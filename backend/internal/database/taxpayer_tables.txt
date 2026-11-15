@@ -1,0 +1,16 @@
+# Tables whose rows belong to one mükellef (taxpayer, docs/01 §2.3: kaynak veri).
+# Every sqlc query that touches one of them must filter on or set taxpayer_id
+# (see taxpayer_queries_test.go), or carry a
+# "-- tenant-lint: cross-taxpayer <reason>" line directly above its "-- name:" line.
+#
+# Office work product about these rows (data_warnings, change_requests) is in
+# tenant_tables.txt with the "engagement" scope instead.
+source_connections
+customers
+customer_source_links
+attachments
+invoices
+invoice_items
+invoice_tax_summaries
+sync_windows
+sync_runs

@@ -62,14 +62,19 @@ type Querier interface {
 	CreateOrganizationInvitation(ctx context.Context, arg CreateOrganizationInvitationParams) (OrganizationInvitation, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
+	CreateSourceConnection(ctx context.Context, arg CreateSourceConnectionParams) (SourceConnection, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWebAuthnCredential(ctx context.Context, arg CreateWebAuthnCredentialParams) (WebauthnCredential, error)
 	// Self-service account deletion: keep every row, mark the user disabled.
 	DeactivateUser(ctx context.Context, id int64) (User, error)
+	DecideChangeRequest(ctx context.Context, arg DecideChangeRequestParams) (int64, error)
+	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
 	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
+	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
+	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteOAuthAccountByProviderAccount(ctx context.Context, arg DeleteOAuthAccountByProviderAccountParams) error
 	DeleteOAuthAccountByUserProvider(ctx context.Context, arg DeleteOAuthAccountByUserProviderParams) error
@@ -91,9 +96,20 @@ type Querier interface {
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	FindCustomerByIdentityNumber(ctx context.Context, arg FindCustomerByIdentityNumberParams) (Customer, error)
+	FindCustomerBySource(ctx context.Context, arg FindCustomerBySourceParams) (Customer, error)
+	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
+	// 01 §6 kural 1.
+	FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTNParams) ([]Invoice, error)
+	// 01 §6 kural 2: karşı taraf VKN/TCKN + fatura no + tarih.
+	FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInvoicesByPartyNumberDateParams) ([]Invoice, error)
+	// 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
+	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
+	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
+	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
@@ -103,6 +119,8 @@ type Querier interface {
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
+	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
 	GetNotificationByID(ctx context.Context, id int64) (Notification, error)
@@ -123,6 +141,8 @@ type Querier interface {
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
 	GetRoleByUUID(ctx context.Context, argUuid uuid.UUID) (Role, error)
 	GetSecretRecord(ctx context.Context, argUuid uuid.UUID) (GetSecretRecordRow, error)
+	GetSourceConnection(ctx context.Context, arg GetSourceConnectionParams) (SourceConnection, error)
+	GetSourceConnectionBySystem(ctx context.Context, arg GetSourceConnectionBySystemParams) (SourceConnection, error)
 	GetStepupSettings(ctx context.Context) (StepupSetting, error)
 	GetStorageLinkBySlug(ctx context.Context, slug pgtype.Text) (StorageLink, error)
 	GetStorageLinkByTokenHash(ctx context.Context, tokenHash pgtype.Text) (StorageLink, error)
@@ -148,7 +168,12 @@ type Querier interface {
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
+	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
+	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
+	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
+	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) error
+	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
@@ -175,13 +200,19 @@ type Querier interface {
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
+	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
+	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error)
+	ListEntityDataWarnings(ctx context.Context, arg ListEntityDataWarningsParams) ([]DataWarning, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
+	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
+	ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTaxSummariesParams) ([]InvoiceTaxSummary, error)
+	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Email rows stay out of the inbox: their bodies carry one-time codes and
 	// invitation links that must only reach the mailbox, not the account holder.
@@ -189,6 +220,7 @@ type Querier interface {
 	ListOAuthAccountsByUserID(ctx context.Context, userID int64) ([]ListOAuthAccountsByUserIDRow, error)
 	ListOAuthAccountsForUserIDs(ctx context.Context, userIds []int64) ([]ListOAuthAccountsForUserIDsRow, error)
 	ListOAuthProviderSettings(ctx context.Context) ([]OauthProviderSetting, error)
+	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
 	ListOrganizationMembersByOrg(ctx context.Context, arg ListOrganizationMembersByOrgParams) ([]ListOrganizationMembersByOrgRow, error)
 	ListOrganizationMembershipsByUser(ctx context.Context, userID int64) ([]ListOrganizationMembershipsByUserRow, error)
@@ -196,6 +228,7 @@ type Querier interface {
 	// Open invitations (not accepted, not revoked); expired ones are included so
 	// they can be revoked or re-sent.
 	ListPendingOrganizationInvitations(ctx context.Context, arg ListPendingOrganizationInvitationsParams) ([]ListPendingOrganizationInvitationsRow, error)
+	ListPendingSyncWindows(ctx context.Context, arg ListPendingSyncWindowsParams) ([]SyncWindow, error)
 	ListPermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	ListPermissionSlugsByRoleSlug(ctx context.Context, slug string) ([]string, error)
 	ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error)
@@ -209,6 +242,7 @@ type Querier interface {
 	ListRolesForUserIDs(ctx context.Context, userIds []int64) ([]ListRolesForUserIDsRow, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
+	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
 	ListStorageActivity(ctx context.Context, arg ListStorageActivityParams) ([]ListStorageActivityRow, error)
 	ListStorageLinksByKey(ctx context.Context, objectKey string) ([]StorageLink, error)
 	ListStorageSharesByKey(ctx context.Context, objectKey string) ([]ListStorageSharesByKeyRow, error)
@@ -217,6 +251,7 @@ type Querier interface {
 	ListStorageStarsByUser(ctx context.Context, userID int64) ([]StorageStar, error)
 	ListStorageTrash(ctx context.Context, arg ListStorageTrashParams) ([]StorageTrash, error)
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
+	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
@@ -252,6 +287,8 @@ type Querier interface {
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
+	// KDV1 için dönem özeti (yalnızca aktif faturalar).
+	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
@@ -272,12 +309,18 @@ type Querier interface {
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	RewrapSecretRecord(ctx context.Context, arg RewrapSecretRecordParams) (int64, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
+	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
+	SetSourceConnectionCredentialsRef(ctx context.Context, arg SetSourceConnectionCredentialsRefParams) (int64, error)
+	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
+	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
+	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateGitHubAppSettings(ctx context.Context, arg UpdateGitHubAppSettingsParams) (GithubAppSetting, error)
@@ -302,12 +345,18 @@ type Querier interface {
 	UpdateUserTOTPRecoveryHashes(ctx context.Context, arg UpdateUserTOTPRecoveryHashesParams) error
 	UpdateWebAuthnCredentialCounter(ctx context.Context, arg UpdateWebAuthnCredentialCounterParams) error
 	UpdateWebAuthnCredentialName(ctx context.Context, arg UpdateWebAuthnCredentialNameParams) (WebauthnCredential, error)
+	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
+	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
+	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
+	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.
+	UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataWarningParams) (DataWarning, error)
 	// Mobile push devices (Expo) and their pending push tickets.
 	// A token moves to the calling user when the device switches accounts and is
 	// re-enabled on every registration.
 	UpsertPushDevice(ctx context.Context, arg UpsertPushDeviceParams) (PushDevice, error)
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
+	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 }

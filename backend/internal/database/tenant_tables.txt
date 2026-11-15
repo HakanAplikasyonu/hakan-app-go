@@ -17,3 +17,5 @@ organization_invitations
 engagements
 engagement_assignments engagement
 ai_usage_events
+data_warnings engagement
+change_requests engagement
