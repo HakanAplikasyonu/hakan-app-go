@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   Card,
   CardContent,
@@ -7,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { routes } from "@/config/routes";
 import { OfficeRequestsCard } from "@/features/taxpayer-onboarding/components/office-requests-card";
 import { HistorySharesCard } from "@/features/taxpayer/components/history-shares-card";
 import type { TaxpayerContextResponse } from "@/features/taxpayer/services/taxpayer.service";
@@ -42,8 +45,33 @@ export function TaxpayerHome({
             </span>
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-muted-foreground text-sm">
-          {t("taxpayer.home_empty")}
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          {[
+            {
+              href: routes.taxpayer.invoices(context.taxpayer.uuid),
+              title: t("taxpayer.nav_invoices"),
+              text: t("taxpayer.home_invoices"),
+            },
+            {
+              href: routes.taxpayer.receipts(context.taxpayer.uuid),
+              title: t("taxpayer.nav_receipts"),
+              text: t("taxpayer.home_receipts"),
+            },
+            {
+              href: routes.taxpayer.uploads(context.taxpayer.uuid),
+              title: t("taxpayer.nav_uploads"),
+              text: t("taxpayer.home_uploads"),
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="hover:bg-muted/50 rounded-md border p-3 transition-colors"
+            >
+              <div className="font-medium">{item.title}</div>
+              <div className="text-muted-foreground text-sm">{item.text}</div>
+            </Link>
+          ))}
         </CardContent>
       </Card>
       <HistorySharesCard taxpayer={context.taxpayer.uuid} />

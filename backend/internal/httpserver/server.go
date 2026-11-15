@@ -79,6 +79,7 @@ import (
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
+	taxpayerportal "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayerportal"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
 	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
@@ -359,6 +360,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
+	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
+	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, taxpayerportal.NewHandler(deps.Queries, ublSvc))
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)

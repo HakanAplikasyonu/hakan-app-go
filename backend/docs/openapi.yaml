@@ -4739,6 +4739,209 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/invoices:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerInvoices
+      summary: Mükellefin faturaları
+      description: |
+        Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-[0-9]{2}$" } }
+        - { name: direction, in: query, schema: { type: string, enum: [outgoing, incoming] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerInvoicePage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/invoices/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerInvoice
+      summary: Fatura ayrıntısı (satırlar, KDV özeti, kaynaklar)
+      description: |
+        Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerInvoiceDetail"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/receipts:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerReceipts
+      summary: Mükellefin fişleri
+      description: |
+        Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerReceiptPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/uploads:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerUploads
+      summary: Kullanıcının kendi belge yüklemeleri
+      description: |
+        Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJobList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: createTaxpayerUpload
+      summary: E-fatura XML / ZIP yükle
+      description: |
+        Dosya, şirketin aktif ofisi (engagement) adına ofis yüklemesiyle aynı
+        hattan işlenir (XSD, GİB Schematron, eşleme, mükerrer kontrolü). Aktif
+        ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "202":
+          description: Job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJob"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: "`NO_ACTIVE_ENGAGEMENT`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: "`UPLOAD_TOO_LARGE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: "`UNSUPPORTED_FILE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/uploads/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerUpload
+      summary: Yükleme raporu
+      description: |
+        Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJob"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/context:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -9205,6 +9408,127 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EngagementDocumentList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    TaxpayerInvoice:
+      type: object
+      required: [uuid, invoice_number, direction, type, issue_date, period, currency, tax_exclusive_amount, tax_amount, withholding_amount, payable_amount, status, source_system, capture_method]
+      properties:
+        uuid: { type: string, format: uuid }
+        ettn: { type: string }
+        invoice_number: { type: string }
+        direction: { type: string, enum: [outgoing, incoming] }
+        type: { type: string }
+        profile: { type: string }
+        issue_date: { type: string, format: date }
+        period: { type: string }
+        counterparty_name: { type: string }
+        counterparty_tax_id: { type: string }
+        currency: { type: string }
+        tax_exclusive_amount: { type: string, description: Decimal string }
+        tax_amount: { type: string }
+        withholding_amount: { type: string }
+        payable_amount: { type: string }
+        status: { type: string, enum: [draft, active, cancelled] }
+        source_system: { type: string }
+        capture_method: { type: string }
+
+    TaxpayerInvoicePage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/TaxpayerInvoice" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    TaxpayerInvoiceDetail:
+      allOf:
+        - $ref: "#/components/schemas/TaxpayerInvoice"
+        - type: object
+          required: [items, tax_summary, sources]
+          properties:
+            notes: { type: string }
+            items:
+              type: array
+              items:
+                type: object
+                required: [line_no, name, quantity, unit_price, tax_rate, tax_exclusive_amount, tax_amount]
+                properties:
+                  line_no: { type: integer }
+                  name: { type: string }
+                  quantity: { type: string }
+                  unit_code: { type: string }
+                  unit_price: { type: string }
+                  tax_rate: { type: string }
+                  tax_exclusive_amount: { type: string }
+                  tax_amount: { type: string }
+            tax_summary:
+              type: array
+              items:
+                type: object
+                required: [tax_rate, base, vat, withholding]
+                properties:
+                  tax_rate: { type: string }
+                  base: { type: string }
+                  vat: { type: string }
+                  withholding: { type: string }
+            sources:
+              type: array
+              items:
+                type: object
+                required: [source_system, capture_method, match_rule, first_seen_at]
+                properties:
+                  source_system: { type: string }
+                  capture_method: { type: string }
+                  match_rule: { type: string }
+                  first_seen_at: { type: string, format: date-time }
+
+    TaxpayerReceipt:
+      type: object
+      required: [uuid, status, media_type, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report, other] }
+        status: { type: string, enum: [draft, duplicate, failed, approved, rejected] }
+        media_type: { type: string }
+        vendor_name: { type: string }
+        date: { type: string }
+        total_amount: { type: string }
+        error: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TaxpayerReceiptPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/TaxpayerReceipt" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    EnvelopeTaxpayerInvoicePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerInvoicePage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerInvoiceDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerReceiptPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerReceiptPage" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

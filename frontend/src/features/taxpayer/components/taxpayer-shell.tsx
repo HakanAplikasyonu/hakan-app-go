@@ -27,6 +27,7 @@ import {
   type TaxpayerContextResponse,
 } from "@/features/taxpayer/services/taxpayer.service";
 import { ApiError } from "@/lib/api/errors";
+import { TaxpayerNav } from "@/features/taxpayer/components/taxpayer-nav";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -100,6 +101,9 @@ export function TaxpayerShell({
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
           <span className="font-semibold">{context.data.taxpayer.title}</span>
           <CompanySwitcher current={context.data.taxpayer.uuid} />
+        </div>
+        <div className="mx-auto max-w-5xl px-4 pb-2">
+          <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-6">

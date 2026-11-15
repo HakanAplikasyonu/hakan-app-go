@@ -67,3 +67,87 @@ export const taxpayerInvitationService = {
       { body: { token } },
     ),
 };
+
+// --- Mükellef web paneli (issue #39) ----------------------------------------
+
+export type TaxpayerInvoice = components["schemas"]["TaxpayerInvoice"];
+export type TaxpayerInvoicePage = components["schemas"]["TaxpayerInvoicePage"];
+export type TaxpayerInvoiceDetail =
+  components["schemas"]["TaxpayerInvoiceDetail"];
+export type TaxpayerReceipt = components["schemas"]["TaxpayerReceipt"];
+export type TaxpayerReceiptPage = components["schemas"]["TaxpayerReceiptPage"];
+export type TaxpayerUploadJob = components["schemas"]["UBLUploadJob"];
+export type TaxpayerUploadPage = {
+  items: TaxpayerUploadJob[];
+  limit: number;
+  offset: number;
+};
+
+export const taxpayerPanelKeys = {
+  invoices: (uuid: string, filters: Record<string, string | number>) =>
+    ["taxpayer", uuid.toLowerCase(), "invoices", filters] as const,
+  invoice: (uuid: string, invoice: string) =>
+    ["taxpayer", uuid.toLowerCase(), "invoice", invoice] as const,
+  receipts: (uuid: string, offset: number) =>
+    ["taxpayer", uuid.toLowerCase(), "receipts", offset] as const,
+  uploads: (uuid: string) =>
+    ["taxpayer", uuid.toLowerCase(), "uploads"] as const,
+};
+
+function query(params: Record<string, string | number | undefined>) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
+export const taxpayerPanelService = {
+  invoices: (
+    taxpayer: string,
+    params: {
+      period?: string;
+      direction?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) =>
+    taxpayerRequest<TaxpayerInvoicePage>(
+      "GET",
+      `/v1/taxpayer/invoices${query(params)}`,
+      { taxpayer },
+    ),
+  invoice: (taxpayer: string, invoice: string) =>
+    taxpayerRequest<TaxpayerInvoiceDetail>(
+      "GET",
+      `/v1/taxpayer/invoices/${encodeURIComponent(invoice)}`,
+      { taxpayer },
+    ),
+  receipts: (taxpayer: string, params: { limit?: number; offset?: number }) =>
+    taxpayerRequest<TaxpayerReceiptPage>(
+      "GET",
+      `/v1/taxpayer/receipts${query(params)}`,
+      { taxpayer },
+    ),
+  uploads: (taxpayer: string) =>
+    taxpayerRequest<TaxpayerUploadPage>(
+      "GET",
+      `/v1/taxpayer/uploads${query({ limit: 50 })}`,
+      { taxpayer },
+    ),
+  /** Multipart upload; the browser sets the boundary header itself. */
+  async upload(taxpayer: string, file: File): Promise<TaxpayerUploadJob> {
+    const base = apiConfig.baseUrl.replace(/\/$/, "");
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${base}/v1/taxpayer/uploads`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json", [TAXPAYER_HEADER]: taxpayer },
+      body: form,
+    });
+    const payload = await response.json().catch(() => undefined);
+    return unwrap<TaxpayerUploadJob>({ data: payload, response });
+  },
+};
