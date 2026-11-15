@@ -113,7 +113,11 @@ func main() {
 		}
 		notifSvc := notifusecase.New(queries, queueClient, provs, log).WithSecretBox(secretBox)
 		if cfg.Queue.WorkerInProcess {
-			worker = queue.NewWorker(cfg, log, notifSvc.Deliver).
+			// The in-process worker never takes fixed-egress tasks (issue
+			// #45): they must leave from the egress worker's IP.
+			wcfg := cfg
+			wcfg.Queue.WorkerPool = queue.PoolGeneral
+			worker = queue.NewWorker(wcfg, log, notifSvc.Deliver).
 				WithLogPurge(logsSvc.ApplyDueRules)
 			if n, err := notifSvc.ReclaimStuck(ctx, notifusecase.DefaultStuckProcessingMinutes); err != nil {
 				log.Error("notification_reclaim_failed", "error", err)

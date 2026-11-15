@@ -22,6 +22,7 @@ type Config struct {
 	CORS       CORSConfig
 	SMTP       SMTPConfig
 	Queue      QueueConfig
+	Egress     EgressConfig
 	Bulk       BulkConfig
 	Centrifugo CentrifugoConfig
 	Auth       AuthConfig
@@ -275,6 +276,21 @@ type QueueConfig struct {
 	Enabled         bool
 	Concurrency     int
 	WorkerInProcess bool
+	// WorkerPool is all | general | fixed-egress (issue #45).
+	WorkerPool string
+}
+
+// EgressConfig is the fixed outbound IP setup (issue #45).
+type EgressConfig struct {
+	// ProxyURL routes fixed-egress calls through a forward proxy. Empty:
+	// direct from the worker host.
+	ProxyURL string
+	// ExpectedIPs are the allowlisted public IPs to verify.
+	ExpectedIPs []string
+	// CheckURL answers with the caller's public IP as text.
+	CheckURL string
+	// CheckInterval is the period of the IP check.
+	CheckInterval time.Duration
 }
 
 // BulkConfig controls bulk action engine thresholds.
@@ -360,6 +376,13 @@ func Load() (Config, error) {
 			Enabled:         getBool("QUEUE_ENABLED", true),
 			Concurrency:     getInt("QUEUE_CONCURRENCY", 10),
 			WorkerInProcess: getBool("QUEUE_WORKER_INPROCESS", true),
+			WorkerPool:      strings.ToLower(strings.TrimSpace(getEnv("WORKER_POOL", "all"))),
+		},
+		Egress: EgressConfig{
+			ProxyURL:      getEnv("EGRESS_PROXY_URL", ""),
+			ExpectedIPs:   splitCSV(getEnv("EGRESS_EXPECTED_IPS", "")),
+			CheckURL:      getEnv("EGRESS_IP_CHECK_URL", "https://api.ipify.org"),
+			CheckInterval: getDuration("EGRESS_CHECK_INTERVAL", 15*time.Minute),
 		},
 		Bulk: BulkConfig{
 			SyncMax:       getInt("BULK_SYNC_MAX", 50),
@@ -474,6 +497,11 @@ func (c Config) validate() error {
 	}
 	if c.Redis.Addr == "" {
 		return fmt.Errorf("config: REDIS_ADDR is required")
+	}
+	switch c.Queue.WorkerPool {
+	case "", "all", "general", "fixed-egress":
+	default:
+		return fmt.Errorf("config: WORKER_POOL must be all, general or fixed-egress")
 	}
 	if c.Queue.Concurrency <= 0 {
 		return fmt.Errorf("config: QUEUE_CONCURRENCY must be positive")

@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/cache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
@@ -27,6 +28,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
 	bulkadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/egress"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine"
 	ioadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine/adapters"
@@ -155,7 +157,27 @@ func main() {
 	} else {
 		vault = secrets.New(keyring, secrets.NewPGStore(db.New(pool)))
 	}
-	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{}, log)
+	// Sabit çıkış IP'si (#45): entegratör çağrıları fixed-egress havuzunda,
+	// EGRESS_PROXY_URL varsa o vekil üzerinden çıkar. IP denetimi de aynı
+	// istemciyi kullanır, böylece denetlenen yol entegratörün gördüğü yoldur.
+	egressCfg := egress.Config{
+		ProxyURL: cfg.Egress.ProxyURL, ExpectedIPs: cfg.Egress.ExpectedIPs,
+		CheckURL: cfg.Egress.CheckURL, CheckInterval: cfg.Egress.CheckInterval,
+	}
+	egressHTTP, err := egressCfg.HTTPClient(0)
+	if err != nil {
+		log.Error("egress_config_invalid", "error", err)
+		exit(1)
+	}
+	egressRedis, err := cache.NewRedisClient(ctx, cfg.Redis)
+	if err != nil {
+		log.Warn("egress_status_store_unavailable", "error", err)
+	}
+	egressChecker := egress.NewChecker(egressCfg, egressHTTP, egress.NewStore(egressRedis, cfg.App.Env))
+	if cfg.Queue.WorkerPool != queue.PoolGeneral && len(egressCfg.Normalize().ExpectedIPs) == 0 {
+		log.Warn("egress_expected_ips_empty", "detail", "EGRESS_EXPECTED_IPS is empty: the IP check records the IP but cannot alarm")
+	}
+	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{HTTP: egressHTTP}, log)
 
 	worker := queue.NewWorker(cfg, log, notifSvc.Deliver).
 		WithExport(exportSvc.ProcessExport).
@@ -168,6 +190,7 @@ func main() {
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
+		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
 		WithSearch(
@@ -180,33 +203,42 @@ func main() {
 		go searchIndexer.Bootstrap(ctx)
 	}
 
-	scheduler, err := queue.StartLogPurgeScheduler(cfg, log)
-	if err != nil {
-		log.Error("log_purge_scheduler_failed", "error", err)
-		exit(1)
-	}
-	if err := queue.RegisterPushReceiptsSchedule(scheduler); err != nil {
-		log.Error("push_receipts_scheduler_failed", "error", err)
-		exit(1)
-	}
-	if err := queue.RegisterDocTaskRemindersSchedule(scheduler); err != nil {
-		log.Error("doc_task_reminders_scheduler_failed", "error", err)
-		exit(1)
-	}
-	if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
-		log.Error("agents_offline_sweep_scheduler_failed", "error", err)
-		exit(1)
-	}
-	go func() {
-		if err := scheduler.Run(); err != nil {
-			log.Error("log_purge_scheduler_stopped", "error", err)
+	// The fixed-egress pool runs no schedulers: periodic tasks are scheduled
+	// once, by the general (or all) pool, and routed by queue.
+	if cfg.Queue.WorkerPool != queue.PoolFixedEgress {
+		scheduler, err := queue.StartLogPurgeScheduler(cfg, log)
+		if err != nil {
+			log.Error("log_purge_scheduler_failed", "error", err)
+			exit(1)
 		}
-	}()
+		if err := queue.RegisterPushReceiptsSchedule(scheduler); err != nil {
+			log.Error("push_receipts_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterDocTaskRemindersSchedule(scheduler); err != nil {
+			log.Error("doc_task_reminders_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
+			log.Error("agents_offline_sweep_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {
+			log.Error("egress_check_scheduler_failed", "error", err)
+			exit(1)
+		}
+		go func() {
+			if err := scheduler.Run(); err != nil {
+				log.Error("log_purge_scheduler_stopped", "error", err)
+			}
+		}()
+	}
 
 	log.Info("worker_started",
 		"app", cfg.App.Name,
 		"env", cfg.App.Env,
 		"concurrency", cfg.Queue.Concurrency,
+		"pool", cfg.Queue.WorkerPool,
 	)
 
 	if n, err := notifSvc.ReclaimStuck(ctx, notifusecase.DefaultStuckProcessingMinutes); err != nil {

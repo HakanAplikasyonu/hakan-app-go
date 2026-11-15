@@ -10,7 +10,8 @@ import (
 )
 
 // TaskEntegratorSync runs one integrator sync of a source connection (issue
-// #40, 30 §7). It runs on QueueImports; the run itself takes a per-connection
+// #40, 30 §7). It runs on QueueFixedEgress (EntegratorSyncOptions, issue
+// #45): integrators allowlist the caller IP. The run itself takes a per-connection
 // lock, so duplicate tasks end with entegrator.ErrBusy.
 const TaskEntegratorSync = "app:entegrator:sync"
 

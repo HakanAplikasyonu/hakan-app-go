@@ -110,6 +110,13 @@ x-backend-environment: &backend-environment
   QUEUE_ENABLED: ${QUEUE_ENABLED:-true}
   QUEUE_WORKER_INPROCESS: "false"
   QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY:-10}
+  # Sabit çıkış IP'si (issue #45). WORKER_POOL: all | general | fixed-egress.
+  # worker-egress profili açılınca ana worker'da WORKER_POOL=general yapın.
+  WORKER_POOL: ${WORKER_POOL:-all}
+  EGRESS_PROXY_URL: ${EGRESS_PROXY_URL:-}
+  EGRESS_EXPECTED_IPS: ${EGRESS_EXPECTED_IPS:-}
+  EGRESS_IP_CHECK_URL: ${EGRESS_IP_CHECK_URL:-https://api.ipify.org}
+  EGRESS_CHECK_INTERVAL: ${EGRESS_CHECK_INTERVAL:-15m}
   BULK_SYNC_MAX: ${BULK_SYNC_MAX:-}
   BULK_ROLLBACK_HOURS: ${BULK_ROLLBACK_HOURS:-}
   VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -362,6 +369,37 @@ services:
       centrifugo:
         condition: service_healthy
       meilisearch:
+        condition: service_healthy
+    stop_grace_period: 35s
+    restart: unless-stopped
+    networks:
+      - app
+
+  # Sabit çıkış IP'li worker havuzu (issue #45, D4). Entegratör ve banka
+  # çağrıları "fixed-egress" kuyruğunda yalnızca bu serviste çalışır ve
+  # entegratörün allowlist'indeki IP'den çıkar. İki kurulum yolu var:
+  #   1. Bu servisi çıkış IP'si sabit bir sunucuda çalıştırın (Dokploy uzak
+  #      sunucu / ayrı node), EGRESS_PROXY_URL boş kalsın.
+  #   2. Bu sunucuda çalıştırın, çağrılar sabit IP'li bir ileri vekilden
+  #      (squid / tinyproxy / socks5) çıksın: EGRESS_PROXY_URL=http://...
+  # İki durumda da EGRESS_EXPECTED_IPS'e allowlist'teki IP'yi yazın; IP
+  # değişirse egress denetimi düşer (log + Sentry) ve
+  # GET /v1/platform/egress durumu gösterir.
+  # Açmak için: COMPOSE_PROFILES=fixed-egress ve ana worker'da
+  # WORKER_POOL=general.
+  worker-egress:
+    <<: *backend-image
+    profiles: ["fixed-egress"]
+    container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-worker-egress
+    environment:
+      <<: *backend-environment
+      APP_ROLE: worker
+      AUTO_MIGRATE: "false"
+      WORKER_POOL: fixed-egress
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
         condition: service_healthy
     stop_grace_period: 35s
     restart: unless-stopped
