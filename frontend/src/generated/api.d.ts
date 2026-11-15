@@ -2413,6 +2413,255 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/warning-rules": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Warning rule configuration (office)
+         * @description Requires `tenant.warnings.read`. Every warning code (05-uyari-kodlari.md)
+         *     with its catalog default, the office override
+         *     and the effective configuration for the office. Resolution order:
+         *     engagement > office > catalog default; params merge key by key.
+         */
+        get: operations["listOfficeWarningRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/warning-rules/{code}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Override a warning rule (office)
+         * @description Requires `tenant.warning_rules.write`. Null / omitted fields inherit
+         *     from the level below. `params` keys must exist in the code's default
+         *     params; values are decimal strings, numbers or null (null = threshold
+         *     not set: the check does not run).
+         */
+        put: operations["setOfficeWarningRule"];
+        post?: never;
+        /**
+         * Remove a warning rule override (office)
+         * @description Requires `tenant.warning_rules.write`. 404 when there is no override.
+         */
+        delete: operations["resetOfficeWarningRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warning-rules": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Warning rule configuration (engagement)
+         * @description Requires `tenant.warnings.read`. Every warning code (05-uyari-kodlari.md)
+         *     with its catalog default, the office override, the engagement override
+         *     and the effective configuration for one engagement (taxpayer); requires `tenant.engagements.read` and engagement access as well. Resolution order:
+         *     engagement > office > catalog default; params merge key by key.
+         */
+        get: operations["listEngagementWarningRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warning-rules/{code}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Override a warning rule (engagement)
+         * @description Requires `tenant.warning_rules.write`. Null / omitted fields inherit
+         *     from the level below. `params` keys must exist in the code's default
+         *     params; values are decimal strings, numbers or null (null = threshold
+         *     not set: the check does not run).
+         */
+        put: operations["setEngagementWarningRule"];
+        post?: never;
+        /**
+         * Remove a warning rule override (engagement)
+         * @description Requires `tenant.warning_rules.write`. 404 when there is no override.
+         */
+        delete: operations["resetEngagementWarningRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/warnings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data warnings of the office
+         * @description Requires `tenant.warnings.read`. Without `tenant.engagements.read_all`
+         *     only engagements assigned to the caller are listed. Ordered blocker,
+         *     warning, info, then most recently updated.
+         */
+        get: operations["listOfficeWarnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warnings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Data warnings of one engagement
+         * @description Requires `tenant.warnings.read`, `tenant.engagements.read` and engagement access.
+         */
+        get: operations["listEngagementWarnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                warningUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark an open warning acknowledged
+         * @description Requires `tenant.warnings.write` and engagement access. Only an open
+         *     warning can be decided; the decision (who, when) is stored on the row.
+         *     A later sync with the same condition does not reopen it.
+         */
+        post: operations["acknowledgeEngagementWarning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                warningUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark an open warning resolved
+         * @description Requires `tenant.warnings.write` and engagement access. Only an open
+         *     warning can be decided; the decision (who, when) is stored on the row.
+         *     A later sync with the same condition does not reopen it.
+         */
+        post: operations["resolveEngagementWarning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invitations/preview": {
         parameters: {
             query?: never;
@@ -2687,6 +2936,106 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["AIPrivacy"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @enum {string} */
+        WarningSeverity: "info" | "warning" | "blocker";
+        WarningRuleLayer: {
+            severity: components["schemas"]["WarningSeverity"] | null;
+            enabled: boolean | null;
+            params: {
+                [key: string]: unknown;
+            };
+        };
+        WarningRule: {
+            /** @example TAX_TOTAL_MISMATCH */
+            code: string;
+            /** @example 3.1 */
+            section: string;
+            entity_types: string[];
+            default: components["schemas"]["WarningRuleLayer"];
+            office: components["schemas"]["WarningRuleLayer"] | null;
+            engagement: components["schemas"]["WarningRuleLayer"] | null;
+            effective: {
+                enabled: boolean;
+                severity: components["schemas"]["WarningSeverity"];
+                params: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        WarningRuleInput: {
+            severity?: components["schemas"]["WarningSeverity"] | null;
+            enabled?: boolean | null;
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        EnvelopeWarningRule: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WarningRule"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeWarningRuleList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["WarningRule"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        DataWarning: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** @example 2026-10 */
+            period: string | null;
+            entity_type: string;
+            /**
+             * Format: uuid
+             * @description Public id of the entity for invoice and customer warnings; null otherwise.
+             */
+            entity_uuid: string | null;
+            /** @example TAX_TOTAL_MISMATCH */
+            code: string;
+            severity: components["schemas"]["WarningSeverity"];
+            params: {
+                [key: string]: unknown;
+            };
+            /** @example control:invoice_totals */
+            producer: string;
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved" | "auto_resolved";
+            /** Format: date-time */
+            resolved_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        EnvelopeDataWarningPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["DataWarning"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeWarningDecision: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** Format: uuid */
+                uuid: string;
+                /** @enum {string} */
+                status: "acknowledged" | "resolved";
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTenantSettings: {
@@ -8228,6 +8577,350 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeWarningRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningRuleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setOfficeWarningRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarningRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Updated rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resetOfficeWarningRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Override removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementWarningRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningRuleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementWarningRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarningRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Updated rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resetEngagementWarningRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Override removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeWarnings: {
+        parameters: {
+            query?: {
+                period?: string;
+                code?: string;
+                severity?: components["schemas"]["WarningSeverity"];
+                status?: "open" | "acknowledged" | "resolved" | "auto_resolved";
+                entity_type?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Warnings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDataWarningPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementWarnings: {
+        parameters: {
+            query?: {
+                period?: string;
+                code?: string;
+                severity?: components["schemas"]["WarningSeverity"];
+                status?: "open" | "acknowledged" | "resolved" | "auto_resolved";
+                entity_type?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Warnings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDataWarningPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acknowledgeEngagementWarning: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                warningUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Decided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningDecision"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    resolveEngagementWarning: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                warningUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Decided */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningDecision"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
