@@ -31,3 +31,29 @@ type Warning struct {
 	LineNo     int            `json:"line_no,omitempty"` // for invoice_item
 	Params     map[string]any `json:"params,omitempty"`
 }
+
+// DefaultSeverity is the fallback level per code when the warning catalog
+// (#13: warning_codes / warning_rule_configs) has no row for it. It mirrors
+// the catalog seed.
+var DefaultSeverity = map[string]string{
+	WarnPartyMismatch:       "blocker",
+	WarnUnmappedTypeCode:    "warning",
+	WarnUnmappedProfile:     "info",
+	WarnUnknownTaxCode:      "warning",
+	WarnLineTaxableMismatch: "warning",
+	WarnTaxTotalMismatch:    "warning",
+	WarnBaseTotalMismatch:   "warning",
+	WarnPayableMismatch:     "warning",
+	WarnHeaderEstimate:      "warning",
+	WarnInvalidTaxID:        "warning",
+	WarnPossibleDuplicate:   "warning",
+	WarnUBLSchematronFail:   "blocker",
+}
+
+// Severity returns the level for code, "warning" when unknown.
+func Severity(code string) string {
+	if s, ok := DefaultSeverity[code]; ok {
+		return s
+	}
+	return "warning"
+}

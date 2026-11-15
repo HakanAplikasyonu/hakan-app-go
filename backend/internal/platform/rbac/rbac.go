@@ -67,6 +67,9 @@ const (
 	PermTenantWarningsRead       = "tenant.warnings.read"
 	PermTenantWarningsWrite      = "tenant.warnings.write"
 	PermTenantWarningRulesWrite  = "tenant.warning_rules.write"
+	// Fatura okuma ve UBL yükleme (issue #11).
+	PermTenantInvoicesRead  = "tenant.invoices.read"
+	PermTenantInvoicesWrite = "tenant.invoices.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

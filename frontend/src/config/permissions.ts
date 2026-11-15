@@ -58,6 +58,8 @@ export const Permission = {
   TenantEngagementsRead: "tenant.engagements.read",
   TenantEngagementsWrite: "tenant.engagements.write",
   TenantEngagementsReadAll: "tenant.engagements.read_all",
+  TenantInvoicesRead: "tenant.invoices.read",
+  TenantInvoicesWrite: "tenant.invoices.write",
 } as const;
 
 export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
