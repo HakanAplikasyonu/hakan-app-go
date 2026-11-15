@@ -2386,6 +2386,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Documents (invoices) the engagement may see
+         * @description Requires `tenant.engagements.read`. Runs under Postgres RLS. An
+         *     engagement sees documents dated in its own period; documents from
+         *     before it started only with the mükellef's history consent (or when
+         *     the company never had another office); nothing dated on or after it
+         *     ended. An ended engagement is readable only while its archive window
+         *     is open (`engagement_archive_days` in the office settings, default 0).
+         */
+        get: operations["getTenantEngagementDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/history-shares": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * History consents granted to this engagement
+         * @description Requires `tenant.engagements.read`.
+         */
+        get: operations["getTenantEngagementHistoryShares"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/end": {
         parameters: {
             query?: never;
@@ -3039,6 +3100,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/history-shares": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The company's history-sharing consents
+         * @description Owners only. Newest first; revoked records stay listed.
+         */
+        get: operations["getTaxpayerHistoryShares"];
+        put?: never;
+        /**
+         * Share data from before the current office
+         * @description Owners only. Opens documents dated before the current (active)
+         *     engagement started to that office, optionally within
+         *     `from_date`..`to_date` (inclusive, YYYY-MM-DD). `409` when the
+         *     company has no active office.
+         */
+        post: operations["postTaxpayerHistoryShare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/history-shares/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Take a consent back
+         * @description Owners only. The office loses the shared period at once; the record stays.
+         */
+        delete: operations["deleteTaxpayerHistoryShare"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer-invitations/preview": {
         parameters: {
             query?: never;
@@ -3077,6 +3200,146 @@ export interface paths {
          *     invitation token like an office one.
          */
         post: operations["acceptTaxpayerInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/invoices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mükellefin faturaları
+         * @description Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+         */
+        get: operations["listTaxpayerInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/invoices/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Fatura ayrıntısı (satırlar, KDV özeti, kaynaklar)
+         * @description Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+         */
+        get: operations["getTaxpayerInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/receipts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mükellefin fişleri
+         * @description Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+         */
+        get: operations["listTaxpayerReceipts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/uploads": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kullanıcının kendi belge yüklemeleri
+         * @description Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+         */
+        get: operations["listTaxpayerUploads"];
+        put?: never;
+        /**
+         * E-fatura XML / ZIP yükle
+         * @description Dosya, şirketin aktif ofisi (engagement) adına ofis yüklemesiyle aynı
+         *     hattan işlenir (XSD, GİB Schematron, eşleme, mükerrer kontrolü). Aktif
+         *     ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+         */
+        post: operations["createTaxpayerUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/uploads/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Yükleme raporu
+         * @description Mükellef web paneli (issue #39). Yalnızca `X-Taxpayer` ile seçilen şirketin verisi döner.
+         */
+        get: operations["getTaxpayerUpload"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4144,6 +4407,122 @@ export interface paths {
          *     from another channel keeps it and re-picks its primary source.
          */
         delete: operations["undoTenantBankStatementImport"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/imports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Account plan import history (newest first; the first per target is active)
+         * @description Requires `tenant.account_plan.read` and an active engagement.
+         */
+        get: operations["listEngagementAccountPlanImports"];
+        put?: never;
+        /**
+         * Import the target account plan (Luca hesap planı or mizan, .xlsx / .csv)
+         * @description Requires `tenant.account_plan.write` and an active engagement. The file becomes the engagement's active plan for `target` (default `luca`); the previous version stays in the import history. The header row is detected ("Hesap Kodu", "Hesap Adı"; borç / alacak / bakiye columns mark a trial balance). Codes are normalized to the dotted form (`120 01 001` → `120.01.001`). Legacy `.xls` is rejected.
+         */
+        post: operations["importEngagementAccountPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/accounts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Accounts of the active plan
+         * @description Requires `tenant.account_plan.read`. `q` matches a code prefix or a name substring.
+         */
+        get: operations["listEngagementAccountPlanAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/check": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check account codes against the active plan
+         * @description Requires `tenant.account_plan.read`. Read-only: reports `missing` (not in the plan), `non_leaf` (group accounts with sub-accounts) and `invalid` (not account codes). With no plan loaded `plan_loaded` is false and nothing is reported. The export gate (ACCOUNT_NOT_IN_TARGET_PLAN) uses the same check and raises the warning.
+         */
+        post: operations["checkEngagementAccountCodes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/missing-template": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Excel of accounts to open in Luca (unverified template)
+         * @description Requires `tenant.account_plan.read`. Returns an .xlsx with "Hesap Kodu" and "Hesap Adı" columns. Luca's real template layout is not verified yet (D18); the file says so on its "Bilgi" sheet.
+         */
+        post: operations["downloadMissingAccountsTemplate"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6342,6 +6721,170 @@ export interface components {
             data: components["schemas"]["TaxpayerPendingRequestList"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        HistoryShare: {
+            /** Format: uuid */
+            uuid: string;
+            /** @description Office name (empty in the office's own view) */
+            organization: string;
+            /** Format: date */
+            from_date: string | null;
+            /** Format: date */
+            to_date: string | null;
+            /** Format: date-time */
+            granted_at: string;
+            /** Format: date-time */
+            revoked_at: string | null;
+            active: boolean;
+        };
+        HistoryShareList: {
+            items: components["schemas"]["HistoryShare"][];
+        };
+        CreateHistoryShareRequest: {
+            /**
+             * Format: date
+             * @description Empty or missing means no lower bound
+             */
+            from_date?: string;
+            /**
+             * Format: date
+             * @description Empty or missing means no upper bound
+             */
+            to_date?: string;
+        };
+        EngagementDocument: {
+            /** Format: uuid */
+            uuid: string;
+            invoice_number: string;
+            /** Format: date */
+            issue_date: string;
+            /** @enum {string} */
+            direction: "outgoing" | "incoming";
+            payable_amount: string;
+            currency: string;
+        };
+        EngagementDocumentList: {
+            items: components["schemas"]["EngagementDocument"][];
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EnvelopeHistoryShare: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HistoryShare"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeHistoryShareList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["HistoryShareList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEngagementDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TaxpayerInvoice: {
+            /** Format: uuid */
+            uuid: string;
+            ettn?: string;
+            invoice_number: string;
+            /** @enum {string} */
+            direction: "outgoing" | "incoming";
+            type: string;
+            profile?: string;
+            /** Format: date */
+            issue_date: string;
+            period: string;
+            counterparty_name?: string;
+            counterparty_tax_id?: string;
+            currency: string;
+            /** @description Decimal string */
+            tax_exclusive_amount: string;
+            tax_amount: string;
+            withholding_amount: string;
+            payable_amount: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "cancelled";
+            source_system: string;
+            capture_method: string;
+        };
+        TaxpayerInvoicePage: {
+            items: components["schemas"]["TaxpayerInvoice"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        TaxpayerInvoiceDetail: components["schemas"]["TaxpayerInvoice"] & {
+            notes?: string;
+            items: {
+                line_no: number;
+                name: string;
+                quantity: string;
+                unit_code?: string;
+                unit_price: string;
+                tax_rate: string;
+                tax_exclusive_amount: string;
+                tax_amount: string;
+            }[];
+            tax_summary: {
+                tax_rate: string;
+                base: string;
+                vat: string;
+                withholding: string;
+            }[];
+            sources: {
+                source_system: string;
+                capture_method: string;
+                match_rule: string;
+                /** Format: date-time */
+                first_seen_at: string;
+            }[];
+        };
+        TaxpayerReceipt: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind?: "expense_receipt" | "fuel_receipt" | "z_report" | "other";
+            /** @enum {string} */
+            status: "draft" | "duplicate" | "failed" | "approved" | "rejected";
+            media_type: string;
+            vendor_name?: string;
+            date?: string;
+            total_amount?: string;
+            error?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        TaxpayerReceiptPage: {
+            items: components["schemas"]["TaxpayerReceipt"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        EnvelopeTaxpayerInvoicePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerInvoicePage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerInvoiceDetail: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerInvoiceDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerReceiptPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerReceiptPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeEngagementContext: {
             /** @enum {boolean} */
             success: true;
@@ -6631,6 +7174,77 @@ export interface components {
             } & {
                 [key: string]: string;
             };
+        };
+        AccountPlanImport: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example luca */
+            target: string;
+            /** @enum {string} */
+            source_format: "xlsx" | "csv";
+            /** @enum {string} */
+            source_kind: "account_plan" | "trial_balance";
+            file_name: string;
+            sha256: string;
+            account_count: number;
+            skipped_rows: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        AccountPlanAccount: {
+            /** @example 120.01.001 */
+            code: string;
+            name: string;
+            /** @example 120 */
+            main_code: string;
+            level: number;
+            is_leaf: boolean;
+        };
+        EnvelopeAccountPlanImportResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                import: components["schemas"]["AccountPlanImport"];
+                /** @description 1-based; 0 when no header row was found */
+                header_row: number;
+                duplicates: number;
+                /** @description First 20 rows without a usable account code */
+                skipped: {
+                    row?: number;
+                    value?: string;
+                    reason?: string;
+                }[];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAccountPlanImportList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["AccountPlanImport"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAccountPlanAccountPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["AccountPlanAccount"][];
+                total: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAccountPlanCheck: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                plan_loaded: boolean;
+                import?: components["schemas"]["AccountPlanImport"];
+                missing: string[];
+                non_leaf: string[];
+                invalid: string[];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
     };
     responses: {
@@ -10605,6 +11219,71 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantEngagementDocuments: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementDocumentList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantEngagementHistoryShares: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeHistoryShareList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     endTenantEngagement: {
         parameters: {
             query?: never;
@@ -11567,6 +12246,101 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTaxpayerHistoryShares: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Consents */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeHistoryShareList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTaxpayerHistoryShare: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateHistoryShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeHistoryShare"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTaxpayerHistoryShare: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     previewTaxpayerInvitation: {
         parameters: {
             query?: never;
@@ -11664,6 +12438,280 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerInvoices: {
+        parameters: {
+            query?: {
+                period?: string;
+                direction?: "outgoing" | "incoming";
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvoicePage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvoiceDetail"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerReceipts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerReceiptPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerUploads: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJobList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTaxpayerUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Job accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `NO_ACTIVE_ENGAGEMENT` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `UPLOAD_TOO_LARGE` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `UNSUPPORTED_FILE` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -13281,6 +14329,214 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementAccountPlanImports: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Imports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountPlanImportList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    importEngagementAccountPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @default luca */
+                    target?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountPlanImportResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description File too large (`UPLOAD_TOO_LARGE`) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not .xlsx or .csv (`UNSUPPORTED_FILE`) */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementAccountPlanAccounts: {
+        parameters: {
+            query?: {
+                target?: string;
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountPlanAccountPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    checkEngagementAccountCodes: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default luca */
+                    target?: string;
+                    codes: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Check result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountPlanCheck"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadMissingAccountsTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    accounts: {
+                        code: string;
+                        name?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Spreadsheet */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };
