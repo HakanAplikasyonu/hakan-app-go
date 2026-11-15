@@ -11,6 +11,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0
 	github.com/furkanmeclis/go-ubltr v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider v0.1.0
+	github.com/furkanmeclis/go-ubltr/provider/isnet v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/izibiz v0.1.0
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-webauthn/webauthn v0.12.3
