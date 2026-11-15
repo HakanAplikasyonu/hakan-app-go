@@ -45,6 +45,10 @@ Sonradan verilen kararlar:
 
 | D19 | **Marka kimliği** (yan oturumda hazırlandı):<br>• Logo işareti `docs/brand/logo-mark.svg`: iki dikey sütun (borç/alacak) ve onay çizgisi bir arada "H" harfini oluşturuyor.<br>• Palet boilerplate'in slate tokenları üzerine kurulu: marka mavisi `#1447e6`, onay rengi `#5b8cff`.<br>• Durum renkleri: onaylandı `#009689`, inceleme `#ffb900`, uyarı `#f54900`, engelleyici `#e7000b`.<br>• Fontlar: Geist; tutar, hesap kodu, VKN ve ETTN için Geist Mono.<br>• Kanvas: https://claude.ai/artifact/X3LAbL8LTy645XLYtAL16N<br>• Uygulama ikonları (iOS/Android, Tauri, favicon) kanvasta tanımlı; repoda şimdilik yalnızca logo SVG'si var. |
 
+| D20 | Çalışma düzeni: **her issue için ayrı dal ve PR.** CI yeşilse PR otomatik birleşir ve issue panoda kendiliğinden kapanır. |
+| D21 | Faz 6 işleri (`upstream:boilerplate` etiketli) **önce bu repoda** yazılır, olgunlaşınca boilerplate'e taşınır. D7'yi sıralama açısından değiştirir; hedef yine boilerplate. |
+| D22 | İş takibi GitHub Projects'te: [HAKAN Yol Haritası](https://github.com/orgs/HakanAplikasyonu/projects/1). Pano private, repo public. |
+
 Bütün kararlar verildi. Açık kalan tek dış bağımlılık go-ubltr'nin yeni sürümü (D6).
 
 "HAKAN" yalnızca geliştirme ortamının adı. Ürün adı, GitHub organizasyonu ve modül yolu ayrıca karara bağlanacak (§7, D12).
