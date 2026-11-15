@@ -163,6 +163,7 @@ func (s *Service) vaultOpener(ctx context.Context, conn db.SourceConnection, own
 	return Open(name, provider.Config{
 		Username: cr.Username, Password: cr.Password, APIKey: cr.APIKey,
 		Endpoint: cr.Endpoint, Test: cr.Test, VKN: ownTaxID, Options: cr.Options,
+		HTTP: auditDoer{next: auditHTTP, log: s.log, conn: conn.Uuid, system: conn.SourceSystem, vkn: ownTaxID},
 	})
 }
 
