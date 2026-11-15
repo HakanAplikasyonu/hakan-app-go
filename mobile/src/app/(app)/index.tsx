@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { Button, Card, Screen, Text } from '@/components/ui';
+import { router } from 'expo-router';
+
+import { Button, Card, Chip, Row, Screen, Text } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
 import { initials, kindLabel, roleLabel } from '@/core/auth/taxpayers';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { useColors } from '@/core/theme';
+import { useReceipts } from '@/features/receipts/provider';
+import { QueueBanner } from '@/features/receipts/queue-banner';
+import { openTask, useTasks } from '@/features/tasks/use-tasks';
 
-/** Mükellef ana sayfası. Fiş / Z raporu ve görevler #38 ile gelir. */
+/** Mükellef ana sayfası: fiş çek, görevler, fişlerim. */
 export default function HomeScreen() {
   const { me, taxpayer, taxpayers, switchTaxpayer, signOut } = useAuth();
   const c = useColors();
   const [push, setPush] = useState<PushPermission>('unavailable');
   const [pushBusy, setPushBusy] = useState(false);
+  const { summary, items } = useReceipts();
+  const { tasks } = useTasks();
 
   useEffect(() => {
     getPushPermission().then(setPush);
@@ -62,10 +69,31 @@ export default function HomeScreen() {
         <Text tone="muted">Fişlerinizi ve müşavirinizin istediği belgeleri buradan göndereceksiniz.</Text>
       </View>
 
+      <QueueBanner />
+      <Button title="Fiş / Z raporu çek" onPress={() => router.push('/capture')} />
+
       <Card>
-        <Text variant="heading">Görevler</Text>
-        <Text tone="muted">Müşavirinizin istediği eksik belgeler ve onay bekleyen işler burada listelenecek.</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text variant="heading">Görevler</Text>
+          {tasks.length ? <Chip label={String(tasks.length)} tone="warning" /> : null}
+        </View>
+        {tasks.length === 0 ? <Text tone="muted">Şu an yapmanız gereken bir şey yok.</Text> : null}
+        {tasks.slice(0, 3).map((t) => (
+          <Row key={t.id} title={t.title} subtitle={t.detail || undefined} onPress={() => openTask(t)} />
+        ))}
+        <Button title="Tüm görevler" variant="ghost" onPress={() => router.push('/tasks')} />
       </Card>
+
+      <Row
+        title="Fişlerim"
+        subtitle={
+          items.length
+            ? `${summary.uploaded} gönderildi${summary.waiting + summary.blocked ? ` · ${summary.waiting + summary.blocked} bekliyor` : ''}${summary.failed ? ` · ${summary.failed} hatalı` : ''}`
+            : 'Henüz fiş çekmediniz'
+        }
+        onPress={() => router.push('/receipts')}
+        trailing={<Text tone="muted">›</Text>}
+      />
 
       {push !== 'granted' ? (
         <Card>

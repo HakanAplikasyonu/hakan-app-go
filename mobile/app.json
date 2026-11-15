@@ -33,6 +33,14 @@
       "expo-secure-store",
       "expo-localization",
       [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Fiş ve Z raporu fotoğrafı çekip müşavirinize göndermek için kamera kullanılır.",
+          "photosPermission": "Galerideki fiş fotoğraflarını seçip müşavirinize göndermek için kullanılır.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",
