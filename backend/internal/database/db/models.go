@@ -1546,6 +1546,18 @@ type UserTotp struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type VatCarryForward struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Amount         pgtype.Numeric     `json:"amount"`
+	Note           pgtype.Text        `json:"note"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type WarningCode struct {
 	Code            string             `json:"code"`
 	Section         string             `json:"section"`

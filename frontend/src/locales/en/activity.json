@@ -50,5 +50,7 @@
   "actions.organizations.member_left": "Member left",
   "actions.organizations.invitation_created": "Invitation sent",
   "actions.organizations.invitation_revoked": "Invitation revoked",
-  "actions.organizations.invitation_accepted": "Invitation accepted"
+  "actions.organizations.invitation_accepted": "Invitation accepted",
+  "actions.vat.opening.set": "VAT opening carry-forward set",
+  "actions.vat.opening.delete": "VAT opening carry-forward deleted"
 }

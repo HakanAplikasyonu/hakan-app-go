@@ -101,6 +101,10 @@ const (
 	// Hesap kodu kuralları (issue #25).
 	PermTenantAccountRulesRead  = "tenant.account_rules.read"
 	PermTenantAccountRulesWrite = "tenant.account_rules.write"
+	// KDV erken uyarı (issue #33): tahmini okuma; uyarıyı çalıştırma ve
+	// açılış devreden KDV'si girme.
+	PermTenantVATRead  = "tenant.vat.read"
+	PermTenantVATWrite = "tenant.vat.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

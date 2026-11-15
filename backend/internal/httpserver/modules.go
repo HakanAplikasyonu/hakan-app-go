@@ -26,6 +26,8 @@ import (
 	searchhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/handler"
 	summariesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries"
 	summarieshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/handler"
+	vatforecastmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast"
+	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
 	warningsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -51,6 +53,7 @@ type moduleHandlers struct {
 	doctasks    *doctasksmodule.Handler
 	// accountrules: hesap kodu kural motoru (issue #25).
 	accountrules *accountruleshandler.Handler
+	vat          *vatforecasthandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// taxpayers resolves X-Taxpayer for /v1/taxpayer/* module routes.
@@ -76,5 +79,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
+		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements},
 	}
 }
