@@ -58,6 +58,10 @@ import (
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/qrlogin"
+	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
+	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
+	receiptsreviewlink "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/reviewlink"
+	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
@@ -71,6 +75,7 @@ import (
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
+	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
 	warningsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/usecase"
@@ -395,6 +400,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
 	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries), log)
+	// Appliers are registered by the modules that own suggestion targets.
+	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
+		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{})
+	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
+	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
+		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),
@@ -404,8 +415,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		excel:    excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log)),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))),
-		// Appliers are registered by the modules that own suggestion targets.
-		review:      reviewhandler.New(reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)), activityRec),
+		review:      reviewhandler.New(reviewSvc, activityRec),
+		receipts:    receiptshandler.New(receiptsSvc),
 		engagements: engagementResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)

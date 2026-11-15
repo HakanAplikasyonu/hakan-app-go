@@ -32,6 +32,7 @@ const (
 	BlockToolResult       = "tool_result"
 	BlockThinking         = "thinking"
 	BlockRedactedThinking = "redacted_thinking"
+	BlockImage            = "image"
 )
 
 // Normalized stop reasons.
@@ -60,6 +61,9 @@ type Block struct {
 	ToolUseID string `json:"tool_use_id,omitempty"`
 	Content   string `json:"content,omitempty"`
 	IsError   bool   `json:"is_error,omitempty"`
+	// image (user messages): base64 bytes and their media type
+	// (image/jpeg, image/png, image/webp, image/gif).
+	MediaType string `json:"media_type,omitempty"`
 	// thinking / redacted_thinking (Anthropic only; must be replayed verbatim)
 	Thinking  string `json:"thinking,omitempty"`
 	Signature string `json:"signature,omitempty"`
@@ -74,6 +78,11 @@ type Message struct {
 
 // TextBlock builds a text block.
 func TextBlock(text string) Block { return Block{Type: BlockText, Text: text} }
+
+// ImageBlock builds an image block from base64 data.
+func ImageBlock(mediaType, base64Data string) Block {
+	return Block{Type: BlockImage, MediaType: mediaType, Data: base64Data}
+}
 
 // ToolResultBlock builds a tool_result block.
 func ToolResultBlock(toolUseID, content string, isError bool) Block {

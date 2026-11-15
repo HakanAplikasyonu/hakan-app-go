@@ -433,6 +433,42 @@ type ExcelImportTemplate struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Expense struct {
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	TaxpayerID         int64              `json:"taxpayer_id"`
+	SourceSystem       string             `json:"source_system"`
+	SourceID           string             `json:"source_id"`
+	CaptureMethod      string             `json:"capture_method"`
+	ExpenseDate        pgtype.Date        `json:"expense_date"`
+	Period             pgtype.Text        `json:"period"`
+	Amount             pgtype.Numeric     `json:"amount"`
+	Currency           string             `json:"currency"`
+	TaxRate            pgtype.Numeric     `json:"tax_rate"`
+	TaxExclusiveAmount pgtype.Numeric     `json:"tax_exclusive_amount"`
+	TaxAmount          pgtype.Numeric     `json:"tax_amount"`
+	Description        string             `json:"description"`
+	ReceiptType        string             `json:"receipt_type"`
+	VendorTaxNumber    pgtype.Text        `json:"vendor_tax_number"`
+	VendorName         pgtype.Text        `json:"vendor_name"`
+	ReceiptNumber      pgtype.Text        `json:"receipt_number"`
+	ZReportNumber      pgtype.Text        `json:"z_report_number"`
+	OkcSerialNumber    pgtype.Text        `json:"okc_serial_number"`
+	VehiclePlate       pgtype.Text        `json:"vehicle_plate"`
+	PaymentMethod      pgtype.Text        `json:"payment_method"`
+	IsDeductible       string             `json:"is_deductible"`
+	ApprovalStatus     string             `json:"approval_status"`
+	OcrConfidence      pgtype.Numeric     `json:"ocr_confidence"`
+	OcrFields          []byte             `json:"ocr_fields"`
+	AttachmentID       pgtype.Int8        `json:"attachment_id"`
+	RawPayload         []byte             `json:"raw_payload"`
+	ContentHash        pgtype.Text        `json:"content_hash"`
+	ApprovedBy         pgtype.Int8        `json:"approved_by"`
+	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ExportJob struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -846,6 +882,27 @@ type PushTicket struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type ReceiptCapture struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	UploadedBy     pgtype.Int8        `json:"uploaded_by"`
+	AttachmentID   int64              `json:"attachment_id"`
+	MediaType      string             `json:"media_type"`
+	Kind           pgtype.Text        `json:"kind"`
+	Status         string             `json:"status"`
+	Fields         []byte             `json:"fields"`
+	Model          pgtype.Text        `json:"model"`
+	ExpenseID      pgtype.Int8        `json:"expense_id"`
+	RetailSaleID   pgtype.Int8        `json:"retail_sale_id"`
+	DuplicateOf    pgtype.UUID        `json:"duplicate_of"`
+	Error          pgtype.Text        `json:"error"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RefreshToken struct {
 	ID                 int64              `json:"id"`
 	Uuid               uuid.UUID          `json:"uuid"`
@@ -857,6 +914,34 @@ type RefreshToken struct {
 	IpAddress          *netip.Addr        `json:"ip_address"`
 	ImpersonatorUserID pgtype.Int8        `json:"impersonator_user_id"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+}
+
+type RetailSale struct {
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	TaxpayerID      int64              `json:"taxpayer_id"`
+	SourceSystem    string             `json:"source_system"`
+	SourceID        string             `json:"source_id"`
+	CaptureMethod   string             `json:"capture_method"`
+	SaleDate        pgtype.Date        `json:"sale_date"`
+	Period          pgtype.Text        `json:"period"`
+	ZReportNumber   pgtype.Text        `json:"z_report_number"`
+	OkcSerialNumber pgtype.Text        `json:"okc_serial_number"`
+	SubtotalAmount  pgtype.Numeric     `json:"subtotal_amount"`
+	TaxAmount       pgtype.Numeric     `json:"tax_amount"`
+	TotalAmount     pgtype.Numeric     `json:"total_amount"`
+	Currency        string             `json:"currency"`
+	InvoiceID       pgtype.Int8        `json:"invoice_id"`
+	ApprovalStatus  string             `json:"approval_status"`
+	OcrConfidence   pgtype.Numeric     `json:"ocr_confidence"`
+	OcrFields       []byte             `json:"ocr_fields"`
+	AttachmentID    pgtype.Int8        `json:"attachment_id"`
+	RawPayload      []byte             `json:"raw_payload"`
+	ContentHash     pgtype.Text        `json:"content_hash"`
+	ApprovedBy      pgtype.Int8        `json:"approved_by"`
+	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ReviewSetting struct {
@@ -1102,6 +1187,19 @@ type TaxpayerMember struct {
 	Role       string             `json:"role"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TaxpayerVehicle struct {
+	ID          int64              `json:"id"`
+	Uuid        uuid.UUID          `json:"uuid"`
+	TaxpayerID  int64              `json:"taxpayer_id"`
+	Plate       string             `json:"plate"`
+	Description string             `json:"description"`
+	ValidFrom   pgtype.Date        `json:"valid_from"`
+	ValidTo     pgtype.Date        `json:"valid_to"`
+	CreatedBy   pgtype.Int8        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type UblUploadJob struct {

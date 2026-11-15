@@ -191,6 +191,8 @@ func toAnthropicMessages(in []Message) ([]anthropic.MessageParam, error) {
 				blocks = append(blocks, anthropic.NewThinkingBlock(b.Signature, b.Thinking))
 			case BlockRedactedThinking:
 				blocks = append(blocks, anthropic.NewRedactedThinkingBlock(b.Data))
+			case BlockImage:
+				blocks = append(blocks, anthropic.NewImageBlockBase64(b.MediaType, b.Data))
 			}
 		}
 		if len(blocks) == 0 {

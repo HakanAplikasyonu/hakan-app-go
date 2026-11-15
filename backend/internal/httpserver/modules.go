@@ -11,6 +11,8 @@ import (
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
+	receiptsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts"
+	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
 	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
@@ -31,6 +33,7 @@ type moduleHandlers struct {
 	warnings *warningshandler.Handler
 	review   *reviewhandler.Handler
 	excel    *excelimporthandler.Handler
+	receipts *receiptshandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -48,5 +51,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		warningsmodule.Module{H: h.warnings, Engagements: h.engagements},
 		reviewmodule.Module{H: h.review, Engagements: h.engagements},
 		excelimportmodule.Module{H: h.excel, Engagements: h.engagements},
+		receiptsmodule.Module{H: h.receipts, Engagements: h.engagements},
 	}
 }

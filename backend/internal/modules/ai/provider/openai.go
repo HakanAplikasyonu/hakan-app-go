@@ -38,10 +38,32 @@ func NewOpenAICompatible(cfg Config) *OpenAICompatible {
 func (o *OpenAICompatible) Kind() string { return KindOpenAICompatible }
 
 type oaiMessage struct {
-	Role       string        `json:"role"`
-	Content    *string       `json:"content"`
+	Role    string  `json:"role"`
+	Content *string `json:"content"`
+	// Parts replaces Content with a content array (text + image_url) when set.
+	Parts      []oaiPart     `json:"-"`
 	ToolCalls  []oaiToolCall `json:"tool_calls,omitempty"`
 	ToolCallID string        `json:"tool_call_id,omitempty"`
+}
+
+type oaiPart struct {
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	ImageURL *struct {
+		URL string `json:"url"`
+	} `json:"image_url,omitempty"`
+}
+
+// MarshalJSON writes content as a parts array when Parts is set.
+func (m oaiMessage) MarshalJSON() ([]byte, error) {
+	type plain oaiMessage
+	if len(m.Parts) == 0 {
+		return json.Marshal(plain(m))
+	}
+	return json.Marshal(struct {
+		Role    string    `json:"role"`
+		Content []oaiPart `json:"content"`
+	}{m.Role, m.Parts})
 }
 
 type oaiToolCall struct {
@@ -145,8 +167,15 @@ func (o *OpenAICompatible) buildRequest(req Request, stream bool) oaiRequest {
 			out.Messages = append(out.Messages, msg)
 		case RoleUser:
 			var texts []string
+			var images []oaiPart
 			for _, b := range m.Content {
 				switch b.Type {
+				case BlockImage:
+					p := oaiPart{Type: "image_url"}
+					p.ImageURL = &struct {
+						URL string `json:"url"`
+					}{URL: "data:" + b.MediaType + ";base64," + b.Data}
+					images = append(images, p)
 				case BlockToolResult:
 					content := b.Content
 					if b.IsError {
@@ -157,7 +186,14 @@ func (o *OpenAICompatible) buildRequest(req Request, stream bool) oaiRequest {
 					texts = append(texts, b.Text)
 				}
 			}
-			if len(texts) > 0 {
+			switch {
+			case len(images) > 0:
+				parts := images
+				if len(texts) > 0 {
+					parts = append([]oaiPart{{Type: "text", Text: strings.Join(texts, "\n\n")}}, images...)
+				}
+				out.Messages = append(out.Messages, oaiMessage{Role: "user", Parts: parts})
+			case len(texts) > 0:
 				out.Messages = append(out.Messages, oaiMessage{Role: "user", Content: strPtr(strings.Join(texts, "\n\n"))})
 			}
 		}

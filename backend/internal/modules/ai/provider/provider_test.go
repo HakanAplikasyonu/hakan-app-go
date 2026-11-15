@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -341,5 +342,42 @@ func TestOpenAICompatibleDisableStoreSendsStoreFalse(t *testing.T) {
 	_ = json.Unmarshal(raw, &body)
 	if _, ok := body["store"]; ok {
 		t.Fatalf("store should be omitted when DisableStore is false: %s", raw)
+	}
+}
+
+func TestImageBlocks(t *testing.T) {
+	req := Request{Model: "m", Messages: []Message{{Role: RoleUser, Content: []Block{
+		TextBlock("fişi oku"), ImageBlock("image/jpeg", "QUJD"),
+	}}}}
+	raw, err := json.Marshal(NewOpenAICompatible(Config{BaseURL: "http://x/v1"}).buildRequest(req, false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body struct {
+		Messages []struct {
+			Content []struct {
+				Type     string `json:"type"`
+				Text     string `json:"text"`
+				ImageURL struct {
+					URL string `json:"url"`
+				} `json:"image_url"`
+			} `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatalf("%v: %s", err, raw)
+	}
+	parts := body.Messages[0].Content
+	if len(parts) != 2 || parts[0].Text != "fişi oku" || parts[1].ImageURL.URL != "data:image/jpeg;base64,QUJD" {
+		t.Fatalf("parts = %s", raw)
+	}
+	msgs, err := toAnthropicMessages(req.Messages)
+	if err != nil || len(msgs) != 1 || len(msgs[0].Content) != 2 || msgs[0].Content[1].OfImage == nil {
+		t.Fatalf("anthropic = %+v %v", msgs, err)
+	}
+	// Plain text messages keep the string content.
+	raw, _ = json.Marshal(NewOpenAICompatible(Config{BaseURL: "http://x/v1"}).buildRequest(Request{Model: "m", Messages: []Message{{Role: RoleUser, Content: []Block{TextBlock("a")}}}}, false))
+	if !bytes.Contains(raw, []byte(`"content":"a"`)) {
+		t.Fatalf("text message = %s", raw)
 	}
 }
