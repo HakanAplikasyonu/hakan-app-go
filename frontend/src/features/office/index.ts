@@ -7,3 +7,4 @@ export { ReviewQueuePage } from "./components/review-queue-page";
 export { ReviewStudioPage } from "./components/review-studio";
 export { UploadPage } from "./components/upload-page";
 export { EngagementDocumentsPage } from "./components/engagement-documents-page";
+export { CommandCenterPage } from "./components/command-center";
