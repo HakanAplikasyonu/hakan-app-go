@@ -18,6 +18,10 @@ import (
 // (provider.ListQuery.From/To), which 30 §7 prefers over the invoice date.
 const dateFieldCreated = "created"
 
+// CodeLimitReached marks a one-day window whose listing still filled the
+// LIMIT of an integrator without paging (36 §5.3).
+const CodeLimitReached = "LIMIT_REACHED"
+
 // istanbul is the calendar month boundaries are drawn in.
 var istanbul = func() *time.Location {
 	if l, err := time.LoadLocation("Europe/Istanbul"); err == nil {
@@ -177,12 +181,21 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 		return nil, err
 	}
 	from, to := w.RangeStart.Time, w.RangeEnd.Time
+	prof := listProfile(j.c.Name())
+	limit := j.s.cfg.PageSize
+	if prof.PageSize > 0 {
+		limit = prof.PageSize
+	}
+	// Windows are [from, to); listings take inclusive bounds, often as
+	// dates, so the end moves back by a nanosecond and both are given in
+	// Turkish time.
+	qFrom, qTo := from.In(istanbul), to.Add(-time.Nanosecond).In(istanbul)
 	cursor := w.PageCursor.String
 	for pages := 1; ; pages++ {
 		if err := j.throttle(ctx); err != nil {
 			return nil, err
 		}
-		page, err := j.c.List(ctx, dir, ListQuery{Kind: kind, From: from, To: to, Cursor: cursor, Limit: j.s.cfg.PageSize})
+		page, err := j.c.List(ctx, dir, ListQuery{Kind: kind, From: qFrom, To: qTo, Cursor: cursor, Limit: limit})
 		if err != nil {
 			j.cnt.WindowsFailed++
 			_ = setStatus("failed", repository.Text(cursor), errorJSON(err))
@@ -194,11 +207,21 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 				return nil, err
 			}
 		}
-		if page.Next == "" {
+		wide := to.Sub(from) > j.s.cfg.MinWindow
+		full := prof.NoCursor && page.Next == "" && limit > 0 && len(page.Items) >= limit
+		switch {
+		case full && wide:
+			return j.split(ctx, w, setStatus)
+		case full:
+			// One day still fills the LIMIT: documents may be missing.
+			j.cnt.Windows++
+			j.cnt.LimitReached++
+			info, _ := json.Marshal(map[string]any{"code": CodeLimitReached, "limit": limit})
+			return nil, setStatus("done", pgtype.Text{}, info)
+		case page.Next == "":
 			j.cnt.Windows++
 			return nil, setStatus("done", pgtype.Text{}, nil)
-		}
-		if pages >= j.s.cfg.MaxPagesPerWindow && to.Sub(from) > j.s.cfg.MinWindow {
+		case pages >= j.s.cfg.MaxPagesPerWindow && wide:
 			return j.split(ctx, w, setStatus)
 		}
 		cursor = page.Next
