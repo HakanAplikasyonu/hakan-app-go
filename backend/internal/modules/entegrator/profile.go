@@ -1,6 +1,9 @@
 package entegrator
 
-import "sync"
+import (
+	"sync"
+	"time"
+)
 
 // ListProfile describes how an integrator's listing pages (36 §5.3, 37 §5.3).
 type ListProfile struct {
@@ -16,6 +19,10 @@ type ListProfile struct {
 	// instant (Uyumsoft CreateEndDate, seen in the test system). The extra
 	// hours overlap the next window; indexing is idempotent.
 	EndDateOnly bool
+	// ListGap is the least time between two listing calls of a connection,
+	// for integrators that rate-limit the list endpoint itself (Turkcell:
+	// 6 calls / 15 minutes). Config.RequestGap still applies to every call.
+	ListGap time.Duration
 }
 
 var (

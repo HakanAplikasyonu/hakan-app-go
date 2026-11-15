@@ -68,6 +68,8 @@ github.com/furkanmeclis/go-ubltr/provider/nes v0.1.0 h1:/NKKThDe/vifcbVJ+msaKkF8
 github.com/furkanmeclis/go-ubltr/provider/nes v0.1.0/go.mod h1:sl3wSlO/O0CGQ5v74KhFJC26fAVTztEli5YmHRlZDjU=
 github.com/furkanmeclis/go-ubltr/provider/trendyol v0.1.0 h1:0scPgPoOI7T0mb/iN81oBS+xPHr0ODWvCZ2yw3Ou87Q=
 github.com/furkanmeclis/go-ubltr/provider/trendyol v0.1.0/go.mod h1:9hv6XcfjXLPaNqNFoV0i7do3N4nj0wbhxlbi/NfcBnY=
+github.com/furkanmeclis/go-ubltr/provider/turkcell v0.1.0 h1:oHox+7t2Zo6Ar/ewPLvulkPaWYdrdCrqBPisnmqjFPw=
+github.com/furkanmeclis/go-ubltr/provider/turkcell v0.1.0/go.mod h1:wxzIpjBwh2WYt2vgJ4hvZobDUQAIen1OAzpZUzyleUY=
 github.com/fxamacker/cbor/v2 v2.8.0 h1:fFtUGXUzXPHTIUdne5+zzMPTfffl3RD5qYnkY40vtxU=
 github.com/fxamacker/cbor/v2 v2.8.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/getsentry/sentry-go v0.49.0 h1:Ehejknu1l023Ub7QoRBVLAI7g3Jnhqku4oWx4B4Sh5s=
