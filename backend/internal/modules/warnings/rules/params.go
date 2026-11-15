@@ -42,3 +42,29 @@ func paramDecimal(cfg map[string]engine.Effective, code, key string) (decimal.De
 }
 
 func money(d decimal.Decimal) string { return d.StringFixed(2) }
+
+// paramStrings reads a list-of-strings param (keyword lists). ok=false when
+// absent or null.
+func paramStrings(cfg map[string]engine.Effective, code, key string) ([]string, bool, error) {
+	eff, ok := cfg[code]
+	if !ok {
+		return nil, false, nil
+	}
+	v, ok := eff.Params[key]
+	if !ok || v == nil {
+		return nil, false, nil
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return nil, false, fmt.Errorf("%s.%s: want a list of strings", code, key)
+	}
+	out := make([]string, 0, len(list))
+	for _, x := range list {
+		s, ok := x.(string)
+		if !ok {
+			return nil, false, fmt.Errorf("%s.%s: want a list of strings", code, key)
+		}
+		out = append(out, s)
+	}
+	return out, true, nil
+}

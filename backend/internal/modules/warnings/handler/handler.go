@@ -27,6 +27,7 @@ type Rules interface {
 type Handler struct {
 	rules    Rules
 	warnings Warnings
+	controls ControlRunner
 }
 
 // New builds the handler.

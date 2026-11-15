@@ -50,4 +50,5 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET /v1/tenant/engagements/{engagementUuid}/warnings", read, h.ListEngagementWarnings, eng...)
 	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge", decide, h.AcknowledgeWarning, eng...)
 	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve", decide, h.ResolveWarning, eng...)
+	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/controls/run", decide, h.RunControls, eng...)
 }

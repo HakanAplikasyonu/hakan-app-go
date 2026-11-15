@@ -18,10 +18,10 @@ import (
 
 // Rate limits for the invitation endpoints (per 15 minutes).
 const (
-	limitWindow             = 15 * time.Minute
-	limitPreviewPerIP       = 60
-	limitAcceptPerIP        = 20
-	limitInvitesPerOrg      = 50
+	limitWindow        = 15 * time.Minute
+	limitPreviewPerIP  = 60
+	limitAcceptPerIP   = 20
+	limitInvitesPerOrg = 50
 )
 
 // MemberHandler serves mükellef invitations and the mükellef shell context.

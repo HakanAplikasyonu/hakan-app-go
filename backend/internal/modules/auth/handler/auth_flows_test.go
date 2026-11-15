@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )

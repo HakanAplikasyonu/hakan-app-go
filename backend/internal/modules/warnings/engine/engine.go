@@ -136,7 +136,11 @@ func (e *Engine) WithClock(now func() time.Time) *Engine { e.now = now; return e
 
 // Report is what Apply did.
 type Report struct {
-	Created, Refreshed, Suppressed, Disabled, AutoResolved int
+	Created      int `json:"created"`
+	Refreshed    int `json:"refreshed"`
+	Suppressed   int `json:"suppressed"`
+	Disabled     int `json:"disabled"`
+	AutoResolved int `json:"auto_resolved"`
 }
 
 var producerRe = regexp.MustCompile(`^(adapter:[a-z0-9_]+|ubl_parser|excel_import|sync_engine|control:[a-z0-9_]+)$`)

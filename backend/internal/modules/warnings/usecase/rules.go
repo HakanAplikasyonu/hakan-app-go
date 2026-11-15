@@ -153,12 +153,18 @@ func validate(cur repository.CodeLayers, in SetInput) (engine.Layer, error) {
 		}
 		switch t := v.(type) {
 		case nil, float64:
+		case []any:
+			for _, x := range t {
+				if _, ok := x.(string); !ok {
+					return l, fmt.Errorf("%w: param %q must be a list of strings", ErrInvalid, k)
+				}
+			}
 		case string:
 			if _, err := decimal.NewFromString(t); err != nil {
 				return l, fmt.Errorf("%w: param %q must be a decimal string", ErrInvalid, k)
 			}
 		default:
-			return l, fmt.Errorf("%w: param %q must be a decimal string, a number or null", ErrInvalid, k)
+			return l, fmt.Errorf("%w: param %q must be a decimal string, a number, a list of strings or null", ErrInvalid, k)
 		}
 	}
 	params := in.Params
