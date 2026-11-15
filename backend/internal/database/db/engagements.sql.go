@@ -197,7 +197,7 @@ func (q *Queries) GetEngagementByUUID(ctx context.Context, arg GetEngagementByUU
 
 const getTaxpayerByUUID = `-- name: GetTaxpayerByUUID :one
 
-SELECT id, uuid, created_at, updated_at FROM taxpayers WHERE uuid = $1
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office FROM taxpayers WHERE uuid = $1
 `
 
 // Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
@@ -209,6 +209,10 @@ func (q *Queries) GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Tax
 		&i.Uuid,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Kind,
+		&i.TaxID,
+		&i.Title,
+		&i.TaxOffice,
 	)
 	return i, err
 }

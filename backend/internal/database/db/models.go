@@ -810,6 +810,10 @@ type Taxpayer struct {
 	Uuid      uuid.UUID          `json:"uuid"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	Kind      string             `json:"kind"`
+	TaxID     string             `json:"tax_id"`
+	Title     string             `json:"title"`
+	TaxOffice string             `json:"tax_office"`
 }
 
 type User struct {

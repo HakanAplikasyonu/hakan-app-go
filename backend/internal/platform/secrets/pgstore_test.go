@@ -2,29 +2,20 @@ package secrets
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
-// TestPGStoreDumpAndRotation needs a migrated database:
+// TestPGStoreDumpAndRotation needs a database server (see internal/testdb):
 //
 //	TEST_DATABASE_URL=postgres://… go test ./internal/platform/secrets/ -run PG
 func TestPGStoreDumpAndRotation(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
+	// testdb opens a fresh, migrated database (skips without TEST_DATABASE_URL).
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
+	pool := testdb.Open(t).Pool
 	store := NewPGStore(db.New(pool))
 
 	const user, pass = "pg-test-kullanici", "pg-test-parola-XYZ"

@@ -780,6 +780,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/taxpayers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List taxpayer identities
+         * @description Requires `platform.taxpayers.read`. `q` matches an exact VKN/TCKN or part of the title.
+         */
+        get: operations["getPlatformTaxpayers"];
+        put?: never;
+        /**
+         * Register a taxpayer identity
+         * @description Requires `platform.taxpayers.write`. VKN (10 digits) and TCKN
+         *     (11 digits) are checked with their check-digit algorithms. A legal
+         *     entity needs a VKN. A VKN/TCKN exists once on the platform: a second
+         *     registration answers `409 TAXPAYER_ALREADY_EXISTS`. This answer is
+         *     platform-only; office routes never reveal whether a tax id exists (D1b).
+         */
+        post: operations["postPlatformTaxpayer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/taxpayers/{uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a taxpayer identity
+         * @description Requires `platform.taxpayers.read`.
+         */
+        get: operations["getPlatformTaxpayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update title or tax office
+         * @description Requires `platform.taxpayers.write`. Kind and tax id never change.
+         */
+        patch: operations["patchPlatformTaxpayer"];
+        trace?: never;
+    };
     "/v1/platform/organizations": {
         parameters: {
             query?: never;
@@ -2073,6 +2128,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/taxpayer": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer identity of an active engagement
+         * @description Follows the taxpayer access rule (docs/01 §2.3): only through an
+         *     active engagement of this office, to an assigned member or one with
+         *     `tenant.engagements.read_all`. Once the engagement ends the office
+         *     gets `403`.
+         */
+        get: operations["getTenantEngagementTaxpayer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/end": {
         parameters: {
             query?: never;
@@ -2268,6 +2354,65 @@ export interface paths {
         patch: operations["patchTenantSettings"];
         trace?: never;
     };
+    "/v1/tenant/ai/usage": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office AI cost report
+         * @description Requires `tenant.ai.usage.read`. One row per month x taxpayer x model
+         *     for calls billed to the current organization. Dates are office-local
+         *     (Europe/Istanbul); `to` is inclusive; the range is 1-366 days and
+         *     defaults to the current month. `cost_usd` is an estimate from the model
+         *     price table; calls to models without a known price are counted in
+         *     `unpriced_calls` and add nothing to the cost.
+         */
+        get: operations["getTenantAIUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/ai/privacy": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * AI data-handling statement
+         * @description Requires `tenant.settings.read`. Which providers are configured, whether
+         *     identifiers are masked before leaving the server, and whether each
+         *     provider is bound not to train on the data (and on what basis).
+         */
+        get: operations["getTenantAIPrivacy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invitations/preview": {
         parameters: {
             query?: never;
@@ -2404,6 +2549,79 @@ export interface components {
             settings: {
                 [key: string]: unknown;
             };
+        };
+        AIUsageRow: {
+            /** @example 2026-11 */
+            month: string;
+            /** Format: int64 */
+            taxpayer_id: number | null;
+            model: string;
+            /** Format: int64 */
+            calls: number;
+            /** Format: int64 */
+            fallback_calls: number;
+            /** Format: int64 */
+            unpriced_calls: number;
+            /** Format: int64 */
+            input_tokens: number;
+            /** Format: int64 */
+            output_tokens: number;
+            /** Format: int64 */
+            cache_read_tokens: number;
+            /** Format: int64 */
+            cache_write_tokens: number;
+            /**
+             * @description Decimal, 6 fraction digits
+             * @example 0.012345
+             */
+            cost_usd: string;
+        };
+        AIUsageReport: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            rows: components["schemas"]["AIUsageRow"][];
+            totals: {
+                /** Format: int64 */
+                calls: number;
+                /** Format: int64 */
+                fallback_calls: number;
+                /** Format: int64 */
+                unpriced_calls: number;
+                /** Format: int64 */
+                input_tokens: number;
+                /** Format: int64 */
+                output_tokens: number;
+                cost_usd: string;
+            };
+        };
+        EnvelopeAIUsageReport: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AIUsageReport"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        AIProviderPrivacy: {
+            /** @enum {string} */
+            provider: "anthropic" | "openai_compatible";
+            model: string;
+            no_training: boolean;
+            /** @enum {string} */
+            basis: "anthropic_commercial_terms" | "store_false" | "not_guaranteed" | "unknown";
+        };
+        AIPrivacy: {
+            enabled: boolean;
+            masking: boolean;
+            masked_kinds: ("VKN" | "TCKN" | "IBAN" | "AD")[];
+            primary: components["schemas"]["AIProviderPrivacy"] | null;
+            fallback: components["schemas"]["AIProviderPrivacy"] | null;
+        };
+        EnvelopeAIPrivacy: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AIPrivacy"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTenantSettings: {
             /** @enum {boolean} */
@@ -3520,6 +3738,58 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["EngagementPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        Taxpayer: {
+            /** Format: uuid */
+            uuid: string;
+            /**
+             * @description legal: tüzel kişi; individual: gerçek kişi
+             * @enum {string}
+             */
+            kind: "legal" | "individual";
+            /** @description 10-digit VKN or 11-digit TCKN */
+            tax_id: string;
+            /** @enum {string} */
+            tax_id_type: "vkn" | "tckn";
+            /** @description Unvan or full name */
+            title: string;
+            /** @description Vergi dairesi (may be empty) */
+            tax_office: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        TaxpayerPage: {
+            items: components["schemas"]["Taxpayer"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        CreateTaxpayerRequest: {
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            /** @description VKN (10) or TCKN (11); spaces, dots and dashes are ignored */
+            tax_id: string;
+            title: string;
+            tax_office?: string;
+        };
+        PatchTaxpayerRequest: {
+            title?: string;
+            tax_office?: string;
+        };
+        EnvelopeTaxpayer: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Taxpayer"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerPage"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEngagementContext: {
@@ -5282,6 +5552,122 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getPlatformTaxpayers: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                q?: components["parameters"]["Q"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taxpayer page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postPlatformTaxpayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxpayerRequest"];
+            };
+        };
+        responses: {
+            /** @description Created taxpayer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getPlatformTaxpayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    patchPlatformTaxpayer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchTaxpayerRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
     getPlatformOrganizations: {
@@ -7302,6 +7688,37 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantEngagementTaxpayer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayer"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     endTenantEngagement: {
         parameters: {
             query?: never;
@@ -7625,6 +8042,68 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantAIUsage: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cost report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAIUsageReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantAIPrivacy: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Privacy statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAIPrivacy"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
