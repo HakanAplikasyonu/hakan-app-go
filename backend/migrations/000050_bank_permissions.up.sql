@@ -1,3 +1,6 @@
+-- 000049 numarası #90 (journal_drafts) ile aynı anda alındı; 000050 olarak yeniden
+-- numaralandı. İçerik idempotent (ON CONFLICT, grant_tenant_role_permission),
+-- eski numarayla çalışmış bir veritabanında tekrar çalışması zararsız.
 -- Banka izinleri (#19): ekstre yükleme ve banka hareketleri.
 -- Kural (000044, DATABASE_RULES.md): sahip yeni tenant.* iznini kendiliğinden
 -- alır; diğer rollere grant_tenant_role_permission ile şablon ve ofis
