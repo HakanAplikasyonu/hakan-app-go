@@ -115,6 +115,13 @@ type AppConfig struct {
 // EncryptionConfig holds at-rest secret encryption material.
 type EncryptionConfig struct {
 	Key string
+	// SecretsKeyring is the credential vault's KEK list ("id:base64,id2:base64").
+	// Empty: the vault wraps data keys with Key (KEK id "app"). See
+	// internal/platform/secrets and backend/docs/sir-kasasi.md.
+	SecretsKeyring string
+	// SecretsActiveKeyID picks the KEK for new records and rotation; empty
+	// means the last SecretsKeyring entry (or "app").
+	SecretsActiveKeyID string
 }
 
 type HTTPConfig struct {
@@ -250,7 +257,9 @@ func Load() (Config, error) {
 			Env:  getEnv("APP_ENV", "development"),
 		},
 		Encryption: EncryptionConfig{
-			Key: getEnv("APP_ENCRYPTION_KEY", defaultEncryptionKey),
+			Key:                getEnv("APP_ENCRYPTION_KEY", defaultEncryptionKey),
+			SecretsKeyring:     getEnv("SECRETS_KEYRING", ""),
+			SecretsActiveKeyID: getEnv("SECRETS_ACTIVE_KEY_ID", ""),
 		},
 		HTTP: HTTPConfig{
 			Addr:         getEnv("APP_HTTP_ADDR", ":8080"),
