@@ -98,6 +98,9 @@ const (
 	// Eksik belge görevleri (issue #36).
 	PermTenantDocTasksRead  = "tenant.doc_tasks.read"
 	PermTenantDocTasksWrite = "tenant.doc_tasks.write"
+	// Hesap kodu kuralları (issue #25).
+	PermTenantAccountRulesRead  = "tenant.account_rules.read"
+	PermTenantAccountRulesWrite = "tenant.account_rules.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

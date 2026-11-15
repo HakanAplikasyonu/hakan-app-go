@@ -5,6 +5,8 @@ import (
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	accountplanmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan"
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
+	accountrulesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules"
+	accountruleshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/handler"
 	activitymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
@@ -47,6 +49,8 @@ type moduleHandlers struct {
 	periods     *periodshandler.Handler
 	summaries   *summarieshandler.Handler
 	doctasks    *doctasksmodule.Handler
+	// accountrules: hesap kodu kural motoru (issue #25).
+	accountrules *accountruleshandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// taxpayers resolves X-Taxpayer for /v1/taxpayer/* module routes.
@@ -71,5 +75,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
+		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
 	}
 }

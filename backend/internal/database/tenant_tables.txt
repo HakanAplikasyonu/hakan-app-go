@@ -41,3 +41,5 @@ period_lock_events engagement
 period_summaries engagement
 document_tasks engagement
 document_task_uploads engagement
+account_rules
+account_assignments engagement

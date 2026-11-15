@@ -90,6 +90,8 @@ tags:
     description: Dönem yönetimi (hazırlık durumu, dönem kilidi, kilitli döneme gelen değişiklik talepleri, mükellef × dönem matrisi)
   - name: DocumentTasks
     description: Eksik belge görevleri (bankada var, belgesi yok → mükellefe görev → yükleme → eşleşme)
+  - name: AccountRules
+    description: Account code rules (versioned office template and engagement rules, suggestions, rule candidates)
 paths:
   /healthz:
     get:
@@ -7126,6 +7128,345 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/account-rules:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [AccountRules]
+      operationId: listOfficeAccountRules
+      summary: Office template account code rules
+      description: |
+        Requires `tenant.account_rules.read`. Active rules (with `include_retired`, every version). Office template rules are copied to an engagement when it is opened.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: include_retired, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [AccountRules]
+      operationId: createOfficeAccountRule
+      summary: Create a office template account code rule
+      description: |
+        Requires `tenant.account_rules.write`. Conditions are ANDed; empty conditions match every line. Priority 1..999 (lower first; platform defaults are 1000).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/account-rules/{ruleKey}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: ruleKey, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [AccountRules]
+      operationId: updateOfficeAccountRule
+      summary: Store a new version of a rule
+      description: |
+        Requires `tenant.account_rules.write`. The active version is retired unchanged; suggestions and assignments keep pointing at the version that produced them.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [AccountRules]
+      operationId: retireOfficeAccountRule
+      summary: Retire a rule
+      description: |
+        Requires `tenant.account_rules.write`. The rule stops matching; its versions stay for provenance.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Done }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/account-rules/{ruleKey}/versions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: ruleKey, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [AccountRules]
+      operationId: listOfficeAccountRuleVersions
+      summary: Every version of a rule (newest first)
+      description: |
+        Requires `tenant.account_rules.read`. 
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rules:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountRules]
+      operationId: listEngagementAccountRules
+      summary: Engagement account code rules
+      description: |
+        Requires `tenant.account_rules.read`. Active rules (with `include_retired`, every version). Office template rules are copied to an engagement when it is opened.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: include_retired, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [AccountRules]
+      operationId: createEngagementAccountRule
+      summary: Create a engagement account code rule
+      description: |
+        Requires `tenant.account_rules.write`. Conditions are ANDed; empty conditions match every line. Priority 1..999 (lower first; platform defaults are 1000).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rules/apply-template:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [AccountRules]
+      operationId: applyAccountRuleTemplate
+      summary: Copy missing office template rules to the engagement
+      description: |
+        Requires `tenant.account_rules.write`. Copies the active office template rules the engagement does not have yet.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleCopy" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rules/{ruleKey}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: ruleKey, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [AccountRules]
+      operationId: updateEngagementAccountRule
+      summary: Store a new version of a rule
+      description: |
+        Requires `tenant.account_rules.write`. The active version is retired unchanged; suggestions and assignments keep pointing at the version that produced them.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [AccountRules]
+      operationId: retireEngagementAccountRule
+      summary: Retire a rule
+      description: |
+        Requires `tenant.account_rules.write`. The rule stops matching; its versions stay for provenance.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Done }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rules/{ruleKey}/versions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: ruleKey, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [AccountRules]
+      operationId: listEngagementAccountRuleVersions
+      summary: Every version of a rule (newest first)
+      description: |
+        Requires `tenant.account_rules.read`. 
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rule-candidates:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountRules]
+      operationId: listAccountRuleCandidates
+      summary: Rule candidates (kural yapılsın mı?)
+      description: |
+        Requires `tenant.account_rules.read`. The same counterparty booked to the same line account by the accountant at least 3 times (accepted or corrected suggestions not produced by a rule) and not yet covered by an active rule.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleCandidateList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rule-candidates/promote:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [AccountRules]
+      operationId: promoteAccountRuleCandidate
+      summary: Turn a candidate into an engagement rule
+      description: |
+        Requires `tenant.account_rules.write`. Creates a line rule with origin `candidate`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRulePromoteInput" }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/account-suggestions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [AccountRules]
+      operationId: suggestInvoiceAccounts
+      summary: Suggest account codes for an invoice
+      description: |
+        Requires `tenant.review.decide`. Runs the rules for every line (line and VAT account) and the counterparty (cari account, found by name in the target plan or proposed under 120 / 320) and submits each to the review queue (kind `account_code`) with confidence, rationale and provenance (`rule_ref` = rule version, `history:counterparty` or `global:*`). Suggestions at or above the threshold are applied at once. Fields that already have a code are skipped.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountSuggestionList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -11133,4 +11474,139 @@ components:
             upload: { $ref: "#/components/schemas/DocumentTaskUpload" }
             matched: { type: boolean }
             warning_resolved: { type: boolean }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    AccountRuleConditions:
+      type: object
+      properties:
+        direction: { type: string, enum: [incoming, outgoing] }
+        invoice_type: { type: string, examples: [SATIS, IADE] }
+        counterparty_tax_id: { type: string, description: VKN or TCKN }
+        counterparty_name_contains: { type: string }
+        item_name_contains: { type: array, items: { type: string }, maxItems: 20 }
+        line_type: { type: string, enum: [goods, service, fixed_asset_candidate, discount, expense, unknown] }
+        tax_rate: { type: string, examples: ["20"] }
+
+    AccountRuleInput:
+      type: object
+      required: [account_code]
+      properties:
+        role: { type: string, enum: [line, vat, counterparty], default: line }
+        priority: { type: integer, minimum: 1, maximum: 999, default: 100 }
+        name: { type: string, maxLength: 200 }
+        conditions: { $ref: "#/components/schemas/AccountRuleConditions" }
+        account_code: { type: string, examples: ["770.01"] }
+        confidence: { type: string, description: "0..1; default 0.96" }
+
+    AccountRule:
+      type: object
+      required: [uuid, rule_key, version, status, scope, role, priority, name, conditions, account_code, confidence, origin, created_at]
+      properties:
+        uuid: { type: string, format: uuid, description: This version }
+        rule_key: { type: string, format: uuid, description: Stable id across versions }
+        version: { type: integer }
+        status: { type: string, enum: [active, retired] }
+        scope: { type: string, enum: [office, engagement] }
+        role: { type: string, enum: [line, vat, counterparty] }
+        priority: { type: integer }
+        name: { type: string }
+        conditions: { $ref: "#/components/schemas/AccountRuleConditions" }
+        account_code: { type: string }
+        confidence: { type: string }
+        origin: { type: string, enum: [manual, candidate, template] }
+        created_at: { type: string, format: date-time }
+        retired_at: { type: string, format: date-time }
+
+    AccountRuleCandidate:
+      type: object
+      properties:
+        counterparty_key: { type: string, description: "VKN/TCKN, or name:<folded name>" }
+        counterparty_name: { type: string }
+        direction: { type: string }
+        account_code: { type: string }
+        decisions: { type: integer }
+        last_decided_at: { type: string, format: date-time }
+        question: { type: string }
+
+    AccountRulePromoteInput:
+      type: object
+      required: [counterparty_key, account_code]
+      properties:
+        counterparty_key: { type: string }
+        counterparty_name: { type: string }
+        direction: { type: string, enum: [incoming, outgoing] }
+        account_code: { type: string }
+
+    AccountSuggestion:
+      type: object
+      properties:
+        uuid: { type: string, format: uuid }
+        target_type: { type: string, enum: [invoice_item, customer] }
+        target_field: { type: string, enum: [account_code, vat_account_code] }
+        line_no: { type: integer }
+        account_code: { type: string }
+        confidence: { type: string }
+        status: { type: string }
+        rationale: { type: string }
+        rule_ref: { type: string }
+
+    EnvelopeAccountRule:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAccountRuleList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AccountRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAccountRuleCandidateList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AccountRuleCandidate" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAccountSuggestionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/AccountSuggestion" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAccountRuleCopy:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          properties:
+            copied: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
