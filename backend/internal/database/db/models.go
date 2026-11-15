@@ -652,6 +652,18 @@ type RefreshToken struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 }
 
+type ReviewSetting struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	AutoAccept     pgtype.Bool        `json:"auto_accept"`
+	Threshold      pgtype.Numeric     `json:"threshold"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Role struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -771,6 +783,51 @@ type StorageTrash struct {
 	DeletedBy   pgtype.Int8        `json:"deleted_by"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+}
+
+type Suggestion struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	Kind             string             `json:"kind"`
+	TargetType       string             `json:"target_type"`
+	TargetID         pgtype.Int8        `json:"target_id"`
+	TargetField      string             `json:"target_field"`
+	Period           pgtype.Text        `json:"period"`
+	ProposedValue    []byte             `json:"proposed_value"`
+	Confidence       pgtype.Numeric     `json:"confidence"`
+	Rationale        string             `json:"rationale"`
+	Origin           string             `json:"origin"`
+	SourceEntityType pgtype.Text        `json:"source_entity_type"`
+	SourceEntityID   pgtype.Int8        `json:"source_entity_id"`
+	RuleRef          pgtype.Text        `json:"rule_ref"`
+	Model            pgtype.Text        `json:"model"`
+	AiUsageEventID   pgtype.Int8        `json:"ai_usage_event_id"`
+	Inputs           []byte             `json:"inputs"`
+	Status           string             `json:"status"`
+	AppliedValue     []byte             `json:"applied_value"`
+	PreviousValue    []byte             `json:"previous_value"`
+	RuleCandidate    bool               `json:"rule_candidate"`
+	DecidedBy        pgtype.Int8        `json:"decided_by"`
+	DecidedAt        pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SuggestionDecision struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	SuggestionID   int64              `json:"suggestion_id"`
+	Action         string             `json:"action"`
+	ActorUserID    pgtype.Int8        `json:"actor_user_id"`
+	Reason         string             `json:"reason"`
+	Value          []byte             `json:"value"`
+	Confidence     pgtype.Numeric     `json:"confidence"`
+	Threshold      pgtype.Numeric     `json:"threshold"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type SyncRun struct {

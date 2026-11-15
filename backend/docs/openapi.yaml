@@ -61,6 +61,8 @@ tags:
     description: Mükellef kullanıcıları (ofis daveti, `X-Taxpayer` başlığı ile mükellef kabuğu). `TENANCY_ENABLED`.
   - name: Warnings
     description: Warning engine (05-uyari-kodlari.md) rule configuration and warnings
+  - name: Review
+    description: Review queue (suggestions, provenance, decisions, thresholds)
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -4282,6 +4284,351 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/review/suggestions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listOfficeSuggestions
+      summary: Office review queue
+      description: |
+        Requires `tenant.review.read`. Pending suggestions by default, lowest confidence first. Without `tenant.engagements.read_all` only assigned engagements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
+        - { name: kind, in: query, required: false, schema: { type: string } }
+        - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestionPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: getOfficeReviewSettings
+      summary: Office review thresholds
+      description: |
+        Requires `tenant.review.read`. Auto-accept policy. Resolution per field: engagement+kind, engagement+*, office+kind, office+*, default (on, 0.95).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReviewSettings"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Review]
+      operationId: putOfficeReviewSetting
+      summary: Set an office review threshold
+      description: |
+        Requires `tenant.review.settings.write`. kind `*` = every kind; null fields inherit.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewSettingInput"
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReviewSettings"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/settings/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: kind, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Review]
+      operationId: deleteOfficeReviewSetting
+      summary: Remove an office review threshold
+      description: |
+        Requires `tenant.review.settings.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Review]
+      operationId: listEngagementSuggestions
+      summary: Engagement review queue
+      description: |
+        Requires `tenant.review.read`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
+        - { name: kind, in: query, required: false, schema: { type: string } }
+        - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestionPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Review]
+      operationId: getEngagementSuggestion
+      summary: Suggestion with provenance and decision log
+      description: |
+        Requires `tenant.review.read`. Decisions list who, when and why, oldest first.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestionDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Review]
+      operationId: acceptEngagementSuggestion
+      summary: Accept a suggestion
+      description: |
+        Requires `tenant.review.decide`. Applies the proposed value (pending only). 409 when the kind has no applier. The decision is logged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestionDecisionInput"
+      responses:
+        "200":
+          description: Updated suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestion"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Review]
+      operationId: rejectEngagementSuggestion
+      summary: Reject a suggestion
+      description: |
+        Requires `tenant.review.decide`. Closes a pending suggestion without applying it. `reason` is required. The decision is logged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestionDecisionInput"
+      responses:
+        "200":
+          description: Updated suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestion"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/correct:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Review]
+      operationId: correctEngagementSuggestion
+      summary: Correct a suggestion
+      description: |
+        Requires `tenant.review.decide`. Applies `value` instead (pending or applied suggestions) and marks the suggestion as a rule candidate. `reason` is required. The decision is logged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestionDecisionInput"
+      responses:
+        "200":
+          description: Updated suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestion"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/revert:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Review]
+      operationId: revertEngagementSuggestion
+      summary: Revert a suggestion
+      description: |
+        Requires `tenant.review.decide`. Undoes an applied suggestion (auto_accepted, accepted, corrected) by restoring the value from before the first application. `reason` is required. The decision is logged.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SuggestionDecisionInput"
+      responses:
+        "200":
+          description: Updated suggestion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestion"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/review-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Review]
+      operationId: getEngagementReviewSettings
+      summary: Engagement review thresholds
+      description: |
+        Requires `tenant.review.read`. Auto-accept policy. Resolution per field: engagement+kind, engagement+*, office+kind, office+*, default (on, 0.95).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReviewSettings"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Review]
+      operationId: putEngagementReviewSetting
+      summary: Set an engagement review threshold
+      description: |
+        Requires `tenant.review.settings.write`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewSettingInput"
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReviewSettings"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/review-settings/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: kind, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Review]
+      operationId: deleteEngagementReviewSetting
+      summary: Remove an engagement review threshold
+      description: |
+        Requires `tenant.review.settings.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -4910,6 +5257,140 @@ components:
           properties:
             uuid: { type: string, format: uuid }
             status: { type: string, enum: [acknowledged, resolved] }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    Suggestion:
+      type: object
+      required: [uuid, kind, target_type, target_id, target_field, period, proposed_value, confidence, rationale, provenance, status, applied_value, previous_value, rule_candidate, decided_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        kind: { type: string, example: account_code }
+        target_type: { type: string, example: invoice_item }
+        target_id: { type: [integer, "null"], format: int64 }
+        target_field: { type: string }
+        period: { type: [string, "null"] }
+        proposed_value: {}
+        confidence: { type: string, example: "0.8700" }
+        rationale: { type: string }
+        provenance:
+          type: object
+          required: [origin, inputs]
+          properties:
+            origin: { type: string, enum: [document, rule, model, input] }
+            source_entity_type: { type: string }
+            source_entity_id: { type: integer, format: int64 }
+            rule_ref: { type: string }
+            model: { type: string }
+            inputs: { type: object, additionalProperties: true }
+        status: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded] }
+        applied_value: {}
+        previous_value: {}
+        rule_candidate: { type: boolean }
+        decided_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    SuggestionDecision:
+      type: object
+      required: [action, actor_uuid, reason, value, confidence, threshold, created_at]
+      properties:
+        action: { type: string, enum: [auto_accept, accept, reject, correct, revert, supersede] }
+        actor_uuid: { type: [string, "null"], format: uuid, description: null for automatic decisions }
+        reason: { type: string }
+        value: {}
+        confidence: { type: string }
+        threshold: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+
+    SuggestionDecisionInput:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: { type: string }
+        value: { description: "correct only: the value to apply" }
+
+    ReviewPolicy:
+      type: object
+      required: [auto_accept, threshold]
+      properties:
+        auto_accept: { type: boolean }
+        threshold: { type: string }
+
+    ReviewSettingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        kind: { type: string, default: "*" }
+        auto_accept: { type: [boolean, "null"] }
+        threshold: { type: [string, "null"], example: "0.95" }
+
+    ReviewSettings:
+      type: object
+      required: [rows, default, effective]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [level, kind, auto_accept, threshold]
+            properties:
+              level: { type: string, enum: [office, engagement] }
+              kind: { type: string }
+              auto_accept: { type: [boolean, "null"] }
+              threshold: { type: [string, "null"] }
+        default: { $ref: "#/components/schemas/ReviewPolicy" }
+        effective:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ReviewPolicy" }
+
+    EnvelopeSuggestion:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Suggestion" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeSuggestionDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          allOf:
+            - $ref: "#/components/schemas/Suggestion"
+            - type: object
+              required: [decisions]
+              properties:
+                decisions:
+                  type: array
+                  items: { $ref: "#/components/schemas/SuggestionDecision" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeSuggestionPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Suggestion" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeReviewSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ReviewSettings" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:
