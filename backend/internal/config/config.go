@@ -32,10 +32,34 @@ type Config struct {
 	Search     SearchConfig
 	Sentry     SentryConfig
 	Tenancy    TenancyConfig
+	AI         AIConfig
 }
 
 // TenancyConfig controls organizations (the multi-tenant shell). See
 // docs/design/tenant-core.md.
+// AIConfig configures the AI module (internal/modules/ai). The primary
+// provider is Anthropic; the fallback is optional and used only when the
+// primary call fails. Keys come from the environment only.
+type AIConfig struct {
+	Provider string
+	APIKey   string
+	BaseURL  string
+	Model    string
+
+	FallbackProvider string
+	FallbackAPIKey   string
+	FallbackBaseURL  string
+	FallbackModel    string
+
+	// Masking replaces VKN, TCKN, IBAN and known names before a request
+	// leaves the server. Turning it off is for local debugging only.
+	Masking bool
+	// DisableProviderStore sends store=false to OpenAI-compatible providers
+	// (no retention for evals / training).
+	DisableProviderStore bool
+	MaxTokens            int
+}
+
 type TenancyConfig struct {
 	// Enabled mounts the /v1/tenant routes. Off = single-scope app.
 	Enabled bool
@@ -366,6 +390,19 @@ func Load() (Config, error) {
 			SelfServe: getBool("TENANCY_SELF_SERVE", false),
 			CacheTTL:  getDuration("TENANCY_CACHE_TTL", 60*time.Second),
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
+		},
+		AI: AIConfig{
+			Provider:             getEnv("AI_PROVIDER", "anthropic"),
+			APIKey:               getEnv("AI_API_KEY", ""),
+			BaseURL:              getEnv("AI_BASE_URL", ""),
+			Model:                getEnv("AI_MODEL", "claude-opus-5-5"),
+			FallbackProvider:     getEnv("AI_FALLBACK_PROVIDER", ""),
+			FallbackAPIKey:       getEnv("AI_FALLBACK_API_KEY", ""),
+			FallbackBaseURL:      getEnv("AI_FALLBACK_BASE_URL", ""),
+			FallbackModel:        getEnv("AI_FALLBACK_MODEL", ""),
+			Masking:              getBool("AI_MASKING", true),
+			DisableProviderStore: getBool("AI_DISABLE_PROVIDER_STORE", true),
+			MaxTokens:            getInt("AI_MAX_TOKENS", 4096),
 		},
 	}
 

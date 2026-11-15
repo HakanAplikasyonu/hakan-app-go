@@ -61,6 +61,7 @@ const (
 	// PermTenantEngagementsReadAll reaches every engagement of the office
 	// without an assignment (issue #2).
 	PermTenantEngagementsReadAll = "tenant.engagements.read_all"
+	PermTenantAIUsageRead        = "tenant.ai.usage.read"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

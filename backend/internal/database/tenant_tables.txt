@@ -16,3 +16,4 @@ organization_members
 organization_invitations
 engagements
 engagement_assignments engagement
+ai_usage_events

@@ -17,6 +17,9 @@ import (
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	activityusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/usecase"
+	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
+	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
+	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
 	authmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth"
 	authhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/identity"
@@ -356,6 +359,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		search:   searchhandler.New(searchSvc),
 		activity: activityhandler.New(activityusecase.New(deps.Queries)),
 		logs:     logshandler.New(logsSvc),
+		ai: aihandler.New(aimodule.NewService(
+			cfg.AI, airepository.NewPostgres(deps.Queries), log,
+		)),
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
