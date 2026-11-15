@@ -27,3 +27,4 @@ suggestion_decisions engagement
 review_settings
 excel_imports engagement
 excel_import_rows engagement
+receipt_captures engagement

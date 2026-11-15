@@ -54,6 +54,7 @@ type Querier interface {
 	CountPendingOrganizationInvitations(ctx context.Context, organizationID int64) (int64, error)
 	CountPermissions(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountPlatformNotifications(ctx context.Context, arg CountPlatformNotificationsParams) (int64, error)
+	CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error)
 	CountRoles(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
@@ -124,6 +125,7 @@ type Querier interface {
 	DeleteStorageShare(ctx context.Context, argUuid uuid.UUID) error
 	DeleteStorageStar(ctx context.Context, arg DeleteStorageStarParams) error
 	DeleteStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) error
+	DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerVehicleParams) (int64, error)
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
@@ -141,19 +143,26 @@ type Querier interface {
 	// 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
 	// açıklamanın ilk 30 karakteri → olası mükerrer.
 	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
+	// Mükerrer yakalamanın gösterdiği önceki yükleme.
+	FindCaptureByExpense(ctx context.Context, arg FindCaptureByExpenseParams) (uuid.UUID, error)
 	FindCashBoxByIBAN(ctx context.Context, arg FindCashBoxByIBANParams) (CashBox, error)
 	FindCustomerByIdentityNumber(ctx context.Context, arg FindCustomerByIdentityNumberParams) (Customer, error)
 	FindCustomerBySource(ctx context.Context, arg FindCustomerBySourceParams) (Customer, error)
 	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
+	// Aynı satıcı + tarih + tutar (+ fiş no varsa) başka görselle gelmiş mi.
+	FindDuplicateExpense(ctx context.Context, arg FindDuplicateExpenseParams) (FindDuplicateExpenseRow, error)
+	FindDuplicateRetailSale(ctx context.Context, arg FindDuplicateRetailSaleParams) (FindDuplicateRetailSaleRow, error)
 	// tenant-lint: cross-org şablon araması kendi ofisi, kendi mükellefi ve global ile sınırlı
 	// En özel kapsam önce: company > tenant > global.
 	FindExcelImportTemplates(ctx context.Context, arg FindExcelImportTemplatesParams) ([]ExcelImportTemplate, error)
+	FindExpenseByAttachment(ctx context.Context, arg FindExpenseByAttachmentParams) (FindExpenseByAttachmentRow, error)
 	// 01 §6 kural 1.
 	FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTNParams) ([]Invoice, error)
 	// 01 §6 kural 2: karşı taraf VKN/TCKN + fatura no + tarih.
 	FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInvoicesByPartyNumberDateParams) ([]Invoice, error)
 	// 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
+	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
@@ -169,6 +178,7 @@ type Querier interface {
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
+	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
@@ -198,6 +208,8 @@ type Querier interface {
 	GetOrganizationMemberByUserUUID(ctx context.Context, arg GetOrganizationMemberByUserUUIDParams) (GetOrganizationMemberByUserUUIDRow, error)
 	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
+	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
+	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
 	GetRoleByUUID(ctx context.Context, argUuid uuid.UUID) (Role, error)
@@ -256,6 +268,7 @@ type Querier interface {
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
+	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
@@ -263,6 +276,8 @@ type Querier interface {
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
+	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
+	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
 	InsertRolePermission(ctx context.Context, arg InsertRolePermissionParams) error
 	InsertSecretRecord(ctx context.Context, arg InsertSecretRecordParams) error
 	InsertStorageActivity(ctx context.Context, arg InsertStorageActivityParams) (StorageActivity, error)
@@ -272,6 +287,7 @@ type Querier interface {
 	InsertStorageTrash(ctx context.Context, arg InsertStorageTrashParams) (StorageTrash, error)
 	InsertSuggestion(ctx context.Context, arg InsertSuggestionParams) (Suggestion, error)
 	InsertSuggestionDecision(ctx context.Context, arg InsertSuggestionDecisionParams) error
+	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
@@ -340,6 +356,7 @@ type Querier interface {
 	ListPlatformNotifications(ctx context.Context, arg ListPlatformNotificationsParams) ([]Notification, error)
 	ListPlatformNotificationsForExport(ctx context.Context, arg ListPlatformNotificationsForExportParams) ([]Notification, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
+	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
 	// Ofis satırları ve, engagement verilirse, onun satırları.
 	ListReviewSettings(ctx context.Context, arg ListReviewSettingsParams) ([]ListReviewSettingsRow, error)
 	ListRolePermissionSlugsByRoleUUID(ctx context.Context, argUuid uuid.UUID) ([]string, error)
@@ -364,6 +381,8 @@ type Querier interface {
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
+	// Fiş yakalama (issue #23).
+	ListTaxpayerVehicles(ctx context.Context, taxpayerID int64) ([]TaxpayerVehicle, error)
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
 	// tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
 	ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error)
@@ -451,8 +470,11 @@ type Querier interface {
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
+	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
+	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
+	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
 	SetSourceConnectionCredentialsRef(ctx context.Context, arg SetSourceConnectionCredentialsRefParams) (int64, error)
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
@@ -469,6 +491,8 @@ type Querier interface {
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
+	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
+	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)
 	UpdateGitHubAppSettings(ctx context.Context, arg UpdateGitHubAppSettingsParams) (GithubAppSetting, error)
 	UpdateImportJobFileKey(ctx context.Context, arg UpdateImportJobFileKeyParams) (ImportJob, error)
 	UpdateImportJobMapping(ctx context.Context, arg UpdateImportJobMappingParams) (ImportJob, error)
@@ -479,6 +503,7 @@ type Querier interface {
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateOrganizationRole(ctx context.Context, arg UpdateOrganizationRoleParams) (Role, error)
+	UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSaleFieldParams) (RetailSale, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
 	UpdateSuggestionDecision(ctx context.Context, arg UpdateSuggestionDecisionParams) (Suggestion, error)
@@ -516,6 +541,8 @@ type Querier interface {
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
+	// Plaka mükellefin listesinde ve fiş tarihi geçerlilik aralığında mı (T8).
+	VehicleRegisteredOn(ctx context.Context, arg VehicleRegisteredOnParams) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)

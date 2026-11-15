@@ -22,3 +22,6 @@ bank_transaction_sources
 bank_rules
 bank_balance_snapshots
 bank_daily_summaries
+taxpayer_vehicles
+expenses
+retail_sales

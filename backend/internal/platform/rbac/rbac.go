@@ -77,6 +77,10 @@ const (
 	PermTenantExcelImportsRead   = "tenant.excel_imports.read"
 	PermTenantExcelImportsWrite  = "tenant.excel_imports.write"
 	PermTenantExcelImportsCommit = "tenant.excel_imports.commit"
+	// Fiş yakalama (issue #23).
+	PermTenantReceiptsRead    = "tenant.receipts.read"
+	PermTenantReceiptsWrite   = "tenant.receipts.write"
+	PermTenantReceiptsApprove = "tenant.receipts.approve"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

@@ -65,6 +65,8 @@ tags:
     description: Review queue (suggestions, provenance, decisions, thresholds)
   - name: ExcelImports
     description: Excel / CSV import (04-excel-ice-aktarma.md)
+  - name: Receipts
+    description: Receipt capture (OCR drafts, vehicle list, plate check)
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -5060,6 +5062,211 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/receipts:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Receipts]
+      operationId: captureReceipt
+      summary: Capture a receipt photo
+      description: |
+        Requires `tenant.receipts.write`, `tenant.engagements.read` and engagement access. JPEG/PNG/WebP/GIF up to 10 MB. The AI reads date, VKN, amounts, KDV, plate (per-field confidence) into an expense draft (Z report: retail_sale draft) with approval_status=pending and the photo attached. The same photo, or the same vendor + date + amount, returns status=duplicate without a new draft (the same photo makes no AI call). Fields under 0.80 confidence go to the review queue (kind receipt_field); a plate not on the vehicle list raises PLATE_NOT_REGISTERED. When the AI read fails the capture is stored with status=failed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+                kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    get:
+      tags: [Receipts]
+      operationId: listReceiptCaptures
+      summary: Receipt captures
+      description: |
+        Requires `tenant.receipts.read`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [draft, duplicate, failed, approved, rejected] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapturePage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: receiptUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Receipts]
+      operationId: getReceiptCapture
+      summary: Receipt capture
+      description: |
+        Requires `tenant.receipts.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: receiptUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: approveReceiptCapture
+      summary: Approve a receipt draft
+      description: |
+        Requires `tenant.receipts.approve` (accountant). Only drafts; only approved expenses count for the declaration.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: receiptUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: rejectReceiptCapture
+      summary: Reject a receipt draft
+      description: |
+        Requires `tenant.receipts.approve` (accountant). Only drafts; only approved expenses count for the declaration.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vehicles:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: listTaxpayerVehicles
+      summary: Taxpayer vehicle list
+      description: |
+        Requires `tenant.receipts.read`. Plates the plate check (T8) accepts.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Receipts]
+      operationId: addTaxpayerVehicle
+      summary: Add a vehicle
+      description: |
+        Requires `tenant.receipts.write`. The plate is normalized (34ABC123); 409 if already listed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VehicleInput"
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVehicle"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: vehicleUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Receipts]
+      operationId: deleteTaxpayerVehicle
+      summary: Remove a vehicle
+      description: |
+        Requires `tenant.receipts.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: OK
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -6014,6 +6221,108 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/ExcelImportTemplate" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ReceiptField:
+      type: object
+      required: [raw, value, confidence, valid]
+      properties:
+        raw: { type: string }
+        value: { type: string, description: "Normalized (dates YYYY-MM-DD, amounts 2 decimals, plate 34ABC123)" }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        valid: { type: boolean }
+
+    ReceiptCapture:
+      type: object
+      required: [uuid, status, kind, media_type, fields, model, draft, duplicate_of, error, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        status: { type: string, enum: [draft, duplicate, failed, approved, rejected] }
+        kind: { type: [string, "null"], enum: [expense_receipt, fuel_receipt, z_report, other, null] }
+        media_type: { type: string }
+        fields:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ReceiptField" }
+        model: { type: [string, "null"] }
+        draft:
+          type: [object, "null"]
+          properties:
+            type: { type: string, enum: [expense, retail_sale] }
+            uuid: { type: string, format: uuid }
+        duplicate_of: { type: [string, "null"], format: uuid }
+        error: { type: [string, "null"] }
+        plate_check: { type: string, enum: [registered, not_registered, no_plate, error] }
+        in_review:
+          type: array
+          items: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Vehicle:
+      type: object
+      required: [uuid, plate, description, valid_from, valid_to]
+      properties:
+        uuid: { type: string, format: uuid }
+        plate: { type: string, example: 34ABC123 }
+        description: { type: string }
+        valid_from: { type: [string, "null"], format: date }
+        valid_to: { type: [string, "null"], format: date }
+
+    VehicleInput:
+      type: object
+      additionalProperties: false
+      required: [plate]
+      properties:
+        plate: { type: string }
+        description: { type: string }
+        valid_from: { type: [string, "null"], format: date }
+        valid_to: { type: [string, "null"], format: date }
+
+    EnvelopeReceiptCapture:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ReceiptCapture" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeReceiptCapturePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ReceiptCapture" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeVehicle:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Vehicle" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeVehicleList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/Vehicle" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:
