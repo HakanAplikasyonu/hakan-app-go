@@ -15,6 +15,7 @@ require (
 	github.com/furkanmeclis/go-ubltr/provider/izibiz v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/nes v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/nilvera v0.1.0
+	github.com/furkanmeclis/go-ubltr/provider/sovos v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/trendyol v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/turkcell v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/uyumsoft v0.1.0
