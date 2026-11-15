@@ -1,5 +1,5 @@
-import { TenantHome } from "@/features/tenant";
+import { OfficeHome } from "@/features/office";
 
 export default function TenantHomePage() {
-  return <TenantHome />;
+  return <OfficeHome />;
 }

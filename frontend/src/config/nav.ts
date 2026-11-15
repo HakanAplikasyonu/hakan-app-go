@@ -1,6 +1,9 @@
 import {
   Activity,
   Bell,
+  ClipboardCheck,
+  FileText,
+  TriangleAlert,
   Building2,
   UsersRound,
   Cpu,
@@ -268,9 +271,11 @@ export function tenantNav(slug: string): NavCatalog {
     id: "tenant",
     groups: [
       {
-        id: "tenant",
-        labelKey: "layout.section_tenant",
-        icon: Building2,
+        // Ofis paneli (#15). İzinler engagement modeliyle (W1 #2) gelecek;
+        // şimdilik ofisin her üyesi görür.
+        id: "office",
+        labelKey: "office.nav_group",
+        icon: FileText,
         defaultOpen: true,
         items: [
           {
@@ -279,6 +284,44 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.home(slug),
             icon: LayoutDashboard,
           },
+          {
+            id: "taxpayers",
+            titleKey: "office.nav_taxpayers",
+            href: routes.tenant.taxpayers(slug),
+            icon: Building2,
+          },
+          {
+            id: "invoices",
+            titleKey: "office.nav_invoices",
+            href: routes.tenant.invoices(slug),
+            icon: FileText,
+          },
+          {
+            id: "review",
+            titleKey: "office.nav_review",
+            href: routes.tenant.review(slug),
+            icon: ClipboardCheck,
+          },
+          {
+            id: "warnings",
+            titleKey: "office.nav_warnings",
+            href: routes.tenant.warnings(slug),
+            icon: TriangleAlert,
+          },
+          {
+            id: "upload",
+            titleKey: "office.nav_upload",
+            href: routes.tenant.upload(slug),
+            icon: Upload,
+          },
+        ],
+      },
+      {
+        id: "tenant",
+        labelKey: "layout.section_tenant",
+        icon: Building2,
+        defaultOpen: true,
+        items: [
           {
             id: "members",
             titleKey: "tenant.nav_members",
