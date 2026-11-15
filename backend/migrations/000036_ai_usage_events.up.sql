@@ -6,9 +6,8 @@ CREATE TABLE ai_usage_events (
     id                 BIGSERIAL PRIMARY KEY,
     uuid               UUID          NOT NULL DEFAULT gen_random_uuid(),
     organization_id    BIGINT        NOT NULL REFERENCES organizations (id) ON DELETE CASCADE,
-    -- Taxpayer (mükellef) the call was made for. No FK yet: the taxpayer
-    -- table lands with the shared data model (#9); the FK is added there.
-    taxpayer_id        BIGINT        NULL,
+    -- Taxpayer (mükellef) the call was made for, when there is one.
+    taxpayer_id        BIGINT        NULL REFERENCES taxpayers (id) ON DELETE SET NULL,
     user_id            BIGINT        NULL REFERENCES users (id) ON DELETE SET NULL,
     purpose            VARCHAR(64)   NOT NULL,
     provider           VARCHAR(32)   NOT NULL,

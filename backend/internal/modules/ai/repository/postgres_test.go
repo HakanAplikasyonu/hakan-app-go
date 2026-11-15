@@ -32,8 +32,13 @@ func TestPostgresRecordAndReport(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgID) })
 
+	var tp int64
+	if err := pool.QueryRow(ctx, `INSERT INTO taxpayers DEFAULT VALUES RETURNING id`).Scan(&tp); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = pool.Exec(ctx, `DELETE FROM taxpayers WHERE id = $1`, tp) })
+
 	store := NewPostgres(db.New(pool))
-	tp := int64(7)
 	recs := []usecase.UsageRecord{
 		{OrganizationID: orgID, TaxpayerID: &tp, Purpose: "t", Provider: "anthropic", Model: "claude-opus-5-5",
 			Usage: provider.Usage{InputTokens: 1000, OutputTokens: 100}, CostUSD: "0.006000", MaskedValues: 3},
@@ -59,7 +64,7 @@ func TestPostgresRecordAndReport(t *testing.T) {
 	if rows[0].TaxpayerID != nil || rows[0].UnpricedCalls != 1 || rows[0].FallbackCalls != 1 || rows[0].CostUSD != "0.000000" {
 		t.Fatalf("row0 = %+v", rows[0])
 	}
-	if rows[1].TaxpayerID == nil || *rows[1].TaxpayerID != 7 || rows[1].Calls != 2 || rows[1].CostUSD != "0.012000" || rows[1].InputTokens != 2000 {
+	if rows[1].TaxpayerID == nil || *rows[1].TaxpayerID != tp || rows[1].Calls != 2 || rows[1].CostUSD != "0.012000" || rows[1].InputTokens != 2000 {
 		t.Fatalf("row1 = %+v", rows[1])
 	}
 	if rows[1].Month != now.In(time.FixedZone("TRT", 3*3600)).Format("2006-01") {
