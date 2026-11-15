@@ -25,6 +25,25 @@ type ActivityEvent struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 }
 
+type AiUsageEvent struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	TaxpayerID       pgtype.Int8        `json:"taxpayer_id"`
+	UserID           pgtype.Int8        `json:"user_id"`
+	Purpose          string             `json:"purpose"`
+	Provider         string             `json:"provider"`
+	Model            string             `json:"model"`
+	IsFallback       bool               `json:"is_fallback"`
+	InputTokens      int64              `json:"input_tokens"`
+	OutputTokens     int64              `json:"output_tokens"`
+	CacheReadTokens  int64              `json:"cache_read_tokens"`
+	CacheWriteTokens int64              `json:"cache_write_tokens"`
+	CostUsd          pgtype.Numeric     `json:"cost_usd"`
+	MaskedValues     int32              `json:"masked_values"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type AppLog struct {
 	ID        int64              `json:"id"`
 	Uuid      uuid.UUID          `json:"uuid"`

@@ -12,6 +12,8 @@ import (
 )
 
 type Querier interface {
+	// Office AI cost report: one row per month x taxpayer x model.
+	AIUsageReport(ctx context.Context, arg AIUsageReportParams) ([]AIUsageReportRow, error)
 	// tenant-lint: cross-org id comes from the token lookup in the same locked tx
 	// Single use: only a pending, unexpired invitation flips to accepted.
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
@@ -141,6 +143,7 @@ type Querier interface {
 	HasActivePushDevices(ctx context.Context, userID int64) (bool, error)
 	HasPendingOwnerOrganizationInvitationForEmail(ctx context.Context, arg HasPendingOwnerOrganizationInvitationForEmailParams) (bool, error)
 	IncrementOTPAttempts(ctx context.Context, id int64) (OtpCode, error)
+	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)

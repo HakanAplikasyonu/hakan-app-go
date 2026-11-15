@@ -5,6 +5,8 @@ import (
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	activitymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
+	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
+	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
@@ -18,6 +20,7 @@ type moduleHandlers struct {
 	search   *searchhandler.Handler
 	activity *activityhandler.Handler
 	logs     *logshandler.Handler
+	ai       *aihandler.Handler
 }
 
 // selfRegisteredModules is the single list of modules mounted through
@@ -29,5 +32,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		searchmodule.Module{H: h.search},
 		activitymodule.Module{H: h.activity},
 		logsmodule.Module{H: h.logs},
+		aimodule.Module{H: h.ai},
 	}
 }

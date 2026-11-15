@@ -76,6 +76,18 @@ x-backend-environment: &backend-environment
   PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-${AUTH_URL:?AUTH_URL is required}}
   # Passkey relying-party ID; empty → hostname of PUBLIC_FRONTEND_URL.
   AUTH_WEBAUTHN_RP_ID: ${AUTH_WEBAUTHN_RP_ID:-}
+  # AI module (docs/01 G11). Keys only via env; empty key = AI off.
+  AI_PROVIDER: ${AI_PROVIDER:-anthropic}
+  AI_API_KEY: ${AI_API_KEY:-}
+  AI_BASE_URL: ${AI_BASE_URL:-}
+  AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+  AI_FALLBACK_PROVIDER: ${AI_FALLBACK_PROVIDER:-}
+  AI_FALLBACK_API_KEY: ${AI_FALLBACK_API_KEY:-}
+  AI_FALLBACK_BASE_URL: ${AI_FALLBACK_BASE_URL:-}
+  AI_FALLBACK_MODEL: ${AI_FALLBACK_MODEL:-}
+  AI_MASKING: ${AI_MASKING:-true}
+  AI_DISABLE_PROVIDER_STORE: ${AI_DISABLE_PROVIDER_STORE:-true}
+  AI_MAX_TOKENS: ${AI_MAX_TOKENS:-}
   MAIL_FROM: ${MAIL_FROM:-noreply@localhost}
   MAIL_FROM_NAME: ${MAIL_FROM_NAME:-App}
   MAIL_DRIVER: ${MAIL_DRIVER:-smtp}
