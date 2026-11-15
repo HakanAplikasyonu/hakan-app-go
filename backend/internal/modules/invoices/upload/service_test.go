@@ -16,6 +16,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
 const ownVKN = "1288331521"
@@ -64,45 +65,17 @@ type env struct {
 
 func setup(t *testing.T) *env {
 	t.Helper()
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
+	d := testdb.Open(t)
+	org := d.Organization(t)
+	user := d.User(t)
+	tp := d.Taxpayer(t, "legal", ownVKN)
+	eng := d.Engagement(t, org, tp)
+	return &env{
+		pool:  d.Pool,
+		svc:   New(d.Pool, storage.NewMemory(), nil, nil),
+		scope: engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp},
+		actor: user,
 	}
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	e := &env{pool: pool}
-	var tp, org, eng, user int64
-	must := func(err error) {
-		t.Helper()
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	must(pool.QueryRow(ctx, `INSERT INTO taxpayers DEFAULT VALUES RETURNING id`).Scan(&tp))
-	must(pool.QueryRow(ctx, `INSERT INTO organizations (slug, name) VALUES ('w2-up-'||gen_random_uuid(), 'Test') RETURNING id`).Scan(&org))
-	must(pool.QueryRow(ctx, `INSERT INTO engagements (organization_id, taxpayer_id) VALUES ($1, $2) RETURNING id`, org, tp).Scan(&eng))
-	must(pool.QueryRow(ctx, `INSERT INTO users (email, password_hash, name, surname)
-		VALUES ('w2-'||gen_random_uuid()||'@example.com', 'x', 'T', 'U') RETURNING id`).Scan(&user))
-	e.scope = engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
-	e.actor = user
-	e.svc = New(pool, storage.NewMemory(), nil, nil).WithOwnTaxIDResolver(func(context.Context, int64) (string, error) { return ownVKN, nil })
-	t.Cleanup(func() {
-		c := context.Background()
-		_, _ = pool.Exec(c, `DELETE FROM ubl_upload_jobs WHERE taxpayer_id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM data_warnings WHERE taxpayer_id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM invoices WHERE taxpayer_id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM attachments WHERE taxpayer_id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM customers WHERE taxpayer_id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM engagements WHERE id = $1`, eng)
-		_, _ = pool.Exec(c, `DELETE FROM organizations WHERE id = $1`, org)
-		_, _ = pool.Exec(c, `DELETE FROM taxpayers WHERE id = $1`, tp)
-		_, _ = pool.Exec(c, `DELETE FROM users WHERE id = $1`, user)
-	})
-	return e
 }
 
 func (e *env) count(t *testing.T, sql string) int {

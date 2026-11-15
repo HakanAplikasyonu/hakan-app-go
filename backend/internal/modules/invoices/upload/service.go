@@ -101,7 +101,7 @@ func New(pool DB, store ObjectStore, enq Enqueuer, log *slog.Logger) *Service {
 }
 
 // WithOwnTaxIDResolver replaces how the taxpayer's own VKN/TCKN is read
-// (tests; until #3 settles the taxpayers identity columns).
+// (tests).
 func (s *Service) WithOwnTaxIDResolver(fn func(ctx context.Context, taxpayerID int64) (string, error)) *Service {
 	s.ownTaxID = fn
 	return s

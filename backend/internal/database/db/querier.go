@@ -180,8 +180,7 @@ type Querier interface {
 	// ended engagement, another office's engagement or a missing assignment all
 	// return no row.
 	GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpayerForOfficeMemberParams) (Taxpayer, error)
-	// Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
-	// adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
+	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
 	GetTenantRoleByKey(ctx context.Context, arg GetTenantRoleByKeyParams) (Role, error)

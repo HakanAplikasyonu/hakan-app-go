@@ -2461,6 +2461,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/ubl-uploads": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List UBL upload jobs (newest first, without item details)
+         * @description Requires `tenant.invoices.read` and an active engagement.
+         */
+        get: operations["listTenantUBLUploads"];
+        put?: never;
+        /**
+         * Upload UBL-TR XML / ZIP invoices
+         * @description Requires `tenant.invoices.write` and an active engagement. Accepts a
+         *     single UBL-TR XML, a ZIP of XML files, base64 text or a GİB envelope
+         *     (max 200 MB). The file is processed in the background: XSD, GİB
+         *     Schematron (failure → `UBL_SCHEMATRON_FAIL` warning, invoice kept),
+         *     mapping to the common model and duplicate check by ETTN. Poll the job
+         *     for its report.
+         */
+        post: operations["uploadTenantUBLInvoices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/ubl-uploads/{jobUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                jobUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a UBL upload job with its report
+         * @description Requires `tenant.invoices.read` and an active engagement.
+         */
+        get: operations["getTenantUBLUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3790,6 +3856,62 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TaxpayerPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        UBLUploadItem: {
+            /** @description File name (inside the ZIP) */
+            name: string;
+            /** @enum {string} */
+            status: "added" | "duplicate" | "failed";
+            /** Format: uuid */
+            ettn?: string;
+            invoice_number?: string;
+            /** Format: uuid */
+            invoice_uuid?: string;
+            /** @enum {string} */
+            error_code?: "unreadable" | "unsupported_document" | "xsd_invalid" | "PARTY_MISMATCH" | "mapping_failed" | "store_failed";
+            error?: string;
+            /** @description Warning codes raised for an added invoice */
+            warnings?: string[];
+        };
+        UBLUploadReport: {
+            total: number;
+            added: number;
+            duplicate: number;
+            failed: number;
+            items: components["schemas"]["UBLUploadItem"][] | null;
+        };
+        UBLUploadJob: {
+            /** Format: uuid */
+            uuid: string;
+            file_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            /** @enum {string} */
+            status: "queued" | "processing" | "done" | "failed";
+            report?: components["schemas"]["UBLUploadReport"];
+            error?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        EnvelopeUBLUploadJob: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["UBLUploadJob"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeUBLUploadJobList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["UBLUploadJob"][];
+                limit: number;
+                offset: number;
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEngagementContext: {
@@ -8190,6 +8312,130 @@ export interface operations {
                 };
             };
             429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantUBLUploads: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Jobs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJobList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadTenantUBLInvoices: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Job accepted (status `queued`, or `done` when processed inline) */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJob"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description File too large (`UPLOAD_TOO_LARGE`) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not XML, ZIP or base64 (`UNSUPPORTED_FILE`) */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantUBLUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                jobUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job and report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeUBLUploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

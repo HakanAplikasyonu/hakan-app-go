@@ -484,18 +484,15 @@ func (q *Queries) GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySource
 }
 
 const getTaxpayerOwnTaxID = `-- name: GetTaxpayerOwnTaxID :one
-SELECT COALESCE(to_jsonb(t) ->> 'tax_number', to_jsonb(t) ->> 'vkn', to_jsonb(t) ->> 'tax_id', to_jsonb(t) ->> 'identity_number', '')::text AS own_tax_id
-FROM taxpayers t
-WHERE t.id = $1
+SELECT tax_id FROM taxpayers WHERE id = $1
 `
 
-// Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
-// adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
+// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 func (q *Queries) GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error) {
 	row := q.db.QueryRow(ctx, getTaxpayerOwnTaxID, taxpayerID)
-	var own_tax_id string
-	err := row.Scan(&own_tax_id)
-	return own_tax_id, err
+	var tax_id string
+	err := row.Scan(&tax_id)
+	return tax_id, err
 }
 
 const insertInvoice = `-- name: InsertInvoice :one

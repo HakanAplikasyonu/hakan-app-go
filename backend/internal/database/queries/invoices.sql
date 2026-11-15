@@ -114,8 +114,5 @@ GROUP BY i.direction, s.tax_rate, s.withholding_code, s.tax_exemption_code
 ORDER BY i.direction, s.tax_rate;
 
 -- name: GetTaxpayerOwnTaxID :one
--- Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
--- adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
-SELECT COALESCE(to_jsonb(t) ->> 'tax_number', to_jsonb(t) ->> 'vkn', to_jsonb(t) ->> 'tax_id', to_jsonb(t) ->> 'identity_number', '')::text AS own_tax_id
-FROM taxpayers t
-WHERE t.id = @taxpayer_id;
+-- Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
+SELECT tax_id FROM taxpayers WHERE id = @taxpayer_id;
