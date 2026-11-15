@@ -25,3 +25,4 @@ bank_daily_summaries
 taxpayer_vehicles
 expenses
 retail_sales
+bank_transaction_matches
