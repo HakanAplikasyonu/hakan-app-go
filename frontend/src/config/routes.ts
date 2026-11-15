@@ -119,8 +119,16 @@ export const routes = {
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
   },
+  /** Mükellef (taxpayer) shell — company users invited by an office. */
+  taxpayer: {
+    /** Company picker for users with several companies. */
+    picker: "/m",
+    home: (uuid: string) => `/m/${encodeURIComponent(uuid)}`,
+  },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,
+  /** Mükellef invitation link sent by an office (public). */
+  inviteTaxpayer: (token: string) => `/invite/m/${encodeURIComponent(token)}`,
   errors: {
     unauthorized: "/unauthorized",
     forbidden: "/forbidden",

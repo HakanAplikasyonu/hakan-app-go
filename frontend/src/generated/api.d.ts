@@ -2159,6 +2159,71 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invitations": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Mükellef invitations of an engagement
+         * @description Requires `tenant.engagements.read` and access to an active engagement. Newest first, at most 100.
+         */
+        get: operations["getTenantEngagementInvitations"];
+        put?: never;
+        /**
+         * Invite a mükellef user
+         * @description D15: a mükellef user joins only by an office invitation. Requires
+         *     `tenant.engagements.write` and access to an active engagement. An
+         *     open invitation to the same address on this engagement is replaced.
+         *     The email links to `/invite/m/{token}`; only the token hash is stored.
+         */
+        post: operations["postTenantEngagementInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invitations/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a mükellef invitation
+         * @description Requires `tenant.engagements.write`.
+         */
+        delete: operations["deleteTenantEngagementInvitation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/end": {
         parameters: {
             query?: never;
@@ -2656,6 +2721,78 @@ export interface paths {
          *     A later sync with the same condition does not reopen it.
          */
         post: operations["resolveEngagementWarning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer-invitations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Describe a mükellef invitation link
+         * @description Public; the token travels in the body. An invitation whose engagement
+         *     has ended reads as `revoked`. Rate limited per client IP.
+         */
+        post: operations["previewTaxpayerInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer-invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept a mükellef invitation
+         * @description The signed-in account's email must be the invited address. Creates the
+         *     `taxpayer_members` row and consumes the invitation (single use). New
+         *     users sign up first: the registration endpoints accept a mükellef
+         *     invitation token like an office one.
+         */
+        post: operations["acceptTaxpayerInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/context": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolved mükellef scope
+         * @description Resolves `X-Taxpayer` and the caller's mükellef membership. Office
+         *     membership gives no access here. Unknown taxpayer, malformed uuid and
+         *     missing membership all answer `403 NO_TAXPAYER_MEMBERSHIP`.
+         */
+        get: operations["getTaxpayerContext"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3303,6 +3440,8 @@ export interface components {
             permissions: string[];
             /** @description Tenant memberships (role and `tenant.*` permissions per organization). Present only when `TENANCY_ENABLED=true`. */
             organizations?: components["schemas"]["MeOrganization"][];
+            /** @description Mükellef (company) memberships; the mükellef shell opens `/m/{uuid}`. Present only when `TENANCY_ENABLED=true` and the user has at least one. */
+            taxpayers?: components["schemas"]["MeTaxpayer"][];
             links: components["schemas"]["MeLinks"];
             channels: components["schemas"]["MeChannels"];
             realtime: components["schemas"]["MeRealtime"];
@@ -4263,6 +4402,109 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
+        MeTaxpayer: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            title: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+        };
+        TaxpayerInvitation: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+            /** @enum {string} */
+            status: "pending" | "accepted" | "revoked" | "expired";
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            invited_by: string | null;
+        };
+        TaxpayerInvitationList: {
+            items: components["schemas"]["TaxpayerInvitation"][];
+        };
+        CreateTaxpayerInvitationRequest: {
+            /** Format: email */
+            email: string;
+            /**
+             * @description Defaults to owner
+             * @enum {string}
+             */
+            role?: "owner" | "employee";
+        };
+        TaxpayerInvitationPreview: {
+            taxpayer: {
+                title: string;
+            };
+            organization: {
+                name: string;
+            };
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+            /** @enum {string} */
+            status: "pending" | "accepted" | "revoked" | "expired";
+            /** Format: date-time */
+            expires_at: string;
+            invited_by: string | null;
+        };
+        AcceptedTaxpayerInvitation: {
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            role: "owner" | "employee";
+        };
+        TaxpayerContext: {
+            taxpayer: {
+                /** Format: uuid */
+                uuid: string;
+                /** @enum {string} */
+                kind: "legal" | "individual";
+                tax_id: string;
+                /** @enum {string} */
+                tax_id_type: "vkn" | "tckn";
+                title: string;
+            };
+            /** @enum {string} */
+            role: "owner" | "employee";
+        };
+        EnvelopeTaxpayerInvitation: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerInvitation"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerInvitationList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerInvitationList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerInvitationPreview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerInvitationPreview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAcceptedTaxpayerInvitation: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AcceptedTaxpayerInvitation"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerContext: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerContext"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeEngagementContext: {
             /** @enum {boolean} */
             success: true;
@@ -4656,6 +4898,11 @@ export interface components {
     };
     parameters: {
         EngagementUuid: string;
+        /**
+         * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+         *     forwards it on `/api/v1/taxpayer/*` only.
+         */
+        XTaxpayer: string;
         /**
          * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
          *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
@@ -8190,6 +8437,114 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantEngagementInvitations: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitations */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantEngagementInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxpayerInvitationRequest"];
+            };
+        };
+        responses: {
+            /** @description Invitation */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantEngagementInvitation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `INVITATION_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
     endTenantEngagement: {
         parameters: {
             query?: never;
@@ -8921,6 +9276,152 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewTaxpayerInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Invitation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerInvitationPreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description `INVITATION_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acceptTaxpayerInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAcceptedTaxpayerInvitation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `INVITATION_EMAIL_MISMATCH` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `INVITATION_NOT_FOUND` */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `ALREADY_MEMBER` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `INVITATION_UNAVAILABLE` (used, revoked, expired or engagement ended) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mükellef scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerContext"];
+                };
+            };
+            /** @description `TAXPAYER_REQUIRED` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

@@ -57,6 +57,8 @@ tags:
     description: AI module (office cost report, provider privacy statement)
   - name: Taxpayers
     description: Global mükellef kimliği (VKN/TCKN). Platform kataloğu ve engagement üzerinden ofis görünümü.
+  - name: TaxpayerPortal
+    description: Mükellef kullanıcıları (ofis daveti, `X-Taxpayer` başlığı ile mükellef kabuğu). `TENANCY_ENABLED`.
   - name: Warnings
     description: Warning engine (05-uyari-kodlari.md) rule configuration and warnings
   - name: Realtime
@@ -3531,6 +3533,81 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invitations:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTenantEngagementInvitations
+      summary: Mükellef invitations of an engagement
+      description: Requires `tenant.engagements.read` and access to an active engagement. Newest first, at most 100.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Invitations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerInvitationList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: postTenantEngagementInvitation
+      summary: Invite a mükellef user
+      description: |
+        D15: a mükellef user joins only by an office invitation. Requires
+        `tenant.engagements.write` and access to an active engagement. An
+        open invitation to the same address on this engagement is replaced.
+        The email links to `/invite/m/{token}`; only the token hash is stored.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaxpayerInvitationRequest"
+      responses:
+        "201":
+          description: Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerInvitation"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ResourceUUID"
+    delete:
+      tags: [TaxpayerPortal]
+      operationId: deleteTenantEngagementInvitation
+      summary: Revoke a mükellef invitation
+      description: Requires `tenant.engagements.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Revoked }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404":
+          description: "`INVITATION_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/end:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -4084,6 +4161,127 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer-invitations/preview:
+    post:
+      tags: [TaxpayerPortal]
+      operationId: previewTaxpayerInvitation
+      summary: Describe a mükellef invitation link
+      description: |
+        Public; the token travels in the body. An invitation whose engagement
+        has ended reads as `revoked`. Rate limited per client IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "200":
+          description: Invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerInvitationPreview"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404":
+          description: "`INVITATION_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer-invitations/accept:
+    post:
+      tags: [TaxpayerPortal]
+      operationId: acceptTaxpayerInvitation
+      summary: Accept a mükellef invitation
+      description: |
+        The signed-in account's email must be the invited address. Creates the
+        `taxpayer_members` row and consumes the invitation (single use). New
+        users sign up first: the registration endpoints accept a mükellef
+        invitation token like an office one.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAcceptedTaxpayerInvitation"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`INVITATION_EMAIL_MISMATCH`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: "`INVITATION_NOT_FOUND`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: "`ALREADY_MEMBER`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "410":
+          description: "`INVITATION_UNAVAILABLE` (used, revoked, expired or engagement ended)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/context:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerContext
+      summary: Resolved mükellef scope
+      description: |
+        Resolves `X-Taxpayer` and the caller's mükellef membership. Office
+        membership gives no access here. Unknown taxpayer, malformed uuid and
+        missing membership all answer `403 NO_TAXPAYER_MEMBERSHIP`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Mükellef scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerContext"
+        "400":
+          description: "`TAXPAYER_REQUIRED`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -4268,6 +4466,14 @@ components:
       name: engagementUuid
       in: path
       required: true
+      schema: { type: string, format: uuid }
+    XTaxpayer:
+      name: X-Taxpayer
+      in: header
+      required: true
+      description: |
+        Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+        forwards it on `/api/v1/taxpayer/*` only.
       schema: { type: string, format: uuid }
     XOrganization:
       name: X-Organization
@@ -5057,6 +5263,14 @@ components:
             organization). Present only when `TENANCY_ENABLED=true`.
           items:
             $ref: "#/components/schemas/MeOrganization"
+        taxpayers:
+          type: array
+          description: >-
+            Mükellef (company) memberships; the mükellef shell opens
+            `/m/{uuid}`. Present only when `TENANCY_ENABLED=true` and the user
+            has at least one.
+          items:
+            $ref: "#/components/schemas/MeTaxpayer"
         links:
           $ref: "#/components/schemas/MeLinks"
         channels:
@@ -6374,6 +6588,125 @@ components:
               items: { $ref: "#/components/schemas/UBLUploadJob" }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    MeTaxpayer:
+      type: object
+      required: [uuid, kind, title, role]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [legal, individual] }
+        title: { type: string }
+        role: { type: string, enum: [owner, employee] }
+
+    TaxpayerInvitation:
+      type: object
+      required: [uuid, email, role, status, expires_at, created_at, invited_by]
+      properties:
+        uuid: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [owner, employee] }
+        status: { type: string, enum: [pending, accepted, revoked, expired] }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        invited_by: { type: [string, "null"] }
+
+    TaxpayerInvitationList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerInvitation" }
+
+    CreateTaxpayerInvitationRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+        role: { type: string, enum: [owner, employee], description: Defaults to owner }
+
+    TaxpayerInvitationPreview:
+      type: object
+      required: [taxpayer, organization, email, role, status, expires_at, invited_by]
+      properties:
+        taxpayer:
+          type: object
+          required: [title]
+          properties:
+            title: { type: string }
+        organization:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [owner, employee] }
+        status: { type: string, enum: [pending, accepted, revoked, expired] }
+        expires_at: { type: string, format: date-time }
+        invited_by: { type: [string, "null"] }
+
+    AcceptedTaxpayerInvitation:
+      type: object
+      required: [taxpayer_uuid, role]
+      properties:
+        taxpayer_uuid: { type: string, format: uuid }
+        role: { type: string, enum: [owner, employee] }
+
+    TaxpayerContext:
+      type: object
+      required: [taxpayer, role]
+      properties:
+        taxpayer:
+          type: object
+          required: [uuid, kind, tax_id, tax_id_type, title]
+          properties:
+            uuid: { type: string, format: uuid }
+            kind: { type: string, enum: [legal, individual] }
+            tax_id: { type: string }
+            tax_id_type: { type: string, enum: [vkn, tckn] }
+            title: { type: string }
+        role: { type: string, enum: [owner, employee] }
+
+    EnvelopeTaxpayerInvitation:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerInvitation" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerInvitationList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerInvitationList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerInvitationPreview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerInvitationPreview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeAcceptedTaxpayerInvitation:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AcceptedTaxpayerInvitation" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerContext:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerContext" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

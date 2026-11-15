@@ -816,6 +816,30 @@ type Taxpayer struct {
 	TaxOffice string             `json:"tax_office"`
 }
 
+type TaxpayerInvitation struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Email          string             `json:"email"`
+	Role           string             `json:"role"`
+	TokenHash      string             `json:"token_hash"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	AcceptedAt     pgtype.Timestamptz `json:"accepted_at"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	InvitedBy      pgtype.Int8        `json:"invited_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type TaxpayerMember struct {
+	ID         int64              `json:"id"`
+	TaxpayerID int64              `json:"taxpayer_id"`
+	UserID     int64              `json:"user_id"`
+	Role       string             `json:"role"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+}
+
 type UblUploadJob struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

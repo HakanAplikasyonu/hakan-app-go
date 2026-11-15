@@ -55,6 +55,12 @@ function isProtectedPath(pathname: string) {
     return true;
   }
   if (
+    pathname === routes.taxpayer.picker ||
+    pathname.startsWith(`${routes.taxpayer.picker}/`)
+  ) {
+    return true;
+  }
+  if (
     pathname.startsWith(`${routes.platform.root}/`) &&
     !isGuestAuthPath(pathname)
   ) {

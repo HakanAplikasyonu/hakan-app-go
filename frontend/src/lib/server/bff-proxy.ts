@@ -422,6 +422,13 @@ function isTenantPath(segments: string[]) {
   return segments[0] === "tenant";
 }
 
+/** Mükellef (taxpayer uuid) of a /v1/taxpayer/* request (issue #4). */
+const TAXPAYER_HEADER = "X-Taxpayer";
+
+function isTaxpayerPath(segments: string[]) {
+  return segments[0] === "taxpayer";
+}
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
@@ -490,6 +497,11 @@ export async function proxyToUpstream(
   if (isTenantPath(pathSegments)) {
     const organization = request.headers.get(ORGANIZATION_HEADER)?.trim();
     if (organization) headers.set(ORGANIZATION_HEADER, organization);
+  }
+  // Same rule for the mükellef shell: X-Taxpayer only on /v1/taxpayer/*.
+  if (isTaxpayerPath(pathSegments)) {
+    const taxpayer = request.headers.get(TAXPAYER_HEADER)?.trim();
+    if (taxpayer) headers.set(TAXPAYER_HEADER, taxpayer);
   }
 
   if (accessToken && !isAuthPublicTokenPath(path)) {
