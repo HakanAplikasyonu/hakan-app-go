@@ -84,6 +84,7 @@ import (
 	settingshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings/handler"
 	settingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/kolaybi"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/parasut"
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
@@ -388,6 +389,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Easytrade adaptörü (issue #46).
 	easytrade.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		easytrade.NewHandler(easytrade.NewService(deps.DB, sourceVault, cfg.Easytrade.BaseURL, nil)))
+	// KolayBi adaptörü (issue #48).
+	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
