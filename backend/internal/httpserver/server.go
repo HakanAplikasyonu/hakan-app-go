@@ -112,6 +112,7 @@ import (
 	bulkadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/egress"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine"
@@ -124,6 +125,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx/orgcache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
@@ -419,6 +421,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
 	}
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
+	// Fixed-egress status (issue #45): the last public IP check of the
+	// egress worker pool.
+	mux.Handle("GET /v1/platform/egress", middleware.Chain(
+		egress.StatusHandler(egress.Config{
+			ProxyURL: cfg.Egress.ProxyURL, ExpectedIPs: cfg.Egress.ExpectedIPs,
+			CheckURL: cfg.Egress.CheckURL, CheckInterval: cfg.Egress.CheckInterval,
+		}, egress.NewStore(deps.Redis, cfg.App.Env)),
+		middleware.Authenticate(tokens, loader),
+		middleware.RequirePermission(rbac.PermPlatformSettingsRead),
+	))
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)
 	if err != nil {

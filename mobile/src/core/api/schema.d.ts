@@ -835,6 +835,32 @@ export interface paths {
         patch: operations["patchPlatformTaxpayer"];
         trace?: never;
     };
+    "/v1/platform/egress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fixed-egress (static outbound IP) status
+         * @description Requires `platform.settings.read`. Integrator calls run on the
+         *     `fixed-egress` worker pool and must leave from an allowlisted IP
+         *     (issue #45). The egress worker checks its public IP every
+         *     `EGRESS_CHECK_INTERVAL` through the same transport the integrator
+         *     calls use; a mismatch fails the check task (error log and Sentry).
+         *     This shows the configuration and the last check. `stale` is true when
+         *     no check ran within two intervals (the egress worker may be down).
+         */
+        get: operations["getPlatformEgress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/platform/organizations": {
         parameters: {
             query?: never;
@@ -9007,6 +9033,33 @@ export interface components {
             data: components["schemas"]["TaxpayerReceiptPage"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        EgressCheck: {
+            observed_ip: string;
+            expected_ips: string[];
+            ok: boolean;
+            error?: string;
+            via_proxy: boolean;
+            /** Format: date-time */
+            checked_at: string;
+        };
+        EgressStatus: {
+            /** @description EGRESS_EXPECTED_IPS is set */
+            configured: boolean;
+            via_proxy: boolean;
+            expected_ips: string[];
+            last: components["schemas"]["EgressCheck"] | null;
+            stale: boolean;
+            /** @example 15m0s */
+            check_interval: string;
+            /** Format: date-time */
+            now: string;
+        };
+        EnvelopeEgressStatus: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EgressStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeEngagementContext: {
             /** @enum {boolean} */
             success: true;
@@ -11547,6 +11600,29 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getPlatformEgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEgressStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
             500: components["responses"]["InternalError"];
         };
     };

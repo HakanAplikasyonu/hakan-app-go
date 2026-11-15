@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/furkanmeclis/go-ubltr/provider"
@@ -89,6 +90,10 @@ type Config struct {
 	// CallTimeout bounds one integrator call (default 2 minutes). A call
 	// that hangs fails its window or document instead of the whole run.
 	CallTimeout time.Duration
+	// HTTP is the transport for integrator calls (issue #45). The
+	// fixed-egress worker sets it to the client that leaves from the
+	// allowlisted IP (internal/platform/egress); nil uses go-ubltr's default.
+	HTTP *http.Client
 }
 
 func (c Config) withDefaults() Config {
@@ -169,8 +174,17 @@ func (s *Service) vaultOpener(ctx context.Context, conn db.SourceConnection, own
 	return Open(name, provider.Config{
 		Username: cr.Username, Password: cr.Password, APIKey: cr.APIKey,
 		Endpoint: cr.Endpoint, Test: cr.Test, VKN: ownTaxID, Options: cr.Options,
-		HTTP: auditDoer{next: auditHTTP, log: s.log, conn: conn.Uuid, system: conn.SourceSystem, vkn: ownTaxID},
+		HTTP: auditDoer{next: s.transport(), log: s.log, conn: conn.Uuid, system: conn.SourceSystem, vkn: ownTaxID},
 	})
+}
+
+// transport is the HTTP client under the audit log: the fixed-egress client
+// when configured (issue #45), otherwise the default.
+func (s *Service) transport() *http.Client {
+	if s.cfg.HTTP != nil {
+		return s.cfg.HTTP
+	}
+	return auditHTTP
 }
 
 // Counters are stored on sync_runs.counters.

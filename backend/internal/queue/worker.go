@@ -59,15 +59,9 @@ func NewWorker(cfg config.Config, log *slog.Logger, deliver DeliverNotificationF
 	}
 	server := asynq.NewServer(RedisOpt(cfg.Redis), asynq.Config{
 		Concurrency: concurrency,
-		Queues: map[string]int{
-			"default":          1,
-			QueueNotifications: 2,
-			QueueExports:       2,
-			QueueImports:       2,
-			QueueBulk:          2,
-			QueueSearch:        2,
-			QueueMaintenance:   1,
-		},
+		// WORKER_POOL selects the queues (issue #45): a dedicated
+		// fixed-egress pool, the general pool, or all of them.
+		Queues: PoolQueues(cfg.Queue.WorkerPool),
 		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
 			log.Error("queue_task_failed", "type", task.Type(), "error", err)
 			reportTaskFailure(ctx, task, err)

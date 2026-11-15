@@ -1499,6 +1499,32 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/platform/egress:
+    get:
+      tags: [Platform]
+      operationId: getPlatformEgress
+      summary: Fixed-egress (static outbound IP) status
+      description: |
+        Requires `platform.settings.read`. Integrator calls run on the
+        `fixed-egress` worker pool and must leave from an allowlisted IP
+        (issue #45). The egress worker checks its public IP every
+        `EGRESS_CHECK_INTERVAL` through the same transport the integrator
+        calls use; a mismatch fails the check task (error log and Sentry).
+        This shows the configuration and the last check. `stale` is true when
+        no check ran within two intervals (the egress worker may be down).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEgressStatus"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/platform/organizations:
     get:
       tags: [Platform]
@@ -12140,6 +12166,44 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerReceiptPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EgressCheck:
+      type: object
+      required: [observed_ip, expected_ips, ok, via_proxy, checked_at]
+      properties:
+        observed_ip: { type: string }
+        expected_ips:
+          type: array
+          items: { type: string }
+        ok: { type: boolean }
+        error: { type: string }
+        via_proxy: { type: boolean }
+        checked_at: { type: string, format: date-time }
+
+    EgressStatus:
+      type: object
+      required: [configured, via_proxy, expected_ips, last, stale, check_interval, now]
+      properties:
+        configured: { type: boolean, description: EGRESS_EXPECTED_IPS is set }
+        via_proxy: { type: boolean }
+        expected_ips:
+          type: array
+          items: { type: string }
+        last:
+          oneOf:
+            - $ref: "#/components/schemas/EgressCheck"
+            - type: "null"
+        stale: { type: boolean }
+        check_interval: { type: string, examples: ["15m0s"] }
+        now: { type: string, format: date-time }
+
+    EnvelopeEgressStatus:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EgressStatus" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:
