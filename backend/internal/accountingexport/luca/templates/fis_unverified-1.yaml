@@ -1,0 +1,26 @@
+# Luca "Excel Veri Aktarımı" muhasebe fişi şablonu (docs/02 §1.1, §3.3).
+#
+# DOĞRULANMADI: Luca'nın "Şablon indir" dosyası henüz elimizde değil (D18).
+# Aşağıdaki beş başlık, Luca destek makalesinde geçen zorunlu alan ADLARIDIR;
+# gerçek başlık yazımı, sırası, tarih biçimi ve ondalık ayırıcı şablon dosyası
+# gelince bu dosyada düzeltilir. Kod değişmez: yeni bir sürüm dosyası
+# (fis_<sürüm>.yaml) eklenip verified: true yapılır.
+driver: luca
+template: fis
+version: "unverified-1"
+verified: false
+file: { format: xlsx, sheet: "", header_row: 1 }
+# Luca: bir yüklemede en fazla 50 fiş; mahsup fişinde en fazla 400 satır
+# (açılış / kapanış fişinde satır sınırı yok).
+limits: { max_entries_per_file: 50, max_lines_per_mahsup: 400 }
+columns:            # sıra = dosyadaki sıra
+  - { key: entry_no,    header: "Fiş No",      required: true }
+  # Boş biçim: tarih hücresi (Excel tarihi) olarak yazılır.
+  - { key: entry_date,  header: "Fiş Tarihi",  required: true }
+  - { key: account,     header: "Hesap Kodu",  required: true }
+  # Boş decimal: tutar sayı hücresi olarak yazılır.
+  - { key: debit,       header: "Borç",        required: true }
+  - { key: credit,      header: "Alacak",      required: true }
+# Luca'daki fiş tipi değerleri şablondan teyit edilecek; şimdilik ortak adlar.
+entry_types: { mahsup: "Mahsup", acilis: "Açılış", kapanis: "Kapanış" }
+notes: "Sütunlar ve biçimler Luca şablon dosyasıyla doğrulanmadı."
