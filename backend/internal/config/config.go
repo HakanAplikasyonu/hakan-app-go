@@ -33,6 +33,16 @@ type Config struct {
 	Sentry     SentryConfig
 	Tenancy    TenancyConfig
 	AI         AIConfig
+	Parasut    ParasutConfig
+}
+
+// ParasutConfig is the Paraşüt integrator application (docs/kaynak 10 §1.1):
+// one registration for the whole platform; each taxpayer authorizes it.
+type ParasutConfig struct {
+	BaseURL      string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
 }
 
 // TenancyConfig controls organizations (the multi-tenant shell). See
@@ -390,6 +400,12 @@ func Load() (Config, error) {
 			SelfServe: getBool("TENANCY_SELF_SERVE", false),
 			CacheTTL:  getDuration("TENANCY_CACHE_TTL", 60*time.Second),
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
+		},
+		Parasut: ParasutConfig{
+			BaseURL:      getEnv("PARASUT_BASE_URL", "https://api.parasut.com"),
+			ClientID:     getEnv("PARASUT_CLIENT_ID", ""),
+			ClientSecret: getEnv("PARASUT_CLIENT_SECRET", ""),
+			RedirectURL:  getEnv("PARASUT_REDIRECT_URL", ""),
 		},
 		AI: AIConfig{
 			Provider:             getEnv("AI_PROVIDER", "anthropic"),

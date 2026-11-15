@@ -547,6 +547,7 @@ type Querier interface {
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
+	ListSourceConnectionsBySystem(ctx context.Context, arg ListSourceConnectionsBySystemParams) ([]SourceConnection, error)
 	ListStorageActivity(ctx context.Context, arg ListStorageActivityParams) ([]ListStorageActivityRow, error)
 	ListStorageLinksByKey(ctx context.Context, objectKey string) ([]StorageLink, error)
 	ListStorageSharesByKey(ctx context.Context, objectKey string) ([]ListStorageSharesByKeyRow, error)
@@ -698,7 +699,9 @@ type Querier interface {
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
+	SetSourceConnectionCompany(ctx context.Context, arg SetSourceConnectionCompanyParams) (SourceConnection, error)
 	SetSourceConnectionCredentialsRef(ctx context.Context, arg SetSourceConnectionCredentialsRefParams) (int64, error)
+	SetSourceConnectionState(ctx context.Context, arg SetSourceConnectionStateParams) (SourceConnection, error)
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
 	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
@@ -774,6 +777,9 @@ type Querier interface {
 	// re-enabled on every registration.
 	UpsertPushDevice(ctx context.Context, arg UpsertPushDeviceParams) (PushDevice, error)
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
+	// Ön muhasebe programlarından gelen masraflar (#47 Paraşüt): kaynak anahtarıyla
+	// tekil (uq_expenses_source); aynı kayıt tekrar gelirse tutarlar güncellenir.
+	UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpenseParams) (UpsertSourceExpenseRow, error)
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
