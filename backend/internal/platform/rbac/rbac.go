@@ -87,6 +87,10 @@ const (
 	// Hedef hesap planı (issue #30).
 	PermTenantAccountPlanRead  = "tenant.account_plan.read"
 	PermTenantAccountPlanWrite = "tenant.account_plan.write"
+	// Dönem yönetimi (issue #32): hazırlık durumu ve kilit, değişiklik talebi kararı.
+	PermTenantPeriodsRead          = "tenant.periods.read"
+	PermTenantPeriodsLock          = "tenant.periods.lock"
+	PermTenantChangeRequestsDecide = "tenant.change_requests.decide"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

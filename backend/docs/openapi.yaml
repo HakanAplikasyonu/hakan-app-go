@@ -84,6 +84,8 @@ tags:
 
   - name: AccountPlan
     description: Target account plan (Luca hesap planı / mizan import, ACCOUNT_NOT_IN_TARGET_PLAN check)
+  - name: Periods
+    description: Dönem yönetimi (hazırlık durumu, dönem kilidi, kilitli döneme gelen değişiklik talepleri, mükellef × dönem matrisi)
 paths:
   /healthz:
     get:
@@ -6364,6 +6366,281 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/periods/matrix:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Periods]
+      operationId: getTenantPeriodMatrix
+      summary: Engagement × period matrix (command center)
+      description: |
+        Requires `tenant.periods.read`. Active engagements of the office (only
+        assigned ones without `tenant.engagements.read_all`) × the last
+        `periods` months ending at `until` (default: the current month,
+        Türkiye time). Each cell: readiness (no open blocker and no open
+        change request), lock state and counts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: until, in: query, required: false, schema: { $ref: "#/components/schemas/Period" } }
+        - { name: periods, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 24, default: 6 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Matrix
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodMatrix"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/periods/{period}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/PeriodPath"
+    get:
+      tags: [Periods]
+      operationId: getEngagementPeriodReadiness
+      summary: Readiness of one period
+      description: |
+        Requires `tenant.periods.read`, `tenant.engagements.read` and engagement
+        access. `ready` is true when the period has no open blocker warning
+        (period-bound, or on an invoice of the period) and no open change
+        request. The lock is reported but does not decide readiness.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Readiness
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodReadiness"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/periods/{period}/lock:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/PeriodPath"
+    post:
+      tags: [Periods]
+      operationId: lockEngagementPeriod
+      summary: Lock a period
+      description: |
+        Requires `tenant.periods.lock` and engagement access. After locking,
+        invoices arriving for the period do not change the stored record: a
+        change request is opened and `LOCKED_PERIOD_CHANGE` raised
+        (02-adaptor-mimarisi.md §3.4). The lock is written to the lock event
+        log. 409 when the period is already locked.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeriodLockInput"
+      responses:
+        "200":
+          description: Readiness after locking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodReadiness"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/periods/{period}/unlock:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/PeriodPath"
+    post:
+      tags: [Periods]
+      operationId: unlockEngagementPeriod
+      summary: Unlock a period
+      description: |
+        Requires `tenant.periods.lock` and engagement access. `reason` is
+        required and kept in the lock event log. Open change requests stay
+        open. 409 when the period is not locked.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeriodUnlockInput"
+      responses:
+        "200":
+          description: Readiness after unlocking
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodReadiness"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/periods/{period}/lock-events:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/PeriodPath"
+    get:
+      tags: [Periods]
+      operationId: listEngagementPeriodLockEvents
+      summary: Lock audit trail of a period
+      description: Requires `tenant.periods.read` and engagement access. Newest first.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Lock events
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodLockEventList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/change-requests:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Periods]
+      operationId: listEngagementChangeRequests
+      summary: Change requests of locked periods
+      description: |
+        Requires `tenant.periods.read` and engagement access. Open requests
+        unless `status` is given (`all`: any status). Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, applied, rejected, all], default: open } }
+        - { name: period, in: query, required: false, schema: { $ref: "#/components/schemas/Period" } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Change requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeChangeRequestPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ChangeRequestUuid"
+    get:
+      tags: [Periods]
+      operationId: getEngagementChangeRequest
+      summary: One change request with its new content
+      description: Requires `tenant.periods.read` and engagement access. `new_payload` is the held invoice in the common model.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Change request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeChangeRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ChangeRequestUuid"
+    post:
+      tags: [Periods]
+      operationId: applyEngagementChangeRequest
+      summary: Apply a change request
+      description: |
+        Requires `tenant.change_requests.decide` and engagement access. Writes
+        the held content to the invoice through the normal upsert path (the
+        period stays locked), records who decided and when, and auto-resolves
+        `LOCKED_PERIOD_CHANGE` when no other request is open for the record,
+        all in one transaction. 409 when the request is already decided or
+        no longer applies (a source of equal or higher priority won meanwhile).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Applied change request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeChangeRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ChangeRequestUuid"
+    post:
+      tags: [Periods]
+      operationId: rejectEngagementChangeRequest
+      summary: Reject a change request
+      description: |
+        Requires `tenant.change_requests.decide` and engagement access. The
+        record is not changed; `LOCKED_PERIOD_CHANGE` auto-resolves when no
+        other request is open for the record. 409 when already decided.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rejected change request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeChangeRequest"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -6432,6 +6709,19 @@ components:
       in: query
       description: Comma-separated fields; prefix `-` for descending
       schema: { type: string }
+
+    PeriodPath:
+      name: period
+      in: path
+      required: true
+      description: Dönem (YYYY-MM)
+      schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+
+    ChangeRequestUuid:
+      name: changeRequestUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
 
   responses:
     BadRequest:
@@ -9979,4 +10269,183 @@ components:
             missing: { type: array, items: { type: string } }
             non_leaf: { type: array, items: { type: string } }
             invalid: { type: array, items: { type: string } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    Period:
+      type: string
+      pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$"
+      description: Dönem (YYYY-MM)
+      example: "2026-10"
+
+    PeriodLock:
+      type: object
+      required: [period, locked_at]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        note: { type: string }
+        locked_by_uuid: { type: string, format: uuid }
+        locked_at: { type: string, format: date-time }
+
+    PeriodReadinessReason:
+      type: object
+      required: [code, count]
+      properties:
+        code: { type: string, enum: [OPEN_BLOCKER, OPEN_CHANGE_REQUESTS] }
+        warning_code: { type: string, description: Warning code for OPEN_BLOCKER }
+        count: { type: integer, format: int64 }
+
+    PeriodReadiness:
+      type: object
+      required: [period, ready, locked, lock, open_blockers, open_change_requests, reasons]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        ready: { type: boolean, description: No open blocker and no open change request }
+        locked: { type: boolean }
+        lock:
+          oneOf:
+            - $ref: "#/components/schemas/PeriodLock"
+            - type: "null"
+        open_blockers: { type: integer, format: int64 }
+        open_change_requests: { type: integer, format: int64 }
+        reasons:
+          type: array
+          items: { $ref: "#/components/schemas/PeriodReadinessReason" }
+
+    PeriodLockInput:
+      type: object
+      additionalProperties: false
+      properties:
+        note: { type: string, maxLength: 2000 }
+
+    PeriodUnlockInput:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+
+    PeriodLockEvent:
+      type: object
+      required: [uuid, period, action, actor_uuid, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { $ref: "#/components/schemas/Period" }
+        action: { type: string, enum: [lock, unlock] }
+        reason: { type: string }
+        actor_uuid: { type: [string, "null"], format: uuid }
+        created_at: { type: string, format: date-time }
+
+    ChangeRequest:
+      type: object
+      required: [uuid, period, entity_type, invoice_uuid, kind, old_hash, new_hash, diff, status, decided_by_uuid, decided_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { $ref: "#/components/schemas/Period" }
+        entity_type: { type: string, enum: [invoice] }
+        invoice_uuid: { type: [string, "null"], format: uuid, description: "The invoice; null for a new invoice held back by the lock" }
+        kind: { type: string, enum: [create, update] }
+        old_hash: { type: [string, "null"] }
+        new_hash: { type: [string, "null"] }
+        diff:
+          type: object
+          description: "Fark özeti: kind, source {system, capture_method}, fields {name: {old, new}}"
+          additionalProperties: true
+        new_payload:
+          type: object
+          description: The held invoice (common model); only on the single-request read
+          additionalProperties: true
+        status: { type: string, enum: [open, applied, rejected] }
+        decided_by_uuid: { type: [string, "null"], format: uuid }
+        decided_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PeriodMatrixCell:
+      type: object
+      required: [period, ready, locked, locked_at, open_blockers, open_change_requests]
+      properties:
+        period: { $ref: "#/components/schemas/Period" }
+        ready: { type: boolean }
+        locked: { type: boolean }
+        locked_at: { type: [string, "null"], format: date-time }
+        open_blockers: { type: integer, format: int64 }
+        open_change_requests: { type: integer, format: int64 }
+
+    PeriodMatrixRow:
+      type: object
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, cells]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        taxpayer_tax_id: { type: string }
+        cells:
+          type: array
+          items: { $ref: "#/components/schemas/PeriodMatrixCell" }
+
+    EnvelopePeriodReadiness:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PeriodReadiness" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePeriodLockEventList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PeriodLockEvent" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeChangeRequest:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ChangeRequest" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeChangeRequestPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ChangeRequest" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePeriodMatrix:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [periods, items, total, limit, offset]
+          properties:
+            periods:
+              type: array
+              items: { $ref: "#/components/schemas/Period" }
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PeriodMatrixRow" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }

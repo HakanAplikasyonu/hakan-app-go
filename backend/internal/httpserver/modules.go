@@ -13,6 +13,8 @@ import (
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
+	periodsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods"
+	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	receiptsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
 	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
@@ -38,6 +40,7 @@ type moduleHandlers struct {
 	receipts *receiptshandler.Handler
 	// accountplan: hedef hesap planı (issue #30).
 	accountplan *accountplanhandler.Handler
+	periods     *periodshandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -57,5 +60,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		excelimportmodule.Module{H: h.excel, Engagements: h.engagements},
 		receiptsmodule.Module{H: h.receipts, Engagements: h.engagements},
 		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
+		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 	}
 }

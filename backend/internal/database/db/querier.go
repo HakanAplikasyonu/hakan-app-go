@@ -19,6 +19,11 @@ type Querier interface {
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
 	// tenant-lint: cross-org kabul, token özetiyle bulunan satırın id'siyle tek kullanımlık
 	AcceptTaxpayerInvitation(ctx context.Context, id int64) (int64, error)
+	// Kilitleme: o mükellef + döneme süren fatura yazımları bitene kadar bekler.
+	AcquirePeriodLockExclusive(ctx context.Context, arg AcquirePeriodLockExclusiveParams) error
+	// Dönem yönetimi (issue #32): kilit, hazırlık durumu, değişiklik talepleri.
+	// Fatura yazımı: aynı mükellef + dönem kilitlenirken bekler (paylaşımlı, tx sonuna kadar).
+	AcquirePeriodWriteLock(ctx context.Context, arg AcquirePeriodWriteLockParams) error
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
@@ -44,6 +49,7 @@ type Querier interface {
 	CountAppLogsByLevel(ctx context.Context) ([]CountAppLogsByLevelRow, error)
 	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
+	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
@@ -51,12 +57,19 @@ type Querier interface {
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
 	CountOnboardingRequestsByOrg(ctx context.Context, organizationID int64) (int64, error)
+	// Hazırlık: dönemin açık engelleyici uyarıları. Dönemsiz fatura uyarıları
+	// faturanın dönemine sayılır.
+	CountOpenBlockersByCode(ctx context.Context, arg CountOpenBlockersByCodeParams) ([]CountOpenBlockersByCodeRow, error)
+	CountOpenChangeRequestsForEntity(ctx context.Context, arg CountOpenChangeRequestsForEntityParams) (int64, error)
+	CountOpenChangeRequestsForPeriod(ctx context.Context, arg CountOpenChangeRequestsForPeriodParams) (int64, error)
 	CountOrganizationMembersByOrg(ctx context.Context, arg CountOrganizationMembersByOrgParams) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountOrganizationRoleUsage(ctx context.Context, arg CountOrganizationRoleUsageParams) (int32, error)
 	CountOrganizations(ctx context.Context, arg CountOrganizationsParams) (int64, error)
 	CountOutboxByStatus(ctx context.Context, status string) (int64, error)
 	CountPendingOrganizationInvitations(ctx context.Context, organizationID int64) (int64, error)
+	// tenant-lint: org-wide ofis dönem matrisi sayımı; ListPeriodMatrixEngagements ile aynı süzgeç
+	CountPeriodMatrixEngagements(ctx context.Context, arg CountPeriodMatrixEngagementsParams) (int64, error)
 	CountPermissions(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountPlatformNotifications(ctx context.Context, arg CountPlatformNotificationsParams) (int64, error)
 	CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error)
@@ -137,6 +150,7 @@ type Querier interface {
 	DeleteOfficeWarningRule(ctx context.Context, arg DeleteOfficeWarningRuleParams) (int64, error)
 	DeleteOrganizationMember(ctx context.Context, arg DeleteOrganizationMemberParams) (int64, error)
 	DeleteOrganizationRole(ctx context.Context, arg DeleteOrganizationRoleParams) (int64, error)
+	DeletePeriodLock(ctx context.Context, arg DeletePeriodLockParams) (int64, error)
 	DeletePushDeviceForUser(ctx context.Context, arg DeletePushDeviceForUserParams) (int64, error)
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error
 	DeletePushTickets(ctx context.Context, ids []int64) error
@@ -186,6 +200,8 @@ type Querier interface {
 	FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTNParams) ([]Invoice, error)
 	// 01 §6 kural 2: karşı taraf VKN/TCKN + fatura no + tarih.
 	FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInvoicesByPartyNumberDateParams) ([]Invoice, error)
+	// Aynı içerik ikinci kez gelirse açık talep tekrar kullanılır.
+	FindOpenChangeRequestByHash(ctx context.Context, arg FindOpenChangeRequestByHashParams) (ChangeRequest, error)
 	// 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
 	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
@@ -200,6 +216,8 @@ type Querier interface {
 	// tenant-lint: cross-org mükellefin kendi aktif engagement'ı (hangi ofiste olursa)
 	GetActiveEngagementOfTaxpayer(ctx context.Context, taxpayerID int64) (GetActiveEngagementOfTaxpayerRow, error)
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
+	// tenant-lint: cross-org fatura yazım yolu (kaynak veri, mükellef kapsamı): mükellefin aktif engagement'ındaki kilit (D1: tek aktif)
+	GetActivePeriodLockForTaxpayer(ctx context.Context, arg GetActivePeriodLockForTaxpayerParams) (GetActivePeriodLockForTaxpayerRow, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
@@ -209,6 +227,7 @@ type Querier interface {
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
+	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -250,6 +269,7 @@ type Querier interface {
 	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
 	// tenant-lint: cross-org mükellef sahibi talebi uuid ve kendi VKN'siyle bulur
 	GetPendingOnboardingRequestForTaxID(ctx context.Context, arg GetPendingOnboardingRequestForTaxIDParams) (GetPendingOnboardingRequestForTaxIDRow, error)
+	GetPeriodLock(ctx context.Context, arg GetPeriodLockParams) (PeriodLock, error)
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
@@ -329,6 +349,8 @@ type Querier interface {
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
+	InsertPeriodLock(ctx context.Context, arg InsertPeriodLockParams) (PeriodLock, error)
+	InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLockEventParams) (PeriodLockEvent, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
@@ -377,6 +399,7 @@ type Querier interface {
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
 	ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error)
+	ListChangeRequests(ctx context.Context, arg ListChangeRequestsParams) ([]ListChangeRequestsRow, error)
 	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
 	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
 	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)
@@ -443,6 +466,9 @@ type Querier interface {
 	// they can be revoked or re-sent.
 	ListPendingOrganizationInvitations(ctx context.Context, arg ListPendingOrganizationInvitationsParams) ([]ListPendingOrganizationInvitationsRow, error)
 	ListPendingSyncWindows(ctx context.Context, arg ListPendingSyncWindowsParams) ([]SyncWindow, error)
+	ListPeriodLockEvents(ctx context.Context, arg ListPeriodLockEventsParams) ([]ListPeriodLockEventsRow, error)
+	// tenant-lint: org-wide ofis dönem matrisi; read_all yoksa engagement_assignments ile süzülür
+	ListPeriodMatrixEngagements(ctx context.Context, arg ListPeriodMatrixEngagementsParams) ([]ListPeriodMatrixEngagementsRow, error)
 	ListPermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	ListPermissionSlugsByRoleSlug(ctx context.Context, slug string) ([]string, error)
 	ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error)
@@ -506,6 +532,8 @@ type Querier interface {
 	ListWarningRuleConfigs(ctx context.Context, arg ListWarningRuleConfigsParams) ([]ListWarningRuleConfigsRow, error)
 	ListWebAuthnCredentialsByUserID(ctx context.Context, userID int64) ([]WebauthnCredential, error)
 	ListWebAuthnCredentialsForUserIDs(ctx context.Context, userIds []int64) ([]WebauthnCredential, error)
+	// Karar: talebi satır kilidiyle okur (eşzamanlı iki karar tek sonuç verir).
+	LockChangeRequest(ctx context.Context, arg LockChangeRequestParams) (ChangeRequest, error)
 	// tenant-lint: cross-org onay işlemi, token ile bulunan satır kilitlenir
 	LockOnboardingRequest(ctx context.Context, id int64) (TaxpayerOnboardingRequest, error)
 	LockOrganizationRow(ctx context.Context, id int64) (Organization, error)
@@ -542,6 +570,9 @@ type Querier interface {
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
+	PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error)
+	PeriodMatrixChangeRequests(ctx context.Context, arg PeriodMatrixChangeRequestsParams) ([]PeriodMatrixChangeRequestsRow, error)
+	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
 	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)
