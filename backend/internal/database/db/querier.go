@@ -23,6 +23,8 @@ type Querier interface {
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
+	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
+	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
 	ClearAppSettingsLogo(ctx context.Context) (AppSetting, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
@@ -73,6 +75,7 @@ type Querier interface {
 	// tarafı mükellefe yalnızca aktif ve erişilebilir bir engagement üzerinden
 	// ulaşır (GetTaxpayerForOfficeMember).
 	CreateTaxpayer(ctx context.Context, arg CreateTaxpayerParams) (Taxpayer, error)
+	CreateUBLUploadJob(ctx context.Context, arg CreateUBLUploadJobParams) (UblUploadJob, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWebAuthnCredential(ctx context.Context, arg CreateWebAuthnCredentialParams) (WebauthnCredential, error)
 	// Self-service account deletion: keep every row, mark the user disabled.
@@ -118,6 +121,8 @@ type Querier interface {
 	// 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
+	// tenant-lint: cross-org worker finishes the job it claimed by id
+	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
@@ -175,8 +180,12 @@ type Querier interface {
 	// ended engagement, another office's engagement or a missing assignment all
 	// return no row.
 	GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpayerForOfficeMemberParams) (Taxpayer, error)
+	// Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
+	// adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
+	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
 	GetTenantRoleByKey(ctx context.Context, arg GetTenantRoleByKeyParams) (Role, error)
+	GetUBLUploadJob(ctx context.Context, arg GetUBLUploadJobParams) (UblUploadJob, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, error)
@@ -196,7 +205,7 @@ type Querier interface {
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
-	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) error
+	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
@@ -280,6 +289,7 @@ type Querier interface {
 	// tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
 	ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error)
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
+	ListUBLUploadJobs(ctx context.Context, arg ListUBLUploadJobsParams) ([]UblUploadJob, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
 	ListUserRolesByUserUUID(ctx context.Context, argUuid uuid.UUID) ([]Role, error)
@@ -328,6 +338,8 @@ type Querier interface {
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)
+	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
+	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.

@@ -51,6 +51,8 @@ tags:
     description: Organization-scoped routes (`X-Organization` header; `TENANCY_ENABLED`)
   - name: Engagements
     description: Ofis <-> mükellef hizmet ilişkisi ve üye atamaları (`X-Organization`; `TENANCY_ENABLED`)
+  - name: Invoices
+    description: Mükellef faturaları; UBL / ZIP yükleme (aktif engagement)
   - name: AI
     description: AI module (office cost report, provider privacy statement)
   - name: Taxpayers
@@ -4162,6 +4164,98 @@ paths:
         "429": { $ref: "#/components/responses/TooManyRequests" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/ubl-uploads:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Invoices]
+      operationId: uploadTenantUBLInvoices
+      summary: Upload UBL-TR XML / ZIP invoices
+      description: |
+        Requires `tenant.invoices.write` and an active engagement. Accepts a
+        single UBL-TR XML, a ZIP of XML files, base64 text or a GİB envelope
+        (max 200 MB). The file is processed in the background: XSD, GİB
+        Schematron (failure → `UBL_SCHEMATRON_FAIL` warning, invoice kept),
+        mapping to the common model and duplicate check by ETTN. Poll the job
+        for its report.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "202":
+          description: Job accepted (status `queued`, or `done` when processed inline)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJob"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "413":
+          description: File too large (`UPLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: Not XML, ZIP or base64 (`UNSUPPORTED_FILE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    get:
+      tags: [Invoices]
+      operationId: listTenantUBLUploads
+      summary: List UBL upload jobs (newest first, without item details)
+      description: Requires `tenant.invoices.read` and an active engagement.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJobList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/ubl-uploads/{jobUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: jobUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Invoices]
+      operationId: getTenantUBLUpload
+      summary: Get a UBL upload job with its report
+      description: Requires `tenant.invoices.read` and an active engagement.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Job and report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeUBLUploadJob"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -6215,6 +6309,71 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    UBLUploadItem:
+      type: object
+      required: [name, status]
+      properties:
+        name: { type: string, description: File name (inside the ZIP) }
+        status: { type: string, enum: [added, duplicate, failed] }
+        ettn: { type: string, format: uuid }
+        invoice_number: { type: string }
+        invoice_uuid: { type: string, format: uuid }
+        error_code:
+          type: string
+          enum: [unreadable, unsupported_document, xsd_invalid, PARTY_MISMATCH, mapping_failed, store_failed]
+        error: { type: string }
+        warnings: { type: array, items: { type: string }, description: Warning codes raised for an added invoice }
+
+    UBLUploadReport:
+      type: object
+      required: [total, added, duplicate, failed, items]
+      properties:
+        total: { type: integer }
+        added: { type: integer }
+        duplicate: { type: integer }
+        failed: { type: integer }
+        items:
+          type: [array, "null"]
+          items: { $ref: "#/components/schemas/UBLUploadItem" }
+
+    UBLUploadJob:
+      type: object
+      required: [uuid, file_name, size_bytes, status, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        file_name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        status: { type: string, enum: [queued, processing, done, failed] }
+        report: { $ref: "#/components/schemas/UBLUploadReport" }
+        error: { type: string }
+        created_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+
+    EnvelopeUBLUploadJob:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/UBLUploadJob" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeUBLUploadJobList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/UBLUploadJob" }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

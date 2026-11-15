@@ -44,6 +44,7 @@ import (
 	oauthprovidermodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider"
 	oauthproviderhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/handler"
 	oauthproviderusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/usecase"
+	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
 	notifmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications"
@@ -301,6 +302,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayerHandler := taxpayersmodule.NewHandler(taxpayersmodule.New(taxpayersmodule.NewPostgres(deps.Queries)))
 	taxpayersmodule.RegisterPlatformRoutes(mux, tokens, loader, taxpayerHandler)
 	taxpayersmodule.RegisterTenantRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerHandler)
+	// UBL / ZIP fatura yükleme (issue #11), aktif engagement zinciri arkasında.
+	var ublEnq invoiceupload.Enqueuer
+	if deps.Queue != nil {
+		ublEnq = deps.Queue
+	}
+	ublSvc := invoiceupload.New(deps.DB, deps.Storage, ublEnq, log)
+	invoiceupload.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceupload.NewHandler(ublSvc))
+	if s.worker != nil {
+		s.worker.WithUBLUpload(ublSvc.Process)
+	}
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)

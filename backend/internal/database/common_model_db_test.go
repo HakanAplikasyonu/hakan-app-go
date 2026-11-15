@@ -86,14 +86,15 @@ func TestCommonDataModelRoundTrip(t *testing.T) {
 	must(params.IssueDate.Scan("2026-10-15"))
 	inv, err := q.InsertInvoice(ctx, params)
 	must(err)
-	must(q.InsertInvoiceItem(ctx, db.InsertInvoiceItemParams{
+	_, err = q.InsertInvoiceItem(ctx, db.InsertInvoiceItemParams{
 		TaxpayerID: tp1, InvoiceID: inv.ID, LineNo: 1, Name: "Kalem", Quantity: num(t, "1.5"), UnitPrice: num(t, "66.748933"),
 		LineExtensionAmount: num(t, "100.1234"), OwnAllowanceAmount: num(t, "0"), AllowanceTotalAmount: num(t, "0"),
 		TaxExclusiveAmount: num(t, "100.1234"), TaxRate: num(t, "20"), TotalTaxAmount: num(t, "20.0247"),
 		TaxInclusiveAmount: num(t, "120.1481"), WithholdingRate: num(t, "0"), WithholdingAmount: num(t, "0"),
 		ExciseRate: num(t, "0"), ExciseAmount: num(t, "0"), CommunicationsTaxRate: num(t, "0"), CommunicationsTaxAmount: num(t, "0"),
 		IncomeTaxWithholdingAmount: num(t, "0"), LineType: "unknown", TaxBreakdowns: []byte(`[]`),
-	}))
+	})
+	must(err)
 	must(q.InsertInvoiceTaxSummary(ctx, db.InsertInvoiceTaxSummaryParams{
 		TaxpayerID: tp1, InvoiceID: inv.ID, TaxRate: num(t, "20"), Base: num(t, "100.1234"), Vat: num(t, "20.0247"), Withholding: num(t, "0"),
 	}))
@@ -129,7 +130,7 @@ func TestCommonDataModelRoundTrip(t *testing.T) {
 
 	// An item cannot point at another taxpayer's invoice (composite FK).
 	must(savepoint(ctx, tx))
-	err = q.InsertInvoiceItem(ctx, db.InsertInvoiceItemParams{
+	_, err = q.InsertInvoiceItem(ctx, db.InsertInvoiceItemParams{
 		TaxpayerID: tp2, InvoiceID: inv.ID, LineNo: 9, Quantity: num(t, "0"), UnitPrice: num(t, "0"),
 		LineExtensionAmount: num(t, "0"), OwnAllowanceAmount: num(t, "0"), AllowanceTotalAmount: num(t, "0"),
 		TaxExclusiveAmount: num(t, "0"), TaxRate: num(t, "0"), TotalTaxAmount: num(t, "0"), TaxInclusiveAmount: num(t, "0"),

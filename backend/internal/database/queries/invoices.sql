@@ -64,7 +64,7 @@ WHERE taxpayer_id = @taxpayer_id AND period = @period
 ORDER BY issue_date, id
 LIMIT @lim OFFSET @off;
 
--- name: InsertInvoiceItem :exec
+-- name: InsertInvoiceItem :one
 INSERT INTO invoice_items (
     taxpayer_id, invoice_id, line_no, name, description, product_code, quantity, unit_code, unit_price,
     line_extension_amount, own_allowance_amount, allowance_total_amount, tax_exclusive_amount,
@@ -79,7 +79,8 @@ INSERT INTO invoice_items (
     sqlc.narg(tax_exemption_code), sqlc.narg(special_tax_base_code), sqlc.narg(special_tax_base_amount), sqlc.narg(export_registered_code), sqlc.narg(gtip_code),
     @excise_rate, @excise_amount, @communications_tax_rate, @communications_tax_amount,
     @income_tax_withholding_amount, @line_type, @tax_breakdowns
-);
+)
+RETURNING id;
 
 -- name: ListInvoiceItems :many
 SELECT * FROM invoice_items
@@ -111,3 +112,10 @@ JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpay
 WHERE i.taxpayer_id = @taxpayer_id AND i.period = @period AND i.status_normalized = 'active'
 GROUP BY i.direction, s.tax_rate, s.withholding_code, s.tax_exemption_code
 ORDER BY i.direction, s.tax_rate;
+
+-- name: GetTaxpayerOwnTaxID :one
+-- Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
+-- adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
+SELECT COALESCE(to_jsonb(t) ->> 'tax_number', to_jsonb(t) ->> 'vkn', to_jsonb(t) ->> 'tax_id', to_jsonb(t) ->> 'identity_number', '')::text AS own_tax_id
+FROM taxpayers t
+WHERE t.id = @taxpayer_id;

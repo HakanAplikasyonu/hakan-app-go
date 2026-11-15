@@ -816,6 +816,26 @@ type Taxpayer struct {
 	TaxOffice string             `json:"tax_office"`
 }
 
+type UblUploadJob struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	ActorID        int64              `json:"actor_id"`
+	FileName       string             `json:"file_name"`
+	FileKey        string             `json:"file_key"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	Status         string             `json:"status"`
+	Report         []byte             `json:"report"`
+	Error          pgtype.Text        `json:"error"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	FinishedAt     pgtype.Timestamptz `json:"finished_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type User struct {
 	ID              int64              `json:"id"`
 	Uuid            uuid.UUID          `json:"uuid"`

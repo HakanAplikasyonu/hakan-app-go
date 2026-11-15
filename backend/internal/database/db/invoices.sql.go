@@ -483,6 +483,21 @@ func (q *Queries) GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySource
 	return i, err
 }
 
+const getTaxpayerOwnTaxID = `-- name: GetTaxpayerOwnTaxID :one
+SELECT COALESCE(to_jsonb(t) ->> 'tax_number', to_jsonb(t) ->> 'vkn', to_jsonb(t) ->> 'tax_id', to_jsonb(t) ->> 'identity_number', '')::text AS own_tax_id
+FROM taxpayers t
+WHERE t.id = $1
+`
+
+// Mükellefin kendi VKN/TCKN'si. taxpayers kimlik kolonları #3'te geliyor; kolon
+// adı kesinleşene kadar satır JSON'undan okunur (kolon yoksa NULL).
+func (q *Queries) GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error) {
+	row := q.db.QueryRow(ctx, getTaxpayerOwnTaxID, taxpayerID)
+	var own_tax_id string
+	err := row.Scan(&own_tax_id)
+	return own_tax_id, err
+}
+
 const insertInvoice = `-- name: InsertInvoice :one
 INSERT INTO invoices (
     taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type,
@@ -620,7 +635,7 @@ func (q *Queries) InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (I
 	return i, err
 }
 
-const insertInvoiceItem = `-- name: InsertInvoiceItem :exec
+const insertInvoiceItem = `-- name: InsertInvoiceItem :one
 INSERT INTO invoice_items (
     taxpayer_id, invoice_id, line_no, name, description, product_code, quantity, unit_code, unit_price,
     line_extension_amount, own_allowance_amount, allowance_total_amount, tax_exclusive_amount,
@@ -636,6 +651,7 @@ INSERT INTO invoice_items (
     $25, $26, $27, $28,
     $29, $30, $31
 )
+RETURNING id
 `
 
 type InsertInvoiceItemParams struct {
@@ -672,8 +688,8 @@ type InsertInvoiceItemParams struct {
 	TaxBreakdowns              []byte         `json:"tax_breakdowns"`
 }
 
-func (q *Queries) InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) error {
-	_, err := q.db.Exec(ctx, insertInvoiceItem,
+func (q *Queries) InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertInvoiceItem,
 		arg.TaxpayerID,
 		arg.InvoiceID,
 		arg.LineNo,
@@ -706,7 +722,9 @@ func (q *Queries) InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemPa
 		arg.LineType,
 		arg.TaxBreakdowns,
 	)
-	return err
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const insertInvoiceTaxSummary = `-- name: InsertInvoiceTaxSummary :exec
