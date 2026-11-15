@@ -77,6 +77,8 @@ tags:
     description: Excel / CSV import (04-excel-ice-aktarma.md)
   - name: Receipts
     description: Receipt capture (OCR drafts, vehicle list, plate check)
+  - name: Summaries
+    description: AI period summary drafts (numbers backed by portal data)
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -5867,6 +5869,150 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/period-summaries:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Summaries]
+      operationId: generatePeriodSummary
+      summary: Draft an AI period summary
+      description: |
+        Requires `tenant.summaries.write`. Facts (sales / purchase base and VAT, counts, VAT difference, approved expenses, change vs the previous period, open warnings) are computed from portal data with their source. The AI writes the prose with {{Fn}} placeholders only; an answer with any other digit is rejected (one retry, then a fixed template). An earlier draft of the period is superseded. Nothing is sent.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period]
+              properties:
+                period: { type: string, example: "2026-10" }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodSummary"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    get:
+      tags: [Summaries]
+      operationId: listPeriodSummaries
+      summary: Period summaries
+      description: |
+        Requires `tenant.summaries.read`. Latest 50.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodSummaryList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: summaryUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Summaries]
+      operationId: getPeriodSummary
+      summary: Period summary
+      description: |
+        Requires `tenant.summaries.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodSummary"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Summaries]
+      operationId: editPeriodSummary
+      summary: Edit a draft
+      description: |
+        Requires `tenant.summaries.write`. Drafts only; numbers are checked on approval.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body: { type: string, maxLength: 20000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodSummary"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: summaryUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Summaries]
+      operationId: approvePeriodSummary
+      summary: Approve a draft
+      description: |
+        Requires `tenant.summaries.approve` (accountant). Refused with 422 and the offending numbers when the body has a number that is not one of the facts (or the period''s year / month).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePeriodSummary"
+        "422":
+          description: A number in the body is not backed by portal data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -7560,6 +7706,62 @@ components:
                 suppressed: { type: integer }
                 disabled: { type: integer }
                 auto_resolved: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    PeriodSummaryFact:
+      type: object
+      required: [id, label, value, unit, rendered, source]
+      properties:
+        id: { type: string, example: F1 }
+        label: { type: string }
+        value: { type: string, description: "Non-negative decimal" }
+        unit: { type: string, enum: [TRY, count, percent] }
+        rendered: { type: string, example: "95.250,75 TL" }
+        source:
+          type: object
+          properties:
+            table: { type: string }
+            filter: { type: string }
+            records: { type: integer }
+
+    PeriodSummary:
+      type: object
+      required: [uuid, period, status, facts, template, body, edited, model, approved_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        status: { type: string, enum: [draft, approved, superseded] }
+        facts:
+          type: array
+          items: { $ref: "#/components/schemas/PeriodSummaryFact" }
+        template: { type: string, description: "AI text with {{Fn}} placeholders" }
+        body: { type: string }
+        edited: { type: boolean }
+        model: { type: [string, "null"] }
+        approved_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EnvelopePeriodSummary:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PeriodSummary" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePeriodSummaryList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PeriodSummary" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:

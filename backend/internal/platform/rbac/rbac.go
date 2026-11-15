@@ -81,6 +81,10 @@ const (
 	PermTenantReceiptsRead    = "tenant.receipts.read"
 	PermTenantReceiptsWrite   = "tenant.receipts.write"
 	PermTenantReceiptsApprove = "tenant.receipts.approve"
+	// AI dönem özeti (issue #35).
+	PermTenantSummariesRead    = "tenant.summaries.read"
+	PermTenantSummariesWrite   = "tenant.summaries.write"
+	PermTenantSummariesApprove = "tenant.summaries.approve"
 	// Bank statements and movements (#19, #20).
 	PermTenantBankRead  = "tenant.bank.read"
 	PermTenantBankWrite = "tenant.bank.write"

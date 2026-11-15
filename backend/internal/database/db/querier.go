@@ -29,6 +29,7 @@ type Querier interface {
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
 	ApproveJournalDraft(ctx context.Context, arg ApproveJournalDraftParams) (int64, error)
+	ApprovePeriodSummary(ctx context.Context, arg ApprovePeriodSummaryParams) (PeriodSummary, error)
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
@@ -270,6 +271,7 @@ type Querier interface {
 	// tenant-lint: cross-org mükellef sahibi talebi uuid ve kendi VKN'siyle bulur
 	GetPendingOnboardingRequestForTaxID(ctx context.Context, arg GetPendingOnboardingRequestForTaxIDParams) (GetPendingOnboardingRequestForTaxIDRow, error)
 	GetPeriodLock(ctx context.Context, arg GetPeriodLockParams) (PeriodLock, error)
+	GetPeriodSummary(ctx context.Context, arg GetPeriodSummaryParams) (PeriodSummary, error)
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
@@ -351,6 +353,7 @@ type Querier interface {
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPeriodLock(ctx context.Context, arg InsertPeriodLockParams) (PeriodLock, error)
 	InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLockEventParams) (PeriodLockEvent, error)
+	InsertPeriodSummary(ctx context.Context, arg InsertPeriodSummaryParams) (PeriodSummary, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
@@ -469,6 +472,7 @@ type Querier interface {
 	ListPeriodLockEvents(ctx context.Context, arg ListPeriodLockEventsParams) ([]ListPeriodLockEventsRow, error)
 	// tenant-lint: org-wide ofis dönem matrisi; read_all yoksa engagement_assignments ile süzülür
 	ListPeriodMatrixEngagements(ctx context.Context, arg ListPeriodMatrixEngagementsParams) ([]ListPeriodMatrixEngagementsRow, error)
+	ListPeriodSummaries(ctx context.Context, arg ListPeriodSummariesParams) ([]PeriodSummary, error)
 	ListPermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	ListPermissionSlugsByRoleSlug(ctx context.Context, slug string) ([]string, error)
 	ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error)
@@ -631,9 +635,16 @@ type Querier interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
+	// Onaylı masraflar (beyana yalnızca onaylı masraf girer).
+	SummaryExpenseTotals(ctx context.Context, arg SummaryExpenseTotalsParams) (SummaryExpenseTotalsRow, error)
+	// AI dönem özeti (issue #35): olgu sorguları ve taslaklar.
+	// Dönemin aktif faturaları, yöne göre.
+	SummaryInvoiceTotals(ctx context.Context, arg SummaryInvoiceTotalsParams) ([]SummaryInvoiceTotalsRow, error)
+	SummaryOpenWarnings(ctx context.Context, arg SummaryOpenWarningsParams) ([]SummaryOpenWarningsRow, error)
 	// İnceleme kuyruğu (issue #14).
 	// Aynı hedef alanın bekleyen önerisi yenisiyle değişir.
 	SupersedePendingSuggestions(ctx context.Context, arg SupersedePendingSuggestionsParams) ([]SupersedePendingSuggestionsRow, error)
+	SupersedePeriodSummaryDrafts(ctx context.Context, arg SupersedePeriodSummaryDraftsParams) error
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
@@ -651,6 +662,7 @@ type Querier interface {
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateOrganizationRole(ctx context.Context, arg UpdateOrganizationRoleParams) (Role, error)
+	UpdatePeriodSummaryBody(ctx context.Context, arg UpdatePeriodSummaryBodyParams) (PeriodSummary, error)
 	UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSaleFieldParams) (RetailSale, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
