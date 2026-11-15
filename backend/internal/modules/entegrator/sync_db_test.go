@@ -501,3 +501,28 @@ func TestEndDateOnlyProfile(t *testing.T) {
 		}
 	}
 }
+
+// hangingFetch never answers a UBL download.
+type hangingFetch struct{ *spy }
+
+func (hangingFetch) Fetch(ctx context.Context, _ provider.FetchQuery) (*provider.FetchResult, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// Asılı kalan tek çağrı çalışmayı durdurmaz: CallTimeout sonunda belge
+// failed olur, çalışma partial biter.
+func TestCallTimeout(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, Config{CallTimeout: 50 * time.Millisecond})
+	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) { return Wrap(hangingFetch{e.spy}), nil })
+	e.deliver(t, 1, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-14T09:00:00+03:00"))
+	e.deliver(t, 2, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-14T10:00:00+03:00"))
+	rep, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunIncremental)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Status != "partial" || rep.Counters.UBLFailed != 2 || rep.Counters.New != 2 {
+		t.Fatalf("report %+v", rep)
+	}
+}

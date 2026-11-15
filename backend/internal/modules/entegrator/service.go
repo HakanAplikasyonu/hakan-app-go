@@ -86,6 +86,9 @@ type Config struct {
 	IncrementalLookback time.Duration
 	// ManualInterval is the floor between manual runs (default 5 minutes).
 	ManualInterval time.Duration
+	// CallTimeout bounds one integrator call (default 2 minutes). A call
+	// that hangs fails its window or document instead of the whole run.
+	CallTimeout time.Duration
 }
 
 func (c Config) withDefaults() Config {
@@ -112,6 +115,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.ManualInterval <= 0 {
 		c.ManualInterval = 5 * time.Minute
+	}
+	if c.CallTimeout <= 0 {
+		c.CallTimeout = 2 * time.Minute
 	}
 	return c
 }
@@ -363,12 +369,14 @@ func kindOf(err error) provider.ErrorKind {
 }
 
 // abortsRun: errors after which no further call of this run can succeed.
-func abortsRun(err error) bool {
+// A single call that ran past CallTimeout does not end the run; the run's
+// own context being done does.
+func abortsRun(ctx context.Context, err error) bool {
 	switch kindOf(err) {
 	case provider.KindAuth, provider.KindPermission, provider.KindRateLimit:
 		return true
 	}
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	return ctx.Err() != nil
 }
 
 func errorJSON(err error) []byte {

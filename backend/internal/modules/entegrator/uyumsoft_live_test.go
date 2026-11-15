@@ -108,7 +108,7 @@ func TestUyumsoftLiveSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	svc := New(d.Pool, nil, storage.NewMemory(), Config{IncrementalLookback: to.Sub(from), RequestGap: 200 * time.Millisecond}, nil).
+	svc := New(d.Pool, nil, storage.NewMemory(), Config{IncrementalLookback: to.Sub(from), RequestGap: 200 * time.Millisecond, CallTimeout: time.Minute}, nil).
 		WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) { return c, nil }).
 		WithClock(func() time.Time { return to })
 	rep, err := svc.Run(ctx, tp, conn.Uuid, RunIncremental)
