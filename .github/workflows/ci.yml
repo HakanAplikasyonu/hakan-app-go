@@ -1,0 +1,588 @@
+name: CI
+
+# Push covers every branch; a pull_request trigger only duplicated those runs
+# and, for PRs opened by the auto-pr job (github-actions bot), produced empty
+# "failure"/"action_required" runs that showed as red X's.
+#
+# schedule: a weekly image-build keeps the GHCR cache warm and catches base-image
+# drift. workflow_dispatch lets you force a full build/publish by hand.
+on:
+  push:
+    branches: ["**"]
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC (off the hour to dodge the rush)
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Feature branches: newest push wins. main: never cancel mid-run, or a
+  # publish could land without its tag (and release numbers could be skipped).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Path filter. Plain `git diff` (no third-party action) decides which jobs
+  # run. Outputs gate every downstream job. Mapping:
+  #   backend/**            -> backend, contracts
+  #   backend/migrations/** -> + infra (image rebuild)
+  #   frontend/**           -> frontend, contracts
+  #   mobile/**             -> mobile, mobile_release (see the OpenAPI note in
+  #                            the mobile job; openapi.yaml NEVER maps to mobile)
+  #   Dockerfiles / compose.prod.yml / deploy/** -> infra (image build)
+  #   backend/cmd/** , backend/deploy/** , go.mod/go.sum , frontend
+  #   package.json / pnpm-lock.yaml / next.config.* -> their app + infra
+  #   docs/** , *.md , .github/* (other than this file) -> nothing
+  #   this workflow file    -> full (run everything)
+  # schedule / workflow_dispatch -> full.
+  # `images` echoes deploy/images.json so image-build/publish-images can matrix
+  # over every build-context service without hardcoding backend+frontend.
+  # ---------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      backend: ${{ steps.f.outputs.backend }}
+      frontend: ${{ steps.f.outputs.frontend }}
+      contracts: ${{ steps.f.outputs.contracts }}
+      infra: ${{ steps.f.outputs.infra }}
+      mobile: ${{ steps.f.outputs.mobile }}
+      full: ${{ steps.f.outputs.full }}
+      mobile_release: ${{ steps.f.outputs.mobile_release }}
+      images: ${{ steps.f.outputs.images }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: f
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          backend=false; frontend=false; contracts=false
+          infra=false; mobile=false; full=false
+
+          if [ "$EVENT" != "push" ]; then
+            # schedule / workflow_dispatch: no diff to compute, build everything.
+            full=true
+            files=""
+          else
+            # main: diff this push (BEFORE..SHA), which only decides mobile_release;
+            # every main push runs the full suite below, so publish-images never
+            # ships code whose tests were skipped. Feature branches: diff the
+            # whole branch against its merge-base with main, so a docs-only push
+            # after a red one still re-tests the branch before auto-pr merges it.
+            base="$BEFORE"
+            [ "$REF" = "refs/heads/main" ] || base=""
+            if [ -z "$base" ] \
+               || [ "$base" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              # New branch or the before-commit is not in history: diff against
+              # the merge-base with main; if that is unknown, treat as full.
+              base=""
+              if git fetch --no-tags --quiet origin main 2>/dev/null; then
+                base="$(git merge-base FETCH_HEAD "$SHA" 2>/dev/null || true)"
+              fi
+            fi
+            if [ -z "$base" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+              full=true
+              files=""
+            else
+              files="$(git diff --name-only "$base" "$SHA")"
+            fi
+          fi
+
+          # The workflow file changing means "re-run everything".
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              case "$file" in
+                .github/workflows/ci.yml) full=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              # Order matters: first match wins (case globs, * spans '/').
+              case "$file" in
+                docs/*|*.md|.github/*)              : ;;   # nothing (before app dirs: backend/*.md is docs)
+                compose.prod.yml|deploy/*)          infra=true ;;
+                */Dockerfile|Dockerfile)            infra=true ;;
+                # Image-shaping files outside the Dockerfile: the build loop
+                # (backend/cmd), the entrypoint, and the dependency manifests.
+                backend/cmd/*|backend/deploy/*|backend/go.mod|backend/go.sum)
+                                                    backend=true; contracts=true; infra=true ;;
+                frontend/package.json|frontend/pnpm-lock.yaml|frontend/next.config.*)
+                                                    frontend=true; contracts=true; infra=true ;;
+                backend/migrations/*)               backend=true; contracts=true; infra=true ;;
+                backend/*)                          backend=true; contracts=true ;;
+                frontend/*)                         frontend=true; contracts=true ;;
+                mobile/*)                           mobile=true ;;
+                *)                                  : ;;   # unmapped -> nothing
+              esac
+            done <<< "$files"
+          fi
+
+          if [ "$full" = "true" ] || [ "$REF" = "refs/heads/main" ]; then
+            backend=true; frontend=true; contracts=true; infra=true; mobile=true
+          fi
+
+          # mobile_release: ONLY a real (non-doc) mobile/** diff. Never set by
+          # `full`, and never by backend/docs/openapi.yaml — see the mobile job.
+          mobile_release=false
+          if [ -n "$files" ]; then
+            while IFS= read -r file; do
+              case "$file" in
+                *.md) ;;
+                mobile/*) mobile_release=true ;;
+              esac
+            done <<< "$files"
+          fi
+
+          images="$(jq -c '.images' deploy/images.json)"
+
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "contracts=$contracts"
+            echo "infra=$infra"
+            echo "mobile=$mobile"
+            echo "full=$full"
+            echo "mobile_release=$mobile_release"
+            echo "images=$images"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile full=$full mobile_release=$mobile_release"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+      - uses: sqlc-dev/setup-sqlc@v5
+        with:
+          sqlc-version: "1.31.1"
+      - name: sqlc generate
+        run: sqlc generate
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+      # Tenant izolasyon lint'i: tenant_tables.txt'deki her tablo sorgusu
+      # organization_id ile kapsanmalı (internal/database/queries_test.go).
+      - name: tenant_tables lint
+        run: go test ./internal/database/ -run TestTenantQueriesReferenceOrganization -count=1 -v
+      - name: Test
+        run: go test ./...
+      - name: OpenAPI lint
+        run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
+
+  # Runs on a frontend change OR a contract change (backend/** sets contracts),
+  # so a backend API edit re-verifies the committed frontend client.
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.contracts == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Lint
+        run: pnpm lint
+      - name: i18n
+        working-directory: .
+        run: node scripts/check-i18n.mjs
+      - name: Build
+        run: pnpm build
+
+  # Env config (docs/design/env-core.md): .env.server.example matches
+  # deploy/env/schema, .env.example has every schema key, prod-env tests pass
+  # (they also run `docker compose config` on compose.prod.yml).
+  env:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Env schema sync
+        run: scripts/check-env-sync.sh
+      - name: Backend env reaches compose.prod.yml
+        run: |
+          scripts/check-compose-env.sh
+          scripts/check-compose-env.test.sh
+
+  # Build every build-context image (deploy/images.json), NO push. Proves the
+  # Dockerfiles still build on an infra change / weekly / manual run. Skipped on
+  # main pushes, where publish-images builds and pushes the same images.
+  # Non-release builds are versioned sha-<short> (no release notes).
+  image-build:
+    needs: changes
+    if: >-
+      ( github.event_name != 'push' || github.ref != 'refs/heads/main' ) &&
+      ( needs.changes.outputs.infra == 'true' || needs.changes.outputs.full == 'true' )
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - id: meta
+        run: |
+          echo "version=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Build ${{ matrix.image.service }} (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.context }}/${{ matrix.image.dockerfile }}
+          push: false
+          # Always re-resolve FROM tags (pinned Go toolchain, security fixes).
+          pull: true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ steps.meta.outputs.built_at }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Main push: decide the release ONCE, before any image is built, so every
+  # image bakes the same provenance and release-tag cuts exactly this version.
+  #   version  next v0.N (after the highest existing v0.* tag)
+  #   notes    auto-generated: `git log --no-merges` since the previous v0.* tag
+  #            (no hand-kept CHANGELOG), capped at 200 lines
+  #   release  base64 release.json {version, git_sha, built_at, notes} -> the
+  #            backend embeds it (internal/buildinfo); cmd/release-record writes
+  #            it to app_releases when the migrate service runs on deploy.
+  release-meta:
+    needs: changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.m.outputs.version }}
+      built_at: ${{ steps.m.outputs.built_at }}
+      release_b64: ${{ steps.m.outputs.release_b64 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: m
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          last="$(git tag -l 'v0.*' | sed -n 's/^v0\.\([0-9]\+\)$/\1/p' | sort -n | tail -1)"
+          version="v0.$(( ${last:-0} + 1 ))"
+          if [ -n "$last" ]; then
+            range="v0.${last}..${GITHUB_SHA}"; since="since v0.${last}"
+          else
+            range="${GITHUB_SHA}"; since="(first release)"
+          fi
+          log="$(git log --no-merges --pretty='- %s (%h)' "$range")"
+          total="$(printf '%s' "$log" | grep -c '^- ' || true)"
+          notes="$(printf '%s\n' "$log" | head -n 200)"
+          if [ "${total:-0}" -gt 200 ]; then
+            notes="${notes}"$'\n'"- …and $(( total - 200 )) more commits ${since}."
+          fi
+          [ -n "$log" ] || notes="- No code changes ${since} (redeploy)."
+          built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          release_b64="$(jq -nc --arg v "$version" --arg s "$GITHUB_SHA" --arg b "$built_at" --arg n "$notes" \
+            '{version:$v, git_sha:$s, built_at:$b, notes:$n}' | base64 -w0)"
+          {
+            echo "version=$version"
+            echo "built_at=$built_at"
+            echo "release_b64=$release_b64"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release $version ($since)"
+            echo
+            echo "$notes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Green push to main: build + push every image to GHCR as :main,
+  # :sha-<short> and :v0.N. Image path is repo-derived
+  # (ghcr.io/<owner>/<repo>-<service>), never a hardcoded app name, so forks
+  # publish under their own name. Provenance (release-meta) goes in as build
+  # args + OCI labels on every image; only the backend Dockerfile consumes the
+  # args (an image that doesn't declare them just ignores them).
+  # always() so a docs-only main push (backend/frontend skipped) still refreshes
+  # the tags; a real backend/frontend/env failure blocks the push via the gate.
+  publish-images:
+    needs: [changes, backend, frontend, env, release-meta]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.release-meta.result == 'success' &&
+      needs.env.result == 'success' &&
+      needs.backend.result != 'failure' &&
+      needs.frontend.result != 'failure' &&
+      needs.backend.result != 'cancelled' &&
+      needs.frontend.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.changes.outputs.images) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: |
+          set -euo pipefail
+          repo="${GITHUB_REPOSITORY,,}"            # ghcr.io requires lowercase
+          echo "image=ghcr.io/${repo}-${{ matrix.image.service }}" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Build and push ${{ matrix.image.service }}
+        uses: docker/build-push-action@v7
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.context }}/${{ matrix.image.dockerfile }}
+          push: true
+          # Always re-resolve FROM tags (pinned Go toolchain, security fixes).
+          pull: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:main
+            ${{ steps.meta.outputs.image }}:sha-${{ steps.meta.outputs.sha }}
+            ${{ steps.meta.outputs.image }}:${{ needs.release-meta.outputs.version }}
+          build-args: |
+            VERSION=${{ needs.release-meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            BUILD_TIME=${{ needs.release-meta.outputs.built_at }}
+            RELEASE_JSON_B64=${{ needs.release-meta.outputs.release_b64 }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.release-meta.outputs.version }}
+            org.opencontainers.image.created=${{ needs.release-meta.outputs.built_at }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.image.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Images are on GHCR -> cut the version release-meta chose (the one baked
+  # into the images). Dokploy watches v0.* and deploys the tag; its migrate
+  # service then records the release in app_releases.
+  release-tag:
+    needs: [release-meta, publish-images]
+    if: always() && needs.publish-images.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Tag ${{ needs.release-meta.outputs.version }}
+        env:
+          TAG: ${{ needs.release-meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force --quiet
+          if existing="$(git rev-parse -q --verify "refs/tags/${TAG}^{commit}")"; then
+            if [ "$existing" = "$GITHUB_SHA" ]; then
+              echo "$TAG already points at ${GITHUB_SHA::7} (re-run); nothing to do."
+              exit 0
+            fi
+            echo "::error title=Tag taken::$TAG already exists at ${existing::7}, but the images were baked as $TAG for ${GITHUB_SHA::7}. Re-run the whole workflow so release-meta picks the next number."
+            exit 1
+          fi
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
+          echo "Tagged **$TAG** at \`${GITHUB_SHA::7}\`. Dokploy deploys on v0.* tags." >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Mobile (Expo). Skips cleanly (green) until mobile/package.json exists.
+  #
+  # OpenAPI -> mobile DECOUPLING (the fix for spurious app releases):
+  # The mobile client types are COMMITTED (mobile/src/core/api/schema.d.ts,
+  # generated by a version-PINNED openapi-typescript from
+  # backend/docs/openapi.yaml). The release trigger is mobile/** ONLY
+  # (changes.outputs.mobile_release), never backend/docs/openapi.yaml.
+  # openapi-typescript output is deterministic, so a backend change that does
+  # not alter the API surface regenerates an identical schema.d.ts -> no
+  # mobile/** diff -> no release. A real API change shows up as a committed
+  # schema.d.ts diff, which IS a mobile/** change and does release.
+  #
+  # This job (verification, never a release) also runs on backend changes so
+  # an API edit that forgot to regenerate the committed types fails here
+  # ("api:generate is up to date") instead of drifting silently.
+  # ---------------------------------------------------------------------------
+  mobile:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true' || needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        run: |
+          if [ -f mobile/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "Mobile CI skipped: \`mobile/package.json\` does not exist yet." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.guard.outputs.present == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ hashFiles('mobile/.nvmrc') != '' && 'mobile/.nvmrc' || 'frontend/.nvmrc' }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: npm ci
+      - name: Generator is pinned
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: |
+          # Stable output needs an exact openapi-typescript version (no ^ / ~).
+          node -e '
+            const p = require("./package.json");
+            const v = (p.devDependencies || {})["openapi-typescript"] || (p.dependencies || {})["openapi-typescript"];
+            if (!v) { console.error("::error::openapi-typescript is not a mobile dependency"); process.exit(1); }
+            if (!/^\d+\.\d+\.\d+$/.test(v)) { console.error(`::error::pin openapi-typescript to an exact version (found "${v}")`); process.exit(1); }
+            console.log(`openapi-typescript pinned at ${v}`);
+          '
+      - name: Lint
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: npm run lint
+      - name: Typecheck
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: npm run typecheck
+      - name: Test
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: npm test --if-present
+      - name: api:generate is up to date
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        run: |
+          npm run api:generate
+          if ! git diff --exit-code -- src/core/api/ || [ -n "$(git status --porcelain -- src/core/api/)" ]; then
+            echo "::error title=Stale mobile API types::Run 'npm run api:generate' in mobile/ and commit src/core/api/schema.d.ts."
+            exit 1
+          fi
+
+  # EAS release on a green main push, ONLY when mobile/** really changed
+  # (changes.outputs.mobile_release). Skips green with a summary note when
+  # mobile/ is absent, EXPO_TOKEN is unset, or app.json has no EAS projectId.
+  mobile-release:
+    needs: [changes, backend, frontend, mobile]
+    if: >-
+      always() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.changes.result == 'success' &&
+      needs.backend.result != 'failure' &&
+      needs.backend.result != 'cancelled' &&
+      needs.frontend.result != 'failure' &&
+      needs.frontend.result != 'cancelled' &&
+      needs.mobile.result != 'failure' &&
+      needs.mobile.result != 'cancelled'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MOBILE_RELEASE: ${{ needs.changes.outputs.mobile_release }}
+        run: |
+          skip() { echo "ship=false" >> "$GITHUB_OUTPUT"; echo "Mobile release skipped: $1" >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+          [ -f mobile/package.json ] || skip "\`mobile/\` does not exist yet."
+          [ "$MOBILE_RELEASE" = "true" ] || skip "no \`mobile/**\` change in this push (backend / OpenAPI edits never ship the app)."
+          [ -n "$EXPO_TOKEN" ] || skip "\`EXPO_TOKEN\` secret is not set."
+          pid="$(jq -r '.expo.extra.eas.projectId // empty' mobile/app.json 2>/dev/null || true)"
+          [ -n "$pid" ] || skip "\`mobile/app.json\` has no \`expo.extra.eas.projectId\` (run \`eas init\`)."
+          echo "ship=true" >> "$GITHUB_OUTPUT"
+      - if: steps.guard.outputs.ship == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ hashFiles('mobile/.nvmrc') != '' && 'mobile/.nvmrc' || 'frontend/.nvmrc' }}
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - if: steps.guard.outputs.ship == 'true'
+        uses: expo/expo-github-action@v9
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Install
+        if: steps.guard.outputs.ship == 'true'
+        working-directory: mobile
+        run: npm ci
+      - name: EAS build (production, all platforms)
+        if: steps.guard.outputs.ship == 'true'
+        working-directory: mobile
+        run: |
+          eas build --platform all --profile production --non-interactive --no-wait
+          echo "EAS production build queued for \`${GITHUB_SHA::7}\`." >> "$GITHUB_STEP_SUMMARY"
+
+  # HAKAN (D20): boilerplate'teki auto-pr işi kaldırıldı. Her issue kendi
+  # dalında tek PR olarak açılır ve `gh pr merge --auto --squash` ile CI yeşil
+  # olunca birleşir. Push çalıştırması PR'ın son commit'inde kontrol olarak görünür.
+
+  # Single required status check. Passes when every gated job is success or
+  # skipped; fails if any failed or was cancelled. Make THIS the required check
+  # in branch protection (not the individual jobs, which skip by design).
+  ci:
+    if: always()
+    needs: [changes, backend, frontend, env, mobile, image-build, release-meta, publish-images, release-tag, mobile-release]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Gate
+        run: |
+          set -euo pipefail
+          results="${{ join(needs.*.result, ' ') }}"
+          echo "Needed job results: $results"
+          for r in $results; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error title=CI gate failed::A required job reported '$r'."; exit 1 ;;
+            esac
+          done
+          echo "All required jobs passed or were skipped."
