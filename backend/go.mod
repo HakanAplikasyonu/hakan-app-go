@@ -13,6 +13,7 @@ require (
 	github.com/furkanmeclis/go-ubltr/provider v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/isnet v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/izibiz v0.1.0
+	github.com/furkanmeclis/go-ubltr/provider/nes v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/nilvera v0.1.0
 	github.com/furkanmeclis/go-ubltr/provider/uyumsoft v0.1.0
 	github.com/getsentry/sentry-go v0.49.0
