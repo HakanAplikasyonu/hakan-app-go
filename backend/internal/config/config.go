@@ -35,6 +35,7 @@ type Config struct {
 	AI         AIConfig
 	Parasut    ParasutConfig
 	Easytrade  EasytradeConfig
+	KolayBi    KolayBiConfig
 }
 
 // ParasutConfig is the Paraşüt integrator application (docs/kaynak 10 §1.1):
@@ -44,6 +45,13 @@ type ParasutConfig struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
+}
+
+// KolayBiConfig is the KolayBi API (docs/kaynak 11 §1.1): the channel is the
+// integrator's, each taxpayer brings an api_key.
+type KolayBiConfig struct {
+	BaseURL string
+	Channel string
 }
 
 // EasytradeConfig is the Easytrade Muhasebe API (docs/kaynak 09).
@@ -407,6 +415,7 @@ func Load() (Config, error) {
 			CacheTTL:  getDuration("TENANCY_CACHE_TTL", 60*time.Second),
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
 		},
+		KolayBi:   KolayBiConfig{BaseURL: getEnv("KOLAYBI_BASE_URL", "https://ofis-api.kolaybi.com"), Channel: getEnv("KOLAYBI_CHANNEL", "")},
 		Easytrade: EasytradeConfig{BaseURL: getEnv("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api")},
 		Parasut: ParasutConfig{
 			BaseURL:      getEnv("PARASUT_BASE_URL", "https://api.parasut.com"),

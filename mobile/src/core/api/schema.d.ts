@@ -4541,6 +4541,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/kolaybi-connections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's KolayBi connections
+         * @description Requires `tenant.invoices.read`.
+         */
+        get: operations["listKolayBiConnections"];
+        put?: never;
+        /**
+         * Connect with the taxpayer's KolayBi api key
+         * @description Requires `tenant.invoices.write`. The api key (11 §1.1) is verified by
+         *     taking a token and listing companies, then stored in the credential
+         *     vault. With one company (or `company_id`) the connection is `active`;
+         *     otherwise choose with `PUT …/company`.
+         */
+        post: operations["connectKolayBi"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/company": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Bind the connection to one KolayBi company
+         * @description Requires `tenant.invoices.write`.
+         */
+        put: operations["selectKolayBiCompany"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/sync": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read invoices, returns and general expenses now
+         * @description Requires `tenant.invoices.write` and an `active` connection. Reads
+         *     `sale_invoice`, `sale_return_invoice`, `purchase_invoice`,
+         *     `purchase_return_invoice` and `general_expense` issued `from`–`to`
+         *     (`min_issue_date` / `max_issue_date`, 11 §3.1) and writes them with the
+         *     common duplicate rules. Once per 5 minutes.
+         */
+        post: operations["syncKolayBiConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/parasut-connections": {
         parameters: {
             query?: never;
@@ -5905,6 +6002,47 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        KolayBiConnection: {
+            /** Format: uuid */
+            uuid: string;
+            setup_state: string;
+            /** @enum {string} */
+            status: "pending" | "active" | "auth_failed" | "rate_limited" | "disabled";
+            company_id?: string;
+            company_name?: string;
+            error?: string;
+            /** Format: date-time */
+            last_sync_at?: string;
+            last_report?: components["schemas"]["ParasutReport"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeKolayBiConnection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["KolayBiConnection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeKolayBiConnectionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["KolayBiConnection"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeKolayBiConnect: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                connection: components["schemas"]["KolayBiConnection"];
+                companies: {
+                    id: string;
+                    name: string;
+                }[];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EasytradeConnection: {
             /** Format: uuid */
             uuid: string;
@@ -16734,6 +16872,226 @@ export interface operations {
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
             /** @description `EASYTRADE_AUTH_FAILED` or `EASYTRADE_LICENSE_EXPIRED` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listKolayBiConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeKolayBiConnectionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    connectKolayBi: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    api_key: string;
+                    company_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connection and companies */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeKolayBiConnect"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `UNKNOWN_COMPANY` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `KOLAYBI_AUTH_FAILED` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `KOLAYBI_NOT_CONFIGURED` or `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    selectKolayBiCompany: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    company_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeKolayBiConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `UNKNOWN_COMPANY` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    syncKolayBiConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sync report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeParasutReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_RANGE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `SYNC_THROTTLED` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `KOLAYBI_AUTH_FAILED` */
             502: {
                 headers: {
                     [name: string]: unknown;
