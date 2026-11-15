@@ -140,3 +140,8 @@ CREATE TABLE export_batch_items (
 );
 
 CREATE UNIQUE INDEX uq_export_batch_items_live ON export_batch_items (journal_draft_id) WHERE reversed_at IS NULL;
+
+-- RLS (issue #6): engagement kapsamlı tablolar.
+SELECT rls_apply_engagement(t) FROM unnest(ARRAY[
+    'export_settings', 'journal_drafts', 'journal_draft_lines', 'export_batches', 'export_batch_items'
+]::regclass[]) AS t;

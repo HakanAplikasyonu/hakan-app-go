@@ -402,6 +402,19 @@ func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, row
 		b.Settings.InvoicesReachLucaDirectly = settings.InvoicesReachLucaDirectly
 	}
 	b.Settings.IncludeInvoiceEntries = in.IncludeInvoiceEntries
+	// The portal's own KDV summary for the period (excel_formula shows it
+	// next to what the entries post to 391 / 191).
+	if in.Period != "" {
+		vat, err := s.q.PeriodVATSummary(ctx, db.PeriodVATSummaryParams{TaxpayerID: scope.TaxpayerID, Period: in.Period})
+		if err != nil {
+			return b, err
+		}
+		for _, v := range vat {
+			b.VATSummary = append(b.VATSummary, accountingexport.VATRow{
+				Direction: v.Direction, Rate: repository.Dec(v.TaxRate), Base: repository.Dec(v.Base), VAT: repository.Dec(v.Vat),
+			})
+		}
+	}
 	for _, r := range rows {
 		lines, err := s.q.ListJournalDraftLines(ctx, db.ListJournalDraftLinesParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, JournalDraftID: r.ID})
 		if err != nil {
