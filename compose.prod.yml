@@ -66,6 +66,10 @@ x-backend-environment: &backend-environment
   JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-}
   AUTH_ADAPTER_SECRET: ${AUTH_ADAPTER_SECRET:?AUTH_ADAPTER_SECRET is required}
   APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?APP_ENCRYPTION_KEY is required}
+  # Sır kasası KEK listesi ve etkin anahtar (backend/docs/sir-kasasi.md). Boşsa kasa
+  # APP_ENCRYPTION_KEY ile çalışır (KEK kimliği "app").
+  SECRETS_KEYRING: ${SECRETS_KEYRING:-}
+  SECRETS_ACTIVE_KEY_ID: ${SECRETS_ACTIVE_KEY_ID:-}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
   # Public origin for links the API generates (e-mail links, step-up
   # origin). Defaults to AUTH_URL.
