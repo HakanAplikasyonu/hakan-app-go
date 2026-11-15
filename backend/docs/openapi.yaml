@@ -5267,6 +5267,45 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/controls/run:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Warnings]
+      operationId: runEngagementControls
+      summary: Run the accountant controls for a period
+      description: |
+        Requires `tenant.warnings.write` and engagement access. Checks every
+        invoice and line of the period: FIXED_ASSET_CANDIDATE and
+        UNUSUAL_RECORD_TYPE on lines, UNUSUAL_AMOUNT and NEW_PARTY_HIGH_AMOUNT on
+        invoices (06 T3). Thresholds and keyword lists come from the warning
+        rule configuration. A re-run refreshes instead of duplicating; a
+        condition that no longer holds is auto_resolved.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period]
+              properties:
+                period: { type: string, example: "2026-10" }
+      responses:
+        "200":
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeControlRun"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -6427,6 +6466,28 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/Vehicle" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeControlRun:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [period, invoices, items, report]
+          properties:
+            period: { type: string }
+            invoices: { type: integer }
+            items: { type: integer }
+            report:
+              type: object
+              properties:
+                created: { type: integer }
+                refreshed: { type: integer }
+                suppressed: { type: integer }
+                disabled: { type: integer }
+                auto_resolved: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:

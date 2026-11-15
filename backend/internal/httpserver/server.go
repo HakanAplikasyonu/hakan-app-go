@@ -77,6 +77,7 @@ import (
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
+	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
@@ -420,7 +421,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		ai:       aihandler.New(aiSvc),
 		excel:    excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log)),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
-			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))),
+			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
+			WithControls(warningscontrols.New(deps.Queries, warningEngine)),
 		review:      reviewhandler.New(reviewSvc, activityRec),
 		receipts:    receiptshandler.New(receiptsSvc),
 		engagements: engagementResolver,

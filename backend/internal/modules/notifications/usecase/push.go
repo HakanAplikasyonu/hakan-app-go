@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	webpush "github.com/SherClockHolmes/webpush-go"
 )
 
 // VAPIDConfig holds Web Push VAPID keys.

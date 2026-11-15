@@ -308,6 +308,8 @@ type Querier interface {
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
+	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
@@ -330,6 +332,9 @@ type Querier interface {
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
 	ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error)
+	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
+	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
+	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
@@ -458,6 +463,9 @@ type Querier interface {
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
 	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
+	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
+	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
+	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
 	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)
@@ -517,6 +525,8 @@ type Querier interface {
 	// İnceleme kuyruğu (issue #14).
 	// Aynı hedef alanın bekleyen önerisi yenisiyle değişir.
 	SupersedePendingSuggestions(ctx context.Context, arg SupersedePendingSuggestionsParams) ([]SupersedePendingSuggestionsRow, error)
+	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
+	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
