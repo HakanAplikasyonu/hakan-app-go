@@ -3,16 +3,15 @@ package database_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
 func num(t *testing.T, s string) pgtype.Numeric {
@@ -24,19 +23,12 @@ func num(t *testing.T, s string) pgtype.Numeric {
 	return n
 }
 
-// TestCommonDataModelRoundTrip needs a migrated database (TEST_DATABASE_URL).
+// TestCommonDataModelRoundTrip needs a database server (TEST_DATABASE_URL, see internal/testdb).
 // It runs inside a transaction that is rolled back.
 func TestCommonDataModelRoundTrip(t *testing.T) {
-	dsn := os.Getenv("TEST_DATABASE_URL")
-	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
+	// testdb opens a fresh, migrated database (skips without TEST_DATABASE_URL).
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
+	pool := testdb.Open(t).Pool
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -51,8 +43,8 @@ func TestCommonDataModelRoundTrip(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	must(tx.QueryRow(ctx, `INSERT INTO taxpayers DEFAULT VALUES RETURNING id`).Scan(&tp1))
-	must(tx.QueryRow(ctx, `INSERT INTO taxpayers DEFAULT VALUES RETURNING id`).Scan(&tp2))
+	must(tx.QueryRow(ctx, `INSERT INTO taxpayers (kind, tax_id, title) VALUES ('legal', '1234567890', 'Test 1') RETURNING id`).Scan(&tp1))
+	must(tx.QueryRow(ctx, `INSERT INTO taxpayers (kind, tax_id, title) VALUES ('legal', '0000000001', 'Test 2') RETURNING id`).Scan(&tp2))
 	must(tx.QueryRow(ctx, `INSERT INTO organizations (slug, name) VALUES ('w2-test-'||gen_random_uuid(), 'Test') RETURNING id`).Scan(&orgID))
 	must(tx.QueryRow(ctx, `INSERT INTO engagements (organization_id, taxpayer_id) VALUES ($1, $2) RETURNING id`, orgID, tp1).Scan(&engID))
 

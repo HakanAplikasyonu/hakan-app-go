@@ -11,6 +11,8 @@ export const Permission = {
   PlatformRolesExport: "platform.roles.export",
   PlatformRolesImport: "platform.roles.import",
   PlatformOrganizationsRead: "platform.organizations.read",
+  PlatformTaxpayersRead: "platform.taxpayers.read",
+  PlatformTaxpayersWrite: "platform.taxpayers.write",
   PlatformOrganizationsWrite: "platform.organizations.write",
   PlatformNotificationsRead: "platform.notifications.read",
   PlatformNotificationsReadAll: "platform.notifications.read_all",

@@ -47,6 +47,7 @@ type Querier interface {
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
+	CountTaxpayers(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
@@ -63,6 +64,11 @@ type Querier interface {
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSourceConnection(ctx context.Context, arg CreateSourceConnectionParams) (SourceConnection, error)
+	// Taxpayers (issue #3): platform düzeyinde global mükellef kimliği.
+	// taxpayers bir ofise ait değildir; tenant_tables.txt'de yer almaz. Ofis
+	// tarafı mükellefe yalnızca aktif ve erişilebilir bir engagement üzerinden
+	// ulaşır (GetTaxpayerForOfficeMember).
+	CreateTaxpayer(ctx context.Context, arg CreateTaxpayerParams) (Taxpayer, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWebAuthnCredential(ctx context.Context, arg CreateWebAuthnCredentialParams) (WebauthnCredential, error)
 	// Self-service account deletion: keep every row, mark the user disabled.
@@ -149,8 +155,17 @@ type Querier interface {
 	GetStorageLinkByUUID(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	GetStorageTrashByOriginalKey(ctx context.Context, originalKey string) (StorageTrash, error)
 	GetStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) (StorageTrash, error)
+	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
+	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
 	GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Taxpayer, error)
+	// GetTaxpayerForOfficeMember is the office-side access rule for taxpayer
+	// data (docs/01 §2.3): the taxpayer is returned only through an ACTIVE
+	// engagement of this organization, and only to a member assigned to it or
+	// one whose role grants tenant.engagements.read_all (read_all = true). An
+	// ended engagement, another office's engagement or a missing assignment all
+	// return no row.
+	GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpayerForOfficeMemberParams) (Taxpayer, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
 	GetTenantRoleByKey(ctx context.Context, arg GetTenantRoleByKeyParams) (Role, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -252,6 +267,7 @@ type Querier interface {
 	ListStorageTrash(ctx context.Context, arg ListStorageTrashParams) ([]StorageTrash, error)
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
+	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
@@ -334,6 +350,7 @@ type Querier interface {
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
+	UpdateTaxpayerProfile(ctx context.Context, arg UpdateTaxpayerProfileParams) (Taxpayer, error)
 	UpdateUserLastLogin(ctx context.Context, id int64) error
 	UpdateUserLocale(ctx context.Context, arg UpdateUserLocaleParams) error
 	UpdateUserPasswordByID(ctx context.Context, arg UpdateUserPasswordByIDParams) error

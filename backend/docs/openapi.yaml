@@ -53,6 +53,8 @@ tags:
     description: Ofis <-> mükellef hizmet ilişkisi ve üye atamaları (`X-Organization`; `TENANCY_ENABLED`)
   - name: AI
     description: AI module (office cost report, provider privacy statement)
+  - name: Taxpayers
+    description: Global mükellef kimliği (VKN/TCKN). Platform kataloğu ve engagement üzerinden ofis görünümü.
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -1357,6 +1359,107 @@ paths:
                 $ref: "#/components/schemas/EnvelopeResourceMeta"
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/platform/taxpayers:
+    get:
+      tags: [Taxpayers]
+      operationId: getPlatformTaxpayers
+      summary: List taxpayer identities
+      description: Requires `platform.taxpayers.read`. `q` matches an exact VKN/TCKN or part of the title.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/Q"
+      responses:
+        "200":
+          description: Taxpayer page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Taxpayers]
+      operationId: postPlatformTaxpayer
+      summary: Register a taxpayer identity
+      description: |
+        Requires `platform.taxpayers.write`. VKN (10 digits) and TCKN
+        (11 digits) are checked with their check-digit algorithms. A legal
+        entity needs a VKN. A VKN/TCKN exists once on the platform: a second
+        registration answers `409 TAXPAYER_ALREADY_EXISTS`. This answer is
+        platform-only; office routes never reveal whether a tax id exists (D1b).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaxpayerRequest"
+      responses:
+        "201":
+          description: Created taxpayer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/platform/taxpayers/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/ResourceUUID"
+    get:
+      tags: [Taxpayers]
+      operationId: getPlatformTaxpayer
+      summary: Get a taxpayer identity
+      description: Requires `platform.taxpayers.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Taxpayer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [Taxpayers]
+      operationId: patchPlatformTaxpayer
+      summary: Update title or tax office
+      description: Requires `platform.taxpayers.write`. Kind and tax id never change.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTaxpayerRequest"
+      responses:
+        "200":
+          description: Updated taxpayer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/platform/organizations:
     get:
@@ -3394,6 +3497,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeEngagementContext"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/taxpayer:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Taxpayers]
+      operationId: getTenantEngagementTaxpayer
+      summary: Taxpayer identity of an active engagement
+      description: |
+        Follows the taxpayer access rule (docs/01 §2.3): only through an
+        active engagement of this office, to an assigned member or one with
+        `tenant.engagements.read_all`. Once the engagement ends the office
+        gets `403`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Taxpayer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayer"
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
@@ -5641,6 +5770,62 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EngagementPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    Taxpayer:
+      type: object
+      required: [uuid, kind, tax_id, tax_id_type, title, tax_office, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [legal, individual], description: "legal: tüzel kişi; individual: gerçek kişi" }
+        tax_id: { type: string, description: 10-digit VKN or 11-digit TCKN }
+        tax_id_type: { type: string, enum: [vkn, tckn] }
+        title: { type: string, description: Unvan or full name }
+        tax_office: { type: string, description: Vergi dairesi (may be empty) }
+        created_at: { type: string, format: date-time }
+
+    TaxpayerPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Taxpayer" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    CreateTaxpayerRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, tax_id, title]
+      properties:
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string, description: "VKN (10) or TCKN (11); spaces, dots and dashes are ignored" }
+        title: { type: string, maxLength: 255 }
+        tax_office: { type: string, maxLength: 128 }
+
+    PatchTaxpayerRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, maxLength: 255 }
+        tax_office: { type: string, maxLength: 128 }
+
+    EnvelopeTaxpayer:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Taxpayer" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerPage" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

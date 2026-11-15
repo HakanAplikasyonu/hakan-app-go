@@ -63,6 +63,7 @@ import (
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
+	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/appleauth"
@@ -292,6 +293,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	tenantmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, tenantHandler)
 	engagementsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, engagementHandler)
+	// Taxpayers (issue #3): platform catalog always; the office-side profile
+	// of an engagement only with tenancy.
+	taxpayerHandler := taxpayersmodule.NewHandler(taxpayersmodule.New(taxpayersmodule.NewPostgres(deps.Queries)))
+	taxpayersmodule.RegisterPlatformRoutes(mux, tokens, loader, taxpayerHandler)
+	taxpayersmodule.RegisterTenantRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerHandler)
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)

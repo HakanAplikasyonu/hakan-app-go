@@ -55,6 +55,7 @@ const (
 	CodeNoEngagementAccess        = "NO_ENGAGEMENT_ACCESS"
 	CodeEngagementEnded           = "ENGAGEMENT_ENDED"
 	CodeEngagementAlreadyActive   = "ENGAGEMENT_ALREADY_ACTIVE"
+	CodeTaxpayerAlreadyExists     = "TAXPAYER_ALREADY_EXISTS"
 )
 
 // RequestIDFunc resolves the correlation id from request context.

@@ -22,6 +22,8 @@ const (
 	PermPlatformRolesBulkDelete           = "platform.roles.bulk.delete"
 	PermPlatformOrganizationsRead         = "platform.organizations.read"
 	PermPlatformOrganizationsWrite        = "platform.organizations.write"
+	PermPlatformTaxpayersRead             = "platform.taxpayers.read"
+	PermPlatformTaxpayersWrite            = "platform.taxpayers.write"
 	PermPlatformBulkRead                  = "platform.bulk.read"
 	PermPlatformNotificationsRead         = "platform.notifications.read"
 	PermPlatformNotificationsReadAll      = "platform.notifications.read_all"
