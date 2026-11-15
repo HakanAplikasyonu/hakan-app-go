@@ -141,7 +141,8 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := db.New(tx)
 	// Serialise numbering per engagement + period.
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext('journal_drafts:' || $1::text || ':' || $2::text))", scope.ID, period); err != nil {
+	lockKey := fmt.Sprintf("journal_drafts:%d:%s", scope.ID, period)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", lockKey); err != nil {
 		return Draft{}, err
 	}
 	next, err := q.NextJournalEntryNo(ctx, db.NextJournalEntryNoParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Period: period})
@@ -456,4 +457,3 @@ func nonNilIssues(is []accountingexport.Issue) []accountingexport.Issue {
 	}
 	return is
 }
-
