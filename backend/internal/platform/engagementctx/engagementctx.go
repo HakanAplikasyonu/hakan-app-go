@@ -44,7 +44,10 @@ type Access struct {
 	Status         string
 	StartedAt      time.Time
 	EndedAt        *time.Time
-	Assigned       bool
+	// ArchiveUntil ends the read-only archive window of an ended engagement
+	// (issue #8).
+	ArchiveUntil *time.Time
+	Assigned     bool
 }
 
 // Scope is the resolved engagement of one request.
@@ -56,6 +59,7 @@ type Scope struct {
 	TaxpayerUUID   uuid.UUID
 	Status         string
 	StartedAt      time.Time
+	ArchiveUntil   *time.Time
 	// ViaReadAll is true when the caller is not assigned and reached the
 	// engagement through tenant.engagements.read_all.
 	ViaReadAll bool

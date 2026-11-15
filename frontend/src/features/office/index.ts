@@ -6,3 +6,4 @@ export { WarningsPage } from "./components/warnings-page";
 export { ReviewQueuePage } from "./components/review-queue-page";
 export { ReviewStudioPage } from "./components/review-studio";
 export { UploadPage } from "./components/upload-page";
+export { EngagementDocumentsPage } from "./components/engagement-documents-page";

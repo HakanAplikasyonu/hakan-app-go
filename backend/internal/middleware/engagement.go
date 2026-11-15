@@ -3,6 +3,7 @@ package middleware
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -26,17 +27,34 @@ import (
 // (403 NO_ENGAGEMENT_ACCESS), so the route cannot be used to probe which
 // engagements exist.
 func RequireEngagement(resolver engagementctx.Resolver) func(http.Handler) http.Handler {
-	return requireEngagement(resolver, false)
+	return requireEngagement(resolver, endedRefused)
+}
+
+// RequireEngagementArchive is RequireEngagement that also lets an ended
+// engagement through while its read-only archive window is open
+// (engagements.archive_until, issue #8). Use it on read-only (GET) routes
+// whose data is filtered by engagement_document_visible, which itself keeps
+// the old office to the period before the office change.
+func RequireEngagementArchive(resolver engagementctx.Resolver) func(http.Handler) http.Handler {
+	return requireEngagement(resolver, endedInArchive)
 }
 
 // RequireEngagementAllowEnded is RequireEngagement that also lets ended
 // engagements through. Use it for routes that manage the engagement itself
 // (detail, assignment list), not for mükellef data.
 func RequireEngagementAllowEnded(resolver engagementctx.Resolver) func(http.Handler) http.Handler {
-	return requireEngagement(resolver, true)
+	return requireEngagement(resolver, endedAllowed)
 }
 
-func requireEngagement(resolver engagementctx.Resolver, allowEnded bool) func(http.Handler) http.Handler {
+type endedMode int
+
+const (
+	endedRefused endedMode = iota
+	endedAllowed
+	endedInArchive
+)
+
+func requireEngagement(resolver engagementctx.Resolver, ended endedMode) func(http.Handler) http.Handler {
 	if resolver == nil {
 		panic("middleware: RequireEngagement needs a resolver")
 	}
@@ -71,7 +89,9 @@ func requireEngagement(resolver engagementctx.Resolver, allowEnded bool) func(ht
 				writeNoEngagementAccess(w, r, errors.New("not assigned to engagement"))
 				return
 			}
-			if access.Status != engagementctx.StatusActive && !allowEnded {
+			inArchive := access.ArchiveUntil != nil && time.Now().Before(*access.ArchiveUntil)
+			if access.Status != engagementctx.StatusActive &&
+				(ended == endedRefused || (ended == endedInArchive && !inArchive)) {
 				response.RecordFailure(w, engagementctx.ErrEnded)
 				response.Error(w, r, http.StatusForbidden, response.CodeEngagementEnded, "Engagement has ended")
 				return
@@ -84,6 +104,7 @@ func requireEngagement(resolver engagementctx.Resolver, allowEnded bool) func(ht
 				TaxpayerUUID:   access.TaxpayerUUID,
 				Status:         access.Status,
 				StartedAt:      access.StartedAt,
+				ArchiveUntil:   access.ArchiveUntil,
 				ViaReadAll:     !access.Assigned,
 			})))
 		})

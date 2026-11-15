@@ -135,7 +135,7 @@ func (q *Queries) EndEngagementByID(ctx context.Context, id int64) error {
 }
 
 const getActiveEngagementForTaxpayer = `-- name: GetActiveEngagementForTaxpayer :one
-SELECT id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at FROM engagements WHERE taxpayer_id = $1 AND ended_at IS NULL
+SELECT id, uuid, organization_id, taxpayer_id, status, started_at, ended_at, created_at, updated_at, archive_until FROM engagements WHERE taxpayer_id = $1 AND ended_at IS NULL
 `
 
 // tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
@@ -152,6 +152,7 @@ func (q *Queries) GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID
 		&i.EndedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ArchiveUntil,
 	)
 	return i, err
 }

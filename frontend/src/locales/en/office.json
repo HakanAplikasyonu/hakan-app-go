@@ -194,5 +194,17 @@
   "palette.placeholder": "Invoice no, ETTN, tax ID, counterparty or amount… (⌘J)",
   "palette.empty": "No results.",
   "palette.actions": "Actions",
-  "palette.pending": "{{count}} waiting"
+  "palette.pending": "{{count}} waiting",
+  "engagement_documents_page_title": "Taxpayer documents",
+  "engagement_documents_page_description": "Documents you can see for this taxpayer: the engagement period and any past data the taxpayer shared.",
+  "engagement_history_title": "Past data consent",
+  "engagement_history_none": "The taxpayer has not shared data from before the engagement; only documents from the engagement period are visible.",
+  "engagement_history_active": "The taxpayer shared data from before the engagement: {{ranges}}",
+  "engagement_documents_title": "Documents",
+  "engagement_documents_empty": "No documents to show.",
+  "engagement_col_number": "Invoice no.",
+  "engagement_col_date": "Date",
+  "engagement_col_amount": "Payable amount",
+  "engagement_prev": "Previous",
+  "engagement_next": "Next"
 }

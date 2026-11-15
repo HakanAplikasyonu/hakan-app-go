@@ -8,12 +8,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { OfficeRequestsCard } from "@/features/taxpayer-onboarding/components/office-requests-card";
+import { HistorySharesCard } from "@/features/taxpayer/components/history-shares-card";
 import type { TaxpayerContextResponse } from "@/features/taxpayer/services/taxpayer.service";
 import { useLocale } from "@/providers/locale-provider";
 
 /**
  * `/m/{uuid}` home. Owners also see offices asking to add the company
- * (issue #7); the card hides itself for everyone else.
+ * (issue #7) and the pre-engagement history consents for the current office
+ * (issue #8); both cards hide themselves for everyone else.
  */
 export function TaxpayerHome({
   context,
@@ -44,6 +46,7 @@ export function TaxpayerHome({
           {t("taxpayer.home_empty")}
         </CardContent>
       </Card>
+      <HistorySharesCard taxpayer={context.taxpayer.uuid} />
     </div>
   );
 }

@@ -26,3 +26,4 @@ taxpayer_vehicles
 expenses
 retail_sales
 bank_transaction_matches
+taxpayer_history_shares

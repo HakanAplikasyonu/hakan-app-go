@@ -133,3 +133,40 @@ func RegisterOnboardingRoutes(
 	mux.Handle("POST /v1/taxpayer/onboarding-requests/{uuid}/approve", middleware.Chain(http.HandlerFunc(h.ownerApprove), authn, tp))
 	mux.Handle("POST /v1/taxpayer/onboarding-requests/{uuid}/reject", middleware.Chain(http.HandlerFunc(h.ownerReject), authn, tp))
 }
+
+// RegisterHistoryRoutes mounts the office-change routes (issue #8, D2):
+//
+//   - mükellef owners: /v1/taxpayer/history-shares (share / list / revoke);
+//   - office: documents the engagement may see, and the shares it holds.
+//     Documents go through RequireEngagementArchive: an ended engagement
+//     reads its own period while its archive window is open.
+func RegisterHistoryRoutes(
+	mux *http.ServeMux,
+	tokens *jwt.Manager,
+	loader middleware.IdentityLoader,
+	orgResolver orgctx.Resolver,
+	engResolver engagementctx.Resolver,
+	tpResolver taxpayerctx.Resolver,
+	h *HistoryHandler,
+) {
+	if orgResolver == nil || engResolver == nil || tpResolver == nil || h == nil {
+		return
+	}
+	authn := middleware.Authenticate(tokens, loader)
+	org := middleware.RequireOrganization(orgResolver)
+	read := middleware.RequireTenantPermission(rbac.PermTenantEngagementsRead)
+	archive := middleware.RequireEngagementArchive(engResolver)
+	eng := middleware.RequireEngagementAllowEnded(engResolver)
+	tp := middleware.RequireTaxpayer(tpResolver)
+
+	mux.Handle("GET /v1/taxpayer/history-shares", middleware.Chain(http.HandlerFunc(h.list), authn, tp))
+	mux.Handle("POST /v1/taxpayer/history-shares", middleware.Chain(http.HandlerFunc(h.share), authn, tp))
+	mux.Handle("DELETE /v1/taxpayer/history-shares/{uuid}", middleware.Chain(http.HandlerFunc(h.revoke), authn, tp))
+
+	mux.Handle("GET /v1/tenant/engagements/{engagementUuid}/documents", middleware.Chain(
+		http.HandlerFunc(h.officeDocuments), authn, org, read, archive,
+	))
+	mux.Handle("GET /v1/tenant/engagements/{engagementUuid}/history-shares", middleware.Chain(
+		http.HandlerFunc(h.officeShares), authn, org, read, eng,
+	))
+}

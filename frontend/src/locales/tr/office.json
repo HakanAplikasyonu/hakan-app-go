@@ -194,5 +194,17 @@
   "palette.placeholder": "Fatura no, ETTN, VKN, karşı taraf ya da tutar… (⌘J)",
   "palette.empty": "Sonuç yok.",
   "palette.actions": "İşlemler",
-  "palette.pending": "{{count}} bekliyor"
+  "palette.pending": "{{count}} bekliyor",
+  "engagement_documents_page_title": "Mükellef belgeleri",
+  "engagement_documents_page_description": "Bu mükellef için görebildiğiniz belgeler: hizmet ilişkisi dönemi ve mükellefin paylaştığı geçmiş veriler.",
+  "engagement_history_title": "Geçmiş veri onayı",
+  "engagement_history_none": "Mükellef ilişki öncesindeki verileri paylaşmadı; yalnızca ilişki dönemindeki belgeler görünür.",
+  "engagement_history_active": "Mükellef ilişki öncesindeki verileri paylaştı: {{ranges}}",
+  "engagement_documents_title": "Belgeler",
+  "engagement_documents_empty": "Görüntülenecek belge yok.",
+  "engagement_col_number": "Fatura no",
+  "engagement_col_date": "Tarih",
+  "engagement_col_amount": "Ödenecek tutar",
+  "engagement_prev": "Önceki",
+  "engagement_next": "Sonraki"
 }
