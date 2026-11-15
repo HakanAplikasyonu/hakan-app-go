@@ -32,6 +32,8 @@ import (
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
+	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
+	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
@@ -389,14 +391,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// here one at a time from the explicit RegisterRoutes calls above.
 	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
+	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries), log)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),
 		activity: activityhandler.New(activityusecase.New(deps.Queries)),
 		logs:     logshandler.New(logsSvc),
-		ai: aihandler.New(aimodule.NewService(
-			cfg.AI, airepository.NewPostgres(deps.Queries), log,
-		)),
+		ai:       aihandler.New(aiSvc),
+		excel:    excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log)),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))),
 		// Appliers are registered by the modules that own suggestion targets.

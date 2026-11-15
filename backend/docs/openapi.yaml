@@ -63,6 +63,8 @@ tags:
     description: Warning engine (05-uyari-kodlari.md) rule configuration and warnings
   - name: Review
     description: Review queue (suggestions, provenance, decisions, thresholds)
+  - name: ExcelImports
+    description: Excel / CSV import (04-excel-ice-aktarma.md)
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -4759,6 +4761,305 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [ExcelImports]
+      operationId: uploadExcelImport
+      summary: Upload an Excel / CSV export
+      description: |
+        Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                data_type: { type: string, enum: [outgoing_invoices, incoming_invoices] }
+                source_system: { type: string, example: bizimhesap }
+                period: { type: string, example: "2026-10" }
+                sheet: { type: string }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    get:
+      tags: [ExcelImports]
+      operationId: listExcelImports
+      summary: Excel imports of an engagement
+      description: |
+        Requires `tenant.excel_imports.read`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImportPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [ExcelImports]
+      operationId: getExcelImport
+      summary: Excel import status, layout, mapping and preview
+      description: |
+        Requires `tenant.excel_imports.read`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/mapping:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [ExcelImports]
+      operationId: setExcelImportMapping
+      summary: Correct the column mapping
+      description: |
+        Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. Listed columns are overwritten; others keep their mapping. save_template company|tenant stores it as a template. Validation runs afterwards.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExcelImportMappingInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/validate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [ExcelImports]
+      operationId: validateExcelImport
+      summary: Validate again
+      description: |
+        Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [ExcelImports]
+      operationId: listExcelImportRows
+      summary: Row results
+      description: |
+        Requires `tenant.excel_imports.read`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: result, in: query, required: false, schema: { type: string, enum: [ok, warning, error, skipped] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImportRowPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows/{rowNo}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: rowNo, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    patch:
+      tags: [ExcelImports]
+      operationId: patchExcelImportRow
+      summary: Skip or unskip a row
+      description: |
+        Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExcelImportRowPatch"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: Idempotency-Key, in: header, required: true, schema: { type: string, maxLength: 128 } }
+    post:
+      tags: [ExcelImports]
+      operationId: commitExcelImport
+      summary: Write the import to the common model
+      description: |
+        Requires `tenant.excel_imports.commit` (accountant). Only from preview. Rows already in the database (same source key or ETTN) are not duplicated. The same Idempotency-Key returns the committed import; another key gets 409.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [ExcelImports]
+      operationId: rollbackExcelImport
+      summary: Remove the invoices this import created
+      description: |
+        Requires `tenant.excel_imports.commit`. Invoices that existed before are left alone.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/excel-import-templates:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [ExcelImports]
+      operationId: listExcelImportTemplates
+      summary: Excel import templates
+      description: |
+        Requires `tenant.excel_imports.read`. The office's company / tenant templates and the global ones.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImportTemplates"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/excel-import-templates/{templateUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: templateUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [ExcelImports]
+      operationId: deleteExcelImportTemplate
+      summary: Delete an office template
+      description: |
+        Requires `tenant.excel_imports.write`. Global templates cannot be deleted.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: OK
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -5521,6 +5822,198 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/ReviewSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ExcelImportColumnMap:
+      type: object
+      required: [column, header, field, confidence, origin, needs_review]
+      properties:
+        column: { type: string, example: B }
+        header: { type: string }
+        field: { type: string, description: "Target field; empty = unmapped (kept in raw_payload)" }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        origin: { type: string, enum: [template, ai, user] }
+        needs_review: { type: boolean }
+
+    ExcelImport:
+      type: object
+      required: [uuid, file_name, format, status, from_template, ai_used, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        file_name: { type: string }
+        format: { type: string, enum: [xlsx, csv] }
+        status: { type: string, enum: [uploaded, analyzing, mapping_review, validating, has_errors, preview, committed, failed, rolled_back] }
+        data_type: { type: [string, "null"] }
+        source_system: { type: [string, "null"] }
+        period: { type: [string, "null"] }
+        sheet: { type: [string, "null"] }
+        layout:
+          type: [object, "null"]
+          properties:
+            header_row: { type: integer }
+            first_data_row: { type: integer }
+            last_data_row: { type: integer }
+            fingerprint: { type: string }
+            columns:
+              type: array
+              items:
+                type: object
+                properties:
+                  column: { type: string }
+                  header: { type: string }
+        mapping:
+          type: [object, "null"]
+          properties:
+            data_type: { type: string }
+            source_system: { type: string }
+            header_row: { type: integer }
+            columns:
+              type: array
+              items: { $ref: "#/components/schemas/ExcelImportColumnMap" }
+            warnings:
+              type: [array, "null"]
+              items: { type: string }
+        from_template: { type: boolean }
+        ai_used: { type: boolean }
+        summary:
+          type: [object, "null"]
+          properties:
+            rows: { type: integer }
+            ok: { type: integer }
+            warnings: { type: integer }
+            errors: { type: integer }
+            skipped: { type: integer }
+            existing: { type: integer }
+            added: { type: integer }
+            duplicates: { type: integer }
+            rolled_back: { type: integer }
+            total_payable: { type: string }
+            vat_by_rate:
+              type: array
+              items:
+                type: object
+                properties:
+                  rate: { type: string }
+                  base: { type: string }
+                  vat: { type: string }
+                  withholding: { type: string }
+        error: { type: [string, "null"] }
+        committed_at: { type: [string, "null"], format: date-time }
+        rolled_back_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ExcelImportRow:
+      type: object
+      required: [row_no, result, skipped, raw, messages, duplicate, written]
+      properties:
+        row_no: { type: integer }
+        result: { type: string, enum: [ok, warning, error, skipped] }
+        skipped: { type: boolean }
+        raw: { type: object, additionalProperties: { type: string } }
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              field: { type: string }
+              severity: { type: string, enum: [error, warning] }
+              detail: { type: string }
+        duplicate: { type: boolean }
+        written: { type: boolean }
+
+    ExcelImportMappingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices] }
+        source_system: { type: string }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [column, field]
+            properties:
+              column: { type: string }
+              field: { type: string }
+        save_template: { type: string, enum: ["", company, tenant] }
+
+    ExcelImportRowPatch:
+      type: object
+      additionalProperties: false
+      required: [skip]
+      properties:
+        skip: { type: boolean }
+
+    ExcelImportTemplate:
+      type: object
+      properties:
+        uuid: { type: string, format: uuid }
+        scope: { type: string, enum: [company, tenant, global] }
+        fingerprint: { type: string }
+        data_type: { type: string }
+        source_system: { type: string }
+        header_row: { type: integer }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/ExcelImportColumnMap" }
+        updated_at: { type: string, format: date-time }
+
+    EnvelopeExcelImport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ExcelImport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeExcelImportPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ExcelImport" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeExcelImportRowPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ExcelImportRow" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeExcelImportTemplates:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ExcelImportTemplate" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:
