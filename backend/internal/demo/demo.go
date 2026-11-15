@@ -34,10 +34,12 @@ type Member struct {
 	Title string
 }
 
-// Taxpayer is a demo taxpayer. TaxID / Title / TaxOffice are not stored yet:
-// the taxpayers table gets identity columns with issue #3.
+// Taxpayer is a demo taxpayer. Tax ids pass the VKN / TCKN checksum
+// (internal/platform/taxid) but belong to no real taxpayer.
 type Taxpayer struct {
-	Key       string
+	Key string
+	// Kind is "legal" or "individual" (taxpayers.kind).
+	Kind      string
 	TaxID     string
 	Title     string
 	TaxOffice string
@@ -59,11 +61,11 @@ var TaxpayerUser = Member{Email: "mukellef@" + EmailDomain, Name: "Okan", Surnam
 
 var Taxpayers = []Taxpayer{
 	{
-		Key: "atlas", TaxID: "9000000017", Title: "Atlas Gıda Ticaret A.Ş.", TaxOffice: "Kadıköy",
+		Key: "atlas", Kind: "legal", TaxID: "9000000017", Title: "Atlas Gıda Ticaret A.Ş.", TaxOffice: "Kadıköy",
 		Assignees: []string{"musavir@" + EmailDomain}, UBLPrefix: "atlas-",
 	},
 	{
-		Key: "selin", TaxID: "10000000146", Title: "Selin Yılmaz", TaxOffice: "Çankaya",
+		Key: "selin", Kind: "individual", TaxID: "10000000146", Title: "Selin Yılmaz", TaxOffice: "Çankaya",
 		Assignees: []string{"musavir@" + EmailDomain, "stajyer@" + EmailDomain}, UBLPrefix: "selin-",
 	},
 }

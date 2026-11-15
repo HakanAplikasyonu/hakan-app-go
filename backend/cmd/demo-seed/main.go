@@ -9,11 +9,10 @@
 // What it creates (all identities invented, see internal/demo):
 //   - office "demo-smmm" with an owner, an admin (müşavir) and a member (stajyer)
 //   - a taxpayer-side user (not linked yet: taxpayer_members arrives with #4)
-//   - two taxpayers with an active engagement each and their assignments
+//   - two taxpayers (VKN/TCKN, unvan, vergi dairesi) with an active
+//     engagement each and their assignments
 //
 // What it does not create yet, and why:
-//   - taxpayer identity (VKN, unvan): the taxpayers table gets those columns
-//     with #3; the demo values live in internal/demo.
 //   - invoices: the UBL set (internal/demo/ubl) is written to the database by
 //     the upload flow (#11). Until then upload it from the office panel.
 //
@@ -40,6 +39,7 @@ import (
 	orgmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/model"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/password"
 )
 
@@ -138,12 +138,17 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 
 	store := engagements.NewPostgres(queries)
 	engSvc := engagements.New(store, nil)
+	tpSvc := taxpayers.New(taxpayers.NewPostgres(queries))
 	for _, tp := range demo.Taxpayers {
-		var taxpayerID int64
-		if err := pool.QueryRow(ctx, `INSERT INTO taxpayers DEFAULT VALUES RETURNING id`).Scan(&taxpayerID); err != nil {
+		identity, err := ensureTaxpayer(ctx, tpSvc, tp)
+		if err != nil {
 			return fmt.Errorf("taxpayer %s: %w", tp.Key, err)
 		}
-		eng, err := store.CreateEngagement(ctx, org.ID, taxpayerID)
+		created, err := engSvc.Create(ctx, org.ID, identity.UUID)
+		if err != nil {
+			return fmt.Errorf("engagement %s: %w", tp.Key, err)
+		}
+		eng, err := store.GetEngagement(ctx, org.ID, created.UUID)
 		if err != nil {
 			return fmt.Errorf("engagement %s: %w", tp.Key, err)
 		}
@@ -152,10 +157,27 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 				return fmt.Errorf("assign %s → %s: %w", email, tp.Key, err)
 			}
 		}
-		fmt.Printf("taxpayer %-6s engagement %s\n", tp.Key, eng.Uuid)
+		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
+}
+
+// ensureTaxpayer registers the demo identity or reuses it when a previous run
+// (or -reset keeping a still-referenced row) left it in the catalog.
+func ensureTaxpayer(ctx context.Context, svc *taxpayers.Service, tp demo.Taxpayer) (taxpayers.Taxpayer, error) {
+	t, err := svc.Create(ctx, taxpayers.CreateInput{Kind: tp.Kind, TaxID: tp.TaxID, Title: tp.Title, TaxOffice: tp.TaxOffice})
+	if errors.Is(err, taxpayers.ErrAlreadyExists) {
+		found, ok, ferr := svc.FindByTaxID(ctx, tp.TaxID)
+		if ferr != nil {
+			return taxpayers.Taxpayer{}, ferr
+		}
+		if !ok {
+			return taxpayers.Taxpayer{}, err
+		}
+		return found, nil
+	}
+	return t, err
 }
 
 // ensureUser creates the account or, when it exists, resets its password so
