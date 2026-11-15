@@ -63,6 +63,9 @@ import (
 	orghandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/handler"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
+	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
+	periodsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/repository"
+	periodsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/qrlogin"
 	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
@@ -347,7 +350,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if deps.Queue != nil {
 		ublEnq = deps.Queue
 	}
-	ublSvc := invoiceupload.New(deps.DB, deps.Storage, ublEnq, log)
+	// Kilitli döneme gelen fatura değiştirilmez, değişiklik talebi olur (#32).
+	ublSvc := invoiceupload.New(deps.DB, deps.Storage, ublEnq, log).WithPeriodGuard(periodsrepository.NewGuard())
 	invoiceupload.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceupload.NewHandler(ublSvc))
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
@@ -446,6 +450,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		review:      reviewhandler.New(reviewSvc, activityRec),
 		receipts:    receiptshandler.New(receiptsSvc),
 		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
+		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		engagements: engagementResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)

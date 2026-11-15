@@ -961,6 +961,29 @@ type OutboxEvent struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type PeriodLock struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Period         string             `json:"period"`
+	Note           pgtype.Text        `json:"note"`
+	LockedBy       pgtype.Int8        `json:"locked_by"`
+	LockedAt       pgtype.Timestamptz `json:"locked_at"`
+}
+
+type PeriodLockEvent struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Action         string             `json:"action"`
+	Reason         pgtype.Text        `json:"reason"`
+	ActorID        pgtype.Int8        `json:"actor_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type Permission struct {
 	ID        int64              `json:"id"`
 	Uuid      uuid.UUID          `json:"uuid"`

@@ -25,7 +25,35 @@ const (
 	OutcomeMerged   = "merged"   // same invoice, new source; existing content kept
 	OutcomeReplaced = "replaced" // same invoice, higher-priority source; content rewritten
 	OutcomeSeen     = "seen"     // this source already delivered the invoice
+	// OutcomeHeld: the write would change a locked period (`02` §3.4); the
+	// invoice is untouched and a change request holds the new content.
+	OutcomeHeld = "held"
 )
+
+// PendingChange is a write SaveInvoiceGuarded is about to make: a new
+// invoice (Existing nil) or new content for an existing one.
+type PendingChange struct {
+	TaxpayerID   int64
+	Invoice      model.Invoice
+	AttachmentID int64
+	Existing     *db.Invoice
+	MatchRule    string
+}
+
+// Hold is a PeriodGuard verdict.
+type Hold struct {
+	Held              bool
+	ChangeRequestUUID uuid.UUID
+	Period            string
+}
+
+// PeriodGuard keeps locked periods unchanged (`02` §3.4). Hold is called
+// inside the write transaction before an invoice is inserted or rewritten;
+// when the period is locked it records a change request instead (same tx)
+// and returns Held. The implementation lives in modules/periods.
+type PeriodGuard interface {
+	Hold(ctx context.Context, tx pgx.Tx, c PendingChange) (Hold, error)
+}
 
 // SaveResult says what SaveInvoice did.
 type SaveResult struct {
@@ -42,10 +70,12 @@ type SaveResult struct {
 	// payable amount (`01` §6 rule 3). Not merged; the caller raises
 	// POSSIBLE_DUPLICATE.
 	PossibleDuplicates []uuid.UUID
+	// ChangeRequestUUID is the change request opened when Outcome is held.
+	ChangeRequestUUID uuid.UUID
 }
 
 // Duplicate reports whether the invoice already existed.
-func (r SaveResult) Duplicate() bool { return r.Outcome != OutcomeCreated }
+func (r SaveResult) Duplicate() bool { return r.Outcome != OutcomeCreated && r.Outcome != OutcomeHeld }
 
 // payableTolerance is `01` §6 rule 3 (±0,01).
 var payableTolerance = decimal.RequireFromString("0.01")
@@ -63,6 +93,14 @@ var payableTolerance = decimal.RequireFromString("0.01")
 // only when the new source has a higher priority (entegratör / UBL > program
 // > OCR / elle).
 func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Invoice, ublAttachmentID int64) (SaveResult, error) {
+	return SaveInvoiceGuarded(ctx, tx, taxpayerID, inv, ublAttachmentID, nil)
+}
+
+// SaveInvoiceGuarded is SaveInvoice with a period guard: a write that would
+// insert or rewrite an invoice is first offered to guard, and a held write
+// changes nothing (no source row either, so the same content can be applied
+// later). A nil guard writes unconditionally (applying a change request).
+func SaveInvoiceGuarded(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Invoice, ublAttachmentID int64, guard PeriodGuard) (SaveResult, error) {
 	q := db.New(tx)
 	priority := model.SourcePriority(inv.SourceSystem, inv.CaptureMethod)
 
@@ -86,6 +124,14 @@ func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Inv
 	if match != nil {
 		res := SaveResult{InvoiceID: match.ID, InvoiceUUID: match.Uuid, Outcome: OutcomeMerged, MatchRule: rule}
 		if priority > model.SourcePriority(match.SourceSystem, match.CaptureMethod) {
+			held, err := hold(ctx, tx, guard, PendingChange{TaxpayerID: taxpayerID, Invoice: inv, AttachmentID: ublAttachmentID, Existing: match, MatchRule: rule})
+			if err != nil {
+				return SaveResult{}, err
+			}
+			if held.Held {
+				res.Outcome, res.ChangeRequestUUID = OutcomeHeld, held.ChangeRequestUUID
+				return res, nil
+			}
 			ids, err := replaceContent(ctx, tx, taxpayerID, match.ID, inv, ublAttachmentID)
 			if err != nil {
 				return SaveResult{}, err
@@ -98,6 +144,13 @@ func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Inv
 		return res, nil
 	}
 
+	held, err := hold(ctx, tx, guard, PendingChange{TaxpayerID: taxpayerID, Invoice: inv, AttachmentID: ublAttachmentID, MatchRule: model.MatchNew})
+	if err != nil {
+		return SaveResult{}, err
+	}
+	if held.Held {
+		return SaveResult{Outcome: OutcomeHeld, MatchRule: model.MatchNew, ChangeRequestUUID: held.ChangeRequestUUID}, nil
+	}
 	customerID, err := findOrCreateCustomer(ctx, tx, taxpayerID, inv)
 	if err != nil {
 		return SaveResult{}, fmt.Errorf("repository: customer: %w", err)
@@ -122,6 +175,17 @@ func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Inv
 		return SaveResult{}, err
 	}
 	return res, nil
+}
+
+func hold(ctx context.Context, tx pgx.Tx, guard PeriodGuard, c PendingChange) (Hold, error) {
+	if guard == nil {
+		return Hold{}, nil
+	}
+	h, err := guard.Hold(ctx, tx, c)
+	if err != nil {
+		return Hold{}, fmt.Errorf("repository: period guard: %w", err)
+	}
+	return h, nil
 }
 
 func findMatch(ctx context.Context, q *db.Queries, taxpayerID int64, inv model.Invoice) (*db.Invoice, string, error) {

@@ -91,6 +91,7 @@ type Service struct {
 	limits    ublmap.Limits
 	log       *slog.Logger
 	ownTaxID  func(ctx context.Context, taxpayerID int64) (string, error)
+	guard     repository.PeriodGuard // nil: no period locks (tests)
 }
 
 // New builds the service. enq may be nil.
@@ -109,6 +110,10 @@ func (s *Service) WithOwnTaxIDResolver(fn func(ctx context.Context, taxpayerID i
 	s.ownTaxID = fn
 	return s
 }
+
+// WithPeriodGuard makes invoice writes respect period locks (issue #32):
+// content for a locked period becomes a change request instead.
+func (s *Service) WithPeriodGuard(g repository.PeriodGuard) *Service { s.guard = g; return s }
 
 // WithValidator swaps the validator (tests).
 func (s *Service) WithValidator(v Validator) *Service { s.validator = v; return s }
@@ -131,6 +136,9 @@ const (
 	ItemAdded     = "added"
 	ItemDuplicate = "duplicate"
 	ItemFailed    = "failed"
+	// ItemHeld: the invoice belongs to a locked period; a change request
+	// was opened and the invoice was not changed (issue #32).
+	ItemHeld = "held"
 )
 
 // Report is the upload result (issue #11: eklenen / mükerrer / hatalı).
@@ -139,6 +147,7 @@ type Report struct {
 	Added     int          `json:"added"`
 	Duplicate int          `json:"duplicate"`
 	Failed    int          `json:"failed"`
+	Held      int          `json:"held"`
 	Items     []ItemResult `json:"items"`
 }
 
@@ -155,6 +164,8 @@ type ItemResult struct {
 	ErrorCode string   `json:"error_code,omitempty"`
 	Error     string   `json:"error,omitempty"`
 	Warnings  []string `json:"warnings,omitempty"`
+	// ChangeRequestUUID is set when Status is held.
+	ChangeRequestUUID *uuid.UUID `json:"change_request_uuid,omitempty"`
 }
 
 // Error codes in a report.
@@ -296,6 +307,8 @@ func (s *Service) run(ctx context.Context, job db.UblUploadJob) (Report, error) 
 			rep.Added++
 		case ItemDuplicate:
 			rep.Duplicate++
+		case ItemHeld:
+			rep.Held++
 		default:
 			rep.Failed++
 		}
@@ -354,7 +367,14 @@ func (s *Service) processItem(ctx context.Context, job db.UblUploadJob, own stri
 	}
 	res.InvoiceUUID, res.Outcome, res.MatchRule = saved.InvoiceUUID, saved.Outcome, saved.MatchRule
 	res.Status = ItemAdded
-	if saved.Duplicate() {
+	switch {
+	case saved.Outcome == repository.OutcomeHeld:
+		res.Status = ItemHeld
+		if saved.ChangeRequestUUID != uuid.Nil {
+			id := saved.ChangeRequestUUID
+			res.ChangeRequestUUID = &id
+		}
+	case saved.Duplicate():
 		res.Status = ItemDuplicate
 	}
 	if saved.Written {
@@ -393,9 +413,14 @@ func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Inv
 	if err != nil {
 		return repository.SaveResult{}, nil, err
 	}
-	saved, err := repository.SaveInvoice(ctx, tx, job.TaxpayerID, inv, att.ID)
+	saved, err := repository.SaveInvoiceGuarded(ctx, tx, job.TaxpayerID, inv, att.ID, s.guard)
 	if err != nil {
 		return repository.SaveResult{}, nil, err
+	}
+	if saved.Outcome == repository.OutcomeHeld {
+		// Locked period: nothing changes; the XML joins the invoice when the
+		// change request is applied.
+		return saved, nil, tx.Commit(ctx)
 	}
 	// The XML belongs to the invoice even when it only adds a source.
 	if _, err := q.SetAttachmentOwner(ctx, db.SetAttachmentOwnerParams{TaxpayerID: job.TaxpayerID, ID: att.ID, OwnerType: repository.Text("invoice"), OwnerID: pgtype.Int8{Int64: saved.InvoiceID, Valid: true}}); err != nil {

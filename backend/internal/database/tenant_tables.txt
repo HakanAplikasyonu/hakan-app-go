@@ -36,3 +36,5 @@ export_batch_items engagement
 taxpayer_onboarding_requests
 account_plan_imports engagement
 account_plan_accounts engagement
+period_locks engagement
+period_lock_events engagement
