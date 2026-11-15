@@ -28,3 +28,8 @@ review_settings
 excel_imports engagement
 excel_import_rows engagement
 receipt_captures engagement
+export_settings engagement
+journal_drafts engagement
+journal_draft_lines engagement
+export_batches engagement
+export_batch_items engagement
