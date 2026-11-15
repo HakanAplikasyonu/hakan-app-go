@@ -83,6 +83,7 @@ import (
 	settingsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings"
 	settingshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings/handler"
 	settingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/parasut"
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
@@ -119,6 +120,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/stepup"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
@@ -370,6 +372,18 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankstatement.NewHandler(bankstatement.NewImporter(deps.DB, bankSvc), bankSvc, deps.Queries))
+	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
+	var sourceVault secrets.Vault
+	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
+		log.Warn("source connections: credential vault disabled", "error", err)
+	} else {
+		sourceVault = secrets.New(kr, secrets.NewPGStore(deps.Queries))
+	}
+	parasut.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		parasut.NewHandler(parasut.NewService(deps.DB, sourceVault, parasut.App{
+			BaseURL: cfg.Parasut.BaseURL, ClientID: cfg.Parasut.ClientID,
+			ClientSecret: cfg.Parasut.ClientSecret, RedirectURL: cfg.Parasut.RedirectURL,
+		}, nil)))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)

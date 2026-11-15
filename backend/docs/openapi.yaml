@@ -39,6 +39,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Sources
+    description: Ön muhasebe programı bağlantıları (Paraşüt …)
   - name: Health
     description: Liveness and readiness probes
   - name: Auth
@@ -6247,6 +6249,212 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/parasut-connections:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Sources]
+      operationId: listParasutConnections
+      summary: The taxpayer's Paraşüt connections
+      description: Requires `tenant.invoices.read`. `last_report` is the last sync's counts.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutConnectionList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Sources]
+      operationId: createParasutConnection
+      summary: Start a Paraşüt connection (OAuth authorization_code)
+      description: |
+        Requires `tenant.invoices.write`. Opens a `draft` connection
+        (`source_system = parasut`) and returns `authorize_url` (Paraşüt's
+        consent page, `state` = connection uuid). The page at
+        `PARASUT_REDIRECT_URL` posts the returned `code` to `…/authorize`.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Draft connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutConnection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503":
+          description: "`PARASUT_NOT_CONFIGURED` or `VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/authorize:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: authorizeParasutConnection
+      summary: Exchange the OAuth code and list the companies
+      description: |
+        Requires `tenant.invoices.write`. Tokens go to the credential vault;
+        a login with a single company is bound to it (`active`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        "200":
+          description: Connection and companies
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutAuthorize" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "502":
+          description: "`PARASUT_AUTH_FAILED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/companies:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: listParasutCompanies
+      summary: Companies the stored Paraşüt login can read
+      description: Requires `tenant.invoices.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Companies
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutCompanyList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/company:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    put:
+      tags: [Sources]
+      operationId: selectParasutCompany
+      summary: Bind the connection to one Paraşüt company
+      description: Requires `tenant.invoices.write`. The company must be readable with the stored login.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_id]
+              properties:
+                company_id: { type: string }
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`UNKNOWN_COMPANY`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/sync:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: syncParasutConnection
+      summary: Read sales invoices and purchase bills now
+      description: |
+        Requires `tenant.invoices.write` and an `active` connection. Reads
+        documents issued `from`–`to` (YYYY-MM-DD) and writes them with the
+        common duplicate rules: sales invoices and detailed / e-invoiced
+        bills as invoices, kalemsiz e-belgesiz bills as expenses (10 §4.3).
+        Estimates, recurring templates and cancelled documents are counted in
+        `excluded`. Once per 5 minutes per connection.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+      responses:
+        "200":
+          description: Sync report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_RANGE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`SYNC_THROTTLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: "`PARASUT_AUTH_FAILED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statements:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -7626,6 +7834,11 @@ components:
       bearerFormat: JWT
 
   parameters:
+    SourceConnectionUuid:
+      name: connectionUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     EngagementUuid:
       name: engagementUuid
       in: path
@@ -7783,6 +7996,89 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    ParasutReport:
+      type: object
+      required: [invoices_created, invoices_existing, expenses_created, expenses_updated, expenses_unchanged, possible_duplicates, excluded]
+      properties:
+        invoices_created: { type: integer }
+        invoices_existing: { type: integer }
+        expenses_created: { type: integer }
+        expenses_updated: { type: integer }
+        expenses_unchanged: { type: integer }
+        possible_duplicates: { type: integer }
+        excluded:
+          type: object
+          description: "Read but not written, by reason: cancelled, not_an_invoice (estimates, recurring), no_issue_date"
+          additionalProperties: { type: integer }
+    ParasutConnection:
+      type: object
+      required: [uuid, setup_state, status, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        setup_state: { type: string, enum: [draft, credentials_entered, active, failed] }
+        status: { type: string, enum: [pending, active, auth_failed, rate_limited, disabled] }
+        company_id: { type: string }
+        company_name: { type: string }
+        authorize_url: { type: string, description: "Present while the taxpayer still has to authorize (draft / auth_failed)" }
+        error: { type: string }
+        last_sync_at: { type: string, format: date-time }
+        last_report: { $ref: "#/components/schemas/ParasutReport" }
+        created_at: { type: string, format: date-time }
+    ParasutCompany:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        tax_number: { type: string }
+    EnvelopeParasutReport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ParasutReport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeParasutConnection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ParasutConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeParasutConnectionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ParasutConnection" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeParasutCompanyList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ParasutCompany" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeParasutAuthorize:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [connection, companies]
+          properties:
+            connection: { $ref: "#/components/schemas/ParasutConnection" }
+            companies: { type: array, items: { $ref: "#/components/schemas/ParasutCompany" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TenantInvitation:
       type: object
