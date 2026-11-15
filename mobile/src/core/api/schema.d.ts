@@ -4440,6 +4440,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's Easytrade connections
+         * @description Requires `tenant.invoices.read`.
+         */
+        get: operations["listEasytradeConnections"];
+        put?: never;
+        /**
+         * Connect the taxpayer's Easytrade company
+         * @description Requires `tenant.invoices.write`. Logs in with the taxpayer's
+         *     Easytrade user (`POST /auth/login`); only the 30-day token is kept,
+         *     in the credential vault, never the password. The company is checked
+         *     by listing its branches; every list is then read per branch.
+         */
+        post: operations["connectEasytrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read sales / purchase invoices and expenses now
+         * @description Requires `tenant.invoices.write`. Lists are walked newest first per
+         *     branch and cut at `from` (09 §2); each invoice and expense is read in
+         *     detail and written with the common duplicate rules. Cancelled and
+         *     draft invoices, recurring expense templates and rejected expenses are
+         *     counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
+         *     answer disables the connection.
+         */
+        post: operations["syncEasytradeConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/vat-reconciliation": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Compare Easytrade's VAT report with the portal
+         * @description Requires `tenant.invoices.read`. Reads Easytrade's
+         *     `GET /company/reports/vat` for `period` and compares invoice count,
+         *     base and VAT per direction with the portal's Easytrade invoices
+         *     (±0.05). `match` false means invoices are missing or extra (09 §8).
+         */
+        get: operations["reconcileEasytradeVat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/parasut-connections": {
         parameters: {
             query?: never;
@@ -5804,6 +5905,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        EasytradeConnection: {
+            /** Format: uuid */
+            uuid: string;
+            setup_state: string;
+            /** @enum {string} */
+            status: "pending" | "active" | "auth_failed" | "rate_limited" | "disabled";
+            company_id: string;
+            branches: {
+                id: string;
+                name: string;
+            }[];
+            error?: string;
+            /** Format: date-time */
+            last_sync_at?: string;
+            last_report?: components["schemas"]["ParasutReport"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        EasytradeVatTotals: {
+            invoice_count: number;
+            base: string;
+            vat: string;
+        };
+        EasytradeVatSide: {
+            source: components["schemas"]["EasytradeVatTotals"];
+            portal: components["schemas"]["EasytradeVatTotals"];
+            match: boolean;
+        };
+        EnvelopeEasytradeConnection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EasytradeConnection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEasytradeConnectionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["EasytradeConnection"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEasytradeVatReconciliation: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                period: string;
+                sales: components["schemas"]["EasytradeVatSide"];
+                purchases: components["schemas"]["EasytradeVatSide"];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         ParasutReport: {
             invoices_created: number;
             invoices_existing: number;
@@ -16379,6 +16532,216 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    listEasytradeConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeConnectionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    connectEasytrade: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    /** Format: password */
+                    password: string;
+                    company_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Active connection */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncEasytradeConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sync report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeParasutReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_RANGE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `SYNC_THROTTLED` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `EASYTRADE_AUTH_FAILED` or `EASYTRADE_LICENSE_EXPIRED` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    reconcileEasytradeVat: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reconciliation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeVatReconciliation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `EASYTRADE_AUTH_FAILED` or `EASYTRADE_LICENSE_EXPIRED` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listParasutConnections: {

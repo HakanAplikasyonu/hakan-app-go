@@ -1,20 +1,53 @@
-package parasut
+// Package sources holds what every pre-accounting source adapter shares
+// (02 §2–3): the mapped batch, the writer into the common model and the
+// import report. Adapters live in subpackages (parasut, easytrade …).
+package sources
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 )
 
-// Report counts one import (02 §11 acceptance: counts and totals equal the
-// source).
+// Expense is a source program's expense record (01 §4.10).
+type Expense struct {
+	SourceID     string
+	Date         time.Time
+	Period       string
+	Amount       decimal.Decimal // KDV dahil
+	TaxAmount    decimal.Decimal
+	TaxRate      *decimal.Decimal
+	Currency     string
+	Description  string
+	ReceiptType  string // expenses.receipt_type; empty → other
+	VendorName   string
+	VendorTaxID  string
+	VehiclePlate string
+	Raw          map[string]any
+	Hash         string
+}
+
+// Excluded counts what was read but not written, by reason.
+type Excluded map[string]int
+
+// Batch is one window's mapped records.
+type Batch struct {
+	Invoices []model.Invoice
+	Expenses []Expense
+	Excluded Excluded
+}
+
+// Report counts one import (02 §11: counts and totals equal the source).
 type Report struct {
 	InvoicesCreated    int      `json:"invoices_created"`
 	InvoicesExisting   int      `json:"invoices_existing"`
@@ -26,8 +59,8 @@ type Report struct {
 }
 
 // Write stores a batch in one transaction: invoices through the common
-// duplicate rules (01 §6), expenses by their Paraşüt key.
-func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, b Batch) (Report, error) {
+// duplicate rules (01 §6), expenses by their source key.
+func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSystem string, b Batch) (Report, error) {
 	rep := Report{Excluded: b.Excluded}
 	if rep.Excluded == nil {
 		rep.Excluded = Excluded{}
@@ -48,16 +81,19 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, b Batch) (
 		q := db.New(tx)
 		for _, e := range b.Expenses {
 			raw, _ := json.Marshal(e.Raw)
-			p := db.UpsertSourceExpenseParams{
-				TaxpayerID: taxpayerID, SourceSystem: SourceSystem, SourceID: e.SourceID,
+			rt := e.ReceiptType
+			if rt == "" {
+				rt = "other"
+			}
+			row, err := q.UpsertSourceExpense(ctx, db.UpsertSourceExpenseParams{
+				TaxpayerID: taxpayerID, SourceSystem: sourceSystem, SourceID: e.SourceID,
 				ExpenseDate: pgtype.Date{Time: e.Date, Valid: true}, Period: repository.Text(e.Period),
 				Amount: repository.Num(e.Amount), Currency: e.Currency, TaxRate: repository.NumPtr(e.TaxRate),
 				TaxExclusiveAmount: repository.Num(e.Amount.Sub(e.TaxAmount)), TaxAmount: repository.Num(e.TaxAmount),
-				Description: e.Description, ReceiptType: "other", VendorTaxNumber: repository.Text(e.VendorTaxID),
+				Description: e.Description, ReceiptType: rt, VendorTaxNumber: repository.Text(e.VendorTaxID),
 				VendorName: repository.Text(e.VendorName), VehiclePlate: repository.Text(e.VehiclePlate),
 				RawPayload: raw, ContentHash: repository.Text(e.Hash),
-			}
-			row, err := q.UpsertSourceExpense(ctx, p)
+			})
 			switch {
 			case errors.Is(err, pgx.ErrNoRows):
 				rep.ExpensesUnchanged++

@@ -6249,6 +6249,164 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Sources]
+      operationId: listEasytradeConnections
+      summary: The taxpayer's Easytrade connections
+      description: Requires `tenant.invoices.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeConnectionList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Sources]
+      operationId: connectEasytrade
+      summary: Connect the taxpayer's Easytrade company
+      description: |
+        Requires `tenant.invoices.write`. Logs in with the taxpayer's
+        Easytrade user (`POST /auth/login`); only the 30-day token is kept,
+        in the credential vault, never the password. The company is checked
+        by listing its branches; every list is then read per branch.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, company_id]
+              properties:
+                email: { type: string }
+                password: { type: string, format: password }
+                company_id: { type: string }
+      responses:
+        "201":
+          description: Active connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502":
+          description: "`EASYTRADE_AUTH_FAILED`, `EASYTRADE_LICENSE_EXPIRED`, `EASYTRADE_NO_BRANCH`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "`VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: syncEasytradeConnection
+      summary: Read sales / purchase invoices and expenses now
+      description: |
+        Requires `tenant.invoices.write`. Lists are walked newest first per
+        branch and cut at `from` (09 §2); each invoice and expense is read in
+        detail and written with the common duplicate rules. Cancelled and
+        draft invoices, recurring expense templates and rejected expenses are
+        counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
+        answer disables the connection.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+      responses:
+        "200":
+          description: Sync report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeParasutReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_RANGE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`SYNC_THROTTLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: "`EASYTRADE_AUTH_FAILED` or `EASYTRADE_LICENSE_EXPIRED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/vat-reconciliation:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: reconcileEasytradeVat
+      summary: Compare Easytrade's VAT report with the portal
+      description: |
+        Requires `tenant.invoices.read`. Reads Easytrade's
+        `GET /company/reports/vat` for `period` and compares invoice count,
+        base and VAT per direction with the portal's Easytrade invoices
+        (±0.05). `match` false means invoices are missing or extra (09 §8).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, example: "2026-10" } }
+      responses:
+        "200":
+          description: Reconciliation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeVatReconciliation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "502":
+          description: "`EASYTRADE_AUTH_FAILED` or `EASYTRADE_LICENSE_EXPIRED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/parasut-connections:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -7996,6 +8154,71 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    EasytradeConnection:
+      type: object
+      required: [uuid, setup_state, status, company_id, branches, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        setup_state: { type: string }
+        status: { type: string, enum: [pending, active, auth_failed, rate_limited, disabled] }
+        company_id: { type: string }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: string }
+              name: { type: string }
+        error: { type: string }
+        last_sync_at: { type: string, format: date-time }
+        last_report: { $ref: "#/components/schemas/ParasutReport" }
+        created_at: { type: string, format: date-time }
+    EasytradeVatTotals:
+      type: object
+      required: [invoice_count, base, vat]
+      properties:
+        invoice_count: { type: integer }
+        base: { type: string }
+        vat: { type: string }
+    EasytradeVatSide:
+      type: object
+      required: [source, portal, match]
+      properties:
+        source: { $ref: "#/components/schemas/EasytradeVatTotals" }
+        portal: { $ref: "#/components/schemas/EasytradeVatTotals" }
+        match: { type: boolean }
+    EnvelopeEasytradeConnection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EasytradeConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeEasytradeConnectionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/EasytradeConnection" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeEasytradeVatReconciliation:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [period, sales, purchases]
+          properties:
+            period: { type: string }
+            sales: { $ref: "#/components/schemas/EasytradeVatSide" }
+            purchases: { $ref: "#/components/schemas/EasytradeVatSide" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     ParasutReport:
       type: object
       required: [invoices_created, invoices_existing, expenses_created, expenses_updated, expenses_unchanged, possible_duplicates, excluded]

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
 
@@ -302,7 +303,7 @@ func (s *Service) Sync(ctx context.Context, taxpayerID int64, id uuid.UUID, from
 		}
 		return Report{}, fmt.Errorf("parasut read: %w", err)
 	}
-	rep, err := Write(ctx, s.pool, taxpayerID, b)
+	rep, err := sources.Write(ctx, s.pool, taxpayerID, SourceSystem, b)
 	if err != nil {
 		return Report{}, err
 	}
