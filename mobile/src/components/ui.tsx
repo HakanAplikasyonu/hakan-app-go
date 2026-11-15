@@ -128,3 +128,61 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
   notice: { borderWidth: 1, borderRadius: 12, padding: 12 },
 });
+
+export type ChipTone = 'neutral' | 'brand' | 'success' | 'warning' | 'danger';
+
+export function Chip({ label, tone = 'neutral' }: { label: string; tone?: ChipTone }) {
+  const c = useColors();
+  const color = { neutral: c.muted, brand: c.brand, success: c.success, warning: c.warning, danger: c.danger }[tone];
+  return (
+    <View style={[chipStyles.chip, { borderColor: color }]}>
+      <RNText style={[chipStyles.text, { color }]}>{label}</RNText>
+    </View>
+  );
+}
+
+/** Tappable list row with an optional leading element. */
+export function Row({
+  title,
+  subtitle,
+  leading,
+  trailing,
+  onPress,
+  accessibilityLabel,
+}: {
+  title: string;
+  subtitle?: string;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
+  const c = useColors();
+  return (
+    <Pressable
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      disabled={!onPress}
+      style={({ pressed }) => [chipStyles.row, { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+      {leading}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={{ fontWeight: '600' }} numberOfLines={2}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text variant="caption" tone="muted" numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+      {trailing}
+    </Pressable>
+  );
+}
+
+const chipStyles = StyleSheet.create({
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
+  text: { fontSize: 12, fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12 },
+});
