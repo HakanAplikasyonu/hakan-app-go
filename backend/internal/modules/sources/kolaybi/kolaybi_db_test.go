@@ -122,8 +122,8 @@ func dataset() (*fakeKB, map[string]int, map[string]decimal.Decimal) {
 			vat := net.Mul(decimal.NewFromInt(20)).Div(decimal.NewFromInt(100)).Round(2)
 			d := map[string]any{"id": id, "serial_no": fmt.Sprintf("KB%07d", id), "order_date": date, "currency": "TRY",
 				"document_type": "SATIS", "document_scenario": "EARSIVFATURA", "description": "kayıt",
-				"associate": map[string]any{"name": "Yıldız Market", "identity_no": "9100000021", "is_corporate": true},
-				"items": []map[string]any{{"description": "Ürün", "quantity": qty.String(), "unit_price": price.String(), "vat_rate": 20}},
+				"associate":   map[string]any{"name": "Yıldız Market", "identity_no": "9100000021", "is_corporate": true},
+				"items":       []map[string]any{{"description": "Ürün", "quantity": qty.String(), "unit_price": price.String(), "vat_rate": 20}},
 				"grand_total": net.Add(vat).StringFixed(2), "total_vat": vat.StringFixed(2)}
 			if kind == "general_expense" {
 				d["description"] = "34 KB 1234 akaryakıt"

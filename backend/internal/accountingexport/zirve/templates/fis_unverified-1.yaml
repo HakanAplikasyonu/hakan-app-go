@@ -1,0 +1,27 @@
+# Zirve muhasebe fişi Excel aktarım şablonu (issue #53, docs/02 §3.2–3.3).
+#
+# DOĞRULANMADI: Zirve'nin içe aktarım şablon dosyası henüz elimizde değil
+# (issue #53 "blocked:external"). Sütunlar, ortak fiş modelinin alanlarından
+# Türkçe genel adlarla kuruldu; gerçek başlık yazımı, sırası, tarih biçimi,
+# ondalık ayırıcı ve fiş tipi değerleri şablon dosyası gelince yeni bir sürüm
+# dosyasında (fis_<sürüm>.yaml, verified: true) düzeltilir. Kod değişmez.
+driver: zirve
+template: fis
+version: "unverified-1"
+verified: false
+file: { format: xlsx, sheet: "", header_row: 1 }
+# Zirve'nin dosya / fiş başına satır sınırı bilinmiyor: 0 = sınır yok.
+limits: { max_entries_per_file: 0, max_lines_per_mahsup: 0 }
+columns:            # sıra = dosyadaki sıra
+  - { key: entry_no,          header: "Fiş No",          required: true }
+  - { key: entry_date,        header: "Fiş Tarihi",      required: true }
+  - { key: entry_type,        header: "Fiş Türü" }
+  - { key: entry_description, header: "Fiş Açıklaması" }
+  - { key: account,           header: "Hesap Kodu",      required: true }
+  - { key: description,       header: "Açıklama" }
+  - { key: doc_no,            header: "Evrak No" }
+  - { key: doc_date,          header: "Evrak Tarihi" }
+  - { key: debit,             header: "Borç",            required: true }
+  - { key: credit,            header: "Alacak",          required: true }
+entry_types: { mahsup: "Mahsup", acilis: "Açılış", kapanis: "Kapanış" }
+notes: "Sütunlar ve biçimler Zirve şablon dosyasıyla doğrulanmadı."
