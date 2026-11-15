@@ -17,6 +17,7 @@ import {
   type EmailCodeFormValues,
   type RegisterFormValues,
 } from "@/features/auth/schemas";
+import { taxpayerInvitationService } from "@/features/taxpayer/services/taxpayer.service";
 import { invitationService } from "@/features/tenant/services/tenant.service";
 import { isApiError } from "@/lib/api";
 import {
@@ -30,6 +31,40 @@ import { fetchAppPublicConfig } from "@/services/app-config.service";
 import { authService } from "@/services/auth.service";
 
 import { AuthCard } from "./auth-card";
+
+type InvitationSummary = {
+  kind: "organization" | "taxpayer";
+  /** Organization name, or the company (taxpayer) title. */
+  name: string;
+  email: string;
+  status: string;
+};
+
+/**
+ * Office invitations and mükellef invitations (issue #4) share the sign-up
+ * form: the office one is tried first, a token it does not know is looked up
+ * as a mükellef invitation.
+ */
+async function previewAny(token: string): Promise<InvitationSummary> {
+  try {
+    const inv = await invitationService.preview(token);
+    return {
+      kind: "organization",
+      name: inv.organization.name,
+      email: inv.email,
+      status: inv.status,
+    };
+  } catch (error) {
+    if (!isApiError(error) || !error.isNotFound) throw error;
+    const inv = await taxpayerInvitationService.preview(token);
+    return {
+      kind: "taxpayer",
+      name: inv.taxpayer.title,
+      email: inv.email,
+      status: inv.status,
+    };
+  }
+}
 
 /**
  * Sign-up for the address an organization invited. Works while public
@@ -52,13 +87,9 @@ export function InvitationRegisterForm({
   const schema = useMemo(() => createRegisterSchema(t), [t]);
   const codeSchema = useMemo(() => createEmailCodeSchema(t), [t]);
 
-  const here = routes.invite(token);
-  const target = safeNextPath(next, here);
-  const loginHref = withNextPath(routes.guest.login, target);
-
   const preview = useQuery({
-    queryKey: ["invitation", "preview", token],
-    queryFn: () => invitationService.preview(token),
+    queryKey: ["invitation", "preview-any", token],
+    queryFn: () => previewAny(token),
     retry: false,
     staleTime: 30_000,
     // The card explains failures; no global toast on top.
@@ -84,6 +115,12 @@ export function InvitationRegisterForm({
   }
 
   const invitation = preview.data;
+  const here =
+    invitation?.kind === "taxpayer"
+      ? routes.inviteTaxpayer(token)
+      : routes.invite(token);
+  const target = safeNextPath(next, here);
+  const loginHref = withNextPath(routes.guest.login, target);
   if (!invitation || invitation.status !== "pending") {
     return (
       <AuthCard
@@ -186,7 +223,7 @@ export function InvitationRegisterForm({
   };
 
   const title = t("auth.register.invited_title", {
-    name: invitation.organization.name,
+    name: invitation.name,
   });
 
   const loginLink = (
