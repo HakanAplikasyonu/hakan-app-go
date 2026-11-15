@@ -21,6 +21,8 @@ import (
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
 	searchhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/handler"
+	summariesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries"
+	summarieshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/handler"
 	warningsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -41,6 +43,7 @@ type moduleHandlers struct {
 	// accountplan: hedef hesap planı (issue #30).
 	accountplan *accountplanhandler.Handler
 	periods     *periodshandler.Handler
+	summaries   *summarieshandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -61,5 +64,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		receiptsmodule.Module{H: h.receipts, Engagements: h.engagements},
 		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
+		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
 	}
 }

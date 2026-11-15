@@ -82,6 +82,8 @@ import (
 	storagemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage"
 	storagehandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/handler"
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
+	summarieshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/handler"
+	summariesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/usecase"
 	taxpayerportal "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayerportal"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
@@ -454,6 +456,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		receipts:    receiptshandler.New(receiptsSvc),
 		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
+		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		engagements: engagementResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)

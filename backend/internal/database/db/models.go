@@ -984,6 +984,26 @@ type PeriodLockEvent struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type PeriodSummary struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Period         string             `json:"period"`
+	Status         string             `json:"status"`
+	Facts          []byte             `json:"facts"`
+	Template       string             `json:"template"`
+	Body           string             `json:"body"`
+	Edited         bool               `json:"edited"`
+	Model          pgtype.Text        `json:"model"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	ApprovedBy     pgtype.Int8        `json:"approved_by"`
+	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Permission struct {
 	ID        int64              `json:"id"`
 	Uuid      uuid.UUID          `json:"uuid"`

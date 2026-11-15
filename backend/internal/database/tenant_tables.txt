@@ -38,3 +38,4 @@ account_plan_imports engagement
 account_plan_accounts engagement
 period_locks engagement
 period_lock_events engagement
+period_summaries engagement
