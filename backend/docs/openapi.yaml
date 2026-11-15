@@ -57,6 +57,11 @@ tags:
     description: AI module (office cost report, provider privacy statement)
   - name: Taxpayers
     description: Global mükellef kimliği (VKN/TCKN). Platform kataloğu ve engagement üzerinden ofis görünümü.
+  - name: TaxpayerOnboarding
+    description: |
+      Mükellef ekleme (issue #7, D1b). Ofis VKN/TCKN ve iletişim bilgisini
+      girer; yanıt her durumda aynıdır ve aynı sürede döner. Engagement
+      yalnızca mükellef onaylayınca açılır.
   - name: TaxpayerPortal
     description: Mükellef kullanıcıları (ofis daveti, `X-Taxpayer` başlığı ile mükellef kabuğu). `TENANCY_ENABLED`.
   - name: Warnings
@@ -3535,6 +3540,84 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/taxpayer-requests:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [TaxpayerOnboarding]
+      operationId: getTenantTaxpayerRequests
+      summary: The office's add-mükellef requests
+      description: |
+        Requires `tenant.engagements.read`. Shows only what the office entered
+        and the request status. `engagement_uuid` is set once the mükellef
+        approved.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerRequestPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: postTenantTaxpayerRequest
+      summary: Add a mükellef (sends a consent request)
+      description: |
+        Requires `tenant.engagements.write`. Validates the VKN/TCKN offline
+        (format and check digit) and emails a consent link to
+        `contact_email`. **The answer never depends on whether the tax id is
+        already on the platform** (D1b): same status (`202`), same body shape
+        (`status: consent_requested`, echo of what the office sent) and a
+        response time padded to a fixed minimum. The platform's taxpayer
+        records are not read at all here. The engagement opens only when the
+        mükellef approves. Rate limited per office.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaxpayerRequestRequest"
+      responses:
+        "202":
+          description: Consent requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerRequestAccepted"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/taxpayer-requests/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/ResourceUUID"
+    delete:
+      tags: [TaxpayerOnboarding]
+      operationId: deleteTenantTaxpayerRequest
+      summary: Cancel a pending request
+      description: Requires `tenant.engagements.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Cancelled }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements:
     get:
       tags: [Engagements]
@@ -3564,37 +3647,6 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
-    post:
-      tags: [Engagements]
-      operationId: createTenantEngagement
-      summary: Open an engagement with a taxpayer
-      description: |
-        Requires `tenant.engagements.write`. A taxpayer has at most one active
-        engagement across all offices (`409 ENGAGEMENT_ALREADY_ACTIVE`).
-        Issue #7 moves this behind the taxpayer's consent.
-      security:
-        - bearerAuth: []
-      parameters:
-        - $ref: "#/components/parameters/XOrganization"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateEngagementRequest"
-      responses:
-        "201":
-          description: Opened engagement
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EnvelopeEngagement"
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}:
@@ -4297,6 +4349,182 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer-consents/preview:
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: previewTaxpayerConsent
+      summary: Describe a consent link
+      description: Public; the token travels in the body. Rate limited per client IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "200":
+          description: Consent request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerConsentPreview"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer-consents/approve:
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: approveTaxpayerConsent
+      summary: Approve an office's add-mükellef request
+      description: |
+        The signed-in account's email must be the request's `contact_email`
+        (new users sign up with the token first). Outcomes:
+        `approved` (the engagement is open; if the mükellef was with another
+        office, that engagement ends: office change, D2) and the user is an
+        owner of the company (`taxpayer_uuid`); or `forwarded` (the company
+        already has owner users and the caller is not one of them: they
+        approve from their own mükellef panel).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "200":
+          description: Outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerConsentOutcome"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`INVITATION_EMAIL_MISMATCH`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`INVITATION_UNAVAILABLE` (decided, cancelled or expired)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer-consents/reject:
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: rejectTaxpayerConsent
+      summary: Decline an office's add-mükellef request
+      description: Same account rule as approve.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvitationTokenRequest"
+      responses:
+        "204": { description: Declined }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`INVITATION_EMAIL_MISMATCH`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`INVITATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/onboarding-requests:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerOnboarding]
+      operationId: getTaxpayerOnboardingRequests
+      summary: Offices asking to add this company
+      description: Owners of the company (mükellef role `owner`) only; pending, unexpired requests for the company's own VKN/TCKN.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerPendingRequestList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/onboarding-requests/{uuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - $ref: "#/components/parameters/ResourceUUID"
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: approveTaxpayerOnboardingRequest
+      summary: Owner approves an office's request
+      description: Owners only. Opens the engagement (and ends one with another office, D2).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerConsentOutcome"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`INVITATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/onboarding-requests/{uuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - $ref: "#/components/parameters/ResourceUUID"
+    post:
+      tags: [TaxpayerOnboarding]
+      operationId: rejectTaxpayerOnboardingRequest
+      summary: Owner declines an office's request
+      description: Owners only.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Declined }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`INVITATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer-invitations/preview:
     post:
       tags: [TaxpayerPortal]
@@ -8482,6 +8710,134 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TenantPermissionList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    CreateTaxpayerRequestRequest:
+      type: object
+      additionalProperties: false
+      required: [kind, tax_id, title, contact_email]
+      properties:
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string, description: "VKN (10) or TCKN (11); spaces, dots and dashes are ignored" }
+        title: { type: string, maxLength: 255 }
+        contact_email: { type: string, format: email }
+
+    TaxpayerRequest:
+      type: object
+      required: [uuid, kind, tax_id, title, contact_email, status, created_at, expires_at, engagement_uuid]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string }
+        title: { type: string }
+        contact_email: { type: string, format: email }
+        status: { type: string, enum: [pending, approved, rejected, cancelled, expired] }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        engagement_uuid: { type: [string, "null"], format: uuid, description: Set after the mükellef approved }
+
+    TaxpayerRequestPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerRequest" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    TaxpayerRequestAccepted:
+      type: object
+      required: [status, request]
+      properties:
+        status: { type: string, enum: [consent_requested] }
+        request: { $ref: "#/components/schemas/TaxpayerRequest" }
+
+    TaxpayerConsentPreview:
+      type: object
+      required: [organization, kind, tax_id, title, contact_email, status, expires_at]
+      properties:
+        organization:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string }
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string }
+        title: { type: string }
+        contact_email: { type: string, format: email }
+        status: { type: string, enum: [pending, approved, rejected, cancelled, expired] }
+        expires_at: { type: string, format: date-time }
+
+    TaxpayerConsentOutcome:
+      type: object
+      required: [status, taxpayer_uuid]
+      properties:
+        status: { type: string, enum: [approved, forwarded] }
+        taxpayer_uuid: { type: [string, "null"], format: uuid, description: "Set when the caller can open the company (/m/{uuid})" }
+
+    TaxpayerPendingRequest:
+      type: object
+      required: [uuid, organization, title, tax_id, created_at, expires_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        organization:
+          type: object
+          required: [name]
+          properties:
+            name: { type: string }
+        title: { type: string }
+        tax_id: { type: string }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+
+    TaxpayerPendingRequestList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerPendingRequest" }
+
+    EnvelopeTaxpayerRequestPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerRequestPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerRequestAccepted:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerRequestAccepted" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerConsentPreview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerConsentPreview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerConsentOutcome:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerConsentOutcome" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxpayerPendingRequestList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerPendingRequestList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

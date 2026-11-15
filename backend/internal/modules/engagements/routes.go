@@ -32,7 +32,10 @@ func RegisterRoutes(
 	write := perm(rbac.PermTenantEngagementsWrite)
 
 	mux.Handle("GET /v1/tenant/engagements", middleware.Chain(http.HandlerFunc(h.list), authn, org, read))
-	mux.Handle("POST /v1/tenant/engagements", middleware.Chain(http.HandlerFunc(h.create), authn, org, write))
+	// No office route opens an engagement directly: it would tell the office
+	// whether the taxpayer is active elsewhere (D1b). Engagements open when
+	// the mükellef approves an add request (/v1/tenant/taxpayer-requests,
+	// issue #7).
 
 	mux.Handle("GET /v1/tenant/engagements/{engagementUuid}", middleware.Chain(http.HandlerFunc(h.get), authn, org, read, engAny))
 	// Mükellef data routes follow this chain: active engagement only.

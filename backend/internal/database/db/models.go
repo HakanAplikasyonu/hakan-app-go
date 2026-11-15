@@ -1285,6 +1285,25 @@ type TaxpayerMember struct {
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TaxpayerOnboardingRequest struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	Kind           string             `json:"kind"`
+	TaxID          string             `json:"tax_id"`
+	Title          string             `json:"title"`
+	ContactEmail   string             `json:"contact_email"`
+	TokenHash      string             `json:"token_hash"`
+	Status         string             `json:"status"`
+	RequestedBy    pgtype.Int8        `json:"requested_by"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	TaxpayerID     pgtype.Int8        `json:"taxpayer_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type TaxpayerVehicle struct {
 	ID          int64              `json:"id"`
 	Uuid        uuid.UUID          `json:"uuid"`

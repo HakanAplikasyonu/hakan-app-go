@@ -170,5 +170,9 @@ export const permissions = {
       read: Permission.TenantRolesRead,
       write: Permission.TenantRolesWrite,
     },
+    engagements: {
+      read: Permission.TenantEngagementsRead,
+      write: Permission.TenantEngagementsWrite,
+    },
   },
 } as const;

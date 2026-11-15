@@ -93,3 +93,43 @@ func RegisterMemberRoutes(
 
 	mux.Handle("GET /v1/taxpayer/context", middleware.Chain(http.HandlerFunc(h.taxpayerContext), authn, tp))
 }
+
+// RegisterOnboardingRoutes mounts the add-mükellef flow (issue #7):
+//
+//   - office side: /v1/tenant/taxpayer-requests (one answer for every tax id);
+//   - consent link: /v1/taxpayer-consents/preview, /approve, /reject;
+//   - owners in the mükellef panel: /v1/taxpayer/onboarding-requests.
+func RegisterOnboardingRoutes(
+	mux *http.ServeMux,
+	tokens *jwt.Manager,
+	loader middleware.IdentityLoader,
+	orgResolver orgctx.Resolver,
+	tpResolver taxpayerctx.Resolver,
+	h *OnboardingHandler,
+) {
+	if orgResolver == nil || tpResolver == nil || h == nil {
+		return
+	}
+	authn := middleware.Authenticate(tokens, loader)
+	org := middleware.RequireOrganization(orgResolver)
+	perm := middleware.RequireTenantPermission
+	tp := middleware.RequireTaxpayer(tpResolver)
+
+	mux.Handle("GET /v1/tenant/taxpayer-requests", middleware.Chain(
+		http.HandlerFunc(h.listRequests), authn, org, perm(rbac.PermTenantEngagementsRead),
+	))
+	mux.Handle("POST /v1/tenant/taxpayer-requests", middleware.Chain(
+		http.HandlerFunc(h.createRequest), authn, org, perm(rbac.PermTenantEngagementsWrite),
+	))
+	mux.Handle("DELETE /v1/tenant/taxpayer-requests/{uuid}", middleware.Chain(
+		http.HandlerFunc(h.cancelRequest), authn, org, perm(rbac.PermTenantEngagementsWrite),
+	))
+
+	mux.Handle("POST /v1/taxpayer-consents/preview", http.HandlerFunc(h.previewConsent))
+	mux.Handle("POST /v1/taxpayer-consents/approve", middleware.Chain(http.HandlerFunc(h.approveConsent), authn))
+	mux.Handle("POST /v1/taxpayer-consents/reject", middleware.Chain(http.HandlerFunc(h.rejectConsent), authn))
+
+	mux.Handle("GET /v1/taxpayer/onboarding-requests", middleware.Chain(http.HandlerFunc(h.ownerPending), authn, tp))
+	mux.Handle("POST /v1/taxpayer/onboarding-requests/{uuid}/approve", middleware.Chain(http.HandlerFunc(h.ownerApprove), authn, tp))
+	mux.Handle("POST /v1/taxpayer/onboarding-requests/{uuid}/reject", middleware.Chain(http.HandlerFunc(h.ownerReject), authn, tp))
+}

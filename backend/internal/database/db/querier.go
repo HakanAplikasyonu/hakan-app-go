@@ -27,6 +27,7 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
 	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
@@ -48,6 +49,7 @@ type Querier interface {
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
+	CountOnboardingRequestsByOrg(ctx context.Context, organizationID int64) (int64, error)
 	CountOrganizationMembersByOrg(ctx context.Context, arg CountOrganizationMembersByOrgParams) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
 	CountOrganizationRoleUsage(ctx context.Context, arg CountOrganizationRoleUsageParams) (int32, error)
@@ -79,6 +81,9 @@ type Querier interface {
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateOAuthAccount(ctx context.Context, arg CreateOAuthAccountParams) (OauthAccount, error)
 	CreateOTPCode(ctx context.Context, arg CreateOTPCodeParams) (OtpCode, error)
+	// Mükellef ekleme talepleri (issue #7). Ofis tarafındaki sorgular
+	// taxpayers tablosuna dokunmaz (D1b: varlık sızıntısı yasağı).
+	CreateOnboardingRequest(ctx context.Context, arg CreateOnboardingRequestParams) (TaxpayerOnboardingRequest, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateOrganizationInvitation(ctx context.Context, arg CreateOrganizationInvitationParams) (OrganizationInvitation, error)
 	CreateOrganizationRole(ctx context.Context, arg CreateOrganizationRoleParams) (Role, error)
@@ -98,6 +103,8 @@ type Querier interface {
 	DeactivateUser(ctx context.Context, id int64) (User, error)
 	DecideChangeRequest(ctx context.Context, arg DecideChangeRequestParams) (int64, error)
 	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
+	// tenant-lint: cross-org onay sonucu, token ile bulunan satırın id'siyle
+	DecideOnboardingRequest(ctx context.Context, arg DecideOnboardingRequestParams) error
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
@@ -138,6 +145,8 @@ type Querier interface {
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
+	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
+	EndEngagementByID(ctx context.Context, id int64) error
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
@@ -176,6 +185,8 @@ type Querier interface {
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
+	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
+	GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID int64) (Engagement, error)
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
@@ -213,6 +224,10 @@ type Querier interface {
 	GetOAuthAccountByProviderAccount(ctx context.Context, arg GetOAuthAccountByProviderAccountParams) (GetOAuthAccountByProviderAccountRow, error)
 	GetOAuthAccountByUserProvider(ctx context.Context, arg GetOAuthAccountByUserProviderParams) (GetOAuthAccountByUserProviderRow, error)
 	GetOAuthProviderSettings(ctx context.Context, provider string) (OauthProviderSetting, error)
+	// The consent link carries only the token: the mükellef is not an office
+	// member, so the lookup cannot be organization-scoped.
+	// tenant-lint: cross-org onay bağlantısı, yalnızca token özetiyle tek satır
+	GetOnboardingRequestByTokenHash(ctx context.Context, tokenHash string) (GetOnboardingRequestByTokenHashRow, error)
 	GetOrganizationByID(ctx context.Context, id int64) (Organization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error)
 	GetOrganizationByUUID(ctx context.Context, argUuid uuid.UUID) (Organization, error)
@@ -221,6 +236,8 @@ type Querier interface {
 	GetOrganizationMember(ctx context.Context, arg GetOrganizationMemberParams) (GetOrganizationMemberRow, error)
 	GetOrganizationMemberByUserUUID(ctx context.Context, arg GetOrganizationMemberByUserUUIDParams) (GetOrganizationMemberByUserUUIDRow, error)
 	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
+	// tenant-lint: cross-org mükellef sahibi talebi uuid ve kendi VKN'siyle bulur
+	GetPendingOnboardingRequestForTaxID(ctx context.Context, arg GetPendingOnboardingRequestForTaxIDParams) (GetPendingOnboardingRequestForTaxIDRow, error)
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
@@ -380,6 +397,7 @@ type Querier interface {
 	ListOAuthAccountsByUserID(ctx context.Context, userID int64) ([]ListOAuthAccountsByUserIDRow, error)
 	ListOAuthAccountsForUserIDs(ctx context.Context, userIds []int64) ([]ListOAuthAccountsForUserIDsRow, error)
 	ListOAuthProviderSettings(ctx context.Context) ([]OauthProviderSetting, error)
+	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
 	ListOrganizationMembersByOrg(ctx context.Context, arg ListOrganizationMembersByOrgParams) ([]ListOrganizationMembersByOrgRow, error)
@@ -388,6 +406,11 @@ type Querier interface {
 	// bağlıdır; şablon roller (organization_id IS NULL) burada listelenmez.
 	ListOrganizationRoles(ctx context.Context, organizationID pgtype.Int8) ([]ListOrganizationRolesRow, error)
 	ListOrganizationsFiltered(ctx context.Context, arg ListOrganizationsFilteredParams) ([]Organization, error)
+	// Mükellef panelinde sahibin göreceği bekleyen talepler (mükellefin kendi
+	// VKN'si için). Ofislerin kendi kayıtlarıdır ama yalnızca talebin hedefi
+	// olan mükellefe gösterilir.
+	// tenant-lint: cross-org mükellef sahibi kendi VKN'sine gelen talepleri görür
+	ListPendingOnboardingRequestsForTaxID(ctx context.Context, taxID string) ([]ListPendingOnboardingRequestsForTaxIDRow, error)
 	// Open invitations (not accepted, not revoked); expired ones are included so
 	// they can be revoked or re-sent.
 	ListPendingOrganizationInvitations(ctx context.Context, arg ListPendingOrganizationInvitationsParams) ([]ListPendingOrganizationInvitationsRow, error)
@@ -423,6 +446,8 @@ type Querier interface {
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
+	// tenant-lint: cross-taxpayer sahip var mı (onay yetkisi)
+	ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64) ([]int64, error)
 	// Fiş yakalama (issue #23).
 	ListTaxpayerVehicles(ctx context.Context, taxpayerID int64) ([]TaxpayerVehicle, error)
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
@@ -445,7 +470,10 @@ type Querier interface {
 	ListWarningRuleConfigs(ctx context.Context, arg ListWarningRuleConfigsParams) ([]ListWarningRuleConfigsRow, error)
 	ListWebAuthnCredentialsByUserID(ctx context.Context, userID int64) ([]WebauthnCredential, error)
 	ListWebAuthnCredentialsForUserIDs(ctx context.Context, userIds []int64) ([]WebauthnCredential, error)
+	// tenant-lint: cross-org onay işlemi, token ile bulunan satır kilitlenir
+	LockOnboardingRequest(ctx context.Context, id int64) (TaxpayerOnboardingRequest, error)
 	LockOrganizationRow(ctx context.Context, id int64) (Organization, error)
+	LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	MarkBulkJobCompleted(ctx context.Context, arg MarkBulkJobCompletedParams) (BulkJob, error)
 	MarkBulkJobFailed(ctx context.Context, arg MarkBulkJobFailedParams) (BulkJob, error)

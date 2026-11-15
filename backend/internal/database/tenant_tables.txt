@@ -33,3 +33,4 @@ journal_drafts engagement
 journal_draft_lines engagement
 export_batches engagement
 export_batch_items engagement
+taxpayer_onboarding_requests
