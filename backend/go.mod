@@ -8,6 +8,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.43.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0
+	github.com/furkanmeclis/go-ubltr v0.0.0-20261115194323-7b312a84cd13
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-webauthn/webauthn v0.12.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -20,6 +21,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/pquerna/otp v1.5.0
 	github.com/redis/go-redis/v9 v9.21.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/crypto v0.54.0
 )
@@ -37,6 +39,7 @@ require (
 	github.com/aws/smithy-go v1.27.3 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect
 	github.com/go-webauthn/x v0.1.20 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.1 // indirect
@@ -45,6 +48,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
+	github.com/lestrrat-go/helium v0.7.0 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
