@@ -4356,6 +4356,13 @@ export interface components {
             invoice_number?: string;
             /** Format: uuid */
             invoice_uuid?: string;
+            /**
+             * @description created: new invoice; merged: same invoice from another source, content kept; replaced: higher-priority source rewrote it; seen: this source already sent it
+             * @enum {string}
+             */
+            outcome?: "created" | "merged" | "replaced" | "seen";
+            /** @enum {string} */
+            match_rule?: "new" | "source" | "ettn" | "number";
             /** @enum {string} */
             error_code?: "unreadable" | "unsupported_document" | "xsd_invalid" | "PARTY_MISMATCH" | "mapping_failed" | "store_failed";
             error?: string;

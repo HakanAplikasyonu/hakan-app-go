@@ -116,3 +116,31 @@ ORDER BY i.direction, s.tax_rate;
 -- name: GetTaxpayerOwnTaxID :one
 -- Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 SELECT tax_id FROM taxpayers WHERE id = @taxpayer_id;
+
+-- name: ReplaceInvoiceContent :execrows
+-- Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
+-- yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
+UPDATE invoices SET
+    source_system = @source_system, source_id = @source_id, capture_method = @capture_method,
+    ettn = COALESCE(sqlc.narg(ettn), ettn), invoice_number = @invoice_number, direction = @direction, type = @type,
+    invoice_type_code_raw = sqlc.narg(invoice_type_code_raw), profile = sqlc.narg(profile), profile_raw = sqlc.narg(profile_raw),
+    document_class = @document_class, issue_date = @issue_date, issue_time = sqlc.narg(issue_time),
+    payment_due_date = sqlc.narg(payment_due_date), period = @period,
+    customer_id = sqlc.narg(customer_id), customer_tax_number = sqlc.narg(customer_tax_number),
+    customer_identity_number = sqlc.narg(customer_identity_number), customer_name = sqlc.narg(customer_name),
+    currency = @currency, exchange_rate = sqlc.narg(exchange_rate),
+    line_extension_amount = @line_extension_amount, allowance_total_amount = @allowance_total_amount,
+    tax_exclusive_amount = @tax_exclusive_amount, tax_amount = @tax_amount, tax_inclusive_amount = @tax_inclusive_amount,
+    withholding_amount = @withholding_amount, excise_amount = @excise_amount, communications_tax_amount = @communications_tax_amount,
+    income_tax_withholding_amount = @income_tax_withholding_amount, income_tax_withholding_rate = sqlc.narg(income_tax_withholding_rate),
+    payable_amount = @payable_amount, payable_amount_try = sqlc.narg(payable_amount_try),
+    global_tax_exemption_code = sqlc.narg(global_tax_exemption_code), original_invoice_number = sqlc.narg(original_invoice_number),
+    original_invoice_issue_date = sqlc.narg(original_invoice_issue_date), order_reference = sqlc.narg(order_reference),
+    notes = sqlc.narg(notes), has_items = @has_items, tax_summary_source = @tax_summary_source,
+    ubl_attachment_id = COALESCE(sqlc.narg(ubl_attachment_id), ubl_attachment_id),
+    raw_payload = @raw_payload, content_hash = sqlc.narg(content_hash)
+WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- name: GetInvoiceByID :one
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND id = @id;

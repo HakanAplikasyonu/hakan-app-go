@@ -15,3 +15,4 @@ invoice_tax_summaries
 sync_windows
 sync_runs
 taxpayer_members
+invoice_sources

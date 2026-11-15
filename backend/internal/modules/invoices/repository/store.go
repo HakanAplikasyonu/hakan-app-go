@@ -19,41 +19,83 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 )
 
+// Outcomes of SaveInvoice.
+const (
+	OutcomeCreated  = "created"  // new invoice
+	OutcomeMerged   = "merged"   // same invoice, new source; existing content kept
+	OutcomeReplaced = "replaced" // same invoice, higher-priority source; content rewritten
+	OutcomeSeen     = "seen"     // this source already delivered the invoice
+)
+
 // SaveResult says what SaveInvoice did.
 type SaveResult struct {
 	InvoiceID   int64
 	InvoiceUUID uuid.UUID
-	// Duplicate: an invoice with the same ETTN (or the same source key)
-	// already exists for this taxpayer; nothing was written.
-	Duplicate bool
-	// ItemIDs maps line_no to invoice_items.id for new invoices.
+	Outcome     string
+	MatchRule   string
+	// Written: the invoice content, lines and summary were written by this call
+	// (created or replaced); warnings for the new content belong to it.
+	Written bool
+	// ItemIDs maps line_no to invoice_items.id when Written.
 	ItemIDs map[int]int64
+	// PossibleDuplicates: other invoices with the same counterparty, date and
+	// payable amount (`01` §6 rule 3). Not merged; the caller raises
+	// POSSIBLE_DUPLICATE.
+	PossibleDuplicates []uuid.UUID
 }
 
-// SaveInvoice stores one mapped invoice inside tx: finds or creates the
-// counterparty's customer record, then writes the invoice, its lines and its
-// tax summary. An existing invoice with the same ETTN or the same
-// (source_system, source_id) is reported as a duplicate and left untouched
-// (`01` §6 rule 1; source priority and source links arrive with #12).
+// Duplicate reports whether the invoice already existed.
+func (r SaveResult) Duplicate() bool { return r.Outcome != OutcomeCreated }
+
+// payableTolerance is `01` §6 rule 3 (±0,01).
+var payableTolerance = decimal.RequireFromString("0.01")
+
+// SaveInvoice stores one mapped invoice inside tx, applying `01` §6:
+//
+//  1. the same (source_system, source_id) seen before → nothing changes;
+//  2. same ETTN → same invoice;
+//  3. otherwise same counterparty VKN/TCKN + invoice number + date (when one
+//     side has no ETTN) → same invoice;
+//  4. otherwise a new invoice; same counterparty + date + payable (±0,01)
+//     are returned as possible duplicates and not merged.
+//
+// A matched invoice gains a row in invoice_sources. Its content is rewritten
+// only when the new source has a higher priority (entegratör / UBL > program
+// > OCR / elle).
 func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Invoice, ublAttachmentID int64) (SaveResult, error) {
 	q := db.New(tx)
-	if inv.UUID != "" {
-		ettn, err := uuid.Parse(inv.UUID)
-		if err != nil {
-			return SaveResult{}, fmt.Errorf("repository: ettn: %w", err)
-		}
-		found, err := q.FindInvoicesByETTN(ctx, db.FindInvoicesByETTNParams{TaxpayerID: taxpayerID, Ettn: pgtype.UUID{Bytes: ettn, Valid: true}})
+	priority := model.SourcePriority(inv.SourceSystem, inv.CaptureMethod)
+
+	if src, err := q.GetInvoiceSourceBySource(ctx, db.GetInvoiceSourceBySourceParams{TaxpayerID: taxpayerID, SourceSystem: inv.SourceSystem, SourceID: inv.SourceID}); err == nil {
+		existing, err := q.GetInvoiceByID(ctx, db.GetInvoiceByIDParams{TaxpayerID: taxpayerID, ID: src.InvoiceID})
 		if err != nil {
 			return SaveResult{}, err
 		}
-		if len(found) > 0 {
-			return SaveResult{InvoiceID: found[0].ID, InvoiceUUID: found[0].Uuid, Duplicate: true}, nil
+		if err := upsertSource(ctx, q, taxpayerID, existing.ID, inv, priority, model.MatchSource, ublAttachmentID); err != nil {
+			return SaveResult{}, err
 		}
-	}
-	if existing, err := q.GetInvoiceBySource(ctx, db.GetInvoiceBySourceParams{TaxpayerID: taxpayerID, SourceSystem: inv.SourceSystem, SourceID: inv.SourceID}); err == nil {
-		return SaveResult{InvoiceID: existing.ID, InvoiceUUID: existing.Uuid, Duplicate: true}, nil
+		return SaveResult{InvoiceID: existing.ID, InvoiceUUID: existing.Uuid, Outcome: OutcomeSeen, MatchRule: model.MatchSource}, nil
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return SaveResult{}, err
+	}
+
+	match, rule, err := findMatch(ctx, q, taxpayerID, inv)
+	if err != nil {
+		return SaveResult{}, err
+	}
+	if match != nil {
+		res := SaveResult{InvoiceID: match.ID, InvoiceUUID: match.Uuid, Outcome: OutcomeMerged, MatchRule: rule}
+		if priority > model.SourcePriority(match.SourceSystem, match.CaptureMethod) {
+			ids, err := replaceContent(ctx, tx, taxpayerID, match.ID, inv, ublAttachmentID)
+			if err != nil {
+				return SaveResult{}, err
+			}
+			res.Outcome, res.Written, res.ItemIDs = OutcomeReplaced, true, ids
+		}
+		if err := upsertSource(ctx, q, taxpayerID, match.ID, inv, priority, rule, ublAttachmentID); err != nil {
+			return SaveResult{}, err
+		}
+		return res, nil
 	}
 
 	customerID, err := findOrCreateCustomer(ctx, tx, taxpayerID, inv)
@@ -68,28 +110,158 @@ func SaveInvoice(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Inv
 	if err != nil {
 		return SaveResult{}, fmt.Errorf("repository: invoice: %w", err)
 	}
+	ids, err := insertChildren(ctx, q, taxpayerID, row.ID, inv)
+	if err != nil {
+		return SaveResult{}, err
+	}
+	if err := upsertSource(ctx, q, taxpayerID, row.ID, inv, priority, model.MatchNew, ublAttachmentID); err != nil {
+		return SaveResult{}, err
+	}
+	res := SaveResult{InvoiceID: row.ID, InvoiceUUID: row.Uuid, Outcome: OutcomeCreated, MatchRule: model.MatchNew, Written: true, ItemIDs: ids}
+	if res.PossibleDuplicates, err = possibleDuplicates(ctx, q, taxpayerID, row.ID, inv); err != nil {
+		return SaveResult{}, err
+	}
+	return res, nil
+}
+
+func findMatch(ctx context.Context, q *db.Queries, taxpayerID int64, inv model.Invoice) (*db.Invoice, string, error) {
+	var ettn pgtype.UUID
+	if inv.UUID != "" {
+		id, err := uuid.Parse(inv.UUID)
+		if err != nil {
+			return nil, "", fmt.Errorf("repository: ettn: %w", err)
+		}
+		ettn = pgtype.UUID{Bytes: id, Valid: true}
+		found, err := q.FindInvoicesByETTN(ctx, db.FindInvoicesByETTNParams{TaxpayerID: taxpayerID, Ettn: ettn})
+		if err != nil {
+			return nil, "", err
+		}
+		if len(found) > 0 {
+			return &found[0], model.MatchETTN, nil
+		}
+	}
+	cp := inv.Counterparty
+	if inv.InvoiceNumber == "" || (cp.TaxNumber == "" && cp.IdentityNumber == "") {
+		return nil, "", nil
+	}
+	found, err := q.FindInvoicesByPartyNumberDate(ctx, db.FindInvoicesByPartyNumberDateParams{
+		TaxpayerID: taxpayerID, InvoiceNumber: inv.InvoiceNumber, IssueDate: Date(&inv.IssueDate),
+		CustomerTaxNumber: Text(cp.TaxNumber), CustomerIdentityNumber: Text(cp.IdentityNumber),
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	for i := range found {
+		// Two different ETTNs are two documents, whatever their numbers say.
+		if ettn.Valid && found[i].Ettn.Valid && found[i].Ettn != ettn {
+			continue
+		}
+		return &found[i], model.MatchNumber, nil
+	}
+	return nil, "", nil
+}
+
+func possibleDuplicates(ctx context.Context, q *db.Queries, taxpayerID, invoiceID int64, inv model.Invoice) ([]uuid.UUID, error) {
+	cp := inv.Counterparty
+	if cp.TaxNumber == "" && cp.IdentityNumber == "" {
+		return nil, nil
+	}
+	rows, err := q.FindPossibleDuplicateInvoices(ctx, db.FindPossibleDuplicateInvoicesParams{
+		TaxpayerID: taxpayerID, IssueDate: Date(&inv.IssueDate), Direction: string(inv.Direction),
+		CustomerTaxNumber: Text(cp.TaxNumber), CustomerIdentityNumber: Text(cp.IdentityNumber),
+		PayableMin: Num(inv.Amounts.PayableAmount.Sub(payableTolerance)),
+		PayableMax: Num(inv.Amounts.PayableAmount.Add(payableTolerance)),
+		ExcludeID:  invoiceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]uuid.UUID, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Uuid)
+	}
+	return out, nil
+}
+
+func replaceContent(ctx context.Context, tx pgx.Tx, taxpayerID, invoiceID int64, inv model.Invoice, ublAttachmentID int64) (map[int]int64, error) {
+	q := db.New(tx)
+	customerID, err := findOrCreateCustomer(ctx, tx, taxpayerID, inv)
+	if err != nil {
+		return nil, fmt.Errorf("repository: customer: %w", err)
+	}
+	p, err := invoiceParams(taxpayerID, inv, customerID, ublAttachmentID)
+	if err != nil {
+		return nil, err
+	}
+	n, err := q.ReplaceInvoiceContent(ctx, db.ReplaceInvoiceContentParams{
+		TaxpayerID: taxpayerID, ID: invoiceID,
+		SourceSystem: p.SourceSystem, SourceID: p.SourceID, CaptureMethod: p.CaptureMethod, Ettn: p.Ettn,
+		InvoiceNumber: p.InvoiceNumber, Direction: p.Direction, Type: p.Type,
+		InvoiceTypeCodeRaw: p.InvoiceTypeCodeRaw, Profile: p.Profile, ProfileRaw: p.ProfileRaw, DocumentClass: p.DocumentClass,
+		IssueDate: p.IssueDate, IssueTime: p.IssueTime, PaymentDueDate: p.PaymentDueDate, Period: p.Period,
+		CustomerID: p.CustomerID, CustomerTaxNumber: p.CustomerTaxNumber, CustomerIdentityNumber: p.CustomerIdentityNumber,
+		CustomerName: p.CustomerName, Currency: p.Currency, ExchangeRate: p.ExchangeRate,
+		LineExtensionAmount: p.LineExtensionAmount, AllowanceTotalAmount: p.AllowanceTotalAmount,
+		TaxExclusiveAmount: p.TaxExclusiveAmount, TaxAmount: p.TaxAmount, TaxInclusiveAmount: p.TaxInclusiveAmount,
+		WithholdingAmount: p.WithholdingAmount, ExciseAmount: p.ExciseAmount, CommunicationsTaxAmount: p.CommunicationsTaxAmount,
+		IncomeTaxWithholdingAmount: p.IncomeTaxWithholdingAmount, IncomeTaxWithholdingRate: p.IncomeTaxWithholdingRate,
+		PayableAmount: p.PayableAmount, PayableAmountTry: p.PayableAmountTry,
+		GlobalTaxExemptionCode: p.GlobalTaxExemptionCode, OriginalInvoiceNumber: p.OriginalInvoiceNumber,
+		OriginalInvoiceIssueDate: p.OriginalInvoiceIssueDate, OrderReference: p.OrderReference, Notes: p.Notes,
+		HasItems: p.HasItems, TaxSummarySource: p.TaxSummarySource, UblAttachmentID: p.UblAttachmentID,
+		RawPayload: p.RawPayload, ContentHash: p.ContentHash,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("repository: replace invoice: %w", err)
+	}
+	if n != 1 {
+		return nil, fmt.Errorf("repository: replace invoice: %d rows", n)
+	}
+	if err := q.DeleteInvoiceChildren(ctx, db.DeleteInvoiceChildrenParams{TaxpayerID: taxpayerID, InvoiceID: invoiceID}); err != nil {
+		return nil, err
+	}
+	return insertChildren(ctx, q, taxpayerID, invoiceID, inv)
+}
+
+func insertChildren(ctx context.Context, q *db.Queries, taxpayerID, invoiceID int64, inv model.Invoice) (map[int]int64, error) {
 	itemIDs := make(map[int]int64, len(inv.Items))
 	for _, it := range inv.Items {
-		p, err := itemParams(taxpayerID, row.ID, it)
+		p, err := itemParams(taxpayerID, invoiceID, it)
 		if err != nil {
-			return SaveResult{}, err
+			return nil, err
 		}
 		id, err := q.InsertInvoiceItem(ctx, p)
 		if err != nil {
-			return SaveResult{}, fmt.Errorf("repository: item %d: %w", it.LineNo, err)
+			return nil, fmt.Errorf("repository: item %d: %w", it.LineNo, err)
 		}
 		itemIDs[it.LineNo] = id
 	}
 	for _, s := range inv.TaxSummaries {
 		if err := q.InsertInvoiceTaxSummary(ctx, db.InsertInvoiceTaxSummaryParams{
-			TaxpayerID: taxpayerID, InvoiceID: row.ID,
+			TaxpayerID: taxpayerID, InvoiceID: invoiceID,
 			TaxRate: Num(s.TaxRate), Base: Num(s.Base), Vat: Num(s.VAT), Withholding: Num(s.Withholding),
 			WithholdingCode: Text(s.WithholdingCode), TaxExemptionCode: Text(s.TaxExemptionCode),
 		}); err != nil {
-			return SaveResult{}, fmt.Errorf("repository: tax summary: %w", err)
+			return nil, fmt.Errorf("repository: tax summary: %w", err)
 		}
 	}
-	return SaveResult{InvoiceID: row.ID, InvoiceUUID: row.Uuid, ItemIDs: itemIDs}, nil
+	return itemIDs, nil
+}
+
+func upsertSource(ctx context.Context, q *db.Queries, taxpayerID, invoiceID int64, inv model.Invoice, priority int, rule string, attachmentID int64) error {
+	att := pgtype.Int8{}
+	if attachmentID > 0 {
+		att = pgtype.Int8{Int64: attachmentID, Valid: true}
+	}
+	_, err := q.UpsertInvoiceSource(ctx, db.UpsertInvoiceSourceParams{
+		TaxpayerID: taxpayerID, InvoiceID: invoiceID, SourceSystem: inv.SourceSystem, SourceID: inv.SourceID,
+		CaptureMethod: inv.CaptureMethod, Priority: int16(priority), MatchRule: rule, //nolint:gosec // 1..3
+		ContentHash: Text(inv.ContentHash), AttachmentID: att, RawPayload: []byte("{}"),
+	})
+	if err != nil {
+		return fmt.Errorf("repository: invoice source: %w", err)
+	}
+	return nil
 }
 
 // findOrCreateCustomer applies the `01` §4.3 rule: one customer per VKN (or

@@ -141,7 +141,9 @@ type Querier interface {
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
+	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
+	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
@@ -252,6 +254,7 @@ type Querier interface {
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
+	ListInvoiceSources(ctx context.Context, arg ListInvoiceSourcesParams) ([]InvoiceSource, error)
 	ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTaxSummariesParams) ([]InvoiceTaxSummary, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -344,6 +347,9 @@ type Querier interface {
 	PingDB(ctx context.Context) (int32, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
+	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
+	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
+	ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error)
 	ReplaceSecretRecord(ctx context.Context, arg ReplaceSecretRecordParams) (int64, error)
 	ReplaceUserRoles(ctx context.Context, userID int64) error
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
@@ -409,6 +415,7 @@ type Querier interface {
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
+	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.

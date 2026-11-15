@@ -130,6 +130,15 @@ func TestUpload100InvoiceZipTwice(t *testing.T) {
 		t.Fatal("no tax summaries")
 	}
 
+	// Same counterparty, date and amount, different ETTN (`01` §6 rule 3):
+	// every clone after the first of its kind is flagged, none is merged.
+	if n := e.count(t, `SELECT count(*) FROM data_warnings WHERE taxpayer_id = $1 AND code = 'POSSIBLE_DUPLICATE'`); n != 98 {
+		t.Fatalf("possible duplicate warnings = %d", n)
+	}
+	if n := e.count(t, `SELECT count(*) FROM invoice_sources WHERE taxpayer_id = $1`); n != 100 {
+		t.Fatalf("invoice sources = %d", n)
+	}
+
 	job2, err := e.svc.Upload(ctx, e.scope, e.actor, "portal-indirme.zip", data)
 	if err != nil {
 		t.Fatal(err)
@@ -137,6 +146,9 @@ func TestUpload100InvoiceZipTwice(t *testing.T) {
 	r2 := job2.Report
 	if r2.Total != 100 || r2.Added != 0 || r2.Duplicate != 100 || r2.Failed != 0 {
 		t.Fatalf("second report: %+v", *r2)
+	}
+	if it := r2.Items[0]; it.Outcome != "seen" || it.MatchRule != "source" {
+		t.Fatalf("second upload item: %+v", it)
 	}
 	if n := e.count(t, `SELECT count(*) FROM invoices WHERE taxpayer_id = $1`); n != 100 {
 		t.Fatalf("invoices after re-upload = %d", n)

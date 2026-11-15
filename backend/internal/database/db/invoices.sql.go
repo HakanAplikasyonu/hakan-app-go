@@ -407,6 +407,81 @@ func (q *Queries) GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice
 	return i, err
 }
 
+const getInvoiceByID = `-- name: GetInvoiceByID :one
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+WHERE taxpayer_id = $1 AND id = $2
+`
+
+type GetInvoiceByIDParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	ID         int64 `json:"id"`
+}
+
+func (q *Queries) GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error) {
+	row := q.db.QueryRow(ctx, getInvoiceByID, arg.TaxpayerID, arg.ID)
+	var i Invoice
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.SourceSystem,
+		&i.SourceID,
+		&i.CaptureMethod,
+		&i.Ettn,
+		&i.InvoiceNumber,
+		&i.Direction,
+		&i.Type,
+		&i.InvoiceTypeCodeRaw,
+		&i.Profile,
+		&i.ProfileRaw,
+		&i.DocumentClass,
+		&i.Status,
+		&i.StatusNormalized,
+		&i.IssueDate,
+		&i.IssueTime,
+		&i.PaymentDueDate,
+		&i.Period,
+		&i.CustomerID,
+		&i.CustomerTaxNumber,
+		&i.CustomerIdentityNumber,
+		&i.CustomerName,
+		&i.Currency,
+		&i.ExchangeRate,
+		&i.LineExtensionAmount,
+		&i.AllowanceTotalAmount,
+		&i.TaxExclusiveAmount,
+		&i.TaxAmount,
+		&i.TaxInclusiveAmount,
+		&i.WithholdingAmount,
+		&i.ExciseAmount,
+		&i.CommunicationsTaxAmount,
+		&i.IncomeTaxWithholdingAmount,
+		&i.IncomeTaxWithholdingRate,
+		&i.PayableAmount,
+		&i.PayableAmountTry,
+		&i.GlobalTaxExemptionCode,
+		&i.OriginalInvoiceNumber,
+		&i.OriginalInvoiceIssueDate,
+		&i.OrderReference,
+		&i.IsInternetSale,
+		&i.Sgk,
+		&i.DespatchID,
+		&i.Notes,
+		&i.PaymentStatus,
+		&i.RemainingAmount,
+		&i.HasItems,
+		&i.TaxSummarySource,
+		&i.UblAttachmentID,
+		&i.RawPayload,
+		&i.ContentHash,
+		&i.SourceUpdatedAt,
+		&i.DeletedAtSource,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getInvoiceBySource = `-- name: GetInvoiceBySource :one
 SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
 WHERE taxpayer_id = $1 AND source_system = $2 AND source_id = $3
@@ -1010,4 +1085,131 @@ func (q *Queries) PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryPara
 		return nil, err
 	}
 	return items, nil
+}
+
+const replaceInvoiceContent = `-- name: ReplaceInvoiceContent :execrows
+UPDATE invoices SET
+    source_system = $1, source_id = $2, capture_method = $3,
+    ettn = COALESCE($4, ettn), invoice_number = $5, direction = $6, type = $7,
+    invoice_type_code_raw = $8, profile = $9, profile_raw = $10,
+    document_class = $11, issue_date = $12, issue_time = $13,
+    payment_due_date = $14, period = $15,
+    customer_id = $16, customer_tax_number = $17,
+    customer_identity_number = $18, customer_name = $19,
+    currency = $20, exchange_rate = $21,
+    line_extension_amount = $22, allowance_total_amount = $23,
+    tax_exclusive_amount = $24, tax_amount = $25, tax_inclusive_amount = $26,
+    withholding_amount = $27, excise_amount = $28, communications_tax_amount = $29,
+    income_tax_withholding_amount = $30, income_tax_withholding_rate = $31,
+    payable_amount = $32, payable_amount_try = $33,
+    global_tax_exemption_code = $34, original_invoice_number = $35,
+    original_invoice_issue_date = $36, order_reference = $37,
+    notes = $38, has_items = $39, tax_summary_source = $40,
+    ubl_attachment_id = COALESCE($41, ubl_attachment_id),
+    raw_payload = $42, content_hash = $43
+WHERE taxpayer_id = $44 AND id = $45
+`
+
+type ReplaceInvoiceContentParams struct {
+	SourceSystem               string         `json:"source_system"`
+	SourceID                   string         `json:"source_id"`
+	CaptureMethod              string         `json:"capture_method"`
+	Ettn                       pgtype.UUID    `json:"ettn"`
+	InvoiceNumber              string         `json:"invoice_number"`
+	Direction                  string         `json:"direction"`
+	Type                       string         `json:"type"`
+	InvoiceTypeCodeRaw         pgtype.Text    `json:"invoice_type_code_raw"`
+	Profile                    pgtype.Text    `json:"profile"`
+	ProfileRaw                 pgtype.Text    `json:"profile_raw"`
+	DocumentClass              string         `json:"document_class"`
+	IssueDate                  pgtype.Date    `json:"issue_date"`
+	IssueTime                  pgtype.Text    `json:"issue_time"`
+	PaymentDueDate             pgtype.Date    `json:"payment_due_date"`
+	Period                     string         `json:"period"`
+	CustomerID                 pgtype.Int8    `json:"customer_id"`
+	CustomerTaxNumber          pgtype.Text    `json:"customer_tax_number"`
+	CustomerIdentityNumber     pgtype.Text    `json:"customer_identity_number"`
+	CustomerName               pgtype.Text    `json:"customer_name"`
+	Currency                   string         `json:"currency"`
+	ExchangeRate               pgtype.Numeric `json:"exchange_rate"`
+	LineExtensionAmount        pgtype.Numeric `json:"line_extension_amount"`
+	AllowanceTotalAmount       pgtype.Numeric `json:"allowance_total_amount"`
+	TaxExclusiveAmount         pgtype.Numeric `json:"tax_exclusive_amount"`
+	TaxAmount                  pgtype.Numeric `json:"tax_amount"`
+	TaxInclusiveAmount         pgtype.Numeric `json:"tax_inclusive_amount"`
+	WithholdingAmount          pgtype.Numeric `json:"withholding_amount"`
+	ExciseAmount               pgtype.Numeric `json:"excise_amount"`
+	CommunicationsTaxAmount    pgtype.Numeric `json:"communications_tax_amount"`
+	IncomeTaxWithholdingAmount pgtype.Numeric `json:"income_tax_withholding_amount"`
+	IncomeTaxWithholdingRate   pgtype.Numeric `json:"income_tax_withholding_rate"`
+	PayableAmount              pgtype.Numeric `json:"payable_amount"`
+	PayableAmountTry           pgtype.Numeric `json:"payable_amount_try"`
+	GlobalTaxExemptionCode     pgtype.Text    `json:"global_tax_exemption_code"`
+	OriginalInvoiceNumber      pgtype.Text    `json:"original_invoice_number"`
+	OriginalInvoiceIssueDate   pgtype.Date    `json:"original_invoice_issue_date"`
+	OrderReference             []byte         `json:"order_reference"`
+	Notes                      pgtype.Text    `json:"notes"`
+	HasItems                   bool           `json:"has_items"`
+	TaxSummarySource           string         `json:"tax_summary_source"`
+	UblAttachmentID            pgtype.Int8    `json:"ubl_attachment_id"`
+	RawPayload                 []byte         `json:"raw_payload"`
+	ContentHash                pgtype.Text    `json:"content_hash"`
+	TaxpayerID                 int64          `json:"taxpayer_id"`
+	ID                         int64          `json:"id"`
+}
+
+// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
+// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
+func (q *Queries) ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, replaceInvoiceContent,
+		arg.SourceSystem,
+		arg.SourceID,
+		arg.CaptureMethod,
+		arg.Ettn,
+		arg.InvoiceNumber,
+		arg.Direction,
+		arg.Type,
+		arg.InvoiceTypeCodeRaw,
+		arg.Profile,
+		arg.ProfileRaw,
+		arg.DocumentClass,
+		arg.IssueDate,
+		arg.IssueTime,
+		arg.PaymentDueDate,
+		arg.Period,
+		arg.CustomerID,
+		arg.CustomerTaxNumber,
+		arg.CustomerIdentityNumber,
+		arg.CustomerName,
+		arg.Currency,
+		arg.ExchangeRate,
+		arg.LineExtensionAmount,
+		arg.AllowanceTotalAmount,
+		arg.TaxExclusiveAmount,
+		arg.TaxAmount,
+		arg.TaxInclusiveAmount,
+		arg.WithholdingAmount,
+		arg.ExciseAmount,
+		arg.CommunicationsTaxAmount,
+		arg.IncomeTaxWithholdingAmount,
+		arg.IncomeTaxWithholdingRate,
+		arg.PayableAmount,
+		arg.PayableAmountTry,
+		arg.GlobalTaxExemptionCode,
+		arg.OriginalInvoiceNumber,
+		arg.OriginalInvoiceIssueDate,
+		arg.OrderReference,
+		arg.Notes,
+		arg.HasItems,
+		arg.TaxSummarySource,
+		arg.UblAttachmentID,
+		arg.RawPayload,
+		arg.ContentHash,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
