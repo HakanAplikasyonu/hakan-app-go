@@ -469,6 +469,34 @@ type Expense struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ExportBatch struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	Driver           string             `json:"driver"`
+	TemplateVersion  string             `json:"template_version"`
+	TemplateVerified bool               `json:"template_verified"`
+	Period           pgtype.Text        `json:"period"`
+	Files            []byte             `json:"files"`
+	Issues           []byte             `json:"issues"`
+	CreatedBy        int64              `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type ExportBatchItem struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ExportBatchID  int64              `json:"export_batch_id"`
+	JournalDraftID int64              `json:"journal_draft_id"`
+	ReversedAt     pgtype.Timestamptz `json:"reversed_at"`
+	ReversedBy     pgtype.Int8        `json:"reversed_by"`
+	ReversalReason pgtype.Text        `json:"reversal_reason"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type ExportJob struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -485,6 +513,17 @@ type ExportJob struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	OrganizationID pgtype.Int8        `json:"organization_id"`
+}
+
+type ExportSetting struct {
+	ID                        int64              `json:"id"`
+	OrganizationID            int64              `json:"organization_id"`
+	EngagementID              int64              `json:"engagement_id"`
+	InvoicesReachLucaDirectly bool               `json:"invoices_reach_luca_directly"`
+	BlockOnUnknownAccount     bool               `json:"block_on_unknown_account"`
+	UpdatedBy                 pgtype.Int8        `json:"updated_by"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 }
 
 type GithubAppSetting struct {
@@ -653,6 +692,48 @@ type InvoiceTaxSummary struct {
 	Withholding      pgtype.Numeric `json:"withholding"`
 	WithholdingCode  pgtype.Text    `json:"withholding_code"`
 	TaxExemptionCode pgtype.Text    `json:"tax_exemption_code"`
+}
+
+type JournalDraft struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Period         string             `json:"period"`
+	EntryNo        int32              `json:"entry_no"`
+	EntryType      string             `json:"entry_type"`
+	EntryDate      pgtype.Date        `json:"entry_date"`
+	Description    string             `json:"description"`
+	DocumentType   pgtype.Text        `json:"document_type"`
+	Status         string             `json:"status"`
+	Origin         []byte             `json:"origin"`
+	ApprovedBy     pgtype.Int8        `json:"approved_by"`
+	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type JournalDraftLine struct {
+	ID             int64          `json:"id"`
+	OrganizationID int64          `json:"organization_id"`
+	EngagementID   int64          `json:"engagement_id"`
+	JournalDraftID int64          `json:"journal_draft_id"`
+	LineNo         int32          `json:"line_no"`
+	AccountCode    string         `json:"account_code"`
+	Description    string         `json:"description"`
+	Debit          pgtype.Numeric `json:"debit"`
+	Credit         pgtype.Numeric `json:"credit"`
+	Quantity       pgtype.Numeric `json:"quantity"`
+	Currency       pgtype.Text    `json:"currency"`
+	ExchangeRate   pgtype.Numeric `json:"exchange_rate"`
+	ForeignAmount  pgtype.Numeric `json:"foreign_amount"`
+	DocumentNo     pgtype.Text    `json:"document_no"`
+	DocumentDate   pgtype.Date    `json:"document_date"`
+	SourceKind     pgtype.Text    `json:"source_kind"`
+	SourceID       pgtype.Text    `json:"source_id"`
+	Confidence     pgtype.Numeric `json:"confidence"`
 }
 
 type LogPurgeRule struct {

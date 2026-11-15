@@ -23,6 +23,7 @@ type Querier interface {
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
+	ApproveJournalDraft(ctx context.Context, arg ApproveJournalDraftParams) (int64, error)
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
@@ -179,8 +180,10 @@ type Querier interface {
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
 	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
+	GetExportBatch(ctx context.Context, arg GetExportBatchParams) (ExportBatch, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
+	GetExportSettings(ctx context.Context, arg GetExportSettingsParams) (ExportSetting, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
@@ -188,6 +191,7 @@ type Querier interface {
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
+	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
@@ -269,10 +273,14 @@ type Querier interface {
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
+	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
+	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
+	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
+	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
@@ -290,6 +298,7 @@ type Querier interface {
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
 	ListActivePushDevicesByUser(ctx context.Context, userID int64) ([]PushDevice, error)
@@ -324,13 +333,18 @@ type Querier interface {
 	// tenant-lint: cross-org ofis görür: kendi şablonları ve global olanlar
 	ListExcelImportTemplates(ctx context.Context, organizationID pgtype.Int8) ([]ExcelImportTemplate, error)
 	ListExcelImports(ctx context.Context, arg ListExcelImportsParams) ([]ExcelImport, error)
+	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
+	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
+	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
 	ListInvoiceSources(ctx context.Context, arg ListInvoiceSourcesParams) ([]InvoiceSource, error)
 	ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTaxSummariesParams) ([]InvoiceTaxSummary, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
+	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
+	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Email rows stay out of the inbox: their bodies carry one-time codes and
 	// invitation links that must only reach the mailbox, not the account holder.
@@ -418,6 +432,7 @@ type Querier interface {
 	MarkImportJobApplying(ctx context.Context, id int64) (ImportJob, error)
 	MarkImportJobFailed(ctx context.Context, arg MarkImportJobFailedParams) (ImportJob, error)
 	MarkImportJobRolledBack(ctx context.Context, id int64) (ImportJob, error)
+	MarkJournalDraftExported(ctx context.Context, arg MarkJournalDraftExportedParams) (int64, error)
 	MarkLogPurgeRuleRun(ctx context.Context, arg MarkLogPurgeRuleRunParams) (LogPurgeRule, error)
 	MarkNotificationFailed(ctx context.Context, arg MarkNotificationFailedParams) (Notification, error)
 	MarkNotificationProcessing(ctx context.Context, id int64) (Notification, error)
@@ -431,6 +446,7 @@ type Querier interface {
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
+	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
 	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)
@@ -449,6 +465,8 @@ type Querier interface {
 	ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxpayerMembershipParams) (ResolveTaxpayerMembershipRow, error)
 	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
 	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
+	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
+	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.
@@ -527,6 +545,7 @@ type Querier interface {
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
 	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
 	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
+	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeReviewSetting(ctx context.Context, arg UpsertOfficeReviewSettingParams) error
