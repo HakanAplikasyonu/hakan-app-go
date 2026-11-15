@@ -850,6 +850,28 @@ type UserTotp struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type WarningCode struct {
+	Code            string             `json:"code"`
+	Section         string             `json:"section"`
+	DefaultSeverity string             `json:"default_severity"`
+	DefaultParams   []byte             `json:"default_params"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
+type WarningRuleConfig struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Code           string             `json:"code"`
+	Severity       pgtype.Text        `json:"severity"`
+	Enabled        pgtype.Bool        `json:"enabled"`
+	Params         []byte             `json:"params"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type WebauthnCredential struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`
