@@ -134,6 +134,11 @@ export const routes = {
     /** Company picker for users with several companies. */
     picker: "/m",
     home: (uuid: string) => `/m/${encodeURIComponent(uuid)}`,
+    invoices: (uuid: string) => `/m/${encodeURIComponent(uuid)}/invoices`,
+    invoice: (uuid: string, invoice: string) =>
+      `/m/${encodeURIComponent(uuid)}/invoices/${encodeURIComponent(invoice)}`,
+    receipts: (uuid: string) => `/m/${encodeURIComponent(uuid)}/receipts`,
+    uploads: (uuid: string) => `/m/${encodeURIComponent(uuid)}/uploads`,
   },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,

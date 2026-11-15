@@ -512,3 +512,6 @@ func view(r db.UblUploadJob) Job {
 	}
 	return j
 }
+
+// JobView maps a stored job to its API view (used by the mükellef panel).
+func JobView(r db.UblUploadJob) Job { return view(r) }

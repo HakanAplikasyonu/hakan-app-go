@@ -64,6 +64,9 @@ type Querier interface {
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
+	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
+	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
+	CountTaxpayerReceiptCaptures(ctx context.Context, taxpayerID int64) (int64, error)
 	CountTaxpayers(ctx context.Context, q_ pgtype.Text) (int64, error)
 	// tenant-lint: org-wide ofis uyarı listesi sayımı; ListTenantDataWarnings ile aynı süzgeç
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
@@ -282,6 +285,8 @@ type Querier interface {
 	GetTaxpayerMember(ctx context.Context, arg GetTaxpayerMemberParams) (TaxpayerMember, error)
 	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
+	// tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemesi; taxpayer_id + actor_id ile sınırlı
+	GetTaxpayerUploadJob(ctx context.Context, arg GetTaxpayerUploadJobParams) (UblUploadJob, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
 	GetTenantRoleByKey(ctx context.Context, arg GetTenantRoleByKeyParams) (Role, error)
 	GetUBLUploadJob(ctx context.Context, arg GetUBLUploadJobParams) (UblUploadJob, error)
@@ -467,10 +472,18 @@ type Querier interface {
 	ListSuggestionDecisions(ctx context.Context, arg ListSuggestionDecisionsParams) ([]ListSuggestionDecisionsRow, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
+	// Mükellef web paneli (issue #39). Her sorgu X-Taxpayer ile çözülen
+	// mükellefin taxpayer_id'siyle sınırlıdır; ofis bağlamı (organization_id)
+	// burada yoktur.
+	ListTaxpayerInvoices(ctx context.Context, arg ListTaxpayerInvoicesParams) ([]ListTaxpayerInvoicesRow, error)
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
 	// tenant-lint: cross-taxpayer sahip var mı (onay yetkisi)
 	ListTaxpayerOwnerUserIDs(ctx context.Context, taxpayerID int64) ([]int64, error)
+	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı, ofis bağlamı yok
+	ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpayerReceiptCapturesParams) ([]ListTaxpayerReceiptCapturesRow, error)
+	// tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
+	ListTaxpayerUploadJobs(ctx context.Context, arg ListTaxpayerUploadJobsParams) ([]UblUploadJob, error)
 	// Fiş yakalama (issue #23).
 	ListTaxpayerVehicles(ctx context.Context, taxpayerID int64) ([]TaxpayerVehicle, error)
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
