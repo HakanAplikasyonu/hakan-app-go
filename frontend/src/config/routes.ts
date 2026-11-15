@@ -118,6 +118,8 @@ export const routes = {
       `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}`,
     warnings: (slug: string) => `/t/${encodeURIComponent(slug)}/warnings`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
+    reviewStudio: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/review/studio`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */

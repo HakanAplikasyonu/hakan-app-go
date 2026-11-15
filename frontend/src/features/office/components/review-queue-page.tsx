@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ClipboardCheck, Pencil, X } from "lucide-react";
+import { Check, ClipboardCheck, Pencil, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -149,6 +149,7 @@ function ReviewRow({ s }: { s: Suggestion }) {
 
 function ReviewInner() {
   const { t } = useLocale();
+  const { slug } = useTenant();
   const params = useSearchParams();
   const taxpayers = useOffice((s) => s.taxpayers);
   const suggestions = useOffice((s) => s.suggestions);
@@ -170,6 +171,14 @@ function ReviewInner() {
           threshold: Math.round(REVIEW_THRESHOLD * 100),
         })}
         icon={<ClipboardCheck className="size-6" />}
+        actions={
+          <Button asChild>
+            <Link href={routes.tenant.reviewStudio(slug)}>
+              <Sparkles className="size-4" />
+              {t("office.studio.open")}
+            </Link>
+          </Button>
+        }
       />
       <DemoNotice />
       <div className="flex flex-wrap items-center gap-3">

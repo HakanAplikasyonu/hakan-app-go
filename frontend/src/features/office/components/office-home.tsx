@@ -10,6 +10,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { DEMO_PERIOD } from "../data/demo";
 import { useOffice } from "../hooks/use-office";
+import { OfficePulse } from "./office-pulse";
 import {
   DemoNotice,
   Figure,
@@ -99,6 +100,16 @@ function OfficeHomeInner() {
           }
         />
       </div>
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold">
+          {t("office.pulse.title", { period: DEMO_PERIOD })}
+        </h2>
+        <OfficePulse
+          taxpayers={taxpayers}
+          invoices={invoices}
+          warnings={warnings}
+        />
+      </section>
       <Panel
         title={t("office.matrix_title", { period: DEMO_PERIOD })}
         description={t("office.matrix_description")}
