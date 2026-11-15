@@ -30,6 +30,7 @@ import enStepup from "@/locales/en/stepup.json";
 import enStorage from "@/locales/en/storage.json";
 import enTable from "@/locales/en/table.json";
 import enTenant from "@/locales/en/tenant.json";
+import enTaxpayer from "@/locales/en/taxpayer.json";
 import enUsers from "@/locales/en/users.json";
 import trAccess from "@/locales/tr/access.json";
 import trActivity from "@/locales/tr/activity.json";
@@ -61,6 +62,7 @@ import trStepup from "@/locales/tr/stepup.json";
 import trStorage from "@/locales/tr/storage.json";
 import trTable from "@/locales/tr/table.json";
 import trTenant from "@/locales/tr/tenant.json";
+import trTaxpayer from "@/locales/tr/taxpayer.json";
 import trUsers from "@/locales/tr/users.json";
 
 export type MessageDictionary = Record<string, string>;
@@ -96,6 +98,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     integrations: trIntegrations,
     stepup: trStepup,
     tenant: trTenant,
+    taxpayer: trTaxpayer,
     organizations: trOrganizations,
     office: trOffice,
   },
@@ -129,6 +132,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     integrations: enIntegrations,
     stepup: enStepup,
     tenant: enTenant,
+    taxpayer: enTaxpayer,
     organizations: enOrganizations,
     office: enOffice,
   },

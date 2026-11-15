@@ -17,8 +17,11 @@ type Querier interface {
 	// tenant-lint: cross-org id comes from the token lookup in the same locked tx
 	// Single use: only a pending, unexpired invitation flips to accepted.
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
+	// tenant-lint: cross-org kabul, token özetiyle bulunan satırın id'siyle tek kullanımlık
+	AcceptTaxpayerInvitation(ctx context.Context, id int64) (int64, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
+	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
@@ -75,6 +78,7 @@ type Querier interface {
 	// tarafı mükellefe yalnızca aktif ve erişilebilir bir engagement üzerinden
 	// ulaşır (GetTaxpayerForOfficeMember).
 	CreateTaxpayer(ctx context.Context, arg CreateTaxpayerParams) (Taxpayer, error)
+	CreateTaxpayerInvitation(ctx context.Context, arg CreateTaxpayerInvitationParams) (TaxpayerInvitation, error)
 	CreateUBLUploadJob(ctx context.Context, arg CreateUBLUploadJobParams) (UblUploadJob, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateWebAuthnCredential(ctx context.Context, arg CreateWebAuthnCredentialParams) (WebauthnCredential, error)
@@ -180,6 +184,11 @@ type Querier interface {
 	// ended engagement, another office's engagement or a missing assignment all
 	// return no row.
 	GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpayerForOfficeMemberParams) (Taxpayer, error)
+	// The invitation link carries only the token: the holder is not an office
+	// member, so the lookup cannot be organization-scoped.
+	// tenant-lint: cross-org davet bağlantısı, yalnızca token özetiyle tek satır
+	GetTaxpayerInvitationByTokenHash(ctx context.Context, tokenHash string) (GetTaxpayerInvitationByTokenHashRow, error)
+	GetTaxpayerMember(ctx context.Context, arg GetTaxpayerMemberParams) (TaxpayerMember, error)
 	// Mükellefin kendi VKN/TCKN'si (issue #3); UBL'de kendi taraf doğrulaması buna göre.
 	GetTaxpayerOwnTaxID(ctx context.Context, taxpayerID int64) (string, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
@@ -284,6 +293,9 @@ type Querier interface {
 	ListStorageTrash(ctx context.Context, arg ListStorageTrashParams) ([]StorageTrash, error)
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
+	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
+	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
+	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
 	// tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
 	ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error)
@@ -337,6 +349,9 @@ type Querier interface {
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)
+	// Mükellef kullanıcıları ve ofis davetleri (issue #4).
+	// tenant-lint: cross-taxpayer üyelik çözümü; taxpayer uuid + user_id ile tek satır
+	ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxpayerMembershipParams) (ResolveTaxpayerMembershipRow, error)
 	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
 	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
@@ -346,9 +361,11 @@ type Querier interface {
 	RevokeOtherRefreshTokensForUser(ctx context.Context, arg RevokeOtherRefreshTokensForUserParams) error
 	// A new invitation replaces older open ones for the same address.
 	RevokePendingOrganizationInvitationsForEmail(ctx context.Context, arg RevokePendingOrganizationInvitationsForEmailParams) (int64, error)
+	RevokePendingTaxpayerInvitationsForEmail(ctx context.Context, arg RevokePendingTaxpayerInvitationsForEmailParams) error
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) (int64, error)
 	RevokeRefreshTokenByUUIDForUser(ctx context.Context, arg RevokeRefreshTokenByUUIDForUserParams) (int64, error)
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
+	RevokeTaxpayerInvitation(ctx context.Context, arg RevokeTaxpayerInvitationParams) (int64, error)
 	RewrapSecretRecord(ctx context.Context, arg RewrapSecretRecordParams) (int64, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)

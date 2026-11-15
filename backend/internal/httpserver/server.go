@@ -91,6 +91,7 @@ import (
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/stepup"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -274,6 +275,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		tenantHandler      *tenantmodule.Handler
 		engagementResolver engagementctx.Resolver
 		engagementHandler  *engagementsmodule.Handler
+		taxpayerResolver   taxpayerctx.Resolver
+		memberHandler      *taxpayersmodule.MemberHandler
 	)
 	if cfg.Tenancy.Enabled {
 		// Invitation emails go through the notifications queue (never SMTP
@@ -285,7 +288,15 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		// /me lists memberships only when the /t shell exists: the frontend
 		// routes members into it, which would dead-end with tenancy off.
 		uc.SetOrganizationsLister(orgSvc)
-		uc.SetInvitationGate(orgSvc)
+		// Mükellef users (issue #4): office invitations from an engagement,
+		// /me taxpayers[] and the X-Taxpayer shell. An invitation sign-up
+		// accepts both office and mükellef invitation tokens.
+		members := taxpayersmodule.NewMembers(taxpayersmodule.NewMemberPostgres(deps.DB), notifSvc,
+			taxpayersmodule.InvitationConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
+		uc.SetTaxpayersLister(members)
+		uc.SetInvitationGate(taxpayersmodule.ChainGates(orgSvc, members))
+		taxpayerResolver = members
+		memberHandler = taxpayersmodule.NewMemberHandler(members, ratelimit.New(deps.Redis, cfg.App.Env))
 		orgCache := orgcache.New(orgSvc, deps.Redis, cfg.Tenancy.CacheTTL, cfg.App.Env)
 		orgSvc.SetInvalidator(orgCache)
 		tenantResolver = orgCache
@@ -312,6 +323,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
 	}
+	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)

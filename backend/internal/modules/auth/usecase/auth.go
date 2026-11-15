@@ -115,6 +115,7 @@ type AuthUseCase struct {
 	realtime      RealtimeHints
 	searchIndexer SearchIndexer
 	orgs          OrganizationsLister
+	taxpayers     TaxpayersLister
 	// Optional registration / method policy (nil = allow password login, deny register).
 	authSettings AuthSettingsGate
 	accessPolicy AccessPolicyGate
@@ -161,6 +162,16 @@ type SearchIndexer interface {
 // OrganizationsLister attaches tenant memberships to /auth/me when tenancy is wired.
 type OrganizationsLister interface {
 	ListForUser(ctx context.Context, userID int64) ([]model.MeOrganization, error)
+}
+
+// TaxpayersLister attaches mükellef memberships to /auth/me (issue #4).
+type TaxpayersLister interface {
+	ListForUser(ctx context.Context, userID int64) ([]model.MeTaxpayer, error)
+}
+
+// SetTaxpayersLister attaches mükellef memberships to /auth/me (optional).
+func (u *AuthUseCase) SetTaxpayersLister(lister TaxpayersLister) {
+	u.taxpayers = lister
 }
 
 // RealtimeHints carries non-secret Centrifugo metadata for /me.
@@ -477,6 +488,13 @@ func (u *AuthUseCase) Me(ctx context.Context, userUUID uuid.UUID, impersonatorUU
 			return model.Me{}, err
 		}
 		out.Organizations = orgs
+	}
+	if u.taxpayers != nil {
+		tps, err := u.taxpayers.ListForUser(ctx, user.ID)
+		if err != nil {
+			return model.Me{}, err
+		}
+		out.Taxpayers = tps
 	}
 	if impersonatorUUID != nil {
 		impUser, err := u.repo.FindUserByUUID(ctx, *impersonatorUUID)

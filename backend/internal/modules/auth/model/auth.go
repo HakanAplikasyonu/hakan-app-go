@@ -106,12 +106,23 @@ type MeOrganization struct {
 	Permissions  []string           `json:"permissions"`
 }
 
+// MeTaxpayer is one mükellef (company) membership returned by /auth/me
+// (issue #4). The mükellef shell opens /m/{uuid}.
+type MeTaxpayer struct {
+	UUID  uuid.UUID `json:"uuid"`
+	Kind  string    `json:"kind"`
+	Title string    `json:"title"`
+	// Role is owner or employee.
+	Role string `json:"role"`
+}
+
 // Me is the session hydration payload.
 type Me struct {
 	User          PublicUser       `json:"user"`
 	Roles         []string         `json:"roles"`
 	Permissions   []string         `json:"permissions"`
 	Organizations []MeOrganization `json:"organizations,omitempty"`
+	Taxpayers     []MeTaxpayer     `json:"taxpayers,omitempty"`
 	Links         MeLinks          `json:"links"`
 	Channels      MeChannels       `json:"channels"`
 	Realtime      MeRealtime       `json:"realtime"`

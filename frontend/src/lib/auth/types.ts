@@ -5,6 +5,15 @@ export type LoginRequest = components["schemas"]["LoginRequest"];
 export type Me = components["schemas"]["Me"];
 export type Tokens = components["schemas"]["Tokens"];
 export type MeOrganization = components["schemas"]["MeOrganization"];
+export type MeTaxpayer = components["schemas"]["MeTaxpayer"];
+
+/** A mükellef (company) membership from `/v1/auth/me` (issue #4). */
+export type AuthTaxpayer = {
+  uuid: string;
+  kind: "legal" | "individual";
+  title: string;
+  role: "owner" | "employee";
+};
 
 /** A tenant membership from `/v1/auth/me` (role + permissions in that org). */
 export type AuthOrganization = {
@@ -41,6 +50,8 @@ export type AuthUser = {
   roles: string[];
   /** Tenant memberships; empty when tenancy is off or the user has none. */
   organizations: AuthOrganization[];
+  /** Mükellef (company) memberships; empty for office-only users. */
+  taxpayers: AuthTaxpayer[];
   realtimeUserChannel?: string;
   realtimeEnabled?: boolean;
   impersonation?: {
@@ -53,8 +64,15 @@ export type AuthUser = {
 };
 
 export function mapMeToAuthUser(me: Me): AuthUser {
-  const { user, roles, permissions, realtime, impersonation, organizations } =
-    me;
+  const {
+    user,
+    roles,
+    permissions,
+    realtime,
+    impersonation,
+    organizations,
+    taxpayers,
+  } = me;
   const locale =
     typeof user.locale === "string" && user.locale ? user.locale : "tr";
   const mapped: AuthUser = {
@@ -70,6 +88,7 @@ export function mapMeToAuthUser(me: Me): AuthUser {
     permissions: permissions ?? [],
     roles: roles ?? [],
     organizations: (organizations ?? []).map(mapMeOrganization),
+    taxpayers: (taxpayers ?? []).map(mapMeTaxpayer),
     realtimeUserChannel: realtime?.user_channel,
     realtimeEnabled: realtime?.enabled,
   };
@@ -97,6 +116,20 @@ function mapMeOrganization(org: MeOrganization): AuthOrganization {
     role: { key: org.role.key, name: org.role.name },
     permissions: org.permissions ?? [],
   };
+}
+
+function mapMeTaxpayer(tp: MeTaxpayer): AuthTaxpayer {
+  return { uuid: tp.uuid, kind: tp.kind, title: tp.title, role: tp.role };
+}
+
+/** The mükellef membership for `uuid`, if the user has one. */
+export function findTaxpayer(
+  user: AuthUser | null | undefined,
+  uuid: string,
+): AuthTaxpayer | undefined {
+  if (!user) return undefined;
+  const wanted = uuid.toLowerCase();
+  return (user.taxpayers ?? []).find((t) => t.uuid.toLowerCase() === wanted);
 }
 
 /** The membership for `slug` (case-insensitive), if the user has one. */
@@ -131,12 +164,16 @@ export function isCmsUser(user: AuthUser | null | undefined): boolean {
 /**
  * Shell after sign-in (an explicit `next` always wins, see login-form):
  * platform users → /platform; one organization → /t/{slug}; several → the
- * /t picker; none → the CMS home (single-scope apps keep working).
+ * /t picker; no office but companies → /m/{uuid} or the /m picker; none →
+ * the CMS home (single-scope apps keep working).
  */
 export function defaultHomeForUser(user: AuthUser): string {
   if (isPlatformUser(user)) return "/platform";
   const orgs = user.organizations ?? [];
   if (orgs.length === 1) return `/t/${orgs[0]!.slug}`;
   if (orgs.length > 1) return "/t";
+  const tps = user.taxpayers ?? [];
+  if (tps.length === 1) return `/m/${tps[0]!.uuid}`;
+  if (tps.length > 1) return "/m";
   return "/";
 }
