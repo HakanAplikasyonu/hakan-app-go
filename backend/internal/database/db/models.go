@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AccountAssignment struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	TargetType     string             `json:"target_type"`
+	TargetID       int64              `json:"target_id"`
+	Field          string             `json:"field"`
+	AccountCode    string             `json:"account_code"`
+	RuleID         pgtype.Int8        `json:"rule_id"`
+	SuggestionID   pgtype.Int8        `json:"suggestion_id"`
+	AssignedBy     pgtype.Int8        `json:"assigned_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type AccountPlanAccount struct {
 	ID             int64  `json:"id"`
 	OrganizationID int64  `json:"organization_id"`
@@ -38,6 +54,27 @@ type AccountPlanImport struct {
 	SkippedRows    int32              `json:"skipped_rows"`
 	ImportedBy     pgtype.Int8        `json:"imported_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type AccountRule struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	RuleKey        uuid.UUID          `json:"rule_key"`
+	Version        int32              `json:"version"`
+	Status         string             `json:"status"`
+	Role           string             `json:"role"`
+	Priority       int32              `json:"priority"`
+	Name           string             `json:"name"`
+	Conditions     []byte             `json:"conditions"`
+	AccountCode    string             `json:"account_code"`
+	Confidence     pgtype.Numeric     `json:"confidence"`
+	Origin         string             `json:"origin"`
+	CopiedFrom     pgtype.Int8        `json:"copied_from"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	RetiredAt      pgtype.Timestamptz `json:"retired_at"`
 }
 
 type ActivityEvent struct {

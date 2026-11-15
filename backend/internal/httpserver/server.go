@@ -18,6 +18,9 @@ import (
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
 	accountplanrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/repository"
 	accountplanusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
+	accountruleshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/handler"
+	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
+	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	activityusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/usecase"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
@@ -437,11 +440,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// here one at a time from the explicit RegisterRoutes calls above.
 	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
+	// Appliers are registered by the modules that own suggestion targets.
 	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries), log)
 	// Appliers are registered by the modules that own suggestion targets.
 	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
 		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).
-		Register(bankmatching.SuggestionKind, bankmatching.Applier{})
+		Register(bankmatching.SuggestionKind, bankmatching.Applier{}).
+		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
 	// Banka–fatura eşleme ve BNK kontrolleri (#21).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
@@ -459,8 +464,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
 			WithControls(warningscontrols.New(deps.Queries, warningEngine)),
-		review:      reviewhandler.New(reviewSvc, activityRec),
-		receipts:    receiptshandler.New(receiptsSvc),
+		review:   reviewhandler.New(reviewSvc, activityRec),
+		receipts: receiptshandler.New(receiptsSvc),
+		accountrules: accountruleshandler.New(accountrulesusecase.New(
+			accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)),
 		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),

@@ -19,6 +19,10 @@ type Querier interface {
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
 	// tenant-lint: cross-org kabul, token özetiyle bulunan satırın id'siyle tek kullanımlık
 	AcceptTaxpayerInvitation(ctx context.Context, id int64) (int64, error)
+	// Kural adayı: müşavirin aynı karşı taraf için aynı hesap koduna verdiği
+	// düzeltme / kabul kararları (kural dışı önerilerde). min_count kez
+	// tekrarlanınca "kural yapılsın mı?" sorulur.
+	AccountRuleCandidates(ctx context.Context, arg AccountRuleCandidatesParams) ([]AccountRuleCandidatesRow, error)
 	// Kilitleme: o mükellef + döneme süren fatura yazımları bitene kadar bekler.
 	AcquirePeriodLockExclusive(ctx context.Context, arg AcquirePeriodLockExclusiveParams) error
 	// Dönem yönetimi (issue #32): kilit, hazırlık durumu, değişiklik talepleri.
@@ -44,6 +48,7 @@ type Querier interface {
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
+	CopyOfficeAccountRules(ctx context.Context, arg CopyOfficeAccountRulesParams) (int32, error)
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
 	CountActivityEvents(ctx context.Context, arg CountActivityEventsParams) (int64, error)
 	CountAllBulkJobs(ctx context.Context) (int64, error)
@@ -95,6 +100,9 @@ type Querier interface {
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
+	// Kural hafızası (docs/01 §3 "carries context forward"): aynı karşı tarafın
+	// önceki faturalarında onaylanmış satır hesap kodları, en sık kullanılan önce.
+	CounterpartyAccountHistory(ctx context.Context, arg CounterpartyAccountHistoryParams) ([]CounterpartyAccountHistoryRow, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
 	// Açık BNK_* uyarılarından görev açar. Hareket başına tek açık görev
 	// (uq_document_tasks_active); var olanlar atlanır.
@@ -133,6 +141,7 @@ type Querier interface {
 	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
 	// tenant-lint: cross-org onay sonucu, token ile bulunan satırın id'siyle
 	DecideOnboardingRequest(ctx context.Context, arg DecideOnboardingRequestParams) error
+	DeleteAccountAssignment(ctx context.Context, arg DeleteAccountAssignmentParams) (int64, error)
 	// Yeni sürüm gelince etkin plan değişir; eski sürümün özeti imports'ta kalır.
 	DeleteAccountPlanAccounts(ctx context.Context, arg DeleteAccountPlanAccountsParams) (int64, error)
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -220,7 +229,9 @@ type Querier interface {
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
+	GetAccountRuleByID(ctx context.Context, arg GetAccountRuleByIDParams) (AccountRule, error)
 	GetActiveAccountPlanImport(ctx context.Context, arg GetActiveAccountPlanImportParams) (AccountPlanImport, error)
+	GetActiveAccountRuleForUpdate(ctx context.Context, arg GetActiveAccountRuleForUpdateParams) (AccountRule, error)
 	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
 	GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID int64) (Engagement, error)
 	// tenant-lint: cross-org mükellefin kendi aktif engagement'ı (hangi ofiste olursa)
@@ -255,6 +266,7 @@ type Querier interface {
 	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
+	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
@@ -344,6 +356,7 @@ type Querier interface {
 	// rows: [{"code","name","main_code","level","is_leaf"}, ...]
 	InsertAccountPlanAccounts(ctx context.Context, arg InsertAccountPlanAccountsParams) (int64, error)
 	InsertAccountPlanImport(ctx context.Context, arg InsertAccountPlanImportParams) (AccountPlanImport, error)
+	InsertAccountRule(ctx context.Context, arg InsertAccountRuleParams) (AccountRule, error)
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
@@ -392,10 +405,16 @@ type Querier interface {
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
+	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
 	// Çıktı (journals, #26) için etkin planın bütün kodları.
 	ListAccountPlanCodeSet(ctx context.Context, arg ListAccountPlanCodeSetParams) ([]string, error)
+	// Cari hesap açma önerisi: ana hesabın (120 / 320) etkin plandaki alt kodları.
+	ListAccountPlanCodesUnder(ctx context.Context, arg ListAccountPlanCodesUnderParams) ([]ListAccountPlanCodesUnderRow, error)
 	ListAccountPlanImports(ctx context.Context, arg ListAccountPlanImportsParams) ([]AccountPlanImport, error)
+	ListAccountRuleVersions(ctx context.Context, arg ListAccountRuleVersionsParams) ([]AccountRule, error)
+	// Bir seviyenin (ofis şablonu: engagement_id NULL) kuralları.
+	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
 	ListActivePushDevicesByUser(ctx context.Context, userID int64) ([]PushDevice, error)
@@ -641,6 +660,7 @@ type Querier interface {
 	ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxpayerMembershipParams) (ResolveTaxpayerMembershipRow, error)
 	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
 	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
+	RetireAccountRule(ctx context.Context, arg RetireAccountRuleParams) (int64, error)
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
@@ -727,6 +747,8 @@ type Querier interface {
 	UpdateUserTOTPRecoveryHashes(ctx context.Context, arg UpdateUserTOTPRecoveryHashesParams) error
 	UpdateWebAuthnCredentialCounter(ctx context.Context, arg UpdateWebAuthnCredentialCounterParams) error
 	UpdateWebAuthnCredentialName(ctx context.Context, arg UpdateWebAuthnCredentialNameParams) (WebauthnCredential, error)
+	// Önceki değeri döndürür (inceleme kuyruğu geri alma için saklar).
+	UpsertAccountAssignment(ctx context.Context, arg UpsertAccountAssignmentParams) (string, error)
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error

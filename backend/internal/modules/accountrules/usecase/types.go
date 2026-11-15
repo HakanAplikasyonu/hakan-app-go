@@ -1,0 +1,118 @@
+// Package usecase runs the account code rules (issue #25): versioned office
+// template and engagement rules, suggestions into the review queue (#14)
+// with confidence, rationale and provenance, the applier that records the
+// accepted code, and rule candidates learnt from the accountant's decisions.
+package usecase
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+)
+
+// Errors.
+var (
+	ErrInvalid  = errors.New("accountrules: invalid input")
+	ErrNotFound = errors.New("accountrules: not found")
+)
+
+// Subject is the engagement suggestions belong to.
+type Subject struct {
+	OrganizationID int64
+	EngagementID   int64
+	TaxpayerID     int64
+}
+
+// RuleInput is a new rule or a new version of one.
+type RuleInput struct {
+	Role        engine.Role       `json:"role"`
+	Priority    int               `json:"priority"`
+	Name        string            `json:"name"`
+	Conditions  engine.Conditions `json:"conditions"`
+	AccountCode string            `json:"account_code"`
+	Confidence  *decimal.Decimal  `json:"confidence,omitempty"`
+}
+
+// Rule is one stored rule version.
+type Rule struct {
+	ID          int64             `json:"-"`
+	UUID        uuid.UUID         `json:"uuid"`
+	Key         uuid.UUID         `json:"rule_key"`
+	Version     int               `json:"version"`
+	Status      string            `json:"status"`
+	Scope       string            `json:"scope"` // office | engagement
+	Role        engine.Role       `json:"role"`
+	Priority    int               `json:"priority"`
+	Name        string            `json:"name"`
+	Conditions  engine.Conditions `json:"conditions"`
+	AccountCode string            `json:"account_code"`
+	Confidence  decimal.Decimal   `json:"confidence"`
+	Origin      string            `json:"origin"`
+	CreatedAt   time.Time         `json:"created_at"`
+	RetiredAt   *time.Time        `json:"retired_at,omitempty"`
+}
+
+// Ref is the provenance name of the rule version.
+func (r Rule) Ref() string { return refFor(r.ID, r.Version) }
+
+// InvoiceLine is one invoice item as the engine sees it.
+type InvoiceLine struct {
+	ID       int64
+	LineNo   int
+	Name     string
+	LineType string
+	TaxRate  decimal.Decimal
+}
+
+// Invoice is an invoice to code.
+type Invoice struct {
+	ID             int64
+	UUID           uuid.UUID
+	Direction      string
+	Type           string
+	Period         string
+	CustomerID     *int64
+	TaxNumber      string
+	IdentityNumber string
+	CustomerName   string
+	Lines          []InvoiceLine
+}
+
+// HistoryRow is a code the counterparty's earlier lines were booked to.
+type HistoryRow struct {
+	AccountCode string
+	Uses        int64
+	LastPeriod  string
+}
+
+// Candidate is a repeated decision that could become a rule.
+type Candidate struct {
+	CounterpartyKey  string    `json:"counterparty_key"`
+	CounterpartyName string    `json:"counterparty_name"`
+	Direction        string    `json:"direction"`
+	AccountCode      string    `json:"account_code"`
+	Decisions        int64     `json:"decisions"`
+	LastDecidedAt    time.Time `json:"last_decided_at"`
+	Question         string    `json:"question"`
+}
+
+// Store persists rules and reads the data the engine needs.
+type Store interface {
+	ListRules(ctx context.Context, org, eng int64, includeRetired bool) ([]Rule, error)
+	Versions(ctx context.Context, org, eng int64, key uuid.UUID) ([]Rule, error)
+	CreateRule(ctx context.Context, org, eng int64, in RuleInput, origin string, userID int64) (Rule, error)
+	// NewVersion retires the active version of key and stores in as the
+	// next version, in one transaction.
+	NewVersion(ctx context.Context, org, eng int64, key uuid.UUID, in RuleInput, userID int64) (Rule, error)
+	Retire(ctx context.Context, org, eng int64, key uuid.UUID) error
+	CopyTemplate(ctx context.Context, org, eng int64) (int, error)
+	Invoice(ctx context.Context, taxpayerID int64, id uuid.UUID) (Invoice, error)
+	History(ctx context.Context, s Subject, field, direction, taxNumber, identityNumber string, excludeInvoiceID int64) ([]HistoryRow, error)
+	PlanUnder(ctx context.Context, s Subject, mainCode string) ([]engine.PlanAccount, error)
+	Assigned(ctx context.Context, s Subject, targetType string, ids []int64) (map[int64]map[string]string, error)
+	Candidates(ctx context.Context, s Subject, minCount int64) ([]Candidate, error)
+}
