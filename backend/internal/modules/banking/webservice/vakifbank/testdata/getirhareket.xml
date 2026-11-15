@@ -1,0 +1,71 @@
+<!-- Synthetic answer built from the field list of "Online Hesap Hareketleri Web
+     Servis Dokümanı" v1.20 (22 §1). Not a recorded bank answer: replace with
+     the first real (masked) answer from the test system (CLAUDE.md §6). -->
+<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope" xmlns:a="http://www.w3.org/2005/08/addressing">
+  <s:Header><a:Action s:mustUnderstand="1">Peak.Integration.ExternalInbound.Ekstre/ISOnlineEkstreServis/GetirHareketResponse</a:Action></s:Header>
+  <s:Body>
+    <GetirHareketResponse xmlns="Peak.Integration.ExternalInbound.Ekstre">
+      <GetirHareketResult xmlns:b="http://schemas.datacontract.org/2004/07/Peak.Integration.ExternalInbound.Ekstre.DataTransferObjects" xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+        <b:BankaKodu>15</b:BankaKodu>
+        <b:BankaAdi>VAKIFBANK</b:BankaAdi>
+        <b:IslemKodu>VBB0001</b:IslemKodu>
+        <b:IslemAciklamasi>Başarılı</b:IslemAciklamasi>
+        <b:Hesaplar>
+          <b:DtoEkstreHesap>
+            <b:HesapNo>00158007301234567</b:HesapNo>
+            <b:HesapNoIban>TR59 0001 5001 5800 7301 2345 67</b:HesapNoIban>
+            <b:DovizTipi>TL</b:DovizTipi>
+            <b:SubeKodu>00158</b:SubeKodu>
+            <b:SubeAdi>KADIKÖY</b:SubeAdi>
+            <b:MusteriNo>123456789</b:MusteriNo>
+            <b:MusteriUnvani>ATLAS GIDA TİCARET A.Ş.</b:MusteriUnvani>
+            <b:VergiKimlikNumarasi>9000000017</b:VergiKimlikNumarasi>
+            <b:HesapRumuzu>Ana hesap</b:HesapRumuzu>
+            <b:HesapTipi>1</b:HesapTipi>
+            <b:HesapDurumu>true</b:HesapDurumu>
+            <b:AcilisBakiye>10000.00</b:AcilisBakiye>
+            <b:CariBakiye>21485.50</b:CariBakiye>
+            <b:KullanilabilirBakiye>21485.50</b:KullanilabilirBakiye>
+            <b:Hareketler>
+              <b:DtoEkstreHareket>
+                <b:IslemNo>2026110300001</b:IslemNo>
+                <b:IslemTarihi>2026-11-03 09:15:22</b:IslemTarihi>
+                <b:Tutar>12000.00</b:Tutar>
+                <b:BorcAlacak>A</b:BorcAlacak>
+                <b:Aciklama>FAST ATL2026000000101 TAHSILAT</b:Aciklama>
+                <b:IslemAdi>Gelen FAST</b:IslemAdi>
+                <b:IslemOncesiBakiye>10000.00</b:IslemOncesiBakiye>
+                <b:IslemSonrasıBakiye>22000.00</b:IslemSonrasıBakiye>
+                <b:IslemKodu>FST</b:IslemKodu>
+                <b:IslemKanal>FAST</b:IslemKanal>
+                <b:Detaylar xmlns:c="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                  <c:KeyValueOfstringstring><c:Key>Id</c:Key><c:Value>REF-1</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>IslemTarihZamani</c:Key><c:Value>2026-11-03 09:15:22.137</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>GonderenAdi</c:Key><c:Value>YILDIZ MARKET LTD STI</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>GonderenKimlikNumarasi</c:Key><c:Value>9100000021</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>GonderenIbanKumarasi</c:Key><c:Value>TR320010009999901234567890</c:Value></c:KeyValueOfstringstring>
+                </b:Detaylar>
+              </b:DtoEkstreHareket>
+              <b:DtoEkstreHareket>
+                <b:IslemNo>2026110300002</b:IslemNo>
+                <b:IslemTarihi>2026-11-03 23:59:10</b:IslemTarihi>
+                <b:Tutar>514.50</b:Tutar>
+                <b:BorcAlacak>B</b:BorcAlacak>
+                <b:Aciklama>EFT KALEM KIRTASIYE</b:Aciklama>
+                <b:IslemAdi>Giden EFT</b:IslemAdi>
+                <b:IslemOncesiBakiye>22000.00</b:IslemOncesiBakiye>
+                <b:IslemSonrasıBakiye>21485.50</b:IslemSonrasıBakiye>
+                <b:IslemKodu>EFT</b:IslemKodu>
+                <b:Detaylar xmlns:c="http://schemas.microsoft.com/2003/10/Serialization/Arrays">
+                  <c:KeyValueOfstringstring><c:Key>AliciAdi</c:Key><c:Value>KALEM KIRTASIYE</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>AliciKimlikNumarasi</c:Key><c:Value>9200000035</c:Value></c:KeyValueOfstringstring>
+                  <c:KeyValueOfstringstring><c:Key>EftIslemTuru</c:Key><c:Value>M01</c:Value></c:KeyValueOfstringstring>
+                </b:Detaylar>
+              </b:DtoEkstreHareket>
+            </b:Hareketler>
+          </b:DtoEkstreHesap>
+        </b:Hesaplar>
+      </GetirHareketResult>
+    </GetirHareketResponse>
+  </s:Body>
+</s:Envelope>

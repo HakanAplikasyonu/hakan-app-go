@@ -37,6 +37,8 @@ import (
 	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	bankmatching "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/matching"
 	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
+	bankws "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
@@ -392,6 +394,17 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// KolayBi adaptörü (issue #48).
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))
+	// Banka web servisi (issue #49): şube talimatı + sabit IP ile ilk banka.
+	// Kimlik bilgileri sır kasasında (purpose bank_connection).
+	bankws.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bankws.NewHandler(bankws.NewService(deps.DB, sourceVault, bankSvc, bankws.Registry{
+			"vakifbank": func(env string) bankws.Adapter {
+				if env == bankws.EnvTest {
+					return vakifbank.New(vakifbank.TestEndpoint, nil)
+				}
+				return vakifbank.New(vakifbank.ProductionEndpoint, nil)
+			},
+		}, bankws.Options{EgressIPs: cfg.Bank.EgressIPs, TechContact: cfg.Bank.TechContact})))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)

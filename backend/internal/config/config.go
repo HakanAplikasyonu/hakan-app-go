@@ -36,6 +36,7 @@ type Config struct {
 	Parasut    ParasutConfig
 	Easytrade  EasytradeConfig
 	KolayBi    KolayBiConfig
+	Bank       BankConfig
 }
 
 // ParasutConfig is the Paraşüt integrator application (docs/kaynak 10 §1.1):
@@ -57,6 +58,14 @@ type KolayBiConfig struct {
 // EasytradeConfig is the Easytrade Muhasebe API (docs/kaynak 09).
 type EasytradeConfig struct {
 	BaseURL string
+}
+
+// BankConfig is the bank web-service channel (docs/kaynak 20 §4–5). The
+// fixed egress IPs and the technical contact are printed on the branch
+// instruction the taxpayer signs; they never change once banks know them.
+type BankConfig struct {
+	EgressIPs   []string
+	TechContact string
 }
 
 // TenancyConfig controls organizations (the multi-tenant shell). See
@@ -423,6 +432,10 @@ func Load() (Config, error) {
 			ClientSecret: getEnv("PARASUT_CLIENT_SECRET", ""),
 			RedirectURL:  getEnv("PARASUT_REDIRECT_URL", ""),
 		},
+		Bank: BankConfig{
+			EgressIPs:   splitList(getEnv("BANK_EGRESS_IPS", "")),
+			TechContact: getEnv("BANK_TECH_CONTACT", ""),
+		},
 		AI: AIConfig{
 			Provider:             getEnv("AI_PROVIDER", "anthropic"),
 			APIKey:               getEnv("AI_API_KEY", ""),
@@ -669,6 +682,17 @@ func parseReviewAccounts(raw string) map[string]string {
 			continue
 		}
 		out[email] = code
+	}
+	return out
+}
+
+// splitList reads a comma-separated list, dropping empty items.
+func splitList(v string) []string {
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
 	}
 	return out
 }
