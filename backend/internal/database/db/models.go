@@ -441,6 +441,24 @@ type DataWarning struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type DesktopAgent struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	MachineID      string             `json:"machine_id"`
+	Name           string             `json:"name"`
+	Platform       string             `json:"platform"`
+	Version        string             `json:"version"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	Status         string             `json:"status"`
+	LastSeenAt     pgtype.Timestamptz `json:"last_seen_at"`
+	LastHeartbeat  []byte             `json:"last_heartbeat"`
+	OfflineSince   pgtype.Timestamptz `json:"offline_since"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type DocumentTask struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`

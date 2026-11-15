@@ -250,6 +250,7 @@ type Querier interface {
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
+	GetDesktopAgent(ctx context.Context, arg GetDesktopAgentParams) (DesktopAgent, error)
 	GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams) (GetDocumentTaskRow, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
@@ -354,6 +355,8 @@ type Querier interface {
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
 	HasActivePushDevices(ctx context.Context, userID int64) (bool, error)
 	HasPendingOwnerOrganizationInvitationForEmail(ctx context.Context, arg HasPendingOwnerOrganizationInvitationForEmailParams) (bool, error)
+	// Önceki durumu da döner: offline → online geçişi kayda değer.
+	HeartbeatDesktopAgent(ctx context.Context, arg HeartbeatDesktopAgentParams) (HeartbeatDesktopAgentRow, error)
 	IncrementBankRuleHits(ctx context.Context, arg IncrementBankRuleHitsParams) error
 	IncrementOTPAttempts(ctx context.Context, id int64) (OtpCode, error)
 	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
@@ -458,6 +461,7 @@ type Querier interface {
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
 	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
+	ListDesktopAgents(ctx context.Context, organizationID int64) ([]DesktopAgent, error)
 	ListDocumentTaskRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
 	ListDocumentTaskUploads(ctx context.Context, arg ListDocumentTaskUploadsParams) ([]ListDocumentTaskUploadsRow, error)
 	ListDocumentTasks(ctx context.Context, arg ListDocumentTasksParams) ([]ListDocumentTasksRow, error)
@@ -653,6 +657,10 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
+	// tenant-lint: cross-org zamanlanmış sağlık taraması bütün ofislerin sessiz ajanlarını işaretler
+	// @silent_before'dan beri haber vermeyen çevrimiçi ajanlar offline olur.
+	// Dönen satırlar bu çalıştırmada offline'a geçenlerdir (bildirim bir kez).
+	MarkSilentDesktopAgentsOffline(ctx context.Context, arg MarkSilentDesktopAgentsOfflineParams) ([]MarkSilentDesktopAgentsOfflineRow, error)
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
 	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
@@ -688,6 +696,7 @@ type Querier interface {
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
+	RevokeDesktopAgent(ctx context.Context, arg RevokeDesktopAgentParams) (int64, error)
 	RevokeHistoryShare(ctx context.Context, arg RevokeHistoryShareParams) (int64, error)
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.
@@ -787,6 +796,10 @@ type Querier interface {
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
+	// Masaüstü yerel ajanı (issue #51).
+	// Aynı makine yeniden kayıt olursa satır güncellenir; geri alınmış ajan
+	// yeniden kaydolunca tekrar etkinleşir.
+	UpsertDesktopAgent(ctx context.Context, arg UpsertDesktopAgentParams) (DesktopAgent, error)
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
 	// Listeden görülen belge (37 §5.2). prev_* alanları bu çağrıdan önceki hali

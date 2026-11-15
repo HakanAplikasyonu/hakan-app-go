@@ -11,6 +11,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
+	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
@@ -163,6 +164,7 @@ func main() {
 		WithUBLUpload(invoiceupload.New(pool, store, nil, log).Process).
 		WithDocTaskReminders(doctasksmodule.New(pool, store, notifSvc,
 			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount).
+		WithAgentsOfflineSweep(agentsusecase.New(db.New(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
@@ -189,6 +191,10 @@ func main() {
 	}
 	if err := queue.RegisterDocTaskRemindersSchedule(scheduler); err != nil {
 		log.Error("doc_task_reminders_scheduler_failed", "error", err)
+		exit(1)
+	}
+	if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
+		log.Error("agents_offline_sweep_scheduler_failed", "error", err)
 		exit(1)
 	}
 	go func() {

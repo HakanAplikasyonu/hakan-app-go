@@ -21,7 +21,27 @@ const SIDECAR: &str = "hakan-sidecar";
 
 /// Ön yüzün çağırabileceği sidecar yöntemleri. Yeni yöntem (#51 yerel ajan)
 /// eklenince buraya da yazılır; liste dışı istek sidecar'a ulaşmaz.
-const ALLOWED_METHODS: &[&str] = &["ping", "version", "ubl.inspect", "api.health"];
+const ALLOWED_METHODS: &[&str] = &[
+    "ping",
+    "version",
+    "ubl.inspect",
+    "api.health",
+    // Yerel ajan (#51). `auth.resume` listede yok: yalnızca kabuk, anahtar
+    // zincirindeki belirteçle çağırır.
+    "agent.status",
+    "auth.login",
+    "auth.logout",
+    "agent.organizations",
+    "agent.use_organization",
+    "agent.engagements",
+    "watch.add",
+    "watch.remove",
+    "source.test",
+    "source.preview",
+];
+
+/// Oturum yenileme belirtecinin anahtar zincirindeki adı.
+const REFRESH_KEY: &str = "refresh_token";
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -42,10 +62,12 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
     }
     *state.ready.lock().unwrap() = None;
 
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let (mut rx, child) = app
         .shell()
         .sidecar(SIDECAR)
         .map_err(|e| e.to_string())?
+        .args(["--data-dir".as_ref(), data_dir.as_os_str()])
         .set_raw_out(true)
         .spawn()
         .map_err(|e| e.to_string())?;
@@ -72,8 +94,11 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                             if ev.event == "ready" {
                                 *app.state::<SidecarState>().ready.lock().unwrap() =
                                     Some(ev.data.clone());
+                                resume_session(bridge.clone());
                             }
-                            let _ = app.emit("sidecar://event", ev);
+                            if !handle_private_event(&ev) {
+                                let _ = app.emit("sidecar://event", ev);
+                            }
                         }
                     }
                 }
@@ -92,6 +117,42 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+/// Oturum olayları kabukta kalır: yenileme belirteci ön yüze hiç gitmez.
+/// `true` dönerse olay ön yüze iletilmez.
+fn handle_private_event(ev: &bridge::Event) -> bool {
+    match ev.event.as_str() {
+        "auth.rotated" => {
+            if let Some(t) = ev.data.get("refresh_token").and_then(Value::as_str) {
+                if let Err(e) = secrets::store(REFRESH_KEY, t) {
+                    log::error!("oturum belirteci anahtar zincirine yazılamadı: {e}");
+                }
+            }
+            true
+        }
+        "auth.signed_out" => {
+            let _ = secrets::remove(REFRESH_KEY);
+            false
+        }
+        _ => false,
+    }
+}
+
+/// Sidecar hazır olunca anahtar zincirindeki belirteçle oturumu sürdürür.
+fn resume_session(bridge: Arc<Bridge>) {
+    let Ok(Some(token)) = secrets::load(REFRESH_KEY) else {
+        return;
+    };
+    tauri::async_runtime::spawn(async move {
+        let params = serde_json::json!({ "refresh_token": token });
+        if let Err(e) = bridge.call("auth.resume", params, CALL_TIMEOUT).await {
+            log::warn!("oturum sürdürülemedi: {e}");
+            if e.code == "SIGNED_OUT" {
+                let _ = secrets::remove(REFRESH_KEY);
+            }
+        }
+    });
 }
 
 fn current_bridge(state: &SidecarState) -> Result<Arc<Bridge>, RpcError> {

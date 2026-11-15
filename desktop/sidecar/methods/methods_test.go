@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	ubltr "github.com/furkanmeclis/go-ubltr"
@@ -84,6 +85,35 @@ func TestAPIHealth(t *testing.T) {
 	for _, u := range []string{"", "ftp://x", "http://api.example.com", "nota url"} {
 		if _, perr := call(t, h, map[string]string{"base_url": u}); perr == nil || perr.Code != rpc.CodeInvalidParams {
 			t.Errorf("%q kabul edilmemeliydi: %v", u, perr)
+		}
+	}
+}
+
+func TestSourceParams(t *testing.T) {
+	var buf strings.Builder
+	s := rpc.NewServer(&buf)
+	RegisterSources(s)
+	in := strings.Join([]string{
+		`{"id":1,"method":"source.preview","params":{"config":{"kind":"mikro","host":"x","database":"d","user":"u","password":"p"},"from":"2026-10-01","to":"2026-09-01"}}`,
+		`{"id":2,"method":"source.test","params":{"config":{"kind":"logo_tiger","host":"x","database":"d","user":"u","password":"p","firm_no":"1","period_no":"01"}}}`,
+		`{"id":3,"method":"source.test","params":{"config":{"kind":"netsis"}}}`,
+	}, "\n")
+	if err := s.Serve(context.Background(), strings.NewReader(in)); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	for _, id := range []string{`"id":1`, `"id":2`, `"id":3`} {
+		line := ""
+		for _, l := range strings.Split(out, "\n") {
+			if strings.Contains(l, id+",") {
+				line = l
+			}
+		}
+		if !strings.Contains(line, `"code":"INVALID_PARAMS"`) {
+			t.Errorf("%s INVALID_PARAMS olmalıydı: %s", id, line)
+		}
+		if strings.Contains(line, `"p"`) || strings.Contains(line, "password") {
+			t.Errorf("hata parolayı sızdırıyor: %s", line)
 		}
 	}
 }

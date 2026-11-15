@@ -105,6 +105,9 @@ const (
 	// açılış devreden KDV'si girme.
 	PermTenantVATRead  = "tenant.vat.read"
 	PermTenantVATWrite = "tenant.vat.write"
+	// Masaüstü yerel ajanı (issue #51): kayıt, heartbeat ve liste.
+	PermTenantAgentsRead  = "tenant.agents.read"
+	PermTenantAgentsWrite = "tenant.agents.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

@@ -39,7 +39,10 @@ async fn shell_talks_to_go_sidecar() {
         return;
     };
 
+    let data_dir = std::env::temp_dir().join(format!("hakan-sidecar-test-{}", std::process::id()));
     let mut child = Command::new(&bin)
+        .arg("--data-dir")
+        .arg(&data_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -101,6 +104,22 @@ async fn shell_talks_to_go_sidecar() {
         .unwrap();
     assert!(sum["uuid"].as_str().is_some_and(|s| !s.is_empty()), "{sum}");
 
+    // Yerel ajan: oturum yok, makine kimliği üretildi ve durum dosyası yazıldı.
+    let st = bridge.call("agent.status", json!({}), t).await.unwrap();
+    assert_eq!(st["signed_in"], false);
+    assert!(
+        st["machine_id"]
+            .as_str()
+            .is_some_and(|m| m.starts_with("hk-")),
+        "{st}"
+    );
+    assert!(data_dir.join("agent-state.json").exists());
+    let err = bridge
+        .call("auth.resume", json!({"refresh_token": ""}), t)
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, "SIGNED_OUT");
+
     let err = bridge.call("yok.boyle", json!({}), t).await.unwrap_err();
     assert_eq!(err.code, "UNKNOWN_METHOD");
 
@@ -122,4 +141,5 @@ async fn shell_talks_to_go_sidecar() {
     drop(bridge);
     child.kill().await.ok();
     let _ = tokio::time::timeout(Duration::from_secs(5), reader).await;
+    let _ = std::fs::remove_dir_all(&data_dir);
 }

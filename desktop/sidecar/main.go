@@ -11,8 +11,10 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/agent"
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/methods"
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/rpc"
 )
@@ -25,6 +27,7 @@ var (
 
 func main() {
 	showVersion := flag.Bool("version", false, "sürümü yaz ve çık")
+	dataDir := flag.String("data-dir", "", "ajan durum dizini (kabuk uygulama veri dizinini verir)")
 	flag.Parse()
 	info := methods.NewInfo(version, commit)
 	if *showVersion {
@@ -39,6 +42,28 @@ func main() {
 
 	srv := rpc.NewServer(os.Stdout)
 	methods.Register(srv, info, nil)
+
+	dir := *dataDir
+	if dir == "" {
+		base, err := os.UserConfigDir()
+		if err != nil {
+			log.Error("veri dizini bulunamadı", "err", err)
+			os.Exit(1)
+		}
+		dir = filepath.Join(base, "app.hakan.desktop")
+	}
+	rt, err := agent.NewRuntime(dir, version, func(name string, data any) {
+		if err := srv.Emit(name, data); err != nil {
+			log.Warn("olay yazılamadı", "event", name, "err", err)
+		}
+	})
+	if err != nil {
+		log.Error("ajan durumu yüklenemedi", "err", err)
+		os.Exit(1)
+	}
+	defer rt.Stop()
+	methods.RegisterAgent(srv, rt)
+	methods.RegisterSources(srv)
 	if err := srv.Emit("ready", info); err != nil {
 		log.Error("ready olayı yazılamadı", "err", err)
 		os.Exit(1)

@@ -42,7 +42,7 @@ main {
   display: grid;
   gap: 14px;
   padding: 20px;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
 }
 .card {
   background: var(--card);
@@ -54,7 +54,8 @@ main {
 .card-head h2 { margin: 0; }
 .muted { color: var(--muted); font-size: 13px; }
 .row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
-.grow { flex: 1; min-width: 200px; display: grid; gap: 4px; }
+.grow { flex: 1; min-width: 160px; }
+.row > label { display: grid; gap: 4px; }
 label span { font-size: 12px; color: var(--muted); }
 input {
   height: 32px;
@@ -90,3 +91,35 @@ button.ghost { background: transparent; color: var(--fg); border: 1px solid var(
   color: var(--muted);
   text-align: center;
 }
+h3 { font-size: 13px; margin: 14px 0 6px; }
+.grow-x { flex: 1; }
+.stack { display: grid; gap: 10px; }
+.stack > label { display: grid; gap: 4px; }
+select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.list li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list.small li { font-size: 12px; color: var(--muted); }
+.list li[data-outcome="uploaded"] { color: var(--ok); }
+.list li[data-outcome="rejected"], .list li[data-outcome="failed"] { color: var(--down); }
+.small-btn { height: 26px; padding: 0 10px; font-size: 12px; }
+.out {
+  margin: 10px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px;
+  white-space: pre-wrap;
+}
+.out:empty { display: none; }
+[hidden] { display: none !important; }

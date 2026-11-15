@@ -1,0 +1,67 @@
+{
+  "logo": {
+    "verified": false,
+    "note": "⚠️ Tablo, kolon adları ve TYPE kodları doğrulanmadı (14 §4.1, §4.2, §9, §11). SQL kolon adları REST adlarından farklı olabilir (TRCODE <-> TYPE). Pilot mükellefte Test ile doğrulanıp geçersiz kılma dosyasıyla düzeltilir.",
+    "tables": ["LG_{FFF}_{PP}_INVOICE"],
+    "invoice_query": "SELECT * FROM LG_{FFF}_{PP}_INVOICE WITH (NOLOCK) WHERE [DATE] >= @from AND [DATE] < @to",
+    "drop_columns": ["CREDIT_CARD_NO"],
+    "type_fields": ["type"],
+    "fields": {
+      "source_id": ["INTERNAL_REFERENCE"],
+      "guid": ["GUID"],
+      "doc_no": ["DOC_NUMBER"],
+      "internal_no": ["NUMBER"],
+      "date": ["DATE"],
+      "doc_date": ["DOC_DATE"],
+      "type": ["TRCODE", "TYPE"],
+      "cancelled": ["CANCELLED"],
+      "counterparty_code": ["ARP_CODE"],
+      "currency": ["CURR_INVOICE"],
+      "gross": ["TOTAL_GROSS"],
+      "discounts": ["TOTAL_DISCOUNTS"],
+      "vat": ["TOTAL_VAT"],
+      "additional_tax": ["TOTAL_ADD_TAX"],
+      "net": ["TOTAL_NET"]
+    },
+    "type_rules": [
+      {"match": {"type": "1"}, "direction": "purchase", "kind": "invoice", "note": "Satınalma faturası"},
+      {"match": {"type": "4"}, "direction": "purchase", "kind": "invoice", "note": "Alınan hizmet faturası"},
+      {"match": {"type": "6"}, "direction": "purchase", "kind": "return", "note": "Satınalma iade faturası"},
+      {"match": {"type": "13"}, "direction": "purchase", "kind": "invoice", "document_class": "price_difference", "note": "Satınalma fiyat farkı faturası"},
+      {"match": {"type": "26"}, "direction": "purchase", "kind": "invoice", "document_class": "mustahsil", "note": "Müstahsil makbuzu"},
+      {"match": {"type": "7"}, "direction": "sales", "kind": "invoice", "note": "Perakende satış faturası"},
+      {"match": {"type": "8"}, "direction": "sales", "kind": "invoice", "note": "Toptan satış faturası"},
+      {"match": {"type": "9"}, "direction": "sales", "kind": "invoice", "note": "Verilen hizmet faturası"},
+      {"match": {"type": "2"}, "direction": "sales", "kind": "return", "note": "Perakende satış iade faturası"},
+      {"match": {"type": "3"}, "direction": "sales", "kind": "return", "note": "Toptan satış iade faturası"},
+      {"match": {"type": "14"}, "direction": "sales", "kind": "invoice", "document_class": "price_difference", "note": "Satış fiyat farkı faturası"},
+      {"match": {"type": "5"}, "skip": true, "note": "Alınan proforma: çekilmez"},
+      {"match": {"type": "10"}, "skip": true, "note": "Verilen proforma: çekilmez"}
+    ]
+  },
+  "mikro": {
+    "verified": false,
+    "note": "⚠️ CARI_HESAP_HAREKETLERI ve cha_ kolonları doğrulanmadı (15 §2.1, §2.2, §5). cha_evrak_tip / cha_cinsi / cha_tip / cha_normal_Iade değer listesi Mikro tablo dokümanından alınıp type_rules doldurulana kadar her satır TYPE_UNMAPPED uyarısıyla gelir. E_FATURA_DETAYLARI (efd_) doğrulanmış; efd_fat_uid <-> cha_Guid bağı ⚠️.",
+    "tables": ["CARI_HESAP_HAREKETLERI", "E_FATURA_DETAYLARI"],
+    "invoice_query": "SELECT cha.*, efd.efd_uuid, efd.efd_pozisyon, efd.efd_mVkn FROM CARI_HESAP_HAREKETLERI AS cha WITH (NOLOCK) LEFT JOIN E_FATURA_DETAYLARI AS efd WITH (NOLOCK) ON efd.efd_fat_uid = cha.cha_Guid WHERE cha.cha_tarihi >= @from AND cha.cha_tarihi < @to",
+    "drop_columns": [],
+    "type_fields": ["evrak_tip", "cinsi", "tip", "normal_iade"],
+    "tax_breakdown_prefix": "cha_vergi",
+    "fields": {
+      "source_id": ["cha_Guid"],
+      "doc_no": ["cha_belge_no"],
+      "date": ["cha_tarihi"],
+      "doc_date": ["cha_belge_tarih"],
+      "evrak_tip": ["cha_evrak_tip"],
+      "cinsi": ["cha_cinsi"],
+      "tip": ["cha_tip"],
+      "normal_iade": ["cha_normal_Iade"],
+      "cancelled": ["cha_iptal"],
+      "counterparty_code": ["cha_kod"],
+      "ettn": ["efd_uuid"],
+      "amount": ["cha_meblag"],
+      "subtotal": ["cha_aratoplam"]
+    },
+    "type_rules": []
+  }
+}
