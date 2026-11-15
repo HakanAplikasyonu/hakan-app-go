@@ -84,6 +84,9 @@ const (
 	// Bank statements and movements (#19, #20).
 	PermTenantBankRead  = "tenant.bank.read"
 	PermTenantBankWrite = "tenant.bank.write"
+	// Hedef hesap planı (issue #30).
+	PermTenantAccountPlanRead  = "tenant.account_plan.read"
+	PermTenantAccountPlanWrite = "tenant.account_plan.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.
