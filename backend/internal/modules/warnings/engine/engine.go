@@ -171,9 +171,13 @@ func (e *Engine) Apply(ctx context.Context, s Subject, producer string, ent Enti
 		ownedSet[c] = true
 	}
 	found := map[string]Finding{}
+	var order []string // bulguların ilk geliş sırası; map sırası rastgele olduğundan
 	for _, f := range findings {
 		if !ownedSet[f.Code] {
 			return rep, fmt.Errorf("%w: %s", ErrNotOwned, f.Code)
+		}
+		if _, seen := found[f.Code]; !seen {
+			order = append(order, f.Code)
 		}
 		found[f.Code] = f // last one wins; one warning per code per entity
 	}
@@ -184,7 +188,8 @@ func (e *Engine) Apply(ctx context.Context, s Subject, producer string, ent Enti
 	}
 	now := e.now()
 	var keep []string
-	for code, f := range found {
+	for _, code := range order {
+		f := found[code]
 		eff, ok := cfg[code]
 		if !ok {
 			return rep, fmt.Errorf("%w: %s has no configuration", ErrUnknownCode, code)
