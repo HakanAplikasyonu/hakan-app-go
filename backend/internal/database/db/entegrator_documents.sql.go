@@ -291,6 +291,63 @@ func (q *Queries) MarkEntegratorDocumentsMissing(ctx context.Context, arg MarkEn
 	return result.RowsAffected(), nil
 }
 
+const planSyncWindow = `-- name: PlanSyncWindow :one
+INSERT INTO sync_windows (taxpayer_id, connection_id, item, direction, date_field, range_start, range_end)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (connection_id, item, date_field, range_start, range_end) DO UPDATE SET
+    status = CASE WHEN sync_windows.status = 'done' THEN 'pending' ELSE sync_windows.status END,
+    page_cursor = CASE WHEN sync_windows.status = 'done' THEN NULL ELSE sync_windows.page_cursor END,
+    attempts = CASE WHEN sync_windows.status = 'done' THEN 0 ELSE sync_windows.attempts END,
+    last_error = CASE WHEN sync_windows.status = 'done' THEN NULL ELSE sync_windows.last_error END,
+    updated_at = NOW()
+RETURNING id, taxpayer_id, connection_id, item, direction, date_field, range_start, range_end, status, page_cursor, attempts, last_error, started_at, finished_at, created_at, updated_at
+`
+
+type PlanSyncWindowParams struct {
+	TaxpayerID   int64              `json:"taxpayer_id"`
+	ConnectionID int64              `json:"connection_id"`
+	Item         string             `json:"item"`
+	Direction    pgtype.Text        `json:"direction"`
+	DateField    string             `json:"date_field"`
+	RangeStart   pgtype.Timestamptz `json:"range_start"`
+	RangeEnd     pgtype.Timestamptz `json:"range_end"`
+}
+
+// Planlanan pencere: aynı aralık daha önce bittiyse yeniden listelenmek
+// üzere 'pending'e döner (tam tarama, yeniden ilk yükleme). Çalışan ya da
+// hatalı pencere olduğu gibi kalır.
+func (q *Queries) PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error) {
+	row := q.db.QueryRow(ctx, planSyncWindow,
+		arg.TaxpayerID,
+		arg.ConnectionID,
+		arg.Item,
+		arg.Direction,
+		arg.DateField,
+		arg.RangeStart,
+		arg.RangeEnd,
+	)
+	var i SyncWindow
+	err := row.Scan(
+		&i.ID,
+		&i.TaxpayerID,
+		&i.ConnectionID,
+		&i.Item,
+		&i.Direction,
+		&i.DateField,
+		&i.RangeStart,
+		&i.RangeEnd,
+		&i.Status,
+		&i.PageCursor,
+		&i.Attempts,
+		&i.LastError,
+		&i.StartedAt,
+		&i.FinishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const setEntegratorDocumentUBL = `-- name: SetEntegratorDocumentUBL :execrows
 UPDATE entegrator_documents
 SET ubl_status = $1,

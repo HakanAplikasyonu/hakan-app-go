@@ -127,7 +127,7 @@ func (j *job) listWindows(ctx context.Context, planned []window) error {
 	j.planned = planned
 	q := j.s.q
 	for _, w := range planned {
-		if _, err := q.UpsertSyncWindow(ctx, db.UpsertSyncWindowParams{
+		if _, err := q.PlanSyncWindow(ctx, db.PlanSyncWindowParams{
 			TaxpayerID: j.conn.TaxpayerID, ConnectionID: j.conn.ID, Item: w.item(),
 			Direction: repository.Text(direction(w.Dir)), DateField: dateFieldCreated,
 			RangeStart: ts(w.From), RangeEnd: ts(w.To),
@@ -216,16 +216,14 @@ func (j *job) split(ctx context.Context, w db.SyncWindow, setStatus func(string,
 	}
 	var out []db.SyncWindow
 	for _, r := range [][2]time.Time{{from, mid}, {mid, to}} {
-		child, err := j.s.q.UpsertSyncWindow(ctx, db.UpsertSyncWindowParams{
+		child, err := j.s.q.PlanSyncWindow(ctx, db.PlanSyncWindowParams{
 			TaxpayerID: w.TaxpayerID, ConnectionID: w.ConnectionID, Item: w.Item, Direction: w.Direction,
 			DateField: w.DateField, RangeStart: ts(r[0]), RangeEnd: ts(r[1]),
 		})
 		if err != nil {
 			return nil, err
 		}
-		if child.Status != "done" {
-			out = append(out, child)
-		}
+		out = append(out, child)
 	}
 	j.cnt.Splits++
 	j.cnt.Windows++

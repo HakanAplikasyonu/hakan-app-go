@@ -87,3 +87,17 @@ SELECT * FROM sync_windows
 WHERE taxpayer_id = @taxpayer_id AND connection_id = @connection_id
   AND status IN ('pending', 'failed', 'running') AND attempts < @max_attempts::int
 ORDER BY range_start, id;
+
+-- name: PlanSyncWindow :one
+-- Planlanan pencere: aynı aralık daha önce bittiyse yeniden listelenmek
+-- üzere 'pending'e döner (tam tarama, yeniden ilk yükleme). Çalışan ya da
+-- hatalı pencere olduğu gibi kalır.
+INSERT INTO sync_windows (taxpayer_id, connection_id, item, direction, date_field, range_start, range_end)
+VALUES (@taxpayer_id, @connection_id, @item, sqlc.narg(direction), @date_field, @range_start, @range_end)
+ON CONFLICT (connection_id, item, date_field, range_start, range_end) DO UPDATE SET
+    status = CASE WHEN sync_windows.status = 'done' THEN 'pending' ELSE sync_windows.status END,
+    page_cursor = CASE WHEN sync_windows.status = 'done' THEN NULL ELSE sync_windows.page_cursor END,
+    attempts = CASE WHEN sync_windows.status = 'done' THEN 0 ELSE sync_windows.attempts END,
+    last_error = CASE WHEN sync_windows.status = 'done' THEN NULL ELSE sync_windows.last_error END,
+    updated_at = NOW()
+RETURNING *;

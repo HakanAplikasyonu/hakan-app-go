@@ -382,20 +382,28 @@ func TestFullScanMarksMissing(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t, Config{})
 	ettn := e.deliver(t, 1, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-10T09:00:00+03:00"))
+	kept := e.deliver(t, 2, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-11T09:00:00+03:00"))
 	if _, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunFullScan); err != nil {
 		t.Fatal(err)
 	}
+	keptXML, _ := e.fake.Fetch(ctx, provider.FetchQuery{Kind: provider.EInvoice, Direction: provider.Inbound, UUID: strings.ToUpper(kept)})
 	// The document disappears at the source.
 	e.fake = providertest.NewFake()
 	e.spy.Fake = e.fake
+	e.fake.Deliver(provider.DocumentInfo{Kind: provider.EInvoice, UUID: strings.ToUpper(kept), Status: provider.StatusReceived,
+		CreatedAt: mustTime(t, "2026-11-11T09:00:00+03:00")}, keptXML.Data)
+	// Same windows as the first scan: they must be listed again.
 	rep, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunFullScan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rep.Counters.Missing != 1 {
-		t.Fatalf("missing = %d", rep.Counters.Missing)
+	if rep.Counters.Missing != 1 || rep.Counters.Windows == 0 {
+		t.Fatalf("report %+v", rep.Counters)
 	}
 	if d := e.doc(t, ettn, "incoming"); !d.MissingSince.Valid || d.UblStatus != "ok" {
 		t.Fatalf("document %+v", d)
+	}
+	if d := e.doc(t, kept, "incoming"); d.MissingSince.Valid {
+		t.Fatalf("document still at the source marked missing: %+v", d)
 	}
 }

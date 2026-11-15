@@ -660,6 +660,10 @@ type Querier interface {
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
 	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)
+	// Planlanan pencere: aynı aralık daha önce bittiyse yeniden listelenmek
+	// üzere 'pending'e döner (tam tarama, yeniden ilk yükleme). Çalışan ya da
+	// hatalı pencere olduğu gibi kalır.
+	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
