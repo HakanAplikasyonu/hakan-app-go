@@ -400,6 +400,22 @@ type InvoiceItem struct {
 	TaxBreakdowns              []byte         `json:"tax_breakdowns"`
 }
 
+type InvoiceSource struct {
+	ID            int64              `json:"id"`
+	TaxpayerID    int64              `json:"taxpayer_id"`
+	InvoiceID     int64              `json:"invoice_id"`
+	SourceSystem  string             `json:"source_system"`
+	SourceID      string             `json:"source_id"`
+	CaptureMethod string             `json:"capture_method"`
+	Priority      int16              `json:"priority"`
+	MatchRule     string             `json:"match_rule"`
+	ContentHash   pgtype.Text        `json:"content_hash"`
+	AttachmentID  pgtype.Int8        `json:"attachment_id"`
+	RawPayload    []byte             `json:"raw_payload"`
+	FirstSeenAt   pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt    pgtype.Timestamptz `json:"last_seen_at"`
+}
+
 type InvoiceTaxSummary struct {
 	ID               int64          `json:"id"`
 	TaxpayerID       int64          `json:"taxpayer_id"`

@@ -6534,6 +6534,11 @@ components:
         ettn: { type: string, format: uuid }
         invoice_number: { type: string }
         invoice_uuid: { type: string, format: uuid }
+        outcome:
+          type: string
+          enum: [created, merged, replaced, seen]
+          description: "created: new invoice; merged: same invoice from another source, content kept; replaced: higher-priority source rewrote it; seen: this source already sent it"
+        match_rule: { type: string, enum: [new, source, ettn, number] }
         error_code:
           type: string
           enum: [unreadable, unsupported_document, xsd_invalid, PARTY_MISMATCH, mapping_failed, store_failed]

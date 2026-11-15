@@ -36,6 +36,9 @@ import (
 // MaxUploadBytes caps one uploaded file (a ZIP of many invoices).
 const MaxUploadBytes = 200 << 20
 
+// maxCandidates caps the invoice ids listed in a POSSIBLE_DUPLICATE warning.
+const maxCandidates = 10
+
 // Producer is the data_warning producer name for this channel (`05` §1).
 const Producer = "ubl_parser"
 
@@ -146,9 +149,12 @@ type ItemResult struct {
 	ETTN          string    `json:"ettn,omitempty"`
 	InvoiceNumber string    `json:"invoice_number,omitempty"`
 	InvoiceUUID   uuid.UUID `json:"invoice_uuid,omitempty"`
-	ErrorCode     string    `json:"error_code,omitempty"`
-	Error         string    `json:"error,omitempty"`
-	Warnings      []string  `json:"warnings,omitempty"`
+	// Outcome / MatchRule: how the invoice was matched (`01` §6, #12).
+	Outcome   string   `json:"outcome,omitempty"`
+	MatchRule string   `json:"match_rule,omitempty"`
+	ErrorCode string   `json:"error_code,omitempty"`
+	Error     string   `json:"error,omitempty"`
+	Warnings  []string `json:"warnings,omitempty"`
 }
 
 // Error codes in a report.
@@ -342,40 +348,41 @@ func (s *Service) processItem(ctx context.Context, job db.UblUploadJob, own stri
 		warnings = append(warnings, w)
 	}
 
-	added, invUUID, err := s.store1(ctx, job, inv, it.XML, warnings)
+	saved, warnings, err := s.store1(ctx, job, inv, it.XML, warnings)
 	if err != nil {
 		return fail(CodeStore, err)
 	}
-	res.InvoiceUUID = invUUID
-	if !added {
-		res.Status = ItemDuplicate
-		return res
-	}
+	res.InvoiceUUID, res.Outcome, res.MatchRule = saved.InvoiceUUID, saved.Outcome, saved.MatchRule
 	res.Status = ItemAdded
-	for _, w := range warnings {
-		res.Warnings = append(res.Warnings, w.Code)
+	if saved.Duplicate() {
+		res.Status = ItemDuplicate
+	}
+	if saved.Written {
+		for _, w := range warnings {
+			res.Warnings = append(res.Warnings, w.Code)
+		}
 	}
 	return res
 }
 
 // store1 keeps the XML as an attachment and writes the invoice and its
-// warnings in one transaction.
-func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Invoice, xml []byte, warnings []model.Warning) (bool, uuid.UUID, error) {
+// warnings in one transaction. It returns the warnings actually recorded.
+func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Invoice, xml []byte, warnings []model.Warning) (repository.SaveResult, []model.Warning, error) {
 	sum := sha256.Sum256(xml)
 	sha := hex.EncodeToString(sum[:])
 	key := fmt.Sprintf("taxpayers/%d/ubl/%s.xml", job.TaxpayerID, sha)
 	exists, err := s.store.Exists(ctx, key)
 	if err != nil {
-		return false, uuid.Nil, err
+		return repository.SaveResult{}, nil, err
 	}
 	if !exists {
 		if err := s.store.Upload(ctx, storage.File{Body: bytes.NewReader(xml), Size: int64(len(xml)), Filename: inv.UUID + ".xml", ContentType: "application/xml"}, key); err != nil {
-			return false, uuid.Nil, err
+			return repository.SaveResult{}, nil, err
 		}
 	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return false, uuid.Nil, err
+		return repository.SaveResult{}, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := db.New(tx)
@@ -384,25 +391,38 @@ func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Inv
 		ContentType: repository.Text("application/xml"), FileName: repository.Text(inv.UUID + ".xml"),
 	})
 	if err != nil {
-		return false, uuid.Nil, err
+		return repository.SaveResult{}, nil, err
 	}
 	saved, err := repository.SaveInvoice(ctx, tx, job.TaxpayerID, inv, att.ID)
 	if err != nil {
-		return false, uuid.Nil, err
+		return repository.SaveResult{}, nil, err
 	}
-	if saved.Duplicate {
-		return false, saved.InvoiceUUID, tx.Commit(ctx)
-	}
+	// The XML belongs to the invoice even when it only adds a source.
 	if _, err := q.SetAttachmentOwner(ctx, db.SetAttachmentOwnerParams{TaxpayerID: job.TaxpayerID, ID: att.ID, OwnerType: repository.Text("invoice"), OwnerID: pgtype.Int8{Int64: saved.InvoiceID, Valid: true}}); err != nil {
-		return false, uuid.Nil, err
+		return repository.SaveResult{}, nil, err
 	}
+	if !saved.Written {
+		return saved, nil, tx.Commit(ctx)
+	}
+	if len(saved.PossibleDuplicates) > 0 {
+		ids := make([]string, 0, maxCandidates)
+		for i, id := range saved.PossibleDuplicates {
+			if i == maxCandidates {
+				break
+			}
+			ids = append(ids, id.String())
+		}
+		warnings = append(warnings, model.Warning{Code: model.WarnPossibleDuplicate, EntityType: model.EntityInvoice,
+			Params: map[string]any{"candidates": ids, "count": len(saved.PossibleDuplicates)}})
+	}
+	recorded := make([]model.Warning, 0, len(warnings))
 	for _, w := range warnings {
 		setting, err := q.ResolveWarningSetting(ctx, db.ResolveWarningSettingParams{
 			Fallback: model.Severity(w.Code), Code: w.Code, OrganizationID: job.OrganizationID,
 			EngagementID: pgtype.Int8{Int64: job.EngagementID, Valid: true},
 		})
 		if err != nil {
-			return false, uuid.Nil, fmt.Errorf("warning %s: %w", w.Code, err)
+			return repository.SaveResult{}, nil, fmt.Errorf("warning %s: %w", w.Code, err)
 		}
 		if !setting.Enabled {
 			continue // the office switched this check off (#13)
@@ -426,10 +446,11 @@ func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Inv
 			Period: repository.Text(inv.Period), EntityType: w.EntityType, EntityID: pgtype.Int8{Int64: entityID, Valid: true},
 			Code: w.Code, Severity: setting.Severity, Params: raw, Producer: Producer,
 		}); err != nil {
-			return false, uuid.Nil, fmt.Errorf("warning %s: %w", w.Code, err)
+			return repository.SaveResult{}, nil, fmt.Errorf("warning %s: %w", w.Code, err)
 		}
+		recorded = append(recorded, w)
 	}
-	return true, saved.InvoiceUUID, tx.Commit(ctx)
+	return saved, recorded, tx.Commit(ctx)
 }
 
 func summarize(err error) error {
