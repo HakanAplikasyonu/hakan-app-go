@@ -60,6 +60,8 @@ github.com/furkanmeclis/go-ubltr/provider/isnet v0.1.0 h1:bhq55xziIt9CJAlwbkKuPt
 github.com/furkanmeclis/go-ubltr/provider/isnet v0.1.0/go.mod h1:RxUftEQQHT+mBdAxmnhhN0rMo/Z8mPl8LCbek8kSrgY=
 github.com/furkanmeclis/go-ubltr/provider/izibiz v0.1.0 h1:vOaJBOCyjMPpWYK9qeq41dUAOsp2EnAO/IDrVuMemv8=
 github.com/furkanmeclis/go-ubltr/provider/izibiz v0.1.0/go.mod h1:clJZJIErkeSCITvaPqZu+CwkToYj5qQUb/yzWzvpxfU=
+github.com/furkanmeclis/go-ubltr/provider/uyumsoft v0.1.0 h1:ISDTADChbu8qN62Uapgh3efaWSygioS4x21TvUqE3YE=
+github.com/furkanmeclis/go-ubltr/provider/uyumsoft v0.1.0/go.mod h1:7M4Kg80kRF56NtjxNf82p673iJ6HUYDAuGg69KU25NM=
 github.com/fxamacker/cbor/v2 v2.8.0 h1:fFtUGXUzXPHTIUdne5+zzMPTfffl3RD5qYnkY40vtxU=
 github.com/fxamacker/cbor/v2 v2.8.0/go.mod h1:vM4b+DJCtHn+zz7h3FFp/hDAI9WNWCsZj23V5ytsSxQ=
 github.com/getsentry/sentry-go v0.49.0 h1:Ehejknu1l023Ub7QoRBVLAI7g3Jnhqku4oWx4B4Sh5s=

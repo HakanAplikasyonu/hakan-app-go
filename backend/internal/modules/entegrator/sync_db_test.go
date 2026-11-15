@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -459,5 +460,44 @@ func TestNoCursorFullPageSplits(t *testing.T) {
 	}
 	if n := e.count(t, `SELECT count(*) FROM sync_windows WHERE taxpayer_id = $1 AND last_error->>'code' = $2`, CodeLimitReached); n != 1 {
 		t.Fatalf("LIMIT_REACHED windows = %d", n)
+	}
+}
+
+// endDateOnly records the listing bounds it receives.
+type endDateOnly struct {
+	*spy
+	mu  sync.Mutex
+	tos []time.Time
+}
+
+func (*endDateOnly) Name() string { return "fake-enddate" }
+
+func (e *endDateOnly) ListInbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
+	e.mu.Lock()
+	e.tos = append(e.tos, q.To)
+	e.mu.Unlock()
+	return e.spy.ListInbox(ctx, q)
+}
+
+// Uyumsoft CreateEndDate yalnızca tarih (33 §7.2): bitiş ertesi gün 00:00
+// gönderilir, böylece pencerenin son günündeki belgeler kaçmaz.
+func TestEndDateOnlyProfile(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, Config{})
+	RegisterListProfile("fake-enddate", ListProfile{EndDateOnly: true})
+	p := &endDateOnly{spy: e.spy}
+	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) { return Wrap(p), nil })
+	e.now = mustTime(t, "2026-11-15T19:26:00+03:00")
+	if _, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunIncremental); err != nil {
+		t.Fatal(err)
+	}
+	want := mustTime(t, "2026-11-16T00:00:00+03:00")
+	if len(p.tos) == 0 {
+		t.Fatal("no inbox listing")
+	}
+	for _, to := range p.tos {
+		if !to.Equal(want) {
+			t.Fatalf("To = %s, want %s", to, want)
+		}
 	}
 }

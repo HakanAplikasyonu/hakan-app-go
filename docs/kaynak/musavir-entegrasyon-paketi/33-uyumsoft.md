@@ -160,7 +160,7 @@ Eleman sırası şemadaki sırayla aynı olmalı (`InvoiceListQueryModel`):
 | `PageSize` (öznitelik) | Zorunlu | 50 (öneri) |
 | `OnlyNewestInvoices` (öznitelik, sadece gelen) | Zorunlu | `false` |
 | `ExecutionStartDate` / `ExecutionEndDate` | Doküman (liste metotları): "Faturanın tarihine göre" | Dönem taraması |
-| `CreateStartDate` / `CreateEndDate` | Doküman: "Faturanın oluşturulma tarihine göre" | Artımlı çekim |
+| `CreateStartDate` / `CreateEndDate` | Doküman: "Faturanın oluşturulma tarihine göre" | Artımlı çekim. Test ortamında doğrulandı (2026-11-15): `CreateStartDate` saatiyle uygulanıyor, `CreateEndDate` yalnızca **tarih** olarak alınıyor (gece yarısına kesiliyor). 19:25'te oluşan belge, bitişi aynı gün 19:26 olan pencerede gelmiyor, bitiş ertesi gün 00:00 olunca geliyor. Adaptör bitişi pencerenin son anının ertesi günü 00:00 olarak gönderir. |
 | `InvoiceIds` | UUID listesi | Durum / tek fatura |
 | `SortColumn` | Şema: `Default`, `Id`, `CreateDate`, `ExecutionDate` | `CreateDate` (sayfalar arasında kayma olmasın) |
 | `SortMode` | Şema: `Default`, `Ascending`, `Descending` | `Ascending` |
@@ -342,7 +342,8 @@ Not: Giden liste e-fatura ve e-arşivi birlikte döndüğü için senkron işi g
 
 ## 14. Doğrulanacaklar
 
-- [ ] Integration WSDL adresi ve SOAPAction değerleri
+- [x] Integration WSDL adresi ve SOAPAction değerleri (go-ubltr `provider/uyumsoft` test ortamında liste ve UBL indirme çalıştı, 2026-11-15)
+- [x] `CreateEndDate` hassasiyeti: yalnızca tarih (§7.2)
 - [ ] §13 maddeleri 2, 3, 4, 5, 6
 - [ ] `NotPrepared`, `NotSend` durum kodları
 - [ ] Sadece görüntüleme yetkili kullanıcı açılabiliyor mu

@@ -190,6 +190,9 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 	// dates, so the end moves back by a nanosecond and both are given in
 	// Turkish time.
 	qFrom, qTo := from.In(istanbul), to.Add(-time.Nanosecond).In(istanbul)
+	if prof.EndDateOnly {
+		qTo = time.Date(qTo.Year(), qTo.Month(), qTo.Day()+1, 0, 0, 0, 0, istanbul)
+	}
 	cursor := w.PageCursor.String
 	for pages := 1; ; pages++ {
 		if err := j.throttle(ctx); err != nil {
