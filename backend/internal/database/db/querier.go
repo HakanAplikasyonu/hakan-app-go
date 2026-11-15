@@ -41,6 +41,8 @@ type Querier interface {
 	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
+	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
+	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
@@ -66,6 +68,8 @@ type Querier interface {
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
 	CreateEngagement(ctx context.Context, arg CreateEngagementParams) (Engagement, error)
+	// Excel içe aktarma (issue #22).
+	CreateExcelImport(ctx context.Context, arg CreateExcelImportParams) (ExcelImport, error)
 	CreateExportJob(ctx context.Context, arg CreateExportJobParams) (ExportJob, error)
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (ImportJob, error)
 	CreateLogPurgeRule(ctx context.Context, arg CreateLogPurgeRuleParams) (LogPurgeRule, error)
@@ -97,6 +101,11 @@ type Querier interface {
 	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
 	DeleteEngagementReviewSetting(ctx context.Context, arg DeleteEngagementReviewSettingParams) (int64, error)
 	DeleteEngagementWarningRule(ctx context.Context, arg DeleteEngagementWarningRuleParams) (int64, error)
+	DeleteExcelImportRows(ctx context.Context, arg DeleteExcelImportRowsParams) error
+	// Ofis yalnızca kendi şablonunu siler; global şablon platformundur.
+	DeleteExcelImportTemplate(ctx context.Context, arg DeleteExcelImportTemplateParams) (int64, error)
+	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
+	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -136,6 +145,9 @@ type Querier interface {
 	FindCustomerByIdentityNumber(ctx context.Context, arg FindCustomerByIdentityNumberParams) (Customer, error)
 	FindCustomerBySource(ctx context.Context, arg FindCustomerBySourceParams) (Customer, error)
 	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
+	// tenant-lint: cross-org şablon araması kendi ofisi, kendi mükellefi ve global ile sınırlı
+	// En özel kapsam önce: company > tenant > global.
+	FindExcelImportTemplates(ctx context.Context, arg FindExcelImportTemplatesParams) ([]ExcelImportTemplate, error)
 	// 01 §6 kural 1.
 	FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTNParams) ([]Invoice, error)
 	// 01 §6 kural 2: karşı taraf VKN/TCKN + fatura no + tarih.
@@ -155,6 +167,8 @@ type Querier interface {
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
+	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
+	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
@@ -241,6 +255,7 @@ type Querier interface {
 	InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (CashBox, error)
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
+	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
@@ -265,6 +280,7 @@ type Querier interface {
 	ListActiveRefreshTokensByUserID(ctx context.Context, userID int64) ([]RefreshToken, error)
 	ListActivityEvents(ctx context.Context, arg ListActivityEventsParams) ([]ActivityEvent, error)
 	ListAllBulkJobs(ctx context.Context, arg ListAllBulkJobsParams) ([]BulkJob, error)
+	ListAllExcelImportRows(ctx context.Context, arg ListAllExcelImportRowsParams) ([]ExcelImportRow, error)
 	ListAllExportJobs(ctx context.Context, arg ListAllExportJobsParams) ([]ExportJob, error)
 	ListAllImportJobs(ctx context.Context, arg ListAllImportJobsParams) ([]ImportJob, error)
 	ListAllPermissionSlugs(ctx context.Context) ([]string, error)
@@ -287,6 +303,11 @@ type Querier interface {
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error)
 	ListEntityDataWarnings(ctx context.Context, arg ListEntityDataWarningsParams) ([]DataWarning, error)
+	ListExcelImportCreatedInvoices(ctx context.Context, arg ListExcelImportCreatedInvoicesParams) ([]int64, error)
+	ListExcelImportRows(ctx context.Context, arg ListExcelImportRowsParams) ([]ExcelImportRow, error)
+	// tenant-lint: cross-org ofis görür: kendi şablonları ve global olanlar
+	ListExcelImportTemplates(ctx context.Context, organizationID pgtype.Int8) ([]ExcelImportTemplate, error)
+	ListExcelImports(ctx context.Context, arg ListExcelImportsParams) ([]ExcelImport, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
@@ -328,6 +349,7 @@ type Querier interface {
 	ListRolesForUserIDs(ctx context.Context, userIds []int64) ([]ListRolesForUserIDsRow, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
+	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
 	ListStorageActivity(ctx context.Context, arg ListStorageActivityParams) ([]ListStorageActivityRow, error)
 	ListStorageLinksByKey(ctx context.Context, objectKey string) ([]StorageLink, error)
@@ -368,6 +390,8 @@ type Querier interface {
 	MarkBulkJobFailed(ctx context.Context, arg MarkBulkJobFailedParams) (BulkJob, error)
 	MarkBulkJobProcessing(ctx context.Context, id int64) (BulkJob, error)
 	MarkBulkJobRolledBack(ctx context.Context, arg MarkBulkJobRolledBackParams) (BulkJob, error)
+	MarkExcelImportCommitted(ctx context.Context, arg MarkExcelImportCommittedParams) (ExcelImport, error)
+	MarkExcelImportRolledBack(ctx context.Context, arg MarkExcelImportRolledBackParams) (ExcelImport, error)
 	MarkExportJobCompleted(ctx context.Context, arg MarkExportJobCompletedParams) (ExportJob, error)
 	MarkExportJobFailed(ctx context.Context, arg MarkExportJobFailedParams) (ExportJob, error)
 	MarkExportJobProcessing(ctx context.Context, id int64) (ExportJob, error)
@@ -425,6 +449,8 @@ type Querier interface {
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
+	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
+	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
@@ -442,6 +468,7 @@ type Querier interface {
 	SupersedePendingSuggestions(ctx context.Context, arg SupersedePendingSuggestionsParams) ([]SupersedePendingSuggestionsRow, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
+	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	UpdateGitHubAppSettings(ctx context.Context, arg UpdateGitHubAppSettingsParams) (GithubAppSetting, error)
 	UpdateImportJobFileKey(ctx context.Context, arg UpdateImportJobFileKeyParams) (ImportJob, error)
 	UpdateImportJobMapping(ctx context.Context, arg UpdateImportJobMappingParams) (ImportJob, error)
@@ -473,6 +500,8 @@ type Querier interface {
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
+	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
+	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeReviewSetting(ctx context.Context, arg UpsertOfficeReviewSettingParams) error

@@ -369,6 +369,70 @@ type EngagementAssignment struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type ExcelImport struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	FileName       string             `json:"file_name"`
+	Format         string             `json:"format"`
+	Sha256         string             `json:"sha256"`
+	SizeBytes      int64              `json:"size_bytes"`
+	StorageKey     string             `json:"storage_key"`
+	AttachmentID   pgtype.Int8        `json:"attachment_id"`
+	DataType       pgtype.Text        `json:"data_type"`
+	SourceSystem   pgtype.Text        `json:"source_system"`
+	Period         pgtype.Text        `json:"period"`
+	SheetName      pgtype.Text        `json:"sheet_name"`
+	Layout         []byte             `json:"layout"`
+	Mapping        []byte             `json:"mapping"`
+	TemplateID     pgtype.Int8        `json:"template_id"`
+	AiUsed         bool               `json:"ai_used"`
+	Status         string             `json:"status"`
+	Summary        []byte             `json:"summary"`
+	Error          pgtype.Text        `json:"error"`
+	IdempotencyKey pgtype.Text        `json:"idempotency_key"`
+	CommittedBy    pgtype.Int8        `json:"committed_by"`
+	CommittedAt    pgtype.Timestamptz `json:"committed_at"`
+	RolledBackBy   pgtype.Int8        `json:"rolled_back_by"`
+	RolledBackAt   pgtype.Timestamptz `json:"rolled_back_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ExcelImportRow struct {
+	ID             int64       `json:"id"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ImportID       int64       `json:"import_id"`
+	RowNo          int32       `json:"row_no"`
+	Raw            []byte      `json:"raw"`
+	Record         []byte      `json:"record"`
+	Result         string      `json:"result"`
+	Messages       []byte      `json:"messages"`
+	Skipped        bool        `json:"skipped"`
+	InvoiceID      pgtype.Int8 `json:"invoice_id"`
+	Duplicate      bool        `json:"duplicate"`
+}
+
+type ExcelImportTemplate struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	Scope          string             `json:"scope"`
+	OrganizationID pgtype.Int8        `json:"organization_id"`
+	TaxpayerID     pgtype.Int8        `json:"taxpayer_id"`
+	Fingerprint    string             `json:"fingerprint"`
+	DataType       string             `json:"data_type"`
+	SourceSystem   string             `json:"source_system"`
+	HeaderRow      int32              `json:"header_row"`
+	Columns        []byte             `json:"columns"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ExportJob struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

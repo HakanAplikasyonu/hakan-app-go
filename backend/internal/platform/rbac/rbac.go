@@ -73,6 +73,10 @@ const (
 	PermTenantReviewRead          = "tenant.review.read"
 	PermTenantReviewDecide        = "tenant.review.decide"
 	PermTenantReviewSettingsWrite = "tenant.review.settings.write"
+	// Excel içe aktarma (issue #22).
+	PermTenantExcelImportsRead   = "tenant.excel_imports.read"
+	PermTenantExcelImportsWrite  = "tenant.excel_imports.write"
+	PermTenantExcelImportsCommit = "tenant.excel_imports.commit"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

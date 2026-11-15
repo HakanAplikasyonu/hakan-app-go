@@ -7,6 +7,8 @@ import (
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
+	excelimportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport"
+	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
@@ -28,6 +30,7 @@ type moduleHandlers struct {
 	ai       *aihandler.Handler
 	warnings *warningshandler.Handler
 	review   *reviewhandler.Handler
+	excel    *excelimporthandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -44,5 +47,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		aimodule.Module{H: h.ai},
 		warningsmodule.Module{H: h.warnings, Engagements: h.engagements},
 		reviewmodule.Module{H: h.review, Engagements: h.engagements},
+		excelimportmodule.Module{H: h.excel, Engagements: h.engagements},
 	}
 }
