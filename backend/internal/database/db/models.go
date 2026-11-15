@@ -421,6 +421,19 @@ type RolePermission struct {
 	PermissionID int64 `json:"permission_id"`
 }
 
+type SecretRecord struct {
+	ID         int64              `json:"id"`
+	Uuid       uuid.UUID          `json:"uuid"`
+	Purpose    string             `json:"purpose"`
+	Alg        string             `json:"alg"`
+	KekID      string             `json:"kek_id"`
+	WrappedDek []byte             `json:"wrapped_dek"`
+	Ciphertext []byte             `json:"ciphertext"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	RotatedAt  pgtype.Timestamptz `json:"rotated_at"`
+}
+
 type StepupSetting struct {
 	ID                        int16              `json:"id"`
 	TtlHours                  int32              `json:"ttl_hours"`
