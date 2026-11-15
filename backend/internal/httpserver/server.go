@@ -56,6 +56,9 @@ import (
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/qrlogin"
+	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
+	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
+	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	searchhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/handler"
 	searchusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/usecase"
 	settingsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/settings"
@@ -396,6 +399,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		)),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))),
+		// Appliers are registered by the modules that own suggestion targets.
+		review:      reviewhandler.New(reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)), activityRec),
 		engagements: engagementResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)

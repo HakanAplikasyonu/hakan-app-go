@@ -9,6 +9,8 @@ import (
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
+	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
+	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
 	searchhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/handler"
 	warningsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings"
@@ -25,6 +27,7 @@ type moduleHandlers struct {
 	logs     *logshandler.Handler
 	ai       *aihandler.Handler
 	warnings *warningshandler.Handler
+	review   *reviewhandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -40,5 +43,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		logsmodule.Module{H: h.logs},
 		aimodule.Module{H: h.ai},
 		warningsmodule.Module{H: h.warnings, Engagements: h.engagements},
+		reviewmodule.Module{H: h.review, Engagements: h.engagements},
 	}
 }
