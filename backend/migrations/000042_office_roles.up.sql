@@ -17,13 +17,13 @@
 --     Yalnızca şablona yazılan izin var olan ofislere ulaşmaz.
 
 INSERT INTO roles (name, slug, description, is_system, scope, organization_id) VALUES
-    ('Mali Müşavir', 'accountant', 'Tenant accountant template role', true, 'tenant', NULL),
-    ('Stajyer', 'intern', 'Tenant intern template role', true, 'tenant', NULL)
+    ('Mali Müşavir', 'accountant', 'Atandığı mükellefleri yönetir', true, 'tenant', NULL),
+    ('Stajyer', 'intern', 'Atandığı mükellefleri yalnızca görüntüler', true, 'tenant', NULL)
 ON CONFLICT (slug) WHERE scope = 'tenant' AND organization_id IS NULL DO NOTHING;
 
-UPDATE roles SET name = 'Sahip' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'owner';
-UPDATE roles SET name = 'Yönetici' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'admin';
-UPDATE roles SET name = 'Personel' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'member';
+UPDATE roles SET name = 'Sahip', description = 'Ofisteki bütün yetkiler' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'owner';
+UPDATE roles SET name = 'Yönetici', description = 'Rol tanımı dışında bütün yetkiler' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'admin';
+UPDATE roles SET name = 'Personel', description = 'Atandığı mükelleflerde günlük işler' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'member';
 
 -- Mali müşavir: personelin izinleri + engagement yönetimi (atama hariç
 -- read_all yok: yalnızca atandığı mükellefleri görür).
@@ -61,6 +61,8 @@ BEGIN
     SELECT t.name, t.slug, t.description, true, 'tenant', p_organization_id
     FROM roles t
     WHERE t.scope = 'tenant' AND t.organization_id IS NULL
+    ORDER BY CASE t.slug WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 WHEN 'accountant' THEN 3
+                         WHEN 'member' THEN 4 WHEN 'intern' THEN 5 ELSE 6 END, t.id
     ON CONFLICT (organization_id, slug) WHERE scope = 'tenant' AND organization_id IS NOT NULL DO NOTHING;
 
     INSERT INTO role_permissions (role_id, permission_id)

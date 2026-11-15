@@ -35,6 +35,6 @@ DELETE FROM organization_members om USING roles r
 WHERE om.role_id = r.id AND r.slug IN ('accountant', 'intern') AND r.scope = 'tenant';
 DELETE FROM roles WHERE scope = 'tenant' AND organization_id IS NULL AND slug IN ('accountant', 'intern');
 
-UPDATE roles SET name = 'Organization Owner' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'owner';
-UPDATE roles SET name = 'Organization Admin' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'admin';
-UPDATE roles SET name = 'Organization Member' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'member';
+UPDATE roles SET name = 'Organization Owner', description = 'Tenant owner template role' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'owner';
+UPDATE roles SET name = 'Organization Admin', description = 'Tenant admin template role' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'admin';
+UPDATE roles SET name = 'Organization Member', description = 'Tenant member template role' WHERE scope = 'tenant' AND organization_id IS NULL AND slug = 'member';
