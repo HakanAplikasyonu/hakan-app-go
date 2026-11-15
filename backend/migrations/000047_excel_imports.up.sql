@@ -100,6 +100,9 @@ CREATE TABLE excel_import_rows (
     CONSTRAINT chk_excel_import_rows_result CHECK (result IN ('ok', 'warning', 'error', 'skipped'))
 );
 
+-- RLS (issue #6): engagement kapsamlı iki tablo.
+SELECT rls_apply_engagement(t) FROM unnest(ARRAY['excel_imports', 'excel_import_rows']::regclass[]) AS t;
+
 INSERT INTO permissions (name, slug) VALUES
     ('Read tenant Excel imports', 'tenant.excel_imports.read'),
     ('Write tenant Excel imports', 'tenant.excel_imports.write'),
