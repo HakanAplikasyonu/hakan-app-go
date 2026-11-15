@@ -308,6 +308,44 @@ type BankTransactionSource struct {
 	ReceivedAt        pgtype.Timestamptz `json:"received_at"`
 }
 
+type BillingPlan struct {
+	ID                int64              `json:"id"`
+	Code              string             `json:"code"`
+	Name              string             `json:"name"`
+	Currency          string             `json:"currency"`
+	BaseFee           pgtype.Numeric     `json:"base_fee"`
+	PerTaxpayerFee    pgtype.Numeric     `json:"per_taxpayer_fee"`
+	IncludedTaxpayers int32              `json:"included_taxpayers"`
+	VatRate           pgtype.Numeric     `json:"vat_rate"`
+	Active            bool               `json:"active"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BillingStatement struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	Period            string             `json:"period"`
+	PlanCode          string             `json:"plan_code"`
+	PlanSnapshot      []byte             `json:"plan_snapshot"`
+	ActiveTaxpayers   int32              `json:"active_taxpayers"`
+	BillableTaxpayers int32              `json:"billable_taxpayers"`
+	Currency          string             `json:"currency"`
+	BaseFee           pgtype.Numeric     `json:"base_fee"`
+	TaxpayerFeeTotal  pgtype.Numeric     `json:"taxpayer_fee_total"`
+	Subtotal          pgtype.Numeric     `json:"subtotal"`
+	VatRate           pgtype.Numeric     `json:"vat_rate"`
+	VatAmount         pgtype.Numeric     `json:"vat_amount"`
+	Total             pgtype.Numeric     `json:"total"`
+	Status            string             `json:"status"`
+	Lines             []byte             `json:"lines"`
+	Taxpayers         []byte             `json:"taxpayers"`
+	GeneratedAt       pgtype.Timestamptz `json:"generated_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BulkChange struct {
 	ID           int64              `json:"id"`
 	Uuid         uuid.UUID          `json:"uuid"`
@@ -1041,6 +1079,16 @@ type Organization struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type OrganizationBilling struct {
+	OrganizationID int64              `json:"organization_id"`
+	PlanID         int64              `json:"plan_id"`
+	ReadOnly       bool               `json:"read_only"`
+	ReadOnlyReason string             `json:"read_only_reason"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrganizationInvitation struct {

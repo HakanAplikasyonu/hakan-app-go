@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -51,6 +52,13 @@ func RequireOrganization(resolver orgctx.Resolver) func(http.Handler) http.Handl
 				return
 			}
 			tagOrganization(r, scope)
+			if pol := organizationPolicy; pol != nil {
+				if err := pol.Check(r.Context(), scope, r); err != nil {
+					response.RecordFailure(w, err)
+					response.Error(w, r, http.StatusForbidden, CodeOrganizationReadOnly, err.Error())
+					return
+				}
+			}
 			next.ServeHTTP(w, r.WithContext(orgctx.WithScope(r.Context(), scope)))
 		})
 	}
@@ -107,3 +115,19 @@ func tagOrganization(r *http.Request, scope orgctx.Scope) {
 		hub.Scope().SetTag("organization_uuid", scope.UUID.String())
 	}
 }
+
+// CodeOrganizationReadOnly answers a write while the organization is in
+// read-only mode (billing AccessPolicy, issue #52).
+const CodeOrganizationReadOnly = "ORGANIZATION_READ_ONLY"
+
+// OrganizationPolicy is an extra check after the organization resolves
+// (G7 / A10: the billing module puts an office in read-only mode). A non-nil
+// error refuses the request with 403 ORGANIZATION_READ_ONLY.
+type OrganizationPolicy interface {
+	Check(ctx context.Context, scope orgctx.Scope, r *http.Request) error
+}
+
+var organizationPolicy OrganizationPolicy
+
+// SetOrganizationPolicy installs the policy (once, at start-up).
+func SetOrganizationPolicy(p OrganizationPolicy) { organizationPolicy = p }
