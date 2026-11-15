@@ -141,6 +141,8 @@ const (
 	TenantMemberAdded      = "tenant.member_added"
 	TenantInvitation       = "tenant.invitation"
 	TaxpayerInvitation     = "taxpayer.invitation"
+	DocTasksCreated        = "doc_tasks.created"
+	DocTasksReminder       = "doc_tasks.reminder"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
 	NotificationsSent      = "notifications.sent"
@@ -315,6 +317,8 @@ func catalogConstants() []string {
 		TenantMemberAdded,
 		TenantInvitation,
 		TaxpayerInvitation,
+		DocTasksCreated,
+		DocTasksReminder,
 		NotificationsTest,
 		NotificationsQueued,
 		NotificationsSent,

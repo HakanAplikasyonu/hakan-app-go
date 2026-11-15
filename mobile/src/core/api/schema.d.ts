@@ -4904,6 +4904,305 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List missing-document tasks of an engagement (newest first)
+         * @description Requires `tenant.doc_tasks.read` and engagement access. `status`
+         *     defaults to `open`; `all` lists every status.
+         */
+        get: operations["listTenantDocumentTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/detect": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the missing-document control for a period
+         * @description Requires `tenant.doc_tasks.write`. Producer `control:missing_document`
+         *     (21 §6.3): an outgoing `supplier_payment` without a document raises
+         *     `BNK_UNDOCUMENTED_PAYMENT`, an incoming `customer_collection` without a
+         *     document raises `BNK_UNINVOICED_COLLECTION` (entity
+         *     `bank_transaction`). A movement that is matched in banking, ignored,
+         *     cancelled or has a document uploaded by the mükellef is
+         *     auto-resolved; open tasks of such movements are closed
+         *     (`cancel_reason=resolved`).
+         */
+        post: operations["detectTenantMissingDocuments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/generate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open tasks for the mükellef from open BNK_* warnings
+         * @description Requires `tenant.doc_tasks.write`. Opens one task per bank
+         *     transaction with an open `BNK_UNDOCUMENTED_PAYMENT` /
+         *     `BNK_UNINVOICED_COLLECTION` warning (optionally limited to `period`
+         *     and `warning_uuids`). A transaction that already has an open task is
+         *     skipped. With `period`, detection runs first unless `detect=false`.
+         *     The mükellef's members get an in-app (mobile push) and email
+         *     notification; reminders follow with backoff.
+         */
+        post: operations["generateTenantDocumentTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a task with its uploads
+         * @description Requires `tenant.doc_tasks.read`.
+         */
+        get: operations["getTenantDocumentTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an open task
+         * @description Requires `tenant.doc_tasks.write`. A matched or cancelled task answers `409 TASK_CLOSED`.
+         */
+        post: operations["cancelTenantDocumentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/uploads/{uploadUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+                uploadUuid: components["parameters"]["DocumentTaskUploadUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a file the mükellef uploaded
+         * @description Requires `tenant.doc_tasks.read`. Always served as an attachment.
+         */
+        get: operations["downloadTenantDocumentTaskUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/document-tasks": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My document tasks (soonest due first)
+         * @description Tasks of the mükellef's active engagement only; an earlier office's
+         *     tasks are not listed. Any mükellef member (owner, employee) may read.
+         *     `status` defaults to `open`.
+         */
+        get: operations["listTaxpayerDocumentTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/document-tasks/{taskUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        /** One of my document tasks with its uploads */
+        get: operations["getTaxpayerDocumentTask"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/document-tasks/{taskUuid}/uploads": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a photo or PDF for a task
+         * @description Accepts JPEG, PNG, WebP, HEIC or PDF (checked by content, max 20 MB).
+         *     The file is stored as an attachment (deduplicated by SHA-256), matched
+         *     to the task's bank transaction and the control re-runs, so the
+         *     `BNK_*` warning becomes `auto_resolved` and the task `matched`. If the
+         *     bank transaction was cancelled meanwhile, the task becomes
+         *     `submitted` for the office to review. A matched or cancelled task
+         *     answers `409 TASK_CLOSED`.
+         */
+        post: operations["uploadTaxpayerDocumentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/document-tasks/{taskUuid}/uploads/{uploadUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+                uploadUuid: components["parameters"]["DocumentTaskUploadUuid"];
+            };
+            cookie?: never;
+        };
+        /** Download a file uploaded for my task */
+        get: operations["downloadTaxpayerDocumentTaskUpload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7821,6 +8120,135 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
+        DocumentTaskBankTransaction: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            transaction_date: string;
+            /** @enum {string} */
+            direction: "in" | "out";
+            /**
+             * @description Decimal string
+             * @example 1250.00
+             */
+            amount: string;
+            /** @example TRY */
+            currency: string;
+            counterparty_name: string | null;
+            description: string;
+        };
+        DocumentTaskUpload: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            attachment_uuid: string;
+            /** @enum {string} */
+            kind: "image" | "pdf";
+            content_type: string | null;
+            file_name: string | null;
+            /** Format: int64 */
+            size_bytes: number;
+            sha256: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /**
+         * @description A missing-document request. `reminder_count`, `last_reminded_at`,
+         *     `next_reminder_at`, `cancelled_at` and `cancel_reason` are office
+         *     only; `organization_name` is set on the mükellef side.
+         */
+        DocumentTask: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            code: "BNK_UNDOCUMENTED_PAYMENT" | "BNK_UNINVOICED_COLLECTION";
+            /** @enum {string} */
+            kind: "undocumented_payment" | "uninvoiced_collection";
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            status: "open" | "submitted" | "matched" | "cancelled";
+            note: string;
+            /** Format: date-time */
+            due_at: string;
+            overdue: boolean;
+            organization_name?: string;
+            reminder_count?: number;
+            /** Format: date-time */
+            last_reminded_at?: string | null;
+            /** Format: date-time */
+            next_reminder_at?: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: date-time */
+            matched_at: string | null;
+            /** Format: date-time */
+            cancelled_at?: string | null;
+            cancel_reason?: string | null;
+            bank_transaction: components["schemas"]["DocumentTaskBankTransaction"];
+            /** Format: int64 */
+            upload_count: number;
+            /** @description Detail views only */
+            uploads?: components["schemas"]["DocumentTaskUpload"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        MissingDocumentDetection: {
+            checked: number;
+            created: number;
+            refreshed: number;
+            suppressed: number;
+            disabled: number;
+            auto_resolved: number;
+            tasks_closed: number;
+        };
+        EnvelopeDocumentTask: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["DocumentTask"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeDocumentTaskList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["DocumentTask"][];
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeMissingDocumentDetection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["MissingDocumentDetection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeDocumentTaskGenerate: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                detection?: components["schemas"]["MissingDocumentDetection"];
+                created: number;
+                /** @description Members notified */
+                notified: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeDocumentTaskUploadResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                task: components["schemas"]["DocumentTask"];
+                upload: components["schemas"]["DocumentTaskUpload"];
+                matched: boolean;
+                warning_resolved: boolean;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
     };
     responses: {
         /** @description Validation or malformed request */
@@ -7948,6 +8376,8 @@ export interface components {
         /** @description Dönem (YYYY-MM) */
         PeriodPath: string;
         ChangeRequestUuid: string;
+        DocumentTaskUuid: string;
+        DocumentTaskUploadUuid: string;
     };
     requestBodies: never;
     headers: never;
@@ -15636,6 +16066,434 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantDocumentTasks: {
+        parameters: {
+            query?: {
+                status?: "open" | "submitted" | "matched" | "cancelled" | "all";
+                period?: string;
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTaskList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    detectTenantMissingDocuments: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Detection report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingDocumentDetection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    generateTenantDocumentTasks: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    period?: string;
+                    warning_uuids?: string[];
+                    /** @description Default: true when period is set */
+                    detect?: boolean;
+                    /** @default 7 */
+                    due_days?: number;
+                    /** @description Shown to the mükellef */
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTaskGenerate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelTenantDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Cancelled task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadTenantDocumentTaskUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+                uploadUuid: components["parameters"]["DocumentTaskUploadUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerDocumentTasks: {
+        parameters: {
+            query?: {
+                status?: "open" | "submitted" | "matched" | "cancelled" | "all";
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTaskList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadTaxpayerDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded (and matched) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTaskUploadResult"];
+                };
+            };
+            /** @description `FILE_REQUIRED`, `FILE_EMPTY`, `FILE_UNREADABLE` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description File too large (`UPLOAD_TOO_LARGE`) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an image or PDF (`UNSUPPORTED_FILE`) */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadTaxpayerDocumentTaskUpload: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+                uploadUuid: components["parameters"]["DocumentTaskUploadUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

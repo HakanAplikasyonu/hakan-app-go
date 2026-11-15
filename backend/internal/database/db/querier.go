@@ -33,12 +33,15 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
 	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
 	ClearAppSettingsLogo(ctx context.Context) (AppSetting, error)
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
+	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
+	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
@@ -51,6 +54,7 @@ type Querier interface {
 	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
+	CountDocumentTasks(ctx context.Context, arg CountDocumentTasksParams) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
@@ -78,6 +82,8 @@ type Querier interface {
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
+	// tenant-lint: cross-org mükellef kendi görevlerini sayar; taxpayer_id ve aktif engagement ile sınırlı
+	CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
 	CountTaxpayerReceiptCaptures(ctx context.Context, taxpayerID int64) (int64, error)
@@ -90,6 +96,9 @@ type Querier interface {
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
+	// Açık BNK_* uyarılarından görev açar. Hareket başına tek açık görev
+	// (uq_document_tasks_active); var olanlar atlanır.
+	CreateDocumentTasksFromWarnings(ctx context.Context, arg CreateDocumentTasksFromWarningsParams) ([]int64, error)
 	CreateEngagement(ctx context.Context, arg CreateEngagementParams) (Engagement, error)
 	// Excel içe aktarma (issue #22).
 	CreateExcelImport(ctx context.Context, arg CreateExcelImportParams) (ExcelImport, error)
@@ -229,6 +238,9 @@ type Querier interface {
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
+	GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams) (GetDocumentTaskRow, error)
+	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
+	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -250,6 +262,7 @@ type Querier interface {
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
 	GetLatestDataWarning(ctx context.Context, arg GetLatestDataWarningParams) (DataWarning, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
+	GetMissingDocumentCandidate(ctx context.Context, arg GetMissingDocumentCandidateParams) (GetMissingDocumentCandidateRow, error)
 	GetNotificationByID(ctx context.Context, id int64) (Notification, error)
 	GetNotificationByUUID(ctx context.Context, argUuid uuid.UUID) (Notification, error)
 	GetNotificationPreferences(ctx context.Context, userID int64) (NotificationPreference, error)
@@ -293,6 +306,10 @@ type Querier interface {
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
 	GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Taxpayer, error)
+	// tenant-lint: cross-org mükellef kendi görevini okur; taxpayer_id ve aktif engagement ile sınırlı
+	GetTaxpayerDocumentTask(ctx context.Context, arg GetTaxpayerDocumentTaskParams) (GetTaxpayerDocumentTaskRow, error)
+	// tenant-lint: cross-org mükellef tarafı yükleme indirme; taxpayer_id ve aktif engagement ile sınırlı
+	GetTaxpayerDocumentTaskUploadFile(ctx context.Context, arg GetTaxpayerDocumentTaskUploadFileParams) (GetTaxpayerDocumentTaskUploadFileRow, error)
 	// GetTaxpayerForOfficeMember is the office-side access rule for taxpayer
 	// data (docs/01 §2.3): the taxpayer is returned only through an ACTIVE
 	// engagement of this organization, and only to a member assigned to it or
@@ -332,6 +349,7 @@ type Querier interface {
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
+	InsertBankTransactionDocument(ctx context.Context, arg InsertBankTransactionDocumentParams) error
 	InsertBankTransactionMatch(ctx context.Context, arg InsertBankTransactionMatchParams) (BankTransactionMatch, error)
 	InsertBankTransactionSource(ctx context.Context, arg InsertBankTransactionSourceParams) error
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
@@ -339,6 +357,7 @@ type Querier interface {
 	InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (CashBox, error)
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
+	InsertDocumentTaskUpload(ctx context.Context, arg InsertDocumentTaskUploadParams) (DocumentTaskUpload, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
@@ -369,6 +388,7 @@ type Querier interface {
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
@@ -410,6 +430,15 @@ type Querier interface {
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
 	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
+	ListDocumentTaskRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
+	ListDocumentTaskUploads(ctx context.Context, arg ListDocumentTaskUploadsParams) ([]ListDocumentTaskUploadsRow, error)
+	ListDocumentTasks(ctx context.Context, arg ListDocumentTasksParams) ([]ListDocumentTasksRow, error)
+	// ---------------------------------------------------------------------------
+	// Hatırlatma (zamanlanmış iş).
+	// ---------------------------------------------------------------------------
+	// tenant-lint: cross-org zamanlanmış hatırlatma işi bütün ofislerin vadesi gelen görevlerini tarar
+	// Hatırlatması gelen açık görevler, engagement başına toplanır.
+	ListDueDocumentTaskReminders(ctx context.Context, arg ListDueDocumentTaskRemindersParams) ([]ListDueDocumentTaskRemindersRow, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
@@ -445,6 +474,11 @@ type Querier interface {
 	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
 	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
+	// Eksik belge görevi (issue #36). Banka tabloları yalnızca okunur.
+	// Kontrolün baktığı hareketler: dönemin tedarikçi ödemesi / müşteri
+	// tahsilatı hareketleri ve bu üreticinin hâlâ açık uyarısı olan hareketler
+	// (sınıflandırma değiştiyse uyarı kapanabilsin diye).
+	ListMissingDocumentCandidates(ctx context.Context, arg ListMissingDocumentCandidatesParams) ([]ListMissingDocumentCandidatesRow, error)
 	// Email rows stay out of the inbox: their bodies carry one-time codes and
 	// invitation links that must only reach the mailbox, not the account holder.
 	ListNotificationsForUser(ctx context.Context, arg ListNotificationsForUserParams) ([]Notification, error)
@@ -501,6 +535,13 @@ type Querier interface {
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	ListSuggestionDecisions(ctx context.Context, arg ListSuggestionDecisionsParams) ([]ListSuggestionDecisionsRow, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
+	// ---------------------------------------------------------------------------
+	// Mükellef tarafı (/v1/taxpayer/*). Kapsam X-Taxpayer üyeliğidir: görevler
+	// taxpayer_id ile ve yalnızca mükellefin AKTİF engagement'ından okunur.
+	// Bitmiş engagement'ın (eski ofisin) görevleri görünmez (D1, D2).
+	// ---------------------------------------------------------------------------
+	// tenant-lint: cross-org mükellef kendi görevlerini görür; taxpayer_id ve aktif engagement ile sınırlı
+	ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpayerDocumentTasksParams) ([]ListTaxpayerDocumentTasksRow, error)
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
 	// Mükellef web paneli (issue #39). Her sorgu X-Taxpayer ile çözülen
 	// mükellefin taxpayer_id'siyle sınırlıdır; ofis bağlamı (organization_id)
@@ -542,11 +583,16 @@ type Querier interface {
 	LockOnboardingRequest(ctx context.Context, id int64) (TaxpayerOnboardingRequest, error)
 	LockOrganizationRow(ctx context.Context, id int64) (Organization, error)
 	LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
+	// tenant-lint: cross-org mükellef yüklemesi için görevi kilitler; taxpayer_id ve aktif engagement ile sınırlı
+	LockTaxpayerDocumentTask(ctx context.Context, arg LockTaxpayerDocumentTaskParams) (LockTaxpayerDocumentTaskRow, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	MarkBulkJobCompleted(ctx context.Context, arg MarkBulkJobCompletedParams) (BulkJob, error)
 	MarkBulkJobFailed(ctx context.Context, arg MarkBulkJobFailedParams) (BulkJob, error)
 	MarkBulkJobProcessing(ctx context.Context, id int64) (BulkJob, error)
 	MarkBulkJobRolledBack(ctx context.Context, arg MarkBulkJobRolledBackParams) (BulkJob, error)
+	// Geri çekilme: n. hatırlatmadan sonra bir sonraki base_days * 2^n gün sonra;
+	// max_reminders'a ulaşınca hatırlatma biter (next_reminder_at NULL).
+	MarkDocumentTasksReminded(ctx context.Context, arg MarkDocumentTasksRemindedParams) (int64, error)
 	MarkExcelImportCommitted(ctx context.Context, arg MarkExcelImportCommittedParams) (ExcelImport, error)
 	MarkExcelImportRolledBack(ctx context.Context, arg MarkExcelImportRolledBackParams) (ExcelImport, error)
 	MarkExportJobCompleted(ctx context.Context, arg MarkExportJobCompletedParams) (ExportJob, error)
@@ -618,6 +664,8 @@ type Querier interface {
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
+	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
+	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)

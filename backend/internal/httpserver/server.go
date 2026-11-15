@@ -37,6 +37,7 @@ import (
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
@@ -368,6 +369,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
 	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, taxpayerportal.NewHandler(deps.Queries, ublSvc))
+	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
+	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
+		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log)
+	if s.worker != nil {
+		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
+	}
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)
@@ -457,7 +464,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
+		doctasks:    doctasksmodule.NewHandler(docTasksSvc),
 		engagements: engagementResolver,
+		taxpayers:   taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}

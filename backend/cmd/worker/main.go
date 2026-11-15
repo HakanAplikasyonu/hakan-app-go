@@ -11,6 +11,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
@@ -147,6 +148,8 @@ func main() {
 		WithImport(importSvc.ProcessImport).
 		WithBulk(bulkSvc.ProcessBulk).
 		WithUBLUpload(invoiceupload.New(pool, store, nil, log).Process).
+		WithDocTaskReminders(doctasksmodule.New(pool, store, notifSvc,
+			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
 		WithSearch(
@@ -166,6 +169,10 @@ func main() {
 	}
 	if err := queue.RegisterPushReceiptsSchedule(scheduler); err != nil {
 		log.Error("push_receipts_scheduler_failed", "error", err)
+		exit(1)
+	}
+	if err := queue.RegisterDocTaskRemindersSchedule(scheduler); err != nil {
+		log.Error("doc_task_reminders_scheduler_failed", "error", err)
 		exit(1)
 	}
 	go func() {

@@ -232,6 +232,17 @@ type BankTransaction struct {
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankTransactionDocument struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	AttachmentID      int64              `json:"attachment_id"`
+	Method            string             `json:"method"`
+	MatchedBy         pgtype.Int8        `json:"matched_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
 type BankTransactionMatch struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`
@@ -391,6 +402,45 @@ type DataWarning struct {
 	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type DocumentTask struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	WarningID         pgtype.Int8        `json:"warning_id"`
+	Code              string             `json:"code"`
+	Kind              string             `json:"kind"`
+	Period            string             `json:"period"`
+	Status            string             `json:"status"`
+	Note              string             `json:"note"`
+	DueAt             pgtype.Timestamptz `json:"due_at"`
+	ReminderCount     int32              `json:"reminder_count"`
+	LastRemindedAt    pgtype.Timestamptz `json:"last_reminded_at"`
+	NextReminderAt    pgtype.Timestamptz `json:"next_reminder_at"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	SubmittedAt       pgtype.Timestamptz `json:"submitted_at"`
+	MatchedAt         pgtype.Timestamptz `json:"matched_at"`
+	CancelledAt       pgtype.Timestamptz `json:"cancelled_at"`
+	CancelledBy       pgtype.Int8        `json:"cancelled_by"`
+	CancelReason      pgtype.Text        `json:"cancel_reason"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type DocumentTaskUpload struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	TaskID         int64              `json:"task_id"`
+	AttachmentID   int64              `json:"attachment_id"`
+	UploadedBy     pgtype.Int8        `json:"uploaded_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type Engagement struct {
