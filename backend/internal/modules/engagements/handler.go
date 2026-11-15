@@ -1,7 +1,6 @@
 package engagements
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -13,8 +12,6 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 	"github.com/google/uuid"
 )
-
-const maxBodyBytes = 4 << 10
 
 // Handler serves /v1/tenant/engagements.
 type Handler struct{ svc *Service }
@@ -39,24 +36,6 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, page{Items: items, Total: total, Limit: limit, Offset: offset})
-}
-
-type createRequest struct {
-	TaxpayerUUID uuid.UUID `json:"taxpayer_uuid"`
-}
-
-func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
-	s := orgctx.Must(r.Context())
-	var req createRequest
-	if !decode(w, r, &req) {
-		return
-	}
-	e, err := h.svc.Create(r.Context(), s.ID, req.TaxpayerUUID)
-	if err != nil {
-		writeError(w, r, err)
-		return
-	}
-	response.JSON(w, r, http.StatusCreated, e)
 }
 
 func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
@@ -172,14 +151,4 @@ func pathUUID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, b
 		return uuid.Nil, false
 	}
 	return id, true
-}
-
-func decode(w http.ResponseWriter, r *http.Request, dst any) bool {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	dec.DisallowUnknownFields()
-	if err := dec.Decode(dst); err != nil {
-		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
-		return false
-	}
-	return true
 }

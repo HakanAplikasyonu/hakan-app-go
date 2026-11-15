@@ -113,6 +113,9 @@ export const routes = {
     roles: (slug: string) => `/t/${encodeURIComponent(slug)}/roles`,
     settings: (slug: string) => `/t/${encodeURIComponent(slug)}/settings`,
     taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
+    /** "Mükellef ekle": consent requests the office sent (issue #7). */
+    taxpayerRequests: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/taxpayer-requests`,
     invoices: (slug: string) => `/t/${encodeURIComponent(slug)}/invoices`,
     invoice: (slug: string, id: string) =>
       `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}`,
@@ -132,6 +135,8 @@ export const routes = {
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,
   /** Mükellef invitation link sent by an office (public). */
   inviteTaxpayer: (token: string) => `/invite/m/${encodeURIComponent(token)}`,
+  /** Consent link an office's add-mükellef request emails (public). */
+  consent: (token: string) => `/consent/${encodeURIComponent(token)}`,
   errors: {
     unauthorized: "/unauthorized",
     forbidden: "/forbidden",

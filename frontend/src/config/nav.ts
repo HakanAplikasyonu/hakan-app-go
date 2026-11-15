@@ -5,6 +5,7 @@ import {
   FileText,
   TriangleAlert,
   Building2,
+  UserPlus,
   UsersRound,
   Cpu,
   Download,
@@ -289,6 +290,13 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.nav_taxpayers",
             href: routes.tenant.taxpayers(slug),
             icon: Building2,
+          },
+          {
+            id: "taxpayer-requests",
+            titleKey: "onboarding.nav_title",
+            href: routes.tenant.taxpayerRequests(slug),
+            icon: UserPlus,
+            permission: permissions.tenant.engagements.read,
           },
           {
             id: "invoices",

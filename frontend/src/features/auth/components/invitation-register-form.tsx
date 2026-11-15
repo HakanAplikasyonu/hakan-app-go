@@ -18,6 +18,7 @@ import {
   type RegisterFormValues,
 } from "@/features/auth/schemas";
 import { taxpayerInvitationService } from "@/features/taxpayer/services/taxpayer.service";
+import { taxpayerConsentService } from "@/features/taxpayer-onboarding/services/taxpayer-onboarding.service";
 import { invitationService } from "@/features/tenant/services/tenant.service";
 import { isApiError } from "@/lib/api";
 import {
@@ -33,17 +34,20 @@ import { authService } from "@/services/auth.service";
 import { AuthCard } from "./auth-card";
 
 type InvitationSummary = {
-  kind: "organization" | "taxpayer";
-  /** Organization name, or the company (taxpayer) title. */
+  kind: "organization" | "taxpayer" | "consent";
+  /**
+   * Organization name, the company (taxpayer) title, or for an office's
+   * add-mükellef consent request the office's name.
+   */
   name: string;
   email: string;
   status: string;
 };
 
 /**
- * Office invitations and mükellef invitations (issue #4) share the sign-up
- * form: the office one is tried first, a token it does not know is looked up
- * as a mükellef invitation.
+ * Office invitations, mükellef invitations (issue #4) and add-mükellef
+ * consent links (issue #7) share the sign-up form: each is tried in turn,
+ * moving on only when the previous one does not know the token.
  */
 async function previewAny(token: string): Promise<InvitationSummary> {
   try {
@@ -56,6 +60,8 @@ async function previewAny(token: string): Promise<InvitationSummary> {
     };
   } catch (error) {
     if (!isApiError(error) || !error.isNotFound) throw error;
+  }
+  try {
     const inv = await taxpayerInvitationService.preview(token);
     return {
       kind: "taxpayer",
@@ -63,6 +69,29 @@ async function previewAny(token: string): Promise<InvitationSummary> {
       email: inv.email,
       status: inv.status,
     };
+  } catch (error) {
+    if (!isApiError(error) || !error.isNotFound) throw error;
+  }
+  const consent = await taxpayerConsentService.preview(token);
+  return {
+    kind: "consent",
+    name: consent.organization.name,
+    email: consent.contact_email,
+    status: consent.status,
+  };
+}
+
+function invitationHref(
+  kind: InvitationSummary["kind"] | undefined,
+  token: string,
+) {
+  switch (kind) {
+    case "taxpayer":
+      return routes.inviteTaxpayer(token);
+    case "consent":
+      return routes.consent(token);
+    default:
+      return routes.invite(token);
   }
 }
 
@@ -115,10 +144,7 @@ export function InvitationRegisterForm({
   }
 
   const invitation = preview.data;
-  const here =
-    invitation?.kind === "taxpayer"
-      ? routes.inviteTaxpayer(token)
-      : routes.invite(token);
+  const here = invitationHref(invitation?.kind, token);
   const target = safeNextPath(next, here);
   const loginHref = withNextPath(routes.guest.login, target);
   if (!invitation || invitation.status !== "pending") {
@@ -222,9 +248,10 @@ export function InvitationRegisterForm({
     }
   };
 
-  const title = t("auth.register.invited_title", {
-    name: invitation.name,
-  });
+  const title =
+    invitation.kind === "consent"
+      ? t("auth.register.consent_title", { name: invitation.name })
+      : t("auth.register.invited_title", { name: invitation.name });
 
   const loginLink = (
     <p className="text-muted-foreground text-center text-sm">
@@ -279,7 +306,11 @@ export function InvitationRegisterForm({
   return (
     <AuthCard
       title={title}
-      description={t("auth.register.invited_description", { email })}
+      description={
+        invitation.kind === "consent"
+          ? t("auth.register.consent_description", { email })
+          : t("auth.register.invited_description", { email })
+      }
     >
       <div className="space-y-4">
         {showPassword ? (

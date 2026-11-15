@@ -16,7 +16,8 @@ export const taxpayerQueryKeys = {
     ["taxpayer", uuid.toLowerCase(), "context"] as const,
 };
 
-async function request<T>(
+/** Fetch for taxpayer-side endpoints; `taxpayer` adds the `X-Taxpayer` header. */
+export async function taxpayerRequest<T>(
   method: string,
   path: string,
   options?: { body?: unknown; taxpayer?: string; silent?: boolean },
@@ -42,21 +43,25 @@ async function request<T>(
  * the header only on `/v1/taxpayer/*`.
  */
 export function fetchTaxpayerContext(uuid: string) {
-  return request<TaxpayerContextResponse>("GET", "/v1/taxpayer/context", {
-    taxpayer: uuid,
-    silent: true,
-  });
+  return taxpayerRequest<TaxpayerContextResponse>(
+    "GET",
+    "/v1/taxpayer/context",
+    {
+      taxpayer: uuid,
+      silent: true,
+    },
+  );
 }
 
 export const taxpayerInvitationService = {
   preview: (token: string) =>
-    request<TaxpayerInvitationPreview>(
+    taxpayerRequest<TaxpayerInvitationPreview>(
       "POST",
       "/v1/taxpayer-invitations/preview",
       { body: { token }, silent: true },
     ),
   accept: (token: string) =>
-    request<AcceptedTaxpayerInvitation>(
+    taxpayerRequest<AcceptedTaxpayerInvitation>(
       "POST",
       "/v1/taxpayer-invitations/accept",
       { body: { token } },

@@ -2143,6 +2143,74 @@ export interface paths {
         patch: operations["changeTenantMemberRole"];
         trace?: never;
     };
+    "/v1/tenant/taxpayer-requests": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's add-mükellef requests
+         * @description Requires `tenant.engagements.read`. Shows only what the office entered
+         *     and the request status. `engagement_uuid` is set once the mükellef
+         *     approved.
+         */
+        get: operations["getTenantTaxpayerRequests"];
+        put?: never;
+        /**
+         * Add a mükellef (sends a consent request)
+         * @description Requires `tenant.engagements.write`. Validates the VKN/TCKN offline
+         *     (format and check digit) and emails a consent link to
+         *     `contact_email`. **The answer never depends on whether the tax id is
+         *     already on the platform** (D1b): same status (`202`), same body shape
+         *     (`status: consent_requested`, echo of what the office sent) and a
+         *     response time padded to a fixed minimum. The platform's taxpayer
+         *     records are not read at all here. The engagement opens only when the
+         *     mükellef approves. Rate limited per office.
+         */
+        post: operations["postTenantTaxpayerRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/taxpayer-requests/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel a pending request
+         * @description Requires `tenant.engagements.write`.
+         */
+        delete: operations["deleteTenantTaxpayerRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements": {
         parameters: {
             query?: never;
@@ -2158,13 +2226,7 @@ export interface paths {
          */
         get: operations["listTenantEngagements"];
         put?: never;
-        /**
-         * Open an engagement with a taxpayer
-         * @description Requires `tenant.engagements.write`. A taxpayer has at most one active
-         *     engagement across all offices (`409 ENGAGEMENT_ALREADY_ACTIVE`).
-         *     Issue #7 moves this behind the taxpayer's consent.
-         */
-        post: operations["createTenantEngagement"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2821,6 +2883,156 @@ export interface paths {
          *     A later sync with the same condition does not reopen it.
          */
         post: operations["resolveEngagementWarning"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer-consents/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Describe a consent link
+         * @description Public; the token travels in the body. Rate limited per client IP.
+         */
+        post: operations["previewTaxpayerConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer-consents/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an office's add-mükellef request
+         * @description The signed-in account's email must be the request's `contact_email`
+         *     (new users sign up with the token first). Outcomes:
+         *     `approved` (the engagement is open; if the mükellef was with another
+         *     office, that engagement ends: office change, D2) and the user is an
+         *     owner of the company (`taxpayer_uuid`); or `forwarded` (the company
+         *     already has owner users and the caller is not one of them: they
+         *     approve from their own mükellef panel).
+         */
+        post: operations["approveTaxpayerConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer-consents/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline an office's add-mükellef request
+         * @description Same account rule as approve.
+         */
+        post: operations["rejectTaxpayerConsent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/onboarding-requests": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Offices asking to add this company
+         * @description Owners of the company (mükellef role `owner`) only; pending, unexpired requests for the company's own VKN/TCKN.
+         */
+        get: operations["getTaxpayerOnboardingRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/onboarding-requests/{uuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Owner approves an office's request
+         * @description Owners only. Opens the engagement (and ends one with another office, D2).
+         */
+        post: operations["approveTaxpayerOnboardingRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/onboarding-requests/{uuid}/reject": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Owner declines an office's request
+         * @description Owners only.
+         */
+        post: operations["rejectTaxpayerOnboardingRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5928,6 +6140,120 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TenantPermissionList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CreateTaxpayerRequestRequest: {
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            /** @description VKN (10) or TCKN (11); spaces, dots and dashes are ignored */
+            tax_id: string;
+            title: string;
+            /** Format: email */
+            contact_email: string;
+        };
+        TaxpayerRequest: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            /** Format: email */
+            contact_email: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Set after the mükellef approved
+             */
+            engagement_uuid: string | null;
+        };
+        TaxpayerRequestPage: {
+            items: components["schemas"]["TaxpayerRequest"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        TaxpayerRequestAccepted: {
+            /** @enum {string} */
+            status: "consent_requested";
+            request: components["schemas"]["TaxpayerRequest"];
+        };
+        TaxpayerConsentPreview: {
+            organization: {
+                name: string;
+            };
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            /** Format: email */
+            contact_email: string;
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+            /** Format: date-time */
+            expires_at: string;
+        };
+        TaxpayerConsentOutcome: {
+            /** @enum {string} */
+            status: "approved" | "forwarded";
+            /**
+             * Format: uuid
+             * @description Set when the caller can open the company (/m/{uuid})
+             */
+            taxpayer_uuid: string | null;
+        };
+        TaxpayerPendingRequest: {
+            /** Format: uuid */
+            uuid: string;
+            organization: {
+                name: string;
+            };
+            title: string;
+            tax_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+        };
+        TaxpayerPendingRequestList: {
+            items: components["schemas"]["TaxpayerPendingRequest"][];
+        };
+        EnvelopeTaxpayerRequestPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerRequestPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerRequestAccepted: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerRequestAccepted"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerConsentPreview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerConsentPreview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerConsentOutcome: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerConsentOutcome"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerPendingRequestList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerPendingRequestList"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEngagementContext: {
@@ -9860,6 +10186,104 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantTaxpayerRequests: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerRequestPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantTaxpayerRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTaxpayerRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent requested */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerRequestAccepted"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantTaxpayerRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantEngagements: {
         parameters: {
             query?: {
@@ -9891,42 +10315,6 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    createTenantEngagement: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CreateEngagementRequest"];
-            };
-        };
-        responses: {
-            /** @description Opened engagement */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeEngagement"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -10862,6 +11250,234 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewTaxpayerConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Consent request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerConsentPreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveTaxpayerConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerConsentOutcome"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `INVITATION_EMAIL_MISMATCH` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description `INVITATION_UNAVAILABLE` (decided, cancelled or expired) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rejectTaxpayerConsent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Declined */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `INVITATION_EMAIL_MISMATCH` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            /** @description `INVITATION_UNAVAILABLE` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerOnboardingRequests: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerPendingRequestList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveTaxpayerOnboardingRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerConsentOutcome"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVITATION_UNAVAILABLE` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rejectTaxpayerOnboardingRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declined */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVITATION_UNAVAILABLE` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
