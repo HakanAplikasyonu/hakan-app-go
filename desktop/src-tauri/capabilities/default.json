@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Ana pencere: olay dinleme ve uygulama komutları. Kabuk/dosya erişimi ön yüze açılmaz; sidecar yalnızca Rust'tan başlatılır.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

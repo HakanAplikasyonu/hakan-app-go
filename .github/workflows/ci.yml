@@ -48,6 +48,7 @@ jobs:
       contracts: ${{ steps.f.outputs.contracts }}
       infra: ${{ steps.f.outputs.infra }}
       mobile: ${{ steps.f.outputs.mobile }}
+      desktop: ${{ steps.f.outputs.desktop }}
       full: ${{ steps.f.outputs.full }}
       mobile_release: ${{ steps.f.outputs.mobile_release }}
       images: ${{ steps.f.outputs.images }}
@@ -64,7 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           backend=false; frontend=false; contracts=false
-          infra=false; mobile=false; full=false
+          infra=false; mobile=false; desktop=false; full=false
 
           if [ "$EVENT" != "push" ]; then
             # schedule / workflow_dispatch: no diff to compute, build everything.
@@ -129,8 +130,19 @@ jobs:
             done <<< "$files"
           fi
 
+          # HAKAN (#50): masaüstü. Go sidecar backend modülünü import ettiği
+          # için backend/pkg ve go.mod değişikliği de masaüstü işini çalıştırır.
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              case "$file" in
+                *.md) ;;
+                desktop/*|backend/pkg/*|backend/go.mod|backend/go.sum) desktop=true ;;
+              esac
+            done <<< "$files"
+          fi
+
           if [ "$full" = "true" ] || [ "$REF" = "refs/heads/main" ]; then
-            backend=true; frontend=true; contracts=true; infra=true; mobile=true
+            backend=true; frontend=true; contracts=true; infra=true; mobile=true; desktop=true
           fi
 
           # mobile_release: ONLY a real (non-doc) mobile/** diff. Never set by
@@ -153,12 +165,13 @@ jobs:
             echo "contracts=$contracts"
             echo "infra=$infra"
             echo "mobile=$mobile"
+            echo "desktop=$desktop"
             echo "full=$full"
             echo "mobile_release=$mobile_release"
             echo "images=$images"
           } >> "$GITHUB_OUTPUT"
 
-          echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile full=$full mobile_release=$mobile_release"
+          echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile desktop=$desktop full=$full mobile_release=$mobile_release"
 
   backend:
     needs: changes
@@ -526,6 +539,72 @@ jobs:
             exit 1
           fi
 
+  # HAKAN (#50): masaüstü (Tauri v2 kabuk + Go sidecar). Linux'ta derlenir
+  # ve test edilir; imzalı macOS/Windows paketleri desktop-release.yml'de.
+  desktop:
+    needs: changes
+    if: needs.changes.outputs.desktop == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: desktop/sidecar/go.mod
+          cache-dependency-path: |
+            desktop/sidecar/go.sum
+            backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: desktop/.nvmrc
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Sidecar vet + test
+        working-directory: desktop/sidecar
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::gofmt"; exit 1; }
+          go vet ./...
+          go test ./...
+      - name: Sidecar golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: desktop/sidecar
+      - name: Install
+        run: npm ci
+      - name: Build sidecar
+        run: npm run sidecar
+      - name: Linux packages for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libdbus-1-dev xvfb
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: rustfmt
+        working-directory: desktop/src-tauri
+        run: cargo fmt --check
+      - name: clippy
+        working-directory: desktop/src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test (shell ↔ Go sidecar)
+        working-directory: desktop/src-tauri
+        env:
+          HAKAN_SIDECAR_REQUIRED: "1"
+        run: cargo test
+      - name: Self-test (app opens, talks to sidecar)
+        working-directory: desktop/src-tauri
+        run: |
+          cargo build
+          out=$(xvfb-run -a target/debug/hakan-desktop --self-test | grep -E '^\{.*"ok":' | tail -1)
+          echo "$out"
+          echo "$out" | jq -e '.ok == true' >/dev/null
+
   # EAS release on a green main push, ONLY when mobile/** really changed
   # (changes.outputs.mobile_release). Skips green with a summary note when
   # mobile/ is absent, EXPO_TOKEN is unset, or app.json has no EAS projectId.
@@ -588,7 +667,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, mobile, image-build, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, mobile, desktop, image-build, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

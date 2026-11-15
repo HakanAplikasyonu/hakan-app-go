@@ -1,0 +1,4 @@
+/target/
+/gen/schemas
+# Go sidecar derleme çıktısı (scripts/build-sidecar.mjs)
+/binaries/
