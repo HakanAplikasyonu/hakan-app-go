@@ -56,6 +56,11 @@ const (
 	PermTenantMembersWrite                = "tenant.members.write"
 	PermTenantRolesRead                   = "tenant.roles.read"
 	PermTenantRolesWrite                  = "tenant.roles.write"
+	PermTenantEngagementsRead             = "tenant.engagements.read"
+	PermTenantEngagementsWrite            = "tenant.engagements.write"
+	// PermTenantEngagementsReadAll reaches every engagement of the office
+	// without an assignment (issue #2).
+	PermTenantEngagementsReadAll = "tenant.engagements.read_all"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

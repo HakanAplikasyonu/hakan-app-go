@@ -102,6 +102,26 @@ type BulkJob struct {
 	OrganizationID pgtype.Int8        `json:"organization_id"`
 }
 
+type Engagement struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Status         string             `json:"status"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	EndedAt        pgtype.Timestamptz `json:"ended_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type EngagementAssignment struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	UserID         int64              `json:"user_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type ExportJob struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -500,6 +520,13 @@ type StorageTrash struct {
 	DeletedBy   pgtype.Int8        `json:"deleted_by"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+}
+
+type Taxpayer struct {
+	ID        int64              `json:"id"`
+	Uuid      uuid.UUID          `json:"uuid"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {

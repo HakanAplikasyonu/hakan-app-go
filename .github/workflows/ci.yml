@@ -189,7 +189,7 @@ jobs:
       # Tenant izolasyon lint'i: tenant_tables.txt'deki her tablo sorgusu
       # organization_id ile kapsanmalı (internal/database/queries_test.go).
       - name: tenant_tables lint
-        run: go test ./internal/database/ -run TestTenantQueriesReferenceOrganization -count=1 -v
+        run: go test ./internal/database/ -run "TestTenantQueriesReferenceOrganization|TestLintCatchesMissingScopes" -count=1 -v
       - name: Test
         run: go test ./...
       - name: OpenAPI lint

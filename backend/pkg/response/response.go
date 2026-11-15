@@ -52,6 +52,9 @@ const (
 	CodeQRSessionClaimed          = "QR_SESSION_CLAIMED"
 	CodeQRLoginInvalid            = "QR_LOGIN_INVALID"
 	CodeLastSignInMethod          = "LAST_SIGN_IN_METHOD"
+	CodeNoEngagementAccess        = "NO_ENGAGEMENT_ACCESS"
+	CodeEngagementEnded           = "ENGAGEMENT_ENDED"
+	CodeEngagementAlreadyActive   = "ENGAGEMENT_ALREADY_ACTIVE"
 )
 
 // RequestIDFunc resolves the correlation id from request context.

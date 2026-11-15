@@ -28,6 +28,7 @@ import (
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
@@ -66,6 +67,7 @@ import (
 	bulkadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine"
 	ioadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine/adapters"
@@ -260,8 +262,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	orgSvc := orgusecase.New(orgRepo, nil)
 	organizationsmodule.RegisterRoutes(mux, orghandler.New(orgSvc, activityRec), tokens, loader)
 	var (
-		tenantResolver orgctx.Resolver
-		tenantHandler  *tenantmodule.Handler
+		tenantResolver     orgctx.Resolver
+		tenantHandler      *tenantmodule.Handler
+		engagementResolver engagementctx.Resolver
+		engagementHandler  *engagementsmodule.Handler
 	)
 	if cfg.Tenancy.Enabled {
 		// Invitation emails go through the notifications queue (never SMTP
@@ -277,8 +281,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		orgCache := orgcache.New(orgSvc, deps.Redis, cfg.Tenancy.CacheTTL, cfg.App.Env)
 		orgSvc.SetInvalidator(orgCache)
 		tenantResolver = orgCache
+		// Engagements (issue #2): assignment changes bump the organization's
+		// cache version, so engagement and membership answers expire together.
+		engSvc := engagementsmodule.New(engagementsmodule.NewPostgres(deps.Queries), orgCache)
+		engagementResolver = orgcache.NewEngagementCache(engSvc, orgCache)
+		engagementHandler = engagementsmodule.NewHandler(engSvc)
 	}
 	tenantmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, tenantHandler)
+	engagementsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, engagementHandler)
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)
