@@ -293,6 +293,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		taxpayerResolver   taxpayerctx.Resolver
 		memberHandler      *taxpayersmodule.MemberHandler
 		onboardingHandler  *taxpayersmodule.OnboardingHandler
+		historyHandler     *taxpayersmodule.HistoryHandler
 	)
 	if cfg.Tenancy.Enabled {
 		// Invitation emails go through the notifications queue (never SMTP
@@ -319,6 +320,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			taxpayersmodule.OnboardingConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
 		uc.SetInvitationGate(taxpayersmodule.ChainGates(orgSvc, members, onboarding))
 		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, ratelimit.New(deps.Redis, cfg.App.Env))
+		// Office change (issue #8): history shares and archive reads.
+		historyHandler = taxpayersmodule.NewHistoryHandler(taxpayersmodule.NewHistory(deps.DB))
 		tenantResolver = orgCache
 		// Engagements (issue #2): assignment changes bump the organization's
 		// cache version, so engagement and membership answers expire together.
@@ -352,6 +355,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		bankstatement.NewHandler(bankstatement.NewImporter(deps.DB, bankSvc), bankSvc, deps.Queries))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
+	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 
 	qrGeo, err := qrlogin.NewLocator(cfg.Auth.QRGeoIPDB, cfg.Auth.QRTrustGeoHeaders)

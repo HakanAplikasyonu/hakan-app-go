@@ -76,6 +76,7 @@ type Querier interface {
 	// Excel içe aktarma (issue #22).
 	CreateExcelImport(ctx context.Context, arg CreateExcelImportParams) (ExcelImport, error)
 	CreateExportJob(ctx context.Context, arg CreateExportJobParams) (ExportJob, error)
+	CreateHistoryShare(ctx context.Context, arg CreateHistoryShareParams) (CreateHistoryShareRow, error)
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (ImportJob, error)
 	CreateLogPurgeRule(ctx context.Context, arg CreateLogPurgeRuleParams) (LogPurgeRule, error)
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
@@ -187,6 +188,8 @@ type Querier interface {
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
 	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
 	GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID int64) (Engagement, error)
+	// tenant-lint: cross-org mükellefin kendi aktif engagement'ı (hangi ofiste olursa)
+	GetActiveEngagementOfTaxpayer(ctx context.Context, taxpayerID int64) (GetActiveEngagementOfTaxpayerRow, error)
 	GetActiveOTPByEmailType(ctx context.Context, arg GetActiveOTPByEmailTypeParams) (OtpCode, error)
 	GetAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (AppLog, error)
 	GetAppSettings(ctx context.Context) (AppSetting, error)
@@ -366,6 +369,9 @@ type Querier interface {
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
+	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
+	// kuralı engagement_document_visible'da (migration 000048).
+	ListEngagementVisibleInvoices(ctx context.Context, arg ListEngagementVisibleInvoicesParams) ([]ListEngagementVisibleInvoicesRow, error)
 	ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error)
 	ListEntityDataWarnings(ctx context.Context, arg ListEntityDataWarningsParams) ([]DataWarning, error)
 	ListExcelImportCreatedInvoices(ctx context.Context, arg ListExcelImportCreatedInvoicesParams) ([]int64, error)
@@ -377,6 +383,10 @@ type Querier interface {
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
+	ListHistorySharesForEngagement(ctx context.Context, arg ListHistorySharesForEngagementParams) ([]ListHistorySharesForEngagementRow, error)
+	// Ofis geçişi: geçmiş veri paylaşımı ve engagement'ın gördüğü belgeler
+	// (issue #8, D2).
+	ListHistorySharesForTaxpayer(ctx context.Context, taxpayerID int64) ([]ListHistorySharesForTaxpayerRow, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
@@ -527,6 +537,7 @@ type Querier interface {
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
+	RevokeHistoryShare(ctx context.Context, arg RevokeHistoryShareParams) (int64, error)
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.
 	RevokeOrganizationInvitation(ctx context.Context, arg RevokeOrganizationInvitationParams) (OrganizationInvitation, error)

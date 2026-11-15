@@ -124,6 +124,9 @@ export const routes = {
     reviewStudio: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/review/studio`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
+    /** Documents + history consents of one engagement (issue #8). */
+    engagementDocuments: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */
   taxpayer: {

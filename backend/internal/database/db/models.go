@@ -374,6 +374,7 @@ type Engagement struct {
 	EndedAt        pgtype.Timestamptz `json:"ended_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
 }
 
 type EngagementAssignment struct {
@@ -1259,6 +1260,20 @@ type Taxpayer struct {
 	TaxID     string             `json:"tax_id"`
 	Title     string             `json:"title"`
 	TaxOffice string             `json:"tax_office"`
+}
+
+type TaxpayerHistoryShare struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	FromDate       pgtype.Date        `json:"from_date"`
+	ToDate         pgtype.Date        `json:"to_date"`
+	GrantedBy      pgtype.Int8        `json:"granted_by"`
+	GrantedAt      pgtype.Timestamptz `json:"granted_at"`
+	RevokedBy      pgtype.Int8        `json:"revoked_by"`
+	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
 }
 
 type TaxpayerInvitation struct {

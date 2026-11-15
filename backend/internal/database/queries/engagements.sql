@@ -61,6 +61,7 @@ RETURNING *;
 
 -- name: ResolveEngagementAccess :one
 SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at,
+       e.archive_until,
        t.uuid AS taxpayer_uuid,
        EXISTS(
            SELECT 1 FROM engagement_assignments a

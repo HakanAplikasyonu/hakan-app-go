@@ -220,7 +220,7 @@ func (s *Service) ResolveEngagement(ctx context.Context, orgID int64, id uuid.UU
 		ID: r.ID, UUID: r.Uuid, OrganizationID: r.OrganizationID,
 		TaxpayerID: r.TaxpayerID, TaxpayerUUID: r.TaxpayerUuid,
 		Status: r.Status, StartedAt: r.StartedAt.Time, EndedAt: tsPtr(r.EndedAt),
-		Assigned: r.Assigned,
+		ArchiveUntil: tsPtr(r.ArchiveUntil), Assigned: r.Assigned,
 	}, nil
 }
 
