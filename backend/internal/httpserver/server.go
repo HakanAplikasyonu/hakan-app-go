@@ -65,6 +65,9 @@ import (
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
+	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
+	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
+	warningsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/appleauth"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -368,6 +371,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		ai: aihandler.New(aimodule.NewService(
 			cfg.AI, airepository.NewPostgres(deps.Queries), log,
 		)),
+		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
+			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))),
+		engagements: engagementResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}

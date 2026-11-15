@@ -11,6 +11,9 @@ import (
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
 	searchhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search/handler"
+	warningsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings"
+	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 )
 
@@ -21,6 +24,9 @@ type moduleHandlers struct {
 	activity *activityhandler.Handler
 	logs     *logshandler.Handler
 	ai       *aihandler.Handler
+	warnings *warningshandler.Handler
+	// engagements resolves {engagementUuid} for engagement-scoped module routes.
+	engagements engagementctx.Resolver
 }
 
 // selfRegisteredModules is the single list of modules mounted through
@@ -33,5 +39,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		activitymodule.Module{H: h.activity},
 		logsmodule.Module{H: h.logs},
 		aimodule.Module{H: h.ai},
+		warningsmodule.Module{H: h.warnings, Engagements: h.engagements},
 	}
 }

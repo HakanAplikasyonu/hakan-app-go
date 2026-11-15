@@ -55,6 +55,8 @@ tags:
     description: AI module (office cost report, provider privacy statement)
   - name: Taxpayers
     description: Global mükellef kimliği (VKN/TCKN). Platform kataloğu ve engagement üzerinden ofis görünümü.
+  - name: Warnings
+    description: Warning engine (05-uyari-kodlari.md) rule configuration and warnings
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -3818,6 +3820,268 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/warning-rules:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Warnings]
+      operationId: listOfficeWarningRules
+      summary: Warning rule configuration (office)
+      description: |
+        Requires `tenant.warnings.read`. Every warning code (05-uyari-kodlari.md)
+        with its catalog default, the office override
+        and the effective configuration for the office. Resolution order:
+        engagement > office > catalog default; params merge key by key.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningRuleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/warning-rules/{code}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: code, in: path, required: true, schema: { type: string, pattern: "^[A-Z0-9_]+$" } }
+    put:
+      tags: [Warnings]
+      operationId: setOfficeWarningRule
+      summary: Override a warning rule (office)
+      description: |
+        Requires `tenant.warning_rules.write`. Null / omitted fields inherit
+        from the level below. `params` keys must exist in the code's default
+        params; values are decimal strings, numbers or null (null = threshold
+        not set: the check does not run).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WarningRuleInput"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningRule"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Warnings]
+      operationId: resetOfficeWarningRule
+      summary: Remove a warning rule override (office)
+      description: Requires `tenant.warning_rules.write`. 404 when there is no override.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Override removed
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warning-rules:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Warnings]
+      operationId: listEngagementWarningRules
+      summary: Warning rule configuration (engagement)
+      description: |
+        Requires `tenant.warnings.read`. Every warning code (05-uyari-kodlari.md)
+        with its catalog default, the office override, the engagement override
+        and the effective configuration for one engagement (taxpayer); requires `tenant.engagements.read` and engagement access as well. Resolution order:
+        engagement > office > catalog default; params merge key by key.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningRuleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: code, in: path, required: true, schema: { type: string, pattern: "^[A-Z0-9_]+$" } }
+    put:
+      tags: [Warnings]
+      operationId: setEngagementWarningRule
+      summary: Override a warning rule (engagement)
+      description: |
+        Requires `tenant.warning_rules.write`. Null / omitted fields inherit
+        from the level below. `params` keys must exist in the code's default
+        params; values are decimal strings, numbers or null (null = threshold
+        not set: the check does not run).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WarningRuleInput"
+      responses:
+        "200":
+          description: Updated rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningRule"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Warnings]
+      operationId: resetEngagementWarningRule
+      summary: Remove a warning rule override (engagement)
+      description: Requires `tenant.warning_rules.write`. 404 when there is no override.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Override removed
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/warnings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Warnings]
+      operationId: listOfficeWarnings
+      summary: Data warnings of the office
+      description: |
+        Requires `tenant.warnings.read`. Without `tenant.engagements.read_all`
+        only engagements assigned to the caller are listed. Ordered blocker,
+        warning, info, then most recently updated.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: code, in: query, required: false, schema: { type: string } }
+        - { name: severity, in: query, required: false, schema: { $ref: "#/components/schemas/WarningSeverity" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, acknowledged, resolved, auto_resolved] } }
+        - { name: entity_type, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Warnings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeDataWarningPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warnings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Warnings]
+      operationId: listEngagementWarnings
+      summary: Data warnings of one engagement
+      description: Requires `tenant.warnings.read`, `tenant.engagements.read` and engagement access.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: code, in: query, required: false, schema: { type: string } }
+        - { name: severity, in: query, required: false, schema: { $ref: "#/components/schemas/WarningSeverity" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, acknowledged, resolved, auto_resolved] } }
+        - { name: entity_type, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Warnings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeDataWarningPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: warningUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Warnings]
+      operationId: acknowledgeEngagementWarning
+      summary: Mark an open warning acknowledged
+      description: |
+        Requires `tenant.warnings.write` and engagement access. Only an open
+        warning can be decided; the decision (who, when) is stored on the row.
+        A later sync with the same condition does not reopen it.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Decided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningDecision"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: warningUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Warnings]
+      operationId: resolveEngagementWarning
+      summary: Mark an open warning resolved
+      description: |
+        Requires `tenant.warnings.write` and engagement access. Only an open
+        warning can be decided; the decision (who, when) is stored on the row.
+        A later sync with the same condition does not reopen it.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Decided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningDecision"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
       tags: [Tenant]
@@ -4221,6 +4485,131 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/AIPrivacy" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WarningSeverity:
+      type: string
+      enum: [info, warning, blocker]
+
+    WarningRuleLayer:
+      type: object
+      required: [severity, enabled, params]
+      properties:
+        severity:
+          oneOf:
+            - $ref: "#/components/schemas/WarningSeverity"
+            - type: "null"
+        enabled: { type: [boolean, "null"] }
+        params: { type: object, additionalProperties: true }
+
+    WarningRule:
+      type: object
+      required: [code, section, entity_types, default, office, engagement, effective]
+      properties:
+        code: { type: string, example: TAX_TOTAL_MISMATCH }
+        section: { type: string, example: "3.1" }
+        entity_types:
+          type: array
+          items: { type: string }
+        default: { $ref: "#/components/schemas/WarningRuleLayer" }
+        office:
+          oneOf:
+            - $ref: "#/components/schemas/WarningRuleLayer"
+            - type: "null"
+        engagement:
+          oneOf:
+            - $ref: "#/components/schemas/WarningRuleLayer"
+            - type: "null"
+        effective:
+          type: object
+          required: [enabled, severity, params]
+          properties:
+            enabled: { type: boolean }
+            severity: { $ref: "#/components/schemas/WarningSeverity" }
+            params: { type: object, additionalProperties: true }
+
+    WarningRuleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        severity:
+          oneOf:
+            - $ref: "#/components/schemas/WarningSeverity"
+            - type: "null"
+        enabled: { type: [boolean, "null"] }
+        params: { type: object, additionalProperties: true }
+
+    EnvelopeWarningRule:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/WarningRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeWarningRuleList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/WarningRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DataWarning:
+      type: object
+      required: [uuid, engagement_uuid, period, entity_type, entity_uuid, code, severity, params, producer, status, resolved_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        period: { type: [string, "null"], example: "2026-10" }
+        entity_type: { type: string }
+        entity_uuid:
+          type: [string, "null"]
+          format: uuid
+          description: Public id of the entity for invoice and customer warnings; null otherwise.
+        code: { type: string, example: TAX_TOTAL_MISMATCH }
+        severity: { $ref: "#/components/schemas/WarningSeverity" }
+        params: { type: object, additionalProperties: true }
+        producer: { type: string, example: "control:invoice_totals" }
+        status: { type: string, enum: [open, acknowledged, resolved, auto_resolved] }
+        resolved_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EnvelopeDataWarningPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/DataWarning" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeWarningDecision:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [uuid, status]
+          properties:
+            uuid: { type: string, format: uuid }
+            status: { type: string, enum: [acknowledged, resolved] }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantSettings:
