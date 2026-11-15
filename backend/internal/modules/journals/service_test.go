@@ -263,3 +263,18 @@ func readAll(t *testing.T, rc interface {
 func dbSettings(s engagementctx.Scope, direct bool) db.UpsertExportSettingsParams {
 	return db.UpsertExportSettingsParams{OrganizationID: s.OrganizationID, EngagementID: s.ID, InvoicesReachLucaDirectly: direct, BlockOnUnknownAccount: true}
 }
+
+// The real excel_formula driver runs through the service: the workbook is
+// stored and the batch records the driver.
+func TestExportWithExcelFormulaDriver(t *testing.T) {
+	e := setup(t)
+	d := e.draft(t, oct, debit("770", "10"), credit("320", "10"))
+	e.approve(t, d)
+	b, err := e.svc.Export(context.Background(), e.scope, e.actor, ExportInput{Driver: "excel_formula", Period: "2026-10"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Driver != "excel_formula" || !b.TemplateVerified || len(b.Files) != 1 || b.Files[0].Name != "kontrol_2026-10.xlsx" {
+		t.Fatalf("batch: %+v", b)
+	}
+}
