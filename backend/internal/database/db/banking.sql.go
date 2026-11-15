@@ -8,8 +8,84 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const clearPossibleDuplicateLinks = `-- name: ClearPossibleDuplicateLinks :exec
+UPDATE bank_transactions SET possible_duplicate_of = NULL
+WHERE taxpayer_id = $1 AND possible_duplicate_of = $2
+`
+
+type ClearPossibleDuplicateLinksParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	ID         pgtype.Int8 `json:"id"`
+}
+
+func (q *Queries) ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error {
+	_, err := q.db.Exec(ctx, clearPossibleDuplicateLinks, arg.TaxpayerID, arg.ID)
+	return err
+}
+
+const deleteBankBalanceSnapshotsByImport = `-- name: DeleteBankBalanceSnapshotsByImport :exec
+DELETE FROM bank_balance_snapshots WHERE taxpayer_id = $1 AND import_id = $2
+`
+
+type DeleteBankBalanceSnapshotsByImportParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	ImportID   pgtype.UUID `json:"import_id"`
+}
+
+func (q *Queries) DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error {
+	_, err := q.db.Exec(ctx, deleteBankBalanceSnapshotsByImport, arg.TaxpayerID, arg.ImportID)
+	return err
+}
+
+const deleteBankTransaction = `-- name: DeleteBankTransaction :exec
+DELETE FROM bank_transactions WHERE taxpayer_id = $1 AND id = $2
+`
+
+type DeleteBankTransactionParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	ID         int64 `json:"id"`
+}
+
+func (q *Queries) DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error {
+	_, err := q.db.Exec(ctx, deleteBankTransaction, arg.TaxpayerID, arg.ID)
+	return err
+}
+
+const deleteBankTransactionSourcesByImport = `-- name: DeleteBankTransactionSourcesByImport :many
+DELETE FROM bank_transaction_sources
+WHERE taxpayer_id = $1 AND import_id = $2
+RETURNING bank_transaction_id
+`
+
+type DeleteBankTransactionSourcesByImportParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	ImportID   pgtype.UUID `json:"import_id"`
+}
+
+// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
+func (q *Queries) DeleteBankTransactionSourcesByImport(ctx context.Context, arg DeleteBankTransactionSourcesByImportParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, deleteBankTransactionSourcesByImport, arg.TaxpayerID, arg.ImportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var bank_transaction_id int64
+		if err := rows.Scan(&bank_transaction_id); err != nil {
+			return nil, err
+		}
+		items = append(items, bank_transaction_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const fillBankTransactionGaps = `-- name: FillBankTransactionGaps :exec
 UPDATE bank_transactions SET
@@ -249,6 +325,54 @@ func (q *Queries) FindBankTransactionLookalike(ctx context.Context, arg FindBank
 	return i, err
 }
 
+const findCashBoxByAccountNumber = `-- name: FindCashBoxByAccountNumber :many
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes
+WHERE taxpayer_id = $1 AND bank_account_number = $2
+`
+
+type FindCashBoxByAccountNumberParams struct {
+	TaxpayerID        int64       `json:"taxpayer_id"`
+	BankAccountNumber pgtype.Text `json:"bank_account_number"`
+}
+
+func (q *Queries) FindCashBoxByAccountNumber(ctx context.Context, arg FindCashBoxByAccountNumberParams) ([]CashBox, error) {
+	rows, err := q.db.Query(ctx, findCashBoxByAccountNumber, arg.TaxpayerID, arg.BankAccountNumber)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CashBox{}
+	for rows.Next() {
+		var i CashBox
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.TaxpayerID,
+			&i.Type,
+			&i.Name,
+			&i.BankID,
+			&i.Iban,
+			&i.Currency,
+			&i.BankAccountNumber,
+			&i.BankBranchCode,
+			&i.BankAccountSuffix,
+			&i.BankCustomerNo,
+			&i.BankAccountKind,
+			&i.BankConnectionID,
+			&i.BankSyncFrom,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const findCashBoxByIBAN = `-- name: FindCashBoxByIBAN :one
 SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 AND iban = $2
 `
@@ -277,6 +401,41 @@ func (q *Queries) FindCashBoxByIBAN(ctx context.Context, arg FindCashBoxByIBANPa
 		&i.BankAccountKind,
 		&i.BankConnectionID,
 		&i.BankSyncFrom,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const findPreviousDailySummary = `-- name: FindPreviousDailySummary :one
+SELECT id, taxpayer_id, cash_box_id, date, opening_balance, closing_balance, total_credit, total_debit, transaction_count, source, created_at, updated_at FROM bank_daily_summaries
+WHERE taxpayer_id = $1 AND cash_box_id = $2 AND date < $3
+  AND closing_balance IS NOT NULL
+ORDER BY date DESC, id DESC
+LIMIT 1
+`
+
+type FindPreviousDailySummaryParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	CashBoxID  int64       `json:"cash_box_id"`
+	Date       pgtype.Date `json:"date"`
+}
+
+// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
+func (q *Queries) FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error) {
+	row := q.db.QueryRow(ctx, findPreviousDailySummary, arg.TaxpayerID, arg.CashBoxID, arg.Date)
+	var i BankDailySummary
+	err := row.Scan(
+		&i.ID,
+		&i.TaxpayerID,
+		&i.CashBoxID,
+		&i.Date,
+		&i.OpeningBalance,
+		&i.ClosingBalance,
+		&i.TotalCredit,
+		&i.TotalDebit,
+		&i.TransactionCount,
+		&i.Source,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -380,6 +539,40 @@ func (q *Queries) GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox
 	return i, err
 }
 
+const getCashBoxByUUID = `-- name: GetCashBoxByUUID :one
+SELECT id, uuid, taxpayer_id, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, bank_account_suffix, bank_customer_no, bank_account_kind, bank_connection_id, bank_sync_from, created_at, updated_at FROM cash_boxes WHERE taxpayer_id = $1 AND uuid = $2
+`
+
+type GetCashBoxByUUIDParams struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+func (q *Queries) GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error) {
+	row := q.db.QueryRow(ctx, getCashBoxByUUID, arg.TaxpayerID, arg.Uuid)
+	var i CashBox
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.Type,
+		&i.Name,
+		&i.BankID,
+		&i.Iban,
+		&i.Currency,
+		&i.BankAccountNumber,
+		&i.BankBranchCode,
+		&i.BankAccountSuffix,
+		&i.BankCustomerNo,
+		&i.BankAccountKind,
+		&i.BankConnectionID,
+		&i.BankSyncFrom,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const incrementBankRuleHits = `-- name: IncrementBankRuleHits :exec
 UPDATE bank_rules SET hits = hits + 1 WHERE taxpayer_id = $1 AND id = $2
 `
@@ -391,6 +584,37 @@ type IncrementBankRuleHitsParams struct {
 
 func (q *Queries) IncrementBankRuleHits(ctx context.Context, arg IncrementBankRuleHitsParams) error {
 	_, err := q.db.Exec(ctx, incrementBankRuleHits, arg.TaxpayerID, arg.ID)
+	return err
+}
+
+const insertBankBalanceSnapshot = `-- name: InsertBankBalanceSnapshot :exec
+INSERT INTO bank_balance_snapshots (
+    taxpayer_id, cash_box_id, captured_at, balance, available_balance, source, import_id
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7
+)
+`
+
+type InsertBankBalanceSnapshotParams struct {
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	CashBoxID        int64              `json:"cash_box_id"`
+	CapturedAt       pgtype.Timestamptz `json:"captured_at"`
+	Balance          pgtype.Numeric     `json:"balance"`
+	AvailableBalance pgtype.Numeric     `json:"available_balance"`
+	Source           string             `json:"source"`
+	ImportID         pgtype.UUID        `json:"import_id"`
+}
+
+func (q *Queries) InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error {
+	_, err := q.db.Exec(ctx, insertBankBalanceSnapshot,
+		arg.TaxpayerID,
+		arg.CashBoxID,
+		arg.CapturedAt,
+		arg.Balance,
+		arg.AvailableBalance,
+		arg.Source,
+		arg.ImportID,
+	)
 	return err
 }
 
@@ -670,6 +894,48 @@ func (q *Queries) ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRu
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBankTransactionSources = `-- name: ListBankTransactionSources :many
+SELECT id, taxpayer_id, bank_transaction_id, cash_box_id, source_system, capture_method, source_id, import_id, raw_payload, received_at FROM bank_transaction_sources
+WHERE taxpayer_id = $1 AND bank_transaction_id = $2
+ORDER BY id
+`
+
+type ListBankTransactionSourcesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+func (q *Queries) ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionSources, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BankTransactionSource{}
+	for rows.Next() {
+		var i BankTransactionSource
+		if err := rows.Scan(
+			&i.ID,
+			&i.TaxpayerID,
+			&i.BankTransactionID,
+			&i.CashBoxID,
+			&i.SourceSystem,
+			&i.CaptureMethod,
+			&i.SourceID,
+			&i.ImportID,
+			&i.RawPayload,
+			&i.ReceivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -982,6 +1248,46 @@ func (q *Queries) SetBankTransactionPrimarySource(ctx context.Context, arg SetBa
 		arg.RawPayload,
 		arg.TaxpayerID,
 		arg.ID,
+	)
+	return err
+}
+
+const upsertBankDailySummary = `-- name: UpsertBankDailySummary :exec
+INSERT INTO bank_daily_summaries (
+    taxpayer_id, cash_box_id, date, opening_balance, closing_balance, total_credit, total_debit, transaction_count, source
+) VALUES (
+    $1, $2, $3, $4, $5,
+    $6, $7, $8, $9
+)
+ON CONFLICT (taxpayer_id, cash_box_id, date, source) DO UPDATE SET
+    opening_balance = EXCLUDED.opening_balance, closing_balance = EXCLUDED.closing_balance,
+    total_credit = EXCLUDED.total_credit, total_debit = EXCLUDED.total_debit,
+    transaction_count = EXCLUDED.transaction_count
+`
+
+type UpsertBankDailySummaryParams struct {
+	TaxpayerID       int64          `json:"taxpayer_id"`
+	CashBoxID        int64          `json:"cash_box_id"`
+	Date             pgtype.Date    `json:"date"`
+	OpeningBalance   pgtype.Numeric `json:"opening_balance"`
+	ClosingBalance   pgtype.Numeric `json:"closing_balance"`
+	TotalCredit      pgtype.Numeric `json:"total_credit"`
+	TotalDebit       pgtype.Numeric `json:"total_debit"`
+	TransactionCount pgtype.Int4    `json:"transaction_count"`
+	Source           string         `json:"source"`
+}
+
+func (q *Queries) UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error {
+	_, err := q.db.Exec(ctx, upsertBankDailySummary,
+		arg.TaxpayerID,
+		arg.CashBoxID,
+		arg.Date,
+		arg.OpeningBalance,
+		arg.ClosingBalance,
+		arg.TotalCredit,
+		arg.TotalDebit,
+		arg.TransactionCount,
+		arg.Source,
 	)
 	return err
 }

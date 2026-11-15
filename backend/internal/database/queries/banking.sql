@@ -135,3 +135,58 @@ UPDATE bank_rules SET hits = hits + 1 WHERE taxpayer_id = @taxpayer_id AND id = 
 -- name: ListCustomersForBankClassification :many
 SELECT id, type, tax_number, identity_number, bank_accounts FROM customers
 WHERE taxpayer_id = @taxpayer_id AND deleted_at_source IS NULL;
+
+-- name: FindCashBoxByAccountNumber :many
+SELECT * FROM cash_boxes
+WHERE taxpayer_id = @taxpayer_id AND bank_account_number = @bank_account_number;
+
+-- name: UpsertBankDailySummary :exec
+INSERT INTO bank_daily_summaries (
+    taxpayer_id, cash_box_id, date, opening_balance, closing_balance, total_credit, total_debit, transaction_count, source
+) VALUES (
+    @taxpayer_id, @cash_box_id, @date, sqlc.narg(opening_balance), sqlc.narg(closing_balance),
+    sqlc.narg(total_credit), sqlc.narg(total_debit), sqlc.narg(transaction_count), @source
+)
+ON CONFLICT (taxpayer_id, cash_box_id, date, source) DO UPDATE SET
+    opening_balance = EXCLUDED.opening_balance, closing_balance = EXCLUDED.closing_balance,
+    total_credit = EXCLUDED.total_credit, total_debit = EXCLUDED.total_debit,
+    transaction_count = EXCLUDED.transaction_count;
+
+-- Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
+-- name: FindPreviousDailySummary :one
+SELECT * FROM bank_daily_summaries
+WHERE taxpayer_id = @taxpayer_id AND cash_box_id = @cash_box_id AND date < @date
+  AND closing_balance IS NOT NULL
+ORDER BY date DESC, id DESC
+LIMIT 1;
+
+-- name: InsertBankBalanceSnapshot :exec
+INSERT INTO bank_balance_snapshots (
+    taxpayer_id, cash_box_id, captured_at, balance, available_balance, source, import_id
+) VALUES (
+    @taxpayer_id, @cash_box_id, @captured_at, @balance, sqlc.narg(available_balance), @source, sqlc.narg(import_id)
+);
+
+-- Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
+-- name: DeleteBankTransactionSourcesByImport :many
+DELETE FROM bank_transaction_sources
+WHERE taxpayer_id = @taxpayer_id AND import_id = @import_id
+RETURNING bank_transaction_id;
+
+-- name: ListBankTransactionSources :many
+SELECT * FROM bank_transaction_sources
+WHERE taxpayer_id = @taxpayer_id AND bank_transaction_id = @bank_transaction_id
+ORDER BY id;
+
+-- name: DeleteBankTransaction :exec
+DELETE FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- name: ClearPossibleDuplicateLinks :exec
+UPDATE bank_transactions SET possible_duplicate_of = NULL
+WHERE taxpayer_id = @taxpayer_id AND possible_duplicate_of = @id;
+
+-- name: DeleteBankBalanceSnapshotsByImport :exec
+DELETE FROM bank_balance_snapshots WHERE taxpayer_id = @taxpayer_id AND import_id = @import_id;
+
+-- name: GetCashBoxByUUID :one
+SELECT * FROM cash_boxes WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;

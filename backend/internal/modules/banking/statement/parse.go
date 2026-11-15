@@ -1,0 +1,79 @@
+package statement
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// ErrUnsupported: the file is none of MT940/MT942, Excel (.xlsx), CSV or PDF.
+var ErrUnsupported = errors.New("statement: unsupported file")
+
+// Detect names the format of a statement file.
+func Detect(name string, data []byte) string {
+	lower := strings.ToLower(name)
+	switch {
+	case bytes.HasPrefix(data, []byte("%PDF")):
+		return "pdf"
+	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
+		return "excel"
+	case bytes.HasPrefix(data, []byte{0xD0, 0xCF, 0x11, 0xE0}):
+		return "xls" // legacy binary Excel: ask for .xlsx / CSV
+	}
+	text, _ := Decode(head(data, 8192))
+	if strings.Contains(text, ":20:") && (strings.Contains(text, ":25:") || strings.Contains(text, ":61:")) {
+		return "mt940"
+	}
+	if strings.HasSuffix(lower, ".sta") || strings.HasSuffix(lower, ".mt940") || strings.HasSuffix(lower, ".940") {
+		return "mt940"
+	}
+	return "csv"
+}
+
+func head(b []byte, n int) []byte {
+	if len(b) > n {
+		return b[:n]
+	}
+	return b
+}
+
+// Parse reads any supported statement file into statements (one per account
+// block) and returns the detected format and text encoding.
+func Parse(name string, data []byte) ([]Statement, string, error) {
+	format := Detect(name, data)
+	switch format {
+	case "pdf":
+		st, err := ParsePDF(data)
+		if err != nil {
+			return nil, format, err
+		}
+		return []Statement{st}, format, nil
+	case "excel":
+		rows, err := ReadXLSX(data)
+		if err != nil {
+			return nil, format, err
+		}
+		st, err := ParseTabular(rows, "excel")
+		if err != nil {
+			return nil, format, err
+		}
+		return []Statement{st}, format, nil
+	case "mt940":
+		text, _ := Decode(data)
+		sts, err := ParseMT940(text)
+		return sts, format, err
+	case "csv":
+		text, _ := Decode(data)
+		rows, err := ReadCSV(text)
+		if err != nil {
+			return nil, format, fmt.Errorf("csv: %w", err)
+		}
+		st, err := ParseTabular(rows, "csv")
+		if err != nil {
+			return nil, format, err
+		}
+		return []Statement{st}, format, nil
+	}
+	return nil, format, fmt.Errorf("%w: %s (save it as .xlsx or CSV)", ErrUnsupported, format)
+}

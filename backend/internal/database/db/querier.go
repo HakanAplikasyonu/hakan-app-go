@@ -30,6 +30,7 @@ type Querier interface {
 	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
 	ClearAppSettingsLogo(ctx context.Context) (AppSetting, error)
+	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
 	CountActivityEvents(ctx context.Context, arg CountActivityEventsParams) (int64, error)
@@ -99,6 +100,10 @@ type Querier interface {
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
+	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
+	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
+	// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
+	DeleteBankTransactionSourcesByImport(ctx context.Context, arg DeleteBankTransactionSourcesByImportParams) ([]int64, error)
 	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
 	DeleteEngagementReviewSetting(ctx context.Context, arg DeleteEngagementReviewSettingParams) (int64, error)
 	DeleteEngagementWarningRule(ctx context.Context, arg DeleteEngagementWarningRuleParams) (int64, error)
@@ -145,6 +150,7 @@ type Querier interface {
 	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
 	// Mükerrer yakalamanın gösterdiği önceki yükleme.
 	FindCaptureByExpense(ctx context.Context, arg FindCaptureByExpenseParams) (uuid.UUID, error)
+	FindCashBoxByAccountNumber(ctx context.Context, arg FindCashBoxByAccountNumberParams) ([]CashBox, error)
 	FindCashBoxByIBAN(ctx context.Context, arg FindCashBoxByIBANParams) (CashBox, error)
 	FindCustomerByIdentityNumber(ctx context.Context, arg FindCustomerByIdentityNumberParams) (Customer, error)
 	FindCustomerBySource(ctx context.Context, arg FindCustomerBySourceParams) (Customer, error)
@@ -162,6 +168,8 @@ type Querier interface {
 	FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInvoicesByPartyNumberDateParams) ([]Invoice, error)
 	// 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
 	FindPossibleDuplicateInvoices(ctx context.Context, arg FindPossibleDuplicateInvoicesParams) ([]Invoice, error)
+	// Ardışık ekstrelerde önceki kapanış = bu açılış (23 §3.4).
+	FindPreviousDailySummary(ctx context.Context, arg FindPreviousDailySummaryParams) (BankDailySummary, error)
 	FindRetailSaleByAttachment(ctx context.Context, arg FindRetailSaleByAttachmentParams) (FindRetailSaleByAttachmentRow, error)
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
@@ -175,6 +183,7 @@ type Querier interface {
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
+	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -260,6 +269,7 @@ type Querier interface {
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
+	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
 	InsertBankTransactionSource(ctx context.Context, arg InsertBankTransactionSourceParams) error
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
@@ -304,6 +314,7 @@ type Querier interface {
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
 	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
 	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
@@ -521,6 +532,7 @@ type Querier interface {
 	UpdateWebAuthnCredentialName(ctx context.Context, arg UpdateWebAuthnCredentialNameParams) (WebauthnCredential, error)
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
+	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
