@@ -1987,6 +1987,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/roles": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Roles of the organization
+         * @description Requires `tenant.roles.read`. Every office gets copies of the template
+         *     roles (owner, admin, accountant, member, intern) when it is created
+         *     (D16); they are `is_system` and cannot be deleted. Custom roles are
+         *     office-specific and grant permissions only in this organization.
+         */
+        get: operations["getTenantRoles"];
+        put?: never;
+        /**
+         * Create an office role
+         * @description Requires `tenant.roles.write`. `key` is lowercase letters, digits and
+         *     `_` (2-32, starting with a letter), unique in the organization and not
+         *     a template key. `permissions` must be `tenant.*` slugs from
+         *     `GET /v1/tenant/role-permissions`. Bumps the organization's cache
+         *     version.
+         */
+        post: operations["postTenantRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/roles/{roleKey}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                roleKey: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a custom office role
+         * @description Requires `tenant.roles.write`. System roles cannot be deleted
+         *     (`409 ROLE_IS_SYSTEM`); a role held by a member or an open invitation
+         *     cannot be deleted (`409 ROLE_IN_USE`).
+         */
+        delete: operations["deleteTenantRole"];
+        options?: never;
+        head?: never;
+        /**
+         * Update an office role
+         * @description Requires `tenant.roles.write`. Name, description and permissions of
+         *     system and custom roles can change; the `owner` role always keeps every
+         *     tenant permission (its permissions cannot be edited). Bumps the
+         *     organization's cache version.
+         */
+        patch: operations["patchTenantRole"];
+        trace?: never;
+    };
+    "/v1/tenant/role-permissions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Permissions an office role can grant
+         * @description Requires `tenant.roles.read`. Every `tenant.*` permission.
+         */
+        get: operations["getTenantRolePermissions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/members": {
         parameters: {
             query?: never;
@@ -3390,6 +3490,8 @@ export interface components {
              * @enum {string}
              */
             locale: "tr" | "en";
+            /** @description SMMM oda sicil numarası (D16). Not verified. */
+            smmm_registry_no?: string | null;
         };
         MeLinks: {
             /** @example /v1/auth/profile */
@@ -3764,6 +3866,8 @@ export interface components {
             surname?: string;
             /** @enum {string} */
             locale?: "tr" | "en";
+            /** @description SMMM oda sicil numarası; empty string clears it. Not verified (D16). */
+            smmm_registry_no?: string;
         };
         EmailCodeRequest: {
             /** Format: email */
@@ -4510,6 +4614,63 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TaxpayerContext"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TenantRole: {
+            /**
+             * @example owner
+             * @example admin
+             * @example accountant
+             * @example member
+             * @example intern
+             * @example kidemli
+             */
+            key: string;
+            name: string;
+            description: string;
+            /** @description Template copy; cannot be deleted */
+            is_system: boolean;
+            permissions: string[];
+            /** Format: int64 */
+            member_count: number;
+        };
+        TenantRoleList: {
+            items: components["schemas"]["TenantRole"][];
+        };
+        TenantPermission: {
+            slug: string;
+            name: string;
+        };
+        TenantPermissionList: {
+            items: components["schemas"]["TenantPermission"][];
+        };
+        CreateTenantRoleRequest: {
+            key: string;
+            name: string;
+            description?: string;
+            permissions: string[];
+        };
+        PatchTenantRoleRequest: {
+            name?: string;
+            description?: string;
+            permissions?: string[];
+        };
+        EnvelopeTenantRole: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TenantRole"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTenantRoleList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TenantRoleList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTenantPermissionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TenantPermissionList"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeEngagementContext: {
@@ -8171,6 +8332,167 @@ export interface operations {
                 };
             };
             400: components["responses"]["OrganizationRequired"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantRoles: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTenantRoleList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postTenantRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTenantRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTenantRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                roleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    patchTenantRole: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                roleKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchTenantRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTenantRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantRolePermissions: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Permissions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTenantPermissionList"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

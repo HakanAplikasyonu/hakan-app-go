@@ -23,6 +23,8 @@ type User struct {
 	// PasswordSet is false when the user never chose a password (OAuth sign-up
 	// stores a random hash).
 	PasswordSet bool
+	// SMMMRegistryNo is the SMMM oda sicil numarası (D16). Not verified.
+	SMMMRegistryNo *string
 }
 
 // UserAuthMethod is a login option linked to a platform user.
@@ -139,6 +141,8 @@ type PublicUser struct {
 	Locale        string    `json:"locale"`
 	IsSuperAdmin  bool      `json:"is_super_admin"`
 	EmailVerified bool      `json:"email_verified"`
+	// SMMMRegistryNo is the SMMM oda sicil numarası (D16). Not verified.
+	SMMMRegistryNo *string `json:"smmm_registry_no"`
 }
 
 // PlatformUserDetail is a platform user with assigned roles and login methods.
@@ -244,6 +248,7 @@ func ToPublicUser(u User, isSuperAdmin bool) PublicUser {
 	return PublicUser{
 		UUID: u.UUID, Email: u.Email, Name: u.Name, Surname: u.Surname,
 		Status: u.Status, Locale: u.Locale, IsSuperAdmin: isSuperAdmin, EmailVerified: u.EmailVerified,
+		SMMMRegistryNo: u.SMMMRegistryNo,
 	}
 }
 

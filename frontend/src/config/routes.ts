@@ -110,6 +110,7 @@ export const routes = {
     picker: "/t",
     home: (slug: string) => `/t/${encodeURIComponent(slug)}`,
     members: (slug: string) => `/t/${encodeURIComponent(slug)}/members`,
+    roles: (slug: string) => `/t/${encodeURIComponent(slug)}/roles`,
     settings: (slug: string) => `/t/${encodeURIComponent(slug)}/settings`,
     taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
     invoices: (slug: string) => `/t/${encodeURIComponent(slug)}/invoices`,

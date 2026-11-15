@@ -35,6 +35,11 @@ type OrganizationService interface {
 	RevokeInvitation(ctx context.Context, orgID int64, id uuid.UUID, actorRole string) error
 	PreviewInvitation(ctx context.Context, token string) (orgmodel.InvitationPreview, error)
 	AcceptInvitation(ctx context.Context, token string, userID int64) (orgmodel.AcceptedInvitation, error)
+	ListRoles(ctx context.Context, orgID int64) ([]orgusecase.TenantRole, error)
+	ListRolePermissions(ctx context.Context) ([]orgusecase.TenantPermission, error)
+	CreateRole(ctx context.Context, orgID int64, in orgusecase.RoleInput) (orgusecase.TenantRole, error)
+	UpdateRole(ctx context.Context, orgID int64, in orgusecase.RoleInput) (orgusecase.TenantRole, error)
+	DeleteRole(ctx context.Context, orgID int64, key string) error
 }
 
 // Rate limits (per window) for the invitation endpoints.
@@ -421,6 +426,12 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, orgusecase.ErrNotFound), errors.Is(err, orgusecase.ErrMemberNotFound),
 		errors.Is(err, orgusecase.ErrUserNotFound), errors.Is(err, orgusecase.ErrRoleNotFound):
 		response.NotFound(w, r, "Resource was not found")
+	case errors.Is(err, orgusecase.ErrRoleIsSystem):
+		response.Conflict(w, r, response.CodeRoleIsSystem, "System roles cannot be deleted")
+	case errors.Is(err, orgusecase.ErrRoleInUse):
+		response.Conflict(w, r, response.CodeRoleInUse, "Role is held by a member or an open invitation")
+	case errors.Is(err, orgusecase.ErrRoleKeyTaken):
+		response.Conflict(w, r, response.CodeConflict, "Role key already exists in this organization")
 	case errors.Is(err, orgusecase.ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
 	case errors.Is(err, orgusecase.ErrInvalidRequest):

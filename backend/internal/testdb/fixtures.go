@@ -41,14 +41,16 @@ func (d *DB) Organization(t testing.TB) int64 {
 	return id
 }
 
-// Member adds userID to orgID with a template tenant role key (owner,
-// admin, member).
+// Member adds userID to orgID with a tenant role key: the office's own copy
+// when it has one (issue #5), else the template.
 func (d *DB) Member(t testing.TB, orgID, userID int64, roleKey string) {
 	t.Helper()
 	_, err := d.Pool.Exec(context.Background(), `
 		INSERT INTO organization_members (organization_id, user_id, role_id)
 		SELECT $1, $2, r.id FROM roles r
-		WHERE r.scope = 'tenant' AND r.organization_id IS NULL AND r.slug = $3`,
+		WHERE r.scope = 'tenant' AND (r.organization_id = $1 OR r.organization_id IS NULL) AND r.slug = $3
+		ORDER BY r.organization_id NULLS LAST
+		LIMIT 1`,
 		orgID, userID, roleKey)
 	if err != nil {
 		t.Fatalf("testdb: member: %v", err)

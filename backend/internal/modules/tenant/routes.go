@@ -61,6 +61,23 @@ func RegisterRoutes(
 		http.HandlerFunc(h.revokeInvitation), authn, org, perm(rbac.PermTenantMembersWrite),
 	))
 
+	// Office roles (issue #5, D16).
+	mux.Handle("GET /v1/tenant/roles", middleware.Chain(
+		http.HandlerFunc(h.listRoles), authn, org, perm(rbac.PermTenantRolesRead),
+	))
+	mux.Handle("GET /v1/tenant/role-permissions", middleware.Chain(
+		http.HandlerFunc(h.listRolePermissions), authn, org, perm(rbac.PermTenantRolesRead),
+	))
+	mux.Handle("POST /v1/tenant/roles", middleware.Chain(
+		http.HandlerFunc(h.createRole), authn, org, perm(rbac.PermTenantRolesWrite),
+	))
+	mux.Handle("PATCH /v1/tenant/roles/{roleKey}", middleware.Chain(
+		http.HandlerFunc(h.patchRole), authn, org, perm(rbac.PermTenantRolesWrite),
+	))
+	mux.Handle("DELETE /v1/tenant/roles/{roleKey}", middleware.Chain(
+		http.HandlerFunc(h.deleteRole), authn, org, perm(rbac.PermTenantRolesWrite),
+	))
+
 	// Organization settings.
 	mux.Handle("GET /v1/tenant/settings", middleware.Chain(
 		http.HandlerFunc(h.getSettings), authn, org, perm(rbac.PermTenantSettingsRead),

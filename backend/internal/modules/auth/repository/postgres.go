@@ -643,7 +643,17 @@ func mapUser(row db.User) model.User {
 		Name: row.Name, Surname: row.Surname, Status: row.Status, Locale: locale,
 		EmailVerified: row.EmailVerifiedAt.Valid, CreatedAt: row.CreatedAt.Time,
 		DeactivatedAt: timePtr(row.DeactivatedAt), PasswordSet: row.PasswordSet,
+		SMMMRegistryNo: textPtr(row.SmmmRegistryNo),
 	}
+}
+
+// SetSMMMRegistryNo stores (or with nil clears) the SMMM oda sicil no.
+func (r *Postgres) SetSMMMRegistryNo(ctx context.Context, userUUID uuid.UUID, no *string) error {
+	v := pgtype.Text{}
+	if no != nil {
+		v = pgtype.Text{String: *no, Valid: true}
+	}
+	return r.q.SetUserSMMMRegistryNo(ctx, db.SetUserSMMMRegistryNoParams{RegistryNo: v, Uuid: userUUID})
 }
 
 func timePtr(v pgtype.Timestamptz) *time.Time {

@@ -896,7 +896,7 @@ const setUserEmailVerified = `-- name: SetUserEmailVerified :one
 UPDATE users
 SET email_verified_at = NOW()
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set
+RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set, smmm_registry_no
 `
 
 func (q *Queries) SetUserEmailVerified(ctx context.Context, id int64) (User, error) {
@@ -918,6 +918,7 @@ func (q *Queries) SetUserEmailVerified(ctx context.Context, id int64) (User, err
 		&i.DeletedAt,
 		&i.DeactivatedAt,
 		&i.PasswordSet,
+		&i.SmmmRegistryNo,
 	)
 	return i, err
 }
@@ -927,7 +928,7 @@ UPDATE users
 SET name = COALESCE($1, name),
     surname = COALESCE($2, surname)
 WHERE id = $3 AND deleted_at IS NULL
-RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set
+RETURNING id, uuid, email, password_hash, name, surname, status, email_verified_at, last_login_at, locale, created_at, updated_at, deleted_at, deactivated_at, password_set, smmm_registry_no
 `
 
 type UpdateUserProfileParams struct {
@@ -955,6 +956,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.DeletedAt,
 		&i.DeactivatedAt,
 		&i.PasswordSet,
+		&i.SmmmRegistryNo,
 	)
 	return i, err
 }

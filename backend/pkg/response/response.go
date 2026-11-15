@@ -55,6 +55,8 @@ const (
 	CodeNoEngagementAccess        = "NO_ENGAGEMENT_ACCESS"
 	CodeEngagementEnded           = "ENGAGEMENT_ENDED"
 	CodeEngagementAlreadyActive   = "ENGAGEMENT_ALREADY_ACTIVE"
+	CodeRoleIsSystem              = "ROLE_IS_SYSTEM"
+	CodeRoleInUse                 = "ROLE_IN_USE"
 	CodeTaxpayerAlreadyExists     = "TAXPAYER_ALREADY_EXISTS"
 	CodeTaxpayerRequired          = "TAXPAYER_REQUIRED"
 	CodeNoTaxpayerMembership      = "NO_TAXPAYER_MEMBERSHIP"

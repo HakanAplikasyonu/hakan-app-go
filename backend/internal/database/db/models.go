@@ -1076,6 +1076,7 @@ type User struct {
 	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 	DeactivatedAt   pgtype.Timestamptz `json:"deactivated_at"`
 	PasswordSet     bool               `json:"password_set"`
+	SmmmRegistryNo  pgtype.Text        `json:"smmm_registry_no"`
 }
 
 type UserRole struct {

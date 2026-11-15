@@ -28,17 +28,21 @@ import {
   useRevokeTenantInvitation,
   useTenantInvitations,
   useTenantMembers,
+  useTenantRoles,
 } from "@/features/tenant/hooks/use-tenant-admin";
 import {
+  DEFAULT_INVITE_ROLE_KEY,
   INVITATION_STATUS_LABEL_KEYS,
-  TENANT_ROLE_KEYS,
-  TENANT_ROLE_LABEL_KEYS,
+  TENANT_ROLE_KEY_PATTERN,
   canChangeRole,
-  isTenantRoleKey,
+  tenantRoleLabel,
+  tenantRoleOptions,
+  type TenantRoleOption,
 } from "@/features/tenant/lib/roles";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import type {
   TenantMember,
+  TenantRole,
   TenantRoleKey,
 } from "@/features/tenant/services/tenant.service";
 import { defaultHomeForUser } from "@/lib/auth/types";
@@ -48,8 +52,22 @@ import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-function roleLabel(t: (k: string) => string, key: string, fallback: string) {
-  return isTenantRoleKey(key) ? t(TENANT_ROLE_LABEL_KEYS[key]) : fallback;
+/**
+ * The office's roles for pickers and labels. Read only with
+ * `tenant.roles.read`; without it (or while loading) the template list is
+ * used, and the server still validates the chosen key.
+ */
+function useOfficeRoles() {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { can } = usePermission();
+  const query = useTenantRoles(slug, {
+    enabled: can(permissions.tenant.roles.read),
+    silent: true,
+  });
+  const roles = query.data?.items;
+  const options = useMemo(() => tenantRoleOptions(t, roles), [t, roles]);
+  return { roles, options };
 }
 
 function MemberRow({
@@ -57,11 +75,15 @@ function MemberRow({
   isSelf,
   actorRole,
   canWrite,
+  roles,
+  roleOptions,
 }: {
   member: TenantMember;
   isSelf: boolean;
   actorRole: string;
   canWrite: boolean;
+  roles: readonly TenantRole[] | undefined;
+  roleOptions: readonly TenantRoleOption[];
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
@@ -71,9 +93,16 @@ function MemberRow({
   const name = `${member.user.name} ${member.user.surname}`.trim();
   const current = member.role.key;
   // Options the caller may move this member to (the server enforces the same).
-  const options = TENANT_ROLE_KEYS.filter((k) =>
-    canChangeRole(actorRole, current, k),
+  const options = roleOptions.filter((o) =>
+    canChangeRole(actorRole, current, o.key),
   );
+  // Keep the member's current role selectable even if the list lacks it.
+  if (!options.some((o) => o.key === current)) {
+    options.unshift({
+      key: current,
+      label: tenantRoleLabel(t, current, { roles, fallback: member.role.name }),
+    });
+  }
   const editable = canWrite && !isSelf && options.length > 1;
   const removable =
     canWrite && !isSelf && canChangeRole(actorRole, current, "");
@@ -108,7 +137,7 @@ function MemberRow({
             onValueChange={(roleKey) =>
               changeRole.mutate({
                 userUuid: member.user.uuid,
-                roleKey: roleKey as TenantRoleKey,
+                roleKey,
               })
             }
           >
@@ -119,15 +148,15 @@ function MemberRow({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {options.map((key) => (
-                <SelectItem key={key} value={key}>
-                  {t(TENANT_ROLE_LABEL_KEYS[key])}
+              {options.map((o) => (
+                <SelectItem key={o.key} value={o.key}>
+                  {o.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         ) : (
-          roleLabel(t, current, member.role.name)
+          tenantRoleLabel(t, current, { roles, fallback: member.role.name })
         )}
       </td>
       <td className="text-muted-foreground py-2 pe-3 text-sm">
@@ -150,7 +179,13 @@ function MemberRow({
   );
 }
 
-function InviteForm({ actorRole }: { actorRole: string }) {
+function InviteForm({
+  actorRole,
+  roleOptions: allRoleOptions,
+}: {
+  actorRole: string;
+  roleOptions: readonly TenantRoleOption[];
+}) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const invite = useInviteTenantMember(slug);
@@ -159,20 +194,25 @@ function InviteForm({ actorRole }: { actorRole: string }) {
     () =>
       z.object({
         email: z.email(t("tenant.invite_validation_email")),
-        role_key: z.enum(["owner", "admin", "member"]),
+        role_key: z.string().regex(TENANT_ROLE_KEY_PATTERN),
       }),
     [t],
   );
-  const roleOptions = TENANT_ROLE_KEYS.filter((k) =>
-    canChangeRole(actorRole, "", k),
-  ).map((key) => ({ value: key, label: t(TENANT_ROLE_LABEL_KEYS[key]) }));
+  const roleOptions = allRoleOptions
+    .filter((o) => canChangeRole(actorRole, "", o.key))
+    .map((o) => ({ value: o.key, label: o.label }));
+  const defaultRole = roleOptions.some(
+    (o) => o.value === DEFAULT_INVITE_ROLE_KEY,
+  )
+    ? DEFAULT_INVITE_ROLE_KEY
+    : (roleOptions[0]?.value ?? DEFAULT_INVITE_ROLE_KEY);
 
   return (
     <AppForm
       key={formKey}
       id="tenant-invite-form"
       schema={schema}
-      defaultValues={{ email: "", role_key: "member" }}
+      defaultValues={{ email: "", role_key: defaultRole }}
       onSubmit={async (values: { email: string; role_key: TenantRoleKey }) => {
         await invite.mutateAsync({
           email: values.email.trim(),
@@ -208,6 +248,7 @@ function InviteForm({ actorRole }: { actorRole: string }) {
 }
 
 function InvitationsSection({ canWrite }: { canWrite: boolean }) {
+  const officeRoles = useOfficeRoles();
   const { t, locale } = useLocale();
   const { slug, role } = useTenant();
   const query = useTenantInvitations(slug);
@@ -222,7 +263,9 @@ function InvitationsSection({ canWrite }: { canWrite: boolean }) {
       <p className="text-muted-foreground mb-4 text-sm">
         {t("tenant.invitations_description")}
       </p>
-      {canWrite ? <InviteForm actorRole={role.key} /> : null}
+      {canWrite ? (
+        <InviteForm actorRole={role.key} roleOptions={officeRoles.options} />
+      ) : null}
       {query.isLoading ? <Loading label={t("common.loading")} /> : null}
       {query.isError ? (
         <ErrorState
@@ -267,7 +310,10 @@ function InvitationsSection({ canWrite }: { canWrite: boolean }) {
                     />
                   </td>
                   <td className="py-2 pe-3">
-                    {roleLabel(t, inv.role.key, inv.role.name)}
+                    {tenantRoleLabel(t, inv.role.key, {
+                      roles: officeRoles.roles,
+                      fallback: inv.role.name,
+                    })}
                   </td>
                   <td className="text-muted-foreground py-2 pe-3">
                     {date(inv.expires_at, "dd.MM.yyyy", locale)}
@@ -307,6 +353,7 @@ export function TenantMembersPage() {
   const { confirm } = useDialogs();
   const canWrite = can(permissions.tenant.members.write);
   const membersQuery = useTenantMembers(tenant.slug);
+  const officeRoles = useOfficeRoles();
   const leave = useLeaveTenant(tenant.slug);
   const members = membersQuery.data?.items ?? [];
 
@@ -406,6 +453,8 @@ export function TenantMembersPage() {
                       isSelf={m.user.uuid === user?.uuid}
                       actorRole={tenant.role.key}
                       canWrite={canWrite}
+                      roles={officeRoles.roles}
+                      roleOptions={officeRoles.options}
                     />
                   ))}
                 </tbody>

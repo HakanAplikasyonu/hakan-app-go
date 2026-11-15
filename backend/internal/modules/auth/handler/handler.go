@@ -171,14 +171,15 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	p := authctx.MustPrincipal(r.Context())
 	var in struct {
-		Name    *string `json:"name"`
-		Surname *string `json:"surname"`
-		Locale  *string `json:"locale"`
+		Name           *string `json:"name"`
+		Surname        *string `json:"surname"`
+		Locale         *string `json:"locale"`
+		SMMMRegistryNo *string `json:"smmm_registry_no"`
 	}
 	if err := decodeJSON(w, r, &in); err != nil {
 		return
 	}
-	me, err := h.uc.UpdateProfile(r.Context(), p.UserID, p.ImpersonatorUserID, in.Name, in.Surname, in.Locale)
+	me, err := h.uc.UpdateProfile(r.Context(), p.UserID, p.ImpersonatorUserID, in.Name, in.Surname, in.Locale, in.SMMMRegistryNo)
 	if err != nil {
 		writeUsecaseError(w, r, err)
 		return

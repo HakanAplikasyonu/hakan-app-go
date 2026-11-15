@@ -3317,6 +3317,136 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /v1/tenant/roles:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTenantRoles
+      summary: Roles of the organization
+      description: |
+        Requires `tenant.roles.read`. Every office gets copies of the template
+        roles (owner, admin, accountant, member, intern) when it is created
+        (D16); they are `is_system` and cannot be deleted. Custom roles are
+        office-specific and grant permissions only in this organization.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Roles
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTenantRoleList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: postTenantRole
+      summary: Create an office role
+      description: |
+        Requires `tenant.roles.write`. `key` is lowercase letters, digits and
+        `_` (2-32, starting with a letter), unique in the organization and not
+        a template key. `permissions` must be `tenant.*` slugs from
+        `GET /v1/tenant/role-permissions`. Bumps the organization's cache
+        version.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTenantRoleRequest"
+      responses:
+        "201":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTenantRole"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/roles/{roleKey}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: roleKey
+        in: path
+        required: true
+        schema: { type: string, maxLength: 32 }
+    patch:
+      tags: [Tenant]
+      operationId: patchTenantRole
+      summary: Update an office role
+      description: |
+        Requires `tenant.roles.write`. Name, description and permissions of
+        system and custom roles can change; the `owner` role always keeps every
+        tenant permission (its permissions cannot be edited). Bumps the
+        organization's cache version.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTenantRoleRequest"
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTenantRole"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Tenant]
+      operationId: deleteTenantRole
+      summary: Delete a custom office role
+      description: |
+        Requires `tenant.roles.write`. System roles cannot be deleted
+        (`409 ROLE_IS_SYSTEM`); a role held by a member or an open invitation
+        cannot be deleted (`409 ROLE_IN_USE`).
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/role-permissions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTenantRolePermissions
+      summary: Permissions an office role can grant
+      description: Requires `tenant.roles.read`. Every `tenant.*` permission.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Permissions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTenantPermissionList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/members:
     get:
       tags: [Tenant]
@@ -5673,6 +5803,9 @@ components:
           type: string
           enum: [tr, en]
           default: tr
+        smmm_registry_no:
+          type: [string, "null"]
+          description: SMMM oda sicil numarası (D16). Not verified.
 
     MeLinks:
       type: object
@@ -6223,6 +6356,10 @@ components:
         locale:
           type: string
           enum: [tr, en]
+        smmm_registry_no:
+          type: string
+          maxLength: 32
+          description: SMMM oda sicil numarası; empty string clears it. Not verified (D16).
 
     EmailCodeRequest:
       type: object
@@ -7193,6 +7330,88 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TaxpayerContext" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    TenantRole:
+      type: object
+      required: [key, name, description, is_system, permissions, member_count]
+      properties:
+        key: { type: string, examples: [owner, admin, accountant, member, intern, kidemli] }
+        name: { type: string }
+        description: { type: string }
+        is_system: { type: boolean, description: Template copy; cannot be deleted }
+        permissions:
+          type: array
+          items: { type: string }
+        member_count: { type: integer, format: int64 }
+
+    TenantRoleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TenantRole" }
+
+    TenantPermission:
+      type: object
+      required: [slug, name]
+      properties:
+        slug: { type: string }
+        name: { type: string }
+
+    TenantPermissionList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TenantPermission" }
+
+    CreateTenantRoleRequest:
+      type: object
+      additionalProperties: false
+      required: [key, name, permissions]
+      properties:
+        key: { type: string, pattern: "^[a-z][a-z0-9_]{1,31}$" }
+        name: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          items: { type: string }
+
+    PatchTenantRoleRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 100 }
+        description: { type: string, maxLength: 500 }
+        permissions:
+          type: array
+          items: { type: string }
+
+    EnvelopeTenantRole:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TenantRole" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTenantRoleList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TenantRoleList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTenantPermissionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TenantPermissionList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

@@ -44,6 +44,8 @@ export type AuthUser = {
   fullName: string;
   status: string;
   locale: string;
+  /** SMMM oda sicil no (D16, unverified); null when not set. */
+  smmmRegistryNo: string | null;
   isSuperAdmin: boolean;
   emailVerified: boolean;
   permissions: string[];
@@ -83,6 +85,7 @@ export function mapMeToAuthUser(me: Me): AuthUser {
     fullName: `${user.name} ${user.surname}`.trim(),
     status: user.status,
     locale,
+    smmmRegistryNo: user.smmm_registry_no ?? null,
     isSuperAdmin: Boolean(user.is_super_admin),
     emailVerified: Boolean(user.email_verified),
     permissions: permissions ?? [],

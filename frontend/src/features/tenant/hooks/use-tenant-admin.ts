@@ -6,6 +6,8 @@ import {
   tenantAdminKeys,
   tenantQueryKeys,
   tenantService,
+  type CreateTenantRoleBody,
+  type PatchTenantRoleBody,
   type TenantRoleKey,
 } from "@/features/tenant/services/tenant.service";
 import { useAppMutation } from "@/lib/query/mutation";
@@ -33,6 +35,31 @@ export function useTenantSettings(slug: string) {
   return useQuery({
     queryKey: tenantAdminKeys.settings(slug),
     queryFn: () => tenantService.getSettings(slug),
+  });
+}
+
+/**
+ * Office roles. `silent` keeps a refusal out of the toast stream for pages
+ * that only use the list as a nicer source for role pickers (members page).
+ */
+export function useTenantRoles(
+  slug: string,
+  options?: { enabled?: boolean; silent?: boolean },
+) {
+  return useQuery({
+    queryKey: tenantAdminKeys.roles(slug),
+    queryFn: () =>
+      tenantService.listRoles(slug, { silent: options?.silent ?? false }),
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useTenantRolePermissions(slug: string, enabled = true) {
+  return useQuery({
+    queryKey: tenantAdminKeys.rolePermissions(slug),
+    queryFn: () => tenantService.listRolePermissions(slug),
+    enabled,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -134,6 +161,57 @@ export function usePatchTenantSettings(slug: string) {
       // The name shows in the switcher and page headers.
       await refreshScope();
       appToast.success(t("tenant.toast_settings_saved"));
+    },
+  });
+}
+
+export function useCreateTenantRole(slug: string) {
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  return useAppMutation({
+    mutationFn: (body: CreateTenantRoleBody) =>
+      tenantService.createRole(slug, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantAdminKeys.roles(slug),
+      });
+      appToast.success(t("tenant.toast_role_created"));
+    },
+  });
+}
+
+export function usePatchTenantRole(slug: string) {
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  const refreshScope = useRefreshScope(slug);
+  return useAppMutation({
+    mutationFn: (vars: { roleKey: string; body: PatchTenantRoleBody }) =>
+      tenantService.patchRole(slug, vars.roleKey, vars.body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantAdminKeys.roles(slug),
+      });
+      // Role names show on the members page; the caller's own role may be
+      // the one whose permissions just changed.
+      void queryClient.invalidateQueries({
+        queryKey: tenantAdminKeys.members(slug),
+      });
+      await refreshScope();
+      appToast.success(t("tenant.toast_role_saved"));
+    },
+  });
+}
+
+export function useDeleteTenantRole(slug: string) {
+  const { t } = useLocale();
+  const queryClient = useQueryClient();
+  return useAppMutation({
+    mutationFn: (roleKey: string) => tenantService.deleteRole(slug, roleKey),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: tenantAdminKeys.roles(slug),
+      });
+      appToast.success(t("tenant.toast_role_deleted"));
     },
   });
 }
