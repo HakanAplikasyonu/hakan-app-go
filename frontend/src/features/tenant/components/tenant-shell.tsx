@@ -4,6 +4,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { AppLayout } from "@/components/layout";
 import { shellNav } from "@/config/nav";
+import { OfficePalette } from "@/features/office/components/office-palette";
 import { OrganizationSwitcher } from "@/features/tenant/components/organization-switcher";
 import { TenantProvider } from "@/features/tenant/providers/tenant-provider";
 
@@ -25,6 +26,7 @@ export function TenantShell({
       >
         {children}
       </AppLayout>
+      <OfficePalette />
     </TenantProvider>
   );
 }

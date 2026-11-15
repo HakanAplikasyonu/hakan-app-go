@@ -12,6 +12,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { formatAmount } from "../lib/decimal";
 import { useOffice } from "../hooks/use-office";
+import { AmountWaterfall } from "./amount-waterfall";
 import { InvoicePreview } from "./invoice-preview";
 import {
   DemoNotice,
@@ -224,6 +225,13 @@ function InvoiceDetailInner({ id }: { id: string }) {
                 })}
               </tbody>
             </TableBox>
+          </Panel>
+
+          <Panel
+            title={t("office.waterfall.title")}
+            description={t("office.waterfall.description")}
+          >
+            <AmountWaterfall invoice={invoice} />
           </Panel>
 
           <Panel title={t("office.totals")}>

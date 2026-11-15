@@ -51,6 +51,11 @@ type OfficeActions = {
     decision: "approved" | "rejected",
     override?: { accountCode: string; accountName: string },
   ) => void;
+  /** Kararı geri alır: öneri yeniden bekler, satırın kodu boşalır. */
+  reopenSuggestion: (
+    id: string,
+    restore?: { accountCode: string; accountName: string },
+  ) => void;
   setWarningStatus: (id: string, status: WarningStatus) => void;
   setAssignees: (taxpayerId: string, memberIds: string[]) => void;
   reset: () => void;
@@ -288,6 +293,33 @@ function createOfficeStore(slug: string) {
               status: invoiceStatus(inv.id, suggestions),
             };
           });
+          set({ suggestions, invoices });
+        },
+
+        reopenSuggestion(id, restore) {
+          const suggestions = get().suggestions.map((s) =>
+            s.id === id
+              ? {
+                  ...s,
+                  ...(restore ?? {}),
+                  status: "pending" as const,
+                  decidedAt: undefined,
+                }
+              : s,
+          );
+          const target = suggestions.find((s) => s.id === id);
+          if (!target) return;
+          const invoices = get().invoices.map((inv) =>
+            inv.id !== target.invoiceId
+              ? inv
+              : {
+                  ...inv,
+                  lines: inv.lines.map((l) =>
+                    l.id === target.lineId ? { ...l, accountCode: null } : l,
+                  ),
+                  status: invoiceStatus(inv.id, suggestions),
+                },
+          );
           set({ suggestions, invoices });
         },
 
