@@ -278,3 +278,25 @@ func TestExportWithExcelFormulaDriver(t *testing.T) {
 		t.Fatalf("batch: %+v", b)
 	}
 }
+
+// The luca driver runs through the service; its unverified template is
+// recorded on the batch (docs/02 §3.1: the UI warns while Verified=false).
+func TestExportWithLucaDriver(t *testing.T) {
+	e := setup(t)
+	d := e.draft(t, oct, debit("770", "10"), credit("320", "10"))
+	e.approve(t, d)
+	b, err := e.svc.Export(context.Background(), e.scope, e.actor, ExportInput{Driver: "luca", Period: "2026-10"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.Driver != "luca" || b.TemplateVerified || b.TemplateVersion != "unverified-1" || len(b.Files) != 1 || b.Files[0].Name != "luca_fis_2026-10.xlsx" {
+		t.Fatalf("batch: %+v", b)
+	}
+	found := false
+	for _, i := range b.Issues {
+		found = found || i.Code == accountingexport.IssueTemplateUnverified
+	}
+	if !found {
+		t.Fatalf("issues: %+v", b.Issues)
+	}
+}
