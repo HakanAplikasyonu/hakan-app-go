@@ -35,6 +35,7 @@ type Querier interface {
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
+	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
 	CountActivityEvents(ctx context.Context, arg CountActivityEventsParams) (int64, error)
 	CountAllBulkJobs(ctx context.Context) (int64, error)
 	CountAllExportJobs(ctx context.Context) (int64, error)
@@ -106,6 +107,8 @@ type Querier interface {
 	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
 	// tenant-lint: cross-org onay sonucu, token ile bulunan satırın id'siyle
 	DecideOnboardingRequest(ctx context.Context, arg DecideOnboardingRequestParams) error
+	// Yeni sürüm gelince etkin plan değişir; eski sürümün özeti imports'ta kalır.
+	DeleteAccountPlanAccounts(ctx context.Context, arg DeleteAccountPlanAccountsParams) (int64, error)
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
@@ -154,6 +157,8 @@ type Querier interface {
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
+	// Verilen kodlardan planda olanlar (denetim).
+	FindAccountPlanCodes(ctx context.Context, arg FindAccountPlanCodesParams) ([]FindAccountPlanCodesRow, error)
 	// 21 §5 kural 2: aynı hesap + tarih + yön + tutar + işlem sonrası bakiye.
 	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
 	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
@@ -186,6 +191,7 @@ type Querier interface {
 	FinishSyncRun(ctx context.Context, arg FinishSyncRunParams) (int64, error)
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
+	GetActiveAccountPlanImport(ctx context.Context, arg GetActiveAccountPlanImportParams) (AccountPlanImport, error)
 	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
 	GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID int64) (Engagement, error)
 	// tenant-lint: cross-org mükellefin kendi aktif engagement'ı (hangi ofiste olursa)
@@ -291,6 +297,9 @@ type Querier interface {
 	IncrementBankRuleHits(ctx context.Context, arg IncrementBankRuleHitsParams) error
 	IncrementOTPAttempts(ctx context.Context, id int64) (OtpCode, error)
 	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
+	// rows: [{"code","name","main_code","level","is_leaf"}, ...]
+	InsertAccountPlanAccounts(ctx context.Context, arg InsertAccountPlanAccountsParams) (int64, error)
+	InsertAccountPlanImport(ctx context.Context, arg InsertAccountPlanImportParams) (AccountPlanImport, error)
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
@@ -333,6 +342,10 @@ type Querier interface {
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
+	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
+	// Çıktı (journals, #26) için etkin planın bütün kodları.
+	ListAccountPlanCodeSet(ctx context.Context, arg ListAccountPlanCodeSetParams) ([]string, error)
+	ListAccountPlanImports(ctx context.Context, arg ListAccountPlanImportsParams) ([]AccountPlanImport, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
 	ListActivePushDevicesByUser(ctx context.Context, userID int64) ([]PushDevice, error)

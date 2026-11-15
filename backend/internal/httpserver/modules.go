@@ -3,6 +3,8 @@ package httpserver
 import (
 	accessmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access"
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
+	accountplanmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan"
+	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
 	activitymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
@@ -34,6 +36,8 @@ type moduleHandlers struct {
 	review   *reviewhandler.Handler
 	excel    *excelimporthandler.Handler
 	receipts *receiptshandler.Handler
+	// accountplan: hedef hesap planı (issue #30).
+	accountplan *accountplanhandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 }
@@ -52,5 +56,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		reviewmodule.Module{H: h.review, Engagements: h.engagements},
 		excelimportmodule.Module{H: h.excel, Engagements: h.engagements},
 		receiptsmodule.Module{H: h.receipts, Engagements: h.engagements},
+		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
 	}
 }

@@ -1,0 +1,136 @@
+package repository
+
+import (
+	"context"
+	"testing"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
+	warningsrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+)
+
+const planCSV = "Hesap Kodu;Hesap Adı\n100;KASA\n100.01;Merkez\n120;ALICILAR\n120.01;Alıcı A\n600;YURTİÇİ SATIŞLAR\n600.01;Satış\n391;HESAPLANAN KDV\n391.01;KDV %20\n"
+
+// TestGateBlocksMissingCodePerSetting is the #30 acceptance criterion on a
+// real database: an entry with a code outside the imported Luca plan is
+// blocked by default (blocker), only warned when the office lowers the
+// severity, and passes silently when the code is disabled. Fixing the code
+// auto-resolves the warning.
+func TestGateBlocksMissingCodePerSetting(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	org := d.Organization(t)
+	tp := d.Taxpayer(t, "legal", "1234567890")
+	eng := d.Engagement(t, org, tp)
+	other := d.Engagement(t, org, d.Taxpayer(t, "legal", "1234567891"))
+	q := db.New(d.Pool)
+
+	svc := usecase.New(New(d.Pool, q))
+	cfg := warningsrepo.NewConfig(q)
+	gate := usecase.NewGate(svc, engine.New(warningsrepo.NewWarnings(q), cfg), cfg)
+	subj := engine.Subject{OrganizationID: org, EngagementID: eng, TaxpayerID: tp}
+	ent := engine.Entity{Type: "invoice", ID: ptr(int64(4242)), Period: "2026-10"}
+
+	// No plan yet: nothing checked, nothing blocked.
+	v, err := gate.Evaluate(ctx, subj, ent, "", []string{"999.99"})
+	if err != nil || v.PlanLoaded || v.Blocked {
+		t.Fatalf("no plan: %+v %v", v, err)
+	}
+
+	res, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", []byte(planCSV))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Import.AccountCount != 8 || res.Import.SourceKind != usecase.KindAccountPlan {
+		t.Fatalf("import = %+v", res)
+	}
+
+	codes := []string{"120.01", "600.01", "391.01", "770.01"}
+	v, err = gate.Evaluate(ctx, subj, ent, "luca", codes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.PlanLoaded || !v.Blocked || len(v.Missing) != 1 || v.Missing[0] != "770.01" {
+		t.Fatalf("default blocker: %+v", v)
+	}
+	if n := openWarnings(t, d, eng); n != 1 {
+		t.Fatalf("open warnings = %d", n)
+	}
+
+	// Office lowers the code to warning: still reported, no longer blocks.
+	setOffice(t, d, org, `'warning'`, "NULL")
+	v, err = gate.Evaluate(ctx, subj, ent, "luca", codes)
+	if err != nil || v.Blocked || len(v.Missing) != 1 {
+		t.Fatalf("warning severity: %+v %v", v, err)
+	}
+	// Disabled: neither blocks nor keeps the warning open.
+	setOffice(t, d, org, "NULL", "false")
+	v, err = gate.Evaluate(ctx, subj, ent, "luca", codes)
+	if err != nil || v.Blocked || v.Enabled {
+		t.Fatalf("disabled: %+v %v", v, err)
+	}
+	if n := openWarnings(t, d, eng); n != 0 {
+		t.Fatalf("open warnings after disable = %d", n)
+	}
+	setOffice(t, d, org, "NULL", "true")
+
+	// Group account is reported but does not block; fixing the code resolves.
+	v, err = gate.Evaluate(ctx, subj, ent, "luca", []string{"120", "600.01"})
+	if err != nil || v.Blocked || len(v.NonLeaf) != 1 {
+		t.Fatalf("non-leaf: %+v %v", v, err)
+	}
+	var autoResolved int
+	if err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM data_warnings WHERE engagement_id = $1 AND status = 'auto_resolved'`, eng).Scan(&autoResolved); err != nil || autoResolved == 0 {
+		t.Fatalf("auto_resolved = %d %v", autoResolved, err)
+	}
+
+	// The plan is per engagement: the other mükellef has none.
+	r2, err := svc.Check(ctx, usecase.Subject{OrganizationID: org, EngagementID: other}, "", []string{"770.01"})
+	if err != nil || r2.PlanLoaded {
+		t.Fatalf("other engagement: %+v %v", r2, err)
+	}
+
+	// A new import replaces the active plan; history keeps both versions.
+	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan2.csv",
+		[]byte("Hesap Kodu;Hesap Adı\n770;GENEL YÖNETİM\n770.01;Kira\n")); err != nil {
+		t.Fatal(err)
+	}
+	r3, err := svc.Check(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, "", []string{"770.01", "120.01"})
+	if err != nil || len(r3.Missing) != 1 || r3.Missing[0] != "120.01" {
+		t.Fatalf("after reimport: %+v %v", r3, err)
+	}
+	imps, err := svc.Imports(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 10)
+	if err != nil || len(imps) != 2 || imps[0].FileName != "plan2.csv" {
+		t.Fatalf("imports = %+v %v", imps, err)
+	}
+	page, err := svc.Accounts(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, "", "770", 10, 0)
+	if err != nil || page.Total != 2 {
+		t.Fatalf("accounts = %+v %v", page, err)
+	}
+}
+
+func setOffice(t *testing.T, d *testdb.DB, org int64, severity, enabled string) {
+	t.Helper()
+	_, err := d.Pool.Exec(context.Background(), `
+		INSERT INTO warning_rule_configs (organization_id, code, severity, enabled)
+		VALUES ($1, 'ACCOUNT_NOT_IN_TARGET_PLAN', `+severity+`, `+enabled+`)
+		ON CONFLICT (organization_id, code) WHERE engagement_id IS NULL
+		DO UPDATE SET severity = EXCLUDED.severity, enabled = EXCLUDED.enabled`, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func openWarnings(t *testing.T, d *testdb.DB, eng int64) int {
+	t.Helper()
+	var n int
+	if err := d.Pool.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM data_warnings WHERE engagement_id = $1 AND code = 'ACCOUNT_NOT_IN_TARGET_PLAN' AND status = 'open'`, eng).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func ptr[T any](v T) *T { return &v }

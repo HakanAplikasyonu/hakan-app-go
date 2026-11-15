@@ -11,6 +11,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AccountPlanAccount struct {
+	ID             int64  `json:"id"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	ImportID       int64  `json:"import_id"`
+	Target         string `json:"target"`
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	MainCode       string `json:"main_code"`
+	Level          int16  `json:"level"`
+	IsLeaf         bool   `json:"is_leaf"`
+}
+
+type AccountPlanImport struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Target         string             `json:"target"`
+	SourceFormat   string             `json:"source_format"`
+	SourceKind     string             `json:"source_kind"`
+	FileName       string             `json:"file_name"`
+	Sha256         string             `json:"sha256"`
+	AccountCount   int32              `json:"account_count"`
+	SkippedRows    int32              `json:"skipped_rows"`
+	ImportedBy     pgtype.Int8        `json:"imported_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type ActivityEvent struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
