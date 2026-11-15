@@ -20,6 +20,7 @@ import {
   Shield,
   Sparkles,
   Upload,
+  Waypoints,
 } from "lucide-react";
 
 import { permissions } from "@/config/permissions";
@@ -284,6 +285,12 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "layout.home",
             href: routes.tenant.home(slug),
             icon: LayoutDashboard,
+          },
+          {
+            id: "command",
+            titleKey: "office.nav_command",
+            href: routes.tenant.command(slug),
+            icon: Waypoints,
           },
           {
             id: "taxpayers",

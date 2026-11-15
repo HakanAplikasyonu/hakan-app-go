@@ -120,6 +120,7 @@ export const routes = {
     invoice: (slug: string, id: string) =>
       `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}`,
     warnings: (slug: string) => `/t/${encodeURIComponent(slug)}/warnings`,
+    command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     reviewStudio: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/review/studio`,
