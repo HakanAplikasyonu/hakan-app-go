@@ -4795,6 +4795,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/bank-services": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Banks that can be connected through their web service
+         * @description Requires `tenant.bank.read`. Banks with a written adapter (#49:
+         *     Vakıfbank) and the credential fields their form needs. Other banks
+         *     stay on statement upload.
+         */
+        get: operations["listTenantBankServices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's bank web-service connections
+         * @description Requires `tenant.bank.read`.
+         */
+        get: operations["listTenantBankConnections"];
+        put?: never;
+        /**
+         * Start connecting a bank account (draft)
+         * @description Requires `tenant.bank.write`. Opens a `draft` connection
+         *     (`source_connections`, `source_system = bank_<id>`) with the IBANs to
+         *     print on the branch instruction. `environment` is `production`
+         *     (default) or `test` (the bank's test system).
+         */
+        post: operations["createTenantBankConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One bank connection
+         * @description Requires `tenant.bank.read`.
+         */
+        get: operations["getTenantBankConnection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/instruction": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Pre-filled branch instruction (PDF)
+         * @description Requires `tenant.bank.write`. The instruction letter of 20 §5.2 with
+         *     the taxpayer's title, VKN, tax office, the IBANs, the fixed egress
+         *     IPs (`BANK_EGRESS_IPS`) and the technical contact. The taxpayer
+         *     signs it and hands it to the branch. A `draft` becomes `form_ready`.
+         */
+        get: operations["getTenantBankConnectionInstruction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The instruction was handed to the branch
+         * @description Requires `tenant.bank.write`. `draft` / `form_ready` → `submitted_to_bank`.
+         */
+        post: operations["markTenantBankConnectionSubmitted"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enter the bank's service user and verify it
+         * @description Requires `tenant.bank.write`. `values` holds the bank's
+         *     `credential_fields`. They are written to the credential vault (never
+         *     to the connection row or logs), then a one-day query verifies them.
+         *     Success: accounts are linked to cash boxes by IBAN (missing ones are
+         *     created) and the connection is `active`. A bank refusal is not an
+         *     HTTP error: the connection is `failed` and `error` carries the reason
+         *     (`ip_rejected`, `bad_credentials`, `instruction_missing`,
+         *     `tax_id_mismatch` …), the bank's code and the Turkish text.
+         */
+        put: operations["setTenantBankConnectionCredentials"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read movements now ("şimdi çek")
+         * @description Requires `tenant.bank.write` and an `active` connection. Reads
+         *     `from`–`to` (YYYY-MM-DD, Türkiye days) in the bank's window size and
+         *     writes the movements with the duplicate rules and classification. At
+         *     most once per 5 minutes per connection; not older than the bank keeps
+         *     (Vakıfbank 365 days).
+         */
+        post: operations["syncTenantBankConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements": {
         parameters: {
             query?: never;
@@ -6002,6 +6224,90 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BankCredentialField: {
+            key: string;
+            label: string;
+            secret: boolean;
+            pattern?: string;
+            help?: string;
+        };
+        BankService: {
+            bank_id: string;
+            name: string;
+            credential_fields: components["schemas"]["BankCredentialField"][];
+            limits: {
+                max_range_days: number;
+                max_history_days: number;
+            };
+        };
+        EnvelopeBankServiceList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankService"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankConnection: {
+            /** Format: uuid */
+            uuid: string;
+            bank_id: string;
+            bank_name: string;
+            /** @enum {string} */
+            environment: "production" | "test";
+            /** @enum {string} */
+            setup_state: "draft" | "form_ready" | "submitted_to_bank" | "credentials_entered" | "verifying" | "active" | "failed";
+            /** @enum {string} */
+            status: "pending" | "active" | "auth_failed" | "rate_limited" | "disabled";
+            ibans: string[];
+            has_credentials: boolean;
+            error?: {
+                /** @description ip_rejected, unauthorized, bad_credentials, instruction_missing, account_not_defined, bank_error, rate_limited, invalid_request, tax_id_mismatch */
+                reason: string;
+                /** @description The bank's own code (e.g. VBH0009) */
+                code?: string;
+                message: string;
+                /** Format: date-time */
+                at: string;
+            };
+            credential_fields: components["schemas"]["BankCredentialField"][];
+            /** Format: date-time */
+            submitted_at?: string;
+            /** Format: date-time */
+            verified_at?: string;
+            /** Format: date-time */
+            last_sync_at?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeBankConnection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankConnection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankConnectionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankConnection"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankSyncResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                windows: number;
+                accounts: number;
+                inserted: number;
+                merged: number;
+                skipped: number;
+                possible_duplicates: number;
+                connection: components["schemas"]["BankConnection"];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         KolayBiConnection: {
             /** Format: uuid */
             uuid: string;
@@ -9614,6 +9920,7 @@ export interface components {
         };
     };
     parameters: {
+        BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
         /**
@@ -17368,6 +17675,359 @@ export interface operations {
             };
             500: components["responses"]["InternalError"];
             /** @description `PARASUT_AUTH_FAILED` */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listTenantBankServices: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Banks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankServiceList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankConnectionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantBankConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example vakifbank */
+                    bank_id: string;
+                    /** @enum {string} */
+                    environment?: "production" | "test";
+                    ibans?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Draft connection */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `BANK_NOT_SUPPORTED` or `INVALID_IBAN` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankConnection"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankConnectionInstruction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `BANK_EGRESS_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    markTenantBankConnectionSubmitted: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankConnection"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankConnectionCredentials: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    values: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Connection after verification */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `CREDENTIALS_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncTenantBankConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["BankConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    from: string;
+                    /** Format: date */
+                    to: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sync report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankSyncResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_RANGE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `BANK_SYNC_THROTTLED` */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `BANK_REFUSED`: details carry `reason` and the bank's `code` */
             502: {
                 headers: {
                     [name: string]: unknown;

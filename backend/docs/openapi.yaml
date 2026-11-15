@@ -6776,6 +6776,274 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/bank-services:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankServices
+      summary: Banks that can be connected through their web service
+      description: |
+        Requires `tenant.bank.read`. Banks with a written adapter (#49:
+        Vakıfbank) and the credential fields their form needs. Other banks
+        stay on statement upload.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Banks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankServiceList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankConnections
+      summary: The taxpayer's bank web-service connections
+      description: Requires `tenant.bank.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankConnectionList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Bank]
+      operationId: createTenantBankConnection
+      summary: Start connecting a bank account (draft)
+      description: |
+        Requires `tenant.bank.write`. Opens a `draft` connection
+        (`source_connections`, `source_system = bank_<id>`) with the IBANs to
+        print on the branch instruction. `environment` is `production`
+        (default) or `test` (the bank's test system).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bank_id]
+              properties:
+                bank_id: { type: string, example: vakifbank }
+                environment: { type: string, enum: [production, test] }
+                ibans: { type: array, items: { type: string } }
+      responses:
+        "201":
+          description: Draft connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`BANK_NOT_SUPPORTED` or `INVALID_IBAN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/BankConnectionUuid"
+    get:
+      tags: [Bank]
+      operationId: getTenantBankConnection
+      summary: One bank connection
+      description: Requires `tenant.bank.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankConnection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/instruction:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/BankConnectionUuid"
+    get:
+      tags: [Bank]
+      operationId: getTenantBankConnectionInstruction
+      summary: Pre-filled branch instruction (PDF)
+      description: |
+        Requires `tenant.bank.write`. The instruction letter of 20 §5.2 with
+        the taxpayer's title, VKN, tax office, the IBANs, the fixed egress
+        IPs (`BANK_EGRESS_IPS`) and the technical contact. The taxpayer
+        signs it and hands it to the branch. A `draft` becomes `form_ready`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503":
+          description: "`BANK_EGRESS_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/BankConnectionUuid"
+    post:
+      tags: [Bank]
+      operationId: markTenantBankConnectionSubmitted
+      summary: The instruction was handed to the branch
+      description: Requires `tenant.bank.write`. `draft` / `form_ready` → `submitted_to_bank`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankConnection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/BankConnectionUuid"
+    put:
+      tags: [Bank]
+      operationId: setTenantBankConnectionCredentials
+      summary: Enter the bank's service user and verify it
+      description: |
+        Requires `tenant.bank.write`. `values` holds the bank's
+        `credential_fields`. They are written to the credential vault (never
+        to the connection row or logs), then a one-day query verifies them.
+        Success: accounts are linked to cash boxes by IBAN (missing ones are
+        created) and the connection is `active`. A bank refusal is not an
+        HTTP error: the connection is `failed` and `error` carries the reason
+        (`ip_rejected`, `bad_credentials`, `instruction_missing`,
+        `tax_id_mismatch` …), the bank's code and the Turkish text.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: { type: string } }
+      responses:
+        "200":
+          description: Connection after verification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`CREDENTIALS_INCOMPLETE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "`VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/BankConnectionUuid"
+    post:
+      tags: [Bank]
+      operationId: syncTenantBankConnection
+      summary: Read movements now ("şimdi çek")
+      description: |
+        Requires `tenant.bank.write` and an `active` connection. Reads
+        `from`–`to` (YYYY-MM-DD, Türkiye days) in the bank's window size and
+        writes the movements with the duplicate rules and classification. At
+        most once per 5 minutes per connection; not older than the bank keeps
+        (Vakıfbank 365 days).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string, format: date }
+                to: { type: string, format: date }
+      responses:
+        "200":
+          description: Sync report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankSyncResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_RANGE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: "`BANK_SYNC_THROTTLED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: "`BANK_REFUSED`: details carry `reason` and the bank's `code`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statements:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -8155,6 +8423,11 @@ components:
       bearerFormat: JWT
 
   parameters:
+    BankConnectionUuid:
+      name: connectionUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     SourceConnectionUuid:
       name: connectionUuid
       in: path
@@ -8317,6 +8590,102 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    BankCredentialField:
+      type: object
+      required: [key, label, secret]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        secret: { type: boolean }
+        pattern: { type: string }
+        help: { type: string }
+    BankService:
+      type: object
+      required: [bank_id, name, credential_fields, limits]
+      properties:
+        bank_id: { type: string }
+        name: { type: string }
+        credential_fields: { type: array, items: { $ref: "#/components/schemas/BankCredentialField" } }
+        limits:
+          type: object
+          required: [max_range_days, max_history_days]
+          properties:
+            max_range_days: { type: integer }
+            max_history_days: { type: integer }
+    EnvelopeBankServiceList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/BankService" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    BankConnection:
+      type: object
+      required: [uuid, bank_id, bank_name, environment, setup_state, status, ibans, has_credentials, credential_fields, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        bank_id: { type: string }
+        bank_name: { type: string }
+        environment: { type: string, enum: [production, test] }
+        setup_state:
+          type: string
+          enum: [draft, form_ready, submitted_to_bank, credentials_entered, verifying, active, failed]
+        status: { type: string, enum: [pending, active, auth_failed, rate_limited, disabled] }
+        ibans: { type: array, items: { type: string } }
+        has_credentials: { type: boolean }
+        error:
+          type: object
+          required: [reason, message, at]
+          properties:
+            reason: { type: string, description: "ip_rejected, unauthorized, bad_credentials, instruction_missing, account_not_defined, bank_error, rate_limited, invalid_request, tax_id_mismatch" }
+            code: { type: string, description: "The bank's own code (e.g. VBH0009)" }
+            message: { type: string }
+            at: { type: string, format: date-time }
+        credential_fields: { type: array, items: { $ref: "#/components/schemas/BankCredentialField" } }
+        submitted_at: { type: string, format: date-time }
+        verified_at: { type: string, format: date-time }
+        last_sync_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    EnvelopeBankConnection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBankConnectionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/BankConnection" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBankSyncResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [windows, accounts, inserted, merged, skipped, possible_duplicates, connection]
+          properties:
+            windows: { type: integer }
+            accounts: { type: integer }
+            inserted: { type: integer }
+            merged: { type: integer }
+            skipped: { type: integer }
+            possible_duplicates: { type: integer }
+            connection: { $ref: "#/components/schemas/BankConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     KolayBiConnection:
       type: object
       required: [uuid, setup_state, status, created_at]

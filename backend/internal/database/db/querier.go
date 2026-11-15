@@ -410,6 +410,7 @@ type Querier interface {
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
+	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
 	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
 	// Çıktı (journals, #26) için etkin planın bütün kodları.
@@ -433,6 +434,9 @@ type Querier interface {
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
+	// Banka web servisi bağlantıları (#49): source_connections üzerinde
+	// (source_system = 'bank_<id>'), mükellef kapsamında.
+	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
@@ -618,6 +622,7 @@ type Querier interface {
 	// tenant-lint: cross-org mükellef yüklemesi için görevi kilitler; taxpayer_id ve aktif engagement ile sınırlı
 	LockTaxpayerDocumentTask(ctx context.Context, arg LockTaxpayerDocumentTaskParams) (LockTaxpayerDocumentTaskRow, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
+	MarkBankConnectionSynced(ctx context.Context, arg MarkBankConnectionSyncedParams) error
 	MarkBulkJobCompleted(ctx context.Context, arg MarkBulkJobCompletedParams) (BulkJob, error)
 	MarkBulkJobFailed(ctx context.Context, arg MarkBulkJobFailedParams) (BulkJob, error)
 	MarkBulkJobProcessing(ctx context.Context, id int64) (BulkJob, error)
@@ -744,6 +749,7 @@ type Querier interface {
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
+	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
 	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)
