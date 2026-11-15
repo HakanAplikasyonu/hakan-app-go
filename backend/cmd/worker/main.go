@@ -9,9 +9,11 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
@@ -31,6 +33,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
@@ -143,6 +146,16 @@ func main() {
 	log = persist.Logger()
 	defer persist.Close()
 
+	// Entegratör senkronu (#40): bağlantı kimlik bilgileri sır kasasında.
+	// Anahtar halkası geçersizse diğer işler sürer; senkron ErrNoCredentials verir.
+	var vault secrets.Vault
+	if keyring, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
+		log.Warn("secrets_keyring_invalid", "error", err)
+	} else {
+		vault = secrets.New(keyring, secrets.NewPGStore(db.New(pool)))
+	}
+	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{}, log)
+
 	worker := queue.NewWorker(cfg, log, notifSvc.Deliver).
 		WithExport(exportSvc.ProcessExport).
 		WithImport(importSvc.ProcessImport).
@@ -150,6 +163,9 @@ func main() {
 		WithUBLUpload(invoiceupload.New(pool, store, nil, log).Process).
 		WithDocTaskReminders(doctasksmodule.New(pool, store, notifSvc,
 			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount).
+		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
+			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
+		}).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
 		WithSearch(

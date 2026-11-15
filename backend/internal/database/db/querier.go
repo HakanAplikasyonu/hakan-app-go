@@ -254,6 +254,7 @@ type Querier interface {
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
+	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
 	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
@@ -408,6 +409,7 @@ type Querier interface {
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
+	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
 	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
 	// Çıktı (journals, #26) için etkin planın bütün kodları.
@@ -468,6 +470,9 @@ type Querier interface {
 	// kuralı engagement_document_visible'da (migration 000048).
 	ListEngagementVisibleInvoices(ctx context.Context, arg ListEngagementVisibleInvoicesParams) ([]ListEngagementVisibleInvoicesRow, error)
 	ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error)
+	ListEntegratorDocuments(ctx context.Context, arg ListEntegratorDocumentsParams) ([]EntegratorDocument, error)
+	// UBL kuyruğu (37 §5.4): bekleyenler ve deneme hakkı kalan hatalılar.
+	ListEntegratorUBLQueue(ctx context.Context, arg ListEntegratorUBLQueueParams) ([]EntegratorDocument, error)
 	ListEntityDataWarnings(ctx context.Context, arg ListEntityDataWarningsParams) ([]DataWarning, error)
 	ListExcelImportCreatedInvoices(ctx context.Context, arg ListExcelImportCreatedInvoicesParams) ([]int64, error)
 	ListExcelImportRows(ctx context.Context, arg ListExcelImportRowsParams) ([]ExcelImportRow, error)
@@ -536,6 +541,9 @@ type Querier interface {
 	ListPlatformNotificationsForExport(ctx context.Context, arg ListPlatformNotificationsForExportParams) ([]Notification, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
+	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
+	// kesilmiş bir çalışmadandır ve imlecinden sürer.
+	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
 	// Ofis satırları ve, engagement verilirse, onun satırları.
 	ListReviewSettings(ctx context.Context, arg ListReviewSettingsParams) ([]ListReviewSettingsRow, error)
 	ListRolePermissionSlugsByRoleUUID(ctx context.Context, argUuid uuid.UUID) ([]string, error)
@@ -617,6 +625,8 @@ type Querier interface {
 	// Geri çekilme: n. hatırlatmadan sonra bir sonraki base_days * 2^n gün sonra;
 	// max_reminders'a ulaşınca hatırlatma biter (next_reminder_at NULL).
 	MarkDocumentTasksReminded(ctx context.Context, arg MarkDocumentTasksRemindedParams) (int64, error)
+	// Tam taramada görülmeyen belgeler (37 §5.5). Silinmez; ilk görülmediği an kalır.
+	MarkEntegratorDocumentsMissing(ctx context.Context, arg MarkEntegratorDocumentsMissingParams) (int64, error)
 	MarkExcelImportCommitted(ctx context.Context, arg MarkExcelImportCommittedParams) (ExcelImport, error)
 	MarkExcelImportRolledBack(ctx context.Context, arg MarkExcelImportRolledBackParams) (ExcelImport, error)
 	MarkExportJobCompleted(ctx context.Context, arg MarkExportJobCompletedParams) (ExportJob, error)
@@ -691,18 +701,24 @@ type Querier interface {
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
+	SetEntegratorDocumentUBL(ctx context.Context, arg SetEntegratorDocumentUBLParams) (int64, error)
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)
+	// Entegratör durumu (30 §8) faturaya işlenir.
+	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
+	SetSourceConnectionCapabilities(ctx context.Context, arg SetSourceConnectionCapabilitiesParams) (int64, error)
 	SetSourceConnectionCompany(ctx context.Context, arg SetSourceConnectionCompanyParams) (SourceConnection, error)
 	SetSourceConnectionCredentialsRef(ctx context.Context, arg SetSourceConnectionCredentialsRefParams) (int64, error)
 	SetSourceConnectionState(ctx context.Context, arg SetSourceConnectionStateParams) (SourceConnection, error)
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
+	// Sayfa sonrası ilerleme; yarıda kalan pencere buradan sürer (deneme sayısı artmaz).
+	SetSyncWindowCursor(ctx context.Context, arg SetSyncWindowCursorParams) (int64, error)
 	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
@@ -763,6 +779,9 @@ type Querier interface {
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error
+	// Listeden görülen belge (37 §5.2). prev_* alanları bu çağrıdan önceki hali
+	// verir: durum değiştiyse fatura güncellenir, UBL yoksa kuyruğa girer.
+	UpsertEntegratorDocument(ctx context.Context, arg UpsertEntegratorDocumentParams) (UpsertEntegratorDocumentRow, error)
 	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
 	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)

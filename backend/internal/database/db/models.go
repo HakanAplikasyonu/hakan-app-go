@@ -501,6 +501,33 @@ type EngagementAssignment struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type EntegratorDocument struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	ConnectionID     int64              `json:"connection_id"`
+	Ettn             string             `json:"ettn"`
+	DocKind          string             `json:"doc_kind"`
+	Direction        string             `json:"direction"`
+	InvoiceNumber    pgtype.Text        `json:"invoice_number"`
+	IssueDate        pgtype.Date        `json:"issue_date"`
+	CreatedAtSource  pgtype.Timestamptz `json:"created_at_source"`
+	StatusRaw        string             `json:"status_raw"`
+	StatusNormalized string             `json:"status_normalized"`
+	Warnings         []string           `json:"warnings"`
+	HeaderRaw        []byte             `json:"header_raw"`
+	UblStatus        string             `json:"ubl_status"`
+	UblAttempts      int32              `json:"ubl_attempts"`
+	UblError         []byte             `json:"ubl_error"`
+	UblAttachmentID  pgtype.Int8        `json:"ubl_attachment_id"`
+	InvoiceID        pgtype.Int8        `json:"invoice_id"`
+	FirstSeenAt      pgtype.Timestamptz `json:"first_seen_at"`
+	LastSeenAt       pgtype.Timestamptz `json:"last_seen_at"`
+	MissingSince     pgtype.Timestamptz `json:"missing_since"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ExcelImport struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
