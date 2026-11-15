@@ -407,3 +407,57 @@ func TestFullScanMarksMissing(t *testing.T) {
 		t.Fatalf("document still at the source marked missing: %+v", d)
 	}
 }
+
+// noCursor behaves like İzibiz GetInvoice: LIMIT caps the result and there
+// is no next page.
+type noCursor struct{ *spy }
+
+func (noCursor) Name() string { return "fake-nocursor" }
+
+func (n noCursor) ListInbox(ctx context.Context, q provider.ListQuery) (*provider.Page, error) {
+	p, err := n.spy.ListInbox(ctx, q)
+	if p != nil {
+		p.Next = ""
+	}
+	return p, err
+}
+
+// İzibiz kuralı (36 §5.3): dönen kayıt sayısı LIMIT'e eşitse pencere bölünür;
+// 1 günlük pencere hâlâ doluysa LIMIT_REACHED yazılır.
+func TestNoCursorFullPageSplits(t *testing.T) {
+	ctx := context.Background()
+	e := setup(t, Config{})
+	RegisterListProfile("fake-nocursor", ListProfile{PageSize: 2, NoCursor: true})
+	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) {
+		return Wrap(noCursor{e.spy}), nil
+	})
+	base := mustTime(t, "2026-10-01T10:00:00+03:00")
+	for i := range 6 {
+		e.deliver(t, i+1, "TEMELFATURA", provider.StatusReceived, base.Add(time.Duration(i)*96*time.Hour))
+	}
+	rep, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunBackfill)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Counters.Splits == 0 || rep.Counters.LimitReached != 0 || rep.Status != "success" {
+		t.Fatalf("report %+v", rep)
+	}
+	if n := e.count(t, `SELECT count(*) FROM entegrator_documents WHERE taxpayer_id = $1`); n != 6 {
+		t.Fatalf("indexed = %d, want 6", n)
+	}
+
+	// Three documents on one day with LIMIT 2: the day cannot be split.
+	for i := range 3 {
+		e.deliver(t, 30+i, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-03T10:00:00+03:00").Add(time.Duration(i)*time.Minute))
+	}
+	rep, err = e.svc.Run(ctx, e.tp, e.conn.Uuid, RunFullScan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.Counters.LimitReached != 1 || rep.Status != "partial" {
+		t.Fatalf("report %+v", rep)
+	}
+	if n := e.count(t, `SELECT count(*) FROM sync_windows WHERE taxpayer_id = $1 AND last_error->>'code' = $2`, CodeLimitReached); n != 1 {
+		t.Fatalf("LIMIT_REACHED windows = %d", n)
+	}
+}

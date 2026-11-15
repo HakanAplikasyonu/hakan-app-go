@@ -171,6 +171,7 @@ type Counters struct {
 	Windows       int `json:"windows"`
 	WindowsFailed int `json:"windows_failed"`
 	Splits        int `json:"splits"`
+	LimitReached  int `json:"limit_reached"`
 	Pages         int `json:"pages"`
 	Listed        int `json:"listed"`
 	New           int `json:"new"`
@@ -247,7 +248,7 @@ func (s *Service) Run(ctx context.Context, taxpayerID int64, connUUID uuid.UUID,
 	switch {
 	case runErr != nil:
 		rep.Status = "failed"
-	case rep.Counters.WindowsFailed > 0 || rep.Counters.UBLFailed > 0:
+	case rep.Counters.WindowsFailed > 0 || rep.Counters.UBLFailed > 0 || rep.Counters.LimitReached > 0:
 		rep.Status = "partial"
 	}
 	s.finish(ctx, conn, run.ID, rep, runErr)
