@@ -34,6 +34,7 @@ type Config struct {
 	Tenancy    TenancyConfig
 	AI         AIConfig
 	Parasut    ParasutConfig
+	Easytrade  EasytradeConfig
 }
 
 // ParasutConfig is the Paraşüt integrator application (docs/kaynak 10 §1.1):
@@ -43,6 +44,11 @@ type ParasutConfig struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
+}
+
+// EasytradeConfig is the Easytrade Muhasebe API (docs/kaynak 09).
+type EasytradeConfig struct {
+	BaseURL string
 }
 
 // TenancyConfig controls organizations (the multi-tenant shell). See
@@ -401,6 +407,7 @@ func Load() (Config, error) {
 			CacheTTL:  getDuration("TENANCY_CACHE_TTL", 60*time.Second),
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
 		},
+		Easytrade: EasytradeConfig{BaseURL: getEnv("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api")},
 		Parasut: ParasutConfig{
 			BaseURL:      getEnv("PARASUT_BASE_URL", "https://api.parasut.com"),
 			ClientID:     getEnv("PARASUT_CLIENT_ID", ""),

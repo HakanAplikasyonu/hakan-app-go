@@ -14,6 +14,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
 )
 
 // SourceSystem of everything read from Paraşüt.
@@ -21,32 +22,13 @@ const SourceSystem = "parasut"
 
 var hundred = decimal.NewFromInt(100)
 
-// Expense is a kalemsiz, e-belgesiz purchase bill (10 §4.3, Kalem 5).
-type Expense struct {
-	SourceID     string
-	Date         time.Time
-	Period       string
-	Amount       decimal.Decimal // net_total, KDV dahil
-	TaxAmount    decimal.Decimal
-	TaxRate      *decimal.Decimal // header estimate
-	Currency     string
-	Description  string
-	VendorName   string
-	VendorTaxID  string
-	VehiclePlate string
-	Raw          map[string]any
-	Hash         string
-}
-
-// Excluded counts what was read but not written, by reason.
-type Excluded map[string]int
-
-// Batch is one window's mapped records.
-type Batch struct {
-	Invoices []model.Invoice
-	Expenses []Expense
-	Excluded Excluded
-}
+// Kalemsiz, e-belgesiz purchase bills become sources.Expense (10 §4.3).
+type (
+	Batch    = sources.Batch
+	Expense  = sources.Expense
+	Excluded = sources.Excluded
+	Report   = sources.Report
+)
 
 const salesInclude = "contact,details,details.product,active_e_document"
 const purchaseInclude = "supplier,details,details.product,active_e_document"

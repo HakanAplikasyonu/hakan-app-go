@@ -77,6 +77,7 @@ x-backend-environment: &backend-environment
   # Passkey relying-party ID; empty → hostname of PUBLIC_FRONTEND_URL.
   AUTH_WEBAUTHN_RP_ID: ${AUTH_WEBAUTHN_RP_ID:-}
   # AI module (docs/01 G11). Keys only via env; empty key = AI off.
+  EASYTRADE_API_BASE_URL: ${EASYTRADE_API_BASE_URL:-}
   PARASUT_BASE_URL: ${PARASUT_BASE_URL:-}
   PARASUT_CLIENT_ID: ${PARASUT_CLIENT_ID:-}
   PARASUT_CLIENT_SECRET: ${PARASUT_CLIENT_SECRET:-}

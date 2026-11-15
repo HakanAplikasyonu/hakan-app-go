@@ -9,6 +9,7 @@ import (
 
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -116,7 +117,7 @@ func TestAcceptanceCountsAndTotals(t *testing.T) {
 	if b.Excluded["cancelled"] != 1 || b.Excluded["not_an_invoice"] < 2 {
 		t.Fatalf("excluded: %v", b.Excluded)
 	}
-	rep, err := Write(ctx, d.Pool, tp, b)
+	rep, err := sources.Write(ctx, d.Pool, tp, SourceSystem, b)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,7 +167,7 @@ func TestAcceptanceCountsAndTotals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rep, err = Write(ctx, d.Pool, tp, b)
+	rep, err = sources.Write(ctx, d.Pool, tp, SourceSystem, b)
 	if err != nil {
 		t.Fatal(err)
 	}
