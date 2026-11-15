@@ -111,6 +111,13 @@ export const routes = {
     home: (slug: string) => `/t/${encodeURIComponent(slug)}`,
     members: (slug: string) => `/t/${encodeURIComponent(slug)}/members`,
     settings: (slug: string) => `/t/${encodeURIComponent(slug)}/settings`,
+    taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
+    invoices: (slug: string) => `/t/${encodeURIComponent(slug)}/invoices`,
+    invoice: (slug: string, id: string) =>
+      `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}`,
+    warnings: (slug: string) => `/t/${encodeURIComponent(slug)}/warnings`,
+    review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
+    upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
   },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,
