@@ -29,6 +29,7 @@ import (
 	authsettingshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/handler"
 	authsettingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/usecase"
 	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	bankmatching "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/matching"
 	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
@@ -108,6 +109,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+	"github.com/shopspring/decimal"
 )
 
 // Deps holds infrastructure clients wired into the HTTP server.
@@ -408,8 +410,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries), log)
 	// Appliers are registered by the modules that own suggestion targets.
 	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
-		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{})
+		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).
+		Register(bankmatching.SuggestionKind, bankmatching.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
+	// Banka–fatura eşleme ve BNK kontrolleri (#21).
+	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
+			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")})))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{

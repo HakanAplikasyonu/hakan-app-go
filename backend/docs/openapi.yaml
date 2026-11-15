@@ -5439,6 +5439,62 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-matching:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Bank]
+      operationId: runTenantBankMatching
+      summary: Match a period's bank movements to invoices and refresh the BNK warnings
+      description: |
+        Requires `tenant.bank.write`. Open collections and payments of the
+        period are scored against open invoices (21 §6.2): score ≥ 80 with a
+        single candidate 20 ahead of the next is matched automatically; 50–79,
+        several strong candidates or an exact bulk payment (≤ 5 invoices of
+        one counterparty) go to the review queue as `bank_match`
+        suggestions. Then the period controls raise or resolve
+        `BNK_UNINVOICED_COLLECTION`, `BNK_UNDOCUMENTED_PAYMENT`,
+        `BNK_INTEREST`, `BNK_TAX_PAID`, `BNK_RENT_WITHHOLDING`,
+        `BNK_NON_BUSINESS` and `BNK_UNCLASSIFIED`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' } }
+      responses:
+        "200":
+          description: Run summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [period, examined, auto_matched, suggested, unmatched]
+                    properties:
+                      period: { type: string }
+                      examined: { type: integer }
+                      auto_matched: { type: integer }
+                      suggested: { type: integer }
+                      unmatched: { type: integer }
+                      findings: { type: array, items: { type: string } }
+                      warnings:
+                        type: object
+                        properties:
+                          Created: { type: integer }
+                          Refreshed: { type: integer }
+                          Suppressed: { type: integer }
+                          Disabled: { type: integer }
+                          AutoResolved: { type: integer }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statements:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

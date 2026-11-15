@@ -3802,6 +3802,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-matching": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match a period's bank movements to invoices and refresh the BNK warnings
+         * @description Requires `tenant.bank.write`. Open collections and payments of the
+         *     period are scored against open invoices (21 §6.2): score ≥ 80 with a
+         *     single candidate 20 ahead of the next is matched automatically; 50–79,
+         *     several strong candidates or an exact bulk payment (≤ 5 invoices of
+         *     one counterparty) go to the review queue as `bank_match`
+         *     suggestions. Then the period controls raise or resolve
+         *     `BNK_UNINVOICED_COLLECTION`, `BNK_UNDOCUMENTED_PAYMENT`,
+         *     `BNK_INTEREST`, `BNK_TAX_PAID`, `BNK_RENT_WITHHOLDING`,
+         *     `BNK_NON_BUSINESS` and `BNK_UNCLASSIFIED`.
+         */
+        post: operations["runTenantBankMatching"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements": {
         parameters: {
             query?: never;
@@ -12360,6 +12396,59 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    runTenantBankMatching: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            period: string;
+                            examined: number;
+                            auto_matched: number;
+                            suggested: number;
+                            unmatched: number;
+                            findings?: string[];
+                            warnings?: {
+                                Created?: number;
+                                Refreshed?: number;
+                                Suppressed?: number;
+                                Disabled?: number;
+                                AutoResolved?: number;
+                            };
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

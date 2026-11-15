@@ -203,6 +203,21 @@ type BankTransaction struct {
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankTransactionMatch struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	TargetType        string             `json:"target_type"`
+	TargetID          int64              `json:"target_id"`
+	Amount            pgtype.Numeric     `json:"amount"`
+	Score             int16              `json:"score"`
+	Method            string             `json:"method"`
+	Evidence          []byte             `json:"evidence"`
+	MatchedBy         pgtype.Int8        `json:"matched_by"`
+	MatchedAt         pgtype.Timestamptz `json:"matched_at"`
+}
+
 type BankTransactionSource struct {
 	ID                int64              `json:"id"`
 	TaxpayerID        int64              `json:"taxpayer_id"`

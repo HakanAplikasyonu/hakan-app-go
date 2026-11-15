@@ -103,6 +103,7 @@ type Querier interface {
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
 	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
+	DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error
 	// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
 	DeleteBankTransactionSourcesByImport(ctx context.Context, arg DeleteBankTransactionSourcesByImportParams) ([]int64, error)
 	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
@@ -275,6 +276,7 @@ type Querier interface {
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
+	InsertBankTransactionMatch(ctx context.Context, arg InsertBankTransactionMatchParams) (BankTransactionMatch, error)
 	InsertBankTransactionSource(ctx context.Context, arg InsertBankTransactionSourceParams) error
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
 	// Banka hareketi modeli (#20). Bütün sorgular mükellef kapsamında (taxpayer_id).
@@ -323,7 +325,12 @@ type Querier interface {
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
+	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
+	ListBankTransactionsForControls(ctx context.Context, arg ListBankTransactionsForControlsParams) ([]ListBankTransactionsForControlsRow, error)
+	// Banka–fatura eşleme (#21). Aday üretme SQL'de, puanlama Go'da (21 §6.2).
+	ListBankTransactionsForMatching(ctx context.Context, arg ListBankTransactionsForMatchingParams) ([]BankTransaction, error)
 	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
 	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
 	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
@@ -351,6 +358,11 @@ type Querier interface {
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
+	// Adaylar: aynı mükellef, aynı yön, aktif, tamamen kapanmamış faturalar;
+	// tarih penceresi içinde ve tutar / karşı taraf / fatura no'dan en az biri
+	// tutuyor. Tutar, hareketin para biriminde: aynı para birimi ise ödenecek,
+	// TRY hesapta dövizli fatura için TRY karşılığı.
+	ListInvoiceMatchCandidates(ctx context.Context, arg ListInvoiceMatchCandidatesParams) ([]ListInvoiceMatchCandidatesRow, error)
 	ListInvoiceSources(ctx context.Context, arg ListInvoiceSourcesParams) ([]InvoiceSource, error)
 	ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTaxSummariesParams) ([]InvoiceTaxSummary, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
@@ -494,6 +506,7 @@ type Querier interface {
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
+	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
