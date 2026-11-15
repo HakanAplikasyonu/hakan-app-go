@@ -162,7 +162,7 @@ func dataset() *fakeET {
 			"profile": map[string]any{"value": "TEMELFATURA"}, "status": map[string]any{"value": status}, "issue_date": issue,
 			"currency": map[string]any{"code": "TRY"}, "customer": map[string]any{"name": "Yıldız Market", "tax_number": "9100000021"},
 			"amounts": map[string]any{"tax_exclusive_amount": base.StringFixed(2), "tax_amount": vat.StringFixed(2), "payable_amount": base.Add(vat).StringFixed(2)},
-			"items": items}
+			"items":   items}
 		if dir == "incoming" {
 			f.invoices[id]["type"] = map[string]any{"value": "ALIS"}
 		}
