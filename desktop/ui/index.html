@@ -12,9 +12,119 @@
       <img src="logo.svg" alt="" width="28" height="28" />
       <h1>Hakan masaüstü</h1>
       <span id="app-version" class="muted"></span>
+      <span class="grow-x"></span>
+      <span id="agent-badge" class="badge" data-state="wait">Oturum yok</span>
     </header>
 
     <main>
+      <section class="card" aria-labelledby="login-title">
+        <h2 id="login-title">Ofis oturumu</h2>
+        <form id="login-form" class="stack">
+          <label>
+            <span>API adresi</span>
+            <input id="api-url" type="url" placeholder="https://api.ornek.com" required />
+          </label>
+          <div class="row">
+            <label class="grow">
+              <span>E-posta</span>
+              <input id="email" type="email" autocomplete="username" required />
+            </label>
+            <label class="grow">
+              <span>Parola</span>
+              <input id="password" type="password" autocomplete="current-password" required />
+            </label>
+          </div>
+          <label id="totp-row" hidden>
+            <span>Doğrulama kodu</span>
+            <input id="totp" inputmode="numeric" autocomplete="one-time-code" />
+          </label>
+          <div class="row">
+            <button type="submit">Oturum aç</button>
+            <button id="api-check" type="button" class="ghost">Sunucuyu dene</button>
+          </div>
+        </form>
+        <div id="org-pick" class="stack" hidden>
+          <label>
+            <span>Ofis</span>
+            <select id="org"></select>
+          </label>
+          <label>
+            <span>Bu bilgisayarın adı</span>
+            <input id="agent-name" maxlength="120" />
+          </label>
+          <button id="org-use" type="button">Ajanı başlat</button>
+        </div>
+        <div id="signed-in" class="stack" hidden>
+          <dl class="kv" id="agent-info"></dl>
+          <div class="row"><button id="logout" type="button" class="ghost">Oturumu kapat</button></div>
+        </div>
+        <p id="login-out" class="muted" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="watch-title">
+        <h2 id="watch-title">Klasör izleme</h2>
+        <p class="muted">
+          Klasöre düşen <b>.xml</b> ve <b>.zip</b> e-faturalar seçili mükellefe yüklenir. Dosyalar taşınmaz ya
+          da silinmez; aynı içerik bir kez yüklenir.
+        </p>
+        <form id="watch-form" class="stack">
+          <label>
+            <span>Mükellef (hizmet ilişkisi)</span>
+            <select id="engagement" required></select>
+          </label>
+          <label>
+            <span>Etiket</span>
+            <input id="watch-label" placeholder="ör. Atlas Gıda indirilenler" maxlength="80" />
+          </label>
+          <div class="row">
+            <label class="grow">
+              <span>Klasör yolu (ya da klasörü pencereye sürükleyin)</span>
+              <input id="watch-path" required />
+            </label>
+            <button type="submit">Ekle</button>
+          </div>
+        </form>
+        <ul id="watches" class="list"></ul>
+        <h3>Son yüklemeler</h3>
+        <ul id="uploads" class="list small"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="src-title">
+        <h2 id="src-title">Logo / Mikro yerel okuma</h2>
+        <p class="muted">
+          Salt okunur SQL kullanıcısıyla, yalnızca önceden tanımlı sorgular. Tablo ve alan adları pilot mükellefte
+          doğrulanacak; veri şimdilik sunucuya gönderilmez.
+        </p>
+        <form id="src-form" class="stack">
+          <div class="row">
+            <label class="grow">
+              <span>Program</span>
+              <select id="src-kind">
+                <option value="logo_tiger">Logo Tiger</option>
+                <option value="logo_go">Logo GO</option>
+                <option value="mikro">Mikro</option>
+              </select>
+            </label>
+            <label class="grow"><span>Sunucu</span><input id="src-host" required /></label>
+            <label><span>Port</span><input id="src-port" type="number" min="1" max="65535" placeholder="1433" /></label>
+          </div>
+          <div class="row">
+            <label class="grow"><span>Veritabanı</span><input id="src-db" required /></label>
+            <label class="grow"><span>Kullanıcı</span><input id="src-user" required /></label>
+            <label class="grow"><span>Parola</span><input id="src-pass" type="password" required /></label>
+          </div>
+          <div class="row" id="logo-only">
+            <label><span>Firma no</span><input id="src-firm" maxlength="3" placeholder="001" /></label>
+            <label><span>Dönem no</span><input id="src-period" maxlength="2" placeholder="01" /></label>
+          </div>
+          <div class="row">
+            <button type="submit">Bağlantıyı dene</button>
+            <button id="src-preview" type="button" class="ghost">Geçen ayı önizle</button>
+          </div>
+        </form>
+        <pre id="src-out" class="out" aria-live="polite"></pre>
+      </section>
+
       <section class="card" aria-labelledby="sc-title">
         <div class="card-head">
           <h2 id="sc-title">Yerel ajan (Go sidecar)</h2>
@@ -22,49 +132,14 @@
         </div>
         <dl class="kv" id="sc-info"></dl>
         <div class="row">
-          <button id="sc-ping" type="button">Ping</button>
+          <button id="sc-ping" type="button" class="ghost">Ping</button>
           <button id="sc-restart" type="button" class="ghost">Yeniden başlat</button>
-          <span id="sc-ping-out" class="muted" aria-live="polite"></span>
+          <button id="up-check" type="button" class="ghost">Güncelleme denetle</button>
         </div>
-      </section>
-
-      <section class="card" aria-labelledby="api-title">
-        <h2 id="api-title">Sunucu bağlantısı</h2>
-        <form id="api-form" class="row">
-          <label class="grow">
-            <span>API adresi</span>
-            <input id="api-url" type="url" placeholder="https://api.ornek.com" required />
-          </label>
-          <button type="submit">Bağlantıyı dene</button>
-        </form>
-        <p id="api-out" class="muted" aria-live="polite"></p>
-
-        <form id="token-form" class="row">
-          <label class="grow">
-            <span>API anahtarı (anahtar zincirinde saklanır)</span>
-            <input id="token" type="password" autocomplete="off" />
-          </label>
-          <button type="submit">Kaydet</button>
-          <button id="token-delete" type="button" class="ghost">Sil</button>
-        </form>
-        <p id="token-out" class="muted" aria-live="polite"></p>
-      </section>
-
-      <section class="card" aria-labelledby="ubl-title">
-        <h2 id="ubl-title">UBL dosyası denetimi</h2>
-        <div id="drop" class="drop">
-          XML faturayı bu pencereye sürükleyin. Dosya yerelde, sidecar'daki
-          go-ubltr ile okunur; sunucuya gönderilmez.
-        </div>
+        <p id="sc-out" class="muted" aria-live="polite"></p>
+        <h3>UBL dosyası denetimi</h3>
+        <p class="muted">XML faturayı pencereye sürükleyin; dosya yerelde go-ubltr ile okunur, sunucuya gönderilmez.</p>
         <dl class="kv" id="ubl-out"></dl>
-      </section>
-
-      <section class="card" aria-labelledby="up-title">
-        <div class="card-head">
-          <h2 id="up-title">Güncelleme</h2>
-          <button id="up-check" type="button" class="ghost">Denetle</button>
-        </div>
-        <p id="up-out" class="muted" aria-live="polite"></p>
       </section>
     </main>
   </body>

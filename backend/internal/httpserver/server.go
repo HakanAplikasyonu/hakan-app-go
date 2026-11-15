@@ -23,6 +23,8 @@ import (
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	activityusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/usecase"
+	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
+	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
@@ -509,7 +511,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
-		doctasks:    doctasksmodule.NewHandler(docTasksSvc),
+		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
+		agents:   agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		doctasks: doctasksmodule.NewHandler(docTasksSvc),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

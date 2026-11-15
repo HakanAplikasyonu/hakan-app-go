@@ -22,40 +22,76 @@ fn entry(key: &str) -> Result<Entry, String> {
     Entry::new(SERVICE, key).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn secret_set(key: String, value: String) -> Result<(), String> {
-    if value.is_empty() {
-        return Err("boş değer saklanmaz; silmek için secret_delete".into());
-    }
-    entry(&key)?.set_password(&value).map_err(|e| e.to_string())
+/// Kabuk içi kullanım (ön yüze açık değil).
+pub(crate) fn store(key: &str, value: &str) -> Result<(), String> {
+    entry(key)?.set_password(value).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn secret_get(key: String) -> Result<Option<String>, String> {
-    match entry(&key)?.get_password() {
+pub(crate) fn load(key: &str) -> Result<Option<String>, String> {
+    match entry(key)?.get_password() {
         Ok(v) => Ok(Some(v)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => Err(e.to_string()),
     }
 }
 
-/// Değeri döndürmeden yalnızca var olup olmadığını söyler (arayüz göstergesi).
-#[tauri::command]
-pub fn secret_exists(key: String) -> Result<bool, String> {
-    Ok(secret_get(key)?.is_some())
-}
-
-#[tauri::command]
-pub fn secret_delete(key: String) -> Result<(), String> {
-    match entry(&key)?.delete_credential() {
+pub(crate) fn remove(key: &str) -> Result<(), String> {
+    match entry(key)?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => Err(e.to_string()),
     }
 }
 
+/// Ön yüzün erişemeyeceği anahtarlar: oturum belirteci yalnızca kabukta.
+fn reserved(key: &str) -> bool {
+    key == "refresh_token"
+}
+
+fn public_key(key: &str) -> Result<(), String> {
+    if reserved(key) {
+        return Err(format!("{key:?} yalnızca kabuk tarafından kullanılır"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn secret_set(key: String, value: String) -> Result<(), String> {
+    public_key(&key)?;
+    if value.is_empty() {
+        return Err("boş değer saklanmaz; silmek için secret_delete".into());
+    }
+    store(&key, &value)
+}
+
+#[tauri::command]
+pub fn secret_get(key: String) -> Result<Option<String>, String> {
+    public_key(&key)?;
+    load(&key)
+}
+
+/// Değeri döndürmeden yalnızca var olup olmadığını söyler (arayüz göstergesi).
+#[tauri::command]
+pub fn secret_exists(key: String) -> Result<bool, String> {
+    public_key(&key)?;
+    Ok(load(&key)?.is_some())
+}
+
+#[tauri::command]
+pub fn secret_delete(key: String) -> Result<(), String> {
+    public_key(&key)?;
+    remove(&key)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::valid_key;
+    use super::*;
+
+    #[test]
+    fn reserved_keys_stay_in_shell() {
+        assert!(secret_get("refresh_token".into()).is_err());
+        assert!(secret_set("refresh_token".into(), "x".into()).is_err());
+        assert!(secret_delete("refresh_token".into()).is_err());
+    }
 
     #[test]
     fn key_names() {

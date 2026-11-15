@@ -110,3 +110,17 @@ Bağlantıya ait sorunlar `source_connection.status` ve `source_connection.last_
 | `AGENT_OFFLINE` | Bağlantı ajanı 30 dk sessiz | `02` §6 |
 | `IZIBIZ_LIMIT_REACHED` | Yok; geliştirici uyarısı (1 günlük pencerede `LIMIT` doldu) | `36` §5.3 |
 | `PROVIDER_ERROR` | Yok; tekrar denenir, ham yanıt saklanır | `37` §4 |
+
+`AGENT_OFFLINE` (issue #51): masaüstü ajanı `desktop_agents` tablosunda `status=offline` olur ve ajanı kaydeden kullanıcıya `agents.offline` bildirimi gider. Ajan bir kaynak bağlantısına bağlandığında aynı olay `source_connection.last_error`'a da yazılacak.
+
+## 5. Yerel program okuma uyarıları (Logo / Mikro ajanı)
+
+Masaüstü ajanının Logo Tiger/GO ve Mikro SQL okuyucusu (`14` §9, `15` §2) satır başına bu kodları üretir. Ham satır her durumda saklanır (`CLAUDE.md` §6). Program verisini portala alan senkron gelince bu kodlar `data_warning`'e, yoksa önizlemede kalır.
+
+| Kod | Seviye | Ne zaman |
+|---|---|---|
+| `TYPE_UNMAPPED` | `warning` | Fatura türü kodu (Logo `TRCODE`, Mikro `cha_evrak_tip` / `cha_cinsi`) eşleme tablosunda yok |
+| `TAX_RATE_UNMAPPED` | `warning` | Oran bazlı KDV alanları (`cha_vergi1..N`) dolu ama hangi orana karşılık geldiği bilinmiyor |
+| `FIELD_MISSING` | `info` | Yapılandırılmış kolon satırda yok (tablo/kolon adı doğrulanmadı) |
+| `VALUE_INVALID` | `warning` | Tutar ya da tarih çözülemedi |
+| `ROW_LIMIT_REACHED` | `warning` | Pencere satır sınırını aştı; daha küçük pencereyle okunmalı |

@@ -7,7 +7,9 @@ HAKAN masaüstü uygulaması (D5, docs/01 §4.2): **Tauri v2** kabuğu ve yanın
 desktop/
 ├── sidecar/          Go sidecar (ayrı Go modülü; backend modülünü replace ile kullanır)
 │   ├── rpc/          stdin/stdout satır tabanlı JSON protokolü
-│   └── methods/      ping, version, ubl.inspect (go-ubltr), api.health (backend zarfı)
+│   ├── agent/        yerel ajan: API istemcisi, oturum, ajan kaydı + heartbeat, klasör izleme
+│   ├── sources/      Logo Tiger/GO ve Mikro salt okunur SQL okuyucu (defaults.json: doğrulanmamış adlar)
+│   └── methods/      RPC yöntemleri
 ├── src-tauri/        İnce Rust kabuk: pencere, sidecar yaşam döngüsü, OS anahtar zinciri, güncelleyici
 │   ├── src/bridge.rs protokolün Rust tarafı (Tauri'den bağımsız, test edilebilir)
 │   ├── src/secrets.rs Keychain / Credential Manager / Secret Service
@@ -31,6 +33,31 @@ desktop/
   altına taşınmalı.
 - Backend'de yalnızca mevcut API'ler kullanılır (`/healthz`,
   `/v1/app/config`; yükleme uçları #51'de).
+
+## Yerel ajan (#51)
+
+- **Oturum:** Ofis kullanıcısı masaüstünde oturum açar (`/v1/auth/login`, iki
+  adımlı doğrulama destekli). Yenileme belirteci sidecar'dan `auth.rotated`
+  olayıyla kabuğa gelir ve anahtar zincirine yazılır (`refresh_token`); ön
+  yüze hiç iletilmez, ön yüzün `secret_*` komutları bu anahtarı okuyamaz.
+  Uygulama açılınca kabuk belirteçle `auth.resume` çağırır.
+- **Kayıt ve sağlık:** Ofis seçilince makine `POST /v1/tenant/agents` ile
+  kaydolur (kalıcı `machine_id`), 5 dakikada bir heartbeat gönderir. Sunucu
+  30 dakika sessiz ajanı `offline` yapar ve kaydeden kullanıcıya
+  `AGENT_OFFLINE` bildirimi gönderir (02 §6, 05 §4).
+- **Klasör izleme:** Klasör + mükellef (engagement) eşlemesi. 15 saniyede bir
+  yoklama; iki taramada boyutu ve zamanı değişmeyen `.xml` / `.zip`
+  dosyaları mevcut UBL yükleme ucuna (`/ubl-uploads`) gider. Dosyalar
+  taşınmaz ya da silinmez; aynı içerik (SHA-256) bir kez yüklenir. Kalıcı
+  hata (415/400/413) tekrar denenmez, ağ ya da 5xx hatası sonraki taramada
+  denenir. Durum `<uygulama veri dizini>/agent-state.json` (0600, sır yok).
+- **Logo / Mikro:** `source.test` bağlantıyı ve beklenen tabloları denetler,
+  `source.preview` bir tarih penceresini okuyup özetler. Yalnızca
+  `sources/defaults.json`'daki doğrulanmış SELECT sorguları çalışır (tek ifade,
+  her tabloda `WITH (NOLOCK)`, yalnızca `@from`/`@to`), READ UNCOMMITTED ve
+  her zaman geri alınan işlem içinde. Tablo/kolon adları ve tür kodları ⚠️
+  doğrulanmadı; pilot mükellefte geçersiz kılma dosyasıyla düzeltilir.
+  Okunan veri şimdilik sunucuya gönderilmez.
 
 ## Protokol
 

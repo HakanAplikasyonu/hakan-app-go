@@ -9,6 +9,8 @@ import (
 	accountruleshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/handler"
 	activitymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity"
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
+	agentsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents"
+	agentshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
@@ -50,6 +52,7 @@ type moduleHandlers struct {
 	accountplan *accountplanhandler.Handler
 	periods     *periodshandler.Handler
 	summaries   *summarieshandler.Handler
+	agents      *agentshandler.Handler
 	doctasks    *doctasksmodule.Handler
 	// accountrules: hesap kodu kural motoru (issue #25).
 	accountrules *accountruleshandler.Handler
@@ -77,6 +80,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
+		agentsmodule.Module{H: h.agents},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
 		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements},

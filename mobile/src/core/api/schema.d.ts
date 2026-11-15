@@ -4290,6 +4290,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/agents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Desktop agents
+         * @description Requires `tenant.agents.read`. Active (not revoked) agents of the office.
+         */
+        get: operations["listDesktopAgents"];
+        put?: never;
+        /**
+         * Register a desktop agent
+         * @description Requires `tenant.agents.write`. Called by the desktop app with the signed-in office user's session (issue #51). The same `machine_id` updates its existing agent (and re-activates a revoked one).
+         */
+        post: operations["registerDesktopAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agents/{agentUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Desktop agent
+         * @description Requires `tenant.agents.read`.
+         */
+        get: operations["getDesktopAgent"];
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a desktop agent
+         * @description Requires `tenant.agents.write`. Its next heartbeat gets 404.
+         */
+        delete: operations["revokeDesktopAgent"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/agents/{agentUuid}/heartbeat": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Desktop agent heartbeat
+         * @description Requires `tenant.agents.write`. Sent every `heartbeat_seconds` (300). An agent silent for 30 minutes is marked `offline` by a scheduled sweep and the registering user is notified (`AGENT_OFFLINE`, 02 §6 / 05 §4); the next heartbeat brings it back `online`.
+         */
+        post: operations["heartbeatDesktopAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/invitations/preview": {
         parameters: {
             query?: never;
@@ -7151,6 +7241,48 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["PeriodSummary"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        DesktopAgent: {
+            /** Format: uuid */
+            uuid: string;
+            machine_id: string;
+            name: string;
+            /** @enum {string} */
+            platform: "windows" | "macos" | "linux";
+            version: string;
+            /** @enum {string} */
+            status: "online" | "offline";
+            /** Format: date-time */
+            last_seen_at: string;
+            /** Format: date-time */
+            offline_since: string | null;
+            /** @description Last heartbeat stats */
+            heartbeat: Record<string, never>;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Connection event while offline (05 §4) */
+            last_error: null | {
+                /** @enum {string} */
+                code: "AGENT_OFFLINE";
+                /** Format: date-time */
+                at: string;
+            };
+            /** @example 300 */
+            heartbeat_seconds: number;
+        };
+        EnvelopeDesktopAgent: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["DesktopAgent"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeDesktopAgentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["DesktopAgent"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -16715,6 +16847,181 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listDesktopAgents: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopAgentList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    registerDesktopAgent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Stable install id generated by the agent */
+                    machine_id: string;
+                    name: string;
+                    /** @enum {string} */
+                    platform: "windows" | "macos" | "linux";
+                    version?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopAgent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getDesktopAgent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopAgent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    revokeDesktopAgent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    heartbeatDesktopAgent: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                agentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version?: string;
+                    /** @description Free-form agent state for display (watched folders, uploads, sources); at most 8 KB */
+                    stats?: Record<string, never>;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDesktopAgent"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
