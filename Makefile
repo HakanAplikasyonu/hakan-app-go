@@ -18,7 +18,7 @@ endef
 
 FRONTEND_PORT ?= 3000
 
-.PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev \
+.PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed \
 	free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down tools create-super-admin search-reindex check-i18n
 
 infra:
@@ -156,6 +156,11 @@ SA_EMAIL    ?= admin@example.com
 SA_PASSWORD ?= Password1
 SA_NAME     ?= Platform
 SA_SURNAME  ?= Admin
+
+# Temiz veritabanında tek komutla demo (#17): göçler + demo ofisi.
+# Baştan kurmak için: make demo-seed ARGS=-reset
+demo-seed: migrate-up
+	@$(load_env) $(MAKE) -C backend demo-seed ARGS="$(ARGS)"
 
 create-super-admin:
 	@$(load_env) $(MAKE) -C backend create-super-admin \
