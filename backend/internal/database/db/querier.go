@@ -119,6 +119,15 @@ type Querier interface {
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
+	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
+	// 21 §5 kural 2: aynı hesap + tarih + yön + tutar + işlem sonrası bakiye.
+	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
+	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
+	// 21 §5 kural 3: bakiye yoksa aynı hesap + tarih + yön + tutar + normalize
+	// açıklamanın ilk 30 karakteri → olası mükerrer.
+	FindBankTransactionLookalike(ctx context.Context, arg FindBankTransactionLookalikeParams) (BankTransaction, error)
+	FindCashBoxByIBAN(ctx context.Context, arg FindCashBoxByIBANParams) (CashBox, error)
 	FindCustomerByIdentityNumber(ctx context.Context, arg FindCustomerByIdentityNumberParams) (Customer, error)
 	FindCustomerBySource(ctx context.Context, arg FindCustomerBySourceParams) (Customer, error)
 	FindCustomerByTaxNumber(ctx context.Context, arg FindCustomerByTaxNumberParams) (Customer, error)
@@ -136,8 +145,10 @@ type Querier interface {
 	GetAppSettings(ctx context.Context) (AppSetting, error)
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
+	GetBankTransaction(ctx context.Context, arg GetBankTransactionParams) (BankTransaction, error)
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
+	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
@@ -211,12 +222,17 @@ type Querier interface {
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
 	HasActivePushDevices(ctx context.Context, userID int64) (bool, error)
 	HasPendingOwnerOrganizationInvitationForEmail(ctx context.Context, arg HasPendingOwnerOrganizationInvitationForEmailParams) (bool, error)
+	IncrementBankRuleHits(ctx context.Context, arg IncrementBankRuleHitsParams) error
 	IncrementOTPAttempts(ctx context.Context, id int64) (OtpCode, error)
 	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
+	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
+	InsertBankTransactionSource(ctx context.Context, arg InsertBankTransactionSourceParams) error
 	InsertBulkChange(ctx context.Context, arg InsertBulkChangeParams) (BulkChange, error)
+	// Banka hareketi modeli (#20). Bütün sorgular mükellef kapsamında (taxpayer_id).
+	InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (CashBox, error)
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
@@ -249,9 +265,16 @@ type Querier interface {
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
+	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
+	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
+	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
+	ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
+	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
+	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
 	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -388,6 +411,9 @@ type Querier interface {
 	RewrapSecretRecord(ctx context.Context, arg RewrapSecretRecordParams) (int64, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
+	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
+	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
@@ -430,6 +456,7 @@ type Querier interface {
 	UpdateWebAuthnCredentialName(ctx context.Context, arg UpdateWebAuthnCredentialNameParams) (WebauthnCredential, error)
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
+	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	UpsertEngagementReviewSetting(ctx context.Context, arg UpsertEngagementReviewSettingParams) error
 	UpsertEngagementWarningRule(ctx context.Context, arg UpsertEngagementWarningRuleParams) error

@@ -109,6 +109,113 @@ type AuthSetting struct {
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankBalanceSnapshot struct {
+	ID                  int64              `json:"id"`
+	TaxpayerID          int64              `json:"taxpayer_id"`
+	CashBoxID           int64              `json:"cash_box_id"`
+	CapturedAt          pgtype.Timestamptz `json:"captured_at"`
+	Balance             pgtype.Numeric     `json:"balance"`
+	AvailableBalance    pgtype.Numeric     `json:"available_balance"`
+	BlockedAmount       pgtype.Numeric     `json:"blocked_amount"`
+	CreditLimit         pgtype.Numeric     `json:"credit_limit"`
+	AvailableWithCredit pgtype.Numeric     `json:"available_with_credit"`
+	Source              string             `json:"source"`
+	ImportID            pgtype.UUID        `json:"import_id"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+}
+
+type BankDailySummary struct {
+	ID               int64              `json:"id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	CashBoxID        int64              `json:"cash_box_id"`
+	Date             pgtype.Date        `json:"date"`
+	OpeningBalance   pgtype.Numeric     `json:"opening_balance"`
+	ClosingBalance   pgtype.Numeric     `json:"closing_balance"`
+	TotalCredit      pgtype.Numeric     `json:"total_credit"`
+	TotalDebit       pgtype.Numeric     `json:"total_debit"`
+	TransactionCount pgtype.Int4        `json:"transaction_count"`
+	Source           string             `json:"source"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BankRule struct {
+	ID          int64              `json:"id"`
+	Uuid        uuid.UUID          `json:"uuid"`
+	TaxpayerID  int64              `json:"taxpayer_id"`
+	MatchType   string             `json:"match_type"`
+	MatchValue  string             `json:"match_value"`
+	DebitCredit pgtype.Text        `json:"debit_credit"`
+	Kind        string             `json:"kind"`
+	KindDetail  string             `json:"kind_detail"`
+	Hits        int32              `json:"hits"`
+	CreatedBy   pgtype.Int8        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BankTransaction struct {
+	ID                         int64              `json:"id"`
+	Uuid                       uuid.UUID          `json:"uuid"`
+	TaxpayerID                 int64              `json:"taxpayer_id"`
+	CashBoxID                  int64              `json:"cash_box_id"`
+	SourceSystem               string             `json:"source_system"`
+	SourceID                   string             `json:"source_id"`
+	CaptureMethod              string             `json:"capture_method"`
+	BookedAt                   pgtype.Timestamptz `json:"booked_at"`
+	HasTime                    bool               `json:"has_time"`
+	BankSequence               pgtype.Int4        `json:"bank_sequence"`
+	TransactionDate            pgtype.Date        `json:"transaction_date"`
+	ValueDate                  pgtype.Date        `json:"value_date"`
+	DebitCredit                string             `json:"debit_credit"`
+	Amount                     pgtype.Numeric     `json:"amount"`
+	Currency                   string             `json:"currency"`
+	BalanceAfter               pgtype.Numeric     `json:"balance_after"`
+	BalanceBefore              pgtype.Numeric     `json:"balance_before"`
+	Description                string             `json:"description"`
+	DescriptionExtra           pgtype.Text        `json:"description_extra"`
+	DescriptionNormalized      string             `json:"description_normalized"`
+	BankReference              pgtype.Text        `json:"bank_reference"`
+	ReceiptNumber              pgtype.Text        `json:"receipt_number"`
+	BankTxnCode                pgtype.Text        `json:"bank_txn_code"`
+	Mt940Code                  pgtype.Text        `json:"mt940_code"`
+	Channel                    pgtype.Text        `json:"channel"`
+	CounterpartyName           pgtype.Text        `json:"counterparty_name"`
+	CounterpartyIban           pgtype.Text        `json:"counterparty_iban"`
+	CounterpartyTaxNumber      pgtype.Text        `json:"counterparty_tax_number"`
+	CounterpartyIdentityNumber pgtype.Text        `json:"counterparty_identity_number"`
+	CounterpartyBankCode       pgtype.Text        `json:"counterparty_bank_code"`
+	EftQueryNumber             pgtype.Text        `json:"eft_query_number"`
+	PaymentPurpose             pgtype.Text        `json:"payment_purpose"`
+	IsCancelled                bool               `json:"is_cancelled"`
+	Kind                       string             `json:"kind"`
+	KindDetail                 string             `json:"kind_detail"`
+	KindSource                 pgtype.Text        `json:"kind_source"`
+	KindConfidence             pgtype.Numeric     `json:"kind_confidence"`
+	KindReason                 pgtype.Text        `json:"kind_reason"`
+	ClassifiedAt               pgtype.Timestamptz `json:"classified_at"`
+	MatchStatus                string             `json:"match_status"`
+	PossibleDuplicateOf        pgtype.Int8        `json:"possible_duplicate_of"`
+	Period                     string             `json:"period"`
+	RawPayload                 []byte             `json:"raw_payload"`
+	ContentHash                pgtype.Text        `json:"content_hash"`
+	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BankTransactionSource struct {
+	ID                int64              `json:"id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	CashBoxID         int64              `json:"cash_box_id"`
+	SourceSystem      string             `json:"source_system"`
+	CaptureMethod     string             `json:"capture_method"`
+	SourceID          string             `json:"source_id"`
+	ImportID          pgtype.UUID        `json:"import_id"`
+	RawPayload        []byte             `json:"raw_payload"`
+	ReceivedAt        pgtype.Timestamptz `json:"received_at"`
+}
+
 type BulkChange struct {
 	ID           int64              `json:"id"`
 	Uuid         uuid.UUID          `json:"uuid"`
@@ -136,6 +243,26 @@ type BulkJob struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	OrganizationID pgtype.Int8        `json:"organization_id"`
+}
+
+type CashBox struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Type              string             `json:"type"`
+	Name              string             `json:"name"`
+	BankID            pgtype.Text        `json:"bank_id"`
+	Iban              pgtype.Text        `json:"iban"`
+	Currency          string             `json:"currency"`
+	BankAccountNumber pgtype.Text        `json:"bank_account_number"`
+	BankBranchCode    pgtype.Text        `json:"bank_branch_code"`
+	BankAccountSuffix pgtype.Text        `json:"bank_account_suffix"`
+	BankCustomerNo    pgtype.Text        `json:"bank_customer_no"`
+	BankAccountKind   pgtype.Text        `json:"bank_account_kind"`
+	BankConnectionID  pgtype.Int8        `json:"bank_connection_id"`
+	BankSyncFrom      pgtype.Date        `json:"bank_sync_from"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type ChangeRequest struct {

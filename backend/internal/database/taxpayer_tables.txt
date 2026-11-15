@@ -16,3 +16,9 @@ sync_windows
 sync_runs
 taxpayer_members
 invoice_sources
+cash_boxes
+bank_transactions
+bank_transaction_sources
+bank_rules
+bank_balance_snapshots
+bank_daily_summaries
