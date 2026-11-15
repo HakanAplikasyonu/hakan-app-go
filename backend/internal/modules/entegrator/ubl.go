@@ -103,9 +103,11 @@ func (j *job) fetchUBL(ctx context.Context, d db.EntegratorDocument) error {
 	if json.Unmarshal(d.HeaderRaw, &listed) == nil && strings.EqualFold(listed.UUID, d.Ettn) {
 		ref = listed.UUID
 	}
-	res, err := j.c.Fetch(ctx, provider.FetchQuery{Kind: kind, Direction: providerDirection(d.Direction), UUID: ref, Format: provider.FormatUBL})
+	cctx, cancel := context.WithTimeout(ctx, j.s.cfg.CallTimeout)
+	defer cancel()
+	res, err := j.c.Fetch(cctx, provider.FetchQuery{Kind: kind, Direction: providerDirection(d.Direction), UUID: ref, Format: provider.FormatUBL})
 	if err != nil {
-		if abortsRun(err) {
+		if abortsRun(ctx, err) {
 			return err
 		}
 		if kindOf(err) == provider.KindNotFound || kindOf(err) == provider.KindUnsupported {

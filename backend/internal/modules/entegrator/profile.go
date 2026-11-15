@@ -11,6 +11,11 @@ type ListProfile struct {
 	// split in two, down to Config.MinWindow. A full one-day window is
 	// recorded as LIMIT_REACHED.
 	NoCursor bool
+	// EndDateOnly: the integrator cuts the end bound to its date (00:00),
+	// so the end is sent as the start of the day after the window's last
+	// instant (Uyumsoft CreateEndDate, seen in the test system). The extra
+	// hours overlap the next window; indexing is idempotent.
+	EndDateOnly bool
 }
 
 var (

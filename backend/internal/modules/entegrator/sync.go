@@ -150,7 +150,7 @@ func (j *job) listWindows(ctx context.Context, planned []window) error {
 		queue = queue[1:]
 		children, err := j.runWindow(ctx, w)
 		if err != nil {
-			if abortsRun(err) {
+			if abortsRun(ctx, err) {
 				return err
 			}
 			j.s.log.Warn("entegrator: window failed", "connection", j.conn.Uuid, "item", w.Item, "err", err)
@@ -190,12 +190,17 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 	// dates, so the end moves back by a nanosecond and both are given in
 	// Turkish time.
 	qFrom, qTo := from.In(istanbul), to.Add(-time.Nanosecond).In(istanbul)
+	if prof.EndDateOnly {
+		qTo = time.Date(qTo.Year(), qTo.Month(), qTo.Day()+1, 0, 0, 0, 0, istanbul)
+	}
 	cursor := w.PageCursor.String
 	for pages := 1; ; pages++ {
 		if err := j.throttle(ctx); err != nil {
 			return nil, err
 		}
-		page, err := j.c.List(ctx, dir, ListQuery{Kind: kind, From: qFrom, To: qTo, Cursor: cursor, Limit: limit})
+		cctx, cancel := context.WithTimeout(ctx, j.s.cfg.CallTimeout)
+		page, err := j.c.List(cctx, dir, ListQuery{Kind: kind, From: qFrom, To: qTo, Cursor: cursor, Limit: limit})
+		cancel()
 		if err != nil {
 			j.cnt.WindowsFailed++
 			_ = setStatus("failed", repository.Text(cursor), errorJSON(err))
