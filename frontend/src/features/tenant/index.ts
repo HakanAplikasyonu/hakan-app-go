@@ -4,6 +4,7 @@ export { TenantAccessCard } from "./components/tenant-access-card";
 export { InviteAcceptPage } from "./components/invite-accept-page";
 export { TenantHome } from "./components/tenant-home";
 export { TenantMembersPage } from "./components/tenant-members-page";
+export { TenantRolesPage } from "./components/tenant-roles-page";
 export { TenantSettingsPage } from "./components/tenant-settings-page";
 export { TenantShell } from "./components/tenant-shell";
 export {

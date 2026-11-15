@@ -330,6 +330,13 @@ export function tenantNav(slug: string): NavCatalog {
             permission: permissions.tenant.members.read,
           },
           {
+            id: "roles",
+            titleKey: "tenant.nav_roles",
+            href: routes.tenant.roles(slug),
+            icon: Shield,
+            permission: permissions.tenant.roles.read,
+          },
+          {
             id: "settings",
             titleKey: "tenant.nav_settings",
             href: routes.tenant.settings(slug),

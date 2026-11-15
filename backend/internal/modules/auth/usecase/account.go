@@ -57,13 +57,23 @@ func (u *AuthUseCase) SetOrganizationsLister(lister OrganizationsLister) {
 	u.orgs = lister
 }
 
+// smmmRegistrySetter is implemented by the Postgres repository (issue #5).
+type smmmRegistrySetter interface {
+	SetSMMMRegistryNo(ctx context.Context, userUUID uuid.UUID, no *string) error
+}
+
 // UpdateProfile patches the caller's name/surname/locale and returns refreshed Me.
 func (u *AuthUseCase) UpdateProfile(
 	ctx context.Context,
 	userUUID uuid.UUID,
 	impersonatorUUID *uuid.UUID,
 	name, surname, locale *string,
+	smmmRegistryNo ...*string,
 ) (model.Me, error) {
+	var registry *string
+	if len(smmmRegistryNo) > 0 {
+		registry = smmmRegistryNo[0]
+	}
 	user, err := u.repo.FindUserByUUID(ctx, userUUID)
 	if err != nil {
 		return model.Me{}, ErrNotFound
@@ -89,11 +99,33 @@ func (u *AuthUseCase) UpdateProfile(
 		}
 		locale = &v
 	}
-	if name == nil && surname == nil && locale == nil {
-		return model.Me{}, fmt.Errorf("%w: name, surname, or locale is required", ErrInvalidRequest)
+	if registry != nil {
+		v := strings.TrimSpace(*registry)
+		if len([]rune(v)) > 32 {
+			return model.Me{}, fmt.Errorf("%w: smmm_registry_no is too long (max 32)", ErrInvalidRequest)
+		}
+		registry = &v
 	}
-	if _, err := u.repo.UpdateProfile(ctx, userUUID, name, surname, locale); err != nil {
-		return model.Me{}, err
+	if name == nil && surname == nil && locale == nil && registry == nil {
+		return model.Me{}, fmt.Errorf("%w: name, surname, locale or smmm_registry_no is required", ErrInvalidRequest)
+	}
+	if name != nil || surname != nil || locale != nil {
+		if _, err := u.repo.UpdateProfile(ctx, userUUID, name, surname, locale); err != nil {
+			return model.Me{}, err
+		}
+	}
+	if registry != nil {
+		setter, ok := u.repo.(smmmRegistrySetter)
+		if !ok {
+			return model.Me{}, fmt.Errorf("%w: smmm_registry_no is not supported", ErrInvalidRequest)
+		}
+		var value *string
+		if *registry != "" {
+			value = registry
+		}
+		if err := setter.SetSMMMRegistryNo(ctx, userUUID, value); err != nil {
+			return model.Me{}, err
+		}
 	}
 	if u.notifier != nil && (name != nil || surname != nil) {
 		uid := user.ID

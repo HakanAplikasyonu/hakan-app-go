@@ -89,6 +89,24 @@ make create-super-admin
 - Prefer single-responsibility repository methods
 - Pass transactions via `context` / `WithTx`
 
+## Tenant permissions and office roles (HAKAN, issue #5)
+
+Every office has its own copies of the template tenant roles (owner, admin,
+accountant, member, intern), made when the office is created
+(`trg_organizations_copy_tenant_roles`). Offices edit their copies and add
+custom roles; templates (`roles.organization_id IS NULL`) are only the source
+for new offices.
+
+When a migration adds a `tenant.*` permission:
+
+- The `owner` role of every office gets it automatically
+  (`trg_permissions_grant_tenant_owner`).
+- Grant it to any other role with
+  `SELECT grant_tenant_role_permission('<role_slug>', '<permission_slug>');`
+  which writes the template **and** every office copy of that system role.
+  Inserting into `role_permissions` for the template only does not reach
+  existing offices.
+
 ## Migration safety
 
 - Expand/Contract for breaking drops (two-step)

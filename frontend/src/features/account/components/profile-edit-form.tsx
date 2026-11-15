@@ -32,6 +32,8 @@ export function ProfileEditForm() {
       const me = await authService.updateProfile({
         name: values.name,
         surname: values.surname,
+        // Empty string clears the number.
+        smmm_registry_no: values.smmm_registry_no.trim(),
       });
       setUser(mapMeToAuthUser(me));
       toast.success(t("auth.profile.save_success"));
@@ -52,6 +54,7 @@ export function ProfileEditForm() {
       defaultValues={{
         name: user.name,
         surname: user.surname,
+        smmm_registry_no: user.smmmRegistryNo ?? "",
       }}
       onSubmit={onSubmit}
       className="space-y-4"
@@ -74,6 +77,14 @@ export function ProfileEditForm() {
           autoComplete="family-name"
         />
       </div>
+
+      <AppInput
+        name="smmm_registry_no"
+        label={t("auth.profile.smmm_registry_no")}
+        description={t("auth.profile.smmm_registry_no_hint")}
+        autoComplete="off"
+        maxLength={32}
+      />
 
       <Button type="submit" disabled={pending}>
         {pending ? t("auth.profile.saving") : t("auth.profile.save")}

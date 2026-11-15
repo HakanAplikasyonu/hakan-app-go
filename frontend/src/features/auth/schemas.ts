@@ -113,6 +113,11 @@ export function createProfileSchema(t: Translate) {
   return z.object({
     name: z.string().min(1, t("auth.validation.name_required")),
     surname: z.string().min(1, t("auth.validation.surname_required")),
+    // Not validated beyond length (D16): offices type it as printed.
+    smmm_registry_no: z
+      .string()
+      .trim()
+      .max(32, t("auth.validation.smmm_registry_no_max")),
   });
 }
 

@@ -37,7 +37,17 @@ export type TenantInvitationPage =
 export type TenantSettings = components["schemas"]["TenantSettings"];
 export type InvitationPreview = components["schemas"]["InvitationPreview"];
 export type AcceptedInvitation = components["schemas"]["AcceptedInvitation"];
-export type TenantRoleKey = "owner" | "admin" | "member";
+/** Office role key: a template (owner, admin, …) or an office's own role. */
+export type TenantRoleKey = string;
+export type TenantRole = components["schemas"]["TenantRole"];
+export type TenantRoleList = components["schemas"]["TenantRoleList"];
+export type TenantPermission = components["schemas"]["TenantPermission"];
+export type TenantPermissionList =
+  components["schemas"]["TenantPermissionList"];
+export type CreateTenantRoleBody =
+  components["schemas"]["CreateTenantRoleRequest"];
+export type PatchTenantRoleBody =
+  components["schemas"]["PatchTenantRoleRequest"];
 
 export const tenantAdminKeys = {
   members: (slug: string) => ["tenant", slug.toLowerCase(), "members"] as const,
@@ -45,6 +55,9 @@ export const tenantAdminKeys = {
     ["tenant", slug.toLowerCase(), "invitations"] as const,
   settings: (slug: string) =>
     ["tenant", slug.toLowerCase(), "settings"] as const,
+  roles: (slug: string) => ["tenant", slug.toLowerCase(), "roles"] as const,
+  rolePermissions: (slug: string) =>
+    ["tenant", slug.toLowerCase(), "role-permissions"] as const,
 };
 
 export const tenantService = {
@@ -104,6 +117,40 @@ export const tenantService = {
     return tenantRequest<TenantSettings>(slug, "PATCH", "/v1/tenant/settings", {
       body,
     });
+  },
+  /** Office roles: the templates plus the office's own roles. */
+  listRoles(slug: string, options?: { silent?: boolean }) {
+    return tenantRequest<TenantRoleList>(slug, "GET", "/v1/tenant/roles", {
+      silent: options?.silent,
+    });
+  },
+  /** Every `tenant.*` permission a role may hold. */
+  listRolePermissions(slug: string) {
+    return tenantRequest<TenantPermissionList>(
+      slug,
+      "GET",
+      "/v1/tenant/role-permissions",
+    );
+  },
+  createRole(slug: string, body: CreateTenantRoleBody) {
+    return tenantRequest<TenantRole>(slug, "POST", "/v1/tenant/roles", {
+      body,
+    });
+  },
+  patchRole(slug: string, roleKey: string, body: PatchTenantRoleBody) {
+    return tenantRequest<TenantRole>(
+      slug,
+      "PATCH",
+      `/v1/tenant/roles/${encodeURIComponent(roleKey)}`,
+      { body },
+    );
+  },
+  deleteRole(slug: string, roleKey: string) {
+    return tenantRequest<unknown>(
+      slug,
+      "DELETE",
+      `/v1/tenant/roles/${encodeURIComponent(roleKey)}`,
+    );
   },
 };
 

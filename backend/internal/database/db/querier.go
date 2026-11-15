@@ -21,6 +21,7 @@ type Querier interface {
 	AcceptTaxpayerInvitation(ctx context.Context, id int64) (int64, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
+	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
@@ -45,6 +46,7 @@ type Querier interface {
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
 	CountOrganizationMembersByOrg(ctx context.Context, arg CountOrganizationMembersByOrgParams) (int64, error)
 	CountOrganizationOwners(ctx context.Context, organizationID int64) (int64, error)
+	CountOrganizationRoleUsage(ctx context.Context, arg CountOrganizationRoleUsageParams) (int32, error)
 	CountOrganizations(ctx context.Context, arg CountOrganizationsParams) (int64, error)
 	CountOutboxByStatus(ctx context.Context, status string) (int64, error)
 	CountPendingOrganizationInvitations(ctx context.Context, organizationID int64) (int64, error)
@@ -72,6 +74,7 @@ type Querier interface {
 	CreateOTPCode(ctx context.Context, arg CreateOTPCodeParams) (OtpCode, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateOrganizationInvitation(ctx context.Context, arg CreateOrganizationInvitationParams) (OrganizationInvitation, error)
+	CreateOrganizationRole(ctx context.Context, arg CreateOrganizationRoleParams) (Role, error)
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSourceConnection(ctx context.Context, arg CreateSourceConnectionParams) (SourceConnection, error)
@@ -102,10 +105,12 @@ type Querier interface {
 	DeleteOfficeReviewSetting(ctx context.Context, arg DeleteOfficeReviewSettingParams) (int64, error)
 	DeleteOfficeWarningRule(ctx context.Context, arg DeleteOfficeWarningRuleParams) (int64, error)
 	DeleteOrganizationMember(ctx context.Context, arg DeleteOrganizationMemberParams) (int64, error)
+	DeleteOrganizationRole(ctx context.Context, arg DeleteOrganizationRoleParams) (int64, error)
 	DeletePushDeviceForUser(ctx context.Context, arg DeletePushDeviceForUserParams) (int64, error)
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error
 	DeletePushTickets(ctx context.Context, ids []int64) error
 	DeleteRole(ctx context.Context, argUuid uuid.UUID) error
+	DeleteRolePermissions(ctx context.Context, arg DeleteRolePermissionsParams) error
 	DeleteSecretRecord(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteStorageShare(ctx context.Context, argUuid uuid.UUID) error
 	DeleteStorageStar(ctx context.Context, arg DeleteStorageStarParams) error
@@ -166,6 +171,7 @@ type Querier interface {
 	GetOrganizationInvitationByTokenHash(ctx context.Context, tokenHash string) (GetOrganizationInvitationByTokenHashRow, error)
 	GetOrganizationMember(ctx context.Context, arg GetOrganizationMemberParams) (GetOrganizationMemberRow, error)
 	GetOrganizationMemberByUserUUID(ctx context.Context, arg GetOrganizationMemberByUserUUIDParams) (GetOrganizationMemberByUserUUIDRow, error)
+	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
@@ -276,6 +282,9 @@ type Querier interface {
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
 	ListOrganizationMembersByOrg(ctx context.Context, arg ListOrganizationMembersByOrgParams) ([]ListOrganizationMembersByOrgRow, error)
 	ListOrganizationMembershipsByUser(ctx context.Context, userID int64) ([]ListOrganizationMembershipsByUserRow, error)
+	// Ofise özel roller (issue #5, D16). Her sorgu organization_id ile ofise
+	// bağlıdır; şablon roller (organization_id IS NULL) burada listelenmez.
+	ListOrganizationRoles(ctx context.Context, organizationID pgtype.Int8) ([]ListOrganizationRolesRow, error)
 	ListOrganizationsFiltered(ctx context.Context, arg ListOrganizationsFilteredParams) ([]Organization, error)
 	// Open invitations (not accepted, not revoked); expired ones are included so
 	// they can be revoked or re-sent.
@@ -313,6 +322,7 @@ type Querier interface {
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
 	// tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
 	ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error)
+	ListTenantPermissions(ctx context.Context) ([]ListTenantPermissionsRow, error)
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu; read_all yoksa engagement_assignments ile süzülür
 	ListTenantSuggestions(ctx context.Context, arg ListTenantSuggestionsParams) ([]ListTenantSuggestionsRow, error)
@@ -396,6 +406,8 @@ type Querier interface {
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
 	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
+	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
+	SetUserSMMMRegistryNo(ctx context.Context, arg SetUserSMMMRegistryNoParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
@@ -413,6 +425,7 @@ type Querier interface {
 	UpdateOAuthProviderSettings(ctx context.Context, arg UpdateOAuthProviderSettingsParams) (OauthProviderSetting, error)
 	UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error)
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
+	UpdateOrganizationRole(ctx context.Context, arg UpdateOrganizationRoleParams) (Role, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
 	UpdateSuggestionDecision(ctx context.Context, arg UpdateSuggestionDecisionParams) (Suggestion, error)

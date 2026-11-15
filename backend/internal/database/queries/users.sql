@@ -143,3 +143,9 @@ SET status = 'disabled',
     deactivated_at = COALESCE(deactivated_at, NOW())
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING *;
+
+-- name: SetUserSMMMRegistryNo :exec
+-- SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
+UPDATE users
+SET smmm_registry_no = sqlc.narg(registry_no)
+WHERE uuid = sqlc.arg(uuid) AND deleted_at IS NULL;

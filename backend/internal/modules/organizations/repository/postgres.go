@@ -243,3 +243,47 @@ func (r *Postgres) GetUserByEmail(ctx context.Context, email string) (db.User, e
 	row, err := r.q.GetUserByEmail(ctx, email)
 	return row, mapErr(err)
 }
+
+// --- Office roles (usecase.RoleRepository, issue #5) ---
+
+func (r *Postgres) ListOrganizationRoles(ctx context.Context, orgID int64) ([]db.ListOrganizationRolesRow, error) {
+	return r.q.ListOrganizationRoles(ctx, pgtype.Int8{Int64: orgID, Valid: true})
+}
+
+func (r *Postgres) GetOrganizationRoleByKey(ctx context.Context, q *db.Queries, orgID int64, key string) (db.Role, error) {
+	row, err := q.GetOrganizationRoleByKey(ctx, db.GetOrganizationRoleByKeyParams{OrganizationID: pgtype.Int8{Int64: orgID, Valid: true}, RoleKey: key})
+	return row, mapErr(err)
+}
+
+func (r *Postgres) ListTenantPermissions(ctx context.Context) ([]db.ListTenantPermissionsRow, error) {
+	return r.q.ListTenantPermissions(ctx)
+}
+
+func (r *Postgres) CreateOrganizationRole(ctx context.Context, q *db.Queries, params db.CreateOrganizationRoleParams) (db.Role, error) {
+	return q.CreateOrganizationRole(ctx, params)
+}
+
+func (r *Postgres) UpdateOrganizationRole(ctx context.Context, q *db.Queries, params db.UpdateOrganizationRoleParams) (db.Role, error) {
+	row, err := q.UpdateOrganizationRole(ctx, params)
+	return row, mapErr(err)
+}
+
+func (r *Postgres) ReplaceRolePermissions(ctx context.Context, q *db.Queries, orgID, roleID int64, slugs []string) error {
+	org := pgtype.Int8{Int64: orgID, Valid: true}
+	if err := q.DeleteRolePermissions(ctx, db.DeleteRolePermissionsParams{RoleID: roleID, OrganizationID: org}); err != nil {
+		return err
+	}
+	if len(slugs) == 0 {
+		return nil
+	}
+	return q.AddRolePermissionsBySlug(ctx, db.AddRolePermissionsBySlugParams{PermissionSlugs: slugs, RoleID: roleID, OrganizationID: org})
+}
+
+func (r *Postgres) CountOrganizationRoleUsage(ctx context.Context, q *db.Queries, orgID, roleID int64) (int64, error) {
+	n, err := q.CountOrganizationRoleUsage(ctx, db.CountOrganizationRoleUsageParams{OrganizationID: orgID, RoleID: roleID})
+	return int64(n), err
+}
+
+func (r *Postgres) DeleteOrganizationRole(ctx context.Context, q *db.Queries, orgID, roleID int64) (int64, error) {
+	return q.DeleteOrganizationRole(ctx, db.DeleteOrganizationRoleParams{OrganizationID: pgtype.Int8{Int64: orgID, Valid: true}, RoleID: roleID})
+}
