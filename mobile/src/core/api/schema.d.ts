@@ -5500,6 +5500,149 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/vat-forecast": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office VAT forecast (KDV erken uyarı)
+         * @description Requires `tenant.vat.read`. One row per active engagement: hesaplanan − indirilecek − devreden KDV, filing deadline and days left. Without `tenant.engagements.read_all` only assigned engagements.
+         */
+        get: operations["listOfficeVATForecasts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * In-period VAT forecast of a taxpayer
+         * @description Requires `tenant.vat.read`, `tenant.engagements.read` and engagement access. Source: active, not deleted-at-source invoices of the period and their `invoice_tax_summaries`, converted to TL with `invoices.exchange_rate` (rounded per row). Outgoing = hesaplanan KDV (vat − tevkifat), incoming = indirilecek KDV (whole vat; the withheld part is reported as `input_withholding`, KDV2). Devreden KDV runs over earlier periods from the nearest opening carry-forward. Deadline: `due_day` (VAT_DEADLINE_NEAR param, default 28) of the next month, moved to Monday on weekends; public holidays are not applied.
+         */
+        get: operations["getEngagementVATForecast"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the VAT warning rules
+         * @description Requires `tenant.vat.write`. Applies `VAT_PAYABLE_THRESHOLD` (payable ≥ `limit`; null limit = off) and `VAT_DEADLINE_NEAR` (0 ≤ days left ≤ `days_before`) on the period entity, producer `control:vat_forecast`. Conditions that no longer hold are auto-resolved. Without `period`: last month and this month.
+         */
+        post: operations["evaluateEngagementVATForecast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/openings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Opening carry-forwards (açılış devreden KDV)
+         * @description Requires `tenant.vat.read`. Manually entered devreden KDV into a period; the chain restarts from the nearest one at or before the forecast period.
+         */
+        get: operations["listEngagementVATOpenings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the opening carry-forward into a period
+         * @description Requires `tenant.vat.write`. `amount` is a decimal string ≥ 0 with at most two decimals (TL). Logged to the activity log.
+         */
+        put: operations["putEngagementVATOpening"];
+        post?: never;
+        /**
+         * Remove the opening carry-forward of a period
+         * @description Requires `tenant.vat.write`. Logged to the activity log.
+         */
+        delete: operations["deleteEngagementVATOpening"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -8675,6 +8818,177 @@ export interface components {
             success: true;
             data: {
                 copied?: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /**
+         * @description TL amount, two decimals
+         * @example 1234.50
+         */
+        VATMoney: string;
+        VATTotals: {
+            /** @description Hesaplanan KDV (satış KDV'si − satışta tevkif edilen) */
+            output_vat: components["schemas"]["VATMoney"];
+            /** @description Satışlarda alıcının tevkif ettiği KDV (bilgi) */
+            output_withholding: components["schemas"]["VATMoney"];
+            /** @description İndirilecek KDV (alış KDV'sinin tamamı) */
+            input_vat: components["schemas"]["VATMoney"];
+            /** @description Alışlarda tevkif edilen KDV (KDV2; KDV1 netine girmez) */
+            input_withholding: components["schemas"]["VATMoney"];
+            /** @description Önceki dönemden devreden KDV */
+            carried_in: components["schemas"]["VATMoney"];
+            /** @description output_vat − input_vat − carried_in */
+            net: components["schemas"]["VATMoney"];
+            /** @description max(net, 0), ödenecek KDV tahmini */
+            payable: components["schemas"]["VATMoney"];
+            /** @description max(−net, 0), sonraki döneme devreden KDV */
+            carry_out: components["schemas"]["VATMoney"];
+            /** Format: int64 */
+            invoice_count: number;
+        };
+        VATCalendar: {
+            /** Format: date */
+            due_date: string;
+            due_day: number;
+            /** @description Negative once the deadline has passed */
+            days_left: number;
+            /** @description Due day fell on a weekend and moved to Monday */
+            rolled_forward: boolean;
+            /** @description Always false: public holidays are not applied yet */
+            holidays_checked: boolean;
+        };
+        VATChecks: {
+            payable_limit: string | null;
+            payable_limit_reached: boolean;
+            days_before: number;
+            deadline_near: boolean;
+        };
+        VATExcluded: {
+            /** Format: int64 */
+            cancelled: number;
+            /** Format: int64 */
+            draft: number;
+            /** Format: int64 */
+            deleted_at_source: number;
+            /** Format: int64 */
+            missing_exchange_rate: number;
+        };
+        VATForecast: {
+            period: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            currency: "TRY";
+            /** Format: date */
+            as_of: string;
+            totals: components["schemas"]["VATTotals"];
+            rates: {
+                tax_rate: string;
+                output_base: components["schemas"]["VATMoney"];
+                output_vat: components["schemas"]["VATMoney"];
+                output_withholding: components["schemas"]["VATMoney"];
+                input_base: components["schemas"]["VATMoney"];
+                input_vat: components["schemas"]["VATMoney"];
+                input_withholding: components["schemas"]["VATMoney"];
+            }[];
+            lines: {
+                /** @enum {string} */
+                direction: "outgoing" | "incoming";
+                type: string;
+                tax_rate: string;
+                withholding_code: string;
+                /** Format: int64 */
+                invoice_count: number;
+                base: components["schemas"]["VATMoney"];
+                vat: components["schemas"]["VATMoney"];
+                withholding: components["schemas"]["VATMoney"];
+                effective_vat: components["schemas"]["VATMoney"];
+            }[];
+            carry_forward: {
+                /** @enum {string} */
+                source: "opening" | "computed" | "none";
+                opening_period: string | null;
+                opening_amount: string | null;
+                periods: string[];
+            };
+            calendar: components["schemas"]["VATCalendar"];
+            checks: components["schemas"]["VATChecks"];
+            excluded: components["schemas"]["VATExcluded"];
+        };
+        EnvelopeVATForecast: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATForecast"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATForecastOfficePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: {
+                    /** Format: uuid */
+                    engagement_uuid: string;
+                    /** Format: uuid */
+                    taxpayer_uuid: string;
+                    totals: components["schemas"]["VATTotals"];
+                    calendar: components["schemas"]["VATCalendar"];
+                    checks: components["schemas"]["VATChecks"];
+                    excluded: components["schemas"]["VATExcluded"];
+                }[];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATEvaluation: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: {
+                    period: string;
+                    payable: components["schemas"]["VATMoney"];
+                    /** Format: date */
+                    due_date: string;
+                    days_left: number;
+                    created: number;
+                    refreshed: number;
+                    suppressed: number;
+                    disabled: number;
+                    auto_resolved: number;
+                }[];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        VATOpening: {
+            period: string;
+            amount: components["schemas"]["VATMoney"];
+            note: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        VATOpeningInput: {
+            /**
+             * @description Decimal string ≥ 0, at most two decimals
+             * @example 12500.00
+             */
+            amount: string;
+            note?: string | null;
+        };
+        EnvelopeVATOpening: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATOpening"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATOpeningList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["VATOpening"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -17404,6 +17718,210 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeVATForecasts: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM; default this month (Europe/Istanbul) */
+                period?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forecasts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATForecastOfficePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementVATForecast: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM; default this month (Europe/Istanbul) */
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forecast */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATForecast"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    evaluateEngagementVATForecast: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the engine did per period */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATEvaluation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementVATOpenings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Openings, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATOpeningList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putEngagementVATOpening: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VATOpeningInput"];
+            };
+        };
+        responses: {
+            /** @description Opening */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATOpening"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteEngagementVATOpening: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };

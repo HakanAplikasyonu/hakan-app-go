@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	docPath  = "../../../../../docs/kaynak/musavir-entegrasyon-paketi/05-uyari-kodlari.md"
-	seedGlob = "../../../../migrations/*_warning_rules.up.sql"
+	docPath = "../../../../../docs/kaynak/musavir-entegrasyon-paketi/05-uyari-kodlari.md"
+	// The catalog is seeded by *_warning_rules.up.sql; later migrations add
+	// codes with their own INSERT INTO warning_codes (e.g. *_vat_forecast).
+	seedGlob = "../../../../migrations/*.up.sql"
 )
 
 // docCodes parses 05 §3: table rows "| `CODE` | `severity` | ..." and the
@@ -50,17 +52,27 @@ func docCodes(t *testing.T) map[string]string {
 func seedCodes(t *testing.T) map[string]string {
 	t.Helper()
 	files, _ := filepath.Glob(seedGlob)
-	if len(files) != 1 {
-		t.Fatalf("want one *_warning_rules.up.sql, got %v", files)
-	}
-	raw, err := os.ReadFile(files[0])
-	if err != nil {
-		t.Fatal(err)
-	}
 	out := map[string]string{}
 	re := regexp.MustCompile(`\('([A-Z0-9_]+)',\s*'[0-9.]+',\s*'(info|warning|blocker)'`)
-	for _, m := range re.FindAllStringSubmatch(string(raw), -1) {
-		out[m[1]] = m[2]
+	seeds := 0
+	for _, f := range files {
+		raw, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(raw), "INSERT INTO warning_codes") {
+			continue
+		}
+		seeds++
+		for _, m := range re.FindAllStringSubmatch(string(raw), -1) {
+			if _, dup := out[m[1]]; dup {
+				t.Errorf("warning code %s seeded twice (%s)", m[1], filepath.Base(f))
+			}
+			out[m[1]] = m[2]
+		}
+	}
+	if seeds == 0 {
+		t.Fatalf("no migration seeds warning_codes (glob %s)", seedGlob)
 	}
 	return out
 }
@@ -71,7 +83,11 @@ func TestCatalogMatchesDocAndSeed(t *testing.T) {
 	if len(doc) < 45 {
 		t.Fatalf("parsed only %d codes from 05; parser broken?", len(doc))
 	}
-	added := map[string]bool{"UBL_SCHEMATRON_FAIL": true, "ACCOUNT_NOT_IN_TARGET_PLAN": true}
+	added := map[string]bool{
+		"UBL_SCHEMATRON_FAIL": true, "ACCOUNT_NOT_IN_TARGET_PLAN": true,
+		// docs/00 K9 (T10, issue #33)
+		"VAT_PAYABLE_THRESHOLD": true, "VAT_DEADLINE_NEAR": true,
+	}
 	for code, sev := range doc {
 		if _, ok := Lookup(code); !ok {
 			t.Errorf("05 code %s missing from catalog", code)

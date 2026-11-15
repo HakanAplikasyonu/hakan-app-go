@@ -50,5 +50,7 @@
   "actions.organizations.member_left": "Üye ayrıldı",
   "actions.organizations.invitation_created": "Davet gönderildi",
   "actions.organizations.invitation_revoked": "Davet iptal edildi",
-  "actions.organizations.invitation_accepted": "Davet kabul edildi"
+  "actions.organizations.invitation_accepted": "Davet kabul edildi",
+  "actions.vat.opening.set": "KDV açılış devri girildi",
+  "actions.vat.opening.delete": "KDV açılış devri silindi"
 }

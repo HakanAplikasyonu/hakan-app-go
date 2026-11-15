@@ -181,6 +181,7 @@ type Querier interface {
 	DeleteStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) error
 	DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerVehicleParams) (int64, error)
 	DeleteUserTOTP(ctx context.Context, userID int64) error
+	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
@@ -345,6 +346,8 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	GetUserByUUID(ctx context.Context, argUuid uuid.UUID) (User, error)
 	GetUserTOTPByUserID(ctx context.Context, userID int64) (UserTotp, error)
+	// period'a en yakın (aynı ya da önceki) elle girilmiş açılış devri.
+	GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpeningAtOrBeforeParams) (GetVATOpeningAtOrBeforeRow, error)
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
@@ -590,6 +593,7 @@ type Querier interface {
 	ListUserUUIDsForBulk(ctx context.Context, arg ListUserUUIDsForBulkParams) ([]uuid.UUID, error)
 	ListUsersFiltered(ctx context.Context, arg ListUsersFilteredParams) ([]User, error)
 	ListUsersForExport(ctx context.Context, arg ListUsersForExportParams) ([]User, error)
+	ListVATOpenings(ctx context.Context, arg ListVATOpeningsParams) ([]ListVATOpeningsRow, error)
 	ListWarningCodes(ctx context.Context, codes []string) ([]ListWarningCodesRow, error)
 	// Office rows (engagement_id IS NULL) plus, when engagement_id is given,
 	// that engagement's rows.
@@ -772,7 +776,24 @@ type Querier interface {
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
+	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
+	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
+	VATForecastExcluded(ctx context.Context, arg VATForecastExcludedParams) (VATForecastExcludedRow, error)
+	// Devir zinciri için [from_period, before_period) dönem toplamları:
+	// hesaplanan = satış KDV'si − tevkifat, indirilecek = alış KDV'sinin tamamı.
+	VATForecastHistory(ctx context.Context, arg VATForecastHistoryParams) ([]VATForecastHistoryRow, error)
+	// KDV erken uyarı (issue #33, docs/00 K9 / T10). Kaynak ortak model:
+	// invoices + invoice_tax_summaries. Kural (modules/vatforecast):
+	//   * yalnızca status_normalized = 'active' ve kaynakta silinmemiş faturalar;
+	//   * tutarlar TL'ye çevrilir: TRY ise 1, değilse invoices.exchange_rate; kuru
+	//     olmayan döviz faturası dışarıda kalır (VATForecastExcluded sayar);
+	//   * çevrim özet satırı bazında kuruşa yuvarlanır (ROUND(x * kur, 2)).
+	// VATForecastLines ile VATForecastHistory aynı formülü kullanır; devir zinciri
+	// ekrandaki dönem toplamıyla tutarlı kalır.
+	// invoice_count satır grubundaki fatura sayısıdır; çok oranlı bir fatura
+	// birden çok grupta sayılır (dönem toplamı VATForecastExcluded.included).
+	VATForecastLines(ctx context.Context, arg VATForecastLinesParams) ([]VATForecastLinesRow, error)
 	// Plaka mükellefin listesinde ve fiş tarihi geçerlilik aralığında mı (T8).
 	VehicleRegisteredOn(ctx context.Context, arg VehicleRegisteredOnParams) (bool, error)
 }

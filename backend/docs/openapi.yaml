@@ -92,6 +92,8 @@ tags:
     description: Eksik belge görevleri (bankada var, belgesi yok → mükellefe görev → yükleme → eşleşme)
   - name: AccountRules
     description: Account code rules (versioned office template and engagement rules, suggestions, rule candidates)
+  - name: VAT
+    description: KDV erken uyarı (dönem içi tahmin, devreden KDV, beyan takvimi; docs/00 K9 T10)
 paths:
   /healthz:
     get:
@@ -7467,6 +7469,155 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/vat-forecast:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: listOfficeVATForecasts
+      summary: Office VAT forecast (KDV erken uyarı)
+      description: |
+        Requires `tenant.vat.read`. One row per active engagement: hesaplanan − indirilecek − devreden KDV, filing deadline and days left. Without `tenant.engagements.read_all` only assigned engagements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, description: "YYYY-MM; default this month (Europe/Istanbul)", schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Forecasts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVATForecastOfficePage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: getEngagementVATForecast
+      summary: In-period VAT forecast of a taxpayer
+      description: |
+        Requires `tenant.vat.read`, `tenant.engagements.read` and engagement access. Source: active, not deleted-at-source invoices of the period and their `invoice_tax_summaries`, converted to TL with `invoices.exchange_rate` (rounded per row). Outgoing = hesaplanan KDV (vat − tevkifat), incoming = indirilecek KDV (whole vat; the withheld part is reported as `input_withholding`, KDV2). Devreden KDV runs over earlier periods from the nearest opening carry-forward. Deadline: `due_day` (VAT_DEADLINE_NEAR param, default 28) of the next month, moved to Monday on weekends; public holidays are not applied.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, description: "YYYY-MM; default this month (Europe/Istanbul)", schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: Forecast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVATForecast"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [VAT]
+      operationId: evaluateEngagementVATForecast
+      summary: Run the VAT warning rules
+      description: |
+        Requires `tenant.vat.write`. Applies `VAT_PAYABLE_THRESHOLD` (payable ≥ `limit`; null limit = off) and `VAT_DEADLINE_NEAR` (0 ≤ days left ≤ `days_before`) on the period entity, producer `control:vat_forecast`. Conditions that no longer hold are auto-resolved. Without `period`: last month and this month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: What the engine did per period
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVATEvaluation"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listEngagementVATOpenings
+      summary: Opening carry-forwards (açılış devreden KDV)
+      description: |
+        Requires `tenant.vat.read`. Manually entered devreden KDV into a period; the chain restarts from the nearest one at or before the forecast period.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Openings, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVATOpeningList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    put:
+      tags: [VAT]
+      operationId: putEngagementVATOpening
+      summary: Set the opening carry-forward into a period
+      description: |
+        Requires `tenant.vat.write`. `amount` is a decimal string ≥ 0 with at most two decimals (TL). Logged to the activity log.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VATOpeningInput"
+      responses:
+        "200":
+          description: Opening
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeVATOpening"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [VAT]
+      operationId: deleteEngagementVATOpening
+      summary: Remove the opening carry-forward of a period
+      description: |
+        Requires `tenant.vat.write`. Logged to the activity log.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -11609,4 +11760,216 @@ components:
           type: object
           properties:
             copied: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATMoney:
+      type: string
+      description: TL amount, two decimals
+      example: "1234.50"
+
+    VATTotals:
+      type: object
+      required: [output_vat, output_withholding, input_vat, input_withholding, carried_in, net, payable, carry_out, invoice_count]
+      properties:
+        output_vat:
+          description: Hesaplanan KDV (satış KDV'si − satışta tevkif edilen)
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        output_withholding:
+          description: Satışlarda alıcının tevkif ettiği KDV (bilgi)
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        input_vat:
+          description: İndirilecek KDV (alış KDV'sinin tamamı)
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        input_withholding:
+          description: Alışlarda tevkif edilen KDV (KDV2; KDV1 netine girmez)
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        carried_in:
+          description: Önceki dönemden devreden KDV
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        net:
+          description: output_vat − input_vat − carried_in
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        payable:
+          description: max(net, 0), ödenecek KDV tahmini
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        carry_out:
+          description: max(−net, 0), sonraki döneme devreden KDV
+          allOf: [{ $ref: "#/components/schemas/VATMoney" }]
+        invoice_count: { type: integer, format: int64 }
+
+    VATCalendar:
+      type: object
+      required: [due_date, due_day, days_left, rolled_forward, holidays_checked]
+      properties:
+        due_date: { type: string, format: date }
+        due_day: { type: integer }
+        days_left: { type: integer, description: "Negative once the deadline has passed" }
+        rolled_forward: { type: boolean, description: "Due day fell on a weekend and moved to Monday" }
+        holidays_checked: { type: boolean, description: "Always false: public holidays are not applied yet" }
+
+    VATChecks:
+      type: object
+      required: [payable_limit, payable_limit_reached, days_before, deadline_near]
+      properties:
+        payable_limit: { type: [string, "null"] }
+        payable_limit_reached: { type: boolean }
+        days_before: { type: integer }
+        deadline_near: { type: boolean }
+
+    VATExcluded:
+      type: object
+      required: [cancelled, draft, deleted_at_source, missing_exchange_rate]
+      properties:
+        cancelled: { type: integer, format: int64 }
+        draft: { type: integer, format: int64 }
+        deleted_at_source: { type: integer, format: int64 }
+        missing_exchange_rate: { type: integer, format: int64 }
+
+    VATForecast:
+      type: object
+      required: [period, engagement_uuid, taxpayer_uuid, currency, as_of, totals, rates, lines, carry_forward, calendar, checks, excluded]
+      properties:
+        period: { type: string }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        currency: { type: string, enum: [TRY] }
+        as_of: { type: string, format: date }
+        totals: { $ref: "#/components/schemas/VATTotals" }
+        rates:
+          type: array
+          items:
+            type: object
+            required: [tax_rate, output_base, output_vat, output_withholding, input_base, input_vat, input_withholding]
+            properties:
+              tax_rate: { type: string }
+              output_base: { $ref: "#/components/schemas/VATMoney" }
+              output_vat: { $ref: "#/components/schemas/VATMoney" }
+              output_withholding: { $ref: "#/components/schemas/VATMoney" }
+              input_base: { $ref: "#/components/schemas/VATMoney" }
+              input_vat: { $ref: "#/components/schemas/VATMoney" }
+              input_withholding: { $ref: "#/components/schemas/VATMoney" }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [direction, type, tax_rate, withholding_code, invoice_count, base, vat, withholding, effective_vat]
+            properties:
+              direction: { type: string, enum: [outgoing, incoming] }
+              type: { type: string }
+              tax_rate: { type: string }
+              withholding_code: { type: string }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/VATMoney" }
+              vat: { $ref: "#/components/schemas/VATMoney" }
+              withholding: { $ref: "#/components/schemas/VATMoney" }
+              effective_vat: { $ref: "#/components/schemas/VATMoney" }
+        carry_forward:
+          type: object
+          required: [source, opening_period, opening_amount, periods]
+          properties:
+            source: { type: string, enum: [opening, computed, none] }
+            opening_period: { type: [string, "null"] }
+            opening_amount: { type: [string, "null"] }
+            periods: { type: array, items: { type: string } }
+        calendar: { $ref: "#/components/schemas/VATCalendar" }
+        checks: { $ref: "#/components/schemas/VATChecks" }
+        excluded: { $ref: "#/components/schemas/VATExcluded" }
+
+    EnvelopeVATForecast:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATForecast" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeVATForecastOfficePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [engagement_uuid, taxpayer_uuid, totals, calendar, checks, excluded]
+                properties:
+                  engagement_uuid: { type: string, format: uuid }
+                  taxpayer_uuid: { type: string, format: uuid }
+                  totals: { $ref: "#/components/schemas/VATTotals" }
+                  calendar: { $ref: "#/components/schemas/VATCalendar" }
+                  checks: { $ref: "#/components/schemas/VATChecks" }
+                  excluded: { $ref: "#/components/schemas/VATExcluded" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeVATEvaluation:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [period, payable, due_date, days_left, created, refreshed, suppressed, disabled, auto_resolved]
+                properties:
+                  period: { type: string }
+                  payable: { $ref: "#/components/schemas/VATMoney" }
+                  due_date: { type: string, format: date }
+                  days_left: { type: integer }
+                  created: { type: integer }
+                  refreshed: { type: integer }
+                  suppressed: { type: integer }
+                  disabled: { type: integer }
+                  auto_resolved: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATOpening:
+      type: object
+      required: [period, amount, note, updated_at]
+      properties:
+        period: { type: string }
+        amount: { $ref: "#/components/schemas/VATMoney" }
+        note: { type: string }
+        updated_at: { type: string, format: date-time }
+
+    VATOpeningInput:
+      type: object
+      required: [amount]
+      additionalProperties: false
+      properties:
+        amount: { type: string, description: "Decimal string ≥ 0, at most two decimals", example: "12500.00" }
+        note: { type: [string, "null"], maxLength: 1000 }
+
+    EnvelopeVATOpening:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATOpening" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeVATOpeningList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/VATOpening" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }

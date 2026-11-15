@@ -1,7 +1,8 @@
 // Package catalog lists the warning codes of
 // docs/kaynak/musavir-entegrasyon-paketi/05-uyari-kodlari.md (§3.1–§3.4)
 // plus UBL_SCHEMATRON_FAIL (docs/01 §1.1) and ACCOUNT_NOT_IN_TARGET_PLAN
-// (docs/02). Producers write codes, never texts; the panel renders the text.
+// (docs/02) and the VAT early-warning codes (docs/00 K9). Producers write
+// codes, never texts; the panel renders the text.
 //
 // Severities are NOT here: the suggested level of every code is seeded into
 // the warning_codes table and overridden per office / engagement in
@@ -129,6 +130,9 @@ var Codes = []Code{
 	// Added by HAKAN docs.
 	{"UBL_SCHEMATRON_FAIL", "01", []string{EntityInvoice}},
 	{"ACCOUNT_NOT_IN_TARGET_PLAN", "02", []string{AnyEntity}},
+	// KDV erken uyarı (docs/00 K9, T10; issue #33). Seed: *_vat_forecast.up.sql.
+	{"VAT_PAYABLE_THRESHOLD", "00", []string{EntityPeriod}},
+	{"VAT_DEADLINE_NEAR", "00", []string{EntityPeriod}},
 }
 
 var bank = []string{EntityBankTransaction, EntityPeriod}

@@ -91,6 +91,9 @@ import (
 	taxpayerportal "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayerportal"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
+	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
+	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
+	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
@@ -472,6 +475,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		doctasks:    doctasksmodule.NewHandler(docTasksSvc),
+		vat: vatforecasthandler.New(vatforecastusecase.New(
+			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
+		), activityRec),
 		engagements: engagementResolver,
 		taxpayers:   taxpayerResolver,
 	})...); err != nil {
