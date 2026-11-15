@@ -19,8 +19,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 )
 
-// Producer is the data_warning producer name of this channel.
-const Producer = "bank_file"
+// Producer is the data_warning producer name of this channel (05 §1:
+// adapter:<source_system>).
+const Producer = "adapter:bank_file"
 
 // SourceSystem of every file channel row (21 §2).
 const SourceSystem = "bank_file"

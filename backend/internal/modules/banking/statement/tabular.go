@@ -279,9 +279,7 @@ func parseAmount(s string) (decimal.Decimal, error) {
 	if strings.HasSuffix(v, "-") {
 		neg, v = true, strings.TrimSuffix(v, "-")
 	}
-	if strings.HasPrefix(v, "+") {
-		v = v[1:]
-	}
+	v = strings.TrimPrefix(v, "+")
 	if v == "" {
 		return decimal.Decimal{}, fmt.Errorf("tutar boş")
 	}
