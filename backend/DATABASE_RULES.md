@@ -107,6 +107,28 @@ When a migration adds a `tenant.*` permission:
   Inserting into `role_permissions` for the template only does not reach
   existing offices.
 
+## Row level security (HAKAN, issue #6)
+
+Scoped tables (`tenant_tables.txt`, `taxpayer_tables.txt`) have Postgres RLS
+policies for two scoped roles, `hakan_rls_app` and `hakan_rls_worker` (no
+BYPASSRLS). The connection user owns the tables and is not restricted (tables
+are not FORCE'd), so migrations and unscoped code paths work unchanged.
+Code that wants the database to enforce isolation runs in
+`rls.WithScope(ctx, pool, rls.FromRequest(ctx), fn)` (`internal/platform/rls`):
+`SET LOCAL ROLE` plus `SET LOCAL app.organization_id / app.user_id /
+app.taxpayer_ids / app.engagements_read_all`.
+
+A migration that creates a scoped table must also call one template:
+
+```sql
+SELECT rls_apply_org('my_table');         -- organization_id
+SELECT rls_apply_engagement('my_table');  -- organization_id + engagement_id
+SELECT rls_apply_taxpayer('my_table');    -- taxpayer_id
+SELECT rls_apply_platform('my_table');    -- no rows for scoped roles
+```
+
+`TestRLSCoversScopedTables` fails while a listed table has no policy.
+
 ## Migration safety
 
 - Expand/Contract for breaking drops (two-step)

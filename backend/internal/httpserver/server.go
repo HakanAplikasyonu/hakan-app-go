@@ -313,7 +313,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	engagementsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, engagementHandler)
 	// Taxpayers (issue #3): platform catalog always; the office-side profile
 	// of an engagement only with tenancy.
-	taxpayerHandler := taxpayersmodule.NewHandler(taxpayersmodule.New(taxpayersmodule.NewPostgres(deps.Queries)))
+	taxpayerSvc := taxpayersmodule.New(taxpayersmodule.NewPostgres(deps.Queries))
+	// Office-side taxpayer reads run under Postgres RLS (issue #6).
+	taxpayerSvc.SetRLS(deps.DB)
+	taxpayerHandler := taxpayersmodule.NewHandler(taxpayerSvc)
 	taxpayersmodule.RegisterPlatformRoutes(mux, tokens, loader, taxpayerHandler)
 	taxpayersmodule.RegisterTenantRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerHandler)
 	// UBL / ZIP fatura yükleme (issue #11), aktif engagement zinciri arkasında.

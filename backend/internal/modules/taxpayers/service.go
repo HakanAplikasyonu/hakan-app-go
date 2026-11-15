@@ -16,8 +16,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxid"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -65,10 +67,19 @@ type PatchInput struct {
 }
 
 // Service implements the taxpayer use cases.
-type Service struct{ store Store }
+type Service struct {
+	store Store
+	// rlsDB, when set, runs office-side reads under Postgres RLS (issue #6).
+	rlsDB rls.Beginner
+}
 
 // New builds the service.
 func New(store Store) *Service { return &Service{store: store} }
+
+// SetRLS makes office-side reads (ForOfficeMember) run in an RLS-scoped
+// transaction built from the request context (rls.FromRequest), so the
+// database enforces the office and taxpayer boundary as well.
+func (s *Service) SetRLS(db rls.Beginner) { s.rlsDB = db }
 
 // Validate normalizes and checks a CreateInput. It is exported so other
 // flows (office adding a mükellef, issue #7) apply the same rules before
@@ -192,9 +203,22 @@ func (s *Service) Patch(ctx context.Context, id uuid.UUID, in PatchInput) (Taxpa
 // taxpayer only through an active engagement of orgID, to a member assigned
 // to it or holding tenant.engagements.read_all. Anything else is ErrNotFound.
 func (s *Service) ForOfficeMember(ctx context.Context, orgID, userID int64, readAll bool, taxpayerID int64) (Taxpayer, error) {
-	row, err := s.store.ForOfficeMember(ctx, db.GetTaxpayerForOfficeMemberParams{
+	params := db.GetTaxpayerForOfficeMemberParams{
 		OrganizationID: orgID, TaxpayerID: taxpayerID, ReadAll: readAll, UserID: userID,
-	})
+	}
+	var (
+		row db.Taxpayer
+		err error
+	)
+	if s.rlsDB != nil {
+		err = rls.WithScope(ctx, s.rlsDB, rls.FromRequest(ctx), func(ctx context.Context, tx pgx.Tx) error {
+			var e error
+			row, e = NewPostgres(db.New(tx)).ForOfficeMember(ctx, params)
+			return e
+		})
+	} else {
+		row, err = s.store.ForOfficeMember(ctx, params)
+	}
 	if err != nil {
 		return Taxpayer{}, mapNotFound(err)
 	}

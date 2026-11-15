@@ -6,6 +6,10 @@ import (
 	"testing"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -131,4 +135,46 @@ func TestOfficeAccessFollowsActiveAssignedEngagement(t *testing.T) {
 	check(ownerRA, false)
 	check(assignedP, false)
 	check(otherOffice, true)
+}
+
+// TestOfficeAccessUnderRLS runs the same rule through Postgres RLS (issue #6):
+// the request context decides what the database shows, so even the SQL's own
+// filters are not the only guard.
+func TestOfficeAccessUnderRLS(t *testing.T) {
+	svc, d := newDBService(t)
+	svc.SetRLS(d.Pool)
+	orgA, orgB := d.Organization(t), d.Organization(t)
+	assigned, other := d.User(t), d.User(t)
+	d.Member(t, orgA, assigned, "member")
+	d.Member(t, orgB, other, "owner")
+	tp := d.Taxpayer(t, KindLegal, "1234567890")
+	eng := d.Engagement(t, orgA, tp)
+	d.Assign(t, orgA, eng, assigned)
+
+	reqCtx := func(org, user int64, readAll bool) context.Context {
+		ctx := authctx.WithPrincipal(context.Background(), authctx.Principal{UserInternal: user})
+		perms := []string{}
+		if readAll {
+			perms = append(perms, rbac.PermTenantEngagementsReadAll)
+		}
+		ctx = orgctx.WithScope(ctx, orgctx.Scope{ID: org, Permissions: perms})
+		return engagementctx.WithScope(ctx, engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp})
+	}
+	if _, err := svc.ForOfficeMember(reqCtx(orgA, assigned, false), orgA, assigned, false, tp); err != nil {
+		t.Fatalf("assigned member under RLS: %v", err)
+	}
+	// Office B claims the taxpayer: SQL readAll=true, but RLS (org B) and the
+	// engagement join both refuse.
+	if _, err := svc.ForOfficeMember(reqCtx(orgB, other, true), orgB, other, true, tp); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("office B under RLS: %v", err)
+	}
+	// Even a call whose SQL parameters name office A returns nothing when
+	// the request context is office B's.
+	if _, err := svc.ForOfficeMember(reqCtx(orgB, other, true), orgA, other, true, tp); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("mismatched parameters under RLS: %v", err)
+	}
+	d.EndEngagement(t, eng)
+	if _, err := svc.ForOfficeMember(reqCtx(orgA, assigned, false), orgA, assigned, false, tp); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("ended engagement under RLS: %v", err)
+	}
 }
