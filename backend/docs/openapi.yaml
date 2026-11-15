@@ -5439,6 +5439,110 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-statements:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Bank]
+      operationId: importTenantBankStatement
+      summary: Import a bank statement file (MT940 / MT942, .xlsx, CSV, text PDF)
+      description: |
+        Requires `tenant.bank.write` and an active engagement. The account is
+        found from the IBAN in the file (or the `:25:` account number); when
+        the file names none, send `cash_box_uuid`. A file naming an account
+        the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`).
+        Movements go through the duplicate rules (same source key, running
+        balance, lookalike) and are classified. A balance that does not add
+        up raises `BNK_GAP`; a text PDF whose balance does not add up is
+        refused. `?preview=true` reports the same counts without writing.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: preview, in: query, schema: { type: boolean, default: false } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                cash_box_uuid: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Preview report (nothing written)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeBankStatementReport"
+        "201":
+          description: Import report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeBankStatementReport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413":
+          description: File too large (`UPLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: Not a supported statement format (`UNSUPPORTED_FILE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: |
+            `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
+            `STATEMENT_BALANCE_MISMATCH` (text PDF) or `SCANNED_PDF`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: importId, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Bank]
+      operationId: undoTenantBankStatementImport
+      summary: Undo a statement import
+      description: |
+        Requires `tenant.bank.write`. Removes the source rows of that import;
+        a movement left without any channel is deleted, one that also came
+        from another channel keeps it and re-picks its primary source.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Undone
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [import_id, deleted]
+                    properties:
+                      import_id: { type: string, format: uuid }
+                      deleted: { type: integer, description: Movements deleted }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -7990,6 +8094,53 @@ components:
         created_at: { type: string, format: date-time }
         started_at: { type: string, format: date-time }
         finished_at: { type: string, format: date-time }
+
+    BankStatementRowError:
+      type: object
+      properties:
+        Row: { type: integer }
+        Reason: { type: string }
+
+    BankStatementAccount:
+      type: object
+      required: [account, cash_box_uuid, lines, inserted, merged, skipped, possible_duplicates, total_credit, total_debit]
+      properties:
+        account: { type: string, description: IBAN or the statement's account reference }
+        cash_box_uuid: { type: string, format: uuid }
+        bank_id: { type: string }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        lines: { type: integer }
+        inserted: { type: integer }
+        merged: { type: integer, description: Already present through another channel; source added }
+        skipped: { type: integer, description: Same channel and key; nothing new }
+        possible_duplicates: { type: integer, description: Stored but flagged for the accountant }
+        total_credit: { type: string }
+        total_debit: { type: string }
+        opening_balance: { type: string }
+        closing_balance: { type: string }
+        gaps: { type: array, items: { type: string }, description: Running-balance breaks (BNK_GAP) }
+        errors: { type: array, items: { $ref: "#/components/schemas/BankStatementRowError" } }
+
+    BankStatementReport:
+      type: object
+      required: [import_id, format, preview, accounts]
+      properties:
+        import_id: { type: string, format: uuid }
+        format: { type: string, enum: [mt940, excel, csv, pdf] }
+        encoding: { type: string }
+        preview: { type: boolean }
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementAccount" }
+
+    EnvelopeBankStatementReport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementReport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeUBLUploadJob:
       type: object

@@ -59,30 +59,99 @@ type IngestResult struct {
 func (s *Service) Ingest(ctx context.Context, taxpayerID, cashBoxID int64, importID *uuid.UUID, txns []Transaction) (IngestResult, error) {
 	var res IngestResult
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		q := db.New(tx)
-		box, err := q.GetCashBox(ctx, db.GetCashBoxParams{TaxpayerID: taxpayerID, ID: cashBoxID})
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrNotFound
-			}
-			return err
-		}
-		for i := range txns {
-			if err := s.ingestOne(ctx, q, taxpayerID, box, importID, txns[i], &res); err != nil {
-				return fmt.Errorf("movement %d: %w", i+1, err)
-			}
-		}
-		return nil
+		var err error
+		res, err = s.IngestTx(ctx, tx, taxpayerID, cashBoxID, importID, txns)
+		return err
 	})
 	if err != nil {
 		return IngestResult{}, err
 	}
-	if len(res.InsertedIDs) > 0 {
-		if _, err := s.classifyIDs(ctx, taxpayerID, res.InsertedIDs); err != nil {
-			return res, err
+	if err := s.ClassifyInserted(ctx, taxpayerID, res); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+// IngestTx is Ingest inside the caller's transaction, without classifying:
+// a preview runs it and rolls back (23 §2 step 4), an import commits and then
+// calls ClassifyInserted.
+func (s *Service) IngestTx(ctx context.Context, tx pgx.Tx, taxpayerID, cashBoxID int64, importID *uuid.UUID, txns []Transaction) (IngestResult, error) {
+	var res IngestResult
+	q := db.New(tx)
+	box, err := q.GetCashBox(ctx, db.GetCashBoxParams{TaxpayerID: taxpayerID, ID: cashBoxID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return res, ErrNotFound
+		}
+		return res, err
+	}
+	for i := range txns {
+		if err := s.ingestOne(ctx, q, taxpayerID, box, importID, txns[i], &res); err != nil {
+			return res, fmt.Errorf("movement %d: %w", i+1, err)
 		}
 	}
 	return res, nil
+}
+
+// ClassifyInserted classifies what an ingest added.
+func (s *Service) ClassifyInserted(ctx context.Context, taxpayerID int64, res IngestResult) error {
+	if len(res.InsertedIDs) == 0 {
+		return nil
+	}
+	_, err := s.classifyIDs(ctx, taxpayerID, res.InsertedIDs)
+	return err
+}
+
+// UndoImport removes one file upload (21 §2): its source rows go; a movement
+// left without any source is deleted; one that keeps another channel gets
+// its primary source re-picked by priority. It returns the deleted count.
+func (s *Service) UndoImport(ctx context.Context, taxpayerID int64, importID uuid.UUID) (deleted int, err error) {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		imp := pgtype.UUID{Bytes: importID, Valid: true}
+		ids, err := q.DeleteBankTransactionSourcesByImport(ctx, db.DeleteBankTransactionSourcesByImportParams{TaxpayerID: taxpayerID, ImportID: imp})
+		if err != nil {
+			return err
+		}
+		if err := q.DeleteBankBalanceSnapshotsByImport(ctx, db.DeleteBankBalanceSnapshotsByImportParams{TaxpayerID: taxpayerID, ImportID: imp}); err != nil {
+			return err
+		}
+		seen := map[int64]bool{}
+		for _, id := range ids {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			left, err := q.ListBankTransactionSources(ctx, db.ListBankTransactionSourcesParams{TaxpayerID: taxpayerID, BankTransactionID: id})
+			if err != nil {
+				return err
+			}
+			if len(left) == 0 {
+				if err := q.ClearPossibleDuplicateLinks(ctx, db.ClearPossibleDuplicateLinksParams{TaxpayerID: taxpayerID, ID: pgtype.Int8{Int64: id, Valid: true}}); err != nil {
+					return err
+				}
+				if err := q.DeleteBankTransaction(ctx, db.DeleteBankTransactionParams{TaxpayerID: taxpayerID, ID: id}); err != nil {
+					return err
+				}
+				deleted++
+				continue
+			}
+			best := left[0]
+			for _, l := range left[1:] {
+				if CapturePriority(l.CaptureMethod) > CapturePriority(best.CaptureMethod) {
+					best = l
+				}
+			}
+			if err := q.SetBankTransactionPrimarySource(ctx, db.SetBankTransactionPrimarySourceParams{
+				SourceSystem: best.SourceSystem, SourceID: best.SourceID, CaptureMethod: best.CaptureMethod,
+				RawPayload: best.RawPayload, TaxpayerID: taxpayerID, ID: id,
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return deleted, err
 }
 
 type normalized struct {

@@ -18,6 +18,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/joho/godotenv v1.5.1
 	github.com/jung-kurt/gofpdf/v2 v2.17.3
+	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
 	github.com/meilisearch/meilisearch-go v0.31.0
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/pquerna/otp v1.5.0
@@ -25,6 +26,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/crypto v0.54.0
+	golang.org/x/text v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -77,7 +79,6 @@ require (
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

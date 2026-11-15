@@ -28,6 +28,8 @@ import (
 	authsettingsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings"
 	authsettingshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/handler"
 	authsettingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/usecase"
+	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
@@ -336,6 +338,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
 	}
+	// Banka ekstresi yükleme (issue #19): MT940 / Excel / CSV / metin PDF.
+	bankSvc := bankingmodule.NewService(deps.DB, nil)
+	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bankstatement.NewHandler(bankstatement.NewImporter(deps.DB, bankSvc), bankSvc, deps.Queries))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
 

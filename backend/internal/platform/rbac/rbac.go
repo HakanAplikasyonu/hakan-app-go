@@ -81,6 +81,9 @@ const (
 	PermTenantReceiptsRead    = "tenant.receipts.read"
 	PermTenantReceiptsWrite   = "tenant.receipts.write"
 	PermTenantReceiptsApprove = "tenant.receipts.approve"
+	// Bank statements and movements (#19, #20).
+	PermTenantBankRead  = "tenant.bank.read"
+	PermTenantBankWrite = "tenant.bank.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.
