@@ -5,10 +5,11 @@ go 1.26.11
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/alicebob/miniredis/v2 v2.38.0
+	github.com/anthropics/anthropic-sdk-go v1.75.0
 	github.com/aws/aws-sdk-go-v2 v1.43.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.30
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.106.0
-	github.com/furkanmeclis/go-ubltr v0.0.0-20261115194323-7b312a84cd13
+	github.com/furkanmeclis/go-ubltr v0.1.0
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/go-webauthn/webauthn v0.12.3
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -28,7 +29,6 @@ require (
 
 require (
 	github.com/andybalholm/brotli v1.1.1 // indirect
-	github.com/anthropics/anthropic-sdk-go v1.75.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.14 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.31 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.31 // indirect

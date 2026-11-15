@@ -1,0 +1,113 @@
+-- name: InsertInvoice :one
+INSERT INTO invoices (
+    taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type,
+    invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized,
+    issue_date, issue_time, payment_due_date, period,
+    customer_id, customer_tax_number, customer_identity_number, customer_name,
+    currency, exchange_rate,
+    line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount,
+    withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount,
+    income_tax_withholding_rate, payable_amount, payable_amount_try,
+    global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference,
+    notes, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at
+) VALUES (
+    @taxpayer_id, @source_system, @source_id, @capture_method, sqlc.narg(ettn), @invoice_number, @direction, @type,
+    sqlc.narg(invoice_type_code_raw), sqlc.narg(profile), sqlc.narg(profile_raw), @document_class, sqlc.narg(status), @status_normalized,
+    @issue_date, sqlc.narg(issue_time), sqlc.narg(payment_due_date), @period,
+    sqlc.narg(customer_id), sqlc.narg(customer_tax_number), sqlc.narg(customer_identity_number), sqlc.narg(customer_name),
+    @currency, sqlc.narg(exchange_rate),
+    @line_extension_amount, @allowance_total_amount, @tax_exclusive_amount, @tax_amount, @tax_inclusive_amount,
+    @withholding_amount, @excise_amount, @communications_tax_amount, @income_tax_withholding_amount,
+    sqlc.narg(income_tax_withholding_rate), @payable_amount, sqlc.narg(payable_amount_try),
+    sqlc.narg(global_tax_exemption_code), sqlc.narg(original_invoice_number), sqlc.narg(original_invoice_issue_date), sqlc.narg(order_reference),
+    sqlc.narg(notes), @has_items, @tax_summary_source, sqlc.narg(ubl_attachment_id), @raw_payload, sqlc.narg(content_hash), sqlc.narg(source_updated_at)
+)
+RETURNING id, uuid;
+
+-- name: GetInvoice :one
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
+
+-- name: GetInvoiceBySource :one
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND source_system = @source_system AND source_id = @source_id;
+
+-- name: FindInvoicesByETTN :many
+-- 01 §6 kural 1.
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND ettn = @ettn
+ORDER BY id;
+
+-- name: FindInvoicesByPartyNumberDate :many
+-- 01 §6 kural 2: karşı taraf VKN/TCKN + fatura no + tarih.
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id
+  AND invoice_number = @invoice_number
+  AND issue_date = @issue_date
+  AND (customer_tax_number = sqlc.narg(customer_tax_number) OR customer_identity_number = sqlc.narg(customer_identity_number))
+ORDER BY id;
+
+-- name: FindPossibleDuplicateInvoices :many
+-- 01 §6 kural 3: karşı taraf + tarih + ödenecek tutar (±tolerans).
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id
+  AND issue_date = @issue_date
+  AND direction = @direction
+  AND (customer_tax_number = sqlc.narg(customer_tax_number) OR customer_identity_number = sqlc.narg(customer_identity_number))
+  AND payable_amount BETWEEN @payable_min AND @payable_max
+  AND id <> @exclude_id
+ORDER BY id;
+
+-- name: ListInvoicesByPeriod :many
+SELECT * FROM invoices
+WHERE taxpayer_id = @taxpayer_id AND period = @period
+ORDER BY issue_date, id
+LIMIT @lim OFFSET @off;
+
+-- name: InsertInvoiceItem :exec
+INSERT INTO invoice_items (
+    taxpayer_id, invoice_id, line_no, name, description, product_code, quantity, unit_code, unit_price,
+    line_extension_amount, own_allowance_amount, allowance_total_amount, tax_exclusive_amount,
+    tax_rate, total_tax_amount, tax_inclusive_amount, withholding_code, withholding_rate, withholding_amount,
+    tax_exemption_code, special_tax_base_code, special_tax_base_amount, export_registered_code, gtip_code,
+    excise_rate, excise_amount, communications_tax_rate, communications_tax_amount,
+    income_tax_withholding_amount, line_type, tax_breakdowns
+) VALUES (
+    @taxpayer_id, @invoice_id, @line_no, @name, sqlc.narg(description), sqlc.narg(product_code), @quantity, sqlc.narg(unit_code), @unit_price,
+    @line_extension_amount, @own_allowance_amount, @allowance_total_amount, @tax_exclusive_amount,
+    @tax_rate, @total_tax_amount, @tax_inclusive_amount, sqlc.narg(withholding_code), @withholding_rate, @withholding_amount,
+    sqlc.narg(tax_exemption_code), sqlc.narg(special_tax_base_code), sqlc.narg(special_tax_base_amount), sqlc.narg(export_registered_code), sqlc.narg(gtip_code),
+    @excise_rate, @excise_amount, @communications_tax_rate, @communications_tax_amount,
+    @income_tax_withholding_amount, @line_type, @tax_breakdowns
+);
+
+-- name: ListInvoiceItems :many
+SELECT * FROM invoice_items
+WHERE taxpayer_id = @taxpayer_id AND invoice_id = @invoice_id
+ORDER BY line_no;
+
+-- name: InsertInvoiceTaxSummary :exec
+INSERT INTO invoice_tax_summaries (taxpayer_id, invoice_id, tax_rate, base, vat, withholding, withholding_code, tax_exemption_code)
+VALUES (@taxpayer_id, @invoice_id, @tax_rate, @base, @vat, @withholding, sqlc.narg(withholding_code), sqlc.narg(tax_exemption_code));
+
+-- name: ListInvoiceTaxSummaries :many
+SELECT * FROM invoice_tax_summaries
+WHERE taxpayer_id = @taxpayer_id AND invoice_id = @invoice_id
+ORDER BY tax_rate, withholding_code NULLS FIRST, tax_exemption_code NULLS FIRST;
+
+-- name: DeleteInvoiceChildren :exec
+-- Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
+WITH del_items AS (
+    DELETE FROM invoice_items WHERE invoice_items.taxpayer_id = @taxpayer_id AND invoice_items.invoice_id = @invoice_id
+)
+DELETE FROM invoice_tax_summaries WHERE invoice_tax_summaries.taxpayer_id = @taxpayer_id AND invoice_tax_summaries.invoice_id = @invoice_id;
+
+-- name: PeriodVATSummary :many
+-- KDV1 için dönem özeti (yalnızca aktif faturalar).
+SELECT i.direction, s.tax_rate, s.withholding_code, s.tax_exemption_code,
+       SUM(s.base)::numeric AS base, SUM(s.vat)::numeric AS vat, SUM(s.withholding)::numeric AS withholding
+FROM invoices i
+JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
+WHERE i.taxpayer_id = @taxpayer_id AND i.period = @period AND i.status_normalized = 'active'
+GROUP BY i.direction, s.tax_rate, s.withholding_code, s.tax_exemption_code
+ORDER BY i.direction, s.tax_rate;
