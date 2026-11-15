@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hakan</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <header class="top">
+      <img src="logo.svg" alt="" width="28" height="28" />
+      <h1>Hakan masaüstü</h1>
+      <span id="app-version" class="muted"></span>
+    </header>
+
+    <main>
+      <section class="card" aria-labelledby="sc-title">
+        <div class="card-head">
+          <h2 id="sc-title">Yerel ajan (Go sidecar)</h2>
+          <span id="sc-badge" class="badge" data-state="wait">Başlatılıyor…</span>
+        </div>
+        <dl class="kv" id="sc-info"></dl>
+        <div class="row">
+          <button id="sc-ping" type="button">Ping</button>
+          <button id="sc-restart" type="button" class="ghost">Yeniden başlat</button>
+          <span id="sc-ping-out" class="muted" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="api-title">
+        <h2 id="api-title">Sunucu bağlantısı</h2>
+        <form id="api-form" class="row">
+          <label class="grow">
+            <span>API adresi</span>
+            <input id="api-url" type="url" placeholder="https://api.ornek.com" required />
+          </label>
+          <button type="submit">Bağlantıyı dene</button>
+        </form>
+        <p id="api-out" class="muted" aria-live="polite"></p>
+
+        <form id="token-form" class="row">
+          <label class="grow">
+            <span>API anahtarı (anahtar zincirinde saklanır)</span>
+            <input id="token" type="password" autocomplete="off" />
+          </label>
+          <button type="submit">Kaydet</button>
+          <button id="token-delete" type="button" class="ghost">Sil</button>
+        </form>
+        <p id="token-out" class="muted" aria-live="polite"></p>
+      </section>
+
+      <section class="card" aria-labelledby="ubl-title">
+        <h2 id="ubl-title">UBL dosyası denetimi</h2>
+        <div id="drop" class="drop">
+          XML faturayı bu pencereye sürükleyin. Dosya yerelde, sidecar'daki
+          go-ubltr ile okunur; sunucuya gönderilmez.
+        </div>
+        <dl class="kv" id="ubl-out"></dl>
+      </section>
+
+      <section class="card" aria-labelledby="up-title">
+        <div class="card-head">
+          <h2 id="up-title">Güncelleme</h2>
+          <button id="up-check" type="button" class="ghost">Denetle</button>
+        </div>
+        <p id="up-out" class="muted" aria-live="polite"></p>
+      </section>
+    </main>
+  </body>
+</html>

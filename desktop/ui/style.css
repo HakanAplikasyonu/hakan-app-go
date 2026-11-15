@@ -1,0 +1,92 @@
+:root {
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --fg: #0f172b;
+  --muted: #62748e;
+  --border: #e2e8f0;
+  --brand: #1447e6;
+  --ok: #009689;
+  --wait: #ffb900;
+  --down: #e7000b;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #020618;
+    --card: #0f172b;
+    --fg: #f1f5f9;
+    --muted: #90a1b9;
+    --border: #1d293d;
+    --brand: #5b8cff;
+    --ok: #00bba7;
+    --down: #fb2c36;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+.top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+h1 { font-size: 16px; margin: 0; }
+h2 { font-size: 14px; margin: 0 0 10px; }
+main {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+}
+.card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.card-head h2 { margin: 0; }
+.muted { color: var(--muted); font-size: 13px; }
+.row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 10px; }
+.grow { flex: 1; min-width: 200px; display: grid; gap: 4px; }
+label span { font-size: 12px; color: var(--muted); }
+input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+button {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--border); }
+.badge { font-size: 12px; padding: 2px 10px; border-radius: 999px; color: #fff; }
+.badge[data-state="ok"] { background: var(--ok); }
+.badge[data-state="wait"] { background: var(--wait); color: #0f172b; }
+.badge[data-state="down"] { background: var(--down); }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 8px 0 0; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; word-break: break-all; }
+.drop {
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+}
