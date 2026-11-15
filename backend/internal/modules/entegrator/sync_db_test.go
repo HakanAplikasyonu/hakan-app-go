@@ -515,7 +515,9 @@ func (hangingFetch) Fetch(ctx context.Context, _ provider.FetchQuery) (*provider
 func TestCallTimeout(t *testing.T) {
 	ctx := context.Background()
 	e := setup(t, Config{CallTimeout: 50 * time.Millisecond})
-	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) { return Wrap(hangingFetch{e.spy}), nil })
+	e.svc.WithOpener(func(context.Context, db.SourceConnection, string) (*Client, error) {
+		return Wrap(hangingFetch{e.spy}), nil
+	})
 	e.deliver(t, 1, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-14T09:00:00+03:00"))
 	e.deliver(t, 2, "TEMELFATURA", provider.StatusReceived, mustTime(t, "2026-11-14T10:00:00+03:00"))
 	rep, err := e.svc.Run(ctx, e.tp, e.conn.Uuid, RunIncremental)
