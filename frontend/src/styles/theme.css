@@ -1,4 +1,4 @@
-/* shadcn new-york · slate */
+/* shadcn new-york · slate + HAKAN marka katmanı (D19, docs/brand) */
 
 :root {
   --radius: 0.625rem;
@@ -33,6 +33,20 @@
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+
+  /* Marka (D19) */
+  --brand: #1447e6;
+  --brand-foreground: #ffffff;
+  --brand-check: #5b8cff;
+  /* Durum renkleri: onaylandı / inceleme / uyarı / engelleyici */
+  --status-approved: #009689;
+  --status-approved-foreground: #ffffff;
+  --status-review: #ffb900;
+  --status-review-foreground: #0f172b;
+  --status-warning: #f54900;
+  --status-warning-foreground: #ffffff;
+  --status-blocking: #e7000b;
+  --status-blocking-foreground: #ffffff;
 }
 
 .dark {
@@ -67,6 +81,19 @@
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+
+  /* Koyu temada metin ve ince çizgi olarak okunabilsin diye bir ton açık */
+  --brand: #5b8cff;
+  --brand-foreground: #020618;
+  --brand-check: #1447e6;
+  --status-approved: #00bba7;
+  --status-approved-foreground: #020618;
+  --status-review: #ffb900;
+  --status-review-foreground: #0f172b;
+  --status-warning: #ff6900;
+  --status-warning-foreground: #020618;
+  --status-blocking: #fb2c36;
+  --status-blocking-foreground: #ffffff;
 }
 
 @theme inline {
@@ -107,9 +134,31 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-check: var(--brand-check);
+  --color-status-approved: var(--status-approved);
+  --color-status-approved-foreground: var(--status-approved-foreground);
+  --color-status-review: var(--status-review);
+  --color-status-review-foreground: var(--status-review-foreground);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-blocking: var(--status-blocking);
+  --color-status-blocking-foreground: var(--status-blocking-foreground);
+
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono:
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, monospace;
   --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/*
+ * Tutar, hesap kodu, VKN ve ETTN: Geist Mono + hizalı rakamlar (D19).
+ * Kullanım: <span className="figure">1.284.560,40</span>
+ */
+@utility figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }

@@ -13,7 +13,7 @@ export function AppSidebarLogo({ className }: AppSidebarLogoProps) {
     <>
       <span
         className={cn(
-          "bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg",
+          "bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg",
           className,
         )}
       >

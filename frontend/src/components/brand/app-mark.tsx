@@ -7,7 +7,12 @@ type AppMarkProps = SVGProps<SVGSVGElement> & {
   title?: string;
 };
 
-/** Generic hex mark — works on primary tiles and as a standalone glyph. */
+/**
+ * HAKAN işareti (docs/brand/logo-mark.svg, D19): borç/alacak sütunları ve
+ * onay çizgisi bir arada "H" kurar. Sütunlar `currentColor`, onay çizgisi
+ * `--brand-check` tokenıdır; bu yüzden işaret `bg-primary` karonun üstünde
+ * açık ve koyu temada doğru renk alır.
+ */
 export function AppMark({
   className,
   title = brand.name,
@@ -15,7 +20,7 @@ export function AppMark({
 }: AppMarkProps) {
   return (
     <svg
-      viewBox="0 0 24 24"
+      viewBox="12 11 40 42"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       role="img"
@@ -24,9 +29,14 @@ export function AppMark({
       {...props}
     >
       <title>{title}</title>
+      <rect x="15" y="14" width="8" height="36" rx="4" fill="currentColor" />
+      <rect x="41" y="14" width="8" height="36" rx="4" fill="currentColor" />
       <path
-        fill="currentColor"
-        d="M11.1 2.55a2 2 0 0 1 1.8 0l7.15 3.9A2 2 0 0 1 21 8.22v7.56a2 2 0 0 1-1.05 1.77l-7.15 3.9a2 2 0 0 1-1.8 0l-7.15-3.9A2 2 0 0 1 3 15.78V8.22a2 2 0 0 1 1.05-1.77l7.15-3.9Z"
+        d="M21 33 L29 41 L43 25"
+        stroke="var(--brand-check)"
+        strokeWidth="6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
