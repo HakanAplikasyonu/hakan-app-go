@@ -2,9 +2,17 @@
 # one of them must filter on or set organization_id (see queries_test.go), or carry a
 # "-- tenant-lint: cross-org <reason>" line directly above its "-- name:" line.
 #
+# A second word "engagement" marks a table whose rows also belong to one
+# engagement (ofis <-> mükellef ilişkisi, issue #2). Queries on it must filter
+# on or set engagement_id as well, or carry a
+# "-- tenant-lint: org-wide <reason>" line (for example an office-wide report
+# that only an engagements.read_all caller reaches).
+#
 # Engine tables with a nullable organization_id (activity_events,
 # notifications, export_jobs, import_jobs, bulk_jobs) are not listed yet: their
 # rows are user-scoped today and platform views read across organizations.
 # Add a table here once every query on it is org-filtered or exempted.
 organization_members
 organization_invitations
+engagements
+engagement_assignments engagement

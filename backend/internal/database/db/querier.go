@@ -15,6 +15,7 @@ type Querier interface {
 	// tenant-lint: cross-org id comes from the token lookup in the same locked tx
 	// Single use: only a pending, unexpired invitation flips to accepted.
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
+	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
@@ -27,7 +28,9 @@ type Querier interface {
 	CountAllImportJobs(ctx context.Context) (int64, error)
 	CountAppLogs(ctx context.Context, arg CountAppLogsParams) (int64, error)
 	CountAppLogsByLevel(ctx context.Context) ([]CountAppLogsByLevelRow, error)
+	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
+	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
@@ -45,6 +48,7 @@ type Querier interface {
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
+	CreateEngagement(ctx context.Context, arg CreateEngagementParams) (Engagement, error)
 	CreateExportJob(ctx context.Context, arg CreateExportJobParams) (ExportJob, error)
 	CreateImportJob(ctx context.Context, arg CreateImportJobParams) (ImportJob, error)
 	CreateLogPurgeRule(ctx context.Context, arg CreateLogPurgeRuleParams) (LogPurgeRule, error)
@@ -62,6 +66,7 @@ type Querier interface {
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
+	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteOAuthAccountByProviderAccount(ctx context.Context, arg DeleteOAuthAccountByProviderAccountParams) error
 	DeleteOAuthAccountByUserProvider(ctx context.Context, arg DeleteOAuthAccountByUserProviderParams) error
@@ -77,6 +82,7 @@ type Querier interface {
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
+	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
@@ -87,6 +93,7 @@ type Querier interface {
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
+	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
@@ -117,6 +124,8 @@ type Querier interface {
 	GetStorageLinkByUUID(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	GetStorageTrashByOriginalKey(ctx context.Context, originalKey string) (StorageTrash, error)
 	GetStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) (StorageTrash, error)
+	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
+	GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Taxpayer, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg GetTemplateByCodeChannelLangParams) (NotificationTemplate, error)
 	GetTenantRoleByKey(ctx context.Context, arg GetTenantRoleByKeyParams) (Role, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -156,10 +165,13 @@ type Querier interface {
 	ListAllPermissionSlugs(ctx context.Context) ([]string, error)
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
+	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
+	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
+	ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
@@ -236,6 +248,7 @@ type Querier interface {
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	ReplaceUserRoles(ctx context.Context, userID int64) error
+	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error

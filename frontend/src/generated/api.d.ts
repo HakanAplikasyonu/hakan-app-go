@@ -1988,6 +1988,180 @@ export interface paths {
         patch: operations["changeTenantMemberRole"];
         trace?: never;
     };
+    "/v1/tenant/engagements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engagements the caller may see
+         * @description Requires `tenant.engagements.read`. With `tenant.engagements.read_all`
+         *     every engagement of the office is listed; otherwise only those the
+         *     caller is assigned to.
+         */
+        get: operations["listTenantEngagements"];
+        put?: never;
+        /**
+         * Open an engagement with a taxpayer
+         * @description Requires `tenant.engagements.write`. A taxpayer has at most one active
+         *     engagement across all offices (`409 ENGAGEMENT_ALREADY_ACTIVE`).
+         *     Issue #7 moves this behind the taxpayer's consent.
+         */
+        post: operations["createTenantEngagement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One engagement (active or ended)
+         * @description Requires `tenant.engagements.read` and an assignment or `tenant.engagements.read_all`.
+         */
+        get: operations["getTenantEngagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/context": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Resolved engagement scope (active engagements only)
+         * @description The access rule every mükellef data route follows: an active
+         *     engagement, plus an assignment or `tenant.engagements.read_all`.
+         */
+        get: operations["getTenantEngagementContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/end": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End an engagement
+         * @description Requires `tenant.engagements.write`. Already ended → `409 ENGAGEMENT_ENDED`.
+         */
+        post: operations["endTenantEngagement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/assignments": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Members assigned to an engagement
+         * @description Requires `tenant.engagements.read` and access to the engagement.
+         */
+        get: operations["listTenantEngagementAssignments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                userUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Assign an office member (idempotent)
+         * @description Requires `tenant.engagements.write` and an active engagement. The user must be a member of the office.
+         */
+        put: operations["assignTenantEngagementMember"];
+        post?: never;
+        /**
+         * Remove a member's assignment
+         * @description Requires `tenant.engagements.write`.
+         */
+        delete: operations["unassignTenantEngagementMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/leave": {
         parameters: {
             query?: never;
@@ -3291,6 +3465,75 @@ export interface components {
             data: components["schemas"]["OrganizationMemberPage"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        Engagement: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            status: "active" | "ended";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            ended_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EngagementPage: {
+            items: components["schemas"]["Engagement"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EngagementContext: {
+            engagement: components["schemas"]["Engagement"];
+            /** @description True when the caller is not assigned and reached it through read_all */
+            via_read_all: boolean;
+        };
+        EngagementAssignment: {
+            /** Format: uuid */
+            user_uuid: string;
+            /** Format: email */
+            email: string;
+            name: string;
+            surname: string;
+            /** Format: date-time */
+            assigned_at: string;
+        };
+        EngagementAssignmentList: {
+            items: components["schemas"]["EngagementAssignment"][];
+        };
+        CreateEngagementRequest: {
+            /** Format: uuid */
+            taxpayer_uuid: string;
+        };
+        EnvelopeEngagement: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Engagement"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEngagementPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEngagementContext: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementContext"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEngagementAssignmentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementAssignmentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeImpersonationResult: {
             /** @enum {boolean} */
             success: true;
@@ -3656,8 +3899,22 @@ export interface components {
                 "application/json": components["schemas"]["Error"];
             };
         };
+        /**
+         * @description `NO_ENGAGEMENT_ACCESS` (unknown engagement, another office's
+         *     engagement, or no assignment and no `tenant.engagements.read_all`),
+         *     `ENGAGEMENT_ENDED`, or any `TenantForbidden` code
+         */
+        EngagementForbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
     };
     parameters: {
+        EngagementUuid: string;
         /**
          * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
          *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
@@ -6910,6 +7167,265 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantEngagements: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                status?: "active" | "ended";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engagement page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantEngagement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateEngagementRequest"];
+            };
+        };
+        responses: {
+            /** @description Opened engagement */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantEngagement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engagement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagement"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantEngagementContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engagement scope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementContext"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    endTenantEngagement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Ended engagement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagement"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantEngagementAssignments: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assignments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementAssignmentList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    assignTenantEngagementMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                userUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assigned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unassignTenantEngagementMember: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                userUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unassigned */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

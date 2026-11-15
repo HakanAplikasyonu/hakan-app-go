@@ -49,6 +49,8 @@ tags:
     description: Super-admin platform tenant/user catalog
   - name: Tenant
     description: Organization-scoped routes (`X-Organization` header; `TENANCY_ENABLED`)
+  - name: Engagements
+    description: Ofis <-> mükellef hizmet ilişkisi ve üye atamaları (`X-Organization`; `TENANCY_ENABLED`)
   - name: Realtime
     description: Centrifugo connection and subscription tokens
   - name: Notifications
@@ -3286,6 +3288,196 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements:
+    get:
+      tags: [Engagements]
+      operationId: listTenantEngagements
+      summary: Engagements the caller may see
+      description: |
+        Requires `tenant.engagements.read`. With `tenant.engagements.read_all`
+        every engagement of the office is listed; otherwise only those the
+        caller is assigned to.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XOrganization"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [active, ended] }
+      responses:
+        "200":
+          description: Engagement page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagementPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Engagements]
+      operationId: createTenantEngagement
+      summary: Open an engagement with a taxpayer
+      description: |
+        Requires `tenant.engagements.write`. A taxpayer has at most one active
+        engagement across all offices (`409 ENGAGEMENT_ALREADY_ACTIVE`).
+        Issue #7 moves this behind the taxpayer's consent.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/XOrganization"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEngagementRequest"
+      responses:
+        "201":
+          description: Opened engagement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagement"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Engagements]
+      operationId: getTenantEngagement
+      summary: One engagement (active or ended)
+      description: Requires `tenant.engagements.read` and an assignment or `tenant.engagements.read_all`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Engagement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagement"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/context:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Engagements]
+      operationId: getTenantEngagementContext
+      summary: Resolved engagement scope (active engagements only)
+      description: |
+        The access rule every mükellef data route follows: an active
+        engagement, plus an assignment or `tenant.engagements.read_all`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Engagement scope
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagementContext"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/end:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Engagements]
+      operationId: endTenantEngagement
+      summary: End an engagement
+      description: Requires `tenant.engagements.write`. Already ended → `409 ENGAGEMENT_ENDED`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Ended engagement
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagement"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/assignments:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Engagements]
+      operationId: listTenantEngagementAssignments
+      summary: Members assigned to an engagement
+      description: Requires `tenant.engagements.read` and access to the engagement.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagementAssignmentList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - name: userUuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [Engagements]
+      operationId: assignTenantEngagementMember
+      summary: Assign an office member (idempotent)
+      description: Requires `tenant.engagements.write` and an active engagement. The user must be a member of the office.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Assigned }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Engagements]
+      operationId: unassignTenantEngagementMember
+      summary: Remove a member's assignment
+      description: Requires `tenant.engagements.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Unassigned }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/leave:
     post:
       tags: [Tenant]
@@ -3530,6 +3722,11 @@ components:
       bearerFormat: JWT
 
   parameters:
+    EngagementUuid:
+      name: engagementUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     XOrganization:
       name: X-Organization
       in: header
@@ -3633,6 +3830,16 @@ components:
         `NO_TENANT_MEMBERSHIP` (unknown organization or not a member),
         `ORGANIZATION_SUSPENDED`, `ORGANIZATION_ACCESS_EXPIRED`, or `FORBIDDEN`
         (tenant permission missing in this organization)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+    EngagementForbidden:
+      description: |
+        `NO_ENGAGEMENT_ACCESS` (unknown engagement, another office's
+        engagement, or no assignment and no `tenant.engagements.read_all`),
+        `ENGAGEMENT_ENDED`, or any `TenantForbidden` code
       content:
         application/json:
           schema:
@@ -5228,6 +5435,92 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/OrganizationMemberPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    Engagement:
+      type: object
+      required: [uuid, taxpayer_uuid, status, started_at, ended_at, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [active, ended] }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    EngagementPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Engagement" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    EngagementContext:
+      type: object
+      required: [engagement, via_read_all]
+      properties:
+        engagement: { $ref: "#/components/schemas/Engagement" }
+        via_read_all: { type: boolean, description: True when the caller is not assigned and reached it through read_all }
+
+    EngagementAssignment:
+      type: object
+      required: [user_uuid, email, name, surname, assigned_at]
+      properties:
+        user_uuid: { type: string, format: uuid }
+        email: { type: string, format: email }
+        name: { type: string }
+        surname: { type: string }
+        assigned_at: { type: string, format: date-time }
+
+    EngagementAssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/EngagementAssignment" }
+
+    CreateEngagementRequest:
+      type: object
+      required: [taxpayer_uuid]
+      additionalProperties: false
+      properties:
+        taxpayer_uuid: { type: string, format: uuid }
+
+    EnvelopeEngagement:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Engagement" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeEngagementPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EngagementPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeEngagementContext:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EngagementContext" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeEngagementAssignmentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EngagementAssignmentList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeImpersonationResult:
