@@ -9,6 +9,7 @@ import (
 	activityhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity/handler"
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
+	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	excelimportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
@@ -27,6 +28,7 @@ import (
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 )
 
 // moduleHandlers carries the handlers of self-registering modules.
@@ -44,8 +46,11 @@ type moduleHandlers struct {
 	accountplan *accountplanhandler.Handler
 	periods     *periodshandler.Handler
 	summaries   *summarieshandler.Handler
+	doctasks    *doctasksmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
+	// taxpayers resolves X-Taxpayer for /v1/taxpayer/* module routes.
+	taxpayers taxpayerctx.Resolver
 }
 
 // selfRegisteredModules is the single list of modules mounted through
@@ -65,5 +70,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
+		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 	}
 }

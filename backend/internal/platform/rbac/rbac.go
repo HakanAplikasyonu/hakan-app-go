@@ -95,6 +95,9 @@ const (
 	PermTenantPeriodsRead          = "tenant.periods.read"
 	PermTenantPeriodsLock          = "tenant.periods.lock"
 	PermTenantChangeRequestsDecide = "tenant.change_requests.decide"
+	// Eksik belge görevleri (issue #36).
+	PermTenantDocTasksRead  = "tenant.doc_tasks.read"
+	PermTenantDocTasksWrite = "tenant.doc_tasks.write"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

@@ -88,6 +88,8 @@ tags:
     description: Target account plan (Luca hesap planı / mizan import, ACCOUNT_NOT_IN_TARGET_PLAN check)
   - name: Periods
     description: Dönem yönetimi (hazırlık durumu, dönem kilidi, kilitli döneme gelen değişiklik talepleri, mükellef × dönem matrisi)
+  - name: DocumentTasks
+    description: Eksik belge görevleri (bankada var, belgesi yok → mükellefe görev → yükleme → eşleşme)
 paths:
   /healthz:
     get:
@@ -6787,6 +6789,343 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/document-tasks:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [DocumentTasks]
+      operationId: listTenantDocumentTasks
+      summary: List missing-document tasks of an engagement (newest first)
+      description: |
+        Requires `tenant.doc_tasks.read` and engagement access. `status`
+        defaults to `open`; `all` lists every status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, submitted, matched, cancelled, all], default: open } }
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTaskList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/detect:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: detectTenantMissingDocuments
+      summary: Run the missing-document control for a period
+      description: |
+        Requires `tenant.doc_tasks.write`. Producer `control:missing_document`
+        (21 §6.3): an outgoing `supplier_payment` without a document raises
+        `BNK_UNDOCUMENTED_PAYMENT`, an incoming `customer_collection` without a
+        document raises `BNK_UNINVOICED_COLLECTION` (entity
+        `bank_transaction`). A movement that is matched in banking, ignored,
+        cancelled or has a document uploaded by the mükellef is
+        auto-resolved; open tasks of such movements are closed
+        (`cancel_reason=resolved`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+      responses:
+        "200":
+          description: Detection report
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeMissingDocumentDetection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/generate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: generateTenantDocumentTasks
+      summary: Open tasks for the mükellef from open BNK_* warnings
+      description: |
+        Requires `tenant.doc_tasks.write`. Opens one task per bank
+        transaction with an open `BNK_UNDOCUMENTED_PAYMENT` /
+        `BNK_UNINVOICED_COLLECTION` warning (optionally limited to `period`
+        and `warning_uuids`). A transaction that already has an open task is
+        skipped. With `period`, detection runs first unless `detect=false`.
+        The mükellef's members get an in-app (mobile push) and email
+        notification; reminders follow with backoff.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                warning_uuids:
+                  type: array
+                  maxItems: 1000
+                  items: { type: string, format: uuid }
+                detect: { type: boolean, description: "Default: true when period is set" }
+                due_days: { type: integer, minimum: 1, maximum: 90, default: 7 }
+                note: { type: string, maxLength: 1000, description: Shown to the mükellef }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTaskGenerate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    get:
+      tags: [DocumentTasks]
+      operationId: getTenantDocumentTask
+      summary: Get a task with its uploads
+      description: Requires `tenant.doc_tasks.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: cancelTenantDocumentTask
+      summary: Cancel an open task
+      description: Requires `tenant.doc_tasks.write`. A matched or cancelled task answers `409 TASK_CLOSED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: Cancelled task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/uploads/{uploadUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+      - $ref: "#/components/parameters/DocumentTaskUploadUuid"
+    get:
+      tags: [DocumentTasks]
+      operationId: downloadTenantDocumentTaskUpload
+      summary: Download a file the mükellef uploaded
+      description: Requires `tenant.doc_tasks.read`. Always served as an attachment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/document-tasks:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [DocumentTasks, TaxpayerPortal]
+      operationId: listTaxpayerDocumentTasks
+      summary: My document tasks (soonest due first)
+      description: |
+        Tasks of the mükellef's active engagement only; an earlier office's
+        tasks are not listed. Any mükellef member (owner, employee) may read.
+        `status` defaults to `open`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [open, submitted, matched, cancelled, all], default: open } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTaskList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/document-tasks/{taskUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    get:
+      tags: [DocumentTasks, TaxpayerPortal]
+      operationId: getTaxpayerDocumentTask
+      summary: One of my document tasks with its uploads
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/document-tasks/{taskUuid}/uploads:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    post:
+      tags: [DocumentTasks, TaxpayerPortal]
+      operationId: uploadTaxpayerDocumentTask
+      summary: Upload a photo or PDF for a task
+      description: |
+        Accepts JPEG, PNG, WebP, HEIC or PDF (checked by content, max 20 MB).
+        The file is stored as an attachment (deduplicated by SHA-256), matched
+        to the task's bank transaction and the control re-runs, so the
+        `BNK_*` warning becomes `auto_resolved` and the task `matched`. If the
+        bank transaction was cancelled meanwhile, the task becomes
+        `submitted` for the office to review. A matched or cancelled task
+        answers `409 TASK_CLOSED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Uploaded (and matched)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTaskUploadResult" }
+        "400":
+          description: "`FILE_REQUIRED`, `FILE_EMPTY`, `FILE_UNREADABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: File too large (`UPLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: Not an image or PDF (`UNSUPPORTED_FILE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/taxpayer/document-tasks/{taskUuid}/uploads/{uploadUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+      - $ref: "#/components/parameters/DocumentTaskUploadUuid"
+    get:
+      tags: [DocumentTasks, TaxpayerPortal]
+      operationId: downloadTaxpayerDocumentTaskUpload
+      summary: Download a file uploaded for my task
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -6865,6 +7204,18 @@ components:
 
     ChangeRequestUuid:
       name: changeRequestUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+    DocumentTaskUuid:
+      name: taskUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+    DocumentTaskUploadUuid:
+      name: uploadUuid
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -10650,4 +11001,136 @@ components:
             total: { type: integer, format: int64 }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    DocumentTaskBankTransaction:
+      type: object
+      required: [uuid, transaction_date, direction, amount, currency, counterparty_name, description]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        direction: { type: string, enum: [in, out] }
+        amount: { type: string, description: Decimal string, example: "1250.00" }
+        currency: { type: string, example: TRY }
+        counterparty_name: { type: [string, "null"] }
+        description: { type: string }
+
+    DocumentTaskUpload:
+      type: object
+      required: [uuid, attachment_uuid, kind, content_type, file_name, size_bytes, sha256, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        attachment_uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [image, pdf] }
+        content_type: { type: [string, "null"] }
+        file_name: { type: [string, "null"] }
+        size_bytes: { type: integer, format: int64 }
+        sha256: { type: string }
+        created_at: { type: string, format: date-time }
+
+    DocumentTask:
+      type: object
+      description: |
+        A missing-document request. `reminder_count`, `last_reminded_at`,
+        `next_reminder_at`, `cancelled_at` and `cancel_reason` are office
+        only; `organization_name` is set on the mükellef side.
+      required: [uuid, code, kind, period, status, note, due_at, overdue, submitted_at, matched_at, bank_transaction, upload_count, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        code: { type: string, enum: [BNK_UNDOCUMENTED_PAYMENT, BNK_UNINVOICED_COLLECTION] }
+        kind: { type: string, enum: [undocumented_payment, uninvoiced_collection] }
+        period: { type: string, example: "2026-10" }
+        status: { type: string, enum: [open, submitted, matched, cancelled] }
+        note: { type: string }
+        due_at: { type: string, format: date-time }
+        overdue: { type: boolean }
+        organization_name: { type: string }
+        reminder_count: { type: integer }
+        last_reminded_at: { type: [string, "null"], format: date-time }
+        next_reminder_at: { type: [string, "null"], format: date-time }
+        submitted_at: { type: [string, "null"], format: date-time }
+        matched_at: { type: [string, "null"], format: date-time }
+        cancelled_at: { type: [string, "null"], format: date-time }
+        cancel_reason: { type: [string, "null"] }
+        bank_transaction: { $ref: "#/components/schemas/DocumentTaskBankTransaction" }
+        upload_count: { type: integer, format: int64 }
+        uploads:
+          type: array
+          description: Detail views only
+          items: { $ref: "#/components/schemas/DocumentTaskUpload" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    MissingDocumentDetection:
+      type: object
+      required: [checked, created, refreshed, suppressed, disabled, auto_resolved, tasks_closed]
+      properties:
+        checked: { type: integer }
+        created: { type: integer }
+        refreshed: { type: integer }
+        suppressed: { type: integer }
+        disabled: { type: integer }
+        auto_resolved: { type: integer }
+        tasks_closed: { type: integer }
+
+    EnvelopeDocumentTask:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/DocumentTask" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeDocumentTaskList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/DocumentTask" }
+            total: { type: integer }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeMissingDocumentDetection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/MissingDocumentDetection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeDocumentTaskGenerate:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [created, notified]
+          properties:
+            detection: { $ref: "#/components/schemas/MissingDocumentDetection" }
+            created: { type: integer }
+            notified: { type: integer, description: Members notified }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeDocumentTaskUploadResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [task, upload, matched, warning_resolved]
+          properties:
+            task: { $ref: "#/components/schemas/DocumentTask" }
+            upload: { $ref: "#/components/schemas/DocumentTaskUpload" }
+            matched: { type: boolean }
+            warning_resolved: { type: boolean }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
