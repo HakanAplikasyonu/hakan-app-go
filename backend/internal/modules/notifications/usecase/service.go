@@ -45,6 +45,7 @@ type Querier interface {
 	CountPlatformNotifications(ctx context.Context, arg db.CountPlatformNotificationsParams) (int64, error)
 	MarkNotificationProcessing(ctx context.Context, id int64) (db.Notification, error)
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
+	ListOrphanedQueuedNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	MarkNotificationSent(ctx context.Context, arg db.MarkNotificationSentParams) (db.Notification, error)
 	MarkNotificationFailed(ctx context.Context, arg db.MarkNotificationFailedParams) (db.Notification, error)
 	MarkNotificationRead(ctx context.Context, arg db.MarkNotificationReadParams) (db.Notification, error)
@@ -283,6 +284,11 @@ const (
 
 const DefaultStuckProcessingMinutes int32 = 2
 
+// DefaultOrphanedQueuedMinutes: a queued row this old whose deliver task
+// never claimed it is assumed lost (see ReclaimQueued). Well above the
+// after-commit delay and normal queue latency.
+const DefaultOrphanedQueuedMinutes int32 = 10
+
 // Deliver processes one queued notification.
 func (s *Service) Deliver(ctx context.Context, id int64) error {
 	row, err := s.q.MarkNotificationProcessing(ctx, id)
@@ -402,6 +408,52 @@ func (s *Service) ReclaimStuck(ctx context.Context, staleMinutes int32) (int, er
 	for _, id := range ids {
 		if err := s.Deliver(ctx, id); err != nil {
 			s.log.Error("notification_reclaim_failed", "id", id, "error", err)
+			continue
+		}
+		n++
+	}
+	return n, nil
+}
+
+// ReclaimQueued re-enqueues queued rows that no deliver task ever claimed
+// (attempt_count = 0). Before #309 Deliver returned nil when its claim lost
+// the commit race, leaving such rows queued with no task. They go through
+// the normal deliver task; Deliver's claim keeps a late duplicate harmless
+// once the row has left queued. With a nil enq they are delivered inline.
+// The task id is fixed per row so concurrent sweeps (server and worker
+// starting together) enqueue it once.
+func (s *Service) ReclaimQueued(ctx context.Context, enq Enqueuer, staleMinutes int32) (int, error) {
+	if staleMinutes < 0 {
+		staleMinutes = 0
+	}
+	ids, err := s.q.ListOrphanedQueuedNotificationIDs(ctx, staleMinutes)
+	if err != nil {
+		return 0, fmt.Errorf("list orphaned queued notifications: %w", err)
+	}
+	var n int
+	for _, id := range ids {
+		if enq == nil {
+			if err := s.Deliver(ctx, id); err != nil {
+				s.log.Error("notification_requeue_failed", "id", id, "error", err)
+				continue
+			}
+			n++
+			continue
+		}
+		task, err := queue.NewNotificationDeliverTask(id)
+		if err != nil {
+			return n, err
+		}
+		_, err = enq.Enqueue(task,
+			asynq.Queue(queue.QueueNotifications),
+			asynq.MaxRetry(deliverMaxRetry),
+			asynq.TaskID(fmt.Sprintf("notification-requeue:%d", id)),
+		)
+		if errors.Is(err, asynq.ErrTaskIDConflict) {
+			continue // another sweep already enqueued it
+		}
+		if err != nil {
+			s.log.Error("notification_requeue_failed", "id", id, "error", err)
 			continue
 		}
 		n++

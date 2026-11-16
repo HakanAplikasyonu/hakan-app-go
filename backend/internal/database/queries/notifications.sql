@@ -116,6 +116,17 @@ WHERE status = 'processing'
 ORDER BY id
 LIMIT 500;
 
+-- name: ListOrphanedQueuedNotificationIDs :many
+-- Queued rows whose deliver task never ran a claim: lost before #309
+-- (Deliver returned nil on the commit race) or dropped from the queue.
+SELECT id FROM notifications
+WHERE status = 'queued'
+  AND attempt_count = 0
+  AND (scheduled_at IS NULL OR scheduled_at <= NOW())
+  AND created_at < NOW() - make_interval(mins => sqlc.arg(stale_minutes)::int)
+ORDER BY id
+LIMIT 500;
+
 -- name: MarkNotificationSent :one
 -- Cast status on every use. Reusing an untyped param as both VARCHAR assignment
 -- and IN ('delivered', 'read') makes Postgres raise 42P08

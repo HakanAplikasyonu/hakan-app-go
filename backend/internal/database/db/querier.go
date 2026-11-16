@@ -636,6 +636,9 @@ type Querier interface {
 	// bağlıdır; şablon roller (organization_id IS NULL) burada listelenmez.
 	ListOrganizationRoles(ctx context.Context, organizationID pgtype.Int8) ([]ListOrganizationRolesRow, error)
 	ListOrganizationsFiltered(ctx context.Context, arg ListOrganizationsFilteredParams) ([]Organization, error)
+	// Queued rows whose deliver task never ran a claim: lost before #309
+	// (Deliver returned nil on the commit race) or dropped from the queue.
+	ListOrphanedQueuedNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	// Mükellef panelinde sahibin göreceği bekleyen talepler (mükellefin kendi
 	// VKN'si için). Ofislerin kendi kayıtlarıdır ama yalnızca talebin hedefi
 	// olan mükellefe gösterilir.
