@@ -132,18 +132,20 @@ export function CommandCenterPage() {
             })),
           ]}
         />
-        <label className="flex items-center gap-2 text-xs">
+        <label className="flex min-h-6 items-center gap-2 text-xs max-md:min-h-11">
           <input
             type="checkbox"
+            className="accent-brand size-4"
             checked={filter.blockersOnly}
             onChange={(e) => set("blockersOnly", e.target.checked)}
           />
           {t("office.command.blockers_only")}
         </label>
-        <label className="bg-background flex h-8 items-center gap-2 rounded-md border px-2 text-sm">
+        <label className="bg-background focus-within:ring-ring flex h-8 items-center gap-2 rounded-md border px-2 text-sm focus-within:ring-2 max-md:h-11">
           <Search className="text-muted-foreground size-3.5" aria-hidden />
           <input
-            className="w-44 bg-transparent outline-none"
+            className="h-full w-44 min-w-0 bg-transparent outline-none"
+            aria-label={t("office.command.search")}
             placeholder={t("office.command.search")}
             value={filter.query}
             onChange={(e) => set("query", e.target.value)}
@@ -213,7 +215,7 @@ export function CommandCenterPage() {
                         type="button"
                         onClick={() => setPicked(p)}
                         className={cn(
-                          "w-full rounded px-2 py-0.5",
+                          "min-h-6 w-full rounded px-2 py-0.5 max-md:min-h-11",
                           p === focus
                             ? "bg-foreground text-background"
                             : "text-muted-foreground hover:text-foreground",

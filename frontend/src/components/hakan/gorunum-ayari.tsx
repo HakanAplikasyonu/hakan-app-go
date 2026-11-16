@@ -153,7 +153,7 @@ export function GorunumAyari({ className }: { className?: string }) {
             aria-checked={kip === k.value}
             onClick={() => setTheme(k.value)}
             className={cn(
-              "h-[30px] rounded-lg px-2.5 text-xs font-semibold transition-colors",
+              "h-[30px] rounded-lg px-2.5 text-xs font-semibold transition-colors max-md:h-11",
               kip === k.value
                 ? "bg-card text-foreground shadow-card"
                 : "text-text-2",

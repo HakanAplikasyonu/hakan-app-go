@@ -29,7 +29,7 @@ export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
             {item.href && !last ? (
               <Link
                 href={item.href}
-                className="text-muted-foreground hover:text-foreground transition-colors"
+                className="text-muted-foreground hover:text-foreground inline-flex min-h-6 items-center transition-colors max-md:min-h-11"
               >
                 {item.label}
               </Link>

@@ -331,7 +331,7 @@ export function OfficeHome() {
           actions={
             <Link
               href={routes.tenant.taxpayers(slug)}
-              className="text-brand-text text-sm font-semibold hover:underline"
+              className="text-brand-text inline-flex min-h-6 items-center justify-center text-sm font-semibold hover:underline max-md:min-h-11 max-md:min-w-11"
             >
               {t("office.home.all")}
             </Link>

@@ -146,7 +146,9 @@ export function Panel({
 /** Yatay kayan, sade tablo kabı. */
 export function TableBox({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto">
+    // relative: içteki sr-only (absolute) öğeler kaydırma kutusundan taşıp
+    // sayfayı yatay kaydırmasın (#367).
+    <div className="relative overflow-x-auto">
       <table className="[&_th]:text-muted-foreground w-full text-sm [&_tbody_tr]:border-b [&_tbody_tr:last-child]:border-0 [&_td]:px-4 [&_td]:py-2.5 [&_th]:px-4 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_thead]:border-b">
         {children}
       </table>
@@ -166,10 +168,10 @@ export function FilterSelect<T extends string>({
   options: { value: T; label: string }[];
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs">
-      <span className="text-muted-foreground">{label}</span>
+    <label className="flex max-w-full min-w-0 items-center gap-2 text-xs">
+      <span className="text-muted-foreground shrink-0">{label}</span>
       <select
-        className="bg-background h-8 rounded-md border px-2 text-sm"
+        className="bg-background focus-visible:ring-ring h-8 max-w-full min-w-0 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
       >

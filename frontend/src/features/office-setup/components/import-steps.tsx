@@ -342,7 +342,7 @@ function SendOutcome({ batch }: { batch: TaxpayerImport }) {
         })}
       </p>
       {failed.length ? (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm">
             <caption className="mb-2 text-start text-sm font-medium">
               {t("setup.invites_failed_title")}

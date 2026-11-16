@@ -245,7 +245,7 @@ function RequestsSection({ canWrite }: { canWrite: boolean }) {
         </p>
       ) : null}
       {items.length ? (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-muted-foreground border-b text-xs">
