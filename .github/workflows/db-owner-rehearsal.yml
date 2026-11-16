@@ -1,0 +1,143 @@
+# Üretim veritabanı sahibi geçişinin provası (issue #317,
+# docs/runbook/db-sahip-gecisi.md). Zorunlu kontrol değildir: geçişle ilgili
+# dosyalar değişince ve elle tetiklenince çalışır.
+#
+# compose.local.yml'deki Postgres (üretimle aynı imaj), üretimdeki gibi:
+# süper kullanıcı `app` sahip, migration'lar ve demo ofis bu rolle. Sonra:
+#   1. geçişin --dry-run'ı (hiçbir şey değişmemeli), geçiş, ikinci geçiş;
+#   2. yeni sahiple bütün backend testleri ve geçirilmiş veritabanı üzerinde
+#      TestWriteEndpointsNo5xx (SWEEP_DATABASE_URL);
+#   3. yeni sahiple migrate down 3 / up;
+#   4. hakan_backup ile yedek ve geri yükleme, satır sayıları karşılaştırılır;
+#   5. geri dönüş (--dry-run, gerçek) ve yeniden geçiş;
+#   6. yedek tatbikatı (scripts/backup-drill.sh, yedek hakan_backup ile).
+name: db-owner-rehearsal
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/db-owner*
+      - scripts/db-roles.sql
+      - scripts/managed-postgres/**
+      - scripts/backup-drill.sh
+      - deploy/backup/**
+      - backend/migrations/**
+      - docs/runbook/db-sahip-gecisi.md
+      - .github/workflows/db-owner-rehearsal.yml
+  push:
+    branches: [main]
+    paths:
+      - scripts/db-owner*
+      - scripts/db-roles.sql
+      - scripts/managed-postgres/**
+      - backend/migrations/**
+      - .github/workflows/db-owner-rehearsal.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: db-owner-rehearsal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      ADMIN: postgres://app:change_me@127.0.0.1:5432
+      OWNER: postgres://hakan_owner:owner-rehearsal-only@127.0.0.1:5432
+      BACKUP: postgres://hakan_backup:backup-rehearsal-only@127.0.0.1:5432
+      DB_OWNER_PASSWORD: owner-rehearsal-only
+      DB_BACKUP_PASSWORD: backup-rehearsal-only
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Postgres ve Redis (compose.local.yml, üretimle aynı imaj)
+        run: |
+          docker compose -f compose.local.yml up -d --wait postgres redis
+          psql "$ADMIN/app" -XtAc 'SELECT version()'
+          psql "$ADMIN/app" -XtAc 'SELECT rolsuper FROM pg_roles WHERE rolname = current_user' | grep -qx t
+      - name: Üretim benzeri veritabanı (sahip app, migration'lar, demo ofis)
+        working-directory: backend
+        run: |
+          v=$(sed -n 's#^FROM migrate/migrate:\(v[0-9.]*\).*#\1#p' Dockerfile | head -1)
+          go run -tags postgres "github.com/golang-migrate/migrate/v4/cmd/migrate@${v:-v4.20.1}" \
+            -path migrations -database "$ADMIN/app?sslmode=disable" up
+          DB_HOST=127.0.0.1 DB_PORT=5432 DB_USER=app DB_PASSWORD=change_me DB_NAME=app DB_SSLMODE=disable \
+            APP_ENV=development REDIS_ADDR=127.0.0.1:6379 go run ./cmd/demo-seed
+      - name: Geçiş --dry-run (hiçbir şey değişmemeli)
+        run: |
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-migrate.sh --dry-run
+          owner=$(psql "$ADMIN/app" -XtAc "SELECT pg_get_userbyid(relowner) FROM pg_class WHERE relname = 'engagements'")
+          [ "$owner" = app ] || { echo "dry-run changed the owner to $owner"; exit 1; }
+      - name: Geçiş ve ikinci geçiş (idempotent)
+        run: |
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-migrate.sh
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-migrate.sh
+          psql "$ADMIN/app" -XtA -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT 'owner: ' || pg_get_userbyid(datdba) FROM pg_database WHERE datname = current_database();
+          SELECT 'objects still owned by app: ' || count(*) FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace
+            WHERE s.nspname = 'public' AND pg_get_userbyid(c.relowner) = 'app';
+          SQL
+          # The new owner sees nothing without app.system, everything inside it.
+          [ "$(psql "$OWNER/app" -XtAc 'SELECT count(*) FROM engagements')" = 0 ]
+          [ "$(psql "$OWNER/app" -XtA -c 'BEGIN' -c "SELECT set_config('app.system','on',true)" -c 'SELECT count(*) FROM engagements' -c 'ROLLBACK' | sed -n 3p)" -gt 0 ]
+      - name: Backend testleri yeni sahiple ve geçirilmiş veritabanında yazma taraması
+        working-directory: backend
+        env:
+          TESTDB_REQUIRED: "1"
+        run: |
+          TEST_DATABASE_URL="$OWNER/postgres?sslmode=disable" go test ./...
+          SWEEP_DATABASE_URL="$OWNER/app?sslmode=disable" TEST_DATABASE_URL="$OWNER/postgres?sslmode=disable" \
+            go test ./internal/httpserver/ -run TestWriteEndpointsNo5xx -count=1 -v
+      - name: Yeni sahiple migrate down 3 / up
+        working-directory: backend
+        run: |
+          v=$(sed -n 's#^FROM migrate/migrate:\(v[0-9.]*\).*#\1#p' Dockerfile | head -1)
+          m() { go run -tags postgres "github.com/golang-migrate/migrate/v4/cmd/migrate@${v:-v4.20.1}" -path migrations -database "$OWNER/app?sslmode=disable" "$@"; }
+          m down 3
+          m up
+      - name: Yedek (hakan_backup) ve geri yükleme
+        # pg_dump / pg_restore inside the postgres container: the runner's
+        # client tools are older than the server (pg_dump refuses a newer
+        # server), and production runs them from an image of the same version.
+        run: |
+          set -euo pipefail
+          pgc() { docker compose -f compose.local.yml exec -T postgres "$@"; }
+          in_owner=postgres://hakan_owner:owner-rehearsal-only@127.0.0.1:5432
+          in_backup=postgres://hakan_backup:backup-rehearsal-only@127.0.0.1:5432
+          pgc pg_dump --version
+          if pgc pg_dump --format=custom -d "$in_owner/app" -f /tmp/owner.dump 2>/tmp/owner.err; then
+            echo "pg_dump as the owner should fail under FORCE"; exit 1
+          fi
+          cat /tmp/owner.err
+          grep -q 'row-level security' /tmp/owner.err
+          pgc pg_dump --format=custom -d "$in_backup/app" -f /tmp/backup.dump
+          pgc sh -c "pg_dumpall --roles-only --no-role-passwords -d '$in_backup/app' > /tmp/roles.sql"
+          psql "$ADMIN/app" -XqAc 'CREATE DATABASE restored OWNER hakan_owner'
+          psql "$ADMIN/restored" -XqAc 'ALTER SCHEMA public OWNER TO hakan_owner'
+          pgc pg_restore --exit-on-error --single-transaction -d "$in_owner/restored" /tmp/backup.dump
+          q="SELECT string_agg(relname || '=' || n, ',' ORDER BY relname) FROM (SELECT c.relname,
+               (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.' || quote_ident(c.relname), false, true, '')))[1]::text::int AS n
+             FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace WHERE s.nspname = 'public' AND c.relkind = 'r') x"
+          src=$(psql "$ADMIN/app" -XtAc "$q"); dst=$(psql "$ADMIN/restored" -XtAc "$q")
+          [ "$src" = "$dst" ] || { echo "row counts differ"; diff <(tr , '\n' <<<"$src") <(tr , '\n' <<<"$dst"); exit 1; }
+          echo "restore: row counts identical across $(tr , '\n' <<<"$src" | wc -l) tables"
+      - name: Geri dönüş ve yeniden geçiş
+        run: |
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-rollback.sh --dry-run
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-rollback.sh
+          [ "$(psql "$ADMIN/app" -XtAc "SELECT pg_get_userbyid(relowner) FROM pg_class WHERE relname = 'engagements'")" = app ]
+          ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-migrate.sh
+      - name: Yedek tatbikatı (scripts/backup-drill.sh)
+        run: |
+          docker build -t local/hakan-backup:main deploy/backup
+          scripts/backup-drill.sh
+      - name: Günlükler
+        if: failure()
+        run: docker compose -f compose.local.yml logs --no-color --tail 100 postgres

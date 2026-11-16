@@ -141,7 +141,11 @@ calls runs as the owner and must carry `SET app.system = 'on'` (000089) or
 it sees nothing under FORCE. CI's `backend-owner` job runs the whole suite
 and migrate up / down / up with that owner; `TestNonSuperuserOwnerIsForced`
 checks it. Backups use `hakan_backup` (read-only, BYPASSRLS), see
-`docs/yedekleme.md`.
+`docs/yedekleme.md`. Moving an existing database from the superuser to
+`hakan_owner`: `scripts/db-owner-migrate.sh` and
+`docs/runbook/db-sahip-gecisi.md` (#317); on managed Postgres without
+`GRANT SET ON PARAMETER`, `scripts/managed-postgres/definer-functions-plpgsql.sql`
+replaces migration 000089.
 
 **Owner forced everywhere (issue #302, migration 000086).** Every table with
 an `organization_id` or `taxpayer_id` column also has FORCE and the owner's
