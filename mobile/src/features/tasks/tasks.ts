@@ -53,10 +53,25 @@ export function localTasks(items: readonly QueueItem[], taxpayer: string): Task[
   return out;
 }
 
-const taskTitles: Record<ServerTask['kind'], string> = {
+const bankTaskTitles: Record<string, string> = {
   undocumented_payment: 'Ödeme için belge',
   uninvoiced_collection: 'Tahsilat için fatura',
 };
+
+/** Görev bir banka hareketine mi bağlı? Elle açılan talepte (#240) hareket yer tutucudur. */
+export function isBankTask(t: Pick<ServerTask, 'kind'>): boolean {
+  return Object.hasOwn(bankTaskTitles, t.kind);
+}
+
+/**
+ * Görevin başlığı: banka görevlerinde türün adı, müşavirin elle açtığı
+ * talepte (`document_request`) istenen belge. Bilinmeyen tür genel başlık alır.
+ */
+export function taskTitle(t: Pick<ServerTask, 'kind' | 'title'>): string {
+  if (isBankTask(t)) return bankTaskTitles[t.kind];
+  const title = t.title?.trim();
+  return title || 'Eksik belge';
+}
 
 /** Turkish money text: "12.500,00 TRY". */
 export function moneyText(amount: string, currency: string): string {
@@ -79,8 +94,8 @@ export function serverTasks(list: readonly ServerTask[]): Task[] {
     .map((t) => ({
       id: `server:${t.uuid}`,
       source: 'server' as const,
-      title: taskTitles[t.kind] ?? 'Eksik belge',
-      detail: [transactionLine(t), t.status === 'submitted' ? 'Gönderildi, müşavir kontrol ediyor' : t.note].filter(Boolean).join('\n'),
+      title: taskTitle(t),
+      detail: [isBankTask(t) ? transactionLine(t) : '', t.status === 'submitted' ? 'Gönderildi, müşavir kontrol ediyor' : t.note].filter(Boolean).join('\n'),
       action: { type: 'task' as const, uuid: t.uuid },
       due: t.due_at ? t.due_at.slice(0, 10) : null,
       overdue: t.overdue,

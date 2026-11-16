@@ -6852,7 +6852,18 @@ export interface paths {
          */
         get: operations["listTenantDocumentTasks"];
         put?: never;
-        post?: never;
+        /**
+         * Ask the taxpayer for a document (issue
+         * @description Requires `tenant.doc_tasks.write` and an active engagement. Opens a
+         *     `document_request` task (code `DOC_REQUEST`) not tied to a bank
+         *     transaction; the mükellef's members are notified
+         *     (`doc_tasks.requested`). `due_date` (YYYY-MM-DD, Türkiye time, end of
+         *     day) wins over `due_days` (default office policy, at most 90);
+         *     `period` defaults to the due date's month. The response's
+         *     `bank_transaction` is a stand-in (amount 0, the title as description)
+         *     so clients built for bank tasks keep working.
+         */
+        post: operations["createTenantDocumentRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6980,6 +6991,67 @@ export interface paths {
          * @description Requires `tenant.doc_tasks.write`. A matched or cancelled task answers `409 TASK_CLOSED`.
          */
         post: operations["cancelTenantDocumentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a task done (document accepted)
+         * @description Requires `tenant.doc_tasks.write`. An open or submitted task becomes `matched`; a closed one answers `409 TASK_CLOSED`.
+         */
+        post: operations["completeTenantDocumentTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask again after an insufficient upload
+         * @description Requires `tenant.doc_tasks.write`. Only a `submitted` task (else
+         *     `409 TASK_NOT_SUBMITTED`): it is reopened with the new note (what is
+         *     missing) and due date, reminders start over, `request_count` grows and
+         *     the mükellef's members are notified again.
+         */
+        post: operations["rerequestTenantDocumentTask"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11708,26 +11780,40 @@ export interface components {
         };
         /**
          * @description A missing-document request. `reminder_count`, `last_reminded_at`,
-         *     `next_reminder_at`, `cancelled_at` and `cancel_reason` are office
-         *     only; `organization_name` is set on the mükellef side.
+         *     `next_reminder_at`, `cancelled_at`, `cancel_reason` and
+         *     `request_count` are office only; `organization_name` is set on the
+         *     mükellef side. A `document_request` (issue #240) is opened by the
+         *     office by hand and has no bank transaction: `bank_transaction` is
+         *     then a stand-in (the task's uuid, the due date, amount 0, the title
+         *     as description).
          */
         DocumentTask: {
             /** Format: uuid */
             uuid: string;
-            /** @enum {string} */
-            code: "BNK_UNDOCUMENTED_PAYMENT" | "BNK_UNINVOICED_COLLECTION";
-            /** @enum {string} */
-            kind: "undocumented_payment" | "uninvoiced_collection";
+            /**
+             * @description BNK_UNDOCUMENTED_PAYMENT, BNK_UNINVOICED_COLLECTION or DOC_REQUEST (more may follow; treat unknown values as a generic request)
+             * @example BNK_UNDOCUMENTED_PAYMENT
+             */
+            code: string;
+            /**
+             * @description undocumented_payment, uninvoiced_collection or document_request (more may follow)
+             * @example undocumented_payment
+             */
+            kind: string;
             /** @example 2026-10 */
             period: string;
             /** @enum {string} */
             status: "open" | "submitted" | "matched" | "cancelled";
+            /** @description What the office asks for (document_request); empty for bank tasks */
+            title: string;
             note: string;
             /** Format: date-time */
             due_at: string;
             overdue: boolean;
             organization_name?: string;
             reminder_count?: number;
+            /** @description How many times the office asked (1 + re-requests) */
+            request_count?: number;
             /** Format: date-time */
             last_reminded_at?: string | null;
             /** Format: date-time */
@@ -23139,6 +23225,49 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    createTenantDocumentRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    note?: string;
+                    /** Format: date */
+                    due_date?: string;
+                    due_days?: number;
+                    period?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created task */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     detectTenantMissingDocuments: {
         parameters: {
             query?: never;
@@ -23281,6 +23410,84 @@ export interface operations {
         };
         responses: {
             /** @description Cancelled task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    completeTenantDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Completed task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rerequestTenantDocumentTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                taskUuid: components["parameters"]["DocumentTaskUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                    /** Format: date */
+                    due_date?: string;
+                    due_days?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Reopened task */
             200: {
                 headers: {
                     [name: string]: unknown;
