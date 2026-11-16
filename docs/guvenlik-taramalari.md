@@ -23,7 +23,7 @@ sürümler hiçbir ekosistemde önerilmez** (`ignore` `"*"` semver-major): bunla
 geçiş adımlarıyla birlikte elle planlanır. Ayrıca `golang` Docker imajının küçük
 sürümü (1.26 → 1.27) önerilmez; Go araç zinciri `go.mod` ile birlikte elle
 yükseltilir. React Native'in küçük sürümleri Expo SDK'yı izler
-(`npx expo install --fix`). Güvenlik güncellemeleri bu kurallardan etkilenmez.
+(`npx expo install --fix`).
 
 ## Bu PR'da düzeltilenler
 
