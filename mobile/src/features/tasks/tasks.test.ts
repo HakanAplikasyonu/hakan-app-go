@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { markFailed, markUploaded, newItem } from '../receipts/queue.ts';
-import { localTasks, mergeTasks, serverTasks } from './tasks.ts';
+import { markFailed, markTaskUploaded, markUploaded, newItem, receiptItems, taskItems } from '../receipts/queue.ts';
+import { localTasks, mergeTasks, moneyText, serverTasks, taskStatusLabel, transactionLine, type ServerTask } from './tasks.ts';
 
 const item = (id: string) => newItem({ id, taxpayer: 't', kind: 'expense_receipt', fileUri: 'f', mimeType: 'image/jpeg', now: 1 });
 
@@ -23,12 +23,66 @@ test('failed uploads and unsure OCR fields become tasks', () => {
   assert.deepEqual(tasks[1].action, { type: 'receipt', id: 'b' });
 });
 
-test('server tasks sort by due date and lead the list', () => {
+const task = (uuid: string, over: Partial<ServerTask> = {}): ServerTask => ({
+  uuid,
+  code: 'BNK_UNDOCUMENTED_PAYMENT',
+  kind: 'undocumented_payment',
+  period: '2026-10',
+  status: 'open',
+  note: '',
+  due_at: '2026-11-20T21:00:00Z',
+  overdue: false,
+  submitted_at: null,
+  matched_at: null,
+  bank_transaction: {
+    uuid: 'b' + uuid,
+    transaction_date: '2026-10-14',
+    direction: 'out',
+    amount: '12500.00',
+    currency: 'TRY',
+    counterparty_name: 'Kuzey Gıda',
+    description: 'EFT',
+  },
+  upload_count: 0,
+  created_at: '2026-11-01T00:00:00Z',
+  updated_at: '2026-11-01T00:00:00Z',
+  ...over,
+});
+
+test('document tasks (#200): open and submitted ones lead the list by due date', () => {
   const s = serverTasks([
-    { uuid: '2', kind: 'missing_document', title: 'Ekim Z raporları', due_date: null, document_kind: 'z_report' },
-    { uuid: '1', kind: 'missing_document', title: 'Akaryakıt fişi', due_date: '2026-11-20', document_kind: 'fuel_receipt' },
+    task('2', { due_at: '2026-12-01T00:00:00Z', kind: 'uninvoiced_collection', code: 'BNK_UNINVOICED_COLLECTION' }),
+    task('1', { note: 'Kira faturası', overdue: true }),
+    task('3', { status: 'matched' }),
+    task('4', { status: 'submitted' }),
   ]);
   const merged = mergeTasks(s, [{ id: 'l', source: 'local', title: 'x', detail: '', action: { type: 'receipt', id: 'a' }, due: null }]);
-  assert.deepEqual(merged.map((t) => t.id), ['server:1', 'server:2', 'l']);
-  assert.deepEqual(merged[0].action, { type: 'capture', kind: 'fuel_receipt' });
+  assert.deepEqual(merged.map((t) => t.id), ['server:1', 'server:4', 'server:2', 'l']);
+  assert.deepEqual(merged[0].action, { type: 'task', uuid: '1' });
+  assert.equal(merged[0].title, 'Ödeme için belge');
+  assert.equal(merged[0].overdue, true);
+  assert.equal(merged[0].detail, '12.500,00 TRY · Kuzey Gıda · 2026-10-14\nKira faturası');
+  assert.equal(merged[1].detail.split('\n')[1], 'Gönderildi, müşavir kontrol ediyor');
+  assert.equal(merged[2].title, 'Tahsilat için fatura');
+  assert.equal(merged[0].due, '2026-11-20');
+});
+
+test('transaction line falls back to the description and formats the amount', () => {
+  const t = task('x', { bank_transaction: { ...task('x').bank_transaction, counterparty_name: null, amount: '-1250.5' } });
+  assert.equal(transactionLine(t), '1.250,50 TRY · EFT · 2026-10-14');
+  assert.equal(moneyText('abc', 'TRY'), 'abc TRY');
+  assert.equal(taskStatusLabel('matched'), 'Tamamlandı');
+});
+
+test('task photos are not local tasks or receipts, and are listed on their task', () => {
+  const photo = newItem({ id: 'p', taxpayer: 't', kind: 'expense_receipt', fileUri: 'f', mimeType: 'image/jpeg', now: 2, target: { type: 'task', taskUuid: '1' } });
+  const failedPhoto = markFailed(photo, 'rejected', 'UNSUPPORTED_FILE', 3);
+  assert.deepEqual(localTasks([failedPhoto], 't'), []);
+  assert.deepEqual(receiptItems([failedPhoto, item('r')]).map((i) => i.id), ['r']);
+  assert.deepEqual(taskItems([failedPhoto, item('r')], 't', '1').map((i) => i.id), ['p']);
+  assert.deepEqual(taskItems([failedPhoto], 't', 'other'), []);
+  const done = markTaskUploaded(photo, { uploadUuid: 'u1', matched: true });
+  assert.equal(done.status, 'uploaded');
+  assert.deepEqual(done.taskUpload, { uploadUuid: 'u1', matched: true });
+  assert.equal(done.result, null);
 });

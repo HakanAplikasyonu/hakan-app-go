@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import * as Network from 'expo-network';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
@@ -5,6 +6,7 @@ import { AppState } from 'react-native';
 import { errorMessage, isApiError } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 
+import { uploadTaskPhoto } from '../tasks/api';
 import { sendCorrections, uploadReceipt } from './api';
 import {
   addCorrection,
@@ -14,6 +16,7 @@ import {
   correctionsDue,
   due,
   markFailed,
+  markTaskUploaded,
   markUploaded,
   markUploading,
   newItem,
@@ -35,6 +38,8 @@ type ReceiptsApi = {
   online: boolean;
   syncing: boolean;
   enqueue: (kind: ReceiptKind, photos: CapturedPhoto[]) => Promise<void>;
+  /** Queues photos for a document task (#200); uploaded like receipts, also offline. */
+  enqueueTask: (taskUuid: string, photos: CapturedPhoto[]) => Promise<void>;
   retry: (id: string) => void;
   remove: (id: string) => void;
   correct: (id: string, field: string, value: string) => void;
@@ -49,6 +54,7 @@ const newId = () =>
 /** Fiş kuyruğu: çekilen fotoğrafları saklar, bağlantı geldikçe yükler. */
 export function ReceiptsProvider({ children }: { children: ReactNode }) {
   const { taxpayer } = useAuth();
+  const queryClient = useQueryClient();
   const taxpayerUuid = taxpayer?.taxpayer.uuid ?? null;
   const [all, setAll] = useState<QueueItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -85,8 +91,14 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
         for (const item of due(ref.current, taxpayerUuid, Date.now(), { force })) {
           replace(markUploading(item));
           try {
-            const result = await uploadReceipt(item);
-            replace(markUploaded(ref.current.find((i) => i.id === item.id) ?? item, result));
+            const current = () => ref.current.find((i) => i.id === item.id) ?? item;
+            if (item.target?.type === 'task') {
+              replace(markTaskUploaded(current(), await uploadTaskPhoto(item)));
+              void queryClient.invalidateQueries({ queryKey: ['task'] });
+              void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            } else {
+              replace(markUploaded(current(), await uploadReceipt(item)));
+            }
           } catch (e) {
             const status = isApiError(e) ? e.status : 0;
             const current = ref.current.find((i) => i.id === item.id) ?? item;
@@ -108,7 +120,7 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
         setSyncing(false);
       }
     },
-    [taxpayerUuid, replace],
+    [taxpayerUuid, replace, queryClient],
   );
 
   // Triggers: load / company change, network back, app foreground, a minute timer (backoff).
@@ -134,8 +146,8 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
     };
   }, [loaded, sync]);
 
-  const enqueue = useCallback<ReceiptsApi['enqueue']>(
-    async (kind, photos) => {
+  const add = useCallback(
+    async (kind: ReceiptKind, photos: CapturedPhoto[], target: QueueItem['target']) => {
       if (!taxpayerUuid) return;
       const now = Date.now();
       const added: QueueItem[] = [];
@@ -143,12 +155,18 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
         const id = newId();
         const mimeType = p.mimeType || 'image/jpeg';
         const fileUri = await keepPhoto(p.uri, id, mimeType);
-        added.push(newItem({ id, taxpayer: taxpayerUuid, kind, fileUri, mimeType, now: now + n }));
+        added.push(newItem({ id, taxpayer: taxpayerUuid, kind, fileUri, mimeType, now: now + n, target }));
       }
       commit((items) => [...items, ...added]);
       void sync(true);
     },
     [taxpayerUuid, commit, sync],
+  );
+  const enqueue = useCallback<ReceiptsApi['enqueue']>((kind, photos) => add(kind, photos, null), [add]);
+  const enqueueTask = useCallback<ReceiptsApi['enqueueTask']>(
+    // kind is not used for task photos; the task decides what is expected.
+    (taskUuid, photos) => add('expense_receipt', photos, { type: 'task', taskUuid }),
+    [add],
   );
 
   const retry = useCallback(
@@ -188,12 +206,13 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
       online,
       syncing,
       enqueue,
+      enqueueTask,
       retry,
       remove,
       correct,
       syncNow: () => void sync(true),
     };
-  }, [all, taxpayerUuid, online, syncing, enqueue, retry, remove, correct, sync]);
+  }, [all, taxpayerUuid, online, syncing, enqueue, enqueueTask, retry, remove, correct, sync]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

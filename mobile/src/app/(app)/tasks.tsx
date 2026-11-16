@@ -13,7 +13,7 @@ const dueLabel = (d: string) => {
 
 /** Görevler: müşavirin istediği eksik belgeler + telefondaki fişlerden çıkan işler. */
 export default function TasksScreen() {
-  const { tasks, serverAvailable, query } = useTasks();
+  const { tasks, query } = useTasks();
   const c = useColors();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['left', 'right', 'bottom']}>
@@ -21,9 +21,6 @@ export default function TasksScreen() {
         contentContainerStyle={{ padding: 20, gap: 10, maxWidth: 640, width: '100%', alignSelf: 'center' }}
         refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={() => void query.refetch()} />}>
         {query.isError ? <Notice>{errorMessage(query.error)}</Notice> : null}
-        {!query.isLoading && !serverAvailable ? (
-          <Notice tone="info">Müşavirinizin eksik belge istekleri yakında burada görünecek. Şimdilik telefondaki fişlerinizle ilgili işler listeleniyor.</Notice>
-        ) : null}
         {tasks.length === 0 && !query.isLoading ? (
           <Card>
             <Text variant="heading">Yapılacak iş yok</Text>
@@ -38,7 +35,10 @@ export default function TasksScreen() {
             onPress={() => openTask(t)}
             trailing={
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Chip label={t.source === 'server' ? 'Müşavir' : 'Fiş'} tone={t.source === 'server' ? 'brand' : 'warning'} />
+                <Chip
+                  label={t.overdue ? 'Gecikti' : t.source === 'server' ? 'Müşavir' : 'Fiş'}
+                  tone={t.overdue ? 'danger' : t.source === 'server' ? 'brand' : 'warning'}
+                />
                 {t.due ? (
                   <Text variant="caption" tone="muted">
                     {dueLabel(t.due)}

@@ -33,6 +33,12 @@ export type ReceiptResult = {
 
 export type Correction = { field: string; value: string; note?: string };
 
+/** Where a queued photo goes: a receipt (default) or a document task (#200). */
+export type QueueTarget = { type: 'task'; taskUuid: string };
+
+/** The server's answer to a task photo (subset of `DocumentTaskUploadResult`). */
+export type TaskUploadResult = { uploadUuid: string; matched: boolean };
+
 export type QueueItem = {
   /** Client id; also sent as `Idempotency-Key`. */
   id: string;
@@ -54,6 +60,10 @@ export type QueueItem = {
   correctionsSent: boolean;
   /** Why the server refused the corrections (not retried). */
   correctionsError?: string | null;
+  /** Set for a document task photo (#200); absent = receipt. */
+  target?: QueueTarget | null;
+  /** Result of a task photo upload. */
+  taskUpload?: TaskUploadResult | null;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -62,8 +72,17 @@ const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 export const BLOCKED_RETRY_MS = 6 * 60 * MINUTE;
 
-export function newItem(input: { id: string; taxpayer: string; kind: ReceiptKind; fileUri: string; mimeType: string; now: number }): QueueItem {
+export function newItem(input: {
+  id: string;
+  taxpayer: string;
+  kind: ReceiptKind;
+  fileUri: string;
+  mimeType: string;
+  now: number;
+  target?: QueueTarget | null;
+}): QueueItem {
   return {
+    target: input.target ?? null,
     id: input.id,
     taxpayer: input.taxpayer,
     kind: input.kind,
@@ -120,6 +139,23 @@ export function markUploading(item: QueueItem): QueueItem {
 
 export function markUploaded(item: QueueItem, result: ReceiptResult): QueueItem {
   return { ...item, status: 'uploaded', result, lastError: null, nextAttemptAt: 0 };
+}
+
+/** A document task photo reached the server (#200). */
+export function markTaskUploaded(item: QueueItem, result: TaskUploadResult): QueueItem {
+  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, nextAttemptAt: 0 };
+}
+
+/** Receipt photos only (task photos are shown on their task). */
+export function receiptItems(items: readonly QueueItem[]): QueueItem[] {
+  return items.filter((i) => !i.target);
+}
+
+/** Queued photos of one task, oldest first. */
+export function taskItems(items: readonly QueueItem[], taxpayer: string, taskUuid: string): QueueItem[] {
+  return items
+    .filter((i) => i.taxpayer === taxpayer && i.target?.type === 'task' && i.target.taskUuid === taskUuid)
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number): QueueItem {
