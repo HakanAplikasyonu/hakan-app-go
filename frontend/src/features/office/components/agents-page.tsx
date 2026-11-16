@@ -206,7 +206,7 @@ export function OfflineAgentsCard() {
           <h2 id="offline-agents-title" className="text-sm font-semibold">
             {t("office.agents.card_title", { count: offline.length })}
           </h2>
-          <p className="text-muted-foreground text-xs">
+          <p className="text-foreground text-xs">
             {t("office.agents.card_description")}
           </p>
         </div>
@@ -221,7 +221,7 @@ export function OfflineAgentsCard() {
         {offline.slice(0, 5).map((a) => (
           <li key={a.uuid}>
             <span className="font-medium">{a.name}</span>
-            <span className="text-muted-foreground">
+            <span className="text-foreground">
               {" · "}
               {t("office.agents.last_seen", {
                 when: relativeDatetime(a.last_seen_at, locale),
