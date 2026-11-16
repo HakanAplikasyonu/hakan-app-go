@@ -366,12 +366,37 @@ func (s *Service) saveCapabilities(ctx context.Context, conn db.SourceConnection
 			out[docKind(k)] = ops
 		}
 	}
+	// Boxes the integrator cannot list are named, so the office sees "not
+	// supported" instead of an empty list (#59).
+	if nl := NotListable(c); len(nl) > 0 {
+		out["not_listable"] = nl
+	}
 	if caps.MinPollInterval > 0 {
 		out["min_poll_interval_seconds"] = int(caps.MinPollInterval.Seconds())
 	}
 	b, _ := json.Marshal(out)
 	_, err := s.q.SetSourceConnectionCapabilities(ctx, db.SetSourceConnectionCapabilitiesParams{TaxpayerID: conn.TaxpayerID, ID: conn.ID, Capabilities: b})
 	return err
+}
+
+// NotListable names the "<doc_kind>:<direction>" boxes c cannot list.
+func NotListable(c *Client) []string {
+	var out []string
+	for _, k := range []provider.DocumentKind{provider.EInvoice, provider.EArchive} {
+		for _, d := range []provider.Direction{provider.Inbound, provider.Outbound} {
+			if k == provider.EArchive && d == provider.Inbound {
+				continue // e-Arşiv has no inbox
+			}
+			op := provider.OpListInbox
+			if d == provider.Outbound {
+				op = provider.OpListOutbox
+			}
+			if !c.Supports(k, op) {
+				out = append(out, docKind(k)+":"+direction(d))
+			}
+		}
+	}
+	return out
 }
 
 func kindOf(err error) provider.ErrorKind {
