@@ -21,6 +21,9 @@ type Watch struct {
 	Path           string `json:"path"`
 	EngagementUUID string `json:"engagement_uuid"`
 	Label          string `json:"label"`
+	// TaxpayerTitle eklenirken seçilen mükellefin adı (#206); arayüz
+	// çevrimdışıyken de adı gösterebilsin diye saklanır.
+	TaxpayerTitle string `json:"taxpayer_title,omitempty"`
 }
 
 // Uploaded, yüklenmiş (ya da kalıcı olarak reddedilmiş) bir dosyanın kaydı.

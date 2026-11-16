@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -18,6 +19,9 @@ type fieldApplier struct {
 func (f *fieldApplier) Apply(_ context.Context, _ Tx, s Suggestion, v json.RawMessage) (json.RawMessage, error) {
 	if f.fail {
 		return nil, errors.New("boom")
+	}
+	if string(v) == `"not-a-code"` {
+		return nil, fmt.Errorf("%w: not an account code", ErrInvalidValue)
 	}
 	prev, _ := json.Marshal(f.values[*s.Input.TargetID])
 	var str string
@@ -217,5 +221,28 @@ func TestValidation(t *testing.T) {
 	}
 	if _, err := svc.Submit(ctx, Subject{OrganizationID: 1}, input("0.5", "x")); !errors.Is(err, ErrBadSubject) {
 		t.Errorf("subject err = %v", err)
+	}
+}
+
+// A correction whose value the applier refuses is the caller's mistake
+// (400), not a failed application (500) (issue #302, found by the write
+// sweep); a real application failure stays ErrApplyFailed.
+func TestCorrectWithInvalidValue(t *testing.T) {
+	svc, _, ap := setup()
+	ctx := context.Background()
+	a, _ := svc.Submit(ctx, sub, input("0.5", "760.01"))
+	if _, err := svc.Accept(ctx, sub, a.UUID, 5, ""); err != nil {
+		t.Fatal(err)
+	}
+	_, err := svc.Correct(ctx, sub, a.UUID, 5, json.RawMessage(`"not-a-code"`), "yanlış")
+	if !errors.Is(err, ErrInvalid) || errors.Is(err, ErrApplyFailed) {
+		t.Fatalf("invalid value: %v, want ErrInvalid", err)
+	}
+	if ap.values[10] != "760.01" {
+		t.Fatalf("value changed to %q", ap.values[10])
+	}
+	ap.fail = true
+	if _, err := svc.Correct(ctx, sub, a.UUID, 5, json.RawMessage(`"740.01"`), "x"); !errors.Is(err, ErrApplyFailed) {
+		t.Fatalf("apply failure: %v, want ErrApplyFailed", err)
 	}
 }

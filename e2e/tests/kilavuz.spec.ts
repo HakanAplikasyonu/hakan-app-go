@@ -66,6 +66,15 @@ test.describe("@docs ofis paneli görüntüleri", () => {
         { timeout: 90_000 },
       )
       .toBe(true);
+    // Masaüstü ajanları sayfası (#285) için iki örnek ajan (aynı makine
+    // kimliği yeniden kaydı günceller, koşular çoğalmaz).
+    for (const [machine_id, name, platform] of [
+      ["kilavuz-pc-0001", "Muhasebe-PC-01", "windows"],
+      ["kilavuz-mac-0002", "Ortak-Mac", "macos"],
+    ]) {
+      const res = await api.post("/v1/tenant/agents", { machine_id, name, platform, version: "0.1.0" });
+      expect(res.status(), await res.text()).toBe(200);
+    }
     await api.dispose();
   });
 
@@ -83,6 +92,7 @@ test.describe("@docs ofis paneli görüntüleri", () => {
       ["ofis-inceleme-studyosu", "/review/studio", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-uyarilar", "/warnings", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-yevmiye", `/journals?taxpayer=${atlas}`, () => expect(page.getByRole("heading").first()).toBeVisible()],
+      ["ofis-masaustu-ajanlari", "/agents", () => expect(page.getByText("Muhasebe-PC-01").first()).toBeVisible()],
     ];
     for (const [name, p, ready] of screens) {
       await test.step(name, async () => {
@@ -138,8 +148,22 @@ const tauriMock = (signedIn: boolean) => `
       last_heartbeat: "2026-11-16T09:30:00+03:00",
       uploaded_total: 128,
       watches: [
-        { path: "C:\\\\Faturalar\\\\Atlas", label: "Atlas Gıda indirilenler", engagement_uuid: "7c2f9a1e-0000-4000-8000-000000000001" },
-        { path: "C:\\\\Faturalar\\\\Selin", label: "Selin Yılmaz e-arşiv", engagement_uuid: "3b8d4c2a-0000-4000-8000-000000000002" },
+        {
+          path: "C:\\Faturalar\\Atlas",
+          label: "Atlas Gıda indirilenler",
+          engagement_uuid: "7c2f9a1e-0000-4000-8000-000000000001",
+          taxpayer_title: "Atlas Gıda Ltd. Şti.",
+          activity: { uploaded: 12, last_file: "ATL2026000000413.xml", last_outcome: "rejected", last_upload_at: "2026-11-16T09:28:00+03:00", errors: [
+            { name: "notlar.xml", message: "Dosya e-fatura (UBL-TR) değil; yüklenmedi.", retry: false, at: "2026-11-16T09:29:00+03:00" },
+          ] },
+        },
+        {
+          path: "C:\\Faturalar\\Selin",
+          label: "Selin Yılmaz e-arşiv",
+          engagement_uuid: "3b8d4c2a-0000-4000-8000-000000000002",
+          taxpayer_title: "Selin Yılmaz",
+          activity: { uploaded: 4, last_file: "SLN2026000000021.xml", last_outcome: "uploaded", last_upload_at: "2026-11-16T09:10:00+03:00", errors: [] },
+        },
       ],
     })};
     const signedIn = ${signedIn};
@@ -150,8 +174,8 @@ const tauriMock = (signedIn: boolean) => `
           return signedIn ? status : { signed_in: false, running: false, base_url: "", watches: [] };
         case "agent.engagements":
           return { items: [
-            { uuid: "7c2f9a1e-0000-4000-8000-000000000001", taxpayer_uuid: "a1b2c3d4-0000-4000-8000-00000000000a" },
-            { uuid: "3b8d4c2a-0000-4000-8000-000000000002", taxpayer_uuid: "e5f6a7b8-0000-4000-8000-00000000000b" },
+            { uuid: "7c2f9a1e-0000-4000-8000-000000000001", taxpayer_uuid: "a1b2c3d4-0000-4000-8000-00000000000a", taxpayer_title: "Atlas Gıda Ltd. Şti." },
+            { uuid: "3b8d4c2a-0000-4000-8000-000000000002", taxpayer_uuid: "e5f6a7b8-0000-4000-8000-00000000000b", taxpayer_title: "Selin Yılmaz" },
           ] };
         default:
           return {};
@@ -162,6 +186,8 @@ const tauriMock = (signedIn: boolean) => `
         invoke: async (cmd, args) => {
           if (cmd === "sidecar_call") return answer(args.method);
           if (cmd === "sidecar_status") return { ready: { version: "0.1.0", commit: "demo", os: "windows", arch: "amd64", pid: 4242 } };
+          if (cmd === "shell_settings") return { autostart: true, paused: false };
+          if (cmd === "update_status") return { enabled: true, current: "0.1.0", channel: "stable", state: "up_to_date" };
           return {};
         },
       },
@@ -193,7 +219,7 @@ test.describe("@docs masaüstü görüntüleri", () => {
   test("oturum açılmamış", async ({ page }) => {
     await page.addInitScript(tauriMock(false));
     await page.goto(ui);
-    await expect(page.locator("#agent-badge")).toHaveText("Oturum yok");
+    await expect(page.locator("#agent-badge")).toHaveText("Oturum açılmadı");
     await shot(page, "masaustu-oturum");
   });
 
@@ -203,16 +229,17 @@ test.describe("@docs masaüstü görüntüleri", () => {
     await expect(page.locator("#agent-badge")).toHaveText("Çevrimiçi");
     await page.evaluate(() => {
       const emit = (window as unknown as { __emit: (n: string, p: unknown) => void }).__emit;
-      emit("sidecar://event", { event: "upload", data: { name: "ATL2026000000412.xml", outcome: "uploaded" } });
-      emit("sidecar://event", { event: "upload", data: { name: "ATL2026000000413.xml", outcome: "uploaded" } });
-      emit("sidecar://event", { event: "upload", data: { name: "notlar.xml", outcome: "rejected", error: "NOT_UBL" } });
+      const eng = "7c2f9a1e-0000-4000-8000-000000000001";
+      emit("sidecar://event", { event: "upload", data: { name: "ATL2026000000412.xml", engagement_uuid: eng, outcome: "uploaded" } });
+      emit("sidecar://event", { event: "upload", data: { name: "ATL2026000000413.xml", engagement_uuid: eng, outcome: "uploaded" } });
+      emit("sidecar://event", { event: "upload", data: { name: "notlar.xml", engagement_uuid: eng, outcome: "rejected", reason: "Dosya e-fatura (UBL-TR) değil; yüklenmedi." } });
     });
     await shot(page, "masaustu-izleme");
   });
 });
 
 test.describe("yardım sayfaları (#274)", () => {
-  test("ofis panelinden ve mükellef panelinden Yardım açılır", async ({ page }) => {
+  test("ofis panelinden ve mükellef panelinden Yardım açılır", async ({ page, browser }) => {
     await page.goto("/yardim");
     await expect(page.getByRole("heading", { name: "Yardım" })).toBeVisible();
     for (const title of ["Ofis yöneticisi kılavuzu", "Ofis çalışanı kılavuzu", "Mükellef kılavuzu", "Masaüstü ajanı kılavuzu"]) {
@@ -229,11 +256,17 @@ test.describe("yardım sayfaları (#274)", () => {
     await page.getByRole("link", { name: "Yardım" }).first().click();
     await expect(page).toHaveURL(/\/yardim$/);
 
-    await page.context().clearCookies();
-    await uiLogin(page, DEMO.taxpayerUser);
-    await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
-    await page.getByRole("link", { name: "Yardım" }).first().click();
-    await expect(page).toHaveURL(/\/yardim\/mukellef$/);
-    await expect(page.getByRole("heading", { name: "Mükellef kılavuzu" })).toBeVisible();
+    // Mükellef ayrı bir tarayıcı bağlamında: çerez silmek oturumu her zaman
+    // hemen kapatmıyordu, giriş formu bazen hiç görünmüyordu.
+    const tp = await (await browser.newContext()).newPage();
+    try {
+      await uiLogin(tp, DEMO.taxpayerUser);
+      await tp.waitForURL(/\/m\/[0-9a-f-]{36}/);
+      await tp.getByRole("link", { name: "Yardım" }).first().click();
+      await expect(tp).toHaveURL(/\/yardim\/mukellef$/);
+      await expect(tp.getByRole("heading", { name: "Mükellef kılavuzu" })).toBeVisible();
+    } finally {
+      await tp.context().close();
+    }
   });
 });

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/actionlink"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
@@ -110,7 +111,26 @@ func (s *Service) WithSecretBox(box *crypto.SecretBox) *Service {
 }
 
 // Enqueue creates queued notification rows and schedules delivery.
+//
+// A notification is a side effect of the caller's work: its reads and
+// writes run in a savepoint of the caller's transaction
+// (database.BestEffort, issue #311), so a refused or failed row is rolled
+// back alone and never aborts the request that sent it. The error is still
+// returned for callers that report it.
 func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.Notification, error) {
+	var out []model.Notification
+	err := database.BestEffort(ctx, "notification", func(ctx context.Context) error {
+		var err error
+		out, err = s.enqueue(ctx, in)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *Service) enqueue(ctx context.Context, in model.EnqueueInput) ([]model.Notification, error) {
 	if len(in.Channels) == 0 {
 		return nil, fmt.Errorf("%w: channels required", ErrInvalidRequest)
 	}
@@ -233,8 +253,17 @@ func (s *Service) scheduleDeliver(ctx context.Context, id int64) error {
 	opts := []asynq.Option{asynq.Queue(queue.QueueNotifications), asynq.MaxRetry(deliverMaxRetry)}
 	if _, inTx := dbtx.Tx(ctx); inTx {
 		// The row is written in the caller's transaction (request scope,
-		// #166) and is invisible to the worker until it commits. Give the
-		// commit a head start; Deliver retries if it still loses the race.
+		// #166) and is invisible to the worker until it commits (#304).
+		// Enqueue once the transaction has committed; a rollback enqueues
+		// nothing. If the transaction owner runs no commit hooks, fall back
+		// to a delay; Deliver retries if it still loses the race.
+		if dbtx.AfterCommit(ctx, func(ctx context.Context) {
+			if _, err := s.queue.Enqueue(task, opts...); err != nil {
+				s.log.ErrorContext(ctx, "notification_enqueue_after_commit_failed", "id", id, "error", err)
+			}
+		}) {
+			return nil
+		}
 		opts = append(opts, asynq.ProcessIn(deliverAfterCommit))
 	}
 	_, err = s.queue.Enqueue(task, opts...)
@@ -245,7 +274,7 @@ func (s *Service) scheduleDeliver(ctx context.Context, id int64) error {
 // that wrote the notification committed (or that transaction rolled back).
 // The task is retried; a rolled-back row never appears and the retries run
 // out.
-var ErrNotificationNotVisible = errors.New("notifications: notification not visible yet")
+var ErrNotificationNotVisible = fmt.Errorf("notifications: notification not visible yet (%w)", queue.ErrRetrySoon)
 
 const (
 	deliverMaxRetry    = 8
@@ -277,6 +306,18 @@ func (s *Service) Deliver(ctx context.Context, id int64) error {
 		case model.StatusProcessing:
 			row = existing
 			resumed = true
+		case model.StatusQueued, model.StatusFailed:
+			// #304: the UPDATE ran on a snapshot taken before the writing
+			// transaction committed, the SELECT after it. Returning nil here
+			// dropped the e-mail for good. Claim it now, or retry the task.
+			claimed, claimErr := s.q.MarkNotificationProcessing(ctx, id)
+			if errors.Is(claimErr, pgx.ErrNoRows) {
+				return fmt.Errorf("%w: %d", ErrNotificationNotVisible, id)
+			}
+			if claimErr != nil {
+				return claimErr
+			}
+			row = claimed
 		default:
 			return nil
 		}

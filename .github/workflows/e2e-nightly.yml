@@ -1,0 +1,130 @@
+name: e2e (gece)
+
+# #304: CI'daki e2e işinde akış testleri zorunlu değil, bu yüzden main'de bir
+# akış kırmızıya dönünce kimse görmüyordu (yeni ofisin onay e-postası haftalarca
+# kuyrukta kaldı). Bu iş main'de her gece bütün e2e paketini (erişilebilirlik +
+# akışlar) koşar:
+#   - özet iş özetine yazılır, Playwright raporu artefakt olur;
+#   - kırmızıysa tek bir açık "Gece e2e" issue'su açılır ya da güncellenir;
+#   - yeşile dönünce o issue yorumla kapanır;
+#   - iş kırmızı biter (Actions sekmesinde görünür).
+# Elle: Actions → "e2e (gece)" → Run workflow.
+
+on:
+  schedule:
+    - cron: "23 1 * * *" # her gece 01:23 UTC (04:23 TSİ), saat başından uzak
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: e2e-nightly
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install e2e and Chromium
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start environment
+        run: scripts/e2e-up.sh
+      - name: Erişilebilirlik ve akış testleri
+        id: tests
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          CI: "true"
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+        run: npx playwright test --grep-invert @docs --reporter=list,json,html
+      - name: Özet
+        id: report
+        if: always()
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          node scripts/e2e-report.mjs e2e/results.json "$RUN_URL" > e2e-summary.md
+          code=$?
+          set -e
+          cat e2e-summary.md >> "$GITHUB_STEP_SUMMARY"
+          echo "green=$([ "$code" = 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - name: Logs on failure
+        if: steps.report.outputs.green != 'true'
+        run: |
+          for f in e2e/.run/server.log e2e/.run/frontend.log; do
+            echo "::group::$f"; tail -200 "$f" || true; echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: e2e-gece-rapor
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            e2e/results.json
+            e2e/.run/*.log
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Issue (aç / güncelle / kapat)
+        if: always() && steps.report.outcome == 'success'
+        uses: actions/github-script@v8
+        env:
+          GREEN: ${{ steps.report.outputs.green }}
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- e2e-nightly -->";
+            const summary = fs.readFileSync("e2e-summary.md", "utf8");
+            const { owner, repo } = context.repo;
+            const open = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: "open", per_page: 100,
+            });
+            const issue = open.find((i) => !i.pull_request && (i.body || "").includes(marker));
+            if (process.env.GREEN === "true") {
+              if (issue) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body: summary });
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number, state: "closed", state_reason: "completed" });
+              }
+              return;
+            }
+            if (issue) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: issue.number, body: summary });
+            } else {
+              await github.rest.issues.create({
+                owner, repo,
+                title: "Gece e2e: main kırmızı",
+                body: `${marker}\nmain üzerindeki gece e2e koşusu düştü. Her gece bu issue'ya yeni sonuç eklenir; yeşile dönünce kendiliğinden kapanır (.github/workflows/e2e-nightly.yml).\n\n${summary}`,
+              });
+            }
+      - name: Sonuç
+        if: always()
+        run: |
+          [ "${{ steps.report.outputs.green }}" = "true" ] || { echo "::error title=Gece e2e::Kırmızı; özet ve artefakt bu koşuda."; exit 1; }
+      - name: Stop environment
+        if: always()
+        run: scripts/e2e-down.sh

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"path/filepath"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/agent"
 	"github.com/HakanAplikasyonu/hakan-app-go/desktop/sidecar/rpc"
@@ -86,11 +87,12 @@ func RegisterAgent(s *rpc.Server, rt *agent.Runtime) {
 			Path           string `json:"path"`
 			EngagementUUID string `json:"engagement_uuid"`
 			Label          string `json:"label"`
+			TaxpayerTitle  string `json:"taxpayer_title"`
 		}
 		if err := rpc.Decode(params, &p); err != nil {
 			return nil, err
 		}
-		w, err := rt.AddWatch(p.Path, p.EngagementUUID, p.Label)
+		w, err := rt.AddWatch(p.Path, p.EngagementUUID, p.Label, p.TaxpayerTitle)
 		if err != nil {
 			return nil, rpc.Errorf(rpc.CodeInvalidParams, "%v", err)
 		}
@@ -106,6 +108,16 @@ func RegisterAgent(s *rpc.Server, rt *agent.Runtime) {
 		if err := rt.RemoveWatch(p.Path); err != nil {
 			return nil, err
 		}
+		return rt.Status(), nil
+	})
+	s.Handle("watch.clear_errors", func(_ context.Context, params json.RawMessage) (any, error) {
+		var p struct {
+			Path string `json:"path"`
+		}
+		if err := rpc.Decode(params, &p); err != nil {
+			return nil, err
+		}
+		rt.Watcher.ClearErrors(filepath.Clean(p.Path))
 		return rt.Status(), nil
 	})
 }

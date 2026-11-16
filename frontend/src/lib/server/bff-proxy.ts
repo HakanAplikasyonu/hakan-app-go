@@ -304,10 +304,21 @@ async function proxyBuffered(
     }
   }
 
-  return new Response(responseBody, {
+  return new Response(bodyFor(result.status, responseBody), {
     status: result.status,
     headers: passthroughHeaders(result.headers),
   });
+}
+
+/**
+ * 204 / 205 / 304 must not carry a body: `new Response("", { status: 204 })`
+ * throws ("Invalid response status code"), which turned every successful
+ * DELETE without content into a 500 at the BFF (#285).
+ */
+const NULL_BODY_STATUS = new Set([101, 204, 205, 304]);
+
+export function bodyFor<T>(status: number, body: T): T | null {
+  return NULL_BODY_STATUS.has(status) ? null : body;
 }
 
 async function proxyStream(
@@ -352,7 +363,7 @@ async function proxyStream(
   const contentType = result.headers.get("content-type") ?? "";
   if (binary || !contentType.includes("text/event-stream")) {
     if (binary) {
-      return new Response(result.body, {
+      return new Response(bodyFor(result.status, result.body), {
         status: result.status,
         headers: passthroughHeaders(result.headers, { keepLength: true }),
       });
@@ -373,7 +384,7 @@ async function proxyStream(
       merged.set(chunk, offset);
       offset += chunk.byteLength;
     }
-    return new Response(merged, {
+    return new Response(bodyFor(result.status, merged), {
       status: result.status,
       headers: passthroughHeaders(result.headers),
     });

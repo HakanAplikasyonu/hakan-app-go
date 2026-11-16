@@ -10274,6 +10274,8 @@ export interface components {
             uuid: string;
             /** Format: uuid */
             taxpayer_uuid: string;
+            /** @description Mükellefin unvanı ya da adı soyadı (ofis kapsamında; #206) */
+            taxpayer_title: string;
             /** @enum {string} */
             status: "active" | "ended";
             /** Format: date-time */

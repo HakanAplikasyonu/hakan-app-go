@@ -85,10 +85,22 @@ func WithScope(ctx context.Context, db Beginner, s Scope, fn func(ctx context.Co
 	if err := Apply(ctx, tx, s); err != nil {
 		return err
 	}
-	if err := fn(dbtx.WithTx(ctx, tx), tx); err != nil {
+	return runCommitting(ctx, tx, fn)
+}
+
+// runCommitting runs fn with the transaction (and a commit hook list) on the
+// context, commits, then runs the hooks (#304: jobs enqueued for rows written
+// here must not run before those rows are visible). A rollback drops them.
+func runCommitting(ctx context.Context, tx pgx.Tx, fn func(ctx context.Context, tx pgx.Tx) error) error {
+	inner, hooks := dbtx.WithCommitHooks(dbtx.WithTx(ctx, tx))
+	if err := fn(inner, tx); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+	hooks.Run(context.WithoutCancel(ctx))
+	return nil
 }
 
 // Apply puts an open transaction under s (SET LOCAL ROLE and the context
@@ -169,10 +181,7 @@ func System(ctx context.Context, db Beginner, reason string, fn func(ctx context
 	if _, err := tx.Exec(ctx, `SELECT set_config('app.system', 'on', true)`); err != nil {
 		return fmt.Errorf("rls: set system: %w", err)
 	}
-	if err := fn(dbtx.WithTx(ctx, tx), tx); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	return runCommitting(ctx, tx, fn)
 }
 
 // InScope reports whether ctx carries a scoped (or System) transaction: work

@@ -131,6 +131,28 @@ Each RLS table is in one of two states:
 | in transition | `rls_legacy` (`USING true`) | works as before |
 | enforced (`rls_enforced.txt`) | none; FORCE + owner `rls_system` policy | sees nothing, cannot write |
 
+**Roles (issue #312, `scripts/db-roles.sql`).** In production the tables
+belong to `hakan_owner`, which is not a superuser: FORCE applies to it. It is
+a member of the runtime roles with `INHERIT FALSE` (inheriting
+`hakan_rls_runtime` would open every `rls_legacy` table to the owner).
+Migrations must not create roles or grant memberships that already exist
+(000046, 000074 check first). A SECURITY DEFINER function that a policy
+calls runs as the owner and must carry `SET app.system = 'on'` (000089) or
+it sees nothing under FORCE. CI's `backend-owner` job runs the whole suite
+and migrate up / down / up with that owner; `TestNonSuperuserOwnerIsForced`
+checks it. Backups use `hakan_backup` (read-only, BYPASSRLS), see
+`docs/yedekleme.md`.
+
+**Owner forced everywhere (issue #302, migration 000086).** Every table with
+an `organization_id` or `taxpayer_id` column also has FORCE and the owner's
+`rls_system` policy (`rls_owner_force`, called by every `rls_apply_*`
+template), in transition or enforced. The runtime role is not affected (it is
+not the owner); a non-superuser owner sees and writes those tables only
+inside `rls.System` (`app.system`). A data migration touching any such table
+as a non-superuser owner must `SET LOCAL app.system = 'on'` first. The
+exception list is empty since #307; a new exception goes, with its reason,
+into `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
+
 Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
 "reason", fn)`, the deliberate bypass for work that is not done on behalf of
 one tenant (cross-tenant workers, the demo seed, maintenance). Foreign key
@@ -144,7 +166,22 @@ SELECT rls_apply_org('my_table');         -- organization_id
 SELECT rls_apply_engagement('my_table');  -- organization_id + engagement_id
 SELECT rls_apply_taxpayer('my_table');    -- taxpayer_id
 SELECT rls_apply_platform('my_table');    -- no rows for scoped roles
+SELECT rls_apply_org_shared('my_table');  -- organization_id, NULL = platform row
 ```
+
+`rls_apply_org_shared` (migration 000087, #307) is for tables whose
+organization_id NULL rows belong to the platform (system roles, global Excel
+templates, office-less IO engine jobs): a scope reads its own office's rows
+and the NULL rows, writes only its own office's rows; a NULL row is written
+only through `rls.System` (or unscoped, while the table is in transition).
+List the table in `internal/database/shared_tables.txt`
+(`TestSharedTablesPolicies`).
+
+`notifications` and `activity_events` (migration 000088) add a user
+condition on the office-less rows: a scope reads its office's rows and only
+its own user's office-less rows (notifications: also user-less ones), and
+writes only its office's rows. Code that notifies an office from the
+mükellef panel writes inside `rls.ForOffice` (doctasks `notifyOffice`).
 
 How code joins a scope: `database.NewQueries(pool)` (and `database.Ambient`)
 run each statement on the transaction carried by the context, so a
@@ -176,6 +213,18 @@ that scan every office (reminders, offline sweeps) run in one `rls.System`
 transaction with a reason. Questions that are not one tenant's ("which
 office serves this taxpayer now") read through `rls.System`.
 
+**Side effects (issue #311).** A write the request can do without — a
+notification, an activity row, a review-queue submission for a low-confidence
+OCR field, a data warning that only adds information — runs through
+`database.BestEffort(ctx, "name", fn)`: in a savepoint of the request's
+transaction, so its failure (an RLS refusal, a constraint) is rolled back
+alone, logged (`side_effect_failed`) and counted
+(`side_effect_failures_total{name}`) while the request commits its main work.
+A failed statement outside a savepoint aborts the whole transaction (25P02).
+Money, journal entries, approvals and the record the request is about are
+never side effects. `notifications.Enqueue` and `activity.Recorder` already do
+this for their callers.
+
 Exceptions, on purpose:
 - Secrets (`secret_records`, platform) are read and written by the vault on
   its own connection, never in a tenant scope.
@@ -197,7 +246,16 @@ in `internal/platform/rls`), `TestRLSCoversScopedTables` (every listed table has
 `TestRLSEnforcement` (every RLS table is in one state, the list matches),
 `TestEnforcedTablesDoNotLeak` (per enforced table: unscoped sees and writes
 nothing, office A sees and writes only its own rows, System sees all, the
-cascade still works).
+cascade still works), `TestRLSInvariant` (every table with an office or
+taxpayer column: RLS on, FORCE on, a policy and `rls_system`, or a listed
+exception).
+
+**Write sweep** (`internal/httpserver/write_sweep_db_test.go`, #302): every
+POST / PUT / PATCH / DELETE under `/v1/taxpayer/` and `/v1/tenant/` in
+`openapi.yaml` is called once through the real server, on the demo office and
+in the production request scope, as the demo taxpayer user and the office
+owner; any 5xx fails (a 503 only where the case names the unavailable
+external service). A new write endpoint fails the test until it has a case.
 
 ## Migration safety
 

@@ -1,0 +1,583 @@
+package httpserver
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/alicebob/miniredis/v2"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/redis/go-redis/v9"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+)
+
+// Write sweep (issue #302). #277 and #281 were 500s on mükellef write paths
+// that only manual testing found: the request's row level security scope
+// refused a row the handler had to write. This test calls every write
+// operation of the mükellef panel (/v1/taxpayer/*) and of the office panel
+// (/v1/tenant/*) once, through the real server on a real Postgres with the
+// demo office, in the production request scope (DB_RLS_REQUEST_SCOPE), and
+// fails on any 5xx.
+//
+// Every write operation in backend/docs/openapi.yaml under those prefixes
+// must have a case below (TestModuleRoutesDocumented keeps the spec in step
+// with the router): a new endpoint fails this test until it is listed.
+//
+// A case gives the body (JSON, or a multipart file) worth sending; path
+// parameters are filled from the demo data at call time (paramValue), so a
+// later case sees what an earlier one created. Operations run in spec order;
+// `late` ones run after them and `last` ones (ending the engagement,
+// leaving the office) at the very end. `unavailable` names the external service a 503 stands for in
+// this test (no AI provider, no bank or source API); any other 5xx fails.
+type sweepCase struct {
+	body        string // JSON body; empty sends {}
+	file        string // multipart field name; the part is fileName / fileBody
+	fileName    string
+	fileBody    string
+	late        bool // after the others (needs rows they create, or closes one)
+	last        bool // after the late ones (ends the engagement, leaves the office)
+	unavailable string
+}
+
+const pngStub = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+
+var taxpayerWrites = map[string]sweepCase{
+	"POST /v1/taxpayer/onboarding-requests/{uuid}/approve": {body: `{"privacy_notice_version":1,"privacy_notice_language":"tr"}`},
+	"POST /v1/taxpayer/onboarding-requests/{uuid}/reject":  {},
+	"POST /v1/taxpayer/history-shares":                     {body: `{"consent_version":1}`},
+	"DELETE /v1/taxpayer/history-shares/{uuid}":            {},
+	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: pngStub, unavailable: "AI provider (receipt OCR)"},
+	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"100,00"}]}`},
+	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
+	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},
+}
+
+var tenantWrites = map[string]sweepCase{
+	"POST /v1/tenant/roles":                                                                       {body: `{"key":"sweep_role","name":"Tarama","permissions":["tenant.engagements.read"]}`},
+	"PATCH /v1/tenant/roles/{roleKey}":                                                            {body: `{"name":"Tarama 2"}`},
+	"DELETE /v1/tenant/roles/{roleKey}":                                                           {},
+	"PATCH /v1/tenant/members/{userUuid}":                                                         {body: `{"role_key":"member"}`},
+	"DELETE /v1/tenant/members/{userUuid}":                                                        {late: true},
+	"POST /v1/tenant/taxpayer-requests":                                                           {body: `{"kind":"legal","tax_id":"1234567890","title":"Tarama A.Ş.","contact_email":"tarama@example.test"}`},
+	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                                  {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                                    {body: `{"email":"calisan@example.test","role":"employee"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                           {},
+	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                              {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/petitions":                                      {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/end":                                            {last: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                          {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                       {},
+	"POST /v1/tenant/leave":                                                                       {last: true},
+	"POST /v1/tenant/invitations":                                                                 {body: `{"email":"yeni.uye@example.test","role_key":"member"}`},
+	"DELETE /v1/tenant/invitations/{uuid}":                                                        {},
+	"PATCH /v1/tenant/settings":                                                                   {body: `{"name":"Demir Mali Müşavirlik (demo)"}`},
+	"PUT /v1/tenant/setup":                                                                        {body: `{"steps":{"office":{"status":"done"}},"accounting_program":"luca"}`},
+	"POST /v1/tenant/taxpayer-imports":                                                            {file: "file", fileName: "liste.csv", fileBody: "VKN;Unvan;E-posta\n1234567890;Tarama A.Ş.;liste@example.test\n"},
+	"POST /v1/tenant/taxpayer-imports/{uuid}/send":                                                {},
+	"PUT /v1/tenant/warning-rules/{code}":                                                         {body: `{"enabled":false}`},
+	"DELETE /v1/tenant/warning-rules/{code}":                                                      {},
+	"PUT /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                            {body: `{"enabled":false}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                         {},
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge":             {body: `{"note":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve":                 {body: `{"note":"tarama"}`},
+	"PUT /v1/tenant/review/settings":                                                              {body: `{}`},
+	"DELETE /v1/tenant/review/settings/{kind}":                                                    {},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept":            {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/reject":            {body: `{"reason":"tarama"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/correct":           {body: `{"value":"600","reason":"tarama"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/revert":            {body: `{"reason":"tarama"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/review-settings":                                 {body: `{}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/review-settings/{kind}":                       {},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports":                                  {file: "file", fileName: "satis.csv", fileBody: "Tarih;Tutar\n01.10.2026;100\n"},
+	"PUT /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/mapping":              {body: `{"data_type":"outgoing_invoices"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/validate":            {},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows/{rowNo}":       {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit":              {},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback":            {},
+	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                                     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                       {file: "image", fileName: "fis.png", fileBody: pngStub, unavailable: "AI provider (receipt OCR)"},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":                 {},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":                  {},
+	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                                       {body: `{"plate":"34ABC123"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}":                       {},
+	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                   {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries":                               {body: `{"period":"2026-10"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}":                  {body: `{"body":"Ekim dönemi özeti (tarama)."}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}/approve":         {},
+	"POST /v1/tenant/agents":                                                                      {body: `{"machine_id":"sweep-machine-01","name":"Tarama bilgisayarı","platform":"windows","version":"1.0.0"}`},
+	"DELETE /v1/tenant/agents/{agentUuid}":                                                        {},
+	"POST /v1/tenant/agents/{agentUuid}/heartbeat":                                                {body: `{}`},
+	"POST /v1/tenant/legal/dpa/accept":                                                            {body: `{"version":1}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/ubl-uploads":                                    {file: "file", fileName: "atlas-04-istisna.xml", fileBody: "@ubl:atlas-04-istisna.xml"},
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts":                                 {body: `{"entry_date":"2026-10-15T00:00:00Z","description":"Tarama fişi","lines":[{"account":"100","debit":"100.00","credit":"0"},{"account":"600","debit":"0","credit":"100.00"}]}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve":             {},
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse":             {body: `{"reason":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-exports":                                {body: `{"driver":"luca","period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/privacy-requests":                               {body: `{"kind":"export","subject_type":"taxpayer","reason":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/approve":         {},
+	"POST /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/reject":          {body: `{"note":"tarama"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-export-settings":                         {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-matching":                                  {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                          {body: `{}`, unavailable: "EasyTrade API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":    {unavailable: "EasyTrade API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections":                            {body: `{}`, unavailable: "KolayBi API"},
+	"PUT /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/company":    {body: `{}`, unavailable: "KolayBi API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/sync":      {unavailable: "KolayBi API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections":                            {body: `{}`, unavailable: "Paraşüt API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/authorize": {body: `{}`, unavailable: "Paraşüt API"},
+	"PUT /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/company":    {body: `{}`, unavailable: "Paraşüt API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/sync":      {unavailable: "Paraşüt API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections":                               {body: `{}`, unavailable: "bank API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted":    {unavailable: "bank API"},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials":   {body: `{}`, unavailable: "bank API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":         {unavailable: "bank API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-statements":                                {file: "file", fileName: "ekstre.csv", fileBody: "Tarih;Açıklama;Tutar;Bakiye\n05.10.2026;Ödeme;-100,00;900,00\n"},
+	"POST /v1/tenant/engagements/{engagementUuid}/cash-boxes":                                     {body: `{"type":"cash","name":"Tarama kasası"}`},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                      {body: `{"name":"Tarama kasası 2"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}":                   {},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/imports":                           {file: "file", fileName: "plan.csv", fileBody: "Hesap Kodu;Hesap Adı\n100;KASA\n"},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/check":                             {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/missing-template":                  {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/periods/{period}/lock":                          {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/periods/{period}/unlock":                        {body: `{"reason":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/apply":      {},
+	"POST /v1/tenant/engagements/{engagementUuid}/change-requests/{changeRequestUuid}/reject":     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks":                                 {body: `{"title":"Kira sözleşmesi","note":"Ekim kira sözleşmesi","due_days":7}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/detect":                          {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/generate":                        {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel":               {body: `{"reason":"tarama"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete":             {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest":            {body: `{"note":"Faturanın ikinci sayfası eksik"}`},
+	"POST /v1/tenant/account-rules":                                                               {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
+	"PUT /v1/tenant/account-rules/{ruleKey}":                                                      {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
+	"DELETE /v1/tenant/account-rules/{ruleKey}":                                                   {},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-rules":                                  {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-rules/apply-template":                   {body: `{}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/account-rules/{ruleKey}":                         {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/account-rules/{ruleKey}":                      {},
+	"POST /v1/tenant/engagements/{engagementUuid}/account-rule-candidates/promote":                {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/account-suggestions":     {unavailable: "AI provider (account suggestion)"},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate":                          {body: `{}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                  {body: `{"amount":"100.00"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":               {},
+}
+
+type sweepEnv struct {
+	d         *testdb.DB
+	h         http.Handler
+	orgID     int64
+	engID     int64
+	tpID      int64
+	ownerTok  string
+	tpTok     string
+	tpUUID    string
+	backend   string
+	createdBy map[string]bool
+}
+
+func TestWriteEndpointsNo5xx(t *testing.T) {
+	ops := specWriteOps(t)
+	check := func(prefix string, cases map[string]sweepCase) {
+		listed := map[string]bool{}
+		for _, op := range ops {
+			if !strings.HasPrefix(op.path, prefix) {
+				continue
+			}
+			key := op.method + " " + op.path
+			listed[key] = true
+			if _, ok := cases[key]; !ok {
+				t.Errorf("%s is a write operation without a sweep case: add it to the table in write_sweep_db_test.go", key)
+			}
+		}
+		for key := range cases {
+			if !listed[key] {
+				t.Errorf("sweep case %s is not a write operation in openapi.yaml any more: remove it", key)
+			}
+		}
+	}
+	check("/v1/taxpayer/", taxpayerWrites)
+	check("/v1/tenant/", tenantWrites)
+	if t.Failed() {
+		return
+	}
+
+	e := newSweepEnv(t)
+	e.sharedReads(t)
+	var late, last []specOp
+	run := func(op specOp) {
+		key := op.method + " " + op.path
+		if strings.HasPrefix(op.path, "/v1/taxpayer/") {
+			e.call(t, op, taxpayerWrites[key], true)
+		} else {
+			e.call(t, op, tenantWrites[key], false)
+		}
+	}
+	for _, op := range ops {
+		key := op.method + " " + op.path
+		c, tp := taxpayerWrites[key]
+		if !tp {
+			var ok bool
+			if c, ok = tenantWrites[key]; !ok {
+				continue
+			}
+		}
+		switch {
+		case c.last:
+			last = append(last, op)
+			continue
+		case c.late:
+			late = append(late, op)
+			continue
+		}
+		run(op)
+	}
+	for _, op := range append(late, last...) {
+		run(op)
+	}
+}
+
+type specOp struct{ method, path string }
+
+// specWriteOps lists POST/PUT/PATCH/DELETE operations in spec order.
+func specWriteOps(t *testing.T) []specOp {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(backendRoot(), "docs", "openapi.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pathRe := regexp.MustCompile(`^  (/[^:\s]+):\s*$`)
+	opRe := regexp.MustCompile(`^    (post|put|patch|delete):\s*$`)
+	var out []specOp
+	var current string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if m := pathRe.FindStringSubmatch(line); m != nil {
+			current = strings.Trim(m[1], `"'`)
+			continue
+		}
+		if m := opRe.FindStringSubmatch(line); m != nil && current != "" {
+			out = append(out, specOp{strings.ToUpper(m[1]), current})
+		}
+	}
+	return out
+}
+
+func backendRoot() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), "..", "..")
+}
+
+func newSweepEnv(t *testing.T) *sweepEnv {
+	t.Helper()
+	d := testdb.Open(t)
+	u, err := url.Parse(d.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass, _ := u.User.Password()
+	mr := miniredis.RunT(t)
+	env := map[string]string{
+		"APP_ENV": "development", "APP_NAME": "api", "APP_HTTP_ADDR": ":0",
+		"DB_HOST": u.Hostname(), "DB_PORT": u.Port(), "DB_USER": u.User.Username(), "DB_PASSWORD": pass,
+		"DB_NAME": strings.TrimPrefix(u.Path, "/"), "DB_SSLMODE": "disable",
+		"REDIS_ADDR": mr.Addr(), "JWT_ACCESS_SECRET": strings.Repeat("s", 40),
+		"QUEUE_ENABLED": "false", "SEARCH_ENABLED": "false", "CENTRIFUGO_ENABLED": "false",
+		"SMTP_HOST": "127.0.0.1", "SMTP_PORT": "9", "SMTP_TIMEOUT": "1s",
+		"AI_PROVIDER": "anthropic", "AI_API_KEY": "", "RATE_LIMIT_STORE": "memory",
+		"STORAGE_DRIVER": "s3", "TENANCY_ENABLED": "true",
+	}
+	if p := u.Query().Get("sslmode"); p != "" {
+		env["DB_SSLMODE"] = p
+	}
+	for k, v := range env {
+		t.Setenv(k, v)
+	}
+
+	// The demo office (cmd/demo-seed): office, members, taxpayers, engagements.
+	bin := filepath.Join(t.TempDir(), "demo-seed")
+	build := exec.Command("go", "build", "-o", bin, "./cmd/demo-seed")
+	build.Dir = backendRoot()
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build demo-seed: %v\n%s", err, out)
+	}
+	seed := exec.Command(bin)
+	seed.Dir = backendRoot()
+	seed.Env = os.Environ()
+	if out, err := seed.CombinedOutput(); err != nil {
+		t.Fatalf("demo-seed: %v\n%s", err, out)
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.DB.RLSRequestScope = true
+	logOut := io.Discard
+	if os.Getenv("SWEEP_VERBOSE") != "" {
+		logOut = os.Stderr
+	}
+	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	srv, err := New(cfg, log, Deps{
+		DB: d.Pool, Queries: database.NewQueries(d.Pool),
+		Redis:   redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		Storage: memDriver{storage.NewMemory()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &sweepEnv{d: d, h: srv.http.Handler, backend: backendRoot(), createdBy: map[string]bool{}}
+	ctx := context.Background()
+	if err := rls.System(ctx, d.Pool, "test: sweep fixture", func(ctx context.Context, tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = 'demo-smmm'`).Scan(&e.orgID); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `
+			SELECT e.id, t.id, t.uuid::text FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
+			WHERE e.organization_id = $1 AND t.tax_id = '9000000017' AND e.status = 'active'`, e.orgID).Scan(&e.engID, &e.tpID, &e.tpUUID)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	e.ownerTok = e.login(t, "sahip@demo.hakan.local")
+	e.tpTok = e.login(t, "mukellef@demo.hakan.local")
+
+	// The office's invoices (demo UBL set), as the panel uploads them.
+	files, _ := filepath.Glob(filepath.Join(backendRoot(), "internal", "demo", "ubl", "atlas-0[1-2]*.xml"))
+	for _, f := range files {
+		rec := e.do(t, http.MethodPost, "/v1/tenant/engagements/"+e.param(t, "engagementUuid", "")+"/ubl-uploads",
+			sweepCase{file: "file", fileName: filepath.Base(f), fileBody: "@ubl:" + filepath.Base(f)}, false)
+		if rec.Code != http.StatusAccepted {
+			t.Fatalf("seed upload %s: %d %s", f, rec.Code, rec.Body)
+		}
+	}
+	return e
+}
+
+func (e *sweepEnv) login(t *testing.T, email string) string {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, "/v1/auth/login", strings.NewReader(`{"email":"`+email+`","password":"Demo1234!"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	var out struct {
+		Data struct {
+			AccessToken string `json:"access_token"`
+		} `json:"data"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &out) != nil || out.Data.AccessToken == "" {
+		t.Fatalf("login %s: %d %s", email, rec.Code, rec.Body)
+	}
+	return out.Data.AccessToken
+}
+
+var paramRe = regexp.MustCompile(`\{([A-Za-z]+)\}`)
+
+func (e *sweepEnv) call(t *testing.T, op specOp, c sweepCase, taxpayer bool) {
+	t.Helper()
+	path := paramRe.ReplaceAllStringFunc(op.path, func(m string) string {
+		return e.param(t, m[1:len(m)-1], op.path)
+	})
+	rec := e.do(t, op.method, path, c, taxpayer)
+	if os.Getenv("SWEEP_VERBOSE") != "" {
+		t.Logf("%d %s %s %s", rec.Code, op.method, op.path, strings.TrimSpace(firstLine(rec.Body.String())))
+	}
+	if rec.Code < 500 {
+		return
+	}
+	if rec.Code == http.StatusServiceUnavailable && c.unavailable != "" {
+		return
+	}
+	t.Errorf("%s %s (%s) = %d: %s", op.method, op.path, path, rec.Code, strings.TrimSpace(rec.Body.String()))
+}
+
+func (e *sweepEnv) do(t *testing.T, method, path string, c sweepCase, taxpayer bool) *httptest.ResponseRecorder {
+	t.Helper()
+	var body io.Reader
+	contentType := "application/json"
+	switch {
+	case c.file != "":
+		data := c.fileBody
+		if name, ok := strings.CutPrefix(data, "@ubl:"); ok {
+			raw, err := os.ReadFile(filepath.Join(e.backend, "internal", "demo", "ubl", name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			data = string(raw)
+		}
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		fw, _ := mw.CreateFormFile(c.file, c.fileName)
+		_, _ = fw.Write([]byte(data))
+		_ = mw.Close()
+		body, contentType = &buf, mw.FormDataContentType()
+	case c.body != "":
+		body = strings.NewReader(c.body)
+	default:
+		body = strings.NewReader(`{}`)
+	}
+	req := httptest.NewRequest(method, path, body)
+	req.Header.Set("Content-Type", contentType)
+	if taxpayer {
+		req.Header.Set("Authorization", "Bearer "+e.tpTok)
+		req.Header.Set("X-Taxpayer", e.tpUUID)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+e.ownerTok)
+		req.Header.Set("X-Organization", "demo-smmm")
+	}
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	return rec
+}
+
+// paramValue queries: the most recent demo row for a path parameter. $1 is
+// the demo office, $2 the Atlas engagement, $3 Atlas (taxpayer).
+var paramQueries = map[string]string{
+	"userUuid":          `SELECT u.uuid::text FROM users u WHERE u.email = 'stajyer@demo.hakan.local' AND $1 > 0 AND $2 > 0 AND $3 > 0`,
+	"roleKey":           `SELECT 'sweep_role' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
+	"code":              `SELECT 'BNK_UNDOCUMENTED_PAYMENT' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
+	"warningUuid":       `SELECT uuid::text FROM data_warnings WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"suggestionUuid":    `SELECT uuid::text FROM suggestions WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"importUuid":        `SELECT uuid::text FROM excel_imports WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"receiptUuid":       `SELECT uuid::text FROM receipt_captures WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"vehicleUuid":       `SELECT uuid::text FROM taxpayer_vehicles WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"summaryUuid":       `SELECT uuid::text FROM period_summaries WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"agentUuid":         `SELECT uuid::text FROM desktop_agents WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"draftUuid":         `SELECT uuid::text FROM journal_drafts WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"requestUuid":       `SELECT uuid::text FROM privacy_requests WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"cashBoxUuid":       `SELECT uuid::text FROM cash_boxes WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"changeRequestUuid": `SELECT uuid::text FROM change_requests WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"taskUuid":          `SELECT uuid::text FROM document_tasks WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"invoiceUuid":       `SELECT uuid::text FROM invoices WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"connectionUuid":    `SELECT uuid::text FROM source_connections WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"templateUuid":      `SELECT uuid::text FROM excel_import_templates WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"ruleKey":           `SELECT rule_key FROM account_rules WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+}
+
+// uuidQueries fill {uuid} by the operation's path.
+var uuidQueries = map[string]string{
+	"/v1/tenant/taxpayer-requests/":     `SELECT uuid::text FROM taxpayer_onboarding_requests WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/tenant/engagements/":           `SELECT uuid::text FROM taxpayer_invitations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/tenant/invitations/":           `SELECT uuid::text FROM organization_invitations WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/tenant/taxpayer-imports/":      `SELECT uuid::text FROM taxpayer_import_batches WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/taxpayer/onboarding-requests/": `SELECT uuid::text FROM taxpayer_onboarding_requests t WHERE $1 > 0 AND $2 > 0 AND t.tax_id = (SELECT tax_id FROM taxpayers WHERE id = $3) ORDER BY id DESC LIMIT 1`,
+	"/v1/taxpayer/history-shares/":      `SELECT uuid::text FROM taxpayer_history_shares WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/taxpayer/receipts/":            `SELECT uuid::text FROM receipt_captures WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+}
+
+// param resolves a path parameter from the demo data; a parameter without
+// a row (nothing created it yet) gets a random id and the call answers 404.
+func (e *sweepEnv) param(t *testing.T, name, path string) string {
+	t.Helper()
+	switch name {
+	case "engagementUuid":
+		return e.one(t, `SELECT uuid::text FROM engagements WHERE id = $2 AND $1 > 0 AND $3 > 0`, name)
+	case "period":
+		return "2026-10"
+	case "rowNo":
+		return "1"
+	case "kind":
+		return "receipt_field"
+	case "importId":
+		return uuid.NewString()
+	case "uuid":
+		for prefix, q := range uuidQueries {
+			if strings.HasPrefix(path, prefix) {
+				return e.one(t, q, name)
+			}
+		}
+	}
+	if q, ok := paramQueries[name]; ok {
+		return e.one(t, q, name)
+	}
+	t.Fatalf("no value for path parameter {%s} of %s: add it to paramQueries", name, path)
+	return ""
+}
+
+func (e *sweepEnv) one(t *testing.T, q, name string) string {
+	t.Helper()
+	var v string
+	err := rls.System(context.Background(), e.d.Pool, "test: sweep parameter", func(ctx context.Context, tx pgx.Tx) error {
+		return tx.QueryRow(ctx, q, e.orgID, e.engID, e.tpID).Scan(&v)
+	})
+	switch {
+	case err == nil:
+		return v
+	case errors.Is(err, pgx.ErrNoRows):
+		return uuid.NewString()
+	default:
+		t.Fatalf("parameter {%s}: %v", name, fmt.Errorf("%w (query %s)", err, q))
+		return ""
+	}
+}
+
+// memDriver is storage.Memory as a full storage.Driver for the sweep; the
+// operations Memory lacks report the store as unavailable.
+type memDriver struct{ *storage.Memory }
+
+var errNoVersions = fmt.Errorf("sweep storage: not supported")
+
+func (memDriver) DownloadVersion(context.Context, string, string) (io.ReadCloser, int64, error) {
+	return nil, 0, errNoVersions
+}
+func (memDriver) DeleteVersion(context.Context, string, string) error { return errNoVersions }
+func (memDriver) List(context.Context, storage.ListObjectsInput) (storage.ListObjectsResult, error) {
+	return storage.ListObjectsResult{}, nil
+}
+func (memDriver) Head(context.Context, string) (storage.ObjectInfo, error) {
+	return storage.ObjectInfo{}, errNoVersions
+}
+func (memDriver) Copy(context.Context, string, string) error                { return errNoVersions }
+func (memDriver) CopyVersion(context.Context, string, string, string) error { return errNoVersions }
+func (memDriver) ListVersions(context.Context, string) ([]storage.VersionInfo, error) {
+	return nil, nil
+}
+func (memDriver) PresignGet(context.Context, string, time.Duration) (string, error) {
+	return "", errNoVersions
+}
+func (memDriver) PresignPut(context.Context, string, string, time.Duration) (string, error) {
+	return "", errNoVersions
+}
+func (memDriver) Bucket() string { return "sweep" }
+
+func firstLine(s string) string {
+	if len(s) > 160 {
+		s = s[:160]
+	}
+	return s
+}
+
+// sharedReads (issue #307): inside the office's request scope the
+// platform's rows of the rls_apply_org_shared tables stay visible: the
+// system roles in the role list (every permission screen reads them).
+func (e *sweepEnv) sharedReads(t *testing.T) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenant/roles", nil)
+	req.Header.Set("Authorization", "Bearer "+e.ownerTok)
+	req.Header.Set("X-Organization", "demo-smmm")
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `"key":"owner"`) || !strings.Contains(body, `"key":"member"`) {
+		t.Fatalf("GET /v1/tenant/roles in the office scope = %d %s, want the system roles", rec.Code, firstLine(body))
+	}
+}

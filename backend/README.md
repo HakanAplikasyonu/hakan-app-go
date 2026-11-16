@@ -124,3 +124,4 @@ Interactive contract: http://127.0.0.1:8080/docs/
 |-------|--------|
 | Rules | [`DATABASE_RULES.md`](DATABASE_RULES.md) |
 | Toolchain | [`TOOLCHAIN.md`](TOOLCHAIN.md) |
+| New migration | Pull main first; use the highest number in `migrations/` + 1, always with both `.up.sql` and `.down.sql`. `make check-migrations` (repo root) runs the CI check (#299). |

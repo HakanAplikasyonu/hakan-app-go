@@ -1,0 +1,15 @@
+# Tables whose rows belong to one organization or, with organization_id NULL,
+# to the platform (system roles, global templates, office-less engine jobs).
+# Their migration calls rls_apply_org_shared (migration 000087, issue #307):
+# a scope reads its own office's rows and the NULL rows and writes only its
+# own office's rows; NULL rows are written only through rls.System.
+# TestSharedTablesPolicies checks the policies; the behaviour is tested in
+# internal/platform/rls (TestOrgSharedPolicy).
+#
+# They are not in tenant_tables.txt: platform views and user-level queries
+# read them across organizations, which the tenant query lint would refuse.
+roles
+bulk_jobs
+import_jobs
+export_jobs
+excel_import_templates

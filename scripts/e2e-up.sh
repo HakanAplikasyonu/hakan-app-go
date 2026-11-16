@@ -103,6 +103,13 @@ make -C "$ROOT" migrate-up ENV_FILE="$ENV_FILE" MIGRATE="$MIGRATE_CMD"
 
 echo "== API"
 (cd "$ROOT/backend" && go build -o "$DIR/server" ./cmd/server)
+# Testler aynı demo hesaplarıyla, aynı IP'den çok kez giriş yapar; #180'in
+# giriş sınırı (15 dk'da IP + e-posta başına 10) bir koşuda aşılıyordu.
+# Sınırların kendisi backend birim testlerinde denetlenir (ratelimit). Env
+# dosyasındaki (.env.example: 10 / 5) değerin üstüne yazılır; başka değer için
+# E2E_LOGIN_LIMIT / E2E_REGISTER_LIMIT.
+export RATE_LIMIT_LOGIN_LIMIT="${E2E_LOGIN_LIMIT:-1000}"
+export RATE_LIMIT_REGISTER_LIMIT="${E2E_REGISTER_LIMIT:-1000}"
 # setsid: süreç grubu lideri olur, e2e-down grubu birlikte kapatır.
 setsid nohup "$DIR/server" > "$DIR/server.log" 2>&1 < /dev/null &
 echo $! > "$DIR/server.pid"

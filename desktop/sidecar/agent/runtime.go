@@ -68,20 +68,26 @@ func NewRuntime(dataDir, version string, emit Emitter) (*Runtime, error) {
 	return r, nil
 }
 
+// WatchView izlenen klasör ve son etkinliği (#206).
+type WatchView struct {
+	Watch
+	Activity FolderActivity `json:"activity"`
+}
+
 // Status kabuk ve arayüz için özet.
 type Status struct {
-	BaseURL      string     `json:"base_url"`
-	SignedIn     bool       `json:"signed_in"`
-	Organization *OrgRef    `json:"organization"`
-	AgentUUID    string     `json:"agent_uuid,omitempty"`
-	AgentName    string     `json:"agent_name,omitempty"`
-	MachineID    string     `json:"machine_id"`
-	Running      bool       `json:"running"`
-	LastBeat     *time.Time `json:"last_heartbeat,omitempty"`
-	BeatError    string     `json:"heartbeat_error,omitempty"`
-	Watches      []Watch    `json:"watches"`
-	Stats        WatchStats `json:"stats"`
-	Uploaded     int        `json:"uploaded_total"`
+	BaseURL      string      `json:"base_url"`
+	SignedIn     bool        `json:"signed_in"`
+	Organization *OrgRef     `json:"organization"`
+	AgentUUID    string      `json:"agent_uuid,omitempty"`
+	AgentName    string      `json:"agent_name,omitempty"`
+	MachineID    string      `json:"machine_id"`
+	Running      bool        `json:"running"`
+	LastBeat     *time.Time  `json:"last_heartbeat,omitempty"`
+	BeatError    string      `json:"heartbeat_error,omitempty"`
+	Watches      []WatchView `json:"watches"`
+	Stats        WatchStats  `json:"stats"`
+	Uploaded     int         `json:"uploaded_total"`
 }
 
 func (r *Runtime) Status() Status {
@@ -91,11 +97,11 @@ func (r *Runtime) Status() Status {
 	st := Status{
 		BaseURL: snap.BaseURL, SignedIn: r.Client.SignedIn(), Organization: snap.Organization,
 		AgentUUID: snap.AgentUUID, AgentName: snap.AgentName, MachineID: snap.MachineID,
-		Running: r.cancel != nil, BeatError: r.beatError, Watches: snap.Watches,
+		Running: r.cancel != nil, BeatError: r.beatError, Watches: []WatchView{},
 		Stats: r.Watcher.Stats(), Uploaded: r.State.UploadedCount(),
 	}
-	if st.Watches == nil {
-		st.Watches = []Watch{}
+	for _, w := range snap.Watches {
+		st.Watches = append(st.Watches, WatchView{Watch: w, Activity: r.Watcher.Activity(w.Path)})
 	}
 	if !r.lastBeat.IsZero() {
 		t := r.lastBeat
@@ -322,7 +328,7 @@ func (r *Runtime) scanLoop(ctx context.Context) {
 }
 
 // AddWatch bir klasörü izlemeye alır.
-func (r *Runtime) AddWatch(path, engagementUUID, label string) (Watch, error) {
+func (r *Runtime) AddWatch(path, engagementUUID, label, taxpayerTitle string) (Watch, error) {
 	path = filepath.Clean(strings.TrimSpace(path))
 	if !filepath.IsAbs(path) {
 		return Watch{}, errors.New("klasör yolu mutlak olmalı")
@@ -334,7 +340,7 @@ func (r *Runtime) AddWatch(path, engagementUUID, label string) (Watch, error) {
 	if strings.TrimSpace(engagementUUID) == "" {
 		return Watch{}, errors.New("mükellef seçilmeli")
 	}
-	w := Watch{Path: path, EngagementUUID: engagementUUID, Label: strings.TrimSpace(label)}
+	w := Watch{Path: path, EngagementUUID: engagementUUID, Label: strings.TrimSpace(label), TaxpayerTitle: strings.TrimSpace(taxpayerTitle)}
 	err = r.State.Update(func(d *stateData) {
 		for i := range d.Watches {
 			if d.Watches[i].Path == path {

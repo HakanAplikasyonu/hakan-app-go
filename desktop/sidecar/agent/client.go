@@ -212,7 +212,9 @@ func (c *Client) Organizations(ctx context.Context) ([]Organization, error) {
 type Engagement struct {
 	UUID         string `json:"uuid"`
 	TaxpayerUUID string `json:"taxpayer_uuid"`
-	Status       string `json:"status"`
+	// TaxpayerTitle mükellefin unvanı / adı (#206).
+	TaxpayerTitle string `json:"taxpayer_title"`
+	Status        string `json:"status"`
 }
 
 // Engagements etkin hizmet ilişkilerini döner (en çok 500).

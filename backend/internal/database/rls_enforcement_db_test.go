@@ -34,8 +34,9 @@ func TestRuntimeRoleIsSubjectToRLS(t *testing.T) {
 }
 
 // TestRLSEnforcement: every table with row level security is either in
-// transition (rls_legacy policy for the runtime role) or enforced (no
-// rls_legacy, FORCE, rls_system policy) and then listed in rls_enforced.txt.
+// transition (rls_legacy policy for the runtime role; FORCE only together
+// with rls_system) or enforced (no rls_legacy, FORCE, rls_system policy) and
+// then listed in rls_enforced.txt.
 func TestRLSEnforcement(t *testing.T) {
 	d := testdb.Open(t)
 	rows, err := d.Pool.Query(context.Background(), `
@@ -70,7 +71,11 @@ func TestRLSEnforcement(t *testing.T) {
 	var enforced []string
 	for _, tb := range got {
 		switch {
-		case tb.legacy && !tb.force && !tb.system:
+		// In transition: rls_legacy for the runtime role. Since migration
+		// 000086 (#302) the owner is also forced, with its rls_system
+		// policy (rls_owner_force); tables without an office or taxpayer
+		// column may still be unforced.
+		case tb.legacy && tb.force == tb.system:
 			if listed[tb.name] {
 				t.Errorf("%s is in rls_enforced.txt but still has rls_legacy (its migration must call rls_enforce)", tb.name)
 			}

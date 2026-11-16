@@ -52,7 +52,7 @@ func (Applier) Apply(ctx context.Context, tx reviewusecase.Tx, sug reviewusecase
 	}
 	var v codeValue
 	if err := json.Unmarshal(value, &v); err != nil || !engine.ValidCode(v.AccountCode) {
-		return nil, fmt.Errorf("%w: value must be {\"account_code\": \"770.01\"}", usecase.ErrInvalid)
+		return nil, fmt.Errorf("%w (%w): value must be {\"account_code\": \"770.01\"}", usecase.ErrInvalid, reviewusecase.ErrInvalidValue)
 	}
 	tt, tid, field, err := target(sug)
 	if err != nil {

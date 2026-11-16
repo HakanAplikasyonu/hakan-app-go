@@ -225,10 +225,10 @@ func TestWatcherUploadsSettledFilesOnce(t *testing.T) {
 	}
 	rt.Client.SetOrganization("atlas-ymm")
 	dir := t.TempDir()
-	if _, err := rt.AddWatch("goreli/yol", "eng-1", ""); err == nil {
+	if _, err := rt.AddWatch("goreli/yol", "eng-1", "", ""); err == nil {
 		t.Fatal("göreli yol kabul edilmemeli")
 	}
-	if _, err := rt.AddWatch(dir, "eng-1", "İndirilenler"); err != nil {
+	if _, err := rt.AddWatch(dir, "eng-1", "İndirilenler", "Atlas Gıda A.Ş."); err != nil {
 		t.Fatal(err)
 	}
 	old := time.Now().Add(-time.Minute)
@@ -310,6 +310,50 @@ func TestWatcherUploadsSettledFilesOnce(t *testing.T) {
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("durum dosyası izni: %v", info.Mode().Perm())
 	}
+	// Klasör başına etkinlik (#206): son yükleme, okunur hata listesi, ad.
+	view := rt.Status().Watches
+	if len(view) != 1 || view[0].TaxpayerTitle != "Atlas Gıda A.Ş." {
+		t.Fatalf("izlenen klasör görünümü: %+v", view)
+	}
+	act := view[0].Activity
+	if act.Uploaded != 3 || act.LastUploadAt == nil {
+		t.Fatalf("klasör etkinliği: %+v", act)
+	}
+	byName := map[string]FileError{}
+	for _, e := range act.Errors {
+		byName[e.Name] = e
+	}
+	if e := byName["bozuk.xml"]; e.Retry || !strings.Contains(e.Message, "e-fatura") {
+		t.Fatalf("ret hatası: %+v", act.Errors)
+	}
+	if e := byName["sonra.xml"]; !e.Retry || !strings.Contains(e.Message, "yeniden denenecek") {
+		t.Fatalf("geçici hata: %+v", act.Errors)
+	}
+	if len(act.Errors) != 2 {
+		t.Fatalf("aynı dosyanın hatası tekrarlanmamalı: %+v", act.Errors)
+	}
+	for _, e := range act.Errors {
+		if strings.Contains(e.Message, "REJECTED") || strings.Contains(e.Message, "{") {
+			t.Fatalf("ham hata kullanıcıya gitmemeli: %q", e.Message)
+		}
+	}
+	rt.Watcher.ClearErrors(dir)
+	if n := len(rt.Status().Watches[0].Activity.Errors); n != 0 {
+		t.Fatalf("hatalar temizlenmedi: %d", n)
+	}
+	// Silinen klasör okunur bir uyarıyla görünür.
+	gone := filepath.Join(t.TempDir(), "silinecek")
+	_ = os.Mkdir(gone, 0o700)
+	if _, err := rt.AddWatch(gone, "eng-1", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	_ = os.Remove(gone)
+	rt.Watcher.Scan(ctx, time.Now())
+	if a := rt.Watcher.Activity(gone); !strings.Contains(a.FolderError, "bulunamadı") {
+		t.Fatalf("klasör hatası: %+v", a)
+	}
+	_ = rt.RemoveWatch(gone)
+
 	if err := rt.RemoveWatch(dir); err != nil || len(rt.State.Snapshot().Watches) != 0 {
 		t.Fatalf("izleme kaldırma: %v", err)
 	}
@@ -367,7 +411,7 @@ func TestWatchChangeSendsHeartbeat(t *testing.T) {
 	if n0 < 1 {
 		t.Fatal("başlangıç heartbeat'i gönderilmedi")
 	}
-	if _, err := rt.AddWatch(t.TempDir(), "eng-1", "e-fatura"); err != nil {
+	if _, err := rt.AddWatch(t.TempDir(), "eng-1", "e-fatura", ""); err != nil {
 		t.Fatal(err)
 	}
 	n, s := wait(func(_ int, s map[string]any) bool { return s != nil && s["watched_folders"] == float64(1) })

@@ -9,3 +9,4 @@ export { UploadPage } from "./components/upload-page";
 export { EngagementDocumentsPage } from "./components/engagement-documents-page";
 export { CommandCenterPage } from "./components/command-center";
 export { JournalsPage } from "./components/journals-page";
+export { AgentsPage, OfflineAgentsCard } from "./components/agents-page";

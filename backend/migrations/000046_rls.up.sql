@@ -28,22 +28,34 @@
 -- "rol zaten var" demektir.
 DO $$
 BEGIN
-    BEGIN
-        CREATE ROLE hakan_rls_app NOLOGIN NOBYPASSRLS;
-    EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
-    END;
-    BEGIN
-        CREATE ROLE hakan_rls_worker NOLOGIN NOBYPASSRLS;
-    EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
-    END;
+    -- Rol varsa oluşturmaya çalışma: süper kullanıcı olmayan sahip
+    -- (scripts/db-roles.sql, #312) CREATE ROLE yetkisine sahip değildir.
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hakan_rls_app') THEN
+        BEGIN
+            CREATE ROLE hakan_rls_app NOLOGIN NOBYPASSRLS;
+        EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
+        END;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hakan_rls_worker') THEN
+        BEGIN
+            CREATE ROLE hakan_rls_worker NOLOGIN NOBYPASSRLS;
+        EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
+        END;
+    END IF;
 END
 $$;
 
 -- Bağlantı kullanıcısı (göç ve API kullanıcısı) bu rollere geçebilmeli.
 DO $$
 BEGIN
-    EXECUTE format('GRANT hakan_rls_app TO %I', current_user);
-    EXECUTE format('GRANT hakan_rls_worker TO %I', current_user);
+    -- Üyelik varsa yeniden verme: db-roles.sql sahibe INHERIT FALSE ile
+    -- verir; ikinci bir (INHERIT TRUE) üyelik politikaları sahibe açardı.
+    IF NOT pg_has_role(current_user, 'hakan_rls_app', 'MEMBER') THEN
+        EXECUTE format('GRANT hakan_rls_app TO %I', current_user);
+    END IF;
+    IF NOT pg_has_role(current_user, 'hakan_rls_worker', 'MEMBER') THEN
+        EXECUTE format('GRANT hakan_rls_worker TO %I', current_user);
+    END IF;
 END
 $$;
 
