@@ -111,12 +111,19 @@ RETURNING *;
 -- name: InsertReceiptCapture :one
 INSERT INTO receipt_captures (
     organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status,
-    fields, model, expense_id, retail_sale_id, duplicate_of, error
+    fields, model, expense_id, retail_sale_id, duplicate_of, error, client_key
 ) VALUES (
     @organization_id, @engagement_id, @taxpayer_id, sqlc.narg(uploaded_by), @attachment_id, @media_type, sqlc.narg(kind), @status,
-    @fields, sqlc.narg(model), sqlc.narg(expense_id), sqlc.narg(retail_sale_id), sqlc.narg(duplicate_of), sqlc.narg(error)
+    @fields, sqlc.narg(model), sqlc.narg(expense_id), sqlc.narg(retail_sale_id), sqlc.narg(duplicate_of), sqlc.narg(error),
+    sqlc.narg(client_key)
 )
 RETURNING *;
+
+-- name: GetReceiptCaptureByClientKey :one
+-- Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
+SELECT * FROM receipt_captures
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND taxpayer_id = @taxpayer_id AND client_key = @client_key;
 
 -- name: GetReceiptCapture :one
 SELECT * FROM receipt_captures

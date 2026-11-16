@@ -6,8 +6,12 @@
  *   - 2xx              → uploaded (OCR sonucu `result`)
  *   - ağ / 5xx / 429   → pending, artan bekleme (30 sn … 30 dk)
  *   - 401              → pending (oturum yenilenince tekrar)
- *   - 404 / 405        → blocked: sunucu bu uç noktayı henüz sunmuyor (6 saatte bir dener)
+ *   - 404 / 405 / 501  → blocked: sunucu bu uç noktayı sunmuyor (eski sürüm; 6 saatte bir dener)
+ *   - 409 NO_ACTIVE_ENGAGEMENT → blocked: şirketin etkin ofisi yok, ofis bağlanınca yüklenir
  *   - diğer 4xx        → failed: kullanıcı tekrar dener ya da siler
+ *
+ * Uç nokta: POST /v1/taxpayer/receipts (#199). Aynı fotoğraf aynı
+ * Idempotency-Key ile tekrar gönderilirse sunucu ilk kaydı 200 ile döner.
  */
 export type ReceiptKind = 'expense_receipt' | 'fuel_receipt' | 'z_report';
 
@@ -48,6 +52,8 @@ export type QueueItem = {
   /** Corrections the user proposed for OCR fields (sent with the next sync). */
   corrections: Correction[];
   correctionsSent: boolean;
+  /** Why the server refused the corrections (not retried). */
+  correctionsError?: string | null;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -79,12 +85,24 @@ export function backoffMs(attempts: number): number {
   return Math.min(30 * SECOND * 2 ** Math.max(0, attempts - 1), 30 * MINUTE);
 }
 
-/** Classifies an HTTP status (0 = no response) into a failure kind. */
-export function classify(status: number): FailureKind {
+/** Classifies an HTTP status (0 = no response) and error code into a failure kind. */
+export function classify(status: number, code?: string): FailureKind {
   if (status === 0 || status === 429 || status >= 500) return status === 0 ? 'network' : 'server';
   if (status === 401) return 'auth';
   if (status === 404 || status === 405 || status === 501) return 'unsupported';
+  // The company has no active office yet: keep the photo until it has one.
+  if (status === 409 && code === 'NO_ACTIVE_ENGAGEMENT') return 'unsupported';
   return 'rejected';
+}
+
+/** What to do after sending corrections failed with this status (0 = no response). */
+export function correctionOutcome(status: number): 'retry' | 'drop' {
+  return status === 0 || status === 401 || status === 429 || status >= 500 ? 'retry' : 'drop';
+}
+
+/** Corrections were sent, or refused for good (`error`). */
+export function markCorrections(item: QueueItem, error: string | null = null): QueueItem {
+  return { ...item, correctionsSent: true, correctionsError: error };
 }
 
 /** Items of this company to upload now, oldest first. A forced run ignores the backoff. */
@@ -131,7 +149,7 @@ export function recover(items: readonly QueueItem[]): QueueItem[] {
 
 export function addCorrection(item: QueueItem, c: Correction): QueueItem {
   const rest = item.corrections.filter((x) => x.field !== c.field);
-  return { ...item, corrections: [...rest, c], correctionsSent: false };
+  return { ...item, corrections: [...rest, c], correctionsSent: false, correctionsError: null };
 }
 
 /** Uploaded items whose corrections still have to reach the server. */

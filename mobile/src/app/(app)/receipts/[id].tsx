@@ -121,7 +121,11 @@ export default function ReceiptScreen() {
           })}
           {item.corrections.length ? (
             <Text variant="caption" tone="muted">
-              {item.correctionsSent ? 'Düzeltme önerileriniz müşavirinize iletildi.' : 'Düzeltme önerileriniz gönderilmeyi bekliyor.'}
+              {item.correctionsError
+                ? `Düzeltme önerileriniz kabul edilmedi: ${item.correctionsError}`
+                : item.correctionsSent
+                  ? 'Düzeltme önerileriniz müşavirinize iletildi.'
+                  : 'Düzeltme önerileriniz gönderilmeyi bekliyor.'}
             </Text>
           ) : null}
         </Card>

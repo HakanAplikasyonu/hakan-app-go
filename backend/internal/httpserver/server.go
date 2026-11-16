@@ -457,7 +457,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
-	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, taxpayerportal.NewHandler(deps.Queries, ublSvc))
+	portalH := taxpayerportal.NewHandler(deps.Queries, ublSvc)
+	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, portalH)
 	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
 		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log)
@@ -553,6 +554,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")})))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
+	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
+	portalH.WithReceipts(receiptsSvc)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),

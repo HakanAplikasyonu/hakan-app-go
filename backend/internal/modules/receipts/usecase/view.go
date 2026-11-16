@@ -34,6 +34,9 @@ type View struct {
 	InReview  []string  `json:"in_review,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	// Replayed: answered from an earlier upload with the same
+	// Idempotency-Key (#199); the handler then returns 200 instead of 201.
+	Replayed bool `json:"-"`
 }
 
 func (s *Service) view(c db.ReceiptCapture, res *extract.Result) View {

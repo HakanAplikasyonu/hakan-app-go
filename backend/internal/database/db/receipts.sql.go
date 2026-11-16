@@ -237,7 +237,7 @@ func (q *Queries) GetExpense(ctx context.Context, arg GetExpenseParams) (Expense
 }
 
 const getReceiptCapture = `-- name: GetReceiptCapture :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at FROM receipt_captures
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 `
 
@@ -269,6 +269,53 @@ func (q *Queries) GetReceiptCapture(ctx context.Context, arg GetReceiptCapturePa
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ClientKey,
+	)
+	return i, err
+}
+
+const getReceiptCaptureByClientKey = `-- name: GetReceiptCaptureByClientKey :one
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
+WHERE organization_id = $1 AND engagement_id = $2
+  AND taxpayer_id = $3 AND client_key = $4
+`
+
+type GetReceiptCaptureByClientKeyParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	TaxpayerID     int64       `json:"taxpayer_id"`
+	ClientKey      pgtype.Text `json:"client_key"`
+}
+
+// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
+func (q *Queries) GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error) {
+	row := q.db.QueryRow(ctx, getReceiptCaptureByClientKey,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.ClientKey,
+	)
+	var i ReceiptCapture
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.TaxpayerID,
+		&i.UploadedBy,
+		&i.AttachmentID,
+		&i.MediaType,
+		&i.Kind,
+		&i.Status,
+		&i.Fields,
+		&i.Model,
+		&i.ExpenseID,
+		&i.RetailSaleID,
+		&i.DuplicateOf,
+		&i.Error,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientKey,
 	)
 	return i, err
 }
@@ -421,12 +468,13 @@ func (q *Queries) InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraft
 const insertReceiptCapture = `-- name: InsertReceiptCapture :one
 INSERT INTO receipt_captures (
     organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status,
-    fields, model, expense_id, retail_sale_id, duplicate_of, error
+    fields, model, expense_id, retail_sale_id, duplicate_of, error, client_key
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7, $8,
-    $9, $10, $11, $12, $13, $14
+    $9, $10, $11, $12, $13, $14,
+    $15
 )
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
 `
 
 type InsertReceiptCaptureParams struct {
@@ -444,6 +492,7 @@ type InsertReceiptCaptureParams struct {
 	RetailSaleID   pgtype.Int8 `json:"retail_sale_id"`
 	DuplicateOf    pgtype.UUID `json:"duplicate_of"`
 	Error          pgtype.Text `json:"error"`
+	ClientKey      pgtype.Text `json:"client_key"`
 }
 
 func (q *Queries) InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error) {
@@ -462,6 +511,7 @@ func (q *Queries) InsertReceiptCapture(ctx context.Context, arg InsertReceiptCap
 		arg.RetailSaleID,
 		arg.DuplicateOf,
 		arg.Error,
+		arg.ClientKey,
 	)
 	var i ReceiptCapture
 	err := row.Scan(
@@ -483,6 +533,7 @@ func (q *Queries) InsertReceiptCapture(ctx context.Context, arg InsertReceiptCap
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ClientKey,
 	)
 	return i, err
 }
@@ -605,7 +656,7 @@ func (q *Queries) InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerV
 }
 
 const listReceiptCaptures = `-- name: ListReceiptCaptures :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at FROM receipt_captures
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR status = $3::text)
 ORDER BY created_at DESC, id DESC
@@ -654,6 +705,7 @@ func (q *Queries) ListReceiptCaptures(ctx context.Context, arg ListReceiptCaptur
 			&i.Error,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ClientKey,
 		); err != nil {
 			return nil, err
 		}
@@ -764,7 +816,7 @@ func (q *Queries) SetExpenseApproval(ctx context.Context, arg SetExpenseApproval
 const setReceiptCaptureStatus = `-- name: SetReceiptCaptureStatus :one
 UPDATE receipt_captures SET status = $1
 WHERE organization_id = $2 AND engagement_id = $3 AND id = $4
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key
 `
 
 type SetReceiptCaptureStatusParams struct {
@@ -801,6 +853,7 @@ func (q *Queries) SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCap
 		&i.Error,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ClientKey,
 	)
 	return i, err
 }

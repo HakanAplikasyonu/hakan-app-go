@@ -324,6 +324,8 @@ type Querier interface {
 	GetPetition(ctx context.Context, arg GetPetitionParams) (Petition, error)
 	GetPetitionContext(ctx context.Context, arg GetPetitionContextParams) (GetPetitionContextRow, error)
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
+	// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
+	GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)

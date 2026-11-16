@@ -23,6 +23,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/view"
+	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
+	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -38,8 +40,23 @@ type Uploader interface {
 
 // Handler serves /v1/taxpayer/{invoices,receipts,uploads}.
 type Handler struct {
-	q       *db.Queries
-	uploads Uploader
+	q        *db.Queries
+	uploads  Uploader
+	receipts ReceiptCapturer
+}
+
+// ReceiptCapturer is the receipt capture service subset (#199).
+// *receiptsusecase.Service implements it.
+type ReceiptCapturer interface {
+	CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (receiptsusecase.View, error)
+	Correct(ctx context.Context, sc engagementctx.Scope, captureUUID uuid.UUID, userID int64, in []receiptsusecase.Correction) ([]string, error)
+}
+
+// WithReceipts enables receipt upload and corrections from the taxpayer
+// panel and the mobile app (#199). Without it those routes answer 503.
+func (h *Handler) WithReceipts(svc ReceiptCapturer) *Handler {
+	h.receipts = svc
+	return h
 }
 
 // NewHandler builds the handler.
@@ -61,6 +78,8 @@ func mount(mux *http.ServeMux, h *Handler, mws ...func(http.Handler) http.Handle
 	route("GET /v1/taxpayer/invoices", h.listInvoices)
 	route("GET /v1/taxpayer/invoices/{uuid}", h.getInvoice)
 	route("GET /v1/taxpayer/receipts", h.listReceipts)
+	route("POST /v1/taxpayer/receipts", h.createReceipt)
+	route("POST /v1/taxpayer/receipts/{uuid}/corrections", h.correctReceipt)
 	route("GET /v1/taxpayer/uploads", h.listUploads)
 	route("POST /v1/taxpayer/uploads", h.createUpload)
 	route("GET /v1/taxpayer/uploads/{uuid}", h.getUpload)
@@ -278,15 +297,9 @@ func (h *Handler) getUpload(w http.ResponseWriter, r *http.Request) {
 // exactly like an office upload; without an office there is nobody to
 // process it.
 func (h *Handler) createUpload(w http.ResponseWriter, r *http.Request) {
-	s := taxpayerctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
-	eng, err := h.q.GetActiveEngagementForTaxpayer(r.Context(), s.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		response.Error(w, r, http.StatusConflict, "NO_ACTIVE_ENGAGEMENT", "the company has no active office to process uploads")
-		return
-	}
-	if err != nil {
-		response.InternalErr(w, r, err, "could not resolve office")
+	scope, ok := h.activeScope(w, r)
+	if !ok {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, upload.MaxUploadBytes+(1<<20))
@@ -305,7 +318,6 @@ func (h *Handler) createUpload(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, http.StatusBadRequest, "FILE_UNREADABLE", "could not read the file")
 		return
 	}
-	scope := engagementctx.Scope{ID: eng.ID, UUID: eng.Uuid, OrganizationID: eng.OrganizationID, TaxpayerID: s.ID, TaxpayerUUID: s.UUID, Status: eng.Status}
 	job, err := h.uploads.Upload(r.Context(), scope, p.UserInternal, header.Filename, data)
 	switch {
 	case errors.Is(err, upload.ErrEmpty):
@@ -346,4 +358,84 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// activeScope is the engagement of the company's current office: uploads and
+// receipts are processed there. Without one it answers 409.
+func (h *Handler) activeScope(w http.ResponseWriter, r *http.Request) (engagementctx.Scope, bool) {
+	s := taxpayerctx.Must(r.Context())
+	eng, err := h.q.GetActiveEngagementForTaxpayer(r.Context(), s.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		response.Error(w, r, http.StatusConflict, "NO_ACTIVE_ENGAGEMENT", "the company has no active office to process uploads")
+		return engagementctx.Scope{}, false
+	}
+	if err != nil {
+		response.InternalErr(w, r, err, "could not resolve office")
+		return engagementctx.Scope{}, false
+	}
+	return engagementctx.Scope{ID: eng.ID, UUID: eng.Uuid, OrganizationID: eng.OrganizationID,
+		TaxpayerID: s.ID, TaxpayerUUID: s.UUID, Status: eng.Status}, true
+}
+
+// createReceipt: POST /v1/taxpayer/receipts (multipart: image, kind;
+// Idempotency-Key header). The mobile app's capture (#199): the photo is read
+// for the company's current office like an office-side capture. A retry with
+// the same Idempotency-Key returns the first record with 200.
+func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	name, data, ok := receiptshandler.ReadImage(w, r)
+	if !ok {
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	v, err := h.receipts.CaptureKeyed(r.Context(), scope, p.UserInternal, name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+	receiptshandler.WriteCapture(w, r, v, err)
+}
+
+type correctionRequest struct {
+	Corrections []receiptsusecase.Correction `json:"corrections"`
+}
+
+type correctionResult struct {
+	// Submitted are the fields sent to the office's review queue.
+	Submitted []string `json:"submitted"`
+}
+
+// correctReceipt: POST /v1/taxpayer/receipts/{uuid}/corrections. The values
+// go to the office's review queue; the accountant decides (#199).
+func (h *Handler) correctReceipt(w http.ResponseWriter, r *http.Request) {
+	if h.receipts == nil {
+		response.Error(w, r, http.StatusServiceUnavailable, "RECEIPTS_UNAVAILABLE", "receipt capture is not available")
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("uuid"))
+	if err != nil {
+		response.NotFound(w, r, "receipt not found")
+		return
+	}
+	var in correctionRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+		return
+	}
+	scope, ok := h.activeScope(w, r)
+	if !ok {
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	fields, err := h.receipts.Correct(r.Context(), scope, id, p.UserInternal, in.Corrections)
+	if err != nil {
+		receiptshandler.WriteError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusAccepted, correctionResult{Submitted: fields})
 }
