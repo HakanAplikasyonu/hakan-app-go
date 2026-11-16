@@ -171,11 +171,19 @@ export function valueLabel(value: unknown) {
   const { code } = accountValue(value);
   if (code) return code;
   if (value === null || value === undefined) return "";
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value);
+  if (typeof value === "number") return trNumber.format(value);
+  if (typeof value === "string") {
+    // Ondalık tutarlar ("1250.00") tr-TR biçiminde; fiş no gibi kodlar olduğu gibi.
+    return DECIMAL_RE.test(value) ? trNumber.format(Number(value)) : value;
   }
   return JSON.stringify(value);
 }
+
+const DECIMAL_RE = /^-?\d+\.\d+$/;
+const trNumber = new Intl.NumberFormat("tr-TR", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 
 /**
  * The corrected value keeps the proposed shape with the new code; a code

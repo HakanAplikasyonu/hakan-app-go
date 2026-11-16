@@ -41,7 +41,7 @@ export function PeriodPicker({
       <SelectTrigger
         aria-label={t("office.period.label")}
         className={cn(
-          "bg-card w-auto gap-2 pointer-coarse:h-11",
+          "bg-card w-auto gap-2 max-md:h-11 pointer-coarse:h-11",
           compact ? "px-2.5" : "px-3",
           className,
         )}

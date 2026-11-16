@@ -27,7 +27,7 @@ export function OfficeTopbar() {
       <div className="flex h-16 items-center gap-2 px-4 md:gap-3 md:px-6">
         <Link
           href={routes.tenant.home(slug)}
-          className="me-1 flex h-11 items-center md:hidden"
+          className="me-1 flex size-11 items-center justify-center md:hidden"
         >
           <MarkaLogosu varyant="isaret" boyut={24} />
           <span className="sr-only">{t("layout.home")}</span>

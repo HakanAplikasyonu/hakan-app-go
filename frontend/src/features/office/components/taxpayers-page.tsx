@@ -166,7 +166,7 @@ export function TaxpayersPage() {
         }
       />
       <input
-        className="bg-background h-8 w-64 rounded-md border px-2 text-sm"
+        className="bg-background h-8 w-64 max-w-full rounded-md border px-2 text-sm max-md:h-11"
         placeholder={t("office.command.search")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -205,10 +205,7 @@ export function TaxpayersPage() {
                     <td>
                       <Link
                         className="font-medium hover:underline"
-                        href={routes.tenant.engagement(
-                          slug,
-                          r.engagement_uuid,
-                        )}
+                        href={routes.tenant.engagement(slug, r.engagement_uuid)}
                       >
                         {r.taxpayer_title}
                       </Link>

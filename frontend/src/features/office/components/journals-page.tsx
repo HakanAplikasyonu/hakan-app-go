@@ -188,6 +188,7 @@ function NewDraft({ engagement }: { engagement: string }) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="max-md:min-w-11"
                     aria-label={t("office.journals.remove_line")}
                     disabled={lines.length <= 2}
                     onClick={() =>

@@ -58,7 +58,7 @@ export function AgentsPanel() {
       actions={
         <Link
           href={routes.help.guide("masaustu")}
-          className="text-brand text-xs font-medium hover:underline"
+          className="text-brand inline-flex min-h-6 items-center text-xs font-medium hover:underline max-md:min-h-11"
         >
           {t("office.agents.guide_link")}
         </Link>
@@ -220,7 +220,7 @@ export function OfflineAgentsCard() {
         </div>
         <Link
           href={routes.tenant.agents(slug)}
-          className="text-brand text-xs font-medium hover:underline"
+          className="text-brand inline-flex min-h-6 items-center text-xs font-medium hover:underline max-md:min-h-11"
         >
           {t("office.agents.card_open")}
         </Link>
