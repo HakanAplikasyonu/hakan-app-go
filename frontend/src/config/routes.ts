@@ -128,6 +128,9 @@ export const routes = {
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,
+    /** Template-based petitions of one engagement (issue #56). */
+    engagementPetitions: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */
   taxpayer: {

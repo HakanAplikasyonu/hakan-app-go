@@ -71,6 +71,10 @@ tags:
       Ofis geçişi (issue #8, D2). Geçmiş veri yeni ofise yalnızca mükellefin
       (sahibinin) onayıyla açılır; onay saklanır ve geri alınabilir. Eski
       ofis geçişten sonraki belgeleri görmez.
+  - name: Petitions
+    description: |
+      Dilekçe üretimi (issue #56). Şablonlar kodda; hiçbiri hukuki kontrolden
+      geçmedi, hepsi taslak (`draft: true`) ve önizleme ile PDF bunu yazar.
   - name: TaxpayerPortal
     description: Mükellef kullanıcıları (ofis daveti, `X-Taxpayer` başlığı ile mükellef kabuğu). `TENANCY_ENABLED`.
   - name: Warnings
@@ -4102,6 +4106,127 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/petition-templates:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Petitions]
+      operationId: getTenantPetitionTemplates
+      summary: Petition templates
+      description: Requires `tenant.engagements.read`. `draft_notice` is the text printed on draft petitions.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePetitionTemplateList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+
+  /v1/tenant/engagements/{engagementUuid}/petitions/preview:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Petitions]
+      operationId: previewTenantPetition
+      summary: Preview a petition (nothing is stored)
+      description: |
+        Requires `tenant.engagements.read` and an active engagement. The
+        mükellef (title, VKN/TCKN, vergi dairesi), the office name and the
+        signer (user name, SMMM oda sicil no) are filled in from the
+        engagement and the caller; `fields` are the template's own fields.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetitionRequest"
+      responses:
+        "200":
+          description: Rendered petition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeRenderedPetition"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+
+  /v1/tenant/engagements/{engagementUuid}/petitions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Petitions]
+      operationId: getTenantPetitions
+      summary: Petitions of the engagement
+      description: Requires `tenant.engagements.read`. Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Petitions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePetitionList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+    post:
+      tags: [Petitions]
+      operationId: postTenantPetition
+      summary: Create a petition
+      description: Requires `tenant.engagements.write`. Stores the exact text, template key and version.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PetitionRequest"
+      responses:
+        "201":
+          description: Petition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePetition"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+
+  /v1/tenant/engagements/{engagementUuid}/petitions/{uuid}/pdf:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/ResourceUUID"
+    get:
+      tags: [Petitions]
+      operationId: getTenantPetitionPdf
+      summary: Petition as PDF (A4)
+      description: Requires `tenant.engagements.read`. Drafts carry the draft notice at the top and bottom.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/tenant/engagements/{engagementUuid}/end:
     parameters:
@@ -12897,6 +13022,123 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EgressStatus" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    PetitionField:
+      type: object
+      required: [key, label, type, required, max_length]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        type: { type: string, enum: [text, textarea, date] }
+        required: { type: boolean }
+        hint: { type: string }
+        max_length: { type: integer }
+
+    PetitionTemplate:
+      type: object
+      required: [key, title, category, recipient, subject, fields, draft, version]
+      properties:
+        key: { type: string }
+        title: { type: string }
+        category: { type: string, enum: [vergi_dairesi, ticaret_sicil, genel] }
+        recipient: { type: string, description: Addressee line template }
+        subject: { type: string }
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/PetitionField" }
+        draft: { type: boolean, description: Not legally reviewed }
+        version: { type: integer }
+
+    PetitionTemplateList:
+      type: object
+      required: [items, draft_notice]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PetitionTemplate" }
+        draft_notice: { type: string }
+
+    PetitionRequest:
+      type: object
+      additionalProperties: false
+      required: [template_key]
+      properties:
+        template_key: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          description: Date fields as YYYY-MM-DD
+
+    RenderedPetition:
+      type: object
+      required: [template_key, template_version, title, recipient, subject, body, date, petitioner, signer, draft, rendered_at]
+      properties:
+        template_key: { type: string }
+        template_version: { type: integer }
+        title: { type: string }
+        recipient: { type: string }
+        subject: { type: string }
+        body: { type: string, description: Paragraphs separated by newlines }
+        date: { type: string, examples: ["16.11.2026"] }
+        petitioner: { type: string }
+        signer: { type: string }
+        draft: { type: boolean }
+        draft_notice: { type: string }
+        rendered_at: { type: string, format: date-time }
+
+    Petition:
+      type: object
+      required: [uuid, template_key, template_version, draft, created_at, created_by, rendered]
+      properties:
+        uuid: { type: string, format: uuid }
+        template_key: { type: string }
+        template_version: { type: integer }
+        draft: { type: boolean }
+        created_at: { type: string, format: date-time }
+        created_by: { type: [string, "null"] }
+        rendered: { $ref: "#/components/schemas/RenderedPetition" }
+
+    PetitionList:
+      type: object
+      required: [items, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Petition" }
+        limit: { type: integer }
+        offset: { type: integer }
+
+    EnvelopePetitionTemplateList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PetitionTemplateList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeRenderedPetition:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/RenderedPetition" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePetition:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Petition" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePetitionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PetitionList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeEngagementContext:

@@ -77,6 +77,7 @@ import (
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	periodsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/repository"
 	periodsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
+	petitionsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/petitions"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/qrlogin"
 	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
@@ -430,6 +431,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		s.worker.WithDocTaskReminders(docTasksSvc.SendRemindersCount)
 	}
 	realtime.RegisterRoutes(mux, realtime.NewHandler(rtIssuer, uc), tokens, loader)
+	// Dilekçe üretimi (issue #56): şablon + engagement alanları, önizleme ve PDF.
+	petitionsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		petitionsmodule.NewHandler(petitionsmodule.New(deps.DB)))
 	// Fixed-egress status (issue #45): the last public IP check of the
 	// egress worker pool.
 	mux.Handle("GET /v1/platform/egress", middleware.Chain(

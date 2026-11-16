@@ -2623,6 +2623,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/petition-templates": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Petition templates
+         * @description Requires `tenant.engagements.read`. `draft_notice` is the text printed on draft petitions.
+         */
+        get: operations["getTenantPetitionTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/petitions/preview": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a petition (nothing is stored)
+         * @description Requires `tenant.engagements.read` and an active engagement. The
+         *     mükellef (title, VKN/TCKN, vergi dairesi), the office name and the
+         *     signer (user name, SMMM oda sicil no) are filled in from the
+         *     engagement and the caller; `fields` are the template's own fields.
+         */
+        post: operations["previewTenantPetition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/petitions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Petitions of the engagement
+         * @description Requires `tenant.engagements.read`. Newest first.
+         */
+        get: operations["getTenantPetitions"];
+        put?: never;
+        /**
+         * Create a petition
+         * @description Requires `tenant.engagements.write`. Stores the exact text, template key and version.
+         */
+        post: operations["postTenantPetition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/petitions/{uuid}/pdf": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Petition as PDF (A4)
+         * @description Requires `tenant.engagements.read`. Drafts carry the draft notice at the top and bottom.
+         */
+        get: operations["getTenantPetitionPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/end": {
         parameters: {
             query?: never;
@@ -9577,6 +9696,96 @@ export interface components {
             data: components["schemas"]["EgressStatus"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        PetitionField: {
+            key: string;
+            label: string;
+            /** @enum {string} */
+            type: "text" | "textarea" | "date";
+            required: boolean;
+            hint?: string;
+            max_length: number;
+        };
+        PetitionTemplate: {
+            key: string;
+            title: string;
+            /** @enum {string} */
+            category: "vergi_dairesi" | "ticaret_sicil" | "genel";
+            /** @description Addressee line template */
+            recipient: string;
+            subject: string;
+            fields: components["schemas"]["PetitionField"][];
+            /** @description Not legally reviewed */
+            draft: boolean;
+            version: number;
+        };
+        PetitionTemplateList: {
+            items: components["schemas"]["PetitionTemplate"][];
+            draft_notice: string;
+        };
+        PetitionRequest: {
+            template_key: string;
+            /** @description Date fields as YYYY-MM-DD */
+            fields?: {
+                [key: string]: string;
+            };
+        };
+        RenderedPetition: {
+            template_key: string;
+            template_version: number;
+            title: string;
+            recipient: string;
+            subject: string;
+            /** @description Paragraphs separated by newlines */
+            body: string;
+            /** @example 16.11.2026 */
+            date: string;
+            petitioner: string;
+            signer: string;
+            draft: boolean;
+            draft_notice?: string;
+            /** Format: date-time */
+            rendered_at: string;
+        };
+        Petition: {
+            /** Format: uuid */
+            uuid: string;
+            template_key: string;
+            template_version: number;
+            draft: boolean;
+            /** Format: date-time */
+            created_at: string;
+            created_by: string | null;
+            rendered: components["schemas"]["RenderedPetition"];
+        };
+        PetitionList: {
+            items: components["schemas"]["Petition"][];
+            limit: number;
+            offset: number;
+        };
+        EnvelopePetitionTemplateList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["PetitionTemplateList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeRenderedPetition: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RenderedPetition"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopePetition: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Petition"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopePetitionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["PetitionList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeEngagementContext: {
             /** @enum {boolean} */
             success: true;
@@ -14831,6 +15040,170 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantPetitionTemplates: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePetitionTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+        };
+    };
+    previewTenantPetition: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PetitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Rendered petition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRenderedPetition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+        };
+    };
+    getTenantPetitions: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Petitions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePetitionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+        };
+    };
+    postTenantPetition: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PetitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Petition */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePetition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+        };
+    };
+    getTenantPetitionPdf: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     endTenantEngagement: {

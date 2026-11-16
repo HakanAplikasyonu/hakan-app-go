@@ -1225,6 +1225,20 @@ type Permission struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type Petition struct {
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	EngagementID    int64              `json:"engagement_id"`
+	TemplateKey     string             `json:"template_key"`
+	TemplateVersion int32              `json:"template_version"`
+	Fields          []byte             `json:"fields"`
+	Rendered        []byte             `json:"rendered"`
+	Draft           bool               `json:"draft"`
+	CreatedBy       pgtype.Int8        `json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type PgExtension struct {
 	Extname string `json:"extname"`
 }

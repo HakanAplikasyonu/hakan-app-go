@@ -23,6 +23,7 @@ import enOffice from "@/locales/en/office.json";
 import enOnboarding from "@/locales/en/onboarding.json";
 import enOrganizations from "@/locales/en/organizations.json";
 import enPermissions from "@/locales/en/permissions.json";
+import enPetitions from "@/locales/en/petitions.json";
 import enRoles from "@/locales/en/roles.json";
 import enSearch from "@/locales/en/search.json";
 import enErrors from "@/locales/en/errors.json";
@@ -57,6 +58,7 @@ import trOffice from "@/locales/tr/office.json";
 import trOnboarding from "@/locales/tr/onboarding.json";
 import trOrganizations from "@/locales/tr/organizations.json";
 import trPermissions from "@/locales/tr/permissions.json";
+import trPetitions from "@/locales/tr/petitions.json";
 import trRoles from "@/locales/tr/roles.json";
 import trSearch from "@/locales/tr/search.json";
 import trErrors from "@/locales/tr/errors.json";
@@ -107,6 +109,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     office: trOffice,
     onboarding: trOnboarding,
     legal: trLegal,
+    petitions: trPetitions,
   },
   en: {
     common: enCommon,
@@ -143,6 +146,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     office: enOffice,
     onboarding: enOnboarding,
     legal: enLegal,
+    petitions: enPetitions,
   },
 };
 export function loadMessages(locale: AppLocale) {

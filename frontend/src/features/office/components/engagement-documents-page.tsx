@@ -1,5 +1,7 @@
 "use client";
 
+import { FileSignature } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -201,6 +203,19 @@ export function EngagementDocumentsPage({
         },
         { label: t("office.engagement_documents_page_title") },
       ]}
+      actions={
+        <Button asChild variant="outline" size="sm">
+          <Link
+            href={routes.tenant.engagementPetitions(
+              tenant.slug,
+              engagementUuid,
+            )}
+          >
+            <FileSignature className="size-4" />
+            {t("petitions.documents_page_link")}
+          </Link>
+        </Button>
+      }
     >
       <div className="space-y-6">
         <EntitySectionCard title={t("office.engagement_history_title")}>
