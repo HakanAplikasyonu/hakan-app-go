@@ -4,7 +4,8 @@
 #   docker build -t local/hakan-backup:main deploy/backup
 #   scripts/backup-drill.sh
 #
-# 1. Migrates a fresh Postgres, adds marker rows and objects.
+# 1. Migrates a fresh Postgres, backs up the still-empty bucket, then adds
+#    marker rows and objects.
 # 2. Runs backup-run (encrypted dump + roles + manifest, encrypted bucket tar).
 # 3. Checks the backup files hold no plaintext marker.
 # 4. Restores the dump into a second, empty Postgres cluster and verifies the
@@ -44,6 +45,12 @@ compose up -d --wait postgres postgres-restore seaweedfs
 compose run --rm migrate
 compose up -d backup
 b() { compose exec -T backup "$@"; }
+
+# A fresh install has an empty bucket: the object backup must still work.
+b bash -c 'source /usr/local/bin/backup-lib.sh; objects_remote; rclone mkdir "${OBJECTS_REMOTE}app"'
+b env BACKUP_DIR=/drill/empty backup-objects
+b sh -c 'ls /drill/empty/objects/*.tar.age' >/dev/null || die "empty bucket: no archive"
+echo "backup-drill: empty bucket backed up"
 
 # Marker data: one table row and three objects.
 b psql -Xq -v ON_ERROR_STOP=1 -c "INSERT INTO app_releases (version, git_sha, notes) VALUES ('drill', 'drill', '$MARKER')"
