@@ -60,6 +60,68 @@ type Client struct {
 	fetch  provider.Fetcher
 	status provider.StatusChecker
 	users  provider.UserChecker
+	retry  RetryPolicy
+}
+
+// RetryPolicy retries a read call that failed for a passing reason: the
+// integrator was unavailable (5xx), the connection broke or a call timed out
+// while the caller's context is still alive (#196). Rate limits (429) are not
+// retried here: the next run waits for the integrator's interval instead.
+// Every Client call is a read, so a retry cannot repeat a side effect.
+type RetryPolicy struct {
+	// Attempts is the total number of tries (default 3; 1 turns retries off).
+	Attempts int
+	// Base is the first backoff (default 500ms); it doubles each try.
+	Base time.Duration
+}
+
+// DefaultRetry is the policy Wrap gives a Client.
+var DefaultRetry = RetryPolicy{Attempts: 3, Base: 500 * time.Millisecond}
+
+// WithRetry replaces the retry policy.
+func (c *Client) WithRetry(p RetryPolicy) *Client {
+	c.retry = p
+	return c
+}
+
+// retryable: only passing failures; never a rate limit, auth or bad request.
+func retryable(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	switch provider.KindOf(err) {
+	case provider.KindUnavailable, provider.KindTransport, provider.KindTimeout:
+		return true
+	}
+	return false
+}
+
+func call[T any](ctx context.Context, p RetryPolicy, fn func(context.Context) (T, error)) (T, error) {
+	attempts, base := p.Attempts, p.Base
+	if attempts <= 0 {
+		attempts = DefaultRetry.Attempts
+	}
+	if base <= 0 {
+		base = DefaultRetry.Base
+	}
+	var (
+		out T
+		err error
+	)
+	for i := range attempts {
+		out, err = fn(ctx)
+		if !retryable(ctx, err) || i == attempts-1 {
+			return out, err
+		}
+		t := time.NewTimer(base << i)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return out, err
+		case <-t.C:
+		}
+	}
+	return out, err
 }
 
 // Open opens a registered integrator (provider.Open) and wraps it.
@@ -73,7 +135,7 @@ func Open(name string, cfg provider.Config) (*Client, error) {
 
 // Wrap keeps the read interfaces of p.
 func Wrap(p provider.Provider) *Client {
-	c := &Client{name: p.Name(), caps: p.Capabilities()}
+	c := &Client{name: p.Name(), caps: p.Capabilities(), retry: DefaultRetry}
 	c.inbox, _ = p.(provider.InboxLister)
 	c.outbox, _ = p.(provider.OutboxLister)
 	c.fetch, _ = p.(provider.Fetcher)
@@ -117,13 +179,13 @@ func (c *Client) List(ctx context.Context, dir provider.Direction, q ListQuery) 
 			return nil, provider.Unsupported(c.name, provider.OpListInbox, q.Kind)
 		}
 		defer observe(c.name, "list_inbox", time.Now(), &err)
-		return c.inbox.ListInbox(ctx, q.provider())
+		return call(ctx, c.retry, func(ctx context.Context) (*provider.Page, error) { return c.inbox.ListInbox(ctx, q.provider()) })
 	case provider.Outbound:
 		if c.outbox == nil {
 			return nil, provider.Unsupported(c.name, provider.OpListOutbox, q.Kind)
 		}
 		defer observe(c.name, "list_outbox", time.Now(), &err)
-		return c.outbox.ListOutbox(ctx, q.provider())
+		return call(ctx, c.retry, func(ctx context.Context) (*provider.Page, error) { return c.outbox.ListOutbox(ctx, q.provider()) })
 	}
 	return nil, fmt.Errorf("entegrator: unknown direction %q", dir)
 }
@@ -134,7 +196,7 @@ func (c *Client) Fetch(ctx context.Context, q provider.FetchQuery) (_ *provider.
 		return nil, provider.Unsupported(c.name, provider.OpFetch, q.Kind)
 	}
 	defer observe(c.name, "fetch", time.Now(), &err)
-	return c.fetch.Fetch(ctx, q)
+	return call(ctx, c.retry, func(ctx context.Context) (*provider.FetchResult, error) { return c.fetch.Fetch(ctx, q) })
 }
 
 // Status queries one document's status.
@@ -143,7 +205,7 @@ func (c *Client) Status(ctx context.Context, q provider.StatusQuery) (_ *provide
 		return nil, provider.Unsupported(c.name, provider.OpStatus, q.Kind)
 	}
 	defer observe(c.name, "status", time.Now(), &err)
-	return c.status.Status(ctx, q)
+	return call(ctx, c.retry, func(ctx context.Context) (*provider.StatusResult, error) { return c.status.Status(ctx, q) })
 }
 
 // CheckUser looks up a VKN/TCKN in the e-Fatura user list.
@@ -152,7 +214,7 @@ func (c *Client) CheckUser(ctx context.Context, vknTckn string) (_ *provider.Use
 		return nil, provider.Unsupported(c.name, provider.OpCheckUser, "")
 	}
 	defer observe(c.name, "check_user", time.Now(), &err)
-	return c.users.CheckUser(ctx, vknTckn)
+	return call(ctx, c.retry, func(ctx context.Context) (*provider.UserInfo, error) { return c.users.CheckUser(ctx, vknTckn) })
 }
 
 // observe records one integrator call in the metrics (#179): the outcome is

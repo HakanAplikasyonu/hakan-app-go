@@ -31,7 +31,9 @@ func TestClientIsReadOnly(t *testing.T) {
 
 	providerType := reflect.TypeFor[provider.Provider]()
 	typ := reflect.TypeFor[*Client]()
-	allowed := map[string]bool{"Name": true, "Capabilities": true, "Supports": true, "List": true, "Fetch": true, "Status": true, "CheckUser": true}
+	allowed := map[string]bool{"Name": true, "Capabilities": true, "Supports": true, "List": true, "Fetch": true, "Status": true, "CheckUser": true,
+		// Configuration of the read calls themselves (retry of a passing failure).
+		"WithRetry": true}
 	for i := range typ.NumMethod() {
 		m := typ.Method(i)
 		if !allowed[m.Name] {

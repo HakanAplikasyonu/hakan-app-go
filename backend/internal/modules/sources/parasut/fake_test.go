@@ -29,7 +29,14 @@ func (f *fakeParasut) add(list *[]resource, r resource, inc ...resource) {
 }
 
 func (f *fakeParasut) server(t *testing.T) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(f.handler())
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+// handler is the fake's HTTP handler (contract tests wrap it with faults).
+func (f *fakeParasut) handler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		defer f.mu.Unlock()
 		f.requests = append(f.requests, r.URL.Path+"?"+r.URL.RawQuery)
@@ -73,9 +80,7 @@ func (f *fakeParasut) server(t *testing.T) *httptest.Server {
 			hi = len(sorted)
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"data": sorted[lo:hi], "included": f.included, "meta": map[string]any{"total_count": len(sorted)}})
-	}))
-	t.Cleanup(srv.Close)
-	return srv
+	})
 }
 
 func attrs(m map[string]any) map[string]json.RawMessage {
