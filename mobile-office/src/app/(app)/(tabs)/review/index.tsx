@@ -1,21 +1,21 @@
 import { BosDurum, GuvenOlcegi, KristalYukleyici, TacRozeti, type GuvenKaynagi } from '@hakan/mobile-core/hakan';
 import { Ikon, type IkonAdi } from '@hakan/mobile-core/ui/ikon';
 import { DOKUNMA, yerlesim } from '@hakan/mobile-core/ui/layout';
-import { EkranBasligi, Hap, IlerlemeCubugu, KesikKose, metin } from '@hakan/mobile-core/ui/parcalar';
+import { EkranBasligi, Hap, IlerlemeCubugu, KesikKose, metin, Segment } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, SectionList, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
-import { receiptImageSource } from '@/features/clients/api';
+import { receiptImageSource, useClientTitles } from '@/features/clients/api';
 import { money } from '@/features/clients/format';
 import { useDecide, useReviewQueue, useSuggestionContext, type Suggestion, type SuggestionContext } from '@/features/review/api';
-import { confidencePercent, fieldLabel, proposedCode, queueEta, queueProgress } from '@/features/review/format';
+import { confidencePercent, fieldLabel, groupQueue, proposedCode, queueEta, queueProgress, type QueueGrouping } from '@/features/review/format';
 import { KaydirmaKarti } from '@/features/review/kaydirma-karti';
 import { ReasonSheet, type ReasonSheetMode } from '@/features/review/reason-sheet';
 import { periodLabel } from '@/features/warnings/format';
@@ -55,7 +55,16 @@ export default function ReviewScreen() {
   const [attempt, setAttempt] = useState(0);
 
   const queue = items.filter((s) => !skipped.has(s.uuid));
-  const current = (tablet && selected ? queue.find((s) => s.uuid === selected) : null) ?? queue[0] ?? null;
+  const [grouping, setGrouping] = useState<QueueGrouping>('mukellef');
+  const clients = useClientTitles();
+  const sections = useMemo(() => {
+    if (!tablet) return [];
+    const titles = new Map((clients ?? []).map((x) => [x.engagement_uuid, x.title]));
+    return groupQueue(queue, grouping, (e) => titles.get(e));
+  }, [tablet, queue, grouping, clients]);
+  // Tablette seçim yoksa görünen listenin ilk satırı (gruplama sırası).
+  const firstShown = sections[0]?.data[0] ?? null;
+  const current = (tablet && selected ? queue.find((s) => s.uuid === selected) : null) ?? (tablet ? firstShown : null) ?? queue[0] ?? null;
   const remaining = Math.max(0, total - decided);
 
   const run = useCallback(
@@ -148,12 +157,31 @@ export default function ReviewScreen() {
         <View style={{ flex: 1, flexDirection: 'row' }}>
           <View style={[styles.listPane, { backgroundColor: c.surface, borderRightColor: c.line }]}>
             {header}
-            <FlatList
-              data={queue}
+            <Segment
+              testIDOnek="review-group"
+              secenekler={[
+                { key: 'mukellef', label: 'Mükellefe göre' },
+                { key: 'guven', label: 'Güvene göre' },
+              ]}
+              secili={grouping}
+              onSec={setGrouping}
+              style={{ marginHorizontal: 16, marginTop: 12 }}
+            />
+            <SectionList
+              sections={sections}
               keyExtractor={(s) => s.uuid}
-              contentContainerStyle={{ paddingTop: 10, paddingBottom: 24 }}
+              stickySectionHeadersEnabled
+              contentContainerStyle={{ paddingTop: 6, paddingBottom: 24 }}
               onEndReached={() => q.hasNextPage && !q.isFetchingNextPage && q.fetchNextPage()}
               ListEmptyComponent={empty}
+              renderSectionHeader={({ section }) => (
+                <View accessibilityRole="header" style={[styles.groupHead, { backgroundColor: c.surface2, borderTopColor: c.line }]}>
+                  <Text style={[metin.xs, { fontFamily: 'Inter_600SemiBold', color: c.text2, flex: 1 }]} numberOfLines={1}>
+                    {section.title}
+                  </Text>
+                  <Text style={[metin.xs, metin.mono, { color: c.text3 }]}>{section.data.length}</Text>
+                </View>
+              )}
               renderItem={({ item: s }) => {
                 const on = s.uuid === current?.uuid;
                 return (
@@ -464,6 +492,7 @@ const styles = StyleSheet.create({
   hints: { flexDirection: 'row', justifyContent: 'space-between' },
   actions: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 18 },
   listPane: { width: 340, borderRightWidth: StyleSheet.hairlineWidth },
+  groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 8, borderTopWidth: StyleSheet.hairlineWidth },
   listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 12, minHeight: 56, borderTopWidth: StyleSheet.hairlineWidth },
   docPane: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   paper: { width: 300, padding: 24, gap: 8, borderRadius: 4, borderWidth: StyleSheet.hairlineWidth },

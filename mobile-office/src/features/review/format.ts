@@ -95,3 +95,34 @@ export function queueEta(count: number, secondsEach = 6): string {
   const secs = count * secondsEach;
   return secs < 60 ? "1 dk'dan az" : `~${Math.round(secs / 60)} dk`;
 }
+
+export type QueueGrouping = 'mukellef' | 'guven';
+export type QueueGroup<T> = { key: string; title: string; data: T[] };
+
+const BAND_TITLE: Record<ConfidenceBand, string> = { low: 'Düşük güven', medium: 'Orta güven', high: 'Yüksek güven' };
+
+/**
+ * Tablet onay listesi (MusavirTablet): mükellefe göre (kuyruktaki ilk
+ * görünüş sırasıyla) ya da güvene göre (önce düşük: dikkat isteyenler üstte).
+ * Grup içindeki sıra kuyruk sırasıdır.
+ */
+export function groupQueue<T extends Pick<SuggestionLike, 'uuid' | 'engagement_uuid' | 'confidence'>>(
+  list: readonly T[],
+  mode: QueueGrouping,
+  titleOf: (engagement: string) => string | undefined,
+): QueueGroup<T>[] {
+  const groups = new Map<string, QueueGroup<T>>();
+  if (mode === 'guven') {
+    for (const band of ['low', 'medium', 'high'] as const) groups.set(band, { key: band, title: BAND_TITLE[band], data: [] });
+  }
+  for (const s of list) {
+    const key = mode === 'guven' ? confidenceBand(s.confidence) : (s.engagement_uuid ?? '');
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, title: (key && titleOf(key)) || 'Mükellef', data: [] };
+      groups.set(key, g);
+    }
+    g.data.push(s);
+  }
+  return [...groups.values()].filter((g) => g.data.length > 0);
+}
