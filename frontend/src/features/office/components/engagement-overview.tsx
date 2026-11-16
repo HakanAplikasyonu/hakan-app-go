@@ -62,10 +62,13 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
       label: t("office.nav_invoices"),
     },
     {
+<<<<<<< HEAD
       href: routes.tenant.engagementBank(slug, engagement),
       label: t("office.engagement.tab_bank"),
     },
     {
+=======
+>>>>>>> origin/main
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
     },

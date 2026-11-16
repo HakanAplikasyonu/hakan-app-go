@@ -1,9 +1,15 @@
 "use client";
 
-import { useLocale } from "@/providers/locale-provider";
-import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import { createContext, useContext } from "react";
 
-/** "Atla" / "Kaydet ve devam" (last step: "Kurulumu bitir"). */
+import { Button } from "@/components/ui/button";
+import { useLocale } from "@/providers/locale-provider";
+
+/** Sihirbaz gezinmesi: adımlar "Geri"yi buradan alır (OfisKurulum). */
+export const WizardNav = createContext<{ onBack?: () => void }>({});
+
+/** "Geri" / "Bu adımı atla" / "Kaydet ve devam et" (son adım: "Kurulumu bitir"). */
 export function StepActions({
   isLast,
   busy,
@@ -16,12 +22,37 @@ export function StepActions({
   onSave: () => void;
 }) {
   const { t } = useLocale();
+  const { onBack } = useContext(WizardNav);
   return (
-    <div className="mt-6 flex flex-wrap justify-end gap-2 border-t pt-4">
-      <Button type="button" variant="outline" disabled={busy} onClick={onSkip}>
+    <div className="mt-8 flex flex-wrap items-center gap-2 border-t pt-4">
+      {onBack ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11"
+          disabled={busy}
+          onClick={onBack}
+        >
+          <ArrowLeft className="size-4" aria-hidden />
+          {t("common.back")}
+        </Button>
+      ) : null}
+      <span className="flex-1" />
+      <Button
+        type="button"
+        variant="outline"
+        className="h-11"
+        disabled={busy}
+        onClick={onSkip}
+      >
         {t("setup.skip")}
       </Button>
-      <Button type="button" disabled={busy} onClick={onSave}>
+      <Button
+        type="button"
+        className="bg-brand text-on-brand hover:bg-brand/90 h-11"
+        disabled={busy}
+        onClick={onSave}
+      >
         {isLast ? t("setup.finish") : t("setup.save_continue")}
       </Button>
     </div>
