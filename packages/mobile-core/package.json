@@ -6,12 +6,16 @@
   "exports": {
     "./ui": "./src/ui/ui.tsx",
     "./screens": "./src/ui/screens.tsx",
+    "./hakan": "./src/ui/hakan.tsx",
     "./*": "./src/*.ts"
   },
   "scripts": {
     "test": "node --test --experimental-strip-types \"src/**/*.test.ts\""
   },
   "peerDependencies": {
+    "@expo-google-fonts/inter": "*",
+    "@expo-google-fonts/inter-tight": "*",
+    "@expo-google-fonts/jetbrains-mono": "*",
     "@sentry/react-native": ">=8",
     "expo-constants": "*",
     "expo-localization": "*",
@@ -19,6 +23,7 @@
     "expo-secure-store": "*",
     "react": ">=19",
     "react-native": "*",
-    "react-native-safe-area-context": "*"
+    "react-native-safe-area-context": "*",
+    "react-native-svg": "*"
   }
 }

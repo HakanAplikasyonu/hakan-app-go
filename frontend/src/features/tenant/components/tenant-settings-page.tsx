@@ -7,6 +7,7 @@ import { z } from "zod";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { EntityPage, EntitySectionCard } from "@/components/entity";
+import { GorunumAyari } from "@/components/hakan";
 import { AppForm, AppInput } from "@/components/forms";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
@@ -122,6 +123,8 @@ export function TenantSettingsPage() {
         </EntitySectionCard>
       ) : null}
       <OfficeDpaCard slug={tenant.slug} />
+      {/* Ayarlar → Görünüm (arayüz v1, #324): hesaba özel tema. */}
+      <GorunumAyari />
     </EntityPage>
   );
 }

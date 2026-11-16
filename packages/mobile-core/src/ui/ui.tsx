@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useColors } from './theme.ts';
+import { tokens, useColors } from './theme.ts';
 
 export function Screen({ children, scroll = true, style }: { children: ReactNode; scroll?: boolean; style?: ViewStyle }) {
   const c = useColors();
@@ -118,14 +118,15 @@ export function Notice({ children, tone = 'danger' }: { children: ReactNode; ton
 
 const styles = StyleSheet.create({
   screenBody: { flex: 1, padding: 20, gap: 16 },
-  title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.5 },
-  heading: { fontSize: 18, fontWeight: '600' },
-  body: { fontSize: 16, lineHeight: 22 },
-  caption: { fontSize: 13, lineHeight: 18 },
-  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 16, gap: 8 },
-  button: { minHeight: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
-  buttonText: { fontSize: 16, fontWeight: '600' },
-  input: { minHeight: 48, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
+  // Arayüz v1 (#324): tokens.ts `type` ölçüleri; mobil gövde 15/22.
+  title: { fontFamily: tokens.font.display, fontSize: tokens.type.h1.size, lineHeight: tokens.type.h1.line, letterSpacing: -0.5 },
+  heading: { fontFamily: 'InterTight_600SemiBold', fontSize: 18, lineHeight: 24 },
+  body: { fontFamily: tokens.font.sans, fontSize: tokens.type.body.size, lineHeight: tokens.type.body.line },
+  caption: { fontFamily: tokens.font.sans, fontSize: tokens.type.small.size, lineHeight: tokens.type.small.line },
+  card: { borderWidth: StyleSheet.hairlineWidth, borderRadius: tokens.radius.lg, padding: 16, gap: 8 },
+  button: { minHeight: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
+  buttonText: { fontFamily: tokens.font.sansSemi, fontSize: 15 },
+  input: { minHeight: 46, borderWidth: 1, borderRadius: tokens.radius.md, paddingHorizontal: 14, fontSize: 15, fontFamily: tokens.font.sans },
   notice: { borderWidth: 1, borderRadius: 12, padding: 12 },
 });
 
@@ -167,7 +168,7 @@ export function Row({
       style={({ pressed }) => [chipStyles.row, { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       {leading}
       <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ fontWeight: '600' }} numberOfLines={2}>
+        <Text style={{ fontFamily: tokens.font.sansSemi }} numberOfLines={2}>
           {title}
         </Text>
         {subtitle ? (
@@ -183,6 +184,6 @@ export function Row({
 
 const chipStyles = StyleSheet.create({
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
-  text: { fontSize: 12, fontWeight: '600' },
+  text: { fontSize: 12, fontFamily: tokens.font.sansSemi },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 12 },
 });
