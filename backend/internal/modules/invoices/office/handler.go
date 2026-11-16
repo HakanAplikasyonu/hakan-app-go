@@ -24,6 +24,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/pagecursor"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
@@ -75,6 +76,9 @@ type page struct {
 	Total  int64 `json:"total"`
 	Limit  int32 `json:"limit"`
 	Offset int32 `json:"offset"`
+	// NextCursor fetches the next page with ?cursor= (keyset pagination,
+	// #182); null on the last page.
+	NextCursor *string `json:"next_cursor"`
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
@@ -87,13 +91,37 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, http.StatusBadRequest, "INVALID_DIRECTION", "direction must be outgoing or incoming")
 		return
 	}
-	rows, err := h.q.ListEngagementInvoices(r.Context(), db.ListEngagementInvoicesParams{
-		OrganizationID: s.OrganizationID, EngagementID: s.ID, TaxpayerID: s.TaxpayerID,
-		Period: repository.Text(period), Direction: repository.Text(direction), Lim: limit, Off: offset,
-	})
-	if err != nil {
-		response.InternalErr(w, r, err, "could not list invoices")
-		return
+	var rows []db.ListEngagementInvoicesRow
+	if c := strings.TrimSpace(q.Get("cursor")); c != "" {
+		// Keyset page: offset is ignored; deep pages cost as little as the first.
+		date, id, err := pagecursor.Decode(c)
+		if err != nil {
+			response.Error(w, r, http.StatusBadRequest, "INVALID_CURSOR", "cursor is not valid")
+			return
+		}
+		offset = 0
+		after, err := h.q.ListEngagementInvoicesAfter(r.Context(), db.ListEngagementInvoicesAfterParams{
+			OrganizationID: s.OrganizationID, EngagementID: s.ID, TaxpayerID: s.TaxpayerID,
+			CursorDate: pgtype.Date{Time: date, Valid: true}, CursorID: id,
+			Period: repository.Text(period), Direction: repository.Text(direction), Lim: limit,
+		})
+		if err != nil {
+			response.InternalErr(w, r, err, "could not list invoices")
+			return
+		}
+		for _, a := range after {
+			rows = append(rows, db.ListEngagementInvoicesRow(a))
+		}
+	} else {
+		var err error
+		rows, err = h.q.ListEngagementInvoices(r.Context(), db.ListEngagementInvoicesParams{
+			OrganizationID: s.OrganizationID, EngagementID: s.ID, TaxpayerID: s.TaxpayerID,
+			Period: repository.Text(period), Direction: repository.Text(direction), Lim: limit, Off: offset,
+		})
+		if err != nil {
+			response.InternalErr(w, r, err, "could not list invoices")
+			return
+		}
 	}
 	total, err := h.q.CountEngagementInvoices(r.Context(), db.CountEngagementInvoicesParams{
 		TaxpayerID: s.TaxpayerID, EngagementID: s.ID, Period: repository.Text(period), Direction: repository.Text(direction),
@@ -105,6 +133,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	out := page{Items: make([]Row, 0, len(rows)), Total: total, Limit: limit, Offset: offset}
 	for _, row := range rows {
 		out.Items = append(out.Items, Row{Invoice: view.FromInvoice(row.Invoice), OpenWarnings: row.OpenWarnings})
+	}
+	if n := len(rows); n > 0 && n == int(limit) {
+		next := pagecursor.Encode(rows[n-1].Invoice.IssueDate.Time, rows[n-1].Invoice.ID)
+		out.NextCursor = &next
 	}
 	response.JSON(w, r, http.StatusOK, out)
 }

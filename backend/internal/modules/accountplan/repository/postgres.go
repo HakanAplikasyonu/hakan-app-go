@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
 	"github.com/jackc/pgx/v5"
@@ -43,7 +44,7 @@ func (p *Postgres) Replace(ctx context.Context, s usecase.Subject, imp usecase.N
 	if err != nil {
 		return usecase.Import{}, err
 	}
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return usecase.Import{}, fmt.Errorf("begin: %w", err)
 	}

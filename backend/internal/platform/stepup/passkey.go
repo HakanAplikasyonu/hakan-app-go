@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 type WebAuthnConfig struct {
@@ -217,7 +219,7 @@ func mapPasskeyCredential(row model.PasskeyRecord) (webauthn.Credential, error) 
 			BackupState:    row.BackedUp,
 		},
 		Authenticator: webauthn.Authenticator{
-			SignCount: uint32(row.Counter),
+			SignCount: intconv.Uint32(row.Counter),
 		},
 	}, nil
 }

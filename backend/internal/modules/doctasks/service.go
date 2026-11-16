@@ -29,6 +29,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	notifmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
@@ -142,7 +143,7 @@ func New(pool DB, store ObjectStore, notifier Notifier, cfg Config, log *slog.Lo
 	if cfg.MaxReminders <= 0 {
 		cfg.MaxReminders = DefaultConfig.MaxReminders
 	}
-	q := db.New(pool)
+	q := database.QueriesFor(pool)
 	return &Service{
 		db: pool, q: q,
 		engine:   engine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q)),

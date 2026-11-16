@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -26,7 +27,7 @@ func NewPostgres(pool *pgxpool.Pool, q *db.Queries) *Postgres {
 }
 
 func (r *Postgres) WithTx(ctx context.Context, fn TxFunc) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, r.pool)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}

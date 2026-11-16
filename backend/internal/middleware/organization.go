@@ -59,10 +59,24 @@ func RequireOrganization(resolver orgctx.Resolver) func(http.Handler) http.Handl
 					return
 				}
 			}
-			next.ServeHTTP(w, r.WithContext(orgctx.WithScope(r.Context(), scope)))
+			h := next
+			if ts := tenantScope; ts != nil {
+				// The rest of the request runs in one row level security
+				// transaction for this office (issue #166).
+				h = ts(next)
+			}
+			h.ServeHTTP(w, r.WithContext(orgctx.WithScope(r.Context(), scope)))
 		})
 	}
 }
+
+// tenantScope wraps everything after RequireOrganization (issue #166):
+// rls.Middleware, set by the server. Nil leaves tenant routes unscoped.
+var tenantScope func(http.Handler) http.Handler
+
+// SetTenantScope sets the per-request row level security scope for tenant
+// routes (rls.Middleware). Call once at startup.
+func SetTenantScope(mw func(http.Handler) http.Handler) { tenantScope = mw }
 
 // RequireTenantPermission requires a tenant permission slug in the current
 // organization scope. Tenant permissions come from the membership only:

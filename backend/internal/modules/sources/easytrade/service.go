@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
@@ -48,7 +49,7 @@ func NewService(pool *pgxpool.Pool, vault secrets.Vault, baseURL string, hc *htt
 	if hc == nil {
 		hc = &http.Client{Timeout: time.Minute}
 	}
-	return &Service{pool: pool, q: db.New(pool), vault: vault, base: baseURL, hc: hc, now: time.Now, interval: 200 * time.Millisecond}
+	return &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, base: baseURL, hc: hc, now: time.Now, interval: 200 * time.Millisecond}
 }
 
 type meta struct {

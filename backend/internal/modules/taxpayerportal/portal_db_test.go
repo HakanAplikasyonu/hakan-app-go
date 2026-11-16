@@ -26,6 +26,7 @@ import (
 type env struct {
 	d     *testdb.DB
 	mux   *http.ServeMux
+	h     *Handler
 	userA int64
 	tpA   uuid.UUID
 	tpB   uuid.UUID
@@ -108,6 +109,7 @@ func setup(t *testing.T) env {
 	members := taxpayers.NewMembers(taxpayers.NewMemberPostgres(d.Pool), nil, taxpayers.InvitationConfig{}, nil)
 	ups := upload.New(d.Pool, storage.NewMemory(), nil, nil)
 	h := NewHandler(db.New(d.Pool), ups)
+	e.h = h
 	e.mux = http.NewServeMux()
 	fakeAuth := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -120,14 +122,27 @@ func setup(t *testing.T) env {
 
 func (e env) do(t *testing.T, method, path string, tp uuid.UUID, body *bytes.Buffer, contentType string) *httptest.ResponseRecorder {
 	t.Helper()
-	if body == nil {
-		body = &bytes.Buffer{}
+	req := httptest.NewRequest(method, path, nil)
+	if body != nil {
+		req = httptest.NewRequest(method, path, body)
 	}
-	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("X-Taxpayer", tp.String())
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	return e.serve(req)
+}
+
+// req builds a request for taxpayer A.
+func (e env) req(t *testing.T, method, path string, body *bytes.Buffer, contentType string) *http.Request {
+	t.Helper()
+	req := httptest.NewRequest(method, path, body)
+	req.Header.Set("X-Taxpayer", e.tpA.String())
+	req.Header.Set("Content-Type", contentType)
+	return req
+}
+
+func (e env) serve(req *http.Request) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	e.mux.ServeHTTP(rec, req)
 	return rec
@@ -240,5 +255,47 @@ func TestReceiptsList(t *testing.T) {
 	decode(t, rec, &page)
 	if rec.Code != http.StatusOK || page.Total != 1 || page.Items[0].VendorName != "Akaryakıt A.Ş." || page.Items[0].TotalAmount != "1250.00" {
 		t.Fatalf("receipts: %d %+v", rec.Code, page)
+	}
+}
+
+// İmleçli sayfalama (#182): mükellef paneli de imleçle eksiksiz gezilir.
+func TestTaxpayerInvoiceCursorPagination(t *testing.T) {
+	e := setup(t)
+	if _, err := e.d.Pool.Exec(context.Background(), `
+		INSERT INTO invoices (taxpayer_id, source_system, source_id, capture_method, invoice_number,
+			direction, type, issue_date, period, currency, tax_summary_source)
+		SELECT $1, 'test', 'cur-' || g, 'api', 'CUR' || g, 'incoming', 'SATIS',
+			DATE '2025-03-01' + (g / 2), '2025-03', 'TRY', 'header_estimate'
+		FROM generate_series(1, 6) g`, e.tpAID); err != nil {
+		t.Fatal(err)
+	}
+	var all invoicePage
+	decode(t, e.do(t, "GET", "/v1/taxpayer/invoices?limit=100", e.tpA, nil, ""), &all)
+	if all.Total != 7 || all.NextCursor != nil {
+		t.Fatalf("all = %d %v", all.Total, all.NextCursor)
+	}
+	var got []uuid.UUID
+	path := "/v1/taxpayer/invoices?limit=3"
+	for i := 0; i < 5; i++ {
+		var p invoicePage
+		decode(t, e.do(t, "GET", path, e.tpA, nil, ""), &p)
+		for _, it := range p.Items {
+			got = append(got, it.UUID)
+		}
+		if p.NextCursor == nil {
+			break
+		}
+		path = "/v1/taxpayer/invoices?limit=3&cursor=" + *p.NextCursor
+	}
+	if len(got) != 7 {
+		t.Fatalf("got %d rows", len(got))
+	}
+	for i, it := range all.Items {
+		if got[i] != it.UUID {
+			t.Fatalf("row %d differs", i)
+		}
+	}
+	if rec := e.do(t, "GET", "/v1/taxpayer/invoices?cursor=xx", e.tpA, nil, ""); rec.Code != http.StatusBadRequest {
+		t.Fatalf("bad cursor = %d", rec.Code)
 	}
 }

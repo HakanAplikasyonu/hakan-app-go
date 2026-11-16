@@ -2,7 +2,7 @@ import { Notice } from '@/components/ui';
 
 import { useReceipts } from './provider';
 
-/** Kuyruğun durumu: bağlantı yok, bekleyen, sunucuda yeri olmayan fişler. */
+/** Kuyruğun durumu: bağlantı yok, bekleyen, şimdilik gönderilemeyen fişler. */
 export function QueueBanner() {
   const { online, summary } = useReceipts();
   if (!online && summary.waiting + summary.blocked > 0) {
@@ -12,7 +12,7 @@ export function QueueBanner() {
   if (summary.blocked > 0) {
     return (
       <Notice tone="info">
-        {summary.blocked} fiş telefonda bekliyor: müşavir sistemine mükellef tarafından gönderim henüz açılmadı. Açıldığında kendiliğinden gönderilecek.
+        {summary.blocked} fiş telefonda bekliyor: şirketinizin bağlı bir müşavirlik ofisi yok ya da sunucu şu an fiş kabul etmiyor. Ofis bağlanınca kendiliğinden gönderilecek.
       </Notice>
     );
   }

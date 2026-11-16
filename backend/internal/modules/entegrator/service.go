@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
@@ -144,7 +145,7 @@ func New(pool *pgxpool.Pool, vault secrets.Vault, store ObjectStore, cfg Config,
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	s := &Service{pool: pool, q: db.New(pool), vault: vault, store: store, cfg: cfg.withDefaults(), now: time.Now, log: log}
+	s := &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, store: store, cfg: cfg.withDefaults(), now: time.Now, log: log}
 	s.open = s.vaultOpener
 	return s
 }
@@ -313,7 +314,7 @@ func (s *Service) lock(ctx context.Context, connID int64) (func(), error) {
 		return nil, err
 	}
 	var ok bool
-	if err := pc.QueryRow(ctx, "SELECT pg_try_advisory_lock($1::int, $2::int)", lockKey, int32(connID)).Scan(&ok); err != nil {
+	if err := pc.QueryRow(ctx, "SELECT pg_try_advisory_lock($1::int, $2::int)", lockKey, int32(connID)).Scan(&ok); err != nil { //nolint:gosec // lock key half: an id wraps mod 2^32, a collision only serialises two syncs
 		pc.Release()
 		return nil, err
 	}
@@ -322,7 +323,7 @@ func (s *Service) lock(ctx context.Context, connID int64) (func(), error) {
 		return nil, ErrBusy
 	}
 	return func() {
-		_, _ = pc.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, $2::int)", lockKey, int32(connID))
+		_, _ = pc.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, $2::int)", lockKey, int32(connID)) //nolint:gosec // same key as the lock above
 		pc.Release()
 	}, nil
 }

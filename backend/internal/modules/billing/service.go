@@ -13,8 +13,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 // DefaultPlan applies to an office without an organization_billing row.
@@ -41,7 +43,9 @@ type Service struct {
 }
 
 // NewService builds the service.
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool, q: db.New(pool)} }
+func NewService(pool *pgxpool.Pool) *Service {
+	return &Service{pool: pool, q: database.QueriesFor(pool)}
+}
 
 func num(d decimal.Decimal) pgtype.Numeric {
 	var n pgtype.Numeric
@@ -167,8 +171,15 @@ func (s *Service) Usage(ctx context.Context, orgID int64, period string) (Usage,
 	if err != nil {
 		return Usage{}, err
 	}
-	rows, err := s.q.ListActiveTaxpayersInPeriod(ctx, db.ListActiveTaxpayersInPeriodParams{
-		OrganizationID: orgID, PeriodEnd: pgtype.Timestamptz{Time: end, Valid: true}, PeriodStart: pgtype.Timestamptz{Time: start, Valid: true},
+	// The bill counts every active taxpayer of the office, whoever looks:
+	// not limited to the engagements the caller may see (issue #166).
+	var rows []db.ListActiveTaxpayersInPeriodRow
+	err = rls.System(ctx, s.pool, "billing: office-wide active taxpayer count (D9)", func(ctx context.Context, tx pgx.Tx) error {
+		var err error
+		rows, err = db.New(tx).ListActiveTaxpayersInPeriod(ctx, db.ListActiveTaxpayersInPeriodParams{
+			OrganizationID: orgID, PeriodEnd: pgtype.Timestamptz{Time: end, Valid: true}, PeriodStart: pgtype.Timestamptz{Time: start, Valid: true},
+		})
+		return err
 	})
 	if err != nil {
 		return Usage{}, err

@@ -12,6 +12,7 @@ import {
   pickTaxpayer,
   registerWithToken,
   uiLogin,
+  waitForUploads,
 } from "./lib";
 import { exportAndDownload, newApprovedEntry } from "./journal";
 
@@ -106,19 +107,7 @@ test("UBL yükle: Atlas'ın 7 faturası sunucuda işleniyor", async () => {
   await office.locator('input[type="file"]').setInputFiles(ublFiles);
   await office.getByRole("button", { name: `${ublFiles.length} dosyayı yükle` }).click();
   await expect(office.getByText("Yükleme raporu").first()).toBeVisible({ timeout: 60_000 });
-  // Her dosya ayrı bir iş: hepsi bitmeli ve toplam 7 fatura eklenmeli.
-  await expect
-    .poll(
-      async () => {
-        const jobs = await api.json<{ items: { status: string; report?: { added: number } }[] }>(
-          await api.get(`/v1/tenant/engagements/${atlas}/ubl-uploads?limit=50`),
-        );
-        if (jobs.items.some((j) => j.status !== "done")) return -1;
-        return jobs.items.reduce((n, j) => n + (j.report?.added ?? 0), 0);
-      },
-      { timeout: 90_000 },
-    )
-    .toBe(ublFiles.length);
+  await waitForUploads(api, atlas, ublFiles.length);
 
   await office.goto(officePath(`/invoices?taxpayer=${atlas}`));
   for (const no of ["ATL2026000000101", "ATL2026000000102", "ATL2026000000106"]) {

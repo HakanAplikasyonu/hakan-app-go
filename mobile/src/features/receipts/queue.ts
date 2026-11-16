@@ -6,8 +6,12 @@
  *   - 2xx              → uploaded (OCR sonucu `result`)
  *   - ağ / 5xx / 429   → pending, artan bekleme (30 sn … 30 dk)
  *   - 401              → pending (oturum yenilenince tekrar)
- *   - 404 / 405        → blocked: sunucu bu uç noktayı henüz sunmuyor (6 saatte bir dener)
+ *   - 404 / 405 / 501  → blocked: sunucu bu uç noktayı sunmuyor (eski sürüm; 6 saatte bir dener)
+ *   - 409 NO_ACTIVE_ENGAGEMENT → blocked: şirketin etkin ofisi yok, ofis bağlanınca yüklenir
  *   - diğer 4xx        → failed: kullanıcı tekrar dener ya da siler
+ *
+ * Uç nokta: POST /v1/taxpayer/receipts (#199). Aynı fotoğraf aynı
+ * Idempotency-Key ile tekrar gönderilirse sunucu ilk kaydı 200 ile döner.
  */
 export type ReceiptKind = 'expense_receipt' | 'fuel_receipt' | 'z_report';
 
@@ -29,6 +33,12 @@ export type ReceiptResult = {
 
 export type Correction = { field: string; value: string; note?: string };
 
+/** Where a queued photo goes: a receipt (default) or a document task (#200). */
+export type QueueTarget = { type: 'task'; taskUuid: string };
+
+/** The server's answer to a task photo (subset of `DocumentTaskUploadResult`). */
+export type TaskUploadResult = { uploadUuid: string; matched: boolean };
+
 export type QueueItem = {
   /** Client id; also sent as `Idempotency-Key`. */
   id: string;
@@ -48,6 +58,12 @@ export type QueueItem = {
   /** Corrections the user proposed for OCR fields (sent with the next sync). */
   corrections: Correction[];
   correctionsSent: boolean;
+  /** Why the server refused the corrections (not retried). */
+  correctionsError?: string | null;
+  /** Set for a document task photo (#200); absent = receipt. */
+  target?: QueueTarget | null;
+  /** Result of a task photo upload. */
+  taskUpload?: TaskUploadResult | null;
 };
 
 export type FailureKind = 'network' | 'server' | 'auth' | 'unsupported' | 'rejected';
@@ -56,8 +72,17 @@ const SECOND = 1000;
 const MINUTE = 60 * SECOND;
 export const BLOCKED_RETRY_MS = 6 * 60 * MINUTE;
 
-export function newItem(input: { id: string; taxpayer: string; kind: ReceiptKind; fileUri: string; mimeType: string; now: number }): QueueItem {
+export function newItem(input: {
+  id: string;
+  taxpayer: string;
+  kind: ReceiptKind;
+  fileUri: string;
+  mimeType: string;
+  now: number;
+  target?: QueueTarget | null;
+}): QueueItem {
   return {
+    target: input.target ?? null,
     id: input.id,
     taxpayer: input.taxpayer,
     kind: input.kind,
@@ -79,12 +104,24 @@ export function backoffMs(attempts: number): number {
   return Math.min(30 * SECOND * 2 ** Math.max(0, attempts - 1), 30 * MINUTE);
 }
 
-/** Classifies an HTTP status (0 = no response) into a failure kind. */
-export function classify(status: number): FailureKind {
+/** Classifies an HTTP status (0 = no response) and error code into a failure kind. */
+export function classify(status: number, code?: string): FailureKind {
   if (status === 0 || status === 429 || status >= 500) return status === 0 ? 'network' : 'server';
   if (status === 401) return 'auth';
   if (status === 404 || status === 405 || status === 501) return 'unsupported';
+  // The company has no active office yet: keep the photo until it has one.
+  if (status === 409 && code === 'NO_ACTIVE_ENGAGEMENT') return 'unsupported';
   return 'rejected';
+}
+
+/** What to do after sending corrections failed with this status (0 = no response). */
+export function correctionOutcome(status: number): 'retry' | 'drop' {
+  return status === 0 || status === 401 || status === 429 || status >= 500 ? 'retry' : 'drop';
+}
+
+/** Corrections were sent, or refused for good (`error`). */
+export function markCorrections(item: QueueItem, error: string | null = null): QueueItem {
+  return { ...item, correctionsSent: true, correctionsError: error };
 }
 
 /** Items of this company to upload now, oldest first. A forced run ignores the backoff. */
@@ -102,6 +139,23 @@ export function markUploading(item: QueueItem): QueueItem {
 
 export function markUploaded(item: QueueItem, result: ReceiptResult): QueueItem {
   return { ...item, status: 'uploaded', result, lastError: null, nextAttemptAt: 0 };
+}
+
+/** A document task photo reached the server (#200). */
+export function markTaskUploaded(item: QueueItem, result: TaskUploadResult): QueueItem {
+  return { ...item, status: 'uploaded', taskUpload: result, lastError: null, nextAttemptAt: 0 };
+}
+
+/** Receipt photos only (task photos are shown on their task). */
+export function receiptItems(items: readonly QueueItem[]): QueueItem[] {
+  return items.filter((i) => !i.target);
+}
+
+/** Queued photos of one task, oldest first. */
+export function taskItems(items: readonly QueueItem[], taxpayer: string, taskUuid: string): QueueItem[] {
+  return items
+    .filter((i) => i.taxpayer === taxpayer && i.target?.type === 'task' && i.target.taskUuid === taskUuid)
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export function markFailed(item: QueueItem, kind: FailureKind, message: string, now: number): QueueItem {
@@ -131,7 +185,7 @@ export function recover(items: readonly QueueItem[]): QueueItem[] {
 
 export function addCorrection(item: QueueItem, c: Correction): QueueItem {
   const rest = item.corrections.filter((x) => x.field !== c.field);
-  return { ...item, corrections: [...rest, c], correctionsSent: false };
+  return { ...item, corrections: [...rest, c], correctionsSent: false, correctionsError: null };
 }
 
 /** Uploaded items whose corrections still have to reach the server. */

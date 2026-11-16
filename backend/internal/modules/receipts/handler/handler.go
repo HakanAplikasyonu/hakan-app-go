@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/google/uuid"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -26,42 +26,58 @@ func New(svc *usecase.Service) *Handler { return &Handler{svc: svc} }
 
 // Capture: POST .../receipts (multipart: image, kind).
 func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
+	name, data, ok := ReadImage(w, r)
+	if !ok {
+		return
+	}
+	v, err := h.svc.CaptureKeyed(r.Context(), engagementctx.Must(r.Context()), userID(r), name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+	WriteCapture(w, r, v, err)
+}
+
+// ReadImage reads the multipart "image" field (max 10 MB). On failure it has
+// written the 400 and returns ok=false. Shared with the taxpayer panel (#199).
+func ReadImage(w http.ResponseWriter, r *http.Request) (string, []byte, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, usecase.MaxImageBytes+1<<20)
 	if err := r.ParseMultipartForm(4 << 20); err != nil {
 		response.BadRequest(w, r, response.CodeValidationError, "multipart form with an image is required (max 10 MB)")
-		return
+		return "", nil, false
 	}
 	f, hdr, err := r.FormFile("image")
 	if err != nil {
 		response.BadRequest(w, r, response.CodeValidationError, "image is required")
-		return
+		return "", nil, false
 	}
 	defer func() { _ = f.Close() }()
 	data, err := io.ReadAll(io.LimitReader(f, usecase.MaxImageBytes+1))
 	if err != nil {
 		response.BadRequest(w, r, response.CodeValidationError, "image could not be read")
-		return
+		return "", nil, false
 	}
-	v, err := h.svc.Capture(r.Context(), engagementctx.Must(r.Context()), userID(r), hdr.Filename, data, r.FormValue("kind"))
+	return hdr.Filename, data, true
+}
+
+// WriteCapture answers a capture: 201, or 200 when it was replayed from an
+// earlier upload with the same Idempotency-Key.
+func WriteCapture(w http.ResponseWriter, r *http.Request, v usecase.View, err error) {
 	if err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
-	response.JSON(w, r, http.StatusCreated, v)
+	status := http.StatusCreated
+	if v.Replayed {
+		status = http.StatusOK
+	}
+	response.JSON(w, r, status, v)
 }
 
 // List: GET .../receipts.
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	limit, offset := apiquery.DefaultLimit, int32(0)
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= int(apiquery.MaxLimit) {
-		limit = int32(v)
-	}
-	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v >= 0 && v <= 1_000_000 {
-		offset = int32(v)
-	}
+	limit = intconv.ParseInt32(r.URL.Query().Get("limit"), limit, 1, apiquery.MaxLimit)
+	offset = intconv.ParseInt32(r.URL.Query().Get("offset"), offset, 0, 1_000_000)
 	items, total, err := h.svc.List(r.Context(), engagementctx.Must(r.Context()), r.URL.Query().Get("status"), limit, offset)
 	if err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, apiquery.NewPage(items, total, limit, offset))
@@ -94,7 +110,7 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, approve bool) {
 func (h *Handler) Vehicles(w http.ResponseWriter, r *http.Request) {
 	items, err := h.svc.Vehicles(r.Context(), engagementctx.Must(r.Context()))
 	if err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
@@ -111,7 +127,7 @@ func (h *Handler) AddVehicle(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := h.svc.AddVehicle(r.Context(), engagementctx.Must(r.Context()), userID(r), in)
 	if err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusCreated, v)
@@ -124,7 +140,7 @@ func (h *Handler) DeleteVehicle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.svc.DeleteVehicle(r.Context(), engagementctx.Must(r.Context()), id); err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -132,13 +148,14 @@ func (h *Handler) DeleteVehicle(w http.ResponseWriter, r *http.Request) {
 
 func reply(w http.ResponseWriter, r *http.Request, v usecase.View, err error) {
 	if err != nil {
-		writeError(w, r, err)
+		WriteError(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, v)
 }
 
-func writeError(w http.ResponseWriter, r *http.Request, err error) {
+// WriteError maps service errors to responses.
+func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	response.RecordFailure(w, err)
 	switch {
 	case errors.Is(err, usecase.ErrNotFound):
@@ -147,6 +164,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
+	case errors.Is(err, usecase.ErrNoReviewQueue):
+		response.Error(w, r, http.StatusServiceUnavailable, "REVIEW_UNAVAILABLE", "the review queue is not available")
 	case errors.Is(err, extract.ErrAIUnavailable):
 		response.Error(w, r, http.StatusServiceUnavailable, "AI_UNAVAILABLE", "AI is not configured")
 	default:

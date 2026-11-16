@@ -3,20 +3,13 @@
  * çıkan işler (yerel). Pure: tested with node --test.
  */
 import { fieldLabel, fieldsToCheck, kindLabels } from '../receipts/fields.ts';
+import type { components } from '../../core/api/schema';
 import type { QueueItem, ReceiptKind } from '../receipts/queue.ts';
 
-/** Server task (proposed `GET /v1/taxpayer/tasks`, see the PR's decision list). */
-export type ServerTask = {
-  uuid: string;
-  kind: 'missing_document' | string;
-  title: string;
-  description?: string | null;
-  due_date?: string | null;
-  /** For missing documents: what to photograph. */
-  document_kind?: ReceiptKind | null;
-};
+/** Server task: `GET /v1/taxpayer/document-tasks` (#200). */
+export type ServerTask = components['schemas']['DocumentTask'];
 
-export type TaskAction = { type: 'receipt'; id: string } | { type: 'capture'; kind: ReceiptKind | null };
+export type TaskAction = { type: 'receipt'; id: string } | { type: 'capture'; kind: ReceiptKind | null } | { type: 'task'; uuid: string };
 
 export type Task = {
   id: string;
@@ -26,12 +19,14 @@ export type Task = {
   action: TaskAction;
   /** YYYY-MM-DD */
   due: string | null;
+  overdue?: boolean;
 };
 
 export function localTasks(items: readonly QueueItem[], taxpayer: string): Task[] {
   const out: Task[] = [];
   for (const i of items) {
-    if (i.taxpayer !== taxpayer) continue;
+    // Task photos are shown on their task, not as tasks of their own.
+    if (i.taxpayer !== taxpayer || i.target) continue;
     if (i.status === 'failed') {
       out.push({
         id: `failed:${i.id}`,
@@ -58,19 +53,53 @@ export function localTasks(items: readonly QueueItem[], taxpayer: string): Task[
   return out;
 }
 
+const taskTitles: Record<ServerTask['kind'], string> = {
+  undocumented_payment: 'Ödeme için belge',
+  uninvoiced_collection: 'Tahsilat için fatura',
+};
+
+/** Turkish money text: "12.500,00 TRY". */
+export function moneyText(amount: string, currency: string): string {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return `${amount} ${currency}`;
+  const text = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(n));
+  return `${text} ${currency}`;
+}
+
+/** One line about the bank transaction the office is asking about. */
+export function transactionLine(t: ServerTask): string {
+  const b = t.bank_transaction;
+  const who = b.counterparty_name || b.description;
+  return [moneyText(b.amount, b.currency), who, b.transaction_date].filter(Boolean).join(' · ');
+}
+
 export function serverTasks(list: readonly ServerTask[]): Task[] {
-  return list.map((t) => ({
-    id: `server:${t.uuid}`,
-    source: 'server',
-    title: t.title,
-    detail: t.description ?? '',
-    action: { type: 'capture', kind: t.document_kind ?? null },
-    due: t.due_date ?? null,
-  }));
+  return list
+    .filter((t) => t.status === 'open' || t.status === 'submitted')
+    .map((t) => ({
+      id: `server:${t.uuid}`,
+      source: 'server' as const,
+      title: taskTitles[t.kind] ?? 'Eksik belge',
+      detail: [transactionLine(t), t.status === 'submitted' ? 'Gönderildi, müşavir kontrol ediyor' : t.note].filter(Boolean).join('\n'),
+      action: { type: 'task' as const, uuid: t.uuid },
+      due: t.due_at ? t.due_at.slice(0, 10) : null,
+      overdue: t.overdue,
+    }));
 }
 
 /** Server tasks first (by due date, undated last), then local ones. */
 export function mergeTasks(server: readonly Task[], local: readonly Task[]): Task[] {
   const byDue = [...server].sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999'));
   return [...byDue, ...local];
+}
+
+const taskStatusLabels: Record<ServerTask['status'], string> = {
+  open: 'Bekliyor',
+  submitted: 'Gönderildi',
+  matched: 'Tamamlandı',
+  cancelled: 'Kapatıldı',
+};
+
+export function taskStatusLabel(status: ServerTask['status']): string {
+  return taskStatusLabels[status] ?? status;
 }

@@ -6,6 +6,8 @@ import {
   backoffMs,
   BLOCKED_RETRY_MS,
   classify,
+  correctionOutcome,
+  markCorrections,
   correctionsDue,
   due,
   markFailed,
@@ -100,4 +102,29 @@ test('summary counts per company', () => {
     item('e', T, 'tp2'),
   ];
   assert.deepEqual(summarize(list, 'tp1'), { waiting: 1, blocked: 1, failed: 1, uploaded: 1 });
+});
+
+test('classify: the receipt endpoint answers (#199)', () => {
+  assert.equal(classify(409, 'NO_ACTIVE_ENGAGEMENT'), 'unsupported');
+  assert.equal(classify(409, 'CONFLICT'), 'rejected');
+  assert.equal(classify(503), 'server');
+  assert.equal(classify(405), 'unsupported');
+  assert.equal(classify(400, 'VALIDATION_ERROR'), 'rejected');
+});
+
+test('corrections refused by the server are not retried; network errors are', () => {
+  assert.equal(correctionOutcome(0), 'retry');
+  assert.equal(correctionOutcome(503), 'retry');
+  assert.equal(correctionOutcome(401), 'retry');
+  assert.equal(correctionOutcome(400), 'drop');
+  assert.equal(correctionOutcome(409), 'drop');
+  let a = markUploaded(item('c', T), ok);
+  a = addCorrection(a, { field: 'total_amount', value: 'abc' });
+  a = markCorrections(a, 'total_amount value "abc" is not valid');
+  assert.equal(a.correctionsSent, true);
+  assert.deepEqual(correctionsDue([a], 'tp1'), []);
+  // A new correction clears the refusal and is sent again.
+  a = addCorrection(a, { field: 'total_amount', value: '1.250,00' });
+  assert.equal(a.correctionsError, null);
+  assert.deepEqual(correctionsDue([a], 'tp1').map((i) => i.id), ['c']);
 });

@@ -179,3 +179,58 @@ func TestOfficeSeesOnlyVisibleInvoices(t *testing.T) {
 		t.Fatalf("earlier office's invoice UBL = %d", w.Code)
 	}
 }
+
+// İmleçli sayfalama (#182): imleçle gezilen sayfalar OFFSET sırasıyla aynı,
+// eksiksiz ve tekrarsızdır; aynı tarihli faturalar id ile ayrılır.
+func TestOfficeInvoiceCursorPagination(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	// 11 more invoices, three per date, so ties on issue_date are crossed.
+	if _, err := e.d.Pool.Exec(ctx, `
+		INSERT INTO invoices (taxpayer_id, source_system, source_id, capture_method, invoice_number,
+			direction, type, issue_date, period, currency, tax_summary_source)
+		SELECT $1, 'test', 'cur-' || g, 'api', 'CUR' || g, 'outgoing', 'SATIS',
+			DATE '2025-03-01' + (g / 3), '2025-03', 'TRY', 'header_estimate'
+		FROM generate_series(1, 11) g`, e.scope.TaxpayerID); err != nil {
+		t.Fatal(err)
+	}
+	all := decode[page](t, e.call(t, e.h.list, "/x?limit=100", nil))
+	if all.Total != 12 || len(all.Items) != 12 || all.NextCursor != nil {
+		t.Fatalf("offset page = total %d items %d next %v", all.Total, len(all.Items), all.NextCursor)
+	}
+
+	var got []string
+	path := "/x?limit=5"
+	for i := 0; i < 10; i++ {
+		p := decode[page](t, e.call(t, e.h.list, path, nil))
+		if p.Total != 12 {
+			t.Fatalf("total on page %d = %d", i, p.Total)
+		}
+		for _, it := range p.Items {
+			got = append(got, it.UUID.String())
+		}
+		if p.NextCursor == nil {
+			break
+		}
+		path = "/x?limit=5&cursor=" + *p.NextCursor
+	}
+	if len(got) != 12 {
+		t.Fatalf("cursor pages returned %d rows", len(got))
+	}
+	for i, it := range all.Items {
+		if got[i] != it.UUID.String() {
+			t.Fatalf("row %d: cursor %s, offset %s", i, got[i], it.UUID)
+		}
+	}
+	// The warning count is kept on cursor pages too.
+	warned := 0
+	for _, it := range all.Items {
+		warned += int(it.OpenWarnings)
+	}
+	if warned != 1 {
+		t.Fatalf("open warnings = %d", warned)
+	}
+	if w := e.call(t, e.h.list, "/x?cursor=bozuk", nil); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "INVALID_CURSOR") {
+		t.Fatalf("bad cursor = %d %s", w.Code, w.Body)
+	}
+}

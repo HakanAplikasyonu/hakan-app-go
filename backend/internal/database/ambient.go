@@ -21,10 +21,27 @@ import (
 // back to the pool: the runtime role, which sees nothing of an enforced
 // table, so the fallback fails closed.
 type Ambient struct {
-	Pool interface {
-		db.DBTX
-		Begin(ctx context.Context) (pgx.Tx, error)
-	}
+	Pool Pool
+}
+
+// Pool is what Ambient wraps: a pool (or anything with statements and Begin).
+type Pool interface {
+	db.DBTX
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
+// QueriesFor returns sqlc Queries that join the context's transaction
+// (rls.WithScope / rls.System) and use pool otherwise.
+func QueriesFor(pool Pool) *db.Queries { return db.New(Ambient{Pool: pool}) }
+
+// Begin starts a transaction that stays in the caller's scope: a savepoint
+// on the context's transaction when there is one, else a new transaction on
+// pool. Use it instead of pool.Begin.
+func Begin(ctx context.Context, pool Pool) (pgx.Tx, error) { return Ambient{Pool: pool}.Begin(ctx) }
+
+// BeginFunc is pgx.BeginFunc with Begin's scope rule.
+func BeginFunc(ctx context.Context, pool Pool, fn func(pgx.Tx) error) error {
+	return pgx.BeginFunc(ctx, Ambient{Pool: pool}, fn)
 }
 
 var _ db.DBTX = Ambient{}

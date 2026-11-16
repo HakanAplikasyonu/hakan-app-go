@@ -2,15 +2,17 @@ package engagements
 
 import (
 	"errors"
+	"math"
 	"net/http"
-	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
-	"github.com/google/uuid"
 )
 
 // Handler serves /v1/tenant/engagements.
@@ -135,12 +137,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 
 func pageParams(r *http.Request) (int32, int32) {
 	limit, offset := int32(50), int32(0)
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 100 {
-		limit = int32(v)
-	}
-	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v >= 0 {
-		offset = int32(v)
-	}
+	limit = intconv.ParseInt32(r.URL.Query().Get("limit"), limit, 1, 100)
+	offset = intconv.ParseInt32(r.URL.Query().Get("offset"), offset, 0, math.MaxInt32)
 	return limit, offset
 }
 

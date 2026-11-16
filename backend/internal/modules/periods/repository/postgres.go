@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	invoicerepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
@@ -32,12 +33,12 @@ type Postgres struct {
 }
 
 // New builds the store.
-func New(pool DB) *Postgres { return &Postgres{pool: pool, q: db.New(pool)} }
+func New(pool DB) *Postgres { return &Postgres{pool: pool, q: database.QueriesFor(pool)} }
 
 var _ usecase.Store = (*Postgres)(nil)
 
 func (p *Postgres) inTx(ctx context.Context, fn func(tx pgx.Tx, q *db.Queries) error) error {
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}

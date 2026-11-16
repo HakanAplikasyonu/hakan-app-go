@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -32,7 +33,7 @@ func NewPostgres(pool *pgxpool.Pool, q *db.Queries) *Postgres {
 }
 
 func (r *Postgres) withTx(ctx context.Context, fn func(q *db.Queries) error) error {
-	tx, err := r.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, r.pool)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}

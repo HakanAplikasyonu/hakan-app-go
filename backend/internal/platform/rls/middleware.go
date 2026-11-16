@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -36,6 +37,12 @@ func Middleware(db Beginner, taxpayers TaxpayerLister, log *slog.Logger) func(ht
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
+			if _, scoped := dbtx.Tx(ctx); scoped {
+				// Already in a request scope (the tenant scope opened by
+				// RequireOrganization): nothing to add.
+				next.ServeHTTP(w, r)
+				return
+			}
 			s := FromRequest(ctx)
 			if s.OrganizationID > 0 && len(s.TaxpayerIDs) == 0 && taxpayers != nil {
 				ids, err := taxpayers(ctx, s.OrganizationID, s.UserID, s.EngagementsReadAll)
@@ -44,6 +51,25 @@ func Middleware(db Beginner, taxpayers TaxpayerLister, log *slog.Logger) func(ht
 					return
 				}
 				s.TaxpayerIDs = ids
+			}
+			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+				// Reads stream (file downloads, PDFs): nothing to commit
+				// before the answer.
+				sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
+				err := WithScope(ctx, db, s, func(ctx context.Context, _ pgx.Tx) error {
+					next.ServeHTTP(sw, r.WithContext(ctx))
+					if sw.status >= http.StatusBadRequest {
+						return errRollback
+					}
+					return nil
+				})
+				if err != nil && !errors.Is(err, errRollback) {
+					log.ErrorContext(ctx, "rls_scope_failed", "error", err, "path", r.URL.Path)
+					if !sw.wrote {
+						response.InternalErr(w, r, err, "Could not complete the request")
+					}
+				}
+				return
 			}
 			buf := &bufferedWriter{header: http.Header{}, status: http.StatusOK}
 			err := WithScope(ctx, db, s, func(ctx context.Context, _ pgx.Tx) error {
@@ -96,4 +122,46 @@ func (b *bufferedWriter) flush(w http.ResponseWriter) {
 	}
 	w.WriteHeader(b.status)
 	_, _ = w.Write(b.body.Bytes())
+}
+
+// statusWriter records the status of a streamed answer.
+type statusWriter struct {
+	http.ResponseWriter
+	status int
+	wrote  bool
+}
+
+func (s *statusWriter) WriteHeader(code int) {
+	if !s.wrote {
+		s.status = code
+		s.wrote = true
+	}
+	s.ResponseWriter.WriteHeader(code)
+}
+
+func (s *statusWriter) Write(p []byte) (int, error) {
+	if !s.wrote {
+		s.wrote = true
+	}
+	return s.ResponseWriter.Write(p)
+}
+
+// Flush keeps streaming handlers working.
+func (s *statusWriter) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Narrow sets the taxpayers of the request's scope to one taxpayer (the
+// engagement's), on the transaction the context carries. Without one it
+// does nothing. RequireEngagement calls it: the scope opened for the office
+// is narrowed to the engagement.
+func Narrow(ctx context.Context, taxpayerID int64) error {
+	tx, ok := dbtx.Tx(ctx)
+	if !ok || taxpayerID <= 0 {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `SELECT set_config('app.taxpayer_ids', $1, true)`, idArray([]int64{taxpayerID}))
+	return err
 }

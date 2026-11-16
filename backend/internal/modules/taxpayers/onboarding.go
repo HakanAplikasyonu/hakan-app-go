@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	notifmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
@@ -79,7 +80,7 @@ func NewOnboarding(pool *pgxpool.Pool, notifier Notifier, inv orgctx.Invalidator
 		log = slog.Default()
 	}
 	return &Onboarding{
-		pool: pool, q: db.New(pool), notifier: notifier, inv: inv, cfg: cfg, log: log,
+		pool: pool, q: database.QueriesFor(pool), notifier: notifier, inv: inv, cfg: cfg, log: log,
 		now: time.Now, sleep: sleepCtx,
 	}
 }
@@ -449,7 +450,7 @@ func (o *Onboarding) reject(ctx context.Context, requestID, userID int64) error 
 }
 
 func (o *Onboarding) withTx(ctx context.Context, fn func(q *db.Queries) error) error {
-	tx, err := o.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, o.pool)
 	if err != nil {
 		return err
 	}

@@ -4,12 +4,14 @@ import {
   Api,
   DEMO,
   deriveUbl,
+  engagementOf,
   mailToken,
   pickTaxpayer,
   registerWithToken,
   uiLogin,
   uniqueEmail,
   uniqueVkn,
+  waitForUploads,
 } from "./lib";
 import { exportAndDownload, newApprovedEntry } from "./journal";
 
@@ -106,10 +108,16 @@ test("UBL yükle: yeni mükellefin faturaları işleniyor ve listede", async () 
   await owner.locator('input[type="file"]').setInputFiles(files);
   await owner.getByRole("button", { name: "2 dosyayı yükle" }).click();
   await expect(owner.getByText("Eklendi").first()).toBeVisible({ timeout: 60_000 });
+  const api = await Api.login(ownerEmail, password, slug);
+  try {
+    await waitForUploads(api, await engagementOf(api, taxpayer.title), files.length);
+  } finally {
+    await api.dispose();
+  }
 
   await owner.goto(`/t/${slug}/invoices`);
   await pickTaxpayer(owner, taxpayer.title);
-  await expect(owner.getByText("ATL2026000000101").first()).toBeVisible({ timeout: 60_000 });
+  await expect(owner.getByText("ATL2026000000101").first()).toBeVisible();
   await expect(owner.getByText("ATL2026000000102").first()).toBeVisible();
 });
 

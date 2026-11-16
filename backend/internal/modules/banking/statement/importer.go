@@ -15,8 +15,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // Producer is the data_warning producer name of this channel (05 §1:
@@ -122,7 +124,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		_, rep.Encoding = Decode(head(req.Data, 4096))
 	}
 
-	q := db.New(im.pool)
+	q := database.QueriesFor(im.pool)
 	var blocks []resolved
 	var unknown []string
 	for _, st := range sts {
@@ -143,7 +145,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		return rep, &UnknownAccountError{Accounts: unknown}
 	}
 
-	tx, err := im.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, im.pool)
 	if err != nil {
 		return rep, err
 	}
@@ -288,7 +290,7 @@ func (im *Importer) importBlock(ctx context.Context, tx pgx.Tx, req Request, imp
 		params := db.UpsertBankDailySummaryParams{
 			TaxpayerID: req.TaxpayerID, CashBoxID: box.ID, Date: pgtype.Date{Time: st.Closing.Date, Valid: true},
 			ClosingBalance: numeric(st.Closing.Amount), TotalCredit: numeric(credit), TotalDebit: numeric(debit),
-			TransactionCount: pgtype.Int4{Int32: int32(len(st.Lines)), Valid: true}, Source: banking.CaptureMT940,
+			TransactionCount: pgtype.Int4{Int32: intconv.Int32(len(st.Lines)), Valid: true}, Source: banking.CaptureMT940,
 		}
 		if st.Opening != nil {
 			params.OpeningBalance = numeric(st.Opening.Amount)

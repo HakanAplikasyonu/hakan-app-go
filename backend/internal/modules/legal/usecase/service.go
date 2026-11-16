@@ -21,6 +21,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 )
 
@@ -411,7 +412,7 @@ type Pool interface {
 
 // NewPostgres builds the service over a pool, with transactional publish.
 func NewPostgres(pool Pool) *Service {
-	return New(db.New(pool), func(ctx context.Context, fn func(q Queries) error) error {
-		return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error { return fn(db.New(tx)) })
+	return New(database.QueriesFor(pool), func(ctx context.Context, fn func(q Queries) error) error {
+		return database.BeginFunc(ctx, pool, func(tx pgx.Tx) error { return fn(db.New(tx)) })
 	})
 }

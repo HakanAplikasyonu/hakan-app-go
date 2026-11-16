@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
@@ -95,7 +96,7 @@ type matchInvoice struct {
 // "undocumented".
 func (s *Service) Run(ctx context.Context, sub Subject, period string) (Result, error) {
 	res := Result{Period: period}
-	q := db.New(s.pool)
+	q := database.QueriesFor(s.pool)
 	txns, err := q.ListBankTransactionsForMatching(ctx, db.ListBankTransactionsForMatchingParams{TaxpayerID: sub.TaxpayerID, Period: period})
 	if err != nil {
 		return res, err
@@ -176,7 +177,7 @@ func (s *Service) matchOne(ctx context.Context, q *db.Queries, sub Subject, t db
 	d := Decide(m, cands, s.opt)
 	switch d.Outcome {
 	case OutcomeAuto:
-		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 			return writeMatches(ctx, db.New(tx), sub.TaxpayerID, m, d.Picks, "auto", nil)
 		})
 		return d.Outcome, err

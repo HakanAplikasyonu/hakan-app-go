@@ -53,12 +53,22 @@ func (r *Reviewer) SubmitField(ctx context.Context, f receipts.FieldReview) erro
 	if model == "" {
 		model = "unknown"
 	}
+	prov := review.Provenance{Origin: review.OriginModel, Model: model, Inputs: map[string]any{
+		"raw": f.Value.Raw, "valid": f.Value.Valid, "attachment_id": f.AttachmentID,
+	}}
+	if f.ProposedBy > 0 {
+		// The taxpayer typed the value in the mobile app (#199).
+		why = "Mükellef düzeltmesi"
+		if f.Note != "" {
+			why += ": " + f.Note
+		}
+		prov = review.Provenance{Origin: review.OriginInput, Inputs: map[string]any{
+			"raw": f.Value.Raw, "attachment_id": f.AttachmentID, "proposed_by": "taxpayer", "user_id": f.ProposedBy,
+		}}
+	}
 	_, err := r.svc.Submit(ctx, review.Subject{OrganizationID: f.OrganizationID, EngagementID: f.EngagementID, TaxpayerID: f.TaxpayerID}, review.Input{
 		Kind: Kind, TargetType: f.TargetType, TargetID: &targetID, TargetField: f.Field, Period: f.Period,
-		Value: raw, Confidence: decimal.NewFromFloat(f.Value.Confidence), Rationale: why,
-		Provenance: review.Provenance{Origin: review.OriginModel, Model: model, Inputs: map[string]any{
-			"raw": f.Value.Raw, "valid": f.Value.Valid, "attachment_id": f.AttachmentID,
-		}},
+		Value: raw, Confidence: decimal.NewFromFloat(f.Value.Confidence), Rationale: why, Provenance: prov,
 	})
 	return err
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 	"github.com/google/uuid"
 )
@@ -94,6 +95,12 @@ func requireEngagement(resolver engagementctx.Resolver, ended endedMode) func(ht
 				(ended == endedRefused || (ended == endedInArchive && !inArchive)) {
 				response.RecordFailure(w, engagementctx.ErrEnded)
 				response.Error(w, r, http.StatusForbidden, response.CodeEngagementEnded, "Engagement has ended")
+				return
+			}
+			// Narrow the request's row level security scope (opened by the
+			// organization step) to this engagement's taxpayer (issue #166).
+			if err := rls.Narrow(r.Context(), access.TaxpayerID); err != nil {
+				response.InternalErr(w, r, err, "")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(engagementctx.WithScope(r.Context(), engagementctx.Scope{

@@ -8,13 +8,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/model"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/resourcemeta"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
-	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -110,7 +112,7 @@ func (h *Handler) ListRules(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	response.JSON(w, r, http.StatusOK, apiquery.NewPage(items, int64(len(items)), int32(len(items)), 0))
+	response.JSON(w, r, http.StatusOK, apiquery.NewPage(items, int64(len(items)), intconv.Int32(len(items)), 0))
 }
 
 func (h *Handler) CreateRule(w http.ResponseWriter, r *http.Request) {

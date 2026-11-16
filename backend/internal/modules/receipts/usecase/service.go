@@ -20,9 +20,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
@@ -85,6 +87,11 @@ type FieldReview struct {
 	Value          extract.Value
 	Model          string
 	AttachmentID   int64
+	// ProposedBy is the user who typed the value (taxpayer correction,
+	// #199); 0 = read by the model.
+	ProposedBy int64
+	// Note is the proposer's comment.
+	Note string
 }
 
 // Reviewer sends a field to the review queue. Nil: no queue.
@@ -113,7 +120,7 @@ func New(pool DB, store ObjectStore, reader Reader, reviewer Reviewer, warnings 
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{pool: pool, q: db.New(pool), store: store, reader: reader, reviewer: reviewer, warnings: warnings, log: log}
+	return &Service{pool: pool, q: database.QueriesFor(pool), store: store, reader: reader, reviewer: reviewer, warnings: warnings, log: log}
 }
 
 // WithReviewer sets the review queue adapter.
@@ -123,6 +130,52 @@ var mediaTypes = map[string]bool{"image/jpeg": true, "image/png": true, "image/w
 
 // Capture stores a photo and turns it into a draft.
 func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint string) (View, error) {
+	return s.CaptureKeyed(ctx, sc, userID, fileName, data, kindHint, "")
+}
+
+// MaxClientKey bounds the Idempotency-Key a client may send.
+const MaxClientKey = 128
+
+// CaptureKeyed is Capture with the client's Idempotency-Key (#199): a second
+// upload with the same key for the taxpayer returns the first capture with
+// Replayed set, without storing or reading the photo again.
+func (s *Service) CaptureKeyed(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
+	clientKey = strings.TrimSpace(clientKey)
+	if len(clientKey) > MaxClientKey {
+		return View{}, fmt.Errorf("%w: Idempotency-Key is longer than %d characters", ErrInvalid, MaxClientKey)
+	}
+	if clientKey != "" {
+		if v, ok, err := s.byClientKey(ctx, sc, clientKey); err != nil || ok {
+			return v, err
+		}
+	}
+	v, err := s.capture(ctx, sc, userID, fileName, data, kindHint, clientKey)
+	var pgErr *pgconn.PgError
+	if clientKey != "" && errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_receipt_captures_client_key" {
+		// A concurrent request with the same key won; answer with its record.
+		if v, ok, err := s.byClientKey(ctx, sc, clientKey); err != nil || ok {
+			return v, err
+		}
+	}
+	return v, err
+}
+
+func (s *Service) byClientKey(ctx context.Context, sc engagementctx.Scope, key string) (View, bool, error) {
+	c, err := s.q.GetReceiptCaptureByClientKey(ctx, db.GetReceiptCaptureByClientKeyParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, ClientKey: text(key),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return View{}, false, nil
+	}
+	if err != nil {
+		return View{}, false, err
+	}
+	v := s.view(c, nil)
+	v.Replayed = true
+	return v, true, nil
+}
+
+func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, kindHint, clientKey string) (View, error) {
 	if len(data) == 0 || len(data) > MaxImageBytes {
 		return View{}, fmt.Errorf("%w: image must be 1 byte to 10 MB", ErrInvalid)
 	}
@@ -151,6 +204,7 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 	base := db.InsertReceiptCaptureParams{
 		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, UploadedBy: optID(userID),
 		AttachmentID: att.ID, MediaType: media, Kind: text(kindHint), Fields: []byte("{}"),
+		ClientKey: text(clientKey),
 	}
 	// Same image again: no AI call, point at the earlier record.
 	if !att.Inserted {
@@ -178,7 +232,7 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 		return s.insertCapture(ctx, base, &res)
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}
@@ -328,7 +382,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if approve {
 		status, captureStatus = "approved", StatusApproved
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}

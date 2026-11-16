@@ -5140,6 +5140,14 @@ paths:
         - { name: direction, in: query, schema: { type: string, enum: [outgoing, incoming] } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            Keyset pagination (#182): the `next_cursor` of the previous page.
+            With a cursor `offset` is ignored; deep pages cost as little as the
+            first one. Use it instead of large offsets.
+          schema: { type: string, maxLength: 128 }
       responses:
         "200":
           description: OK
@@ -5147,6 +5155,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeTaxpayerInvoicePage"
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403":
           description: "`NO_TAXPAYER_MEMBERSHIP`"
@@ -5214,6 +5223,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: captureTaxpayerReceipt
+      summary: Fiş fotoğrafı yükle (mobil uygulama)
+      description: |
+        Mükellef kapsamlı fiş yükleme (issue #199). Fotoğraf şirketin **etkin
+        ofisi** için okunur; ofis tarafındaki `captureReceipt` ile aynı akıştır
+        (taslak, mükerrer denetimi, düşük güvenli alanlar inceleme kuyruğuna).
+        `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
+        ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
+        yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: İstemcinin fotoğraf kimliği (en çok 128 karakter).
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+                kind: { type: string, enum: [expense_receipt, fuel_receipt, z_report] }
+      responses:
+        "200":
+          description: Aynı Idempotency-Key ile daha önce yüklenen kayıt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "201":
+          description: Yüklendi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`RECEIPTS_UNAVAILABLE` ya da `AI_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /v1/taxpayer/receipts/{uuid}/corrections:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [TaxpayerPortal]
+      operationId: correctTaxpayerReceipt
+      summary: Fiş alanları için düzeltme öner
+      description: |
+        Mükellefin önerdiği değerler (issue #199) ofisin inceleme kuyruğuna
+        `receipt_field` önerisi olarak gider (köken: girdi). Taslağa bu uçta
+        yazılmaz; müşavir kuyrukta kabul eder ya da reddeder. Aynı alandaki
+        bekleyen öneri (düşük güvenli OCR) yerini mükellef önerisine bırakır.
+        Taslağı olmayan fiş (failed, duplicate) için `409`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [corrections]
+              additionalProperties: false
+              properties:
+                corrections:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    required: [field, value]
+                    properties:
+                      field:
+                        type: string
+                        enum: [date, vendor_tax_number, vendor_name, receipt_number, total_amount, tax_amount, tax_rate, vehicle_plate, z_report_number, okc_serial_number, payment_method]
+                      value: { type: string, minLength: 1, maxLength: 200 }
+                      note: { type: string, maxLength: 500 }
+      responses:
+        "202":
+          description: Öneriler inceleme kuyruğuna gönderildi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReceiptCorrectionResult"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`RECEIPTS_UNAVAILABLE` ya da `REVIEW_UNAVAILABLE`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /v1/taxpayer/uploads:
     parameters:
@@ -6944,6 +7074,14 @@ paths:
         - { name: direction, in: query, required: false, schema: { type: string, enum: [outgoing, incoming] } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            Keyset pagination (#182): the `next_cursor` of the previous page.
+            With a cursor `offset` is ignored; deep pages cost as little as the
+            first one. Use it instead of large offsets.
+          schema: { type: string, maxLength: 128 }
       responses:
         "200":
           description: Invoice page
@@ -10954,6 +11092,23 @@ components:
         data: { $ref: "#/components/schemas/ReceiptCapture" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    ReceiptCorrectionResult:
+      type: object
+      required: [submitted]
+      properties:
+        submitted:
+          type: array
+          description: Fields sent to the office's review queue.
+          items: { type: string }
+
+    EnvelopeReceiptCorrectionResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ReceiptCorrectionResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     EnvelopeReceiptCapturePage:
       type: object
       required: [success, data, meta]
@@ -13432,7 +13587,7 @@ components:
 
     OfficeInvoicePage:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, limit, offset, next_cursor]
       properties:
         items:
           type: array
@@ -13440,6 +13595,9 @@ components:
         total: { type: integer, format: int64 }
         limit: { type: integer, format: int32 }
         offset: { type: integer, format: int32 }
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page (`?cursor=`); null on the last page.
 
     OfficeInvoiceWarning:
       type: object
@@ -13762,12 +13920,15 @@ components:
 
     TaxpayerInvoicePage:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, limit, offset, next_cursor]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/TaxpayerInvoice" } }
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page (`?cursor=`); null on the last page.
 
     TaxpayerInvoiceDetail:
       allOf:

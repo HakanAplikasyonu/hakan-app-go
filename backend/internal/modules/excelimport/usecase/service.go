@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/build"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
@@ -90,7 +91,7 @@ func New(pool DB, store ObjectStore, ai mapping.Completer, log *slog.Logger) *Se
 	if ai != nil {
 		m = mapping.NewAIMapper(ai)
 	}
-	return &Service{pool: pool, q: db.New(pool), store: store, ai: m, log: log}
+	return &Service{pool: pool, q: database.QueriesFor(pool), store: store, ai: m, log: log}
 }
 
 // UploadOptions are the optional upload fields (04 §7).
@@ -402,7 +403,7 @@ func (s *Service) validate(ctx context.Context, row db.ExcelImport, sheet parse.
 	summary := Summary{Summary: sum, Existing: existing}
 	sumJSON, _ := json.Marshal(summary)
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}
@@ -448,7 +449,7 @@ func (s *Service) Commit(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if key == "" || len(key) > 128 {
 		return View{}, fmt.Errorf("%w: Idempotency-Key header is required (max 128)", ErrInvalid)
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}
@@ -518,7 +519,7 @@ func (s *Service) Commit(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 // Rollback deletes the invoices this import created (04 §3 rolled_back).
 // Invoices that existed before (duplicates) are left alone.
 func (s *Service) Rollback(ctx context.Context, sc engagementctx.Scope, id uuid.UUID, userID int64) (View, error) {
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}

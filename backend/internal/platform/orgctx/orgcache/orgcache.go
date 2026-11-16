@@ -149,7 +149,7 @@ func (c *CachedResolver) version(ctx context.Context, orgID int64) (string, erro
 	if !errors.Is(err, redis.Nil) {
 		return "", err
 	}
-	seed := strconv.FormatInt(rand.Int64N(1<<62), 10)
+	seed := strconv.FormatInt(rand.Int64N(1<<62), 10) //nolint:gosec // cache generation token, not a secret: only uniqueness matters
 	set, err := c.rdb.SetNX(ctx, key, seed, 0).Result()
 	if err != nil {
 		return "", err

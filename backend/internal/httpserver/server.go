@@ -402,6 +402,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	var rlsScope func(http.Handler) http.Handler
 	if deps.DB != nil {
 		rlsScope = rls.Middleware(deps.DB, database.VisibleTaxpayers(deps.DB), log)
+		if cfg.DB.RLSRequestScope {
+			// Every tenant route: RequireOrganization opens the scope,
+			// RequireEngagement narrows it (issue #166).
+			middleware.SetTenantScope(rlsScope)
+		}
 	}
 	// Yevmiye taslağı ve Luca / Zirve / Excel çıktısı (#143, #26). Hedef hesap
 	// planı (#30) yüklüyse çıktıda ACCOUNT_NOT_IN_TARGET_PLAN denetlenir.
@@ -422,7 +427,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
 		log.Warn("source connections: credential vault disabled", "error", err)
 	} else {
-		sourceVault = secrets.New(kr, secrets.NewPGStore(deps.Queries))
+		// Secrets are platform records (no tenant scope policy): the vault
+		// never joins a request's row level security transaction.
+		sourceVault = secrets.New(kr, secrets.NewPGStore(db.New(deps.DB)))
 	}
 	parasut.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		parasut.NewHandler(parasut.NewService(deps.DB, sourceVault, parasut.App{
@@ -450,7 +457,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
-	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, taxpayerportal.NewHandler(deps.Queries, ublSvc))
+	portalH := taxpayerportal.NewHandler(deps.Queries, ublSvc)
+	taxpayerportal.RegisterRoutes(mux, tokens, loader, taxpayerResolver, portalH)
 	// Eksik belge görevleri (issue #36): tespit, ofis görevi, mükellef yüklemesi.
 	docTasksSvc := doctasksmodule.New(deps.DB, deps.Storage, notifSvc,
 		doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log)
@@ -546,6 +554,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")})))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
+	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
+	portalH.WithReceipts(receiptsSvc)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),

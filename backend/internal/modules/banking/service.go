@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
@@ -59,7 +60,7 @@ type IngestResult struct {
 // (#19). Inserted movements are classified right away.
 func (s *Service) Ingest(ctx context.Context, taxpayerID, cashBoxID int64, importID *uuid.UUID, txns []Transaction) (IngestResult, error) {
 	var res IngestResult
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
 		res, err = s.IngestTx(ctx, tx, taxpayerID, cashBoxID, importID, txns)
 		return err
@@ -107,7 +108,7 @@ func (s *Service) ClassifyInserted(ctx context.Context, taxpayerID int64, res In
 // left without any source is deleted; one that keeps another channel gets
 // its primary source re-picked by priority. It returns the deleted count.
 func (s *Service) UndoImport(ctx context.Context, taxpayerID int64, importID uuid.UUID) (deleted int, err error) {
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err = database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := db.New(tx)
 		imp := pgtype.UUID{Bytes: importID, Valid: true}
 		ids, err := q.DeleteBankTransactionSourcesByImport(ctx, db.DeleteBankTransactionSourcesByImportParams{TaxpayerID: taxpayerID, ImportID: imp})
@@ -369,7 +370,7 @@ type ClassifyResult struct {
 // Classify (re)classifies the taxpayer's movements, optionally one period
 // and only those never classified. Manual corrections are never overwritten.
 func (s *Service) Classify(ctx context.Context, taxpayerID int64, period string, onlyUnclassified bool) (ClassifyResult, error) {
-	q := db.New(s.pool)
+	q := database.QueriesFor(s.pool)
 	rows, err := q.ListBankTransactionsToClassify(ctx, db.ListBankTransactionsToClassifyParams{
 		TaxpayerID: taxpayerID, Period: text(period), OnlyUnclassified: onlyUnclassified,
 	})
@@ -380,7 +381,7 @@ func (s *Service) Classify(ctx context.Context, taxpayerID int64, period string,
 }
 
 func (s *Service) classifyIDs(ctx context.Context, taxpayerID int64, ids []int64) (ClassifyResult, error) {
-	q := db.New(s.pool)
+	q := database.QueriesFor(s.pool)
 	rows := make([]db.BankTransaction, 0, len(ids))
 	for _, id := range ids {
 		r, err := q.GetBankTransaction(ctx, db.GetBankTransactionParams{TaxpayerID: taxpayerID, ID: id})
@@ -474,7 +475,7 @@ func (s *Service) Correct(ctx context.Context, taxpayerID, transactionID int64, 
 		return db.BankRule{}, ErrInvalidKind
 	}
 	var rule db.BankRule
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := db.New(tx)
 		row, err := q.GetBankTransaction(ctx, db.GetBankTransactionParams{TaxpayerID: taxpayerID, ID: transactionID})
 		if err != nil {

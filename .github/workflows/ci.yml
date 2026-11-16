@@ -48,6 +48,7 @@ jobs:
       contracts: ${{ steps.f.outputs.contracts }}
       infra: ${{ steps.f.outputs.infra }}
       mobile: ${{ steps.f.outputs.mobile }}
+      mobile_office: ${{ steps.f.outputs.mobile_office }}
       desktop: ${{ steps.f.outputs.desktop }}
       full: ${{ steps.f.outputs.full }}
       mobile_release: ${{ steps.f.outputs.mobile_release }}
@@ -67,6 +68,7 @@ jobs:
           set -euo pipefail
           backend=false; frontend=false; contracts=false
           infra=false; mobile=false; desktop=false; full=false
+          mobile_office=false
 
           if [ "$EVENT" != "push" ]; then
             # schedule / workflow_dispatch: no diff to compute, build everything.
@@ -127,6 +129,7 @@ jobs:
                 backend/*)                          backend=true; contracts=true ;;
                 frontend/*)                         frontend=true; contracts=true ;;
                 mobile/*)                           mobile=true ;;
+                mobile-office/*)                    mobile_office=true ;;
                 *)                                  : ;;   # unmapped -> nothing
               esac
             done <<< "$files"
@@ -145,6 +148,7 @@ jobs:
 
           if [ "$full" = "true" ] || [ "$REF" = "refs/heads/main" ]; then
             backend=true; frontend=true; contracts=true; infra=true; mobile=true; desktop=true
+            mobile_office=true
           fi
 
           # HAKAN (#170): uçtan uca duman testi. Backend ya da frontend
@@ -180,6 +184,7 @@ jobs:
             echo "contracts=$contracts"
             echo "infra=$infra"
             echo "mobile=$mobile"
+            echo "mobile_office=$mobile_office"
             echo "desktop=$desktop"
             echo "full=$full"
             echo "mobile_release=$mobile_release"
@@ -240,6 +245,61 @@ jobs:
         run: go test ./...
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
+
+  # Security scans (#192, docs/guvenlik-taramalari.md). Every push: gitleaks
+  # over the pushed history. Go changes: govulncheck (reachable vulnerabilities)
+  # and gosec (HIGH severity, backend/.golangci.gosec.yml). Dependency
+  # manifests: pnpm/npm audit at high+. A finding fails the job; justified
+  # false positives are silenced in place (see the doc), never by skipping.
+  security:
+    needs: changes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: gitleaks (secrets in git history)
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          "$(go env GOPATH)/bin/gitleaks" git --redact --no-banner --exit-code 1 .
+      - name: govulncheck (backend)
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: govulncheck (desktop sidecar)
+        if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: desktop/sidecar
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: gosec (HIGH)
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.full == 'true'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+          args: --config .golangci.gosec.yml
+      - uses: pnpm/action-setup@v6
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.full == 'true'
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: pnpm audit (frontend, high+)
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: frontend
+        run: pnpm audit --audit-level high
+      - name: npm audit (mobile, mobile-office, desktop, e2e; high+)
+        run: |
+          set -euo pipefail
+          for d in mobile mobile-office desktop e2e; do
+            echo "::group::npm audit $d"
+            (cd "$d" && npm audit --audit-level=high)
+            echo "::endgroup::"
+          done
 
   # Runs on a frontend change OR a contract change (backend/** sets contracts),
   # so a backend API edit re-verifies the committed frontend client.
@@ -703,6 +763,42 @@ jobs:
             exit 1
           fi
 
+  # HAKAN (#236): müşavir mobil uygulaması (ayrı Expo projesi, app.hakan.office).
+  # mobile/ işiyle aynı denetimler; backend değişince de çalışır ki API tipleri
+  # (src/core/api/schema.d.ts) güncel kalsın. Mağaza sürümü bu işte yok (#242).
+  mobile-office:
+    needs: changes
+    if: needs.changes.outputs.mobile_office == 'true' || needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: mobile-office
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: mobile-office/.nvmrc
+          cache: npm
+          cache-dependency-path: mobile-office/package-lock.json
+      - name: Install
+        run: npm ci
+      # Diğer şeritler openapi.yaml'ı değiştirip yalnızca mobile/ tiplerini
+      # yeniden üretebilir. Kırmızı yerine: tipleri burada üret, işlenmiş
+      # dosya eskiyse uyar; tip denetimi taze şemayla yapılır, gerçek bir API
+      # kırılması yine yakalanır.
+      - name: api:generate (stale → warning)
+        run: |
+          npm run api:generate
+          if ! git diff --quiet -- src/core/api/; then
+            echo "::warning title=Stale mobile-office API types::Run 'npm run api:generate' in mobile-office/ and commit src/core/api/schema.d.ts."
+          fi
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+
   # HAKAN (#50): masaüstü (Tauri v2 kabuk + Go sidecar). Linux'ta derlenir
   # ve test edilir; imzalı macOS/Windows paketleri desktop-release.yml'de.
   desktop:
@@ -834,7 +930,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, mobile, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, security, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

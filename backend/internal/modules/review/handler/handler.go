@@ -8,6 +8,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -15,9 +18,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
-	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 const maxBodyBytes = 64 << 10
@@ -100,12 +102,8 @@ func (h *Handler) ListEngagement(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) list(w http.ResponseWriter, r *http.Request, f usecase.Filter) {
 	q := r.URL.Query()
 	f.Limit, f.Offset = apiquery.DefaultLimit, 0
-	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 && v <= int(apiquery.MaxLimit) {
-		f.Limit = int32(v)
-	}
-	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v >= 0 && v <= 1_000_000 {
-		f.Offset = int32(v)
-	}
+	f.Limit = intconv.ParseInt32(q.Get("limit"), f.Limit, 1, apiquery.MaxLimit)
+	f.Offset = intconv.ParseInt32(q.Get("offset"), f.Offset, 0, 1_000_000)
 	// The queue view: pending unless the caller asks otherwise ("all" = any).
 	switch st := q.Get("status"); st {
 	case "":

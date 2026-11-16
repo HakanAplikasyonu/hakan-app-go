@@ -30,9 +30,9 @@ RUN if [ -n "${RELEASE_JSON_B64}" ]; then \
       go build -trimpath -ldflags="${LDFLAGS}" -o "/out/${cmd}" "./cmd/${cmd}" || exit 1; \
     done
 
-FROM migrate/migrate:v4.19.1 AS migrate
+FROM migrate/migrate:v4.20.1 AS migrate
 
-FROM alpine:3.22 AS runtime
+FROM alpine:3.24 AS runtime
 
 # tesseract: OCR pre-pass that blacks out personal data in receipt photos
 # before they go to the AI provider (AI_IMAGE_REDACTION, issue #169).

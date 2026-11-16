@@ -24,11 +24,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 )
@@ -99,7 +101,7 @@ func New(pool DB, store ObjectStore, enq Enqueuer, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	s := &Service{db: pool, q: db.New(pool), store: store, queue: enq, validator: ubltrValidator{}, limits: ublmap.DefaultLimits, log: log}
+	s := &Service{db: pool, q: database.QueriesFor(pool), store: store, queue: enq, validator: ubltrValidator{}, limits: ublmap.DefaultLimits, log: log}
 	s.ownTaxID = s.q.GetTaxpayerOwnTaxID
 	return s
 }
@@ -400,11 +402,19 @@ func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Inv
 			return repository.SaveResult{}, nil, err
 		}
 	}
-	tx, err := s.db.Begin(ctx)
+	inScope := rls.InScope(ctx)
+	tx, err := database.Begin(ctx, s.db)
 	if err != nil {
 		return repository.SaveResult{}, nil, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if !inScope {
+		// Worker: the item's writes run under the job's office and taxpayer
+		// (issue #166). Inside a request the scope is already set.
+		if err := rls.Apply(ctx, tx, rls.Job(job.OrganizationID, job.TaxpayerID)); err != nil {
+			return repository.SaveResult{}, nil, err
+		}
+	}
 	q := db.New(tx)
 	att, err := q.UpsertAttachment(ctx, db.UpsertAttachmentParams{
 		TaxpayerID: job.TaxpayerID, Kind: "ubl_xml", StorageKey: key, Sha256: sha, SizeBytes: int64(len(xml)),

@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -107,7 +108,7 @@ func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 		return res, fmt.Errorf("doctasks: store file: %w", err)
 	}
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := database.Begin(ctx, s.db)
 	if err != nil {
 		return res, err
 	}
