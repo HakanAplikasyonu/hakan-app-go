@@ -9,7 +9,10 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/usecase"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 // Queries is the subset of db.Querier this repository uses.
@@ -19,10 +22,24 @@ type Queries interface {
 }
 
 // Postgres implements usecase.UsageStore.
-type Postgres struct{ q Queries }
+type Postgres struct {
+	q      Queries
+	ledger rls.Beginner
+}
 
 // NewPostgres builds the store.
 func NewPostgres(q Queries) *Postgres { return &Postgres{q: q} }
+
+// WithLedgerPool writes ledger rows in their own system transaction on pool
+// (#277). The row belongs to the office billed for the call, not to the
+// caller's row level security scope: a mükellef panel request (taxpayer
+// scope, no office) could not insert it, and the failed insert aborted the
+// request's own transaction. Separately, a ledger failure now never touches
+// the caller's work.
+func (p *Postgres) WithLedgerPool(pool rls.Beginner) *Postgres {
+	p.ledger = pool
+	return p
+}
 
 var _ usecase.UsageStore = (*Postgres)(nil)
 
@@ -47,10 +64,19 @@ func (p *Postgres) RecordUsage(ctx context.Context, rec usecase.UsageRecord) err
 			return fmt.Errorf("ai usage cost %q: %w", rec.CostUSD, err)
 		}
 	}
-	if err := p.q.InsertAIUsageEvent(ctx, params); err != nil {
-		return fmt.Errorf("insert ai usage: %w", err)
+	insert := func(ctx context.Context, q Queries) error {
+		if err := q.InsertAIUsageEvent(ctx, params); err != nil {
+			return fmt.Errorf("insert ai usage: %w", err)
+		}
+		return nil
 	}
-	return nil
+	if p.ledger == nil {
+		return insert(ctx, p.q)
+	}
+	// rls.System begins on the pool itself: a new transaction, never the
+	// caller's ambient one.
+	return rls.System(ctx, p.ledger, "ai: cost ledger row for the office billed for the call (#277)",
+		func(ctx context.Context, tx pgx.Tx) error { return insert(ctx, db.New(tx)) })
 }
 
 // UsageReport returns the grouped report for [from, to).

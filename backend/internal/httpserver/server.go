@@ -559,7 +559,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	modRouter := module.NewRouter(module.Deps{Mux: mux, Tokens: tokens, Loader: loader, Resolver: tenantResolver})
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
 	// Appliers are registered by the modules that own suggestion targets.
-	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries), log)
+	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries).WithLedgerPool(deps.DB), log)
 	// Appliers are registered by the modules that own suggestion targets.
 	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
 		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).
