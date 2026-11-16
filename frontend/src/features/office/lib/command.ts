@@ -1,258 +1,106 @@
 /**
  * Komuta merkezi (#34): mükellef × dönem durum matrisi.
  *
- * Hücre durumu iki kaynaktan gelir:
- * 1. Belge verisi (fatura, öneri, uyarı) → `toplandı` / `kontrol edildi`.
- * 2. Dönem iş akışı (W7 #32 dönem yönetimi) → `onaylandı` / `çıktı alındı`
- *    / `beyan`. #32 birleşene kadar bu kaynak `PeriodWorkflow` arayüzüdür;
- *    gerçek uç geldiğinde yalnızca onu dolduran kod değişir.
+ * Kaynak dönem yönetimi (#32) `GET /v1/tenant/periods/matrix`. Hücre durumu:
+ * - kilitli dönem → onaylandı
+ * - hazır (açık engelleyici uyarı ve açık değişiklik talebi yok) → kontrol edildi
+ * - diğerleri → toplandı (engelleyici ya da talep sayısıyla)
  *
- * Hesap tek geçişte (O(fatura + öneri + uyarı)) yapılır; 100 mükellef × 6
- * dönem ekran 1 sn altında kalsın diye bileşen bu modeli `useMemo` ile tutar.
+ * Çıktı alındı ve beyan aşamalarının kaynağı henüz yok (muhasebe çıktısı ve
+ * beyan kaydı dönem kaydına bağlanınca eklenir).
  */
 
 import type {
-  DataWarning,
-  Invoice,
-  Severity,
-  Suggestion,
-  Taxpayer,
-} from "../types";
+  PeriodMatrixCell,
+  PeriodMatrixRow,
+} from "../services/periods.service";
 
-export const cellStatuses = [
-  "empty",
-  "collected",
-  "checked",
-  "approved",
-  "exported",
-  "declared",
-] as const;
+export const cellStatuses = ["collected", "checked", "approved"] as const;
 export type CellStatus = (typeof cellStatuses)[number];
 
-/** #32'nin dönem kaydından gelecek aşamalar. */
-export type WorkflowStage = "approved" | "exported" | "declared";
+export function statusOf(cell: PeriodMatrixCell): CellStatus {
+  if (cell.locked) return "approved";
+  if (cell.ready) return "checked";
+  return "collected";
+}
 
-/** taxpayerId → period (YYYY-MM) → aşama. */
-export type PeriodWorkflow = Record<string, Record<string, WorkflowStage>>;
-
-export type WarningLevel = "none" | Severity;
-
-export type PeriodFacts = {
-  invoices: number;
-  pendingSuggestions: number;
-  openBlockers: number;
-  openWarnings: number;
-  openInfos: number;
+const rank: Record<CellStatus, number> = {
+  collected: 0,
+  checked: 1,
+  approved: 2,
 };
 
-export type Cell = PeriodFacts & {
-  status: CellStatus;
-  level: WarningLevel;
-  /** İş akışı aşaması ilerlemiş ama sonradan engelleyici uyarı açılmış. */
-  regressed: boolean;
-};
-
-export type MatrixRow = {
-  taxpayer: Taxpayer;
-  cells: Record<string, Cell>;
-};
-
-const rank: Record<CellStatus, number> = Object.fromEntries(
-  cellStatuses.map((s, i) => [s, i]),
-) as Record<CellStatus, number>;
-
-const levelRank: Record<WarningLevel, number> = {
-  none: 0,
-  info: 1,
-  warning: 2,
-  blocker: 3,
-};
-
-/** `end` dahil geriye doğru `count` dönem, eskiden yeniye. */
-export function periodsEndingAt(end: string, count: number): string[] {
-  const [y, m] = end.split("-").map(Number);
-  const out: string[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(y, m - 1 - i, 1));
-    out.push(
-      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
-    );
-  }
-  return out;
-}
-
-export function emptyFacts(): PeriodFacts {
-  return {
-    invoices: 0,
-    pendingSuggestions: 0,
-    openBlockers: 0,
-    openWarnings: 0,
-    openInfos: 0,
-  };
-}
-
-/** Belge verisinden mükellef/dönem özetleri (tek geçiş). */
-export function factsFromDocuments(data: {
-  invoices: Invoice[];
-  suggestions: Suggestion[];
-  warnings: DataWarning[];
-}): Map<string, PeriodFacts> {
-  const facts = new Map<string, PeriodFacts>();
-  const at = (taxpayerId: string, period: string) => {
-    const k = key(taxpayerId, period);
-    let f = facts.get(k);
-    if (!f) {
-      f = emptyFacts();
-      facts.set(k, f);
-    }
-    return f;
-  };
-  const periodOfInvoice = new Map<string, string>();
-  for (const inv of data.invoices) {
-    const p = inv.issueDate.slice(0, 7);
-    periodOfInvoice.set(inv.id, p);
-    at(inv.taxpayerId, p).invoices++;
-  }
-  for (const s of data.suggestions) {
-    if (s.status !== "pending") continue;
-    const p = periodOfInvoice.get(s.invoiceId);
-    if (p) at(s.taxpayerId, p).pendingSuggestions++;
-  }
-  for (const w of data.warnings) {
-    if (w.status !== "open") continue;
-    const f = at(w.taxpayerId, w.period);
-    if (w.severity === "blocker") f.openBlockers++;
-    else if (w.severity === "warning") f.openWarnings++;
-    else f.openInfos++;
-  }
-  return facts;
-}
-
-export function key(taxpayerId: string, period: string) {
-  return `${taxpayerId}|${period}`;
-}
-
-export function cellOf(facts: PeriodFacts, stage?: WorkflowStage): Cell {
-  const level: WarningLevel = facts.openBlockers
-    ? "blocker"
-    : facts.openWarnings
-      ? "warning"
-      : facts.openInfos
-        ? "info"
-        : "none";
-  let status: CellStatus = "empty";
-  if (facts.invoices > 0)
-    status =
-      facts.pendingSuggestions === 0 && facts.openBlockers === 0
-        ? "checked"
-        : "collected";
-  let regressed = false;
-  if (stage) {
-    // Aşama kaydı belge durumundan önce gelir; ama engelleyici uyarı
-    // sonradan açıldıysa hücre işaretlenir (müşavir yeniden bakmalı).
-    regressed = facts.openBlockers > 0;
-    status = stage;
-  }
-  return { ...facts, status, level, regressed };
-}
-
-export function buildMatrix(input: {
-  taxpayers: Taxpayer[];
-  periods: string[];
-  facts: Map<string, PeriodFacts>;
-  workflow: PeriodWorkflow;
-}): MatrixRow[] {
-  const blank = emptyFacts();
-  return input.taxpayers.map((taxpayer) => {
-    const cells: Record<string, Cell> = {};
-    const stages = input.workflow[taxpayer.id];
-    for (const p of input.periods)
-      cells[p] = cellOf(
-        input.facts.get(key(taxpayer.id, p)) ?? blank,
-        stages?.[p],
-      );
-    return { taxpayer, cells };
-  });
+export function statusRank(s: CellStatus) {
+  return rank[s];
 }
 
 export type MatrixFilter = {
-  /** Atanan ofis üyesi; "all" ya da "unassigned". */
-  member: string;
   status: "all" | CellStatus;
-  /** En az bu seviyede açık uyarı. */
-  level: "all" | Severity;
+  /** Yalnızca seçili dönemde açık engelleyici uyarısı olanlar. */
+  blockersOnly: boolean;
   query: string;
 };
 
 export const defaultFilter: MatrixFilter = {
-  member: "all",
   status: "all",
-  level: "all",
+  blockersOnly: false,
   query: "",
 };
 
-/**
- * Satır filtresi. Durum ve uyarı seviyesi `focus` dönemine bakar (ekranda
- * seçili sütun); müşavir ve arama satırın kendisine.
- */
+export function cellAt(row: PeriodMatrixRow, period: string) {
+  return row.cells.find((c) => c.period === period);
+}
+
+/** Durum ve engelleyici filtresi seçili döneme (`focus`) uygulanır. */
 export function filterRows(
-  rows: MatrixRow[],
+  rows: PeriodMatrixRow[],
   filter: MatrixFilter,
   focus: string,
-): MatrixRow[] {
+): PeriodMatrixRow[] {
   const q = filter.query.trim().toLocaleLowerCase("tr");
-  return rows.filter(({ taxpayer, cells }) => {
-    if (filter.member === "unassigned") {
-      if (taxpayer.assigneeIds.length) return false;
-    } else if (
-      filter.member !== "all" &&
-      !taxpayer.assigneeIds.includes(filter.member)
-    )
-      return false;
+  return rows.filter((row) => {
     if (
       q &&
-      !taxpayer.title.toLocaleLowerCase("tr").includes(q) &&
-      !taxpayer.taxId.includes(q)
+      !row.taxpayer_title.toLocaleLowerCase("tr").includes(q) &&
+      !row.taxpayer_tax_id.includes(q)
     )
       return false;
-    const c = cells[focus];
-    if (!c) return filter.status === "all" && filter.level === "all";
-    if (filter.status !== "all" && c.status !== filter.status) return false;
-    if (filter.level !== "all" && levelRank[c.level] < levelRank[filter.level])
-      return false;
+    const c = cellAt(row, focus);
+    if (!c) return filter.status === "all" && !filter.blockersOnly;
+    if (filter.status !== "all" && statusOf(c) !== filter.status) return false;
+    if (filter.blockersOnly && c.open_blockers === 0) return false;
     return true;
   });
 }
 
-/** Seçili dönemde duruma göre mükellef sayısı (filtre öncesi). */
 export function statusCounts(
-  rows: MatrixRow[],
+  rows: PeriodMatrixRow[],
   period: string,
 ): Record<CellStatus, number> {
-  const out = Object.fromEntries(cellStatuses.map((s) => [s, 0])) as Record<
-    CellStatus,
-    number
-  >;
+  const out: Record<CellStatus, number> = {
+    collected: 0,
+    checked: 0,
+    approved: 0,
+  };
   for (const r of rows) {
-    const c = r.cells[period];
-    if (c) out[c.status]++;
+    const c = cellAt(r, period);
+    if (c) out[statusOf(c)]++;
   }
   return out;
 }
 
-/** İşi en geride olan önce; eşitse engelleyici uyarı sayısı, sonra unvan. */
-export function sortByProgress(rows: MatrixRow[], period: string): MatrixRow[] {
+/** İşi en geride olan önce; eşitse engelleyici sayısı, sonra unvan. */
+export function sortByProgress(
+  rows: PeriodMatrixRow[],
+  period: string,
+): PeriodMatrixRow[] {
   return [...rows].sort((a, b) => {
-    const ca = a.cells[period];
-    const cb = b.cells[period];
+    const ca = cellAt(a, period);
+    const cb = cellAt(b, period);
     return (
-      rank[ca?.status ?? "empty"] - rank[cb?.status ?? "empty"] ||
-      (cb?.openBlockers ?? 0) - (ca?.openBlockers ?? 0) ||
-      a.taxpayer.title.localeCompare(b.taxpayer.title, "tr")
+      (ca ? rank[statusOf(ca)] : -1) - (cb ? rank[statusOf(cb)] : -1) ||
+      (cb?.open_blockers ?? 0) - (ca?.open_blockers ?? 0) ||
+      a.taxpayer_title.localeCompare(b.taxpayer_title, "tr")
     );
   });
-}
-
-export function statusRank(s: CellStatus) {
-  return rank[s];
 }
