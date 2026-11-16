@@ -114,6 +114,8 @@ type Client struct {
 	HTTP      *http.Client
 	CompanyID string
 	Interval  time.Duration
+	// Backoff is the first wait after a 429; it grows linearly (default 10s).
+	Backoff time.Duration
 	// OnTokens is called after a refresh so the caller can store the new
 	// pair atomically (the old refresh token stops working).
 	OnTokens func(Tokens) error
@@ -151,6 +153,14 @@ func (c *Client) access(ctx context.Context, force bool) (string, error) {
 	}
 	c.tokens = t
 	return t.AccessToken, nil
+}
+
+// backoff is the first wait after a 429 (Backoff, default 10s).
+func (c *Client) backoff() time.Duration {
+	if c.Backoff > 0 {
+		return c.Backoff
+	}
+	return 10 * time.Second
 }
 
 func (c *Client) wait(ctx context.Context) error {
@@ -206,7 +216,7 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) (document, 
 			select {
 			case <-ctx.Done():
 				return document{}, ctx.Err()
-			case <-time.After(time.Duration(attempt+1) * 10 * time.Second):
+			case <-time.After(time.Duration(attempt+1) * c.backoff()):
 			}
 			continue
 		case res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden:

@@ -48,6 +48,8 @@ type Client struct {
 	APIKey    string
 	CompanyID string
 	Interval  time.Duration
+	// Backoff is the first wait after a 429; it grows linearly (default 5s).
+	Backoff time.Duration
 
 	token string
 	last  time.Time
@@ -59,6 +61,14 @@ func NewClient(app App, hc *http.Client, apiKey, companyID string) *Client {
 		hc = &http.Client{Timeout: time.Minute}
 	}
 	return &Client{App: app, HTTP: hc, APIKey: apiKey, CompanyID: companyID, Interval: time.Second}
+}
+
+// backoff is the first wait after a 429 (Backoff, default 5s).
+func (c *Client) backoff() time.Duration {
+	if c.Backoff > 0 {
+		return c.Backoff
+	}
+	return 5 * time.Second
 }
 
 func (c *Client) login(ctx context.Context) error {
@@ -140,7 +150,12 @@ func (c *Client) get(ctx context.Context, path string, q url.Values) ([]byte, er
 			c.token = "" // 11 §1.2: new token with the api_key, retry once
 			continue
 		case res.StatusCode == http.StatusTooManyRequests && attempt < 3:
-			time.Sleep(time.Duration(attempt+1) * 5 * time.Second)
+			// Linear backoff, cut short when the caller gives up.
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(attempt+1) * c.backoff()):
+			}
 			continue
 		case res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden:
 			return nil, ErrAuth
