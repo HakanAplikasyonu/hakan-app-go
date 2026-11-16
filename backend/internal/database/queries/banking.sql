@@ -195,3 +195,34 @@ SELECT * FROM cash_boxes WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
 UPDATE cash_boxes SET name = @name, updated_at = NOW()
 WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid
 RETURNING *;
+
+-- name: ListBankTransactionsPage :many
+-- Banka hareketleri sekmesi (#329): mükellefin hareketleri, yeniden eskiye.
+-- İptal edilen hareket listelenmez.
+SELECT bt.uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
+       bt.description, bt.counterparty_name, bt.kind, bt.kind_detail,
+       bt.match_status, bt.period, (bt.possible_duplicate_of IS NOT NULL)::boolean AS possible_duplicate,
+       cb.uuid AS cash_box_uuid, cb.name AS cash_box_name
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled
+  AND (sqlc.narg(period)::text IS NULL OR bt.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(match_status)::text IS NULL OR bt.match_status = sqlc.narg(match_status)::text)
+  AND (sqlc.narg(cash_box_uuid)::uuid IS NULL OR cb.uuid = sqlc.narg(cash_box_uuid)::uuid)
+ORDER BY bt.transaction_date DESC, bt.id DESC
+LIMIT @lim OFFSET @off;
+
+-- name: SummarizeBankTransactions :one
+-- Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
+-- durumları.
+SELECT count(*)::bigint AS total,
+       COALESCE(sum(bt.amount) FILTER (WHERE bt.debit_credit = 'A'), 0)::numeric(18,4) AS in_total,
+       COALESCE(sum(bt.amount) FILTER (WHERE bt.debit_credit = 'B'), 0)::numeric(18,4) AS out_total,
+       count(*) FILTER (WHERE bt.match_status = 'unmatched')::bigint AS unmatched,
+       count(*) FILTER (WHERE bt.match_status = 'suggested')::bigint AS suggested,
+       count(*) FILTER (WHERE bt.match_status = 'matched')::bigint AS matched
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled
+  AND (sqlc.narg(period)::text IS NULL OR bt.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(cash_box_uuid)::uuid IS NULL OR cb.uuid = sqlc.narg(cash_box_uuid)::uuid);

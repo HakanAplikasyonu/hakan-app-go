@@ -1,0 +1,150 @@
+package statement
+
+import (
+	"net/http"
+	"regexp"
+	"strconv"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
+)
+
+// Banka hareketleri listesi (arayüz 6/9, #329): ofis panelindeki "Banka"
+// sekmesi. Yalnız okuma; eşleştirme ve içe aktarma kendi uçlarında.
+
+const (
+	txDefaultLimit = 50
+	txMaxLimit     = 200
+)
+
+var periodRe = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])$`)
+
+var matchStatuses = map[string]bool{"unmatched": true, "suggested": true, "matched": true, "ignored": true}
+
+// TransactionView is one bank transaction of the list.
+type TransactionView struct {
+	UUID              uuid.UUID `json:"uuid"`
+	Date              string    `json:"transaction_date"`
+	Direction         string    `json:"direction"`
+	Amount            string    `json:"amount"`
+	Currency          string    `json:"currency"`
+	Description       string    `json:"description"`
+	CounterpartyName  *string   `json:"counterparty_name"`
+	Kind              string    `json:"kind"`
+	KindDetail        string    `json:"kind_detail"`
+	MatchStatus       string    `json:"match_status"`
+	Period            string    `json:"period"`
+	PossibleDuplicate bool      `json:"possible_duplicate"`
+	CashBoxUUID       uuid.UUID `json:"cash_box_uuid"`
+	CashBoxName       string    `json:"cash_box_name"`
+}
+
+// TransactionSummary counts the filtered set (match status not applied).
+type TransactionSummary struct {
+	Total     int64  `json:"total"`
+	InTotal   string `json:"in_total"`
+	OutTotal  string `json:"out_total"`
+	Unmatched int64  `json:"unmatched"`
+	Suggested int64  `json:"suggested"`
+	Matched   int64  `json:"matched"`
+}
+
+func decimalString(n pgtype.Numeric) string {
+	if !n.Valid || n.Int == nil || n.NaN {
+		return "0.00"
+	}
+	return decimal.NewFromBigInt(n.Int, n.Exp).StringFixed(2)
+}
+
+// direction: A (alacak) para girişi, B (borç) para çıkışı.
+func direction(dc string) string {
+	if dc == "A" {
+		return "in"
+	}
+	return "out"
+}
+
+// listTransactions: GET .../bank-transactions?period=&match_status=&cash_box_uuid=&limit=&offset=.
+func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
+	scope := engagementctx.Must(r.Context())
+	q := r.URL.Query()
+	var period, status pgtype.Text
+	var box pgtype.UUID
+	if v := q.Get("period"); v != "" {
+		if !periodRe.MatchString(v) {
+			response.BadRequest(w, r, response.CodeValidationError, "period must be YYYY-MM")
+			return
+		}
+		period = pgtype.Text{String: v, Valid: true}
+	}
+	if v := q.Get("match_status"); v != "" && v != "all" {
+		if !matchStatuses[v] {
+			response.BadRequest(w, r, response.CodeValidationError, "match_status must be unmatched, suggested, matched, ignored or all")
+			return
+		}
+		status = pgtype.Text{String: v, Valid: true}
+	}
+	if v := q.Get("cash_box_uuid"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			response.BadRequest(w, r, response.CodeValidationError, "cash_box_uuid is not a uuid")
+			return
+		}
+		box = pgtype.UUID{Bytes: id, Valid: true}
+	}
+	limit, offset := int32(txDefaultLimit), int32(0)
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil || n < 1 || n > txMaxLimit {
+			response.BadRequest(w, r, response.CodeValidationError, "limit must be 1..200")
+			return
+		}
+		limit = int32(n)
+	}
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil || n < 0 || n > 1_000_000 {
+			response.BadRequest(w, r, response.CodeValidationError, "offset must be 0..1000000")
+			return
+		}
+		offset = int32(n)
+	}
+
+	rows, err := h.q.ListBankTransactionsPage(r.Context(), db.ListBankTransactionsPageParams{
+		TaxpayerID: scope.TaxpayerID, Period: period, MatchStatus: status, CashBoxUuid: box, Lim: limit, Off: offset,
+	})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not list bank transactions")
+		return
+	}
+	sum, err := h.q.SummarizeBankTransactions(r.Context(), db.SummarizeBankTransactionsParams{
+		TaxpayerID: scope.TaxpayerID, Period: period, CashBoxUuid: box,
+	})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not summarize bank transactions")
+		return
+	}
+	items := make([]TransactionView, len(rows))
+	for i, t := range rows {
+		items[i] = TransactionView{
+			UUID: t.Uuid, Date: t.TransactionDate.Time.Format(time.DateOnly), Direction: direction(t.DebitCredit),
+			Amount: decimalString(t.Amount), Currency: t.Currency, Description: t.Description,
+			CounterpartyName: textPtr(t.CounterpartyName), Kind: t.Kind, KindDetail: t.KindDetail,
+			MatchStatus: t.MatchStatus, Period: t.Period, PossibleDuplicate: t.PossibleDuplicate,
+			CashBoxUUID: t.CashBoxUuid, CashBoxName: t.CashBoxName,
+		}
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{
+		"items": items, "limit": limit, "offset": offset,
+		"summary": TransactionSummary{
+			Total: sum.Total, InTotal: decimalString(sum.InTotal), OutTotal: decimalString(sum.OutTotal),
+			Unmatched: sum.Unmatched, Suggested: sum.Suggested, Matched: sum.Matched,
+		},
+	})
+}

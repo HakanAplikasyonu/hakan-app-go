@@ -142,6 +142,9 @@ export const routes = {
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,
+    /** Bank transactions of one engagement (#329). */
+    engagementBank: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/bank`,
     /** Template-based petitions of one engagement (issue #56). */
     engagementPetitions: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,

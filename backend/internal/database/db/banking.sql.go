@@ -1029,6 +1029,91 @@ func (q *Queries) ListBankTransactionsNeedingReview(ctx context.Context, arg Lis
 	return items, nil
 }
 
+const listBankTransactionsPage = `-- name: ListBankTransactionsPage :many
+SELECT bt.uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
+       bt.description, bt.counterparty_name, bt.kind, bt.kind_detail,
+       bt.match_status, bt.period, (bt.possible_duplicate_of IS NOT NULL)::boolean AS possible_duplicate,
+       cb.uuid AS cash_box_uuid, cb.name AS cash_box_name
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = $1 AND NOT bt.is_cancelled
+  AND ($2::text IS NULL OR bt.period = $2::text)
+  AND ($3::text IS NULL OR bt.match_status = $3::text)
+  AND ($4::uuid IS NULL OR cb.uuid = $4::uuid)
+ORDER BY bt.transaction_date DESC, bt.id DESC
+LIMIT $6 OFFSET $5
+`
+
+type ListBankTransactionsPageParams struct {
+	TaxpayerID  int64       `json:"taxpayer_id"`
+	Period      pgtype.Text `json:"period"`
+	MatchStatus pgtype.Text `json:"match_status"`
+	CashBoxUuid pgtype.UUID `json:"cash_box_uuid"`
+	Off         int32       `json:"off"`
+	Lim         int32       `json:"lim"`
+}
+
+type ListBankTransactionsPageRow struct {
+	Uuid              uuid.UUID      `json:"uuid"`
+	TransactionDate   pgtype.Date    `json:"transaction_date"`
+	DebitCredit       string         `json:"debit_credit"`
+	Amount            pgtype.Numeric `json:"amount"`
+	Currency          string         `json:"currency"`
+	Description       string         `json:"description"`
+	CounterpartyName  pgtype.Text    `json:"counterparty_name"`
+	Kind              string         `json:"kind"`
+	KindDetail        string         `json:"kind_detail"`
+	MatchStatus       string         `json:"match_status"`
+	Period            string         `json:"period"`
+	PossibleDuplicate bool           `json:"possible_duplicate"`
+	CashBoxUuid       uuid.UUID      `json:"cash_box_uuid"`
+	CashBoxName       string         `json:"cash_box_name"`
+}
+
+// Banka hareketleri sekmesi (#329): mükellefin hareketleri, yeniden eskiye.
+// İptal edilen hareket listelenmez.
+func (q *Queries) ListBankTransactionsPage(ctx context.Context, arg ListBankTransactionsPageParams) ([]ListBankTransactionsPageRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionsPage,
+		arg.TaxpayerID,
+		arg.Period,
+		arg.MatchStatus,
+		arg.CashBoxUuid,
+		arg.Off,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionsPageRow{}
+	for rows.Next() {
+		var i ListBankTransactionsPageRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.TransactionDate,
+			&i.DebitCredit,
+			&i.Amount,
+			&i.Currency,
+			&i.Description,
+			&i.CounterpartyName,
+			&i.Kind,
+			&i.KindDetail,
+			&i.MatchStatus,
+			&i.Period,
+			&i.PossibleDuplicate,
+			&i.CashBoxUuid,
+			&i.CashBoxName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionsToClassify = `-- name: ListBankTransactionsToClassify :many
 SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions
 WHERE taxpayer_id = $1
@@ -1287,6 +1372,51 @@ func (q *Queries) SetBankTransactionPrimarySource(ctx context.Context, arg SetBa
 		arg.ID,
 	)
 	return err
+}
+
+const summarizeBankTransactions = `-- name: SummarizeBankTransactions :one
+SELECT count(*)::bigint AS total,
+       COALESCE(sum(bt.amount) FILTER (WHERE bt.debit_credit = 'A'), 0)::numeric(18,4) AS in_total,
+       COALESCE(sum(bt.amount) FILTER (WHERE bt.debit_credit = 'B'), 0)::numeric(18,4) AS out_total,
+       count(*) FILTER (WHERE bt.match_status = 'unmatched')::bigint AS unmatched,
+       count(*) FILTER (WHERE bt.match_status = 'suggested')::bigint AS suggested,
+       count(*) FILTER (WHERE bt.match_status = 'matched')::bigint AS matched
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = $1 AND NOT bt.is_cancelled
+  AND ($2::text IS NULL OR bt.period = $2::text)
+  AND ($3::uuid IS NULL OR cb.uuid = $3::uuid)
+`
+
+type SummarizeBankTransactionsParams struct {
+	TaxpayerID  int64       `json:"taxpayer_id"`
+	Period      pgtype.Text `json:"period"`
+	CashBoxUuid pgtype.UUID `json:"cash_box_uuid"`
+}
+
+type SummarizeBankTransactionsRow struct {
+	Total     int64          `json:"total"`
+	InTotal   pgtype.Numeric `json:"in_total"`
+	OutTotal  pgtype.Numeric `json:"out_total"`
+	Unmatched int64          `json:"unmatched"`
+	Suggested int64          `json:"suggested"`
+	Matched   int64          `json:"matched"`
+}
+
+// Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
+// durumları.
+func (q *Queries) SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error) {
+	row := q.db.QueryRow(ctx, summarizeBankTransactions, arg.TaxpayerID, arg.Period, arg.CashBoxUuid)
+	var i SummarizeBankTransactionsRow
+	err := row.Scan(
+		&i.Total,
+		&i.InTotal,
+		&i.OutTotal,
+		&i.Unmatched,
+		&i.Suggested,
+		&i.Matched,
+	)
+	return i, err
 }
 
 const upsertBankDailySummary = `-- name: UpsertBankDailySummary :exec

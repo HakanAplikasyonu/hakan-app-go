@@ -6827,6 +6827,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's bank transactions (office "Banka" tab)
+         * @description Requires `tenant.bank.read` (#329). Newest first; cancelled
+         *     transactions are left out. `summary` counts the same filter without
+         *     `match_status` (in / out totals and match states).
+         */
+        get: operations["listTenantBankTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/cash-boxes": {
         parameters: {
             query?: never;
@@ -11246,6 +11276,57 @@ export interface components {
             success: true;
             data: components["schemas"]["TenantPermissionList"];
             meta: components["schemas"]["ResponseMeta"];
+        };
+        BankTransaction: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            transaction_date: string;
+            /**
+             * @description in = alacak (A, para girişi), out = borç (B, para çıkışı)
+             * @enum {string}
+             */
+            direction: "in" | "out";
+            /**
+             * @description Decimal string
+             * @example 18500.00
+             */
+            amount: string;
+            /** @example TRY */
+            currency: string;
+            description: string;
+            counterparty_name: string | null;
+            /** @description Bank classification (DIGER when unknown) */
+            kind: string;
+            /** @example customer_collection */
+            kind_detail: string;
+            /** @enum {string} */
+            match_status: "unmatched" | "suggested" | "matched" | "ignored";
+            /** @example 2026-10 */
+            period: string;
+            possible_duplicate: boolean;
+            /** Format: uuid */
+            cash_box_uuid: string;
+            cash_box_name: string;
+        };
+        BankTransactionPage: {
+            items: components["schemas"]["BankTransaction"][];
+            limit: number;
+            offset: number;
+            summary: {
+                /** Format: int64 */
+                total: number;
+                /** @description Decimal string */
+                in_total: string;
+                /** @description Decimal string */
+                out_total: string;
+                /** Format: int64 */
+                unmatched: number;
+                /** Format: int64 */
+                suggested: number;
+                /** Format: int64 */
+                matched: number;
+            };
         };
         CashBox: {
             /** Format: uuid */
@@ -24089,6 +24170,50 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankTransactions: {
+        parameters: {
+            query?: {
+                period?: string;
+                match_status?: "unmatched" | "suggested" | "matched" | "ignored" | "all";
+                cash_box_uuid?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bank transactions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["BankTransactionPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

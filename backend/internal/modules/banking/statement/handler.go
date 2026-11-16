@@ -54,6 +54,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+boxes, middleware.Chain(http.HandlerFunc(h.listCashBoxes), authn, org, read, eng))
 	mux.Handle("POST "+boxes, middleware.Chain(http.HandlerFunc(h.createCashBox), authn, org, write, eng))
 	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.renameCashBox), authn, org, write, eng))
+	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
+	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
 }
 
 // upload: multipart "file", optional "cash_box_uuid" (when the file names no
