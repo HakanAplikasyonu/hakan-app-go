@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 )
@@ -122,7 +123,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		_, rep.Encoding = Decode(head(req.Data, 4096))
 	}
 
-	q := db.New(im.pool)
+	q := database.QueriesFor(im.pool)
 	var blocks []resolved
 	var unknown []string
 	for _, st := range sts {
@@ -143,7 +144,7 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 		return rep, &UnknownAccountError{Accounts: unknown}
 	}
 
-	tx, err := im.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, im.pool)
 	if err != nil {
 		return rep, err
 	}

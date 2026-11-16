@@ -23,6 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
@@ -113,7 +114,7 @@ func New(pool DB, store ObjectStore, reader Reader, reviewer Reviewer, warnings 
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Service{pool: pool, q: db.New(pool), store: store, reader: reader, reviewer: reviewer, warnings: warnings, log: log}
+	return &Service{pool: pool, q: database.QueriesFor(pool), store: store, reader: reader, reviewer: reviewer, warnings: warnings, log: log}
 }
 
 // WithReviewer sets the review queue adapter.
@@ -178,7 +179,7 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 		return s.insertCapture(ctx, base, &res)
 	}
 
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}
@@ -328,7 +329,7 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if approve {
 		status, captureStatus = "approved", StatusApproved
 	}
-	tx, err := s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, s.pool)
 	if err != nil {
 		return View{}, err
 	}

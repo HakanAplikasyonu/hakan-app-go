@@ -24,6 +24,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
@@ -99,7 +100,7 @@ func New(pool DB, store ObjectStore, enq Enqueuer, log *slog.Logger) *Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	s := &Service{db: pool, q: db.New(pool), store: store, queue: enq, validator: ubltrValidator{}, limits: ublmap.DefaultLimits, log: log}
+	s := &Service{db: pool, q: database.QueriesFor(pool), store: store, queue: enq, validator: ubltrValidator{}, limits: ublmap.DefaultLimits, log: log}
 	s.ownTaxID = s.q.GetTaxpayerOwnTaxID
 	return s
 }
@@ -400,7 +401,7 @@ func (s *Service) store1(ctx context.Context, job db.UblUploadJob, inv model.Inv
 			return repository.SaveResult{}, nil, err
 		}
 	}
-	tx, err := s.db.Begin(ctx)
+	tx, err := database.Begin(ctx, s.db)
 	if err != nil {
 		return repository.SaveResult{}, nil, err
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -42,7 +43,9 @@ type ConsentRecorder interface {
 }
 
 // NewHistory builds the service.
-func NewHistory(pool *pgxpool.Pool) *History { return &History{pool: pool, q: db.New(pool)} }
+func NewHistory(pool *pgxpool.Pool) *History {
+	return &History{pool: pool, q: database.QueriesFor(pool)}
+}
 
 // WithConsents requires every share to carry the accepted version of the
 // explicit-consent text; the share and its evidence are written together and
@@ -174,7 +177,7 @@ func (h *History) inTx(ctx context.Context, fn func(q *db.Queries) error) error 
 	if h.pool == nil {
 		return fn(h.q)
 	}
-	return pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error { return fn(db.New(tx)) })
+	return database.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error { return fn(db.New(tx)) })
 }
 
 // Document is a document as an office sees it.

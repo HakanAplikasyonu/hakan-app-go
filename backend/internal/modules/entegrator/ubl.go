@@ -14,6 +14,7 @@ import (
 	"github.com/furkanmeclis/go-ubltr/provider"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
@@ -179,7 +180,7 @@ func (j *job) save(ctx context.Context, d db.EntegratorDocument, inv model.Invoi
 			return err
 		}
 	}
-	tx, err := j.s.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, j.s.pool)
 	if err != nil {
 		return err
 	}

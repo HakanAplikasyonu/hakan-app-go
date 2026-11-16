@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
@@ -136,7 +137,7 @@ func (p *Postgres) CreateRule(ctx context.Context, org, eng int64, in usecase.Ru
 
 // NewVersion implements usecase.Store.
 func (p *Postgres) NewVersion(ctx context.Context, org, eng int64, key uuid.UUID, in usecase.RuleInput, userID int64) (usecase.Rule, error) {
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return usecase.Rule{}, fmt.Errorf("begin: %w", err)
 	}
@@ -169,7 +170,7 @@ func (p *Postgres) NewVersion(ctx context.Context, org, eng int64, key uuid.UUID
 
 // Retire implements usecase.Store.
 func (p *Postgres) Retire(ctx context.Context, org, eng int64, key uuid.UUID) error {
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}

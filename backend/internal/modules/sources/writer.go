@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
@@ -66,7 +67,7 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 	if rep.Excluded == nil {
 		rep.Excluded = Excluded{}
 	}
-	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+	err := database.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		for _, inv := range b.Invoices {
 			res, err := repository.SaveInvoice(ctx, tx, taxpayerID, inv, 0)
 			if err != nil {

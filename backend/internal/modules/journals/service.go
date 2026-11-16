@@ -138,7 +138,7 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 	if err != nil {
 		return Draft{}, err
 	}
-	tx, err := s.db.Begin(ctx)
+	tx, err := database.Begin(ctx, s.db)
 	if err != nil {
 		return Draft{}, err
 	}
@@ -299,7 +299,7 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 	filesJSON, _ := json.Marshal(files)
 	issuesJSON, _ := json.Marshal(view.Issues)
 
-	tx, err := s.db.Begin(ctx)
+	tx, err := database.Begin(ctx, s.db)
 	if err != nil {
 		return BatchView{}, err
 	}
