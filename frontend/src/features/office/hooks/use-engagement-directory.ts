@@ -20,12 +20,13 @@ export type EngagementEntry = {
  * office-wide list that carries the taxpayer title, so one query (all pages,
  * a single period) feeds every screen.
  */
-export function useEngagementDirectory() {
+export function useEngagementDirectory(enabled = true) {
   const { slug } = useTenant();
   const query = useQuery({
     queryKey: periodKeys.matrixAll(slug, { periods: 1 }),
     queryFn: () => periodService.matrixAll(slug, { periods: 1 }),
     staleTime: 5 * 60_000,
+    enabled,
   });
   const entries = useMemo(() => {
     const map = new Map<string, EngagementEntry>();
