@@ -290,7 +290,17 @@ func backendRoot() string {
 
 func newSweepEnv(t *testing.T) *sweepEnv {
 	t.Helper()
-	d := testdb.Open(t)
+	// SWEEP_DATABASE_URL (issue #317): sweep an existing database that
+	// already holds the demo office — the production-like database the
+	// owner change rehearsal (.github/workflows/db-owner-rehearsal.yml)
+	// migrated to hakan_owner — instead of a fresh one.
+	existing := os.Getenv("SWEEP_DATABASE_URL")
+	var d *testdb.DB
+	if existing != "" {
+		d = testdb.OpenExisting(t, existing)
+	} else {
+		d = testdb.Open(t)
+	}
 	u, err := url.Parse(d.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -315,17 +325,19 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	}
 
 	// The demo office (cmd/demo-seed): office, members, taxpayers, engagements.
-	bin := filepath.Join(t.TempDir(), "demo-seed")
-	build := exec.Command("go", "build", "-o", bin, "./cmd/demo-seed")
-	build.Dir = backendRoot()
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build demo-seed: %v\n%s", err, out)
-	}
-	seed := exec.Command(bin)
-	seed.Dir = backendRoot()
-	seed.Env = os.Environ()
-	if out, err := seed.CombinedOutput(); err != nil {
-		t.Fatalf("demo-seed: %v\n%s", err, out)
+	if existing == "" {
+		bin := filepath.Join(t.TempDir(), "demo-seed")
+		build := exec.Command("go", "build", "-o", bin, "./cmd/demo-seed")
+		build.Dir = backendRoot()
+		if out, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("build demo-seed: %v\n%s", err, out)
+		}
+		seed := exec.Command(bin)
+		seed.Dir = backendRoot()
+		seed.Env = os.Environ()
+		if out, err := seed.CombinedOutput(); err != nil {
+			t.Fatalf("demo-seed: %v\n%s", err, out)
+		}
 	}
 
 	cfg, err := config.Load()

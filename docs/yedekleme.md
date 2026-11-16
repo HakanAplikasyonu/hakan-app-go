@@ -134,6 +134,8 @@ Yedek servisi `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD` doluysa bu rolle bağlanı
   1. Boş bir veritabanına `pg_restore --exit-on-error --single-transaction`, hem süper kullanıcıyla hem `hakan_owner` ile ayrı ayrı denendi; ikisi de başarılı. `pg_dump`, RLS'yi açan ve FORCE'u koyan komutları ve politikaları veriden sonra yazar.
   2. 109 tablonun satır sayıları kaynakla aynıydı. Şema sürümü 89, 71 tablo FORCE'lu ve sahip `hakan_owner`.
 
+Üretimi bu rollere geçirme adımları: `docs/runbook/db-sahip-gecisi.md` (#317).
+
 CI tatbikatı (`scripts/backup-drill.sh`) yedeği `hakan_backup` ile alır, geri yüklemeyi hedef kümenin yöneticisiyle yapar.
 
 ## Tatbikat (CI)

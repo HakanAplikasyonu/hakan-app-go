@@ -154,3 +154,28 @@ func randomSuffix() string {
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
 }
+
+// OpenExisting connects to an existing, already migrated database (issue
+// #317: the production-like database the owner change rehearsal migrated)
+// instead of creating a fresh one. The pool runs as RuntimeRole, like Open;
+// nothing is created or dropped.
+func OpenExisting(t testing.TB, dbURL string) *DB {
+	t.Helper()
+	poolCfg, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		t.Fatalf("testdb: pool config: %v", err)
+	}
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET ROLE "+RuntimeRole)
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
+	if err != nil {
+		t.Fatalf("testdb: pool: %v", err)
+	}
+	t.Cleanup(pool.Close)
+	if err := pool.Ping(context.Background()); err != nil {
+		t.Fatalf("testdb: %v", err)
+	}
+	return &DB{URL: dbURL, Pool: pool, Name: poolCfg.ConnConfig.Database}
+}
