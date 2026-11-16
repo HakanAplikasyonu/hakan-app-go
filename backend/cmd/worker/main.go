@@ -8,6 +8,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/cache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
@@ -37,6 +40,7 @@ import (
 	ioadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mail"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
@@ -214,9 +218,12 @@ func main() {
 		WithImport(importSvc.ProcessImport).
 		WithBulk(bulkSvc.ProcessBulk).
 		WithUBLUpload(invoiceupload.New(pool, store, nil, log).Process).
-		WithDocTaskReminders(doctasksmodule.New(pool, store, notifSvc,
-			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount).
-		WithAgentsOfflineSweep(agentsusecase.New(db.New(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount).
+		// The two sweeps scan every office: deliberate row level security
+		// bypass (issue #166).
+		WithDocTaskReminders(systemCount(pool, "doctasks: reminders across offices", doctasksmodule.New(pool, store, notifSvc,
+			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount)).
+		WithAgentsOfflineSweep(systemCount(pool, "agents: offline sweep across offices",
+			agentsusecase.New(database.NewQueries(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount)).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
@@ -301,4 +308,18 @@ func main() {
 		}
 	}
 	log.Info("worker_stopped")
+}
+
+// systemCount runs a cross-office sweep in one rls.System transaction; the
+// sweep's queries (database.NewQueries) join it.
+func systemCount(pool *pgxpool.Pool, reason string, fn func(context.Context) (int, error)) func(context.Context) (int, error) {
+	return func(ctx context.Context) (int, error) {
+		var n int
+		err := rls.System(ctx, pool, reason, func(ctx context.Context, _ pgx.Tx) error {
+			var err error
+			n, err = fn(ctx)
+			return err
+		})
+		return n, err
+	}
 }

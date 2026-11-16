@@ -12,6 +12,7 @@ import (
 
 	ubltr "github.com/furkanmeclis/go-ubltr"
 	"github.com/furkanmeclis/go-ubltr/provider"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
@@ -19,6 +20,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
@@ -181,11 +183,23 @@ func (j *job) save(ctx context.Context, d db.EntegratorDocument, inv model.Invoi
 			return err
 		}
 	}
+	scope, err := j.scope(ctx, d.TaxpayerID)
+	if err != nil {
+		return err
+	}
+	inScope := rls.InScope(ctx)
 	tx, err := database.Begin(ctx, j.s.pool)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	if !inScope {
+		// The document's writes run under the taxpayer and the office that
+		// serves it now (issue #166).
+		if err := rls.Apply(ctx, tx, scope); err != nil {
+			return err
+		}
+	}
 	q := db.New(tx)
 	att, err := q.UpsertAttachment(ctx, db.UpsertAttachmentParams{
 		TaxpayerID: d.TaxpayerID, Kind: "ubl_xml", StorageKey: key, Sha256: sha, SizeBytes: int64(len(xml)),
@@ -275,4 +289,26 @@ func (j *job) warn(ctx context.Context, q *db.Queries, d db.EntegratorDocument, 
 		}
 	}
 	return nil
+}
+
+// scope is the worker scope for a taxpayer's document: the taxpayer and the
+// office with its active engagement, if any. Which office serves a taxpayer
+// is not a question of one tenant, so it is read through rls.System.
+func (j *job) scope(ctx context.Context, taxpayerID int64) (rls.Scope, error) {
+	var org int64
+	err := rls.System(ctx, j.s.pool, "entegrator: office serving the taxpayer", func(ctx context.Context, tx pgx.Tx) error {
+		eng, err := db.New(tx).GetActiveEngagementForTaxpayer(ctx, taxpayerID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		org = eng.OrganizationID
+		return nil
+	})
+	if err != nil {
+		return rls.Scope{}, err
+	}
+	return rls.Job(org, taxpayerID), nil
 }
