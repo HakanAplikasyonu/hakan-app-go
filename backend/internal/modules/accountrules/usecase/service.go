@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -141,6 +142,11 @@ type SuggestionView struct {
 	Status      string          `json:"status"`
 	Rationale   string          `json:"rationale"`
 	RuleRef     string          `json:"rule_ref"`
+	// Counterparty (cari) suggestions only (#310): the proposed account must
+	// be opened in the accounting program (not in the imported plan yet), and
+	// the name it is matched or opened under.
+	OpenNew     *bool  `json:"open_new,omitempty"`
+	AccountName string `json:"account_name,omitempty"`
 }
 
 // SuggestInvoice proposes account codes for the invoice's lines (line and
@@ -204,14 +210,18 @@ func (s *Service) SuggestInvoice(ctx context.Context, sub Subject, invoiceUUID u
 		}
 		if cdone[*inv.CustomerID][FieldAccount] == "" {
 			a, extra, err := s.counterpartyAssignment(ctx, sub, rules, inv)
-			if err != nil {
+			switch {
+			case errors.Is(err, errNoCounterpartyMain):
+				// No cari suggestion for this invoice.
+			case err != nil:
 				return nil, err
+			default:
+				v, err := s.submit(ctx, sub, inv, nil, TargetCustomer, *inv.CustomerID, FieldAccount, a, cpKey, extra)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, v)
 			}
-			v, err := s.submit(ctx, sub, inv, nil, TargetCustomer, *inv.CustomerID, FieldAccount, a, cpKey, extra)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, v)
 		}
 	}
 	if out == nil {
@@ -240,6 +250,8 @@ func lineAssignment(rules []engine.Rule, x engine.Context, history []HistoryRow)
 	return a
 }
 
+var errNoCounterpartyMain = errors.New("accountrules: no cari main account for this invoice direction")
+
 func (s *Service) counterpartyAssignment(ctx context.Context, sub Subject, rules []engine.Rule, inv Invoice) (engine.Assignment, map[string]any, error) {
 	x := engine.Context{Direction: inv.Direction, InvoiceType: inv.Type,
 		CounterpartyTaxID: firstNonEmpty(inv.TaxNumber, inv.IdentityNumber), CounterpartyName: inv.CustomerName}
@@ -252,6 +264,11 @@ func (s *Service) counterpartyAssignment(ctx context.Context, sub Subject, rules
 	main := a.AccountCode
 	if len(main) > 3 {
 		main = main[:3]
+	}
+	if main == "" {
+		// No default for this direction (neither incoming nor outgoing):
+		// proposing ".01.001" would be nonsense; leave the cari to the office.
+		return a, nil, errNoCounterpartyMain
 	}
 	plan, err := s.store.PlanUnder(ctx, sub, main)
 	if err != nil {
@@ -306,6 +323,12 @@ func (s *Service) submit(ctx context.Context, sub Subject, inv Invoice, l *Invoi
 		Confidence: sug.Input.Confidence, Status: string(sug.Status), Rationale: a.Rationale, RuleRef: a.RuleRef}
 	if l != nil {
 		v.LineNo = l.LineNo
+	}
+	if open, ok := extra["open_new"].(bool); ok {
+		v.OpenNew = &open
+	}
+	if name, ok := extra["account_name"].(string); ok {
+		v.AccountName = name
 	}
 	return v, nil
 }

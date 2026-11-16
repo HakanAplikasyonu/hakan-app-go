@@ -7,6 +7,7 @@ kenar çubuğunda, mükellef panelinde üst menüdedir.
 |---|---|
 | [Ofis yöneticisi](ofis-yoneticisi.md) | Ofis sahibi ve yöneticiler: kurulum, kullanıcılar, mükellef ekleme, entegratörler, inceleme, yevmiye ve Luca / Zirve çıktısı |
 | [Ofis çalışanı](ofis-calisani.md) | Muhasebe ekibi: günlük iş akışı |
+| [Mizan hafızası](mizan-hafizasi.md) | Mizan yükleme, kural adayları ve sonraki aylarda otomatik kodlama |
 | [Mükellef](mukellef.md) | Mükellef kullanıcıları: web paneli ve mobil uygulama |
 | [Masaüstü ajanı](masaustu.md) | Ofis bilgisayarına kurulan ajan: kurulum, klasör izleme, sorun giderme |
 

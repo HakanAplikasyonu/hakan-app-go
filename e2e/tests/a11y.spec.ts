@@ -71,6 +71,7 @@ test.describe("@a11y ofis paneli", () => {
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,
       "/agents",
+      "/account-plan",
       "/members",
       "/roles",
       "/settings",

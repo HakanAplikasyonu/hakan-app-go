@@ -67,3 +67,25 @@ func TestProposeCounterparty(t *testing.T) {
 		t.Fatalf("empty plan = %+v", p)
 	}
 }
+
+// #310: punctuation and spacing differences between the mizan and the
+// invoice must not open a duplicate cari account.
+func TestProposeCounterpartyIgnoresPunctuation(t *testing.T) {
+	t.Parallel()
+	plan := []PlanAccount{
+		{Code: "320.01.002", Name: "DENİZ AMBALAJ LTD. ŞTİ.", IsLeaf: true},
+		{Code: "120.01.006", Name: "KORKMAZ GIDA SAN. VE TİC. A.Ş.", IsLeaf: true},
+	}
+	for _, name := range []string{"Deniz Ambalaj Ltd.Şti.", "Deniz  Ambalaj LTD ŞTİ", "deniz ambalaj ltd. şti."} {
+		if p := ProposeCounterparty("320", name, plan); !p.Existing || p.AccountCode != "320.01.002" {
+			t.Errorf("%q = %+v, want 320.01.002", name, p)
+		}
+	}
+	if p := ProposeCounterparty("120", "Korkmaz Gıda San. ve Tic. A.Ş.", plan); !p.Existing || p.AccountCode != "120.01.006" {
+		t.Errorf("Korkmaz = %+v", p)
+	}
+	// Different words stay different (no fuzzy match).
+	if p := ProposeCounterparty("320", "Deniz Ambalaj Sanayi A.Ş.", plan); p.Existing {
+		t.Errorf("Deniz Ambalaj Sanayi matched %+v", p)
+	}
+}

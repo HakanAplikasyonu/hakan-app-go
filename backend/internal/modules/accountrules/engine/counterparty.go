@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // PlanAccount is one account under a main code in the target plan (#30).
@@ -26,12 +27,12 @@ type CounterpartyProposal struct {
 // free code next to the existing leaf accounts ("120.01.007" after
 // "120.01.006"). With no sub-accounts it proposes main + ".01.001".
 func ProposeCounterparty(main, name string, plan []PlanAccount) CounterpartyProposal {
-	want := Fold(name)
+	want := NameKey(name)
 	parents := map[string]int{}  // leaf'lerin üst kodu -> leaf sayısı
 	lastSeg := map[string]int{}  // üst kod -> en büyük son segment
 	segWidth := map[string]int{} // üst kod -> son segment genişliği
 	for _, a := range plan {
-		if want != "" && a.IsLeaf && Fold(a.Name) == want {
+		if want != "" && a.IsLeaf && NameKey(a.Name) == want {
 			return CounterpartyProposal{AccountCode: a.Code, Name: a.Name, Existing: true}
 		}
 		if !a.IsLeaf || !strings.HasPrefix(a.Code, main+".") {
@@ -64,4 +65,19 @@ func ProposeCounterparty(main, name string, plan []PlanAccount) CounterpartyProp
 		AccountCode: fmt.Sprintf("%s.%0*d", best, segWidth[best], lastSeg[best]+1),
 		Name:        name,
 	}
+}
+
+// NameKey is the form cari names are matched in (#310): Turkish-aware lower
+// case with only letters and digits kept, so the mizan's "KORKMAZ GIDA SAN.
+// VE TİC. A.Ş." matches the invoice's "Korkmaz Gıda San. ve Tic. A.Ş." and
+// "LTD. ŞTİ." matches "LTD.ŞTİ.". Abbreviation variants ("Sanayi" vs "San.")
+// still differ on purpose: a wrong cari is worse than a new-account proposal.
+func NameKey(s string) string {
+	var b strings.Builder
+	for _, r := range Fold(s) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }

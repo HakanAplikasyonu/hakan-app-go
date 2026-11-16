@@ -12191,6 +12191,10 @@ export interface components {
             status?: string;
             rationale?: string;
             rule_ref?: string;
+            /** @description Counterparty (cari) suggestions only. true when the proposed code is not in the imported plan and must be opened in the accounting program (#310). */
+            open_new?: boolean;
+            /** @description Counterparty suggestions only. Plan account name (match) or the invoice's counterparty name (new account). */
+            account_name?: string;
         };
         EnvelopeAccountRule: {
             /** @enum {boolean} */
