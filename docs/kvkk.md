@@ -18,7 +18,7 @@ Ofis ile platform arasındaki ilişki **Veri İşleyen Sözleşmesi** ile kurulu
 
 ## 2. Metinler ve sürümleme
 
-Metinler `legal_documents` tablosundadır (migration `000070`). Türler:
+Metinler `legal_documents` tablosundadır (migration `000071`). Türler:
 
 | Tür (`kind`) | Metin | Kim onaylar | Hangi akışta |
 |---|---|---|---|
