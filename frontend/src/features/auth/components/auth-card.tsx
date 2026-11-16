@@ -1,15 +1,12 @@
 import type { ComponentProps, ReactNode } from "react";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { FieldDescription } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
+/**
+ * Giriş kabuğundaki form bölümü (tuval Giris): kart çerçevesi yok; sayfa
+ * başlığı (h1), kısa açıklama, içerik ve dipnot. Kabuk zemini zaten yüzey.
+ */
 export function AuthCard({
   title,
   description,
@@ -25,17 +22,17 @@ export function AuthCard({
 }) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <CardTitle className="text-xl">{title}</CardTitle>
-          {description ? (
-            <CardDescription>{description}</CardDescription>
-          ) : null}
-        </CardHeader>
-        <CardContent>{children}</CardContent>
-      </Card>
+      <div className="space-y-1.5">
+        <h1 className="font-display text-[28px] leading-tight font-bold tracking-tight">
+          {title}
+        </h1>
+        {description ? (
+          <p className="text-text-2 text-sm">{description}</p>
+        ) : null}
+      </div>
+      <div>{children}</div>
       {footer ? (
-        <FieldDescription className="px-6 text-center">
+        <FieldDescription className="text-text-3 text-xs">
           {footer}
         </FieldDescription>
       ) : null}

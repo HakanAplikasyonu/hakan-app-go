@@ -561,12 +561,71 @@ export function LoginForm() {
     <AuthCard
       title={t("auth.login.title")}
       description={t("auth.login.description")}
+      footer={t("auth.shell.taxpayer_hint")}
     >
       <div className="space-y-4">
+        {showPassword ? (
+          <>
+            <AppForm
+              schema={schema}
+              defaultValues={{ email: "", password: "" }}
+              onSubmit={onSubmit}
+            >
+              <FieldGroup>
+                {displayError ? (
+                  <Field data-invalid={true}>
+                    <FieldError>{displayError}</FieldError>
+                  </Field>
+                ) : null}
+
+                <AppInput
+                  name="email"
+                  label={t("auth.login.email")}
+                  type="email"
+                  autoComplete="email"
+                  placeholder={t("auth.placeholders.email")}
+                />
+                <AppPassword
+                  name="password"
+                  label={t("auth.login.password")}
+                  autoComplete="current-password"
+                  placeholder={t("auth.placeholders.password")}
+                  labelAction={
+                    <Link
+                      href={routes.guest.forgotPassword}
+                      className="ml-auto text-sm underline-offset-4 hover:underline"
+                    >
+                      {t("auth.login.forgot_link")}
+                    </Link>
+                  }
+                />
+
+                <Field>
+                  <Button type="submit" className="h-12" disabled={authPending}>
+                    {pending
+                      ? t("auth.login.submitting")
+                      : t("auth.login.submit")}
+                  </Button>
+                </Field>
+              </FieldGroup>
+            </AppForm>
+          </>
+        ) : displayError ? (
+          <Field data-invalid={true}>
+            <FieldError>{displayError}</FieldError>
+          </Field>
+        ) : null}
+
+        <div className="text-text-3 flex items-center gap-3 text-xs">
+          <Separator className="flex-1" />
+          {t("auth.shell.or")}
+          <Separator className="flex-1" />
+        </div>
+
         <Button
           type="button"
           variant="outline"
-          className="w-full"
+          className="h-12 w-full"
           disabled={authPending}
           onClick={() => {
             setFormError(null);
@@ -607,68 +666,6 @@ export function LoginForm() {
               {oauthPending === button.id ? button.pendingLabel : button.label}
             </Button>
           ))}
-
-        {showPassword ? (
-          <>
-            {(showPasskey || oauthButtons.some((button) => button.enabled)) && (
-              <div className="flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-muted-foreground text-xs uppercase">
-                  {t("auth.passkey.or_password")}
-                </span>
-                <Separator className="flex-1" />
-              </div>
-            )}
-
-            <AppForm
-              schema={schema}
-              defaultValues={{ email: "", password: "" }}
-              onSubmit={onSubmit}
-            >
-              <FieldGroup>
-                {displayError ? (
-                  <Field data-invalid={true}>
-                    <FieldError>{displayError}</FieldError>
-                  </Field>
-                ) : null}
-
-                <AppInput
-                  name="email"
-                  label={t("auth.login.email")}
-                  type="email"
-                  autoComplete="email"
-                  placeholder={t("auth.placeholders.email")}
-                />
-                <AppPassword
-                  name="password"
-                  label={t("auth.login.password")}
-                  autoComplete="current-password"
-                  placeholder={t("auth.placeholders.password")}
-                  labelAction={
-                    <Link
-                      href={routes.guest.forgotPassword}
-                      className="ml-auto text-sm underline-offset-4 hover:underline"
-                    >
-                      {t("auth.login.forgot_link")}
-                    </Link>
-                  }
-                />
-
-                <Field>
-                  <Button type="submit" disabled={authPending}>
-                    {pending
-                      ? t("auth.login.submitting")
-                      : t("auth.login.submit")}
-                  </Button>
-                </Field>
-              </FieldGroup>
-            </AppForm>
-          </>
-        ) : displayError ? (
-          <Field data-invalid={true}>
-            <FieldError>{displayError}</FieldError>
-          </Field>
-        ) : null}
 
         <Button
           type="button"
