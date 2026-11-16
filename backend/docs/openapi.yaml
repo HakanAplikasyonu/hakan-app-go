@@ -9318,6 +9318,45 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [DocumentTasks]
+      operationId: createTenantDocumentRequest
+      summary: Ask the taxpayer for a document (issue #240)
+      description: |
+        Requires `tenant.doc_tasks.write` and an active engagement. Opens a
+        `document_request` task (code `DOC_REQUEST`) not tied to a bank
+        transaction; the mükellef's members are notified
+        (`doc_tasks.requested`). `due_date` (YYYY-MM-DD, Türkiye time, end of
+        day) wins over `due_days` (default office policy, at most 90);
+        `period` defaults to the due date's month. The response's
+        `bank_transaction` is a stand-in (amount 0, the title as description)
+        so clients built for bank tasks keep working.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title]
+              properties:
+                title: { type: string, minLength: 1, maxLength: 200 }
+                note: { type: string, maxLength: 1000 }
+                due_date: { type: string, format: date }
+                due_days: { type: integer, minimum: 1, maximum: 90 }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "201":
+          description: Created task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/document-tasks/detect:
     parameters:
@@ -9451,6 +9490,71 @@ paths:
       responses:
         "200":
           description: Cancelled task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: completeTenantDocumentTask
+      summary: Mark a task done (document accepted)
+      description: Requires `tenant.doc_tasks.write`. An open or submitted task becomes `matched`; a closed one answers `409 TASK_CLOSED`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Completed task
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/DocumentTaskUuid"
+    post:
+      tags: [DocumentTasks]
+      operationId: rerequestTenantDocumentTask
+      summary: Ask again after an insufficient upload
+      description: |
+        Requires `tenant.doc_tasks.write`. Only a `submitted` task (else
+        `409 TASK_NOT_SUBMITTED`): it is reopened with the new note (what is
+        missing) and due date, reminders start over, `request_count` grows and
+        the mükellef's members are notified again.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 1000 }
+                due_date: { type: string, format: date }
+                due_days: { type: integer, minimum: 1, maximum: 90 }
+      responses:
+        "200":
+          description: Reopened task
           content:
             application/json:
               schema: { $ref: "#/components/schemas/EnvelopeDocumentTask" }
@@ -15389,20 +15493,26 @@ components:
       type: object
       description: |
         A missing-document request. `reminder_count`, `last_reminded_at`,
-        `next_reminder_at`, `cancelled_at` and `cancel_reason` are office
-        only; `organization_name` is set on the mükellef side.
-      required: [uuid, code, kind, period, status, note, due_at, overdue, submitted_at, matched_at, bank_transaction, upload_count, created_at, updated_at]
+        `next_reminder_at`, `cancelled_at`, `cancel_reason` and
+        `request_count` are office only; `organization_name` is set on the
+        mükellef side. A `document_request` (issue #240) is opened by the
+        office by hand and has no bank transaction: `bank_transaction` is
+        then a stand-in (the task's uuid, the due date, amount 0, the title
+        as description).
+      required: [uuid, code, kind, period, status, title, note, due_at, overdue, submitted_at, matched_at, bank_transaction, upload_count, created_at, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        code: { type: string, enum: [BNK_UNDOCUMENTED_PAYMENT, BNK_UNINVOICED_COLLECTION] }
-        kind: { type: string, enum: [undocumented_payment, uninvoiced_collection] }
+        code: { type: string, description: "BNK_UNDOCUMENTED_PAYMENT, BNK_UNINVOICED_COLLECTION or DOC_REQUEST (more may follow; treat unknown values as a generic request)", example: BNK_UNDOCUMENTED_PAYMENT }
+        kind: { type: string, description: "undocumented_payment, uninvoiced_collection or document_request (more may follow)", example: undocumented_payment }
         period: { type: string, example: "2026-10" }
         status: { type: string, enum: [open, submitted, matched, cancelled] }
+        title: { type: string, description: "What the office asks for (document_request); empty for bank tasks" }
         note: { type: string }
         due_at: { type: string, format: date-time }
         overdue: { type: boolean }
         organization_name: { type: string }
         reminder_count: { type: integer }
+        request_count: { type: integer, description: "How many times the office asked (1 + re-requests)" }
         last_reminded_at: { type: [string, "null"], format: date-time }
         next_reminder_at: { type: [string, "null"], format: date-time }
         submitted_at: { type: [string, "null"], format: date-time }

@@ -49,6 +49,8 @@ type Querier interface {
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
+	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
+	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
 	CopyOfficeAccountRules(ctx context.Context, arg CopyOfficeAccountRulesParams) (int32, error)
@@ -119,6 +121,10 @@ type Querier interface {
 	// önceki faturalarında onaylanmış satır hesap kodları, en sık kullanılan önce.
 	CounterpartyAccountHistory(ctx context.Context, arg CounterpartyAccountHistoryParams) ([]CounterpartyAccountHistoryRow, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
+	// ---------------------------------------------------------------------------
+	// Müşavirin elle açtığı belge talebi (issue #240).
+	// ---------------------------------------------------------------------------
+	CreateDocumentRequest(ctx context.Context, arg CreateDocumentRequestParams) (CreateDocumentRequestRow, error)
 	// Açık BNK_* uyarılarından görev açar. Hareket başına tek açık görev
 	// (uq_document_tasks_active); var olanlar atlanır.
 	CreateDocumentTasksFromWarnings(ctx context.Context, arg CreateDocumentTasksFromWarningsParams) ([]int64, error)
@@ -293,6 +299,7 @@ type Querier interface {
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
 	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
 	GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error)
+	GetEngagementUUIDByID(ctx context.Context, arg GetEngagementUUIDByIDParams) (uuid.UUID, error)
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -529,6 +536,9 @@ type Querier interface {
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
 	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
 	ListDesktopAgents(ctx context.Context, organizationID int64) ([]DesktopAgent, error)
+	// Yüklemeyi duyacak ofis üyeleri: görevi açan ve engagement'a atananlar
+	// (hâlâ ofis üyesi olanlar).
+	ListDocumentTaskOfficeRecipients(ctx context.Context, arg ListDocumentTaskOfficeRecipientsParams) ([]int64, error)
 	ListDocumentTaskRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
 	ListDocumentTaskUploads(ctx context.Context, arg ListDocumentTaskUploadsParams) ([]ListDocumentTaskUploadsRow, error)
 	ListDocumentTasks(ctx context.Context, arg ListDocumentTasksParams) ([]ListDocumentTasksRow, error)
@@ -797,6 +807,9 @@ type Querier interface {
 	ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error)
 	ReplaceSecretRecord(ctx context.Context, arg ReplaceSecretRecordParams) (int64, error)
 	ReplaceUserRoles(ctx context.Context, userID int64) error
+	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
+	// hatırlatma baştan kurulur.
+	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)

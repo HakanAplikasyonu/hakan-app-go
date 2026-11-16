@@ -135,8 +135,8 @@ func TestRoutesDocumented(t *testing.T) {
 		}
 	}
 	routes := r.Routes()
-	if len(routes) != 10 {
-		t.Fatalf("routes = %d, want 10", len(routes))
+	if len(routes) != 13 {
+		t.Fatalf("routes = %d, want 13", len(routes))
 	}
 	for _, rt := range routes {
 		if !spec[strings.ToLower(rt.Method)+" "+rt.Path] {
