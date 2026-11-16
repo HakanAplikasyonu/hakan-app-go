@@ -182,7 +182,7 @@ func (c *Client) searchOne(ctx context.Context, spec, q string, limit int) ([]Hi
 // raw JSON fields (meilisearch.Hit), not a decoded map (#223).
 func mapHit(spec string, hit meilisearch.Hit) Hit {
 	var row map[string]interface{}
-	if err := hit.Decode(&row); err != nil || row == nil {
+	if err := hit.DecodeInto(&row); err != nil || row == nil {
 		return Hit{Spec: spec}
 	}
 	getStr := func(key string) string {
