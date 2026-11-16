@@ -90,7 +90,12 @@ Diğer profiller: `development-simulator`, `preview`, `production`.
   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
   ```
 
-  CI'da emülatörde **çalıştırılmaz**. Çalıştırmak için önce yerel bir Android derlemesi (Gradle, yaklaşık 15-25 dakika), ardından bir emülatör ve test verisi olan bir backend gerekir; bu, mobil işi her değişiklikte çok ağırlaştırır. CI bunun yerine iki şey yapar:
+  **Gece emülatör koşusu (#300):** `.github/workflows/mobile-e2e.yml` her gece (01:23 UTC) ve elle (Actions → "Mobile E2E (Maestro)" → Run workflow) iki uygulamanın akışlarını Android emülatöründe koşturur. Adımlar:
+  - backend `scripts/e2e-up.sh` ile kalkar (`E2E_SKIP_FRONTEND=1`: compose, migration, demo seed, API);
+  - uygulama `expo prebuild` ve `assembleRelease` (x86_64) ile derlenir; API adresi `http://10.0.2.2:8080`, yalnızca bu işte cleartext açılır;
+  - akışlar `scripts/maestro-ci.sh` ile koşar.
+
+  Sonuç iş özetinde akış başına tablo olarak görünür. `maestro-<uygulama>` artifact'ında JUnit raporu, hata anı ekran görüntüleri, ekran kaydı, logcat ve API logu var. İş zorunlu kontrol değil, yalnızca rapor üretir. Her push'taki mobil işte ayrıca şunlar koşar:
   - `npm test` (`src/core/config/maestro.test.ts`): akışların YAML'ı, `appId`, komutları, sırası ve kullandığı env değişkenleri denetlenir.
   - `expo prebuild` (Android): yerel proje yapılandırması üretilir. Eklentiler (expo-updates, Sentry, bildirim, bağlantılar) burada bozulursa iş düşer.
 - **Sürüm bilgisi:** profil ekranı gerçek sürümü ve derleme numarasını (expo-application) ve varsa OTA güncellemesini gösterir.

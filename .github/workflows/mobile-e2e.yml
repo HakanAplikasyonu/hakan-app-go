@@ -1,0 +1,149 @@
+name: Mobile E2E (Maestro)
+
+# #300: mobile/ ve mobile-office/ Maestro duman akışları Android emülatöründe,
+# demo verili gerçek bir backend'e karşı (scripts/e2e-up.sh: compose,
+# migration, demo seed, Go API). Zorunlu kontrol DEĞİL: yalnızca rapor üretir
+# (JUnit özeti, hata anı ekran görüntüleri, ekran kaydı, logcat, API logu).
+#
+# Gece (schedule) ve elle (workflow_dispatch) çalışır. Bu dosya ya da
+# betikleri değişince de koşar ki iş akışının kendisi denenmiş olsun.
+on:
+  schedule:
+    - cron: "23 1 * * *" # her gece 01:23 UTC (04:23 TSİ)
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/mobile-e2e.yml
+      - scripts/maestro-ci.sh
+
+concurrency:
+  group: mobile-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  maestro:
+    name: maestro (${{ matrix.app }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: mobile
+            email: mukellef@demo.hakan.local
+          - app: mobile-office
+            email: musavir@demo.hakan.local
+    env:
+      # Emülatörden host makinedeki API'ye: 10.0.2.2 → host 127.0.0.1.
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:8080
+      EXPO_PUBLIC_APP_ENV: preview
+      # Sentry Gradle eklentisi sürüm derlemesinde kaynak haritası yüklemesin.
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      MAESTRO_EMAIL: ${{ matrix.email }}
+      MAESTRO_PASSWORD: Demo1234! # demo seed'in herkese açık deneme parolası (backend/cmd/demo-seed)
+      OUT: ${{ github.workspace }}/maestro-out
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: KVM (emülatör hızlandırma)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: ${{ matrix.app }}/.nvmrc
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+
+      - name: Backend (compose, migration, demo seed, API)
+        env:
+          E2E_SKIP_FRONTEND: "1"
+        run: scripts/e2e-up.sh
+
+      - name: Install
+        working-directory: ${{ matrix.app }}
+        run: npm ci
+
+      # Sürüm derlemesi: JS paketin içinde, Metro gerekmez; expo-dev-client
+      # yalnızca debug derlemesinde açılır. İmza: şablonun debug anahtarı.
+      - name: Android projesi (expo prebuild)
+        working-directory: ${{ matrix.app }}
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          # Yalnızca bu iş: emülatör API'ye http ile gider (10.0.2.2).
+          manifest=android/app/src/main/AndroidManifest.xml
+          grep -q 'usesCleartextTraffic' "$manifest" \
+            && sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' "$manifest" \
+            || sed -i 's/<application /<application android:usesCleartextTraffic="true" /' "$manifest"
+          grep -o 'android:usesCleartextTraffic="[a-z]*"' "$manifest"
+
+      - name: APK (assembleRelease, x86_64)
+        working-directory: ${{ matrix.app }}/android
+        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace
+
+      - name: Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          "$HOME/.maestro/bin/maestro" --version
+
+      - name: Emülatörde akışlar
+        id: flows
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: scripts/maestro-ci.sh ${{ matrix.app }} ${{ matrix.app }}/android/app/build/outputs/apk/release/app-release.apk "$OUT"
+
+      - name: Özet
+        if: always()
+        run: |
+          {
+            echo "### Maestro: ${{ matrix.app }}"
+            if [ -f "$OUT/report.xml" ]; then
+              node -e '
+                const x = require("fs").readFileSync(process.argv[1], "utf8");
+                const cases = [...x.matchAll(/<testcase[^>]*name="([^"]+)"[^>]*?(\/>|>([\s\S]*?)<\/testcase>)/g)];
+                console.log("| Akış | Sonuç |\n|---|---|");
+                for (const c of cases) {
+                  const failed = /<failure|<error/.test(c[3] || "");
+                  console.log(`| ${c[1]} | ${failed ? "❌" : "✅"} |`);
+                }' "$OUT/report.xml"
+            else
+              echo "Rapor yok: akışlar çalışmadan iş düştü (yukarıdaki adımlara bakın)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: API logu
+        if: always()
+        run: cp e2e/.run/server.log "$OUT/" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: maestro-${{ matrix.app }}
+          path: maestro-out/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Ortamı kapat
+        if: always()
+        run: scripts/e2e-down.sh || true
