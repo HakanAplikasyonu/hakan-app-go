@@ -93,12 +93,12 @@ test("ofis bilgileri ve ekip daveti", async () => {
   const name = owner.locator('input[name="name"]');
   await expect(name).toHaveValue(officeName);
   await name.fill(`${officeName} SMMM`);
-  await owner.getByRole("button", { name: "Kaydet ve devam" }).click();
+  await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
 
   await owner.locator('input[name="email"]').fill(teamEmail);
   await owner.getByRole("button", { name: "Davet ekle" }).click();
   await expect(owner.getByText(teamEmail)).toBeVisible();
-  await owner.getByRole("button", { name: "Kaydet ve devam" }).click();
+  await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
   await mailToken(teamEmail, "/invite/");
 });
 
@@ -113,7 +113,7 @@ test("mükellef listesi: 200 satır, hatalı satırlar satır satır", async () 
   await expect(owner.getByText("Hatalı VKN Ltd.")).toBeVisible();
   await expect(owner.getByText("E-postasız A.Ş.")).toBeVisible();
   await expect(owner.getByText("Tekrar A.Ş.")).toBeVisible();
-  await owner.getByRole("button", { name: "Kaydet ve devam" }).click();
+  await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
 });
 
 test("yarıda bırakılır, kaldığı yerden devam eder", async () => {
@@ -126,10 +126,10 @@ test("yarıda bırakılır, kaldığı yerden devam eder", async () => {
 
 test("Luca seçimi, entegratör adımı atlanır, toplu davet", async () => {
   await owner.getByRole("radio", { name: "Luca" }).check();
-  await owner.getByRole("button", { name: "Kaydet ve devam" }).click();
+  await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
 
-  await expect(owner.getByRole("button", { name: "Atla" })).toBeVisible();
-  await owner.getByRole("button", { name: "Atla" }).click();
+  await expect(owner.getByRole("button", { name: "Bu adımı atla" })).toBeVisible();
+  await owner.getByRole("button", { name: "Bu adımı atla" }).click();
 
   await expect(owner.getByText(`${ROWS - 3} mükellefe onay e-postası gönderilecek`)).toBeVisible();
   await owner.getByRole("button", { name: "Davetleri gönder" }).click();

@@ -36,47 +36,183 @@ function errorText(error: unknown, fallback: string) {
 
 // --- Mükellef listesi ---
 
-function ImportSummary({ batch }: { batch: TaxpayerImport }) {
+type RowFix = { tax_id: string; title: string };
+
+/** Düzeltilmiş satırlarla yeni bir CSV (sunucunun başlık eşlemesine uygun). */
+function correctedCsv(batch: TaxpayerImport, fixes: Record<number, RowFix>) {
+  const q = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  const lines = ["VKN,Unvan,Vergi dairesi,E-posta,Tür"];
+  for (const r of batch.rows ?? []) {
+    const f = fixes[r.row];
+    lines.push(
+      [
+        f?.tax_id ?? r.tax_id,
+        f?.title ?? r.title,
+        r.tax_office ?? "",
+        r.contact_email ?? "",
+        // Düzeltilen satırda tür boş: sunucu kimlik numarasından çıkarır
+        // (VKN düzeltilip TCKN olursa eski tür çelişirdi).
+        f
+          ? ""
+          : r.kind === "individual"
+            ? "gerçek"
+            : r.kind === "legal"
+              ? "tüzel"
+              : "",
+      ]
+        .map((v) => q(v ?? ""))
+        .join(","),
+    );
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Yüklenen listenin satırları (OfisKurulum): hatalılar önce, durum rozetiyle.
+ * Hatalı satırda VKN ve unvan yerinde düzeltilir; "Düzeltmeleri uygula"
+ * düzeltilmiş listeyi yeni bir yükleme olarak gönderir (satır düzenleme ucu
+ * yok, sunucu yeniden doğrular).
+ */
+function ImportSummary({
+  batch,
+  busy,
+  onReupload,
+}: {
+  batch: TaxpayerImport;
+  busy: boolean;
+  onReupload: (file: File) => void;
+}) {
   const { t } = useLocale();
-  const invalidRows = (batch.rows ?? []).filter((r) => r.errors.length > 0);
+  const [fixes, setFixes] = useState<Record<number, RowFix>>({});
+  const rows = [...(batch.rows ?? [])].sort(
+    (a, b) =>
+      Number(b.errors.length > 0) - Number(a.errors.length > 0) ||
+      a.row - b.row,
+  );
+  const edited = Object.keys(fixes).length;
+  const fix = (row: number, base: RowFix, patch: Partial<RowFix>) =>
+    setFixes((f) => ({ ...f, [row]: { ...(f[row] ?? base), ...patch } }));
   return (
-    <div className="mt-4 space-y-3">
-      <p className="text-muted-foreground text-xs">
-        {t("setup.taxpayers_current_file", { name: batch.file_name })}
-      </p>
-      <p className="text-sm font-medium" data-testid="setup-import-summary">
-        {t("setup.taxpayers_summary", {
-          valid: batch.valid,
-          invalid: batch.invalid,
-        })}
-      </p>
-      {invalidRows.length ? (
-        <div className="overflow-x-auto">
+    <div className="mt-5 space-y-3">
+      <div className="bg-surface-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] border px-4 py-3">
+        <span className="font-mono text-sm font-semibold">
+          {batch.file_name}
+        </span>
+        <span className="text-sm" data-testid="setup-import-summary">
+          {t("setup.taxpayers_summary", {
+            valid: batch.valid,
+            invalid: batch.invalid,
+          })}
+        </span>
+        <span className="sr-only">
+          {t("setup.taxpayers_current_file", { name: batch.file_name })}
+        </span>
+      </div>
+      {rows.length ? (
+        <div className="overflow-x-auto rounded-[10px] border">
           <table className="w-full text-sm">
-            <caption className="mb-2 text-start text-sm font-medium">
-              {t("setup.taxpayers_invalid_title")}
+            <caption className="sr-only">
+              {t("setup.taxpayers_rows_caption")}
             </caption>
             <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className={th}>{t("setup.taxpayers_col_row")}</th>
-                <th className={th}>{t("setup.taxpayers_col_tax_id")}</th>
+              <tr className="text-muted-foreground border-b font-mono text-[11px] uppercase">
+                <th className={`${th} ps-3`}>
+                  {t("setup.taxpayers_col_status")}
+                </th>
                 <th className={th}>{t("setup.taxpayers_col_title")}</th>
+                <th className={th}>{t("setup.taxpayers_col_tax_id")}</th>
+                <th className={`${th} hidden md:table-cell`}>
+                  {t("setup.taxpayers_col_tax_office")}
+                </th>
                 <th className={th}>{t("setup.taxpayers_col_errors")}</th>
               </tr>
             </thead>
             <tbody>
-              {invalidRows.map((r) => (
-                <tr key={r.row} className="border-b last:border-0">
-                  <td className="figure py-2 pe-3">{r.row}</td>
-                  <td className="figure py-2 pe-3">{r.tax_id}</td>
-                  <td className="py-2 pe-3">{r.title}</td>
-                  <td className="text-destructive py-2 pe-3">
-                    {r.errors.map((e) => e.message).join("; ")}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const bad = r.errors.length > 0;
+                const base = { tax_id: r.tax_id, title: r.title };
+                const f = fixes[r.row];
+                return (
+                  <tr
+                    key={r.row}
+                    className={`border-b last:border-0 ${bad ? "bg-danger-tint/40" : ""}`}
+                  >
+                    <td className="py-2 ps-3 pe-3">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${bad ? "bg-danger-tint text-danger" : "bg-ok-tint text-ok"}`}
+                      >
+                        {bad ? t("setup.row_error") : t("setup.row_valid")}
+                      </span>
+                    </td>
+                    <td className="py-2 pe-3">
+                      {bad ? (
+                        <Input
+                          aria-label={t("setup.taxpayers_fix_title", {
+                            row: r.row,
+                          })}
+                          className="h-9 min-w-40"
+                          value={f?.title ?? r.title}
+                          onChange={(e) =>
+                            fix(r.row, base, { title: e.target.value })
+                          }
+                        />
+                      ) : (
+                        r.title
+                      )}
+                    </td>
+                    <td className="figure py-2 pe-3">
+                      {bad ? (
+                        <Input
+                          aria-label={t("setup.taxpayers_fix_tax_id", {
+                            row: r.row,
+                          })}
+                          inputMode="numeric"
+                          className="h-9 w-36 font-mono"
+                          value={f?.tax_id ?? r.tax_id}
+                          onChange={(e) =>
+                            fix(r.row, base, { tax_id: e.target.value })
+                          }
+                        />
+                      ) : (
+                        r.tax_id
+                      )}
+                    </td>
+                    <td className="text-text-2 hidden py-2 pe-3 md:table-cell">
+                      {r.tax_office}
+                    </td>
+                    <td className="text-danger py-2 pe-3">
+                      {r.errors.map((e) => e.message).join("; ")}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+        </div>
+      ) : null}
+      {batch.invalid > 0 ? (
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className="text-text-2 text-xs">
+            {t("setup.taxpayers_fix_hint")}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11"
+            disabled={!edited || busy}
+            onClick={() =>
+              onReupload(
+                new File(
+                  [correctedCsv(batch, fixes)],
+                  batch.file_name.replace(/\.(xlsx|csv)$/i, "") +
+                    "-duzeltilmis.csv",
+                  { type: "text/csv" },
+                ),
+              )
+            }
+          >
+            {t("setup.taxpayers_fix_apply", { count: edited })}
+          </Button>
         </div>
       ) : null}
     </div>
@@ -96,15 +232,7 @@ export function TaxpayersStep(props: SetupStepProps) {
   const importUuid = uploaded ?? props.state.import_uuid;
   const batch = useTaxpayerImport(slug, importUuid);
 
-  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const name = file.name.toLowerCase();
-    if (!ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
-      setError(t("setup.taxpayers_file_type"));
-      e.target.value = "";
-      return;
-    }
+  const upload = async (file: File) => {
     setError(null);
     setUploading(true);
     try {
@@ -125,6 +253,18 @@ export function TaxpayersStep(props: SetupStepProps) {
       // Allows choosing the same file again after fixing it.
       if (inputRef.current) inputRef.current.value = "";
     }
+  };
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      setError(t("setup.taxpayers_file_type"));
+      e.target.value = "";
+      return;
+    }
+    await upload(file);
   };
 
   return (
@@ -165,7 +305,14 @@ export function TaxpayersStep(props: SetupStepProps) {
       {importUuid && batch.isError ? (
         <StepError message={t("setup.taxpayers_load_failed")} />
       ) : null}
-      {batch.data ? <ImportSummary batch={batch.data} /> : null}
+      {batch.data ? (
+        <ImportSummary
+          key={batch.data.uuid}
+          batch={batch.data}
+          busy={uploading}
+          onReupload={(file) => void upload(file)}
+        />
+      ) : null}
       <StepActions
         isLast={props.isLast}
         busy={props.saving || uploading}

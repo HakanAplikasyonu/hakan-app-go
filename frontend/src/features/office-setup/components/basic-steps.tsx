@@ -173,9 +173,21 @@ export function TeamStep({
 
 // --- Muhasebe programı ---
 
-const PROGRAMS: { value: AccountingProgram; labelKey: string }[] = [
-  { value: "luca", labelKey: "setup.accounting_luca" },
-  { value: "zirve", labelKey: "setup.accounting_zirve" },
+const PROGRAMS: {
+  value: AccountingProgram;
+  labelKey: string;
+  hintKey: string;
+}[] = [
+  {
+    value: "luca",
+    labelKey: "setup.accounting_luca",
+    hintKey: "setup.accounting_luca_hint",
+  },
+  {
+    value: "zirve",
+    labelKey: "setup.accounting_zirve",
+    hintKey: "setup.accounting_zirve_hint",
+  },
 ];
 
 export function AccountingStep(props: SetupStepProps) {
@@ -207,21 +219,30 @@ export function AccountingStep(props: SetupStepProps) {
           setProgram(v as AccountingProgram);
           setError(null);
         }}
-        className="flex flex-wrap gap-6"
+        className="grid gap-3 sm:grid-cols-2"
       >
         {PROGRAMS.map((p) => (
-          <div key={p.value} className="flex items-center gap-2">
+          <Label
+            key={p.value}
+            htmlFor={`setup-accounting-${p.value}`}
+            className="has-[button[data-state=checked]]:border-brand has-[button[data-state=checked]]:bg-brand-tint hover:border-line-strong flex min-h-16 cursor-pointer items-start gap-3 rounded-[14px] border p-4 font-normal"
+          >
             <RadioGroupItem
               value={p.value}
               id={`setup-accounting-${p.value}`}
+              aria-describedby={`setup-accounting-${p.value}-hint`}
+              className="mt-0.5"
             />
-            <Label
-              htmlFor={`setup-accounting-${p.value}`}
-              className="font-normal"
-            >
-              {t(p.labelKey)}
-            </Label>
-          </div>
+            <span className="grid gap-0.5">
+              <span className="text-base font-semibold">{t(p.labelKey)}</span>
+              <span
+                id={`setup-accounting-${p.value}-hint`}
+                className="text-text-2 text-sm"
+              >
+                {t(p.hintKey)}
+              </span>
+            </span>
+          </Label>
         ))}
       </RadioGroup>
       <StepError message={error} />
@@ -245,7 +266,44 @@ export function IntegrationsStep(props: SetupStepProps) {
   return (
     <div>
       <Description>{t("setup.integrations_description")}</Description>
-      <h3 className="mb-2 text-sm font-medium">
+      <ul className="mb-6 grid gap-3 md:grid-cols-3">
+        {[
+          {
+            title: t("setup.source_integrator"),
+            body: t("setup.source_integrator_body"),
+            href: "#setup-integrations-list",
+            action: t("setup.source_integrator_action"),
+          },
+          {
+            title: t("setup.source_agent"),
+            body: t("setup.source_agent_body"),
+            href: routes.tenant.agents(slug),
+            action: t("setup.source_agent_action"),
+          },
+          {
+            title: t("setup.source_upload"),
+            body: t("setup.source_upload_body"),
+            href: routes.tenant.upload(slug),
+            action: t("setup.source_upload_action"),
+          },
+        ].map((c) => (
+          <li
+            key={c.title}
+            className="bg-surface-2 flex flex-col gap-2 rounded-[14px] border p-4"
+          >
+            <span className="text-sm font-semibold">{c.title}</span>
+            <span className="text-text-2 flex-1 text-sm">{c.body}</span>
+            <Link
+              href={c.href}
+              className="text-brand-text inline-flex min-h-11 items-center gap-1 text-sm font-semibold hover:underline"
+            >
+              {c.action}
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <h3 id="setup-integrations-list" className="mb-2 text-sm font-medium">
         {t("setup.integrations_list_title")}
       </h3>
       {engagements.isLoading ? (
