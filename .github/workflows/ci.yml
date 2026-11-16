@@ -450,13 +450,27 @@ jobs:
         env:
           CI: "true"
         run: npx playwright test --grep @a11y
+      # #332: ana ekranlar dört temada ve üç kırılımda temel görüntüyle
+      # karşılaştırılır (e2e/tests/gorsel.spec.ts-snapshots). Temiz demo
+      # verisinde, akışlardan önce koşar. Farklar e2e-report artefaktında.
+      # Temel görüntüler CI'da doğrulanana kadar zorunlu değil.
+      - name: Görsel regresyon (zorunlu değil)
+        id: visual
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test --grep @visual
+      - name: Görsel regresyon sonucu
+        if: steps.visual.outcome == 'failure'
+        run: echo "::warning title=e2e::Görsel regresyon farkı var. Beklenen / gerçek / fark görüntüleri e2e-report artefaktında."
       - name: Akış testleri (zorunlu değil)
         id: flows
         continue-on-error: true
         working-directory: e2e
         env:
           CI: "true"
-        run: npx playwright test --grep-invert "@a11y|@docs"
+        run: npx playwright test --grep-invert "@a11y|@docs|@visual"
       - name: Akış testleri sonucu
         if: steps.flows.outcome == 'failure'
         run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil). Ayrıntı e2e-report artefaktında."

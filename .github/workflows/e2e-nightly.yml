@@ -60,7 +60,7 @@ jobs:
         env:
           CI: "true"
           PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
-        run: npx playwright test --grep-invert @docs --reporter=list,json,html
+        run: npx playwright test --grep-invert "@docs|@visual" --reporter=list,json,html
       - name: Özet
         id: report
         if: always()
