@@ -13,7 +13,7 @@ import { statusLabel } from '@/features/receipts/fields';
 import { useReceipts } from '@/features/receipts/provider';
 import { taskItems } from '@/features/receipts/queue';
 import { statusTone } from '@/features/receipts/status';
-import { taskStatusLabel, transactionLine } from '@/features/tasks/tasks';
+import { isBankTask, taskStatusLabel, taskTitle, transactionLine } from '@/features/tasks/tasks';
 import { useTask } from '@/features/tasks/use-tasks';
 
 const dayLabel = (iso: string) =>
@@ -31,6 +31,7 @@ export default function TaskScreen() {
   const queued = taskItems(items, taxpayer?.taxpayer.uuid ?? '', uuid ?? '').filter((i) => i.status !== 'uploaded');
   const t = task.data;
   const closed = t ? t.status === 'matched' || t.status === 'cancelled' : false;
+  const bank = t ? isBankTask(t) : false;
 
   async function add(fromCamera: boolean) {
     if (fromCamera) {
@@ -66,12 +67,12 @@ export default function TaskScreen() {
             <Card>
               <View style={styles.head}>
                 <Text variant="heading" style={{ flex: 1 }}>
-                  {t.kind === 'undocumented_payment' ? 'Ödeme için belge' : 'Tahsilat için fatura'}
+                  {taskTitle(t)}
                 </Text>
                 <Chip label={t.overdue && !closed ? 'Gecikti' : taskStatusLabel(t.status)} tone={t.overdue && !closed ? 'danger' : closed ? 'success' : 'brand'} />
               </View>
-              <Text>{transactionLine(t)}</Text>
-              {t.bank_transaction.description ? <Text tone="muted">{t.bank_transaction.description}</Text> : null}
+              {bank ? <Text>{transactionLine(t)}</Text> : null}
+              {bank && t.bank_transaction.description ? <Text tone="muted">{t.bank_transaction.description}</Text> : null}
               {t.note ? <Text>Müşavirin notu: {t.note}</Text> : null}
               <Text variant="caption" tone="muted">
                 {t.organization_name ? `${t.organization_name} · ` : ''}Son gün {dayLabel(t.due_at)}
@@ -79,7 +80,11 @@ export default function TaskScreen() {
             </Card>
 
             {closed ? (
-              <Notice tone="info">{t.status === 'matched' ? 'Belge alındı ve hareketle eşleşti. Teşekkürler.' : 'Müşaviriniz bu isteği kapattı.'}</Notice>
+              <Notice tone="info">{t.status === 'matched'
+                  ? bank
+                    ? 'Belge alındı ve hareketle eşleşti. Teşekkürler.'
+                    : 'Müşaviriniz belgeyi kabul etti. Teşekkürler.'
+                  : 'Müşaviriniz bu isteği kapattı.'}</Notice>
             ) : (
               <>
                 {denied ? (
