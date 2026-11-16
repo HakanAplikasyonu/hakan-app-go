@@ -42,18 +42,20 @@ export class Api {
   private constructor(
     private readonly ctx: APIRequestContext,
     private readonly token: string,
+    private readonly org: string,
   ) {}
 
-  static async login(email: string, password = DEMO.password): Promise<Api> {
+  /** `org`: X-Organization (ofis kısa adı); varsayılan demo ofisi. */
+  static async login(email: string, password = DEMO.password, org: string = DEMO.org): Promise<Api> {
     const ctx = await pwRequest.newContext({ baseURL: API_URL });
     const res = await ctx.post("/v1/auth/login", { data: { email, password } });
     expect(res.status(), `login ${email}: ${await res.text()}`).toBe(200);
     const body = await res.json();
-    return new Api(ctx, body.data.access_token as string);
+    return new Api(ctx, body.data.access_token as string, org);
   }
 
   private headers(extra: Record<string, string> = {}) {
-    return { authorization: `Bearer ${this.token}`, "X-Organization": DEMO.org, ...extra };
+    return { authorization: `Bearer ${this.token}`, "X-Organization": this.org, ...extra };
   }
 
   async get(path: string, headers?: Record<string, string>) {
@@ -78,6 +80,26 @@ export class Api {
   async dispose() {
     await this.ctx.dispose();
   }
+}
+
+/**
+ * Engagement'ın yükleme işleri bitene ve toplam `added` fatura eklenene kadar
+ * bekler. Her dosya ayrı bir iş; ekranda ilk "Eklendi" görünmesi diğerlerinin
+ * bittiği anlamına gelmez (#221).
+ */
+export async function waitForUploads(api: Api, engagement: string, added: number) {
+  await expect
+    .poll(
+      async () => {
+        const jobs = await api.json<{ items: { status: string; report?: { added: number } }[] }>(
+          await api.get(`/v1/tenant/engagements/${engagement}/ubl-uploads?limit=50`),
+        );
+        if (jobs.items.some((j) => j.status !== "done")) return -1;
+        return jobs.items.reduce((n, j) => n + (j.report?.added ?? 0), 0);
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(added);
 }
 
 /** Ofisin `title` unvanlı mükellefle olan engagement'ı. */
