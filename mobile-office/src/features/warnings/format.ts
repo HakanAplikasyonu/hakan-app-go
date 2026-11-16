@@ -35,7 +35,9 @@ function paramText(v: unknown): string {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  return JSON.stringify(v);
+  // Ham JSON gösterilmez (#375): liste değerleri virgülle, nesneler boş.
+  if (Array.isArray(v)) return v.map(paramText).filter(Boolean).join(', ');
+  return '';
 }
 
 /** Kodun Türkçe metni, `{{ad}}` yer tutucuları params ile doldurulur. */

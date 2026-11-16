@@ -75,6 +75,12 @@ import {
   type ReviewSuggestion,
 } from "../services/review.service";
 import { FilterSelect, Figure } from "./office-ui";
+import {
+  kindTitle,
+  lineTypeLabel,
+  matchSummary,
+  suggestionTitle,
+} from "../lib/suggestion-label";
 
 const ACCOUNT_KIND = "account_code";
 
@@ -188,8 +194,10 @@ function EvidenceChain({
   const { t } = useLocale();
   const ctx = suggestionContext(s);
   const lineBits = [
-    ctx.lineType
-      ? t("office.review_api.line_type", { type: ctx.lineType })
+    lineTypeLabel(ctx.lineType, t)
+      ? t("office.review_api.line_type", {
+          type: lineTypeLabel(ctx.lineType, t) ?? "",
+        })
       : undefined,
     ctx.taxRate ? `KDV %${ctx.taxRate}` : undefined,
     ctx.lineNo
@@ -203,7 +211,9 @@ function EvidenceChain({
       title: t("office.studio.ev_line"),
       body: (
         <>
-          {ctx.itemName ? `“${ctx.itemName}”` : `${s.target_type}`}
+          {ctx.itemName
+            ? `“${ctx.itemName}”`
+            : (matchSummary(s) ?? suggestionTitle(s, t))}
           {lineBits.length ? (
             <span className="text-muted-foreground block text-xs">
               {lineBits.join(" · ")}
@@ -865,7 +875,7 @@ function ReviewWorkspaceInner() {
               >
                 {ctx.counterparty ??
                   ctx.itemName ??
-                  `${current.target_type}.${current.target_field}`}
+                  suggestionTitle(current, t)}
               </h2>
               <p className="text-text-2 text-sm">
                 {[
@@ -900,19 +910,19 @@ function ReviewWorkspaceInner() {
                 {t("office.studio.ev_line")}
               </h3>
               <div className="text-base font-medium break-words">
-                {ctx.itemName ??
-                  (ctx.counterparty
-                    ? t("office.review_api.counterparty_account", {
-                        name: ctx.counterparty,
-                      })
-                    : `${current.target_type}.${current.target_field}`)}
+                {suggestionTitle(current, t)}
               </div>
-              {ctx.taxRate || ctx.lineType || ctx.lineNo ? (
+              {matchSummary(current) ? (
+                <p className="text-text-2 mt-1 text-sm">
+                  {matchSummary(current)}
+                </p>
+              ) : null}
+              {ctx.taxRate || lineTypeLabel(ctx.lineType, t) || ctx.lineNo ? (
                 <Figure className="text-muted-foreground mt-1 block text-xs">
                   {[
-                    ctx.lineType
+                    lineTypeLabel(ctx.lineType, t)
                       ? t("office.review_api.line_type", {
-                          type: ctx.lineType,
+                          type: lineTypeLabel(ctx.lineType, t) ?? "",
                         })
                       : undefined,
                     ctx.taxRate ? `KDV %${ctx.taxRate}` : undefined,
@@ -1156,7 +1166,9 @@ function ReviewWorkspaceInner() {
               ).map((k) => ({
                 value: k,
                 label:
-                  k === ACCOUNT_KIND ? t("office.review_api.kind_account") : k,
+                  k === ACCOUNT_KIND
+                    ? t("office.review_api.kind_account")
+                    : kindTitle(k, t),
               })),
             ]}
           />
@@ -1283,13 +1295,7 @@ function ReviewWorkspaceInner() {
                   {queue.map((s, i) => {
                     const c = suggestionContext(s);
                     const on = i === index;
-                    const title =
-                      c.itemName ??
-                      (c.counterparty
-                        ? t("office.review_api.counterparty_account", {
-                            name: c.counterparty,
-                          })
-                        : s.target_field);
+                    const title = suggestionTitle(s, t);
                     return (
                       <li key={s.uuid} data-index={i}>
                         <button
@@ -1315,6 +1321,7 @@ function ReviewWorkspaceInner() {
                               <span className="min-w-0 flex-1 truncate">
                                 {[
                                   c.itemName ? c.counterparty : undefined,
+                                  matchSummary(s),
                                   s.engagement_uuid
                                     ? directory.entries.get(s.engagement_uuid)
                                         ?.title

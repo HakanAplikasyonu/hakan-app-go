@@ -41,7 +41,69 @@ export function confidenceBand(c: string): ConfidenceBand {
   return n >= 0.85 ? 'high' : 'medium';
 }
 
-export const fieldLabel = (f: string) => (f === 'vat_account_code' ? 'KDV hesabı' : f === 'account_code' ? 'Hesap kodu' : f);
+/** Öneri alanlarının Türkçe adları (#375): ham alan adı gösterilmez. */
+const FIELD_LABELS: Record<string, string> = {
+  account_code: 'Hesap kodu',
+  vat_account_code: 'KDV hesabı',
+  date: 'Fiş tarihi',
+  vendor_tax_number: 'Satıcı VKN',
+  vendor_name: 'Satıcı adı',
+  receipt_number: 'Fiş no',
+  total_amount: 'Fiş toplamı',
+  tax_amount: 'KDV tutarı',
+  tax_rate: 'KDV oranı',
+  vehicle_plate: 'Plaka',
+  z_report_number: 'Z raporu no',
+  okc_serial_number: 'ÖKC sicil no',
+  payment_method: 'Ödeme şekli',
+  match: 'Banka eşleşmesi',
+};
+
+/** "total_amount" → "Total amount": çevirisi olmayan alan için son çare. */
+export function humanize(f: string): string {
+  const s = f.replace(/[_.]+/g, ' ').trim();
+  return s ? s[0].toLocaleUpperCase('tr-TR') + s.slice(1) : f;
+}
+
+export const fieldLabel = (f: string) => FIELD_LABELS[f] ?? humanize(f);
+
+type MatchValue = { score?: number; invoices?: { number?: string }[] };
+function asMatch(v: unknown): MatchValue | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const m = v as MatchValue;
+  return Array.isArray(m.invoices) ? m : null;
+}
+
+/** Listede ve kartta başlık: banka eşleşmesinde fatura numaraları, yoksa alanın adı. */
+export function suggestionLabel(s: Pick<SuggestionLike, 'kind' | 'target_field' | 'proposed_value'>): string {
+  const m = s.kind === 'bank_match' ? asMatch(s.proposed_value) : null;
+  if (m) {
+    const nums = (m.invoices ?? []).map((i) => i.number).filter(Boolean) as string[];
+    return nums.length === 1 ? `Banka eşleşmesi: Fatura ${nums[0]}` : `Banka eşleşmesi: ${nums.length} fatura`;
+  }
+  return fieldLabel(s.target_field);
+}
+
+const trMoney = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Önerilen değerin kısa gösterimi: hesap kodu, tutar (tr-TR), tarih
+ * (GG.AA.YYYY), eşleşme puanı (%73). Nesne asla JSON olarak yazılmaz.
+ */
+export function proposedText(v: unknown): string {
+  const code = proposedCode(v);
+  if (code) return code;
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return trMoney.format(v);
+  if (typeof v === 'string') {
+    const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+    if (d) return `${d[3]}.${d[2]}.${d[1]}`;
+    return /^-?\d+\.\d+$/.test(v) ? trMoney.format(Number(v)) : v;
+  }
+  const m = asMatch(v);
+  if (m) return typeof m.score === 'number' ? `%${m.score}` : '';
+  return '—';
+}
 
 /** Toplu onay: yalnızca bekleyen ve engagement'ı bilinen öneriler. */
 export function bulkTargets<T extends SuggestionLike>(list: readonly T[], selected: ReadonlySet<string>): T[] {

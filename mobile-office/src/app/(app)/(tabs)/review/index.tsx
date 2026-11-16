@@ -15,7 +15,7 @@ import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { receiptImageSource, useClientTitles } from '@/features/clients/api';
 import { money } from '@/features/clients/format';
 import { useDecide, useReviewQueue, useSuggestionContext, type Suggestion, type SuggestionContext } from '@/features/review/api';
-import { confidencePercent, fieldLabel, groupQueue, proposedCode, queueEta, queueProgress, type QueueGrouping } from '@/features/review/format';
+import { confidencePercent, groupQueue, proposedCode, proposedText, queueEta, queueProgress, suggestionLabel, type QueueGrouping } from '@/features/review/format';
 import { KaydirmaKarti } from '@/features/review/kaydirma-karti';
 import { ReasonSheet, type ReasonSheetMode } from '@/features/review/reason-sheet';
 import { periodLabel } from '@/features/warnings/format';
@@ -90,7 +90,7 @@ export default function ReviewScreen() {
 
   const approve = (s: Suggestion) => {
     setApproving(s.uuid);
-    void run(s, { action: 'accept' }, `${proposedCode(s.proposed_value) ?? 'Öneri'} onaylandı.`);
+    void run(s, { action: 'accept' }, `${proposedText(s.proposed_value) || 'Öneri'} onaylandı.`);
   };
   const reject = (s: Suggestion) => setSheet({ s, mode: { kind: 'reject' } });
   const correct = (s: Suggestion) => setSheet({ s, mode: { kind: 'correct', initialCode: proposedCode(s.proposed_value) ?? '' } });
@@ -189,16 +189,16 @@ export default function ReviewScreen() {
                     testID="suggestion-row"
                     accessibilityRole="button"
                     accessibilityState={{ selected: on }}
-                    accessibilityLabel={`${fieldLabel(s.target_field)} ${proposedCode(s.proposed_value) ?? ''}, güven ${confidencePercent(s.confidence)}`}
+                    accessibilityLabel={`${suggestionLabel(s)} ${proposedCode(s.proposed_value) ?? ''}, güven ${confidencePercent(s.confidence)}`}
                     onPress={() => setSelected(s.uuid)}
                     style={[styles.listRow, { borderTopColor: c.line }, on ? { backgroundColor: c.brandTint, borderLeftColor: c.brand, borderLeftWidth: 3 } : null]}>
                     <GuvenOlcegi deger={Number(s.confidence)} kaynak={kaynakOf(s)} />
                     <View style={{ flex: 1, gap: 2 }}>
                       <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]} numberOfLines={1}>
-                        {fieldLabel(s.target_field)}
+                        {suggestionLabel(s)}
                         {s.period ? ` · ${periodLabel(s.period)}` : ''}
                       </Text>
-                      <Text style={[metin.xs, metin.mono, { color: c.text3 }]}>{proposedCode(s.proposed_value) ?? '—'}</Text>
+                      <Text style={[metin.xs, metin.mono, { color: c.text3 }]}>{proposedText(s.proposed_value) || '—'}</Text>
                     </View>
                   </Pressable>
                 );
@@ -284,12 +284,11 @@ function CardBody({ s, approving }: { s: Suggestion; approving: boolean }) {
   const ctx = useSuggestionContext(s.engagement_uuid ?? '', s.uuid);
   const d = ctx.data;
   const amount = d?.invoice ? money(d.item?.line_amount ?? d.invoice.payable_amount, d.invoice.currency) : null;
-  const code = proposedCode(s.proposed_value);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityHint="Ayrıntıyı açar. Sağa kaydır onayla, sola kaydır reddet, yukarı kaydır düzelt."
-      accessibilityLabel={`${docKind(d)}, ${d?.invoice?.counterparty_name ?? ''}, ${fieldLabel(s.target_field)} ${code ?? ''}, güven ${confidencePercent(s.confidence)}`}
+      accessibilityLabel={`${docKind(d)}, ${d?.invoice?.counterparty_name ?? ''}, ${suggestionLabel(s)} ${proposedText(s.proposed_value)}, güven ${confidencePercent(s.confidence)}`}
       onPress={() => router.push({ pathname: '/review/[uuid]', params: { uuid: s.uuid, engagement: s.engagement_uuid ?? '' } })}
       style={[styles.card, { backgroundColor: c.surface, borderColor: c.line }]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -300,7 +299,7 @@ function CardBody({ s, approving }: { s: Suggestion; approving: boolean }) {
       </View>
       <View style={{ gap: 4 }}>
         <Text style={[metin.baslik2, { color: c.text }]} numberOfLines={2}>
-          {d?.invoice?.counterparty_name || (d?.receipt ? 'Fiş görseli' : fieldLabel(s.target_field))}
+          {d?.invoice?.counterparty_name || (d?.receipt ? 'Fiş görseli' : suggestionLabel(s))}
         </Text>
         {d?.item ? (
           <Text style={[metin.sm, { color: c.text2 }]} numberOfLines={2}>
@@ -311,8 +310,8 @@ function CardBody({ s, approving }: { s: Suggestion; approving: boolean }) {
       {amount ? <Text style={[metin.kpi, { fontSize: 28, lineHeight: 34, color: c.text }]}>{amount}</Text> : null}
       <View style={[styles.codeBox, { backgroundColor: c.surface2, borderColor: c.line }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={[metin.mono, { fontSize: 15, color: c.brandText }]}>{code ?? '—'}</Text>
-          <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{fieldLabel(s.target_field)}</Text>
+          <Text style={[metin.mono, { fontSize: 15, color: c.brandText }]}>{proposedText(s.proposed_value) || '—'}</Text>
+          <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{suggestionLabel(s)}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <GuvenOlcegi deger={Number(s.confidence)} kaynak={kaynakOf(s)} />
@@ -353,7 +352,6 @@ function TabletDetail({
   const org = useOrganization();
   const ctx = useSuggestionContext(s.engagement_uuid ?? '', s.uuid);
   const d = ctx.data;
-  const code = proposedCode(s.proposed_value);
   return (
     <>
       <View style={[styles.docPane, { backgroundColor: c.surface3 }]}>
@@ -380,7 +378,7 @@ function TabletDetail({
       <ScrollView style={[styles.decision, { backgroundColor: c.surface, borderLeftColor: c.line }]} contentContainerStyle={{ padding: 22, gap: 16, flexGrow: 1 }}>
         <Hap metin={docKind(d)} ton="brand" />
         <View style={{ gap: 4 }}>
-          <Text style={[metin.baslik2, { color: c.text }]}>{d?.invoice?.counterparty_name || fieldLabel(s.target_field)}</Text>
+          <Text style={[metin.baslik2, { color: c.text }]}>{d?.invoice?.counterparty_name || suggestionLabel(s)}</Text>
           <Text style={[metin.sm, { color: c.text2 }]}>{[periodLabel(s.period ?? null), d?.invoice?.issue_date].filter(Boolean).join(' · ')}</Text>
         </View>
         {d?.item ? (
@@ -392,8 +390,8 @@ function TabletDetail({
         ) : null}
         <View style={[styles.codeBox, { borderColor: c.brand }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[metin.mono, { fontSize: 15, color: c.brandText }]}>{code ?? '—'}</Text>
-            <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{fieldLabel(s.target_field)}</Text>
+            <Text style={[metin.mono, { fontSize: 15, color: c.brandText }]}>{proposedText(s.proposed_value) || '—'}</Text>
+            <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>{suggestionLabel(s)}</Text>
           </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <GuvenOlcegi deger={Number(s.confidence)} kaynak={kaynakOf(s)} />

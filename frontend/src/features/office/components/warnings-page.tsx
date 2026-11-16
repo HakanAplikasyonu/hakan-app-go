@@ -59,7 +59,10 @@ function paramText(value: unknown): string {
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
-  return JSON.stringify(value);
+  // Ham JSON gösterilmez (#375): liste değerleri virgülle, nesneler boş.
+  if (Array.isArray(value))
+    return value.map(paramText).filter(Boolean).join(", ");
+  return "";
 }
 
 /**
