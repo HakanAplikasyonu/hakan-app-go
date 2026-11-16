@@ -42,7 +42,7 @@ func (c *Client) Ping(ctx context.Context) error {
 	if !c.Enabled() {
 		return nil
 	}
-	_, err := c.client.HealthWithContext(ctx)
+	_, err := c.client.Health(ctx)
 	if err != nil {
 		return fmt.Errorf("searchengine: meili health: %w", err)
 	}
@@ -59,11 +59,11 @@ func (c *Client) EnsureIndex(ctx context.Context, spec Spec) error {
 		return nil
 	}
 	uid := c.indexUID(spec.ID)
-	task, err := c.client.CreateIndexWithContext(ctx, &meilisearch.IndexConfig{Uid: uid, PrimaryKey: "id"})
+	task, err := c.client.CreateIndex(ctx, &meilisearch.IndexConfig{Uid: uid, PrimaryKey: "id"})
 	if err != nil {
 		return fmt.Errorf("searchengine: create index %q: %w", uid, err)
 	}
-	if _, err := c.client.WaitForTaskWithContext(ctx, task.TaskUID, 0); err != nil {
+	if _, err := c.client.WaitForTask(ctx, task.TaskUID, 0); err != nil {
 		return fmt.Errorf("searchengine: wait create index %q: %w", uid, err)
 	}
 
@@ -76,11 +76,11 @@ func (c *Client) EnsureIndex(ctx context.Context, spec Spec) error {
 		DisplayedAttributes:  []string{"id", "spec", "title", "subtitle", "keywords", "href", "icon"},
 		FilterableAttributes: append([]string{"spec"}, spec.Filterable...),
 	}
-	task, err = c.client.Index(uid).UpdateSettingsWithContext(ctx, settings)
+	task, err = c.client.Index(uid).UpdateSettings(ctx, settings)
 	if err != nil {
 		return fmt.Errorf("searchengine: update settings %q: %w", uid, err)
 	}
-	if _, err := c.client.WaitForTaskWithContext(ctx, task.TaskUID, 0); err != nil {
+	if _, err := c.client.WaitForTask(ctx, task.TaskUID, 0); err != nil {
 		return fmt.Errorf("searchengine: wait settings %q: %w", uid, err)
 	}
 	return nil
@@ -92,11 +92,11 @@ func (c *Client) UpsertDocuments(ctx context.Context, spec string, docs []Docume
 		return nil
 	}
 	uid := c.indexUID(spec)
-	task, err := c.client.Index(uid).AddDocumentsWithContext(ctx, docs)
+	task, err := c.client.Index(uid).AddDocuments(ctx, docs, nil)
 	if err != nil {
 		return fmt.Errorf("searchengine: upsert %q: %w", uid, err)
 	}
-	if _, err := c.client.WaitForTaskWithContext(ctx, task.TaskUID, 0); err != nil {
+	if _, err := c.client.WaitForTask(ctx, task.TaskUID, 0); err != nil {
 		return fmt.Errorf("searchengine: wait upsert %q: %w", uid, err)
 	}
 	return nil
@@ -108,11 +108,11 @@ func (c *Client) DeleteDocument(ctx context.Context, spec, id string) error {
 		return nil
 	}
 	uid := c.indexUID(spec)
-	task, err := c.client.Index(uid).DeleteDocumentWithContext(ctx, id)
+	task, err := c.client.Index(uid).DeleteDocument(ctx, id, nil)
 	if err != nil {
 		return fmt.Errorf("searchengine: delete %q/%s: %w", uid, id, err)
 	}
-	if _, err := c.client.WaitForTaskWithContext(ctx, task.TaskUID, 0); err != nil {
+	if _, err := c.client.WaitForTask(ctx, task.TaskUID, 0); err != nil {
 		return fmt.Errorf("searchengine: wait delete %q/%s: %w", uid, id, err)
 	}
 	return nil
@@ -146,7 +146,7 @@ func (c *Client) Search(ctx context.Context, specs []string, q string, limit int
 			Limit:    int64(limit),
 		})
 	}
-	resp, err := c.client.MultiSearchWithContext(ctx, &meilisearch.MultiSearchRequest{Queries: queries})
+	resp, err := c.client.MultiSearch(ctx, &meilisearch.MultiSearchRequest{Queries: queries})
 	if err != nil {
 		return nil, fmt.Errorf("searchengine: multi search: %w", err)
 	}
@@ -165,7 +165,7 @@ func (c *Client) Search(ctx context.Context, specs []string, q string, limit int
 }
 
 func (c *Client) searchOne(ctx context.Context, spec, q string, limit int) ([]Hit, error) {
-	resp, err := c.client.Index(c.indexUID(spec)).SearchWithContext(ctx, q, &meilisearch.SearchRequest{
+	resp, err := c.client.Index(c.indexUID(spec)).Search(ctx, q, &meilisearch.SearchRequest{
 		Limit: int64(limit),
 	})
 	if err != nil {
@@ -178,9 +178,11 @@ func (c *Client) searchOne(ctx context.Context, spec, q string, limit int) ([]Hi
 	return out, nil
 }
 
-func mapHit(spec string, hit interface{}) Hit {
-	row, ok := hit.(map[string]interface{})
-	if !ok {
+// mapHit reads a Meilisearch hit. meilisearch-go 0.37 returns each hit as
+// raw JSON fields (meilisearch.Hit), not a decoded map (#223).
+func mapHit(spec string, hit meilisearch.Hit) Hit {
+	var row map[string]interface{}
+	if err := hit.DecodeInto(&row); err != nil || row == nil {
 		return Hit{Spec: spec}
 	}
 	getStr := func(key string) string {
@@ -210,7 +212,7 @@ func (c *Client) Stats(ctx context.Context, spec string) (int64, error) {
 	if !c.Enabled() {
 		return 0, nil
 	}
-	stats, err := c.client.Index(c.indexUID(spec)).GetStatsWithContext(ctx)
+	stats, err := c.client.Index(c.indexUID(spec)).GetStats(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
