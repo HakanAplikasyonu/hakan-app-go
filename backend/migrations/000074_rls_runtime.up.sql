@@ -23,11 +23,17 @@
 
 DO $$
 BEGIN
-    BEGIN
-        CREATE ROLE hakan_rls_runtime NOLOGIN NOBYPASSRLS;
-    EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
-    END;
-    EXECUTE format('GRANT hakan_rls_runtime TO %I', current_user);
+    -- Süper kullanıcı olmayan sahip (#312): rol db-roles.sql ile vardır,
+    -- sahip INHERIT FALSE ile üyedir; ikisini de tekrar yapma.
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'hakan_rls_runtime') THEN
+        BEGIN
+            CREATE ROLE hakan_rls_runtime NOLOGIN NOBYPASSRLS;
+        EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
+        END;
+    END IF;
+    IF NOT pg_has_role(current_user, 'hakan_rls_runtime', 'MEMBER') THEN
+        EXECUTE format('GRANT hakan_rls_runtime TO %I', current_user);
+    END IF;
 END
 $$;
 

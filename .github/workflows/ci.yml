@@ -262,6 +262,60 @@ jobs:
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
 
+  # #312: aynı testler, tabloların sahibi süper kullanıcı OLMAYAN bir rolle
+  # (scripts/db-roles.sql: hakan_owner). Süper kullanıcı FORCE ROW LEVEL
+  # SECURITY'yi atlar; bu iş FORCE'un sahibe de uygulandığı kurulumu
+  # (yönetilen Postgres) denetler: migration'lar, SECURITY DEFINER
+  # fonksiyonları, rls.System ve TestNonSuperuserOwnerIsForced. Migration
+  # up / down / up da bu rolle koşar.
+  backend-owner:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://hakan_owner:owner-ci-only@localhost:5432/postgres?sslmode=disable
+      TESTDB_REQUIRED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Roller (scripts/db-roles.sql)
+        working-directory: .
+        run: |
+          for i in 1 2; do # idempotent: ikinci çalıştırma da geçmeli
+            psql "postgres://postgres:postgres@localhost:5432/postgres" -X -q -v ON_ERROR_STOP=1 \
+              -v owner_password=owner-ci-only -v backup_password=backup-ci-only -f scripts/db-roles.sql
+          done
+          psql "postgres://postgres:postgres@localhost:5432/postgres" -XtAc \
+            "SELECT rolname, rolsuper, rolbypassrls FROM pg_roles WHERE rolname LIKE 'hakan_%' ORDER BY 1"
+      - name: Test (süper kullanıcı olmayan sahip)
+        run: go test ./...
+      - name: Migration up / down / up (süper kullanıcı olmayan sahip)
+        run: |
+          v=$(sed -n 's#^FROM migrate/migrate:\(v[0-9.]*\).*#\1#p' Dockerfile | head -1)
+          psql "postgres://hakan_owner:owner-ci-only@localhost:5432/postgres" -X -q -c "CREATE DATABASE owner_migrate"
+          db="postgres://hakan_owner:owner-ci-only@localhost:5432/owner_migrate?sslmode=disable"
+          m() { go run -tags postgres "github.com/golang-migrate/migrate/v4/cmd/migrate@${v:-v4.20.1}" -path migrations -database "$db" "$@"; }
+          m up
+          m down -all
+          m up
+
   # Security scans (#192, docs/guvenlik-taramalari.md). Every push: gitleaks
   # over the pushed history. Go changes: govulncheck (reachable vulnerabilities)
   # and gosec (HIGH severity, backend/.golangci.gosec.yml). Dependency
@@ -1026,7 +1080,7 @@ jobs:
 
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, security, api-types, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

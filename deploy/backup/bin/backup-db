@@ -23,7 +23,14 @@ mv "$tmp" "$out"
 
 # Cluster roles the schema refers to (RLS roles, grants). pg_dump does not
 # carry them; restore-db applies them first. Encrypted: they hold password hashes.
-if ! pg_dumpall --roles-only | age "${recipients[@]}" -o "$dir/db-$ts.roles.sql.age"; then
+# A non-superuser (hakan_backup, #312) cannot read password hashes: the roles
+# are dumped without them and the passwords are set again on restore
+# (scripts/db-roles.sql).
+role_args=(--roles-only)
+if [[ $(psql -XtAq -c "SELECT rolsuper FROM pg_roles WHERE rolname = current_user") != t ]]; then
+  role_args+=(--no-role-passwords)
+fi
+if ! pg_dumpall "${role_args[@]}" | age "${recipients[@]}" -o "$dir/db-$ts.roles.sql.age"; then
   rm -f "$dir/db-$ts.roles.sql.age"
   die "db: pg_dumpall --roles-only failed"
 fi

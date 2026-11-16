@@ -36,8 +36,18 @@ func TestSideEffectFailuresKeepRequest(t *testing.T) {
 	}
 	count := func(sql string, args ...any) int {
 		t.Helper()
+		// As the owner: FORCE (000086) hides the rows from a non-superuser
+		// owner unless app.system is on (#312).
+		tx, err := owner.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
 		var n int
-		if err := owner.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.system', 'on', true)`); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.QueryRow(ctx, sql, args...).Scan(&n); err != nil {
 			t.Fatal(err)
 		}
 		return n
