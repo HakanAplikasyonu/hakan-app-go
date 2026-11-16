@@ -1,1 +1,3 @@
 node_modules/
+# Görsel test farkları (tests/ui/gorsel/gorsel.test.mjs)
+/tests/ui/gorsel/sonuc/
