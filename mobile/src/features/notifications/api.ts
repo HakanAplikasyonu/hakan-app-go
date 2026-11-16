@@ -5,8 +5,8 @@ import { api } from '@/core/api/client';
 import { useAuth } from '@/core/auth/auth-provider';
 
 /**
- * Mükellef bildirim listesi. Uç #333 ile gelecek; o zamana kadar `available`
- * false döner ve hiç istek atılmaz (ekran boş durumu gösterir).
+ * Mükellef bildirim listesi (`GET /v1/taxpayer/notifications`, #333). Uç
+ * tablosu boşsa `available` false döner ve hiç istek atılmaz.
  */
 export function useInbox() {
   const { taxpayer } = useAuth();
@@ -15,7 +15,7 @@ export function useInbox() {
   const q = useQuery({
     queryKey: ['inbox', uuid],
     enabled: ep !== null && !!uuid,
-    queryFn: async (): Promise<InboxItem[]> => normalizeInbox(await api.get<unknown>(ep!.list, { taxpayer: uuid })),
+    queryFn: async (): Promise<InboxItem[]> => normalizeInbox(await api.get<unknown>(ep!.list, { taxpayer: uuid, query: { limit: 50 } })),
     refetchInterval: 60_000,
   });
   return { ...q, available: ep !== null, items: q.data ?? [] };
