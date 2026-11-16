@@ -14,8 +14,8 @@ import { useInbox, useMarkRead } from '@/features/notifications/api';
 
 /**
  * Bildirimler (MukellefMobil · 4, yeni ekran): okunmamış satır vurgulu,
- * tür ikonu olarak taç; "Tümü okundu". Liste ucu #333 ile gelecek; o zamana
- * kadar istek atılmaz, boş durum görünür.
+ * tür ikonu olarak taç; "Tümü okundu". Liste `GET /v1/taxpayer/notifications`
+ * (#333); okununca `{uuid}/read`, hepsi `read-all`.
  */
 export default function NotificationsScreen() {
   const { colors: c } = useTheme();
