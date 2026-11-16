@@ -15,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/httpserver"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
@@ -26,6 +27,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/tracing"
 )
 
 func main() {
@@ -52,6 +54,20 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// OpenTelemetry (#179): off unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+	if shutdownTracing, err := tracing.Init(ctx, cfg.Tracing, "api"); err != nil {
+		log.Warn("tracing_init_failed", "error", err)
+	} else {
+		if cfg.Tracing.Endpoint != "" {
+			log.Info("tracing_enabled", "service", cfg.Tracing.ServiceName, "sample_ratio", cfg.Tracing.SampleRatio)
+		}
+		defer func() {
+			sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = shutdownTracing(sctx)
+		}()
+	}
 
 	// Alan düzeyinde şifreleme (#168): ham banka/fatura verisi FIELD_ENCRYPTION_KEY
 	// ile mühürlenir. Anahtar geçersizse başlama; düz metin yazmak sessizce olmasın.
@@ -98,7 +114,9 @@ func main() {
 	queries := database.NewQueries(db)
 	logsSvc := logsusecase.New(queries)
 	persist := logging.Attach(log, logsSvc)
-	log = persist.Logger()
+	// Outermost: the app_logs table and the error tracker get scrubbed
+	// records too, with request and office ids (#179).
+	log = slog.New(logging.Redact(persist.Logger().Handler()))
 	defer persist.Close()
 
 	eventBus := events.NewBus(log)
@@ -149,6 +167,11 @@ func main() {
 	if err != nil {
 		log.Error("httpserver_init_failed", "error", err)
 		exit(1)
+	}
+
+	// Prometheus metrics on their own port (#179).
+	if err := metrics.Default.Serve(ctx, cfg.Metrics.Addr, cfg.Metrics.Token, log); err != nil {
+		log.Warn("metrics_listen_failed", "addr", cfg.Metrics.Addr, "error", err)
 	}
 
 	errCh := make(chan error, 1)

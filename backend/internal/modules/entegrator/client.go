@@ -11,11 +11,14 @@ package entegrator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/furkanmeclis/go-ubltr/provider"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
 )
 
 // SourcePrefix prefixes source_connections.source_system and the invoices'
@@ -107,42 +110,71 @@ func (c *Client) Supports(kind provider.DocumentKind, op provider.Operation) boo
 }
 
 // List lists one page of the inbox (provider.Inbound) or outbox.
-func (c *Client) List(ctx context.Context, dir provider.Direction, q ListQuery) (*provider.Page, error) {
+func (c *Client) List(ctx context.Context, dir provider.Direction, q ListQuery) (_ *provider.Page, err error) {
 	switch dir {
 	case provider.Inbound:
 		if c.inbox == nil {
 			return nil, provider.Unsupported(c.name, provider.OpListInbox, q.Kind)
 		}
+		defer observe(c.name, "list_inbox", time.Now(), &err)
 		return c.inbox.ListInbox(ctx, q.provider())
 	case provider.Outbound:
 		if c.outbox == nil {
 			return nil, provider.Unsupported(c.name, provider.OpListOutbox, q.Kind)
 		}
+		defer observe(c.name, "list_outbox", time.Now(), &err)
 		return c.outbox.ListOutbox(ctx, q.provider())
 	}
 	return nil, fmt.Errorf("entegrator: unknown direction %q", dir)
 }
 
 // Fetch downloads a document.
-func (c *Client) Fetch(ctx context.Context, q provider.FetchQuery) (*provider.FetchResult, error) {
+func (c *Client) Fetch(ctx context.Context, q provider.FetchQuery) (_ *provider.FetchResult, err error) {
 	if c.fetch == nil {
 		return nil, provider.Unsupported(c.name, provider.OpFetch, q.Kind)
 	}
+	defer observe(c.name, "fetch", time.Now(), &err)
 	return c.fetch.Fetch(ctx, q)
 }
 
 // Status queries one document's status.
-func (c *Client) Status(ctx context.Context, q provider.StatusQuery) (*provider.StatusResult, error) {
+func (c *Client) Status(ctx context.Context, q provider.StatusQuery) (_ *provider.StatusResult, err error) {
 	if c.status == nil {
 		return nil, provider.Unsupported(c.name, provider.OpStatus, q.Kind)
 	}
+	defer observe(c.name, "status", time.Now(), &err)
 	return c.status.Status(ctx, q)
 }
 
 // CheckUser looks up a VKN/TCKN in the e-Fatura user list.
-func (c *Client) CheckUser(ctx context.Context, vknTckn string) (*provider.UserInfo, error) {
+func (c *Client) CheckUser(ctx context.Context, vknTckn string) (_ *provider.UserInfo, err error) {
 	if c.users == nil {
 		return nil, provider.Unsupported(c.name, provider.OpCheckUser, "")
 	}
+	defer observe(c.name, "check_user", time.Now(), &err)
 	return c.users.CheckUser(ctx, vknTckn)
+}
+
+// observe records one integrator call in the metrics (#179): the outcome is
+// "ok" or the provider's error kind, so the error rate per integrator can be
+// alerted on.
+func observe(name, op string, start time.Time, err *error) {
+	metrics.Default.ObserveIntegrator(name, op, outcome(*err), time.Since(start))
+}
+
+func outcome(err error) string {
+	if err == nil {
+		return "ok"
+	}
+	var pe *provider.Error
+	switch {
+	case errors.As(err, &pe) && pe.Kind != "":
+		return string(pe.Kind)
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	default:
+		return "error"
+	}
 }

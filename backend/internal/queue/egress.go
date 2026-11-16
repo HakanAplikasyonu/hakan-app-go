@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -82,4 +83,15 @@ func PoolQueues(pool string) map[string]int {
 		general[QueueFixedEgress] = 2
 		return general
 	}
+}
+
+// AllQueues lists every queue name, sorted (metrics, issue #179).
+func AllQueues() []string {
+	q := PoolQueues(PoolAll)
+	out := make([]string, 0, len(q))
+	for name := range q {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }

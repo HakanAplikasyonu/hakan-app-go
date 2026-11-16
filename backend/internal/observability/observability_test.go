@@ -148,3 +148,37 @@ func TestScrubPushToken(t *testing.T) {
 		}
 	}
 }
+
+// Loglarda vergi ve banka kimlikleri maskelenir (#179).
+func TestScrubStringIdentifiers(t *testing.T) {
+	cases := map[string]string{
+		"satıcı VKN:1234567890 bulunamadı":                     "satıcı VKN:[vkn] bulunamadı",
+		"tckn 12345678901 eşleşmedi":                           "tckn [tckn] eşleşmedi",
+		"iban TR33 0006 1005 1978 6457 8413 26 reddedildi":     "iban [iban] reddedildi",
+		"iban TR330006100519786457841326":                      "iban [iban]",
+		"fatura 987654321098765 ve 01234567890 numaralı kayıt": "fatura 987654321098765 ve 01234567890 numaralı kayıt",
+	}
+	for in, want := range cases {
+		if got := ScrubString(in); got != want {
+			t.Errorf("ScrubString(%q) = %q, want %q", in, got, want)
+		}
+	}
+	// Identifiers glued to letters (uuid, trace id) stay.
+	for _, keep := range []string{
+		"request 7f1c2d3e-0000-4000-8000-a12345678901",
+		"trace 4bf92f3577b34da6a3ce929d0e0e4736",
+		"invoice GIB2026000000123",
+	} {
+		if got := ScrubString(keep); got != keep {
+			t.Errorf("ScrubString(%q) = %q", keep, got)
+		}
+	}
+	for _, k := range []string{"vkn", "taxpayer_tckn", "iban", "vendor_tax_number", "tax_id"} {
+		if !IsSensitiveKey(k) {
+			t.Errorf("%s should be sensitive", k)
+		}
+	}
+	if IsSensitiveKey("taxpayer_id") {
+		t.Error("taxpayer_id is an internal id, not personal data")
+	}
+}

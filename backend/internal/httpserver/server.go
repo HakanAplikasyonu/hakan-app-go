@@ -14,6 +14,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
@@ -141,6 +142,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/tracing"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
@@ -579,7 +581,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	s.http = &http.Server{
 		Addr:         cfg.HTTP.Addr,
-		Handler:      middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(mux))),
+		Handler:      tracing.HTTP(middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(metrics.Default.HTTP(mux))))),
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,

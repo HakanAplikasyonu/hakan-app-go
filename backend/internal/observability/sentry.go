@@ -65,7 +65,7 @@ func Init(cfg config.SentryConfig, component string) (flush func(), err error) {
 	}
 	enabled.Store(true)
 	tracing.Store(cfg.TracesSampleRate > 0)
-	return func() { sentry.Flush(3 * time.Second) }, nil
+	return func() { FlushAll(3 * time.Second) }, nil
 }
 
 func buildRevision() string {
@@ -137,20 +137,50 @@ func withOptions(ctx context.Context, opts Options, fn func(hub *sentry.Hub)) {
 	})
 }
 
-// CaptureError reports err (no-op when disabled or err is nil).
+// CaptureError reports err to every registered reporter (Sentry by
+// default; no-op when disabled or err is nil).
 func CaptureError(ctx context.Context, err error, opts Options) {
-	if !Enabled() || err == nil {
+	if err == nil {
+		return
+	}
+	for _, r := range reporterList() {
+		r.CaptureError(ctx, err, opts)
+	}
+}
+
+// CaptureMessage reports a message event to every registered reporter.
+func CaptureMessage(ctx context.Context, msg string, opts Options) {
+	if msg == "" {
+		return
+	}
+	for _, r := range reporterList() {
+		r.CaptureMessage(ctx, msg, opts)
+	}
+}
+
+// sentryReporter is the default Reporter: the Sentry-protocol client
+// configured by Init.
+type sentryReporter struct{}
+
+func (sentryReporter) CaptureError(ctx context.Context, err error, opts Options) {
+	if !Enabled() {
 		return
 	}
 	withOptions(ctx, opts, func(hub *sentry.Hub) { hub.CaptureException(err) })
 }
 
-// CaptureMessage reports a message event (no-op when disabled).
-func CaptureMessage(ctx context.Context, msg string, opts Options) {
-	if !Enabled() || msg == "" {
+func (sentryReporter) CaptureMessage(ctx context.Context, msg string, opts Options) {
+	if !Enabled() {
 		return
 	}
 	withOptions(ctx, opts, func(hub *sentry.Hub) { hub.CaptureMessage(msg) })
+}
+
+func (sentryReporter) Flush(timeout time.Duration) bool {
+	if !Enabled() {
+		return true
+	}
+	return sentry.Flush(timeout)
 }
 
 // SetUser attaches the internal user uuid to the request-scoped hub.

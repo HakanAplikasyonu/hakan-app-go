@@ -162,6 +162,18 @@ x-backend-environment: &backend-environment
   SENTRY_RELEASE: ${SENTRY_RELEASE:-}
   # Share of HTTP requests sent as performance transactions (0 = off).
   SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0}
+  # --- Metrics and tracing (#179). Metrics listen on their own port inside
+  # the compose network (not published); scrape backend:9091 and worker:9092.
+  METRICS_ADDR: ${METRICS_ADDR:-:9091}
+  WORKER_METRICS_ADDR: ${WORKER_METRICS_ADDR:-:9092}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  # OpenTelemetry: empty endpoint = tracing off. Other OTEL_EXPORTER_OTLP_*
+  # variables (headers, protocol) are read by the exporter.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ${OTEL_EXPORTER_OTLP_TRACES_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-}
+  OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-0.1}
 
 services:
   postgres:
