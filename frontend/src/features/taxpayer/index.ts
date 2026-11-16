@@ -6,3 +6,4 @@ export { TaxpayerInvoicesPage } from "./components/taxpayer-invoices-page";
 export { TaxpayerInvoiceDetailPage } from "./components/taxpayer-invoice-detail-page";
 export { TaxpayerReceiptsPage } from "./components/taxpayer-receipts-page";
 export { TaxpayerUploadsPage } from "./components/taxpayer-uploads-page";
+export { TaxpayerRequestsPage } from "./components/taxpayer-requests-page";

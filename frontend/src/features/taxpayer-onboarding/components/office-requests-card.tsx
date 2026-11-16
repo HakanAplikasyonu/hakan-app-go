@@ -1,15 +1,9 @@
 "use client";
 
+import { ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -99,61 +93,69 @@ export function OfficeRequestsCard({ taxpayer }: { taxpayer: string }) {
     if (ok) reject.mutate(req.uuid);
   };
 
+  // Bekleyen talep yoksa bant hiç görünmez (arayüz 8/9, #331).
+  if (items.length === 0) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{t("onboarding.panel_title")}</CardTitle>
-        <CardDescription>{t("onboarding.panel_description")}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            {t("onboarding.panel_empty")}
-          </p>
-        ) : (
-          <ul className="divide-y">
-            {items.map((req) => (
-              <li
-                key={req.uuid}
-                className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="text-sm">
-                  <div className="font-medium">{req.organization.name}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {req.title}
-                    {" · "}
-                    <span className="font-mono">{req.tax_id}</span>
-                    {" · "}
-                    {t("onboarding.panel_expires", {
-                      date: date(req.expires_at, "dd.MM.yyyy", locale),
-                    })}
-                  </div>
+    <section
+      aria-labelledby="office-requests-title"
+      className="border-brand bg-brand-tint flex flex-col gap-4 rounded-xl border p-4 sm:flex-row sm:items-start md:p-5"
+    >
+      <ShieldCheck
+        aria-hidden
+        className="text-brand-text size-6 shrink-0"
+        strokeWidth={1.8}
+      />
+      <div className="min-w-0 flex-1">
+        <h2
+          id="office-requests-title"
+          className="font-display text-base font-bold"
+        >
+          {t("onboarding.panel_title")}
+        </h2>
+        <p className="text-text-2 mt-1 text-sm">
+          {t("onboarding.panel_description")}
+        </p>
+        <ul className="divide-line mt-3 divide-y">
+          {items.map((req) => (
+            <li
+              key={req.uuid}
+              className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="text-sm">
+                <div className="font-semibold">{req.organization.name}</div>
+                <div className="text-text-2 text-xs">
+                  {req.title}
+                  {" · "}
+                  <span className="font-mono">{req.tax_id}</span>
+                  {" · "}
+                  {t("onboarding.panel_expires", {
+                    date: date(req.expires_at, "dd.MM.yyyy", locale),
+                  })}
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={busy}
-                    onClick={() => setApproving(req)}
-                  >
-                    {t("onboarding.consent_approve")}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => void onReject(req)}
-                  >
-                    {t("onboarding.consent_reject")}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 md:min-h-9"
+                  disabled={busy}
+                  onClick={() => void onReject(req)}
+                >
+                  {t("onboarding.consent_reject")}
+                </Button>
+                <Button
+                  type="button"
+                  className="min-h-11 md:min-h-9"
+                  disabled={busy}
+                  onClick={() => setApproving(req)}
+                >
+                  {t("onboarding.consent_approve")}
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
       <Dialog
         open={approving !== null}
         onOpenChange={(open) => {
@@ -194,6 +196,6 @@ export function OfficeRequestsCard({ taxpayer }: { taxpayer: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   );
 }

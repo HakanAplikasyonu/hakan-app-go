@@ -153,6 +153,7 @@ export const routes = {
     invoices: (uuid: string) => `/m/${encodeURIComponent(uuid)}/invoices`,
     invoice: (uuid: string, invoice: string) =>
       `/m/${encodeURIComponent(uuid)}/invoices/${encodeURIComponent(invoice)}`,
+    requests: (uuid: string) => `/m/${encodeURIComponent(uuid)}/requests`,
     receipts: (uuid: string) => `/m/${encodeURIComponent(uuid)}/receipts`,
     uploads: (uuid: string) => `/m/${encodeURIComponent(uuid)}/uploads`,
   },

@@ -151,3 +151,71 @@ export const taxpayerPanelService = {
     return unwrap<TaxpayerUploadJob>({ data: payload, response });
   },
 };
+
+// --- Müşavirin istekleri ve belge yükleme (arayüz 8/9, #331) -----------------
+
+export type TaxpayerDocumentTask = components["schemas"]["DocumentTask"];
+export type TaxpayerDocumentTaskPage = {
+  items: TaxpayerDocumentTask[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+export type TaxpayerDocumentTaskStatus =
+  "open" | "submitted" | "matched" | "cancelled" | "all";
+
+export const taxpayerTaskKeys = {
+  all: (uuid: string) => ["taxpayer", uuid.toLowerCase(), "tasks"] as const,
+  list: (uuid: string, status: TaxpayerDocumentTaskStatus) =>
+    ["taxpayer", uuid.toLowerCase(), "tasks", status] as const,
+};
+
+async function postMultipart<T>(
+  taxpayer: string,
+  path: string,
+  field: string,
+  file: File,
+  headers?: Record<string, string>,
+): Promise<T> {
+  const base = apiConfig.baseUrl.replace(/\/$/, "");
+  const form = new FormData();
+  form.append(field, file);
+  const response = await fetch(`${base}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      [TAXPAYER_HEADER]: taxpayer,
+      ...headers,
+    },
+    body: form,
+  });
+  const payload = await response.json().catch(() => undefined);
+  return unwrap<T>({ data: payload, response });
+}
+
+export const taxpayerTaskService = {
+  list: (taxpayer: string, status: TaxpayerDocumentTaskStatus) =>
+    taxpayerRequest<TaxpayerDocumentTaskPage>(
+      "GET",
+      `/v1/taxpayer/document-tasks${query({ status, limit: 100 })}`,
+      { taxpayer },
+    ),
+  /** Bir isteğe belge ekler (PDF ya da görsel). */
+  upload: (taxpayer: string, task: string, file: File) =>
+    postMultipart<unknown>(
+      taxpayer,
+      `/v1/taxpayer/document-tasks/${encodeURIComponent(task)}/uploads`,
+      "file",
+      file,
+    ),
+  /** Fiş / fatura fotoğrafı: müşavirin okuma kuyruğuna gider. */
+  receipt: (taxpayer: string, file: File) =>
+    postMultipart<TaxpayerReceipt>(
+      taxpayer,
+      "/v1/taxpayer/receipts",
+      "image",
+      file,
+      { "Idempotency-Key": crypto.randomUUID() },
+    ),
+};
