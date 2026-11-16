@@ -3,6 +3,7 @@
 // Mağaza gönderimi yapılmaz; bu test yalnızca yapılandırmayı denetler.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { test } from 'node:test';
 
 const read = (p: string) => JSON.parse(readFileSync(new URL(`../../../${p}`, import.meta.url), 'utf8'));
@@ -10,7 +11,9 @@ const read = (p: string) => JSON.parse(readFileSync(new URL(`../../../${p}`, imp
 const app = read('app.json').expo;
 const pkg = read('package.json');
 const eas = read('eas.json');
-const store = read('store/store.config.json');
+const require = createRequire(import.meta.url);
+const store = require('../../../store/store.config.js');
+const appConfig = require('../../../app.config.js');
 
 test('user-facing version is semver and matches package.json', () => {
   assert.match(app.version, /^\d+\.\d+\.\d+$/);
@@ -43,9 +46,39 @@ test('profiles: development / preview are internal, production goes to the store
   assert.equal(eas.build['development-simulator'].ios.simulator, true);
 });
 
-test('no live submission: Android submit stays an internal draft, no iOS submit profile', () => {
-  assert.deepEqual(eas.submit.production.android, { track: 'internal', releaseStatus: 'draft' });
-  assert.equal(eas.submit.production.ios, undefined);
+test('submit profiles: Android internal draft, iOS ids are placeholders only (#203)', () => {
+  const { android, ios } = eas.submit.production;
+  assert.equal(android.track, 'internal');
+  assert.equal(android.releaseStatus, 'draft');
+  assert.match(android.serviceAccountKeyPath, /^\.\/secrets\//, 'service account key stays out of git');
+  // Real App Store Connect ids are an external decision: placeholders until then.
+  assert.match(ios.ascAppId, /^TBD_/);
+  assert.match(ios.appleTeamId, /^TBD_/);
+  assert.equal(ios.metadataPath, './store/store.config.js');
+  assert.equal(eas.submit.preview.extends, 'production');
+});
+
+test('OTA: one EAS channel per build profile, runtime follows the app version (#203)', () => {
+  for (const name of ['development', 'preview', 'production']) assert.equal(eas.build[name].channel, name);
+  const off = appConfig({ config: app });
+  assert.deepEqual(off.runtimeVersion, { policy: 'appVersion' });
+  assert.equal(off.updates.enabled, false, 'no EAS project id: updates off');
+  const prev = process.env.EAS_PROJECT_ID;
+  process.env.EAS_PROJECT_ID = '00000000-0000-0000-0000-000000000000';
+  try {
+    const on = appConfig({ config: app });
+    assert.equal(on.updates.url, 'https://u.expo.dev/00000000-0000-0000-0000-000000000000');
+  } finally {
+    if (prev === undefined) delete process.env.EAS_PROJECT_ID;
+    else process.env.EAS_PROJECT_ID = prev;
+  }
+});
+
+test('store placeholders come from the environment and are listed', () => {
+  const missing: string[] = store.missingStoreValues();
+  assert.ok(missing.includes('STORE_PRIVACY_URL'));
+  const readme = readFileSync(new URL('../../../store/README.md', import.meta.url), 'utf8');
+  for (const name of Object.values(store.storeEnv as Record<string, string>)) assert.ok(readme.includes(name), `README lists ${name}`);
 });
 
 test('store metadata draft is Turkish and within App Store limits', () => {

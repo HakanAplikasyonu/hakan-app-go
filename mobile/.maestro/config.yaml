@@ -1,0 +1,12 @@
+# Maestro duman akışları (#203). Çalıştırma: mobile/README.md, "Duman testleri".
+# Sıra önemlidir: giriş → şirket seçimi → fiş çek → görevler → çıkış.
+flows:
+  - flows/*.yaml
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - login
+    - select-taxpayer
+    - capture
+    - tasks
+    - signout

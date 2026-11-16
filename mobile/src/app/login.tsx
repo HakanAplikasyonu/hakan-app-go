@@ -56,6 +56,7 @@ export default function LoginScreen() {
           returnKeyType="next"
           onSubmitEditing={() => passwordRef.current?.focus()}
           placeholder="ornek@sirket.com"
+          testID="login-email"
         />
         <Field
           inputRef={passwordRef}
@@ -65,6 +66,7 @@ export default function LoginScreen() {
           secureTextEntry
           autoComplete="password"
           textContentType="password"
+          testID="login-password"
           returnKeyType={needsCode ? 'next' : 'go'}
           onSubmitEditing={submit}
         />

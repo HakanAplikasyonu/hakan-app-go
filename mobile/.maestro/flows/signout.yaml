@@ -1,0 +1,13 @@
+# Profil ve çıkış: sürüm etiketi görünür, çıkış giriş ekranına döner.
+appId: app.hakan.mukellef
+name: signout
+tags: [smoke]
+---
+- launchApp
+- tapOn: "Profil ve hesap"
+- assertVisible:
+    id: "app-version"
+- tapOn: "Çıkış yap"
+- extendedWaitUntil:
+    visible: "Giriş yap"
+    timeout: 15000

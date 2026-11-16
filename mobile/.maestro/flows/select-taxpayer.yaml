@@ -1,0 +1,18 @@
+# Şirket seçimi: birden çok şirketi olan hesapta ilk şirket; tek şirkette
+# ekran atlanır ve doğrudan ana sayfa açılır.
+appId: app.hakan.mukellef
+name: select-taxpayer
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Şirket seçin"
+    commands:
+      - tapOn:
+          text: "›"
+          index: 0
+- extendedWaitUntil:
+    visible: "Merhaba.*"
+    timeout: 20000
+- assertVisible: "Fiş / Z raporu çek"

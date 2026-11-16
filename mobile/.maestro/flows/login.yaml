@@ -1,0 +1,21 @@
+# Giriş: e-posta + parola. Kimlik bilgileri ortamdan gelir:
+#   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
+appId: app.hakan.mukellef
+name: login
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Giriş yap"
+- tapOn:
+    id: "login-email"
+- inputText: ${MAESTRO_EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${MAESTRO_PASSWORD}
+- hideKeyboard
+- tapOn: "Giriş yap"
+- extendedWaitUntil:
+    visible:
+      text: "Şirket seçin|Merhaba.*"
+    timeout: 20000

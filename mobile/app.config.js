@@ -42,7 +42,14 @@ module.exports = ({ config }) => {
   return {
     ...config,
     ...appLinks(config),
-    runtimeVersion: { policy: 'fingerprint' },
+    // OTA (#203): an update reaches only builds of the same app version
+    // (runtimeVersion = version in app.json) on the build's EAS channel
+    // (eas.json: development / preview / production). Without an EAS
+    // project id updates are off.
+    runtimeVersion: { policy: 'appVersion' },
+    updates: projectId
+      ? { url: `https://u.expo.dev/${projectId}`, enabled: true, checkAutomatically: 'ON_LOAD', fallbackToCacheTimeout: 0 }
+      : { enabled: false },
     extra: {
       ...config.extra,
       ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),

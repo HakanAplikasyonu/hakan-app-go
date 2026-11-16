@@ -1,0 +1,12 @@
+# Fiş çek: ekran açılır, kamera ve galeri seçenekleri görünür. Gerçek çekim
+# emülatörde kamera gerektirdiği için duman testinde yapılmaz.
+appId: app.hakan.mukellef
+name: capture
+tags: [smoke]
+---
+- launchApp
+- tapOn: "Fiş / Z raporu çek"
+- assertVisible: "Kamerayla çek"
+- assertVisible: "Galeriden seç"
+- back
+- assertVisible: "Merhaba.*"

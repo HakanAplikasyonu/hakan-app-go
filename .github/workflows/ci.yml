@@ -753,6 +753,15 @@ jobs:
         if: steps.guard.outputs.present == 'true'
         working-directory: mobile
         run: npm test --if-present
+      # #203: config plugins (expo-updates, Sentry, notifications, app links)
+      # must still produce a native project; the emulator Maestro run is
+      # documented in mobile/README.md ("Duman testleri") and not run here.
+      - name: Native config (expo prebuild, Android)
+        if: steps.guard.outputs.present == 'true'
+        working-directory: mobile
+        env:
+          EXPO_PUBLIC_APP_ENV: preview
+        run: npx expo prebuild --platform android --no-install --clean
       - name: api:generate is up to date
         if: steps.guard.outputs.present == 'true'
         working-directory: mobile

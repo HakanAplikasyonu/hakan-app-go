@@ -1,0 +1,13 @@
+# Görevler: liste açılır (boşsa "Yapılacak iş yok"). Bir de deep link:
+# hakan://tasks aynı ekranı açar (#201).
+appId: app.hakan.mukellef
+name: tasks
+tags: [smoke]
+---
+- launchApp
+- tapOn: "Tüm görevler"
+- assertVisible: "Görevler"
+- back
+- openLink: "hakan://tasks"
+- assertVisible: "Görevler"
+- back
