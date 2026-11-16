@@ -1,12 +1,18 @@
-# Fiş çek: ekran açılır, kamera ve galeri seçenekleri görünür. Gerçek çekim
+# Fiş çek (arayüz v1, #328): koyu kamera ekranı açılır, deklanşör, galeri ve tür seçici görünür.
 # emülatörde kamera gerektirdiği için duman testinde yapılmaz.
 appId: app.hakan.mukellef
 name: capture
 tags: [smoke]
 ---
 - launchApp
-- tapOn: "Fiş / Z raporu çek"
-- assertVisible: "Kamerayla çek"
-- assertVisible: "Galeriden seç"
-- back
+- tapOn:
+    id: "capture-card"
+- assertVisible:
+    id: "capture-shutter"
+- assertVisible:
+    id: "capture-gallery"
+- tapOn:
+    id: "capture-kind-fuel_receipt"
+- tapOn:
+    id: "capture-close"
 - assertVisible: "Merhaba.*"

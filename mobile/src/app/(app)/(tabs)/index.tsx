@@ -1,28 +1,38 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-
+import { unreadCount } from '@hakan/mobile-core/notifications/inbox';
+import { KristalYukleyici, TacRozeti } from '@hakan/mobile-core/hakan';
+import { Ikon } from '@hakan/mobile-core/ui/ikon';
+import { DOKUNMA, yerlesim } from '@hakan/mobile-core/ui/layout';
+import { Hap, Kart, KesikKose, metin, Satir } from '@hakan/mobile-core/ui/parcalar';
+import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card, Chip, Row, Screen, Text } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
-import { initials, kindLabel, roleLabel } from '@/core/auth/taxpayers';
+import { initials, roleLabel } from '@/core/auth/taxpayers';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
-import { useColors } from '@/core/theme';
-import { receiptsSummaryLine, serverOnly } from '@/features/receipts/history';
+import { dueLine, lateBadge, waitingLine } from '@/features/home/crown';
+import { useInbox } from '@/features/notifications/api';
 import { useReceipts } from '@/features/receipts/provider';
-import { QueueBanner } from '@/features/receipts/queue-banner';
-import { useReceiptHistory } from '@/features/receipts/use-history';
 import { openTask, useTasks } from '@/features/tasks/use-tasks';
 
-/** Mükellef ana sayfası: fiş çek, görevler, fişlerim. */
+/**
+ * Ana sayfa (MukellefMobil · 1): büyük "Fiş / Z raporu çek" kartı,
+ * "Müşavirinin istedikleri" ve çevrimdışı kuyruk durumu.
+ */
 export default function HomeScreen() {
-  const { me, taxpayer, taxpayers, switchTaxpayer, signOut } = useAuth();
-  const c = useColors();
+  const { me, taxpayer, taxpayers, switchTaxpayer } = useAuth();
+  const { colors: c } = useTheme();
+  const { width } = useWindowDimensions();
+  const genis = yerlesim(width) !== 'telefon';
+  const { summary, online } = useReceipts();
+  const { tasks, query } = useTasks();
+  const inbox = useInbox();
+  const unread = unreadCount(inbox.items);
   const [push, setPush] = useState<PushPermission>('unavailable');
   const [pushBusy, setPushBusy] = useState(false);
-  const { summary, items } = useReceipts();
-  const { history } = useReceiptHistory();
-  const { tasks } = useTasks();
 
   useEffect(() => {
     getPushPermission().then(setPush);
@@ -40,85 +50,144 @@ export default function HomeScreen() {
 
   if (!taxpayer) return null;
   const t = taxpayer.taxpayer;
+  const requests = tasks.filter((x) => x.source === 'server');
+  const late = lateBadge(requests);
+  const waiting = summary.waiting + summary.blocked;
 
   return (
-    <Screen style={{ maxWidth: 640, width: '100%', alignSelf: 'center' }}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Şirket: ${t.title}. Değiştir`}
-        onPress={switchTaxpayer}
-        disabled={taxpayers.length < 2}
-        style={[styles.company, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <View style={[styles.avatar, { backgroundColor: c.primary }]}>
-          <Text style={{ color: c.primaryText, fontWeight: '700', fontSize: 18 }}>{initials(t.title)}</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
+      <ScrollView
+        contentContainerStyle={[styles.body, genis ? styles.bodyWide : null]}
+        refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => void query.refetch()} tintColor={c.brandText} />}>
+        <View style={styles.hd}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={taxpayers.length > 1 ? `Şirket: ${t.title}. Değiştir` : `Şirket: ${t.title}`}
+            onPress={switchTaxpayer}
+            disabled={taxpayers.length < 2}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minHeight: DOKUNMA }}>
+            <View style={[styles.av, { backgroundColor: c.brand }]}>
+              <Text style={[styles.avText, { color: c.onBrand }]}>{initials(t.title)}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[metin.govde, { fontFamily: 'Inter_700Bold', color: c.text }]} numberOfLines={1}>
+                {t.title}
+              </Text>
+              <Text style={[metin.xs, metin.num, { color: c.text3 }]} numberOfLines={1}>
+                {t.tax_id_type.toUpperCase()} {t.tax_id} · {roleLabel(taxpayer.role)}
+                {taxpayers.length > 1 ? ' · değiştir' : ''}
+              </Text>
+            </View>
+          </Pressable>
+          <Pressable
+            testID="open-notifications"
+            accessibilityRole="button"
+            accessibilityLabel={unread ? `Bildirimler, ${unread} okunmamış` : 'Bildirimler'}
+            onPress={() => router.push('/notifications')}
+            style={styles.icon}>
+            <Ikon ad="bildirim" renk={c.text} />
+            {unread ? <View style={[styles.dot, { backgroundColor: c.danger }]} /> : null}
+          </Pressable>
         </View>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="heading" numberOfLines={2}>
-            {t.title}
-          </Text>
-          <Text variant="caption" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
-            {t.tax_id_type.toUpperCase()} {t.tax_id} · {kindLabel(t.kind)} · {roleLabel(taxpayer.role)}
-          </Text>
-        </View>
-        {taxpayers.length > 1 ? (
-          <Text variant="caption" tone="brand">
-            Değiştir
-          </Text>
+
+        <Text accessibilityRole="header" style={[styles.hello, { color: c.text }]}>
+          Merhaba{me?.user.name ? `, ${me.user.name}` : ''}
+        </Text>
+
+        {/* Büyük çekim düğmesi: kesik köşeli marka kartı */}
+        <Pressable
+          testID="capture-card"
+          accessibilityRole="button"
+          accessibilityLabel="Fiş / Z raporu çek"
+          accessibilityHint="Kamerayı açar"
+          onPress={() => router.push('/capture')}
+          style={({ pressed }) => [styles.capture, { backgroundColor: c.brand, opacity: pressed ? 0.9 : 1 }]}>
+          <View style={styles.capIcon}>
+            <Ikon ad="fisCek" boyut={22} renk={c.onBrand} />
+          </View>
+          <View style={{ gap: 4 }}>
+            <Text style={[styles.capTitle, { color: c.onBrand }]}>Fiş / Z raporu çek</Text>
+            <Text style={[metin.sm, { color: c.onBrand, opacity: 0.85 }]}>Çek, gönder, gerisini müşavirin halleder.</Text>
+          </View>
+          <KesikKose zemin={c.bg} />
+        </Pressable>
+
+        <Kart testID="home-requests">
+          <View style={styles.cardHead}>
+            <Text accessibilityRole="header" style={[metin.govde, { fontFamily: 'Inter_700Bold', color: c.text, flex: 1 }]}>
+              Müşavirinin istedikleri
+            </Text>
+            {late ? <Hap metin={late} ton="danger" /> : null}
+          </View>
+          {requests.length === 0 ? (
+            <Text style={[metin.sm, { color: c.text3, paddingHorizontal: 14, paddingBottom: 14 }]}>Şu an istenen bir belge yok.</Text>
+          ) : (
+            requests.slice(0, 3).map((r) => {
+              const due = dueLine(r.due);
+              return (
+                <Satir
+                  key={r.id}
+                  testID="home-request-row"
+                  sol={<TacRozeti durum={r.overdue ? 'sorun' : 'bekleniyor'} />}
+                  baslik={r.title}
+                  alt={[due?.text, r.detail.split('\n')[0]].filter(Boolean).join(' · ') || undefined}
+                  altRenk={due?.late ? c.danger : undefined}
+                  sag={<Ikon ad="sag" boyut={16} renk={c.text3} />}
+                  onPress={() => openTask(r)}
+                />
+              );
+            })
+          )}
+          {requests.length > 3 ? (
+            <Pressable accessibilityRole="button" onPress={() => router.push('/tasks')} style={[styles.more, { borderTopColor: c.line }]}>
+              <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.brandText }]}>Tüm istekler ({requests.length})</Text>
+            </Pressable>
+          ) : null}
+        </Kart>
+
+        {waiting > 0 || !online ? (
+          <Kart testID="queue-card" style={styles.queue}>
+            {waiting > 0 ? <KristalYukleyici boyut={22} gecikme={0} etiket="Fişler telefonda bekliyor" /> : <Ikon ad="uyari" renk={c.warn} />}
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>
+                {waitingLine(waiting) ?? 'Bağlantı yok'}
+              </Text>
+              <Text style={[metin.xs, { color: c.text3 }]}>
+                {online
+                  ? summary.blocked
+                    ? 'Şirketinizin bağlı bir müşavirlik ofisi yok ya da sunucu şu an fiş kabul etmiyor; kendiliğinden gönderilecek.'
+                    : 'Gönderiliyor…'
+                  : 'Bağlantı gelince kendiliğinden gönderilecek'}
+              </Text>
+            </View>
+          </Kart>
         ) : null}
-      </Pressable>
 
-      <View style={{ gap: 4 }}>
-        <Text variant="title">Merhaba{me?.user.name ? `, ${me.user.name}` : ''}</Text>
-        <Text tone="muted">Fişlerinizi ve müşavirinizin istediği belgeleri buradan göndereceksiniz.</Text>
-      </View>
-
-      <QueueBanner />
-      <Button title="Fiş / Z raporu çek" onPress={() => router.push('/capture')} />
-
-      <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text variant="heading">Görevler</Text>
-          {tasks.length ? <Chip label={String(tasks.length)} tone="warning" /> : null}
-        </View>
-        {tasks.length === 0 ? <Text tone="muted">Şu an yapmanız gereken bir şey yok.</Text> : null}
-        {tasks.slice(0, 3).map((t) => (
-          <Row key={t.id} title={t.title} subtitle={t.detail || undefined} onPress={() => openTask(t)} />
-        ))}
-        <Button title="Tüm görevler" variant="ghost" onPress={() => router.push('/tasks')} />
-      </Card>
-
-      <Row
-        title="Fişlerim"
-        subtitle={receiptsSummaryLine(summary, serverOnly(history, items, t.uuid).length)}
-        onPress={() => router.push('/receipts')}
-        trailing={<Text tone="muted">›</Text>}
-      />
-
-      {push !== 'granted' ? (
-        <Card>
-          <Text variant="heading">Bildirimler</Text>
-          <Text tone="muted">
-            {push === 'unavailable'
-              ? 'Bu cihazda anlık bildirim kullanılamıyor.'
-              : push === 'denied'
-                ? 'Bildirimler kapalı. Telefon ayarlarından açabilirsiniz.'
-                : 'Müşaviriniz belge istediğinde veya bir kayıt onayınızı beklediğinde haber verelim.'}
-          </Text>
-          {push === 'undetermined' ? <Button title="Bildirimleri aç" onPress={turnOnPush} loading={pushBusy} /> : null}
-        </Card>
-      ) : null}
-
-      <View style={{ flex: 1 }} />
-      <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-        {me?.user.email}
-      </Text>
-      <Button title="Profil ve hesap" variant="secondary" onPress={() => router.push('/profile')} />
-      <Button title="Çıkış yap" variant="ghost" onPress={signOut} />
-    </Screen>
+        {push === 'undetermined' ? (
+          <Kart style={{ padding: 16, gap: 10 }}>
+            <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]}>Bildirimleri açın</Text>
+            <Text style={[metin.xs, { color: c.text2 }]}>Müşaviriniz belge istediğinde veya bir kayıt onayınızı beklediğinde haber verelim.</Text>
+            <Button title="Bildirimleri aç" onPress={turnOnPush} loading={pushBusy} />
+          </Kart>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  company: { flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: StyleSheet.hairlineWidth, borderRadius: 16, padding: 14 },
-  avatar: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  body: { padding: 16, paddingTop: 4, gap: 12, flexGrow: 1 },
+  bodyWide: { paddingHorizontal: 28, maxWidth: 720, width: '100%', alignSelf: 'center' },
+  hd: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 12, paddingBottom: 4 },
+  av: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  avText: { fontFamily: 'Inter_700Bold', fontSize: 14 },
+  icon: { width: DOKUNMA, height: DOKUNMA, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  dot: { position: 'absolute', top: 10, right: 11, width: 8, height: 8, borderRadius: 4 },
+  hello: { fontFamily: 'InterTight_700Bold', fontSize: 22, lineHeight: 28, paddingTop: 4 },
+  capture: { borderRadius: 20, padding: 22, gap: 18, minHeight: 170, overflow: 'hidden' },
+  capIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  capTitle: { fontFamily: 'InterTight_700Bold', fontSize: 24, lineHeight: 30 },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14 },
+  more: { minHeight: DOKUNMA, alignItems: 'center', justifyContent: 'center', borderTopWidth: StyleSheet.hairlineWidth },
+  queue: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
 });

@@ -17,7 +17,7 @@ export default function AppLayout() {
           headerBackButtonDisplayMode: 'minimal',
         }}>
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="capture" options={{ headerShown: true, title: 'Fiş çek', presentation: 'modal' }} />
+        <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="receipts/[id]" options={{ headerShown: true, title: 'Fiş' }} />
         <Stack.Screen name="task/[uuid]" options={{ headerShown: true, title: 'İstek' }} />
         <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Bildirimler' }} />

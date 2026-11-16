@@ -1,3 +1,4 @@
+import { GorunumAyari, Kart } from '@hakan/mobile-core/ui/parcalar';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 
@@ -17,7 +18,7 @@ import { versionLabel } from '@/core/config/version';
  * muhasebe kayıtları müşavirde kalır (yasal saklama).
  */
 export default function ProfileScreen() {
-  const { me, signOut } = useAuth();
+  const { me, signOut, taxpayers, switchTaxpayer } = useAuth();
   const [step, setStep] = useState<'idle' | 'code'>('idle');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +55,9 @@ export default function ProfileScreen() {
 
   return (
     <Screen style={{ maxWidth: 640, width: '100%', alignSelf: 'center' }}>
+      <Text variant="title" accessibilityRole="header">
+        Profil
+      </Text>
       <Card>
         <Text variant="heading">
           {me?.user.name} {me?.user.surname}
@@ -68,6 +72,11 @@ export default function ProfileScreen() {
         </Card>
       ) : null}
 
+      <Kart style={{ padding: 16 }}>
+        <GorunumAyari />
+      </Kart>
+
+      {taxpayers.length > 1 ? <Button title="Şirket değiştir" variant="secondary" onPress={switchTaxpayer} /> : null}
       <Button title="Çıkış yap" variant="secondary" onPress={signOut} />
 
       <Card>
