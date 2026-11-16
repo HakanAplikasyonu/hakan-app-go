@@ -9,6 +9,7 @@
     "./hakan": "./src/ui/hakan.tsx",
     "./ui/ikon": "./src/ui/ikon.tsx",
     "./ui/sekme-cubugu": "./src/ui/sekme-cubugu.tsx",
+    "./ui/parcalar": "./src/ui/parcalar.tsx",
     "./*": "./src/*.ts"
   },
   "scripts": {

@@ -54,3 +54,13 @@ export function clientSubtitle(c: { tax_id: string; kind: string; open_warnings:
   if (c.open_tasks) parts.push(`${c.open_tasks} açık görev`);
   return parts.join(' · ');
 }
+
+/** Avatar baş harfleri: "Atlas Gıda Ticaret A.Ş." → "AG" (mobile/src/core/auth/taxpayers.ts ile aynı kural). */
+export function initials(title: string): string {
+  const skip = new Set(['ltd', 'şti', 'a.ş', 'aş', 've', 'san', 'tic']);
+  const words = title
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter((w) => w && !skip.has(w.toLocaleLowerCase('tr')));
+  return words.slice(0, 2).map((w) => w[0].toLocaleUpperCase('tr')).join('') || '?';
+}

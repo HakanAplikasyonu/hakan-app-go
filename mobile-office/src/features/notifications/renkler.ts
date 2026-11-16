@@ -1,9 +1,8 @@
+import { useTheme } from '@hakan/mobile-core/ui/theme';
 import type { SekmeRenkleri } from '@hakan/mobile-core/ui/sekme-cubugu';
 
-import { useColors } from '@/core/theme';
-
-/** Sekme çubuğu renkleri, uygulamanın temasından. */
+/** Sekme çubuğu renkleri, etkin temadan (useTheme). */
 export function useSekmeRenkleri(): SekmeRenkleri & { bg: string } {
-  const c = useColors();
-  return { bg: c.background, surface: c.surface, line: c.border, text3: c.muted, brandText: c.brand, brandTint: c.background, danger: c.danger, onDanger: '#FFFFFF' };
+  const { colors: c } = useTheme();
+  return { bg: c.bg, surface: c.surface, line: c.line, text3: c.text3, brandText: c.brandText, brandTint: c.brandTint, danger: c.danger, onDanger: c.surface };
 }
