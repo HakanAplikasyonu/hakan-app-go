@@ -1,0 +1,12 @@
+# Çıkış: giriş ekranına döner.
+appId: app.hakan.office
+name: signout
+tags: [smoke]
+---
+- launchApp
+- scrollUntilVisible:
+    element: "Çıkış yap"
+- tapOn: "Çıkış yap"
+- extendedWaitUntil:
+    visible: "Giriş yap"
+    timeout: 15000

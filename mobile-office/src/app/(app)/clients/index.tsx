@@ -88,6 +88,7 @@ function ClientRow({ item, onPress }: { item: OfficeClient; onPress: () => void 
   const dot = item.open_blockers ? c.danger : item.open_warnings ? c.warning : item.open_tasks ? c.brand : null;
   return (
     <Pressable
+      testID="client-row"
       accessibilityRole="button"
       accessibilityLabel={`${item.title}, ${clientSubtitle(item)}`}
       onPress={onPress}

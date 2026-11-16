@@ -767,7 +767,8 @@ jobs:
 
   # HAKAN (#236): müşavir mobil uygulaması (ayrı Expo projesi, app.hakan.office).
   # mobile/ işiyle aynı denetimler; backend değişince de çalışır ki API tipleri
-  # (src/core/api/schema.d.ts) güncel kalsın. Mağaza sürümü bu işte yok (#242).
+  # (src/core/api/schema.d.ts) güncel kalsın. Mağaza sürümü (EAS) bu işte yok; #242
+  # yapılandırmayı test eder, gönderim karar sonrası elle yapılır.
   mobile-office:
     needs: changes
     if: needs.changes.outputs.mobile_office == 'true' || needs.changes.outputs.backend == 'true'
@@ -791,6 +792,13 @@ jobs:
         run: npm run typecheck
       - name: Test
         run: npm test
+      # #242: eklentiler (expo-updates, Sentry, bildirim, bağlantılar) yerel
+      # projeyi üretebilmeli. Emülatörde Maestro çalıştırması CI'da yok
+      # (mobile-office/README.md, "Duman testleri").
+      - name: Native config (expo prebuild, Android)
+        env:
+          EXPO_PUBLIC_APP_ENV: preview
+        run: npx expo prebuild --platform android --no-install --clean
 
   # HAKAN (#50): masaüstü (Tauri v2 kabuk + Go sidecar). Linux'ta derlenir
   # ve test edilir; imzalı macOS/Windows paketleri desktop-release.yml'de.

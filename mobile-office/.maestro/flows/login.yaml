@@ -1,0 +1,21 @@
+# Giriş: ofis kullanıcısının e-postası ve parolası ortamdan gelir:
+#   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
+appId: app.hakan.office
+name: login
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Giriş yap"
+- tapOn:
+    id: "login-email"
+- inputText: ${MAESTRO_EMAIL}
+- tapOn:
+    id: "login-password"
+- inputText: ${MAESTRO_PASSWORD}
+- hideKeyboard
+- tapOn: "Giriş yap"
+- extendedWaitUntil:
+    visible:
+      text: "Ofis seçin|İnceleme kuyruğu"
+    timeout: 20000

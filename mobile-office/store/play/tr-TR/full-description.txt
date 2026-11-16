@@ -1,0 +1,9 @@
+Hakan Ofis, Hakan platformunu kullanan mali müşavirlik ofislerinin müşavir ve çalışanları için mobil uygulamadır.
+
+• Pano: İnceleme kuyruğu, açık belge görevleri, aktif uyarılar ve bugün gelen yüklemeler tek ekranda.
+• İnceleme kuyruğu: Önerilen hesap kodunu belgesiyle ve gerekçesiyle görün; onaylayın, düzeltin ya da reddedin. Kaydırarak ya da toplu onay.
+• Mükellefler: Arama ve süzgeçle mükellef listesi; iletişim, dönem durumu, son fiş ve faturalar.
+• Belge talepleri: Mükelleften eksik belgeyi isteyin, yüklenince inceleyin, gerekirse yeniden isteyin.
+• Bildirimler: Mükellef belge yüklediğinde ve kritik uyarı açıldığında haberiniz olsun.
+
+Uygulamayı kullanmak için ofisinizin Hakan hesabında üye olmanız gerekir. Mükellef hesapları için “Hakan” uygulamasını kullanın.

@@ -46,6 +46,7 @@ export default function LoginScreen() {
         {error ? <Notice tone={needsCode && !code ? 'info' : 'danger'}>{error}</Notice> : null}
 
         <Field
+          testID="login-email"
           label="E-posta"
           value={email}
           onChangeText={setEmail}
@@ -58,6 +59,7 @@ export default function LoginScreen() {
           placeholder="ad@ofis.com"
         />
         <Field
+          testID="login-password"
           inputRef={passwordRef}
           label="Parola"
           value={password}

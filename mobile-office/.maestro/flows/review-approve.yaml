@@ -1,0 +1,25 @@
+# İnceleme onayı: kuyruktaki ilk öneri açılır ve onaylanır. Kuyruk boşsa
+# yalnızca boş durum denetlenir (demo verisinde bekleyen öneri olmalı).
+appId: app.hakan.office
+name: review-approve
+tags: [smoke]
+---
+- launchApp
+- openLink: "hakanofis://review"
+- assertVisible: "İnceleme kuyruğu"
+- runFlow:
+    when:
+      visible:
+        id: "suggestion-row"
+    commands:
+      - tapOn:
+          id: "suggestion-row"
+          index: 0
+      - extendedWaitUntil:
+          visible: "Onayla"
+          timeout: 15000
+      - tapOn: "Onayla"
+      - extendedWaitUntil:
+          visible: ".*onaylandı.*"
+          timeout: 15000
+- back
