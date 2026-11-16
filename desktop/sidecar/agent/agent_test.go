@@ -24,6 +24,7 @@ type fakeAPI struct {
 	uploads    []string
 	reject     map[string]int // dosya adı → HTTP durum
 	heartbeats int
+	lastStats  map[string]any
 	orgHeader  string
 }
 
@@ -88,8 +89,13 @@ func (f *fakeAPI) handler() http.Handler {
 		ok(w, 200, map[string]any{"uuid": "a-1", "name": "PC", "status": "online", "heartbeat_seconds": 300})
 	}))
 	mux.HandleFunc("POST /v1/tenant/agents/{id}/heartbeat", authed(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Stats map[string]any `json:"stats"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&in)
 		f.mu.Lock()
 		f.heartbeats++
+		f.lastStats = in.Stats
 		f.mu.Unlock()
 		if r.PathValue("id") != "a-1" {
 			fail(w, 404, "NOT_FOUND")
@@ -328,4 +334,52 @@ func TestNormalizeBase(t *testing.T) {
 func sha(s string) string {
 	h := sha256Sum([]byte(s))
 	return h
+}
+
+// Klasör eklenince ofise giden durum 5 dakikalık heartbeat'i beklemez;
+// tarama yapılmadan sıfır zaman gönderilmez (#284).
+func TestWatchChangeSendsHeartbeat(t *testing.T) {
+	rt, api, srv, _ := setup(t)
+	ctx := context.Background()
+	if _, err := rt.Login(ctx, srv.URL, "a@b.c", "dogru", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rt.UseOrganization(ctx, "atlas-ymm", "Ofis PC"); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Stop()
+	stats := func() (int, map[string]any) {
+		api.mu.Lock()
+		defer api.mu.Unlock()
+		return api.heartbeats, api.lastStats
+	}
+	wait := func(cond func(int, map[string]any) bool) (int, map[string]any) {
+		deadline := time.Now().Add(3 * time.Second)
+		for {
+			n, s := stats()
+			if cond(n, s) || time.Now().After(deadline) {
+				return n, s
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	n0, _ := wait(func(n int, _ map[string]any) bool { return n >= 1 })
+	if n0 < 1 {
+		t.Fatal("başlangıç heartbeat'i gönderilmedi")
+	}
+	if _, err := rt.AddWatch(t.TempDir(), "eng-1", "e-fatura"); err != nil {
+		t.Fatal(err)
+	}
+	n, s := wait(func(_ int, s map[string]any) bool { return s != nil && s["watched_folders"] == float64(1) })
+	if s == nil || s["watched_folders"] != float64(1) {
+		t.Fatalf("klasör eklenince heartbeat gitmedi: %d heartbeat, son %v", n, s)
+	}
+	if v, ok := s["last_scan"].(string); !ok || strings.HasPrefix(v, "0001-") {
+		t.Fatalf("tarama sonrası last_scan: %v", s["last_scan"])
+	}
+
+	b, _ := json.Marshal(WatchStats{})
+	if strings.Contains(string(b), "last_scan") {
+		t.Fatalf("tarama yokken last_scan gönderilmemeli: %s", b)
+	}
 }
