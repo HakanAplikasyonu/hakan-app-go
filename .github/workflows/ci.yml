@@ -115,6 +115,8 @@ jobs:
               [ -z "$file" ] && continue
               # Order matters: first match wins (case globs, * spans '/').
               case "$file" in
+                # Kullanım kılavuzları (#274) ön yüzde de yayımlanır: eşitleme denetimi.
+                docs/kullanim/*)                    frontend=true ;;
                 docs/*|*.md|.github/*)              : ;;   # nothing (before app dirs: backend/*.md is docs)
                 compose.prod.yml|deploy/*|scripts/prod-smoke.sh|scripts/prod-env.sh|scripts/backup-drill.sh)
                                                     infra=true ;;
@@ -329,6 +331,9 @@ jobs:
       - name: i18n
         working-directory: .
         run: node scripts/check-i18n.mjs
+      - name: Kullanım kılavuzları eşit mi (#274)
+        working-directory: .
+        run: node scripts/sync-kullanim.mjs --check
       - name: Build
         run: pnpm build
 
@@ -383,10 +388,27 @@ jobs:
         working-directory: e2e
         env:
           CI: "true"
-        run: npx playwright test --grep-invert @a11y
+        run: npx playwright test --grep-invert "@a11y|@docs"
       - name: Akış testleri sonucu
         if: steps.flows.outcome == 'failure'
         run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil). Ayrıntı e2e-report artefaktında."
+      # #274: kılavuz görüntüleri demo verisinden yeniden üretilir ve artefakt
+      # olarak yüklenir; depodakilerle karşılaştırılmaz (yazı tipi, saat vb.
+      # piksel farkı yaratır). Güncellemek: artefaktı indirip işleyin ya da
+      # yerelde `npx playwright test --grep @docs`.
+      - name: Kılavuz ekran görüntüleri (zorunlu değil)
+        id: docs
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test --grep @docs
+      - uses: actions/upload-artifact@v5
+        if: steps.docs.outcome == 'success'
+        with:
+          name: kilavuz-goruntuleri
+          path: frontend/public/yardim/img/
+          retention-days: 14
       - name: Logs on failure
         if: failure() || steps.flows.outcome == 'failure'
         run: |

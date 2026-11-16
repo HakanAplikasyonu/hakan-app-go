@@ -163,6 +163,11 @@ export const routes = {
     const qs = q.toString();
     return `/legal/${encodeURIComponent(kind)}${qs ? `?${qs}` : ""}`;
   },
+  /** Public usage guides (#274, docs/kullanim/). */
+  help: {
+    index: () => "/yardim",
+    guide: (slug: string) => `/yardim/${encodeURIComponent(slug)}`,
+  },
   errors: {
     unauthorized: "/unauthorized",
     forbidden: "/forbidden",
