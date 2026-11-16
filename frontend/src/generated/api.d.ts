@@ -5039,6 +5039,284 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/export-drivers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Accounting program export drivers (Luca, Zirve, Excel)
+         * @description Requires `tenant.journals.read`. `verified=false` means the template was not checked against a real file of the program.
+         */
+        get: operations["listExportDrivers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Journal drafts (yevmiye taslağı) of the engagement
+         * @description Requires `tenant.journals.read`. Newest period first.
+         */
+        get: operations["listJournalDrafts"];
+        put?: never;
+        /**
+         * Create a journal draft
+         * @description Requires `tenant.journals.write`. The entry number is the next one in
+         *     the engagement and period (`entry_date` month). Each line has an
+         *     account and exactly one of debit / credit. Balance is checked at
+         *     approval.
+         */
+        post: operations["createJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One journal draft with its lines
+         * @description Requires `tenant.journals.read`.
+         */
+        get: operations["getJournalDraft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a balanced draft
+         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`.
+         */
+        post: operations["approveJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take an exported draft out of its export (ters kayıt)
+         * @description Requires `tenant.journals.export`. Who, when and why are recorded on
+         *     the export; the draft is approved again and can be exported again.
+         */
+        post: operations["reverseJournalDraftExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-exports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Exports (export batches) of the engagement, newest first
+         * @description Requires `tenant.journals.read`.
+         */
+        get: operations["listJournalExports"];
+        put?: never;
+        /**
+         * Export approved drafts to an accounting program file
+         * @description Requires `tenant.journals.export`. Give a `period` (every approved
+         *     draft of it) or explicit `drafts`. The driver validates first; a
+         *     blocker stops the export with `422 EXPORT_BLOCKED`, each issue in
+         *     `error.details` (`code`, `field` = `entry:<no>[/line:<n>]`, `message` =
+         *     issue params as JSON). A draft can be in one live export only
+         *     (`409 ALREADY_EXPORTED`) until it is reversed.
+         */
+        post: operations["createJournalExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One export with its entries (and reversals)
+         * @description Requires `tenant.journals.read`.
+         */
+        get: operations["getJournalExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}/files/{fileName}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+                /** @description A file name listed on the export */
+                fileName: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download an export file (e.g. Luca / Zirve .xlsx)
+         * @description Requires `tenant.journals.read`. The storage path comes from the export record, never from the request.
+         */
+        get: operations["downloadJournalExportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-export-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Export settings of the engagement
+         * @description Requires `tenant.journals.read`. Defaults when none saved.
+         */
+        get: operations["getJournalExportSettings"];
+        /**
+         * Save the export settings
+         * @description Requires `tenant.journals.export`.
+         */
+        put: operations["putJournalExportSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-matching": {
         parameters: {
             query?: never;
@@ -9813,6 +10091,242 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["OfficeInvoiceDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        JournalDraftLineInput: {
+            /** @example 770.01.003 */
+            account: string;
+            description?: string;
+            /**
+             * @description Decimal; exactly one of debit / credit is non-zero
+             * @example 100.00
+             */
+            debit?: string;
+            /** @example 0 */
+            credit?: string;
+            quantity?: string;
+            currency?: string;
+            exchange_rate?: string;
+            foreign_amount?: string;
+            document_no?: string;
+            /** Format: date-time */
+            document_date?: string;
+            /** @description With source_id: where the line came from (e.g. invoice) */
+            source_kind?: string;
+            source_id?: string;
+            confidence?: string;
+        };
+        JournalDraftInput: {
+            /**
+             * @default mahsup
+             * @enum {string}
+             */
+            entry_type: "mahsup" | "acilis" | "kapanis";
+            /** Format: date-time */
+            entry_date: string;
+            description?: string;
+            document_type?: string;
+            origin?: {
+                [key: string]: unknown;
+            };
+            lines: components["schemas"]["JournalDraftLineInput"][];
+        };
+        JournalDraft: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example 2026-10 */
+            period: string;
+            /** Format: int32 */
+            entry_no: number;
+            entry_type: string;
+            /** Format: date-time */
+            entry_date: string;
+            /** @enum {string} */
+            status: "draft" | "approved" | "exported";
+            debit: string;
+            credit: string;
+            /** Format: int32 */
+            lines: number;
+        };
+        JournalDraftPage: {
+            items: components["schemas"]["JournalDraft"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        JournalDraftLine: {
+            /** Format: int32 */
+            line_no: number;
+            account: string;
+            description: string;
+            debit: string;
+            credit: string;
+            quantity?: string;
+            currency?: string;
+            exchange_rate?: string;
+            foreign_amount?: string;
+            document_no?: string;
+            /** Format: date-time */
+            document_date?: string;
+            source_kind?: string;
+            source_id?: string;
+        };
+        JournalDraftDetail: components["schemas"]["JournalDraft"] & {
+            description: string;
+            document_type?: string;
+            origin: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            approved_at?: string;
+            /** Format: date-time */
+            created_at: string;
+            items: components["schemas"]["JournalDraftLine"][];
+        };
+        ExportDriver: {
+            /** @example luca */
+            name: string;
+            template_version: string;
+            limits: {
+                [key: string]: unknown;
+            };
+            entry_types: {
+                [key: string]: string;
+            };
+            file_types: string[];
+            /** @description Template checked against a real file of the program */
+            verified: boolean;
+        };
+        ExportIssue: {
+            code: string;
+            /** @enum {string} */
+            severity: "info" | "warning" | "blocker";
+            entry_no?: string;
+            line?: number;
+            params?: {
+                [key: string]: unknown;
+            };
+        };
+        ExportFile: {
+            name: string;
+            content_type: string;
+            sha256: string;
+            /** Format: int64 */
+            size: number;
+            entries: number;
+        };
+        JournalExportInput: {
+            /** @example luca */
+            driver: string;
+            /** @description Template version; empty = the driver's default */
+            template?: string;
+            /** @example 2026-10 */
+            period?: string;
+            drafts?: string[];
+            /** @description Overrides invoices_reach_luca_directly for this run */
+            include_invoice_entries?: boolean;
+        };
+        JournalExport: {
+            /** Format: uuid */
+            uuid: string;
+            driver: string;
+            template_version: string;
+            template_verified: boolean;
+            files: components["schemas"]["ExportFile"][];
+            issues: components["schemas"]["ExportIssue"][];
+            entries: number;
+        };
+        JournalExportSummary: {
+            /** Format: uuid */
+            uuid: string;
+            driver: string;
+            template_version: string;
+            template_verified: boolean;
+            period?: string;
+            files: components["schemas"]["ExportFile"][];
+            issues: components["schemas"]["ExportIssue"][];
+            /** Format: int32 */
+            entries: number;
+            /** Format: int32 */
+            reversed: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        JournalExportDetail: components["schemas"]["JournalExportSummary"] & {
+            items: {
+                /** Format: uuid */
+                journal_draft_uuid: string;
+                period: string;
+                /** Format: int32 */
+                entry_no: number;
+                /** Format: date-time */
+                reversed_at?: string;
+                reversal_reason?: string;
+            }[];
+        };
+        JournalExportSettings: {
+            /** @description Invoices reach the program through the integrator; invoice entries are left out */
+            invoices_reach_luca_directly: boolean;
+            /** @description An account missing from the target plan blocks the export */
+            block_on_unknown_account: boolean;
+        };
+        EnvelopeExportDriverList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ExportDriver"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalDraftPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalDraftPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalDraft: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalDraft"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalDraftDetail: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalDraftDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalExport: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalExport"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalExportDetail: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalExportDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalExportSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalExportSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalExportList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["JournalExportSummary"][];
+                /** Format: int32 */
+                limit: number;
+                /** Format: int32 */
+                offset: number;
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         TaxpayerInvoice: {
@@ -19069,6 +19583,438 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listExportDrivers: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Drivers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExportDriverList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+        };
+    };
+    listJournalDrafts: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "draft" | "approved" | "exported";
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraft"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Not balanced (`JOURNAL_UNBALANCED`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    reverseJournalDraftExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Draft (approved again) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listJournalExports: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalExportList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createJournalExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalExportInput"];
+            };
+        };
+        responses: {
+            /** @description Export */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalExport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            409: components["responses"]["Conflict"];
+            /** @description Blocked (`EXPORT_BLOCKED`) or nothing to export (`NOTHING_TO_EXPORT`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getJournalExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Export */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalExportDetail"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadJournalExportFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+                /** @description A file name listed on the export */
+                fileName: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getJournalExportSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalExportSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putJournalExportSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JournalExportSettings"];
+            };
+        };
+        responses: {
+            /** @description Settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalExportSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

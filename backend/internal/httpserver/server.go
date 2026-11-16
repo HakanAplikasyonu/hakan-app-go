@@ -64,6 +64,7 @@ import (
 	oauthproviderusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/usecase"
 	invoiceoffice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/office"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
+	journalsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
@@ -393,6 +394,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		}
 	}
 	invoiceoffice.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceoffice.NewHandler(deps.Queries, ublDownload))
+	// Yevmiye taslağı ve Luca / Zirve / Excel çıktısı (#143, #26). Hedef hesap
+	// planı (#30) yüklüyse çıktıda ACCOUNT_NOT_IN_TARGET_PLAN denetlenir.
+	if deps.Storage != nil {
+		journalSvc := journalsmodule.New(deps.DB, deps.Storage).
+			WithPlanLoader(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)).PlanLoader())
+		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage))
+	}
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
 	}

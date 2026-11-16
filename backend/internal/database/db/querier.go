@@ -66,6 +66,7 @@ type Querier interface {
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
+	CountJournalDrafts(ctx context.Context, arg CountJournalDraftsParams) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
 	CountOnboardingRequestsByOrg(ctx context.Context, organizationID int64) (int64, error)
 	// Hazırlık: dönemin açık engelleyici uyarıları. Dönemsiz fatura uyarıları
@@ -522,6 +523,7 @@ type Querier interface {
 	ListExcelImportTemplates(ctx context.Context, organizationID pgtype.Int8) ([]ExcelImportTemplate, error)
 	ListExcelImports(ctx context.Context, arg ListExcelImportsParams) ([]ExcelImport, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
+	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
@@ -543,6 +545,8 @@ type Querier interface {
 	ListInvoiceWarnings(ctx context.Context, arg ListInvoiceWarningsParams) ([]DataWarning, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
 	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
+	// Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
+	ListJournalDrafts(ctx context.Context, arg ListJournalDraftsParams) ([]ListJournalDraftsRow, error)
 	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Eksik belge görevi (issue #36). Banka tabloları yalnızca okunur.

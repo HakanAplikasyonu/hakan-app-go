@@ -64,6 +64,10 @@ export const Permission = {
   TenantBankWrite: "tenant.bank.write",
   /** Accept the data processing agreement for the office (issue #57). */
   TenantLegalAccept: "tenant.legal.accept",
+  /** Journal drafts and accounting program exports (issue #143). */
+  TenantJournalsRead: "tenant.journals.read",
+  TenantJournalsWrite: "tenant.journals.write",
+  TenantJournalsExport: "tenant.journals.export",
 } as const;
 
 export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
@@ -178,6 +182,11 @@ export const permissions = {
     },
     legal: {
       accept: Permission.TenantLegalAccept,
+    },
+    journals: {
+      read: Permission.TenantJournalsRead,
+      write: Permission.TenantJournalsWrite,
+      export: Permission.TenantJournalsExport,
     },
   },
 } as const;

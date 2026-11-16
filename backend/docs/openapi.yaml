@@ -6996,6 +6996,324 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/export-drivers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Journals]
+      operationId: listExportDrivers
+      summary: Accounting program export drivers (Luca, Zirve, Excel)
+      description: Requires `tenant.journals.read`. `verified=false` means the template was not checked against a real file of the program.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Drivers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExportDriverList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Journals]
+      operationId: listJournalDrafts
+      summary: Journal drafts (yevmiye taslağı) of the engagement
+      description: Requires `tenant.journals.read`. Newest period first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [draft, approved, exported] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Draft page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Journals]
+      operationId: createJournalDraft
+      summary: Create a journal draft
+      description: |
+        Requires `tenant.journals.write`. The entry number is the next one in
+        the engagement and period (`entry_date` month). Each line has an
+        account and exactly one of debit / credit. Balance is checked at
+        approval.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalDraftInput" }
+      responses:
+        "201":
+          description: Draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraft"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Journals]
+      operationId: getJournalDraft
+      summary: One journal draft with its lines
+      description: Requires `tenant.journals.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: approveJournalDraft
+      summary: Approve a balanced draft
+      description: Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Approved draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Not balanced (`JOURNAL_UNBALANCED`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: reverseJournalDraftExport
+      summary: Take an exported draft out of its export (ters kayıt)
+      description: |
+        Requires `tenant.journals.export`. Who, when and why are recorded on
+        the export; the draft is approved again and can be exported again.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Draft (approved again)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-exports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Journals]
+      operationId: listJournalExports
+      summary: Exports (export batches) of the engagement, newest first
+      description: Requires `tenant.journals.read`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Exports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Journals]
+      operationId: createJournalExport
+      summary: Export approved drafts to an accounting program file
+      description: |
+        Requires `tenant.journals.export`. Give a `period` (every approved
+        draft of it) or explicit `drafts`. The driver validates first; a
+        blocker stops the export with `422 EXPORT_BLOCKED`, each issue in
+        `error.details` (`code`, `field` = `entry:<no>[/line:<n>]`, `message` =
+        issue params as JSON). A draft can be in one live export only
+        (`409 ALREADY_EXPORTED`) until it is reversed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalExportInput" }
+      responses:
+        "201":
+          description: Export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: Blocked (`EXPORT_BLOCKED`) or nothing to export (`NOTHING_TO_EXPORT`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: batchUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Journals]
+      operationId: getJournalExport
+      summary: One export with its entries (and reversals)
+      description: Requires `tenant.journals.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportDetail"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}/files/{fileName}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: batchUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: fileName, in: path, required: true, schema: { type: string }, description: A file name listed on the export }
+    get:
+      tags: [Journals]
+      operationId: downloadJournalExportFile
+      summary: Download an export file (e.g. Luca / Zirve .xlsx)
+      description: Requires `tenant.journals.read`. The storage path comes from the export record, never from the request.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-export-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Journals]
+      operationId: getJournalExportSettings
+      summary: Export settings of the engagement
+      description: Requires `tenant.journals.read`. Defaults when none saved.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportSettings"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Journals]
+      operationId: putJournalExportSettings
+      summary: Save the export settings
+      description: Requires `tenant.journals.export`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalExportSettings" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportSettings"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-matching:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -13144,6 +13462,263 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/OfficeInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    JournalDraftLineInput:
+      type: object
+      required: [account]
+      properties:
+        account: { type: string, example: "770.01.003" }
+        description: { type: string }
+        debit: { type: string, description: Decimal; exactly one of debit / credit is non-zero, example: "100.00" }
+        credit: { type: string, example: "0" }
+        quantity: { type: string }
+        currency: { type: string }
+        exchange_rate: { type: string }
+        foreign_amount: { type: string }
+        document_no: { type: string }
+        document_date: { type: string, format: date-time }
+        source_kind: { type: string, description: "With source_id: where the line came from (e.g. invoice)" }
+        source_id: { type: string }
+        confidence: { type: string }
+
+    JournalDraftInput:
+      type: object
+      required: [entry_date, lines]
+      properties:
+        entry_type: { type: string, enum: [mahsup, acilis, kapanis], default: mahsup }
+        entry_date: { type: string, format: date-time }
+        description: { type: string }
+        document_type: { type: string }
+        origin: { type: object, additionalProperties: true }
+        lines:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/JournalDraftLineInput" }
+
+    JournalDraft:
+      type: object
+      required: [uuid, period, entry_no, entry_type, entry_date, status, debit, credit, lines]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string, example: "2026-10" }
+        entry_no: { type: integer, format: int32 }
+        entry_type: { type: string }
+        entry_date: { type: string, format: date-time }
+        status: { type: string, enum: [draft, approved, exported] }
+        debit: { type: string }
+        credit: { type: string }
+        lines: { type: integer, format: int32 }
+
+    JournalDraftPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/JournalDraft" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    JournalDraftLine:
+      type: object
+      required: [line_no, account, description, debit, credit]
+      properties:
+        line_no: { type: integer, format: int32 }
+        account: { type: string }
+        description: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        quantity: { type: string }
+        currency: { type: string }
+        exchange_rate: { type: string }
+        foreign_amount: { type: string }
+        document_no: { type: string }
+        document_date: { type: string, format: date-time }
+        source_kind: { type: string }
+        source_id: { type: string }
+
+    JournalDraftDetail:
+      allOf:
+        - $ref: "#/components/schemas/JournalDraft"
+        - type: object
+          required: [description, origin, created_at, items]
+          properties:
+            description: { type: string }
+            document_type: { type: string }
+            origin: { type: object, additionalProperties: true }
+            approved_at: { type: string, format: date-time }
+            created_at: { type: string, format: date-time }
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/JournalDraftLine" }
+
+    ExportDriver:
+      type: object
+      required: [name, template_version, limits, entry_types, file_types, verified]
+      properties:
+        name: { type: string, example: luca }
+        template_version: { type: string }
+        limits: { type: object, additionalProperties: true }
+        entry_types: { type: object, additionalProperties: { type: string } }
+        file_types: { type: array, items: { type: string } }
+        verified: { type: boolean, description: Template checked against a real file of the program }
+
+    ExportIssue:
+      type: object
+      required: [code, severity]
+      properties:
+        code: { type: string }
+        severity: { type: string, enum: [info, warning, blocker] }
+        entry_no: { type: string }
+        line: { type: integer }
+        params: { type: object, additionalProperties: true }
+
+    ExportFile:
+      type: object
+      required: [name, content_type, sha256, size, entries]
+      properties:
+        name: { type: string }
+        content_type: { type: string }
+        sha256: { type: string }
+        size: { type: integer, format: int64 }
+        entries: { type: integer }
+
+    JournalExportInput:
+      type: object
+      required: [driver]
+      properties:
+        driver: { type: string, example: luca }
+        template: { type: string, description: Template version; empty = the driver's default }
+        period: { type: string, example: "2026-10" }
+        drafts: { type: array, items: { type: string, format: uuid } }
+        include_invoice_entries: { type: boolean, description: Overrides invoices_reach_luca_directly for this run }
+
+    JournalExport:
+      type: object
+      required: [uuid, driver, template_version, template_verified, files, issues, entries]
+      properties:
+        uuid: { type: string, format: uuid }
+        driver: { type: string }
+        template_version: { type: string }
+        template_verified: { type: boolean }
+        files: { type: array, items: { $ref: "#/components/schemas/ExportFile" } }
+        issues: { type: array, items: { $ref: "#/components/schemas/ExportIssue" } }
+        entries: { type: integer }
+
+    JournalExportSummary:
+      type: object
+      required: [uuid, driver, template_version, template_verified, files, issues, entries, reversed, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        driver: { type: string }
+        template_version: { type: string }
+        template_verified: { type: boolean }
+        period: { type: string }
+        files: { type: array, items: { $ref: "#/components/schemas/ExportFile" } }
+        issues: { type: array, items: { $ref: "#/components/schemas/ExportIssue" } }
+        entries: { type: integer, format: int32 }
+        reversed: { type: integer, format: int32 }
+        created_at: { type: string, format: date-time }
+
+    JournalExportDetail:
+      allOf:
+        - $ref: "#/components/schemas/JournalExportSummary"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                type: object
+                required: [journal_draft_uuid, period, entry_no]
+                properties:
+                  journal_draft_uuid: { type: string, format: uuid }
+                  period: { type: string }
+                  entry_no: { type: integer, format: int32 }
+                  reversed_at: { type: string, format: date-time }
+                  reversal_reason: { type: string }
+
+    JournalExportSettings:
+      type: object
+      required: [invoices_reach_luca_directly, block_on_unknown_account]
+      properties:
+        invoices_reach_luca_directly: { type: boolean, description: Invoices reach the program through the integrator; invoice entries are left out }
+        block_on_unknown_account: { type: boolean, description: An account missing from the target plan blocks the export }
+
+    EnvelopeExportDriverList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ExportDriver" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalDraftPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalDraftPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalDraft:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalDraft" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalDraftDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalDraftDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalExport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExportDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalExportDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExportSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalExportSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExportList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/JournalExportSummary" } }
+            limit: { type: integer, format: int32 }
+            offset: { type: integer, format: int32 }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TaxpayerInvoice:
