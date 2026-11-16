@@ -1,0 +1,20 @@
+# Pano: dört sayaç gerçek API'den dolar; uyarılar ekranı açılır, derin
+# bağlantı hakanofis://warnings aynı ekranı açar (#241).
+appId: app.hakan.office
+name: dashboard
+tags: [smoke]
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "stat-review"
+    timeout: 20000
+- assertVisible:
+    id: "stat-tasks"
+- assertVisible:
+    id: "stat-warnings"
+- assertVisible:
+    id: "stat-uploads"
+- openLink: "hakanofis://warnings"
+- assertVisible: "Uyarılar"
+- back

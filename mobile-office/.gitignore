@@ -19,3 +19,5 @@ npm-debug.*
 # Native folders are generated (CNG): configure them in app.json / plugins.
 /ios
 /android
+# EAS gönderim anahtarları (Play servis hesabı vb.) repoya girmez (#242).
+secrets/

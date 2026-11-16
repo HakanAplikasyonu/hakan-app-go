@@ -1,0 +1,29 @@
+# Belge talebi: ilk mükellefin ayrıntısından talep açılır; görev ekranı
+# "Bekleniyor" durumuyla açılır ve mükellefe bildirim gider (#240).
+appId: app.hakan.office
+name: task-create
+tags: [smoke]
+---
+- launchApp
+- tapOn: "Mükellefler"
+- extendedWaitUntil:
+    visible:
+      id: "client-row"
+    timeout: 20000
+- tapOn:
+    id: "client-row"
+    index: 0
+- extendedWaitUntil:
+    visible: "Belge iste"
+    timeout: 15000
+- tapOn: "Belge iste"
+- tapOn:
+    id: "request-title"
+- inputText: "Maestro duman testi"
+- hideKeyboard
+- tapOn: "7 gün"
+- tapOn: "Talebi gönder"
+- extendedWaitUntil:
+    visible: "Bekleniyor"
+    timeout: 15000
+- assertVisible: "Maestro duman testi"

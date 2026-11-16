@@ -1,0 +1,16 @@
+# Ofis seçimi: birden çok ofisi olan hesapta ilk ofis; tek ofiste ekran atlanır.
+appId: app.hakan.office
+name: select-office
+tags: [smoke]
+---
+- launchApp
+- runFlow:
+    when:
+      visible: "Ofis seçin"
+    commands:
+      - tapOn:
+          text: "›"
+          index: 0
+- extendedWaitUntil:
+    visible: "İnceleme kuyruğu"
+    timeout: 20000

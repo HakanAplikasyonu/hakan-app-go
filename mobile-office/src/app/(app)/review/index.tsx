@@ -104,7 +104,7 @@ export default function ReviewQueueScreen() {
             enabled={allowed && !selecting}
             onAction={(a) => (a === 'accept' ? void accept(s) : setRejecting(s))}>
             <Pressable
-              testID={`suggestion-${s.uuid}`}
+              testID="suggestion-row"
               accessibilityRole="button"
               accessibilityState={{ selected: selected.has(s.uuid) }}
               accessibilityLabel={`${fieldLabel(s.target_field)} önerisi ${proposedCode(s.proposed_value) ?? ''}, güven ${confidencePercent(s.confidence)}`}

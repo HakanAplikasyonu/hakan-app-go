@@ -1,0 +1,13 @@
+# Maestro duman akışları (#242). Çalıştırma: README.md, "Duman testleri".
+# Sıra önemlidir: giriş → ofis seçimi → pano → inceleme onayı → belge talebi → çıkış.
+flows:
+  - flows/*.yaml
+executionOrder:
+  continueOnFailure: false
+  flowsOrder:
+    - login
+    - select-office
+    - dashboard
+    - review-approve
+    - task-create
+    - signout

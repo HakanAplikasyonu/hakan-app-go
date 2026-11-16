@@ -64,6 +64,18 @@ npm run api:generate   # backend/docs/openapi.yaml → src/core/api/schema.d.ts
 
 CI'daki `mobile-office` işi tipleri yeniden üretir (işlenmiş dosya eskiyse uyarı verir), ardından lint, tip ve test çalıştırır.
 
+## Duman testleri ve sürüm (#242)
+
+- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
+
+  ```bash
+  maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
+  ```
+
+  Hesap bir ofis kullanıcısı olmalı (ör. `make demo-seed` ile gelen `musavir@demo.hakan.local`). Kuyrukta bekleyen öneri yoksa onay adımı atlanır. Emülatör çalıştırması CI'da yok (`mobile/` ile aynı gerekçe: yerel Android derlemesi ve test verili backend gerektirir). CI'da `npm test` akışların YAML'ını, `appId`'yi, komutları, sırayı ve dokunulan `testID`'lerin ekranlarda olduğunu denetler; `expo prebuild` (Android) eklentilerin yerel projeyi ürettiğini denetler.
+- **OTA** (expo-updates): `runtimeVersion` politikası `appVersion`; güncelleme kendi kanalına gider (`npx eas-cli update --channel preview`). EAS proje kimliği yokken kapalı.
+- **Gönderim:** `eas.json` `submit` profilleri (Android internal taslak, iOS kimlikleri `TBD_…`). Eksik dış bilgiler: `store/README.md`.
+
 ## Derleme
 
 ```bash
