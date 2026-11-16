@@ -295,10 +295,10 @@ func (Applier) Apply(ctx context.Context, tx reviewusecase.Tx, sug reviewusecase
 	}
 	var v matchValue
 	if err := json.Unmarshal(value, &v); err != nil || v.BankTransactionID == 0 || len(v.Invoices) == 0 {
-		return nil, fmt.Errorf("bank_match: invalid value")
+		return nil, fmt.Errorf("%w: bank_match: value must name the bank transaction and its invoices", reviewusecase.ErrInvalidValue)
 	}
 	if sug.Input.TargetID == nil || *sug.Input.TargetID != v.BankTransactionID {
-		return nil, fmt.Errorf("bank_match: value is for another bank transaction")
+		return nil, fmt.Errorf("%w: bank_match: value is for another bank transaction", reviewusecase.ErrInvalidValue)
 	}
 	method := "suggested_accepted"
 	if sug.Status == reviewusecase.StatusAutoAccepted {
