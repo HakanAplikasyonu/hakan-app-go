@@ -2,6 +2,7 @@ import { Ikon } from '@hakan/mobile-core/ui/ikon';
 import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
 import { metin } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
+import { colors as temaRenkleri } from '@hakan/mobile-core/ui/tokens';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,8 +19,6 @@ const KISA: Record<ReceiptKind, string> = { expense_receipt: 'Gider fişi', fuel
 const isKind = (v: unknown): v is ReceiptKind => typeof v === 'string' && (KINDS as string[]).includes(v);
 
 /** Kamera ekranı her temada koyu (tasarım: MukellefMobil · 2). */
-const KOYU = '#0A0A0A';
-const BEYAZ = '#FFFFFF';
 
 /**
  * Fiş çek (MukellefMobil · 2): fiş türü seçici, kenar kılavuzları, büyük
@@ -29,7 +28,11 @@ const BEYAZ = '#FFFFFF';
 export default function CaptureScreen() {
   const params = useLocalSearchParams<{ kind?: string }>();
   const { enqueue, online } = useReceipts();
-  const { colors: c } = useTheme();
+  const { colors: c, name } = useTheme();
+  // Vizör her temada koyu (#367): renkler seçili paletin koyu token'larından.
+  const kamera = temaRenkleri[name.startsWith('n3') ? 'n3-dark' : 'm3-dark'];
+  const KOYU = kamera.bg;
+  const BEYAZ = kamera.text;
   const [kind, setKind] = useState<ReceiptKind>(isKind(params.kind) ? params.kind : 'expense_receipt');
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [denied, setDenied] = useState(false);
@@ -93,7 +96,7 @@ export default function CaptureScreen() {
         </View>
       </View>
 
-      <View style={styles.view}>
+      <View style={[styles.view, { backgroundColor: kamera.surface3 }]}>
         {last ? (
           <Image source={{ uri: last.uri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={`Son çekilen fotoğraf, toplam ${photos.length}`} />
         ) : (
@@ -149,14 +152,17 @@ export default function CaptureScreen() {
       <View style={styles.bar}>
         <Pressable testID="capture-gallery" accessibilityRole="button" accessibilityLabel="Galeriden seç" onPress={pick} style={styles.side}>
           <View style={styles.gallery}>{last ? <Image source={{ uri: last.uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Ikon ad="klasor" renk={BEYAZ} />}</View>
-          <Text style={styles.sideText}>Galeri</Text>
+          <Text style={[styles.sideText, { color: BEYAZ }]}>Galeri</Text>
         </Pressable>
         <Pressable
           testID="capture-shutter"
           accessibilityRole="button"
           accessibilityLabel={photos.length ? 'Bir tane daha çek' : 'Kamerayla çek'}
           onPress={shoot}
-          style={({ pressed }) => [styles.shutter, { opacity: pressed ? 0.85 : 1 }]}
+          style={({ pressed }) => [
+            styles.shutter,
+            { backgroundColor: BEYAZ, borderColor: BEYAZ, boxShadow: `inset 0 0 0 4px ${KOYU}`, opacity: pressed ? 0.85 : 1 },
+          ]}
         />
         {photos.length ? (
           <Pressable
@@ -170,14 +176,14 @@ export default function CaptureScreen() {
             <View style={[styles.send, { backgroundColor: c.brand }]}>
               <Ikon ad="onayla" renk={c.onBrand} />
             </View>
-            <Text style={styles.sideText}>Gönder ({photos.length})</Text>
+            <Text style={[styles.sideText, { color: BEYAZ }]}>Gönder ({photos.length})</Text>
           </Pressable>
         ) : (
           <View style={styles.side} accessible accessibilityLabel="Seri çekim: çektikçe fotoğraflar birikir">
             <View style={[styles.serial, { backgroundColor: c.brand }]}>
               <Text style={[metin.xs, { color: c.onBrand, fontFamily: 'Inter_700Bold' }]}>0</Text>
             </View>
-            <Text style={styles.sideText}>Seri</Text>
+            <Text style={[styles.sideText, { color: BEYAZ }]}>Seri</Text>
           </View>
         )}
       </View>
@@ -198,7 +204,7 @@ const styles = StyleSheet.create({
   kinds: { flexDirection: 'row', gap: 2, padding: 3, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
   kind: { minHeight: 32, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center' },
   kindText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  view: { flex: 1, margin: 28, marginTop: 18, borderRadius: 12, backgroundColor: '#1D1D20', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  view: { flex: 1, margin: 28, marginTop: 18, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   guide: { alignItems: 'center', gap: 12, paddingHorizontal: 40 },
   corner: { position: 'absolute', width: 34, height: 34, margin: 2 },
   badge: { position: 'absolute', bottom: 14, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
@@ -206,9 +212,9 @@ const styles = StyleSheet.create({
   miniX: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderBottomLeftRadius: 6 },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 40, paddingTop: 20, paddingBottom: 20 },
   side: { alignItems: 'center', gap: 4, minWidth: 64, minHeight: DOKUNMA },
-  sideText: { color: BEYAZ, fontFamily: 'Inter_500Medium', fontSize: 11 },
+  sideText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   gallery: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#333', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  shutter: { width: 76, height: 76, borderRadius: 38, backgroundColor: BEYAZ, borderWidth: 4, borderColor: BEYAZ, boxShadow: `inset 0 0 0 4px ${KOYU}` },
+  shutter: { width: 76, height: 76, borderRadius: 38, borderWidth: 4 },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   serial: { minWidth: 28, height: 22, borderRadius: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', marginVertical: 11 },
 });
