@@ -104,7 +104,7 @@ Yönetici olarak takip etmeniz gerekenler:
   ayrıntısından yüklenir.
 - Mükellefin mizanını yükleyip kararlarınızı kurala çevirmek için
   [Mizan hafızası](mizan-hafizasi.md) kılavuzuna bakın.
-- Hızlı karar için **İnceleme stüdyosu**nu kullanın:
+- Klavye kısayolları ve "Kural yap" için
   [Ofis çalışanı kılavuzu](ofis-calisani.md#inceleme).
 
 ## 7. Yevmiye ve Luca / Zirve çıktısı

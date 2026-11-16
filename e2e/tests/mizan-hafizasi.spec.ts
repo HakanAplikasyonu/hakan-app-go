@@ -184,8 +184,10 @@ test("ilk ay: öneriler yüklemeyle gelir, müşavir 153'ü 150.01'e düzeltir",
   for (const item of DENIZ_LINES) {
     const row = lineRow(item, "153");
     await expect(row).toHaveCount(1);
-    await row.getByRole("button", { name: "Kodu değiştir" }).click();
-    const input = row.getByLabel("Hesap kodu");
+    // Kuyruk ve karar ekranı tek sayfa (#326): satırı seç, "Kodu düzelt".
+    await row.click();
+    await office.getByRole("button", { name: "Kodu düzelt" }).click();
+    const input = office.getByPlaceholder("Hesap kodu ya da adı…");
     await input.fill(CORRECTED);
     await input.press("Enter");
     await expect(lineRow(item, "153")).toHaveCount(0);
@@ -195,7 +197,8 @@ test("ilk ay: öneriler yüklemeyle gelir, müşavir 153'ü 150.01'e düzeltir",
 test("onaylanan yeni cari Luca'da açılacak hesaplarda, şablon indirilir", async () => {
   await openQueue();
   const yeni = queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" });
-  await yeni.getByRole("button", { name: "Onayla" }).click();
+  await yeni.click();
+  await office.getByRole("button", { name: "Onayla", exact: true }).click();
   await expect(queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" })).toHaveCount(0);
 
   await office.goto(officePath(`/account-plan?taxpayer=${engagement}`));

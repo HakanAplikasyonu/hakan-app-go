@@ -1,5 +1,5 @@
-import { ReviewQueuePage } from "@/features/office";
+import { ReviewWorkspace } from "@/features/office";
 
 export default function Route() {
-  return <ReviewQueuePage />;
+  return <ReviewWorkspace />;
 }

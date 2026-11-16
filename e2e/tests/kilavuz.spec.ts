@@ -89,7 +89,6 @@ test.describe("@docs ofis paneli görüntüleri", () => {
       ["ofis-ubl-yukle", `/upload?taxpayer=${atlas}`, () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-faturalar", `/invoices?taxpayer=${atlas}`, () => expect(page.getByRole("table").first()).toBeVisible()],
       ["ofis-inceleme-kuyrugu", "/review", () => expect(page.getByRole("heading").first()).toBeVisible()],
-      ["ofis-inceleme-studyosu", "/review/studio", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-uyarilar", "/warnings", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-yevmiye", `/journals?taxpayer=${atlas}`, () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-masaustu-ajanlari", "/agents", () => expect(page.getByText("Muhasebe-PC-01").first()).toBeVisible()],

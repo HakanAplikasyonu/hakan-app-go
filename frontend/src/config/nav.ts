@@ -275,45 +275,20 @@ export const cmsNav = defineNav({
 export function tenantNav(slug: string): NavCatalog {
   return defineNav({
     id: "tenant",
+    // Arayüz v1 (#326, docs/tasarim/tuval/OfisNav.dc.html): Bugün / Kayıtlar /
+    // Ofis. Sayaçlar ofis kabuğunda (features/office/shell) eklenir.
     groups: [
       {
-        // Ofis paneli (#15). İzinler engagement modeliyle (W1 #2) gelecek;
-        // şimdilik ofisin her üyesi görür.
-        id: "office",
-        labelKey: "office.nav_group",
-        icon: FileText,
-        defaultOpen: true,
+        id: "today",
+        labelKey: "office.shell.group_today",
+        icon: LayoutDashboard,
+        collapsible: false,
         items: [
           {
             id: "home",
             titleKey: "layout.home",
             href: routes.tenant.home(slug),
             icon: LayoutDashboard,
-          },
-          {
-            id: "command",
-            titleKey: "office.nav_command",
-            href: routes.tenant.command(slug),
-            icon: Waypoints,
-          },
-          {
-            id: "taxpayers",
-            titleKey: "office.nav_taxpayers",
-            href: routes.tenant.taxpayers(slug),
-            icon: Building2,
-          },
-          {
-            id: "taxpayer-requests",
-            titleKey: "onboarding.nav_title",
-            href: routes.tenant.taxpayerRequests(slug),
-            icon: UserPlus,
-            permission: permissions.tenant.engagements.read,
-          },
-          {
-            id: "invoices",
-            titleKey: "office.nav_invoices",
-            href: routes.tenant.invoices(slug),
-            icon: FileText,
           },
           {
             id: "review",
@@ -327,18 +302,25 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.warnings(slug),
             icon: TriangleAlert,
           },
+        ],
+      },
+      {
+        id: "records",
+        labelKey: "office.shell.group_records",
+        icon: FileText,
+        collapsible: false,
+        items: [
           {
-            id: "upload",
-            titleKey: "office.nav_upload",
-            href: routes.tenant.upload(slug),
-            icon: Upload,
+            id: "taxpayers",
+            titleKey: "office.nav_taxpayers",
+            href: routes.tenant.taxpayers(slug),
+            icon: Building2,
           },
           {
-            id: "journals",
-            titleKey: "office.journals.nav",
-            href: routes.tenant.journals(slug),
-            icon: BookOpenCheck,
-            permission: permissions.tenant.journals.read,
+            id: "invoices",
+            titleKey: "office.nav_invoices",
+            href: routes.tenant.invoices(slug),
+            icon: FileText,
           },
           {
             id: "account-plan",
@@ -348,20 +330,46 @@ export function tenantNav(slug: string): NavCatalog {
             permission: permissions.tenant.accountPlan.read,
           },
           {
+            id: "journals",
+            titleKey: "office.journals.nav",
+            href: routes.tenant.journals(slug),
+            icon: BookOpenCheck,
+            permission: permissions.tenant.journals.read,
+          },
+          {
+            id: "upload",
+            titleKey: "office.nav_upload",
+            href: routes.tenant.upload(slug),
+            icon: Upload,
+          },
+        ],
+      },
+      {
+        id: "office",
+        labelKey: "office.shell.group_office",
+        icon: Building2,
+        collapsible: false,
+        items: [
+          {
+            id: "command",
+            titleKey: "office.nav_command",
+            href: routes.tenant.command(slug),
+            icon: Waypoints,
+          },
+          {
+            id: "taxpayer-requests",
+            titleKey: "onboarding.nav_title",
+            href: routes.tenant.taxpayerRequests(slug),
+            icon: UserPlus,
+            permission: permissions.tenant.engagements.read,
+          },
+          {
             id: "agents",
             titleKey: "office.agents.nav",
             href: routes.tenant.agents(slug),
             icon: MonitorSmartphone,
             permission: permissions.tenant.agents.read,
           },
-        ],
-      },
-      {
-        id: "tenant",
-        labelKey: "layout.section_tenant",
-        icon: Building2,
-        defaultOpen: true,
-        items: [
           {
             id: "members",
             titleKey: "tenant.nav_members",

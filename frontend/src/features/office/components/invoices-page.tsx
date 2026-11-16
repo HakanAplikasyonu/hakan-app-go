@@ -18,6 +18,7 @@ import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import { directionOf } from "../lib/from-api";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
+import { useOfficePeriod } from "../period";
 
 type Dir = "all" | "outgoing" | "incoming";
 const PAGE = 50;
@@ -62,8 +63,10 @@ function InvoicesInner() {
     if (key !== "offset") next.delete("offset");
     router.replace(`${pathname}?${next.toString()}`);
   };
+  const { period } = useOfficePeriod();
   const list = useEngagementInvoices(slug, engagement, {
     direction: direction === "all" ? undefined : direction,
+    period,
     limit: PAGE,
     offset,
   });

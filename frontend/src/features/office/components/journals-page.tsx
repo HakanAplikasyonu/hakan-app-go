@@ -36,6 +36,7 @@ import {
 } from "../services/journals.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
+import { ALL_PERIODS, isPeriod, useOfficePeriod } from "../period";
 
 type LineRow = {
   account: string;
@@ -367,7 +368,12 @@ function JournalsInner() {
   const { options, selected, select, isLoading, isError } =
     useSelectedEngagement(slug);
   const engagement = selected?.engagement ?? "";
-  const [period, setPeriod] = useState(thisMonth);
+  // Global dönem seçici (#326); "Tüm dönemler"de bu ay (yeni fişin dönemi).
+  const { period: selectedPeriod, setPeriod: setGlobalPeriod } =
+    useOfficePeriod();
+  const period = selectedPeriod ?? thisMonth();
+  const setPeriod = (value: string) =>
+    setGlobalPeriod(isPeriod(value) ? value : ALL_PERIODS);
   const drafts = useJournalDrafts(slug, engagement, period);
   const exports = useJournalExports(slug, engagement);
   const { approve, reverse } = useJournalActions(slug, engagement);
