@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
@@ -144,7 +145,7 @@ func New(pool *pgxpool.Pool, vault secrets.Vault, store ObjectStore, cfg Config,
 	if log == nil {
 		log = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	s := &Service{pool: pool, q: db.New(pool), vault: vault, store: store, cfg: cfg.withDefaults(), now: time.Now, log: log}
+	s := &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, store: store, cfg: cfg.withDefaults(), now: time.Now, log: log}
 	s.open = s.vaultOpener
 	return s
 }

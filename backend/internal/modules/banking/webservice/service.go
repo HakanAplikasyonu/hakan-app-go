@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
@@ -56,7 +57,7 @@ type Service struct {
 
 // NewService builds the service. vault may be nil (credentials then refused).
 func NewService(pool *pgxpool.Pool, vault secrets.Vault, bank *banking.Service, reg Registry, opt Options) *Service {
-	return &Service{pool: pool, q: db.New(pool), vault: vault, bank: bank, reg: reg, opt: opt, now: time.Now}
+	return &Service{pool: pool, q: database.QueriesFor(pool), vault: vault, bank: bank, reg: reg, opt: opt, now: time.Now}
 }
 
 // Meta is what the connection keeps in source_connections.meta.

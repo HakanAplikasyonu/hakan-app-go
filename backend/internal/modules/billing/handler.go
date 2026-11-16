@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -82,7 +82,7 @@ func (h *Handler) org(w http.ResponseWriter, r *http.Request) (int64, bool) {
 		response.NotFound(w, r, "organization not found")
 		return 0, false
 	}
-	o, err := db.New(h.svc.pool).GetOrganizationByUUID(r.Context(), id)
+	o, err := database.QueriesFor(h.svc.pool).GetOrganizationByUUID(r.Context(), id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		response.NotFound(w, r, "organization not found")
 		return 0, false

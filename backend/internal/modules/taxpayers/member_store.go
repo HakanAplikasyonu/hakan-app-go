@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -22,7 +23,7 @@ type MemberPostgres struct {
 
 // NewMemberPostgres builds the store.
 func NewMemberPostgres(pool *pgxpool.Pool) *MemberPostgres {
-	return &MemberPostgres{pool: pool, q: db.New(pool)}
+	return &MemberPostgres{pool: pool, q: database.QueriesFor(pool)}
 }
 
 var _ MemberStore = (*MemberPostgres)(nil)
@@ -42,7 +43,7 @@ func (p *MemberPostgres) GetMember(ctx context.Context, taxpayerID, userID int64
 }
 
 func (p *MemberPostgres) CreateInvitation(ctx context.Context, params db.CreateTaxpayerInvitationParams) (db.TaxpayerInvitation, error) {
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return db.TaxpayerInvitation{}, err
 	}
@@ -78,7 +79,7 @@ func (p *MemberPostgres) GetInvitationByTokenHash(ctx context.Context, hash stri
 }
 
 func (p *MemberPostgres) AcceptInvitation(ctx context.Context, invitationID, taxpayerID, userID int64, role string) error {
-	tx, err := p.pool.Begin(ctx)
+	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return err
 	}

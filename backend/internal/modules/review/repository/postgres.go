@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/google/uuid"
@@ -32,7 +33,7 @@ type tx struct{ q *db.Queries }
 // InTx runs fn in one transaction; appliers get the tx-bound *db.Queries
 // through Tx.Handle().
 func (p *Postgres) InTx(ctx context.Context, fn func(usecase.Tx) error) error {
-	t, err := p.pool.Begin(ctx)
+	t, err := database.Begin(ctx, p.pool)
 	if err != nil {
 		return fmt.Errorf("begin: %w", err)
 	}
