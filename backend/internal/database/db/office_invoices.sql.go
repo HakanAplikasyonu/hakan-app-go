@@ -13,24 +13,31 @@ import (
 )
 
 const countEngagementInvoices = `-- name: CountEngagementInvoices :one
-SELECT COUNT(*)::bigint FROM invoices
-WHERE taxpayer_id = $1
-  AND engagement_document_visible($2::bigint, issue_date)
-  AND ($3::text IS NULL OR period = $3)
-  AND ($4::text IS NULL OR direction = $4)
+WITH d AS MATERIALIZED (
+    SELECT issue_date, COUNT(*) AS n FROM invoices
+    WHERE taxpayer_id = $2
+      AND ($3::text IS NULL OR period = $3)
+      AND ($4::text IS NULL OR direction = $4)
+    GROUP BY issue_date
+)
+SELECT COALESCE(SUM(d.n), 0)::bigint FROM d
+WHERE engagement_document_visible($1::bigint, d.issue_date)
 `
 
 type CountEngagementInvoicesParams struct {
-	TaxpayerID   int64       `json:"taxpayer_id"`
 	EngagementID int64       `json:"engagement_id"`
+	TaxpayerID   int64       `json:"taxpayer_id"`
 	Period       pgtype.Text `json:"period"`
 	Direction    pgtype.Text `json:"direction"`
 }
 
+// Görünürlük yalnızca tarihe bağlı olduğundan her farklı tarih için bir kez
+// sorulur, satır başına değil (#182). MATERIALIZED, planlayıcının koşulu
+// yeniden satır taramasına itmesini engeller.
 func (q *Queries) CountEngagementInvoices(ctx context.Context, arg CountEngagementInvoicesParams) (int64, error) {
 	row := q.db.QueryRow(ctx, countEngagementInvoices,
-		arg.TaxpayerID,
 		arg.EngagementID,
+		arg.TaxpayerID,
 		arg.Period,
 		arg.Direction,
 	)
@@ -150,17 +157,21 @@ func (q *Queries) GetInvoiceAttachment(ctx context.Context, arg GetInvoiceAttach
 
 const listEngagementInvoices = `-- name: ListEngagementInvoices :many
 
+WITH page AS (
+    SELECT i.id FROM invoices i
+    WHERE i.taxpayer_id = $3
+      AND engagement_document_visible($2::bigint, i.issue_date)
+      AND ($4::text IS NULL OR i.period = $4)
+      AND ($5::text IS NULL OR i.direction = $5)
+    ORDER BY i.issue_date DESC, i.id DESC
+    LIMIT $7 OFFSET $6
+)
 SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at,
        (SELECT COUNT(*) FROM data_warnings w
          WHERE w.organization_id = $1 AND w.engagement_id = $2
            AND w.entity_type = 'invoice' AND w.entity_id = invoices.id AND w.status = 'open')::bigint AS open_warnings
-FROM invoices
-WHERE invoices.taxpayer_id = $3
-  AND engagement_document_visible($2::bigint, invoices.issue_date)
-  AND ($4::text IS NULL OR invoices.period = $4)
-  AND ($5::text IS NULL OR invoices.direction = $5)
+FROM invoices JOIN page ON page.id = invoices.id
 ORDER BY invoices.issue_date DESC, invoices.id DESC
-LIMIT $7 OFFSET $6
 `
 
 type ListEngagementInvoicesParams struct {
@@ -181,6 +192,8 @@ type ListEngagementInvoicesRow struct {
 // Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 // faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 // görür (engagement_document_visible, issue #8).
+// Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
+// satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 func (q *Queries) ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error) {
 	rows, err := q.db.Query(ctx, listEngagementInvoices,
 		arg.OrganizationID,
@@ -198,6 +211,132 @@ func (q *Queries) ListEngagementInvoices(ctx context.Context, arg ListEngagement
 	items := []ListEngagementInvoicesRow{}
 	for rows.Next() {
 		var i ListEngagementInvoicesRow
+		if err := rows.Scan(
+			&i.Invoice.ID,
+			&i.Invoice.Uuid,
+			&i.Invoice.TaxpayerID,
+			&i.Invoice.SourceSystem,
+			&i.Invoice.SourceID,
+			&i.Invoice.CaptureMethod,
+			&i.Invoice.Ettn,
+			&i.Invoice.InvoiceNumber,
+			&i.Invoice.Direction,
+			&i.Invoice.Type,
+			&i.Invoice.InvoiceTypeCodeRaw,
+			&i.Invoice.Profile,
+			&i.Invoice.ProfileRaw,
+			&i.Invoice.DocumentClass,
+			&i.Invoice.Status,
+			&i.Invoice.StatusNormalized,
+			&i.Invoice.IssueDate,
+			&i.Invoice.IssueTime,
+			&i.Invoice.PaymentDueDate,
+			&i.Invoice.Period,
+			&i.Invoice.CustomerID,
+			&i.Invoice.CustomerTaxNumber,
+			&i.Invoice.CustomerIdentityNumber,
+			&i.Invoice.CustomerName,
+			&i.Invoice.Currency,
+			&i.Invoice.ExchangeRate,
+			&i.Invoice.LineExtensionAmount,
+			&i.Invoice.AllowanceTotalAmount,
+			&i.Invoice.TaxExclusiveAmount,
+			&i.Invoice.TaxAmount,
+			&i.Invoice.TaxInclusiveAmount,
+			&i.Invoice.WithholdingAmount,
+			&i.Invoice.ExciseAmount,
+			&i.Invoice.CommunicationsTaxAmount,
+			&i.Invoice.IncomeTaxWithholdingAmount,
+			&i.Invoice.IncomeTaxWithholdingRate,
+			&i.Invoice.PayableAmount,
+			&i.Invoice.PayableAmountTry,
+			&i.Invoice.GlobalTaxExemptionCode,
+			&i.Invoice.OriginalInvoiceNumber,
+			&i.Invoice.OriginalInvoiceIssueDate,
+			&i.Invoice.OrderReference,
+			&i.Invoice.IsInternetSale,
+			&i.Invoice.Sgk,
+			&i.Invoice.DespatchID,
+			&i.Invoice.Notes,
+			&i.Invoice.PaymentStatus,
+			&i.Invoice.RemainingAmount,
+			&i.Invoice.HasItems,
+			&i.Invoice.TaxSummarySource,
+			&i.Invoice.UblAttachmentID,
+			&i.Invoice.RawPayload,
+			&i.Invoice.ContentHash,
+			&i.Invoice.SourceUpdatedAt,
+			&i.Invoice.DeletedAtSource,
+			&i.Invoice.CreatedAt,
+			&i.Invoice.UpdatedAt,
+			&i.OpenWarnings,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEngagementInvoicesAfter = `-- name: ListEngagementInvoicesAfter :many
+WITH page AS (
+    SELECT i.id FROM invoices i
+    WHERE i.taxpayer_id = $3
+      AND (i.issue_date, i.id) < ($4::date, $5::bigint)
+      AND engagement_document_visible($2::bigint, i.issue_date)
+      AND ($6::text IS NULL OR i.period = $6)
+      AND ($7::text IS NULL OR i.direction = $7)
+    ORDER BY i.issue_date DESC, i.id DESC
+    LIMIT $8
+)
+SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at,
+       (SELECT COUNT(*) FROM data_warnings w
+         WHERE w.organization_id = $1 AND w.engagement_id = $2
+           AND w.entity_type = 'invoice' AND w.entity_id = invoices.id AND w.status = 'open')::bigint AS open_warnings
+FROM invoices JOIN page ON page.id = invoices.id
+ORDER BY invoices.issue_date DESC, invoices.id DESC
+`
+
+type ListEngagementInvoicesAfterParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	TaxpayerID     int64       `json:"taxpayer_id"`
+	CursorDate     pgtype.Date `json:"cursor_date"`
+	CursorID       int64       `json:"cursor_id"`
+	Period         pgtype.Text `json:"period"`
+	Direction      pgtype.Text `json:"direction"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListEngagementInvoicesAfterRow struct {
+	Invoice      Invoice `json:"invoice"`
+	OpenWarnings int64   `json:"open_warnings"`
+}
+
+// İmleçli sayfa (#182): (issue_date, id) imlecinden sonraki satırlar. Satır
+// karşılaştırması idx_invoices_taxpayer_issue indeksinde sınır koşuludur,
+// derin sayfa da ilk sayfa kadar ucuzdur.
+func (q *Queries) ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error) {
+	rows, err := q.db.Query(ctx, listEngagementInvoicesAfter,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.CursorDate,
+		arg.CursorID,
+		arg.Period,
+		arg.Direction,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEngagementInvoicesAfterRow{}
+	for rows.Next() {
+		var i ListEngagementInvoicesAfterRow
 		if err := rows.Scan(
 			&i.Invoice.ID,
 			&i.Invoice.Uuid,

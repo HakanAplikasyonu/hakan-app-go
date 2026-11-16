@@ -60,6 +60,9 @@ type Querier interface {
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
 	CountDocumentTasks(ctx context.Context, arg CountDocumentTasksParams) (int64, error)
+	// Görünürlük yalnızca tarihe bağlı olduğundan her farklı tarih için bir kez
+	// sorulur, satır başına değil (#182). MATERIALIZED, planlayıcının koşulu
+	// yeniden satır taramasına itmesini engeller.
 	CountEngagementInvoices(ctx context.Context, arg CountEngagementInvoicesParams) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
@@ -508,7 +511,13 @@ type Querier interface {
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 	// görür (engagement_document_visible, issue #8).
+	// Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
+	// satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 	ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error)
+	// İmleçli sayfa (#182): (issue_date, id) imlecinden sonraki satırlar. Satır
+	// karşılaştırması idx_invoices_taxpayer_issue indeksinde sınır koşuludur,
+	// derin sayfa da ilk sayfa kadar ucuzdur.
+	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
 	ListEngagementVisibleInvoices(ctx context.Context, arg ListEngagementVisibleInvoicesParams) ([]ListEngagementVisibleInvoicesRow, error)
@@ -627,6 +636,8 @@ type Querier interface {
 	// mükellefin taxpayer_id'siyle sınırlıdır; ofis bağlamı (organization_id)
 	// burada yoktur.
 	ListTaxpayerInvoices(ctx context.Context, arg ListTaxpayerInvoicesParams) ([]ListTaxpayerInvoicesRow, error)
+	// İmleçli sayfa (#182), bkz. ListEngagementInvoicesAfter.
+	ListTaxpayerInvoicesAfter(ctx context.Context, arg ListTaxpayerInvoicesAfterParams) ([]ListTaxpayerInvoicesAfterRow, error)
 	// tenant-lint: cross-taxpayer kullanıcının kendi mükellef üyelikleri (/me)
 	ListTaxpayerMembershipsByUser(ctx context.Context, userID int64) ([]ListTaxpayerMembershipsByUserRow, error)
 	// tenant-lint: cross-taxpayer sahip var mı (onay yetkisi)

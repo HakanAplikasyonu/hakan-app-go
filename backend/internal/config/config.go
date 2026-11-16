@@ -250,6 +250,13 @@ type DBConfig struct {
 	// application queries, not only to rls.WithScope. Off only as an
 	// emergency switch (DB_RLS_RUNTIME=false).
 	RLSRuntime bool
+	// PlanCacheMode is the session's plan_cache_mode (DB_PLAN_CACHE_MODE,
+	// issue #182). pgx prepares every query; after five runs Postgres may
+	// switch to a generic plan that knows neither the LIMIT nor which
+	// optional filters (sqlc.narg) are set, and then sorts whole lists.
+	// "force_custom_plan" (default) plans with the real values each time;
+	// "auto" restores the Postgres default.
+	PlanCacheMode string
 }
 
 func (c DBConfig) DSN() string {
@@ -403,7 +410,8 @@ func Load() (Config, error) {
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			MaxConns: int32(getInt("DB_MAX_CONNS", 20)),
 			// RLS for every query (issue #166); false is the emergency switch.
-			RLSRuntime: getBool("DB_RLS_RUNTIME", true),
+			RLSRuntime:    getBool("DB_RLS_RUNTIME", true),
+			PlanCacheMode: strings.TrimSpace(getEnv("DB_PLAN_CACHE_MODE", "force_custom_plan")),
 		},
 		Redis: RedisConfig{
 			Addr:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),
@@ -603,6 +611,11 @@ func (c Config) validate() error {
 	}
 	if c.App.Env != "development" && c.App.Env != "test" && c.SMTP.TLSInsecureSkipVerify {
 		return fmt.Errorf("config: SMTP_TLS_INSECURE_SKIP_VERIFY must not be set outside development")
+	}
+	switch c.DB.PlanCacheMode {
+	case "", "auto", "force_custom_plan", "force_generic_plan":
+	default:
+		return fmt.Errorf("config: DB_PLAN_CACHE_MODE must be auto, force_custom_plan or force_generic_plan")
 	}
 	switch c.AI.ImageRedaction {
 	case "", "required", "off":

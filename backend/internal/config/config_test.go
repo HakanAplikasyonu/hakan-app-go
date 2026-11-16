@@ -93,3 +93,18 @@ func TestParseReviewAccounts(t *testing.T) {
 		t.Fatal("empty must disable")
 	}
 }
+
+func TestValidatePlanCacheMode(t *testing.T) {
+	for _, mode := range []string{"", "auto", "force_custom_plan", "force_generic_plan"} {
+		c := validProdConfig()
+		c.DB.PlanCacheMode = mode
+		if err := c.validate(); err != nil {
+			t.Errorf("plan cache mode %q rejected: %v", mode, err)
+		}
+	}
+	bad := validProdConfig()
+	bad.DB.PlanCacheMode = "custom"
+	if err := bad.validate(); err == nil {
+		t.Fatal("unknown plan cache mode accepted")
+	}
+}

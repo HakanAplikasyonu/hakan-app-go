@@ -10075,6 +10075,8 @@ export interface components {
             limit: number;
             /** Format: int32 */
             offset: number;
+            /** @description Cursor of the next page (`?cursor=`); null on the last page. */
+            next_cursor: string | null;
         };
         OfficeInvoiceWarning: {
             /** Format: uuid */
@@ -10376,6 +10378,8 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            /** @description Cursor of the next page (`?cursor=`); null on the last page. */
+            next_cursor: string | null;
         };
         TaxpayerInvoiceDetail: components["schemas"]["TaxpayerInvoice"] & {
             notes?: string;
@@ -17148,6 +17152,12 @@ export interface operations {
                 direction?: "outgoing" | "incoming";
                 limit?: number;
                 offset?: number;
+                /**
+                 * @description Keyset pagination (#182): the `next_cursor` of the previous page.
+                 *     With a cursor `offset` is ignored; deep pages cost as little as the
+                 *     first one. Use it instead of large offsets.
+                 */
+                cursor?: string;
             };
             header: {
                 /**
@@ -17170,6 +17180,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeTaxpayerInvoicePage"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             /** @description `NO_TAXPAYER_MEMBERSHIP` */
             403: {
@@ -19506,6 +19517,12 @@ export interface operations {
                 direction?: "outgoing" | "incoming";
                 limit?: number;
                 offset?: number;
+                /**
+                 * @description Keyset pagination (#182): the `next_cursor` of the previous page.
+                 *     With a cursor `offset` is ignored; deep pages cost as little as the
+                 *     first one. Use it instead of large offsets.
+                 */
+                cursor?: string;
             };
             header: {
                 /**

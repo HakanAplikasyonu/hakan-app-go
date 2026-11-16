@@ -6,13 +6,27 @@
 SELECT uuid, ettn, invoice_number, direction, type, profile, issue_date, period,
        customer_name, customer_tax_number, customer_identity_number, currency,
        tax_exclusive_amount, tax_amount, withholding_amount, payable_amount,
-       status_normalized, source_system, capture_method
+       status_normalized, source_system, capture_method, id
 FROM invoices
 WHERE taxpayer_id = @taxpayer_id
   AND (sqlc.narg(period)::text IS NULL OR period = sqlc.narg(period))
   AND (sqlc.narg(direction)::text IS NULL OR direction = sqlc.narg(direction))
 ORDER BY issue_date DESC, id DESC
 LIMIT @lim OFFSET @off;
+
+-- name: ListTaxpayerInvoicesAfter :many
+-- İmleçli sayfa (#182), bkz. ListEngagementInvoicesAfter.
+SELECT uuid, ettn, invoice_number, direction, type, profile, issue_date, period,
+       customer_name, customer_tax_number, customer_identity_number, currency,
+       tax_exclusive_amount, tax_amount, withholding_amount, payable_amount,
+       status_normalized, source_system, capture_method, id
+FROM invoices
+WHERE taxpayer_id = @taxpayer_id
+  AND (issue_date, id) < (@cursor_date::date, @cursor_id::bigint)
+  AND (sqlc.narg(period)::text IS NULL OR period = sqlc.narg(period))
+  AND (sqlc.narg(direction)::text IS NULL OR direction = sqlc.narg(direction))
+ORDER BY issue_date DESC, id DESC
+LIMIT @lim;
 
 -- name: CountTaxpayerInvoices :one
 SELECT COUNT(*)::bigint FROM invoices

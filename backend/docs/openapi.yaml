@@ -5140,6 +5140,14 @@ paths:
         - { name: direction, in: query, schema: { type: string, enum: [outgoing, incoming] } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            Keyset pagination (#182): the `next_cursor` of the previous page.
+            With a cursor `offset` is ignored; deep pages cost as little as the
+            first one. Use it instead of large offsets.
+          schema: { type: string, maxLength: 128 }
       responses:
         "200":
           description: OK
@@ -5147,6 +5155,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeTaxpayerInvoicePage"
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403":
           description: "`NO_TAXPAYER_MEMBERSHIP`"
@@ -6944,6 +6953,14 @@ paths:
         - { name: direction, in: query, required: false, schema: { type: string, enum: [outgoing, incoming] } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - name: cursor
+          in: query
+          required: false
+          description: |
+            Keyset pagination (#182): the `next_cursor` of the previous page.
+            With a cursor `offset` is ignored; deep pages cost as little as the
+            first one. Use it instead of large offsets.
+          schema: { type: string, maxLength: 128 }
       responses:
         "200":
           description: Invoice page
@@ -13432,7 +13449,7 @@ components:
 
     OfficeInvoicePage:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, limit, offset, next_cursor]
       properties:
         items:
           type: array
@@ -13440,6 +13457,9 @@ components:
         total: { type: integer, format: int64 }
         limit: { type: integer, format: int32 }
         offset: { type: integer, format: int32 }
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page (`?cursor=`); null on the last page.
 
     OfficeInvoiceWarning:
       type: object
@@ -13762,12 +13782,15 @@ components:
 
     TaxpayerInvoicePage:
       type: object
-      required: [items, total, limit, offset]
+      required: [items, total, limit, offset, next_cursor]
       properties:
         items: { type: array, items: { $ref: "#/components/schemas/TaxpayerInvoice" } }
         total: { type: integer, format: int64 }
         limit: { type: integer }
         offset: { type: integer }
+        next_cursor:
+          type: [string, "null"]
+          description: Cursor of the next page (`?cursor=`); null on the last page.
 
     TaxpayerInvoiceDetail:
       allOf:
