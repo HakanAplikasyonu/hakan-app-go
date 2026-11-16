@@ -9146,6 +9146,34 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/missing:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: listMissingPlanAccounts
+      summary: Applied account codes the active plan lacks
+      description: |
+        Requires `tenant.account_plan.read`. Account codes the office applied for the engagement (accepted or auto-applied suggestions, e.g. a cari to open) that the active plan of `target` does not have (#319). They block the export until they are opened in the program and the plan is imported again; send them to `missing-template`. Empty with no plan loaded.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target
+          in: query
+          schema: { type: string, default: luca }
+      responses:
+        "200":
+          description: Missing accounts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeMissingPlanAccounts"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/missing-template:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -15460,6 +15488,13 @@ components:
               type: string
               examples: [ok, down]
 
+    MissingPlanAccount:
+      type: object
+      required: [code, name, uses]
+      properties:
+        code: { type: string, example: "320.01.007" }
+        name: { type: string, example: "Yeni Lojistik Taşımacılık A.Ş." }
+        uses: { type: integer, format: int64, description: "Applied codes (lines, cari) pointing at it" }
     AccountPlanImport:
       type: object
       required: [uuid, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, created_at]
@@ -15550,6 +15585,20 @@ components:
             missing: { type: array, items: { type: string } }
             non_leaf: { type: array, items: { type: string } }
             invalid: { type: array, items: { type: string } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeMissingPlanAccounts:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MissingPlanAccount" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     Period:

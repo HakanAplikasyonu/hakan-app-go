@@ -65,7 +65,7 @@ Keşif aracı: `AUTHZ_DISCOVER=1 go test ./internal/httpserver -run 'TestAuthz.*
      - `refresh_tokens.session_uuid`: girişten doğan, yenilemeler boyunca sabit oturum kimliği; erişim belirtecinin `sid`'i.
      - `ended_at`: çıkış, iptal, parola ya da hesap kapatma oturumu bitirir. Kimlik yükleyici her istekte buna bakar.
      - Yenileme yalnızca eski yenileme belirtecini tüketir, oturumu bitirmez.
-   - Migration 000090.
+   - Migration 000091.
 2. **Bildirim gelen kutusu ofis ve mükellef kullanıcılarına kapalıydı.** `/v1/notifications*` `notifications.read` istiyordu; bu kullanıcıların genel rolü olmadığı için hepsi 403 alıyordu. Sorgular zaten kullanıcının kendi kimliğiyle. `notifications.read`, `auth.session` gibi oturum tabanına eklendi (#141 ile aynı durum).
 3. **Başka kullanıcının bildirimi 403 dönüyordu.** Bu, bildirim kimliğinin geçerli olduğunu söylüyordu. Artık 404 dönüyor (`GET /v1/notifications/{uuid}`, `/action`).
 

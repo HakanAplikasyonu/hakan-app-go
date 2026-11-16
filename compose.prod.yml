@@ -218,8 +218,11 @@ services:
     container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DB_USER:?DB_USER is required}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # The cluster's superuser, created at first start (#317). After the owner
+      # change (docs/runbook/db-sahip-gecisi.md) DB_USER is hakan_owner and
+      # DB_ADMIN_USER keeps the original superuser; empty = DB_USER.
+      POSTGRES_USER: ${DB_ADMIN_USER:-${DB_USER:?DB_USER is required}}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
       POSTGRES_DB: ${DB_NAME:?DB_NAME is required}
     volumes:
       - postgres_data:/var/lib/postgresql

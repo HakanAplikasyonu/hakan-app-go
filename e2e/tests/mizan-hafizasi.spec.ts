@@ -19,10 +19,12 @@ import {
 } from "./lib";
 
 /**
- * Mizan hafızası (#310), ofis panelinden uçtan uca:
- *   yeni mükellef → Luca mizanı içe aktar → ilk ay faturaları → hesap kodu
- *   öner → kuyrukta 153 → 150.01 düzelt (3 kalem) → kural adayı → "Kural
- *   yap" → ikinci ay faturaları → kalemler soru sorulmadan 150.01.
+ * Mizan hafızası (#310, #319), ofis panelinden uçtan uca:
+ *   yeni mükellef → Luca mizanı içe aktar → ilk ay faturaları (öneriler
+ *   yükleme sonrası kendiliğinden) → kuyrukta 153 → 150.01 düzelt (3 kalem),
+ *   yeni cariyi onayla → "Luca'da açılacak hesaplar" ve şablon → kural
+ *   adayı → "Kural yap" → ikinci ay faturaları → "Hesap kodu öner"e
+ *   basılmadan kalemler 150.01.
  *
  * Fikstürler: backend/testdata/mizan (go run testdata/mizan/generate.go).
  * Faturalardaki mükellef VKN'si her koşuda yeni bir VKN ile değiştirilir; bu
@@ -65,6 +67,26 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: path.join(IMG_DIR, `${name}.jpg`), type: "jpeg", quality: 80, animations: "disabled" });
 }
 
+/** Yükleme sonrası öneri işi (#319) bitene kadar bekler. */
+async function waitForSuggestions(atLeast: number) {
+  const api = await Api.login(DEMO.owner);
+  try {
+    await expect
+      .poll(
+        async () =>
+          (
+            await api.json<{ items: unknown[] }>(
+              await api.get(`/v1/tenant/engagements/${engagement}/suggestions?status=all&kind=account_code&limit=100`),
+            )
+          ).items.length,
+        { timeout: 60_000 },
+      )
+      .toBeGreaterThanOrEqual(atLeast);
+  } finally {
+    await api.dispose();
+  }
+}
+
 async function uploadMonth(month: "2026-10" | "2026-11") {
   const files = ["korkmaz-satis", "deniz-alis", "yeni-lojistik-alis"].map((f) => ubl(`${month}-${f}.xml`));
   await office.goto(officePath("/upload"));
@@ -94,13 +116,6 @@ async function openQueue() {
   await office.goto(officePath("/review"));
   await expect(office.getByRole("heading", { name: "İnceleme kuyruğu" })).toBeVisible();
   await office.getByRole("combobox", { name: "Mükellef" }).selectOption({ label: taxpayer.title });
-}
-
-async function suggestFor(number: string) {
-  await office.goto(officePath(`/invoices?taxpayer=${engagement}`));
-  await office.getByText(number).first().click();
-  await office.getByRole("button", { name: "Hesap kodu öner" }).click();
-  await expect(office.getByText(/öneri hazır|Önerilecek alan yok/).first()).toBeVisible();
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -150,9 +165,10 @@ test("Luca mizanı içe aktarılır", async () => {
   await shot(office, "mizan-hesap-plani");
 });
 
-test("ilk ay: öneriler planı kullanır, müşavir 153'ü 150.01'e düzeltir", async () => {
+test("ilk ay: öneriler yüklemeyle gelir, müşavir 153'ü 150.01'e düzeltir", async () => {
   await uploadMonth("2026-10");
-  for (const n of ["OGZ2026000001001", "DNZ2026000004521", "YNL2026000000318"]) await suggestFor(n);
+  // Korkmaz 2 kalem × (hesap + KDV) + cari, Deniz 3 × 2 + cari, Yeni 1 × 2 + cari.
+  await waitForSuggestions(15);
 
   await openQueue();
   // Planda olan cari mevcut hesabıyla, olmayan sıradaki boş kodla önerilir.
@@ -162,7 +178,9 @@ test("ilk ay: öneriler planı kullanır, müşavir 153'ü 150.01'e düzeltir", 
   await expect(yeni).toContainText("320.01.007");
   await shot(office, "mizan-inceleme-kuyrugu");
 
-  // Her kalemin iki önerisi var: hesap kodu (153) ve KDV hesabı (191).
+  // Her kalemin iki önerisi var: hesap kodu (153) ve KDV hesabı; KDV,
+  // plandaki %20 alt hesabına (191.01) gider.
+  await expect(lineRow(DENIZ_LINES[0], "191.01")).toHaveCount(1);
   for (const item of DENIZ_LINES) {
     const row = lineRow(item, "153");
     await expect(row).toHaveCount(1);
@@ -172,6 +190,21 @@ test("ilk ay: öneriler planı kullanır, müşavir 153'ü 150.01'e düzeltir", 
     await input.press("Enter");
     await expect(lineRow(item, "153")).toHaveCount(0);
   }
+});
+
+test("onaylanan yeni cari Luca'da açılacak hesaplarda, şablon indirilir", async () => {
+  await openQueue();
+  const yeni = queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" });
+  await yeni.getByRole("button", { name: "Onayla" }).click();
+  await expect(queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" })).toHaveCount(0);
+
+  await office.goto(officePath(`/account-plan?taxpayer=${engagement}`));
+  const missing = office.getByRole("row").filter({ hasText: "320.01.007" });
+  await expect(missing).toContainText("Yeni Lojistik");
+  await shot(office, "mizan-acilacak-hesaplar");
+  const download = office.waitForEvent("download");
+  await office.getByRole("button", { name: "Eksik hesap şablonunu indir" }).click();
+  expect((await download).suggestedFilename()).toBe("eksik-hesaplar.xlsx");
 });
 
 test("kural adayı panelde görünür ve kurala terfi eder", async () => {
@@ -189,8 +222,10 @@ test("kural adayı panelde görünür ve kurala terfi eder", async () => {
 });
 
 test("ikinci ay: Deniz Ambalaj kalemleri soru sorulmadan 150.01", async () => {
+  // Yalnızca yükleme: "Hesap kodu öner"e basılmaz (#319).
   await uploadMonth("2026-11");
-  await suggestFor("DNZ2026000004890");
+  // Korkmaz 2 × 2 + cari, Deniz 3 × 2 + cari, Yeni 1 × 2 (cari kodlu).
+  await waitForSuggestions(15 + 13);
 
   await office.goto(officePath(`/account-plan?taxpayer=${engagement}`));
   for (const item of DENIZ_LINES) {

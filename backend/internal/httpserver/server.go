@@ -20,6 +20,7 @@ import (
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
 	accountplanrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/repository"
 	accountplanusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
+	accountrulesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules"
 	accountruleshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/handler"
 	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
 	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
@@ -424,8 +425,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Yevmiye taslağı ve Luca / Zirve / Excel çıktısı (#143, #26). Hedef hesap
 	// planı (#30) yüklüyse çıktıda ACCOUNT_NOT_IN_TARGET_PLAN denetlenir.
 	if deps.Storage != nil {
-		journalSvc := journalsmodule.New(deps.DB, deps.Storage).
-			WithPlanLoader(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)).PlanLoader())
+		// #319: the gate normalizes codes, rejects group accounts and records
+		// the result as a warning.
+		planCfg := warningsrepository.NewConfig(deps.Queries)
+		planGate := accountplanusecase.NewGate(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)),
+			warningsengine.New(warningsrepository.NewWarnings(deps.Queries), planCfg), planCfg)
+		journalSvc := journalsmodule.New(deps.DB, deps.Storage).WithPlanGate(planGate.ExportGate())
 		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage), rlsScope)
 	}
 	// KVKK veri sahibi talepleri (#193): dışa aktarma ve anonimleştirme, yönetici onaylı.
@@ -578,6 +583,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		Register(bankmatching.SuggestionKind, bankmatching.Applier{}).
 		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
+	// Hesap kodu önerileri (#25); yükleme sonrası kendiliğinden (#319).
+	accountRulesSvc := accountrulesusecase.New(accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)
+	autoSuggest := accountrulesmodule.RunAutoSuggest(deps.DB, accountRulesSvc, log)
+	ublSvc.WithAfterProcess(accountrulesmodule.AfterUpload(ublEnq, autoSuggest, log))
+	if s.worker != nil {
+		s.worker.WithAccountSuggest(autoSuggest)
+	}
 	// Banka–fatura eşleme ve BNK kontrolleri (#21).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
@@ -596,13 +608,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
 			WithControls(warningscontrols.New(deps.Queries, warningEngine)),
-		review:   reviewhandler.New(reviewSvc, activityRec),
-		receipts: receiptshandler.New(receiptsSvc),
-		accountrules: accountruleshandler.New(accountrulesusecase.New(
-			accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)),
-		accountplan: accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
-		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
-		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
+		review:       reviewhandler.New(reviewSvc, activityRec),
+		receipts:     receiptshandler.New(receiptsSvc),
+		accountrules: accountruleshandler.New(accountRulesSvc),
+		accountplan:  accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
+		periods:      periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
+		summaries:    summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
 		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
 		legal:         legalhandler.New(legalSvc),

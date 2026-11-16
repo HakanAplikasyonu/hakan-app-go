@@ -28,6 +28,9 @@ type Querier interface {
 	// Dönem yönetimi (issue #32): kilit, hazırlık durumu, değişiklik talepleri.
 	// Fatura yazımı: aynı mükellef + dönem kilitlenirken bekler (paylaşımlı, tx sonuna kadar).
 	AcquirePeriodWriteLock(ctx context.Context, arg AcquirePeriodWriteLockParams) error
+	// Mükellefin hedef muhasebe programı (#319): en son içe aktarılan planın
+	// hedefi; plan yoksa 'luca'.
+	ActiveAccountPlanTarget(ctx context.Context, arg ActiveAccountPlanTargetParams) (string, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
@@ -180,6 +183,8 @@ type Querier interface {
 	DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error
 	// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
 	DeleteBankTransactionSourcesByImport(ctx context.Context, arg DeleteBankTransactionSourcesByImportParams) ([]int64, error)
+	// Kararı geri alınan eşleme unutulur.
+	DeleteCounterpartyAccountBySuggestion(ctx context.Context, arg DeleteCounterpartyAccountBySuggestionParams) (int64, error)
 	DeleteEngagementAssignment(ctx context.Context, arg DeleteEngagementAssignmentParams) (int64, error)
 	DeleteEngagementReviewSetting(ctx context.Context, arg DeleteEngagementReviewSettingParams) (int64, error)
 	DeleteEngagementWarningRule(ctx context.Context, arg DeleteEngagementWarningRuleParams) (int64, error)
@@ -226,6 +231,9 @@ type Querier interface {
 	EndEngagementByID(ctx context.Context, id int64) error
 	// Sign-out: the token's whole session ends, its access tokens with it (#323).
 	EndRefreshSessionByHash(ctx context.Context, tokenHash string) (int64, error)
+	// Yükleme sonrası otomatik öneri (#319) yalnızca hesap planı ya da etkin
+	// kuralı olan mükellefte çalışır.
+	EngagementHasAccountMemory(ctx context.Context, arg EngagementHasAccountMemoryParams) (bool, error)
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
@@ -291,6 +299,8 @@ type Querier interface {
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
+	// Cari hafızası (#319): karşı tarafın VKN'si ile hatırlanan cari hesap.
+	GetCounterpartyAccount(ctx context.Context, arg GetCounterpartyAccountParams) (GetCounterpartyAccountRow, error)
 	// KVKK hukuki metinleri ve onaylar (issue #57). Platform geneli tablolar;
 	// ofis ve mükellef kapsamı onay kaydının kendisindedir.
 	GetCurrentLegalDocument(ctx context.Context, arg GetCurrentLegalDocumentParams) (LegalDocument, error)
@@ -516,6 +526,10 @@ type Querier interface {
 	ListAllPermissionSlugs(ctx context.Context) ([]string, error)
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
+	// "Açılmalı" hesaplar (#319): mükellefe uygulanmış ama etkin planda
+	// olmayan hesap kodları; ad, cari hafızasından ya da önerinin önerdiği
+	// addan. Eksik hesap şablonunu (Luca) besler.
+	ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
@@ -955,6 +969,7 @@ type Querier interface {
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
 	UpsertBillingPlan(ctx context.Context, arg UpsertBillingPlanParams) (BillingPlan, error)
 	UpsertBillingStatement(ctx context.Context, arg UpsertBillingStatementParams) (BillingStatement, error)
+	UpsertCounterpartyAccount(ctx context.Context, arg UpsertCounterpartyAccountParams) error
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	// Masaüstü yerel ajanı (issue #51).
 	// Aynı makine yeniden kayıt olursa satır güncellenir; geri alınmış ajan

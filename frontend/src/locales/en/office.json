@@ -491,5 +491,11 @@
   "memory.revert_reason": "Automatic code reverted by the accountant",
   "memory.retire": "Remove rule",
   "memory.retire_title": "Remove the rule \"{{name}}\"?",
-  "memory.retire_description": "This counterparty's new lines go to the review queue again. Codes written earlier stay as they are."
+  "memory.retire_description": "This counterparty's new lines go to the review queue again. Codes written earlier stay as they are.",
+  "memory.missing_title": "Accounts to open in Luca",
+  "memory.missing_description": "Applied codes the account plan does not have (mostly new counterparties). The Luca export stops until they are opened in Luca and the trial balance is imported again.",
+  "memory.missing_empty": "No account is missing from the plan.",
+  "memory.missing_download": "Download the missing-account template",
+  "memory.col_account_name": "Account name",
+  "memory.col_uses": "Uses"
 }

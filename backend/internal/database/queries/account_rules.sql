@@ -114,3 +114,39 @@ SELECT code, name, level, is_leaf FROM account_plan_accounts
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND target = @target
   AND main_code = @main_code
 ORDER BY code;
+
+-- name: ActiveAccountPlanTarget :one
+-- Mükellefin hedef muhasebe programı (#319): en son içe aktarılan planın
+-- hedefi; plan yoksa 'luca'.
+SELECT COALESCE((SELECT target FROM account_plan_imports
+                 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+                 ORDER BY id DESC LIMIT 1), 'luca')::text AS target;
+
+-- name: GetCounterpartyAccount :one
+-- Cari hafızası (#319): karşı tarafın VKN'si ile hatırlanan cari hesap.
+SELECT account_code, account_name FROM counterparty_accounts
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND counterparty_tax_id = @counterparty_tax_id AND main_code = @main_code;
+
+-- name: UpsertCounterpartyAccount :exec
+INSERT INTO counterparty_accounts (organization_id, engagement_id, taxpayer_id, counterparty_tax_id, main_code,
+                                   account_code, account_name, suggestion_id, decided_by)
+VALUES (@organization_id, @engagement_id, @taxpayer_id, @counterparty_tax_id, @main_code,
+        @account_code, @account_name, sqlc.narg(suggestion_id), sqlc.narg(decided_by))
+ON CONFLICT (engagement_id, counterparty_tax_id, main_code)
+DO UPDATE SET account_code = EXCLUDED.account_code, account_name = EXCLUDED.account_name,
+              suggestion_id = EXCLUDED.suggestion_id, decided_by = EXCLUDED.decided_by;
+
+-- name: DeleteCounterpartyAccountBySuggestion :execrows
+-- Kararı geri alınan eşleme unutulur.
+DELETE FROM counterparty_accounts
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND suggestion_id = @suggestion_id;
+
+-- name: EngagementHasAccountMemory :one
+-- Yükleme sonrası otomatik öneri (#319) yalnızca hesap planı ya da etkin
+-- kuralı olan mükellefte çalışır.
+SELECT (EXISTS (SELECT 1 FROM account_plan_imports p
+                WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id)
+     OR EXISTS (SELECT 1 FROM account_rules r
+                WHERE r.organization_id = @organization_id AND r.engagement_id = @engagement_id
+                  AND r.status = 'active'))::boolean AS has_memory;

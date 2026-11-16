@@ -7,12 +7,14 @@ Her mükellefin hesap planı farklıdır. Bir mükellefte Korkmaz Gıda
 Mizan hafızası bu farkı mükellef bazında hatırlar:
 
 1. **Mizanı yüklersiniz.** Sistem cari ve alt hesapları tanır.
-2. **İlk ay öneri yapar.** Faturadaki firmayı mizanda bulur; bulamazsa
-   açılması gereken yeni cari kodu önerir.
-3. **Siz düzeltirsiniz.** Kararlarınız kaydedilir.
+2. **Faturaları yüklediğiniz anda öneri yapar.** Faturadaki firmayı
+   mizanda bulur; bulamazsa açılması gereken yeni cari kodu önerir.
+3. **Siz düzeltirsiniz.** Kararlarınız kaydedilir; onayladığınız cari
+   firmanın VKN'siyle hatırlanır.
 4. **Aynı karar tekrar ederse kural önerir.** Bir tıkla kural yaparsınız.
-5. **Sonraki aylarda soru sormaz.** Aynı firmanın kalemleri kuraldaki koda
-   kendiliğinden yazılır; inceleme kuyruğunuza düşmez.
+5. **Sonraki aylarda soru sormaz.** Faturaları yüklemeniz yeter: aynı
+   firmanın kalemleri kuraldaki koda kendiliğinden yazılır; inceleme
+   kuyruğunuza düşmez.
 
 Ekran: kenar çubuğunda **Hesap planı ve kurallar**.
 
@@ -34,14 +36,26 @@ seçin, dosyayı seçip **İçe aktar**'a basın.
 
 ## 2. İlk ay: öneriler mizandan gelir
 
-Faturaları yükledikten sonra fatura ekranında **Hesap kodu öner**'e basın.
-Öneriler **İnceleme kuyruğu**na düşer.
+Faturaları (UBL / ZIP) yüklediğinizde, mizanı ya da kuralı olan mükellefte
+hesap kodu önerileri **kendiliğinden** hazırlanır; bir şeye basmanız
+gerekmez. Birkaç saniye sonra öneriler **İnceleme kuyruğu**na düşer.
+Fatura ekranındaki **Hesap kodu öner** düğmesi, öneriyi elle yeniden
+hazırlatmak için durur (ör. mizanı faturalardan sonra yüklediyseniz).
+
+Mizanı ve kuralı olmayan mükellefte öneri kendiliğinden hazırlanmaz;
+**Hesap kodu öner** ile elle isteyebilirsiniz.
 
 ![İnceleme kuyruğunda öneriler](../../frontend/public/yardim/img/mizan-inceleme-kuyrugu.jpg)
 
 - **Cari hesap:** Satıştaki müşteri 120, alıştaki satıcı 320 altında
-  **unvanla** aranır. Büyük/küçük harf, nokta ve boşluk farkı önemsenmez
-  ("KORKMAZ GIDA SAN. VE TİC. A.Ş." = "Korkmaz Gıda San. ve Tic. A.Ş.").
+  aranır. Önce **VKN** ile: bu firmanın carisini daha önce onayladıysanız ya
+  da düzelttiyseniz o hesap sorulmadan yazılır. Yoksa **unvanla** aranır.
+  Unvanda büyük/küçük harf, nokta, boşluk ve Türkçe harf farkı önemsenmez;
+  yaygın kısaltmalar açık hâliyle aynı sayılır:
+  "San." = "Sanayi", "Tic." = "Ticaret", "Ltd. Şti." = "Limited Şirketi",
+  "A.Ş." = "Anonim Şirketi", "İnş." = "İnşaat", "Paz." = "Pazarlama"
+  ("KORKMAZ GIDA SAN. VE TİC. A.Ş." = "Korkmaz Gıda Sanayi ve Ticaret
+  Anonim Şirketi").
   - Mizanda varsa o hesap önerilir (örnek: Korkmaz Gıda → `120.01.006`).
   - Yoksa **sıradaki boş kod** önerilir ve "açılmalı" diye işaretlenir
     (örnek: 320.01.001–006 doluysa Yeni Lojistik → `320.01.007`). Bu cari
@@ -49,7 +63,10 @@ Faturaları yükledikten sonra fatura ekranında **Hesap kodu öner**'e basın.
 - **Kalem hesabı:** Firmayla daha önce verdiğiniz karar yoksa genel kural
   önerilir (alış → 153, satış → 600). Bunlar düşük güvenli olduğu için
   kuyrukta onayınızı bekler.
-- **KDV hesabı:** KDV'li kalemler için 191 / 391 önerilir.
+- **KDV hesabı:** KDV'li kalemler için 191 / 391 önerilir. Mizanda oranlı
+  alt hesaplar varsa kalemin oranına göre alt hesaba gider: adında "%20"
+  geçen `191.01`, "%10" geçen `191.02` gibi. Oran adda yazmıyorsa ya da aynı
+  oranda birden çok alt hesap varsa ana hesapta (191 / 391) kalır.
 
 Kuyrukta önerinin altında **neden** önerildiği yazar (hangi kural, hangi
 geçmiş karar).
@@ -61,7 +78,21 @@ basın. Örnek: Deniz Ambalaj'dan alınan koli, streç film ve etiket ticari mal
 değil, ambalaj malzemesidir; `153` yerine `150.01` yazarsınız.
 
 Her düzeltme ve onay, **firma (VKN) + alış/satış + hesap kodu** olarak
-kaydedilir.
+kaydedilir. Cari için verdiğiniz karar (onay ya da düzeltme) ayrıca
+**VKN → cari hesap** olarak hatırlanır: unvan mizanda farklı yazılmış olsa
+bile o firmanın sonraki faturaları aynı cariye gider. Kararı **Geri al**
+derseniz bu eşleme de unutulur.
+
+### "Açılmalı" cariler: Luca'da açılacak hesaplar
+
+Yeni bir cariyi onayladığınızda hesap henüz Luca'da yoktur. Sayfadaki
+**Luca'da açılacak hesaplar** listesi, uygulanmış ama mizanda olmayan
+kodları gösterir. **Eksik hesap şablonunu indir** ile bu hesapları Excel
+olarak alın, Luca'ya aktarın (ya da elle açın), sonra güncel mizanı yeniden
+yükleyin: hesap listeden düşer.
+
+![Luca'da açılacak hesaplar](../../frontend/public/yardim/img/mizan-acilacak-hesaplar.jpg) Şablonun sütun düzeni Luca'nın kendi
+şablonuyla henüz doğrulanmadı; dosyadaki "Bilgi" sayfası bunu belirtir.
 
 ## 4. Kural adayı: "Kural yapılsın mı?"
 
@@ -76,10 +107,16 @@ görünür.
 
 ## 5. Sonraki aylar: soru sorulmadan
 
-Kuraldaki firmanın yeni faturalarında **Hesap kodu öner** dediğinizde
-kalemler doğrudan kuraldaki koda yazılır. Güveni onay eşiğinin (%95)
-üstünde olduğu için inceleme kuyruğuna düşmezler; **Soru sorulmadan
-kodlananlar** listesinde "Kural" etiketiyle görünürler.
+Kuraldaki firmanın yeni faturalarını yüklediğinizde kalemler doğrudan
+kuraldaki koda yazılır; **Hesap kodu öner**'e basmanız gerekmez. Güveni
+onay eşiğinin (%95) üstünde olduğu için inceleme kuyruğuna düşmezler;
+**Soru sorulmadan kodlananlar** listesinde "Kural" etiketiyle görünürler.
+VKN ile hatırlanan cariler de aynı şekilde sorulmadan yazılır.
+
+**Hangi kural kazanır?** Önce bu mükellef için yaptığınız kurallar, sonra
+ofis şablonundan gelen kurallar, en son genel varsayılanlar (153, 600, 191,
+391…). Ofis şablonundaki bir kuralın öncelik numarası daha küçük olsa bile
+mükellefe yaptığınız kural önce gelir.
 
 ![Otomatik kodlanan kalemler](../../frontend/public/yardim/img/mizan-otomatik-kodlama.jpg)
 
@@ -92,18 +129,31 @@ yeniden kuyruğa düşer, önceden yazılan kodlar değişmez.
 ## 6. Luca'ya aktarırken denetim
 
 **Yevmiye ve çıktı** ekranında Luca dosyası alırken fişteki her hesap
-kodu yüklediğiniz mizanda aranır. Mizanda olmayan bir kod varsa (örneğin
-henüz açmadığınız `320.01.007`) çıktı **durdurulur** ve "Hesap kodu hedef
-hesap planında yok" yazar. Hesabı Luca'da açın, güncel mizanı yeniden yükleyin
-ve çıktıyı tekrar alın.
+kodu yüklediğiniz mizanda aranır:
+
+- `320 01 002` gibi yazımlar `320.01.002` olarak okunur ve dosyaya bu
+  biçimde yazılır.
+- Mizanda olmayan bir kod varsa (örneğin henüz açmadığınız `320.01.007`)
+  çıktı **durdurulur** ve "Hesap kodu hedef hesap planında yok" yazar.
+- Alt hesabı olan bir **ana hesap** (örneğin `153.01` varken `153`) da
+  durdurulur: Luca ana hesaba fiş almaz. Fişi alt hesapla düzeltin.
+
+Hesabı Luca'da açın, güncel mizanı yeniden yükleyin ve çıktıyı tekrar alın.
+Durum aynı zamanda **Uyarılar** ekranına "Hesap kodu hedef hesap planında
+yok" uyarısı olarak düşer; kod düzelince uyarı kendiliğinden kapanır.
+
+"Faturalar Luca'ya doğrudan gidiyor" ayarı açıksa faturadan gelen fişler
+(kalem kalem işlenenler dahil) çifte kayıt olmasın diye çıktıya girmez.
 
 ## Sık sorulanlar
 
 - **Kural ne zaman yanlış olur?** Aynı firmadan farklı türde mal aldığınız
   durumlarda (ör. hem ambalaj hem ticari mal). O firmanın kuralını
   yapmayın; yaptıysanız **Kuralı kaldır** ile kaldırın.
-- **Firma mizanda var ama yeni hesap önerdi.** Unvan mizanda farklı yazılmış
-  olabilir (ör. "Sanayi" ↔ "San."). Öneriyi mizandaki koda düzeltin; o
-  firmanın bundan sonraki faturaları için geçmiş kararınız kullanılır.
+- **Firma mizanda var ama yeni hesap önerdi.** Unvan mizanda başka
+  kelimelerle yazılmış olabilir (kısaltmalar zaten eşleşir; "Gıda" ↔
+  "Gıda Ürünleri" gibi farklar eşleşmez). Öneriyi mizandaki koda düzeltin;
+  karar VKN ile hatırlanır, o firmanın bundan sonraki faturaları o cariye
+  gider.
 - **Eşik nedir?** Bir öneri %95 ve üstü güvenliyse sizin onayınızı
   beklemeden yazılır. Ofis ve mükellef bazında değiştirilebilir.

@@ -491,5 +491,11 @@
   "memory.revert_reason": "Otomatik kod müşavir tarafından geri alındı",
   "memory.retire": "Kuralı kaldır",
   "memory.retire_title": "\"{{name}}\" kuralı kaldırılsın mı?",
-  "memory.retire_description": "Bu firmanın yeni kalemleri yeniden inceleme kuyruğuna düşer. Daha önce yazılan kodlar değişmez."
+  "memory.retire_description": "Bu firmanın yeni kalemleri yeniden inceleme kuyruğuna düşer. Daha önce yazılan kodlar değişmez.",
+  "memory.missing_title": "Luca'da açılacak hesaplar",
+  "memory.missing_description": "Uygulanmış ama hesap planında olmayan kodlar (çoğu yeni cari). Luca çıktısı bunlar Luca'da açılıp mizan yeniden yüklenene kadar durur.",
+  "memory.missing_empty": "Planda eksik hesap yok.",
+  "memory.missing_download": "Eksik hesap şablonunu indir",
+  "memory.col_account_name": "Hesap adı",
+  "memory.col_uses": "Kullanım"
 }

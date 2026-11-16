@@ -415,6 +415,21 @@ type ChangeRequest struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type CounterpartyAccount struct {
+	ID                int64              `json:"id"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	CounterpartyTaxID string             `json:"counterparty_tax_id"`
+	MainCode          string             `json:"main_code"`
+	AccountCode       string             `json:"account_code"`
+	AccountName       string             `json:"account_name"`
+	SuggestionID      pgtype.Int8        `json:"suggestion_id"`
+	DecidedBy         pgtype.Int8        `json:"decided_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Customer struct {
 	ID                      int64              `json:"id"`
 	Uuid                    uuid.UUID          `json:"uuid"`
