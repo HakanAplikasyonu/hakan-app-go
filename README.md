@@ -94,6 +94,12 @@ cd frontend && pnpm typecheck && pnpm lint && pnpm build
 make env-check
 ```
 
+```bash
+make check-migrations
+```
+
+**Migration eklerken:** önce main'i çekin (`git pull origin main`), `backend/migrations` altındaki en yüksek numaranın bir fazlasını kullanın ve her `NNNNNN_ad.up.sql` için `NNNNNN_ad.down.sql` ekleyin. Dalınız açıkken main'e başka bir migration girerse dalınıza main'i alıp kendi numaranızı yükseltin. CI (`backend` işi, "Migration numaraları") çift numarayı, eksik up/down'ı ve main'in en yüksek numarasının altında kalan yeni migration'ı kırmızı yapar (#299).
+
 CI (`.github/workflows/ci.yml`) her push'ta değişen klasörlere göre bu kontrolleri çalıştırır. Tek zorunlu kontrol `ci` işidir.
 
 ## Belgeler

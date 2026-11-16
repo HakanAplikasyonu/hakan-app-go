@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed perf-seed perf-load \
-	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n
+	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n check-migrations
 
 infra:
 	@if [ -n "$(ENV_FILE)" ]; then \
@@ -43,6 +43,14 @@ infra-ps:
 
 migrate-up:
 	@$(load_env) $(MAKE) -C backend migrate-up
+
+# CI check (#299): migration numaraları çift değil, her up'ın down'ı var, yeni
+# migration main'in en yüksek numarasının üstünde. Kural: migration eklemeden
+# önce main'i çekin, en yüksek numara +1 kullanın.
+check-migrations:
+	git fetch --quiet origin main || true
+	scripts/check-migrations.sh --against origin/main
+	scripts/check-migrations.test.sh
 
 backend-dev:
 	@$(load_env) $(MAKE) -C backend dev
