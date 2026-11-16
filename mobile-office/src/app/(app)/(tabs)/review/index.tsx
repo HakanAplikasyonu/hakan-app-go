@@ -382,7 +382,7 @@ function TabletDetail({
               accessibilityRole="button"
               disabled={busy}
               onPress={onApprove}
-              style={({ pressed }) => [styles.bigBtn, { backgroundColor: c.ok, opacity: busy ? 0.6 : pressed ? 0.85 : 1 }]}>
+              style={({ pressed }) => [styles.bigBtn, { flex: 0, backgroundColor: c.ok, opacity: busy ? 0.6 : pressed ? 0.85 : 1 }]}>
               {approving ? <TacRozeti durum="onaylandi" /> : null}
               <Text style={[styles.bigBtnText, { color: c.surface }]}>Onayla</Text>
             </Pressable>

@@ -211,7 +211,7 @@ function Stat({
       </Text>
       <Text style={[metin.kpi, { fontSize: 22, lineHeight: 28, color: danger ? c.danger : c.text }]}>{v}</Text>
       {hint ? (
-        <Text style={[metin.xs, { color: danger ? c.danger : c.text3 }]} numberOfLines={1}>
+        <Text style={[metin.xs, { color: c.text3 }]} numberOfLines={1}>
           {hint}
         </Text>
       ) : null}
