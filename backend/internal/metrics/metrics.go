@@ -36,6 +36,7 @@ type Registry struct {
 	httpDuration *prometheus.HistogramVec
 	integrator   *prometheus.CounterVec
 	integratorD  *prometheus.HistogramVec
+	storageFail  *prometheus.CounterVec
 }
 
 // NewRegistry builds a registry with the runtime and app collectors.
@@ -59,10 +60,14 @@ func NewRegistry() *Registry {
 		Help:    "Integrator call latency by provider and operation.",
 		Buckets: []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60},
 	}, []string{"provider", "operation"})
+	r.storageFail = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "storage_write_failures_total",
+		Help: "Object store writes refused by the store (no_space: no writable volume / disk full; server: 5xx), issue #247.",
+	}, []string{"reason"})
 	r.reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		r.httpRequests, r.httpDuration, r.integrator, r.integratorD,
+		r.httpRequests, r.httpDuration, r.integrator, r.integratorD, r.storageFail,
 	)
 	return r
 }
@@ -172,4 +177,14 @@ func (r *Registry) HTTP(next http.Handler) http.Handler {
 func (r *Registry) ObserveIntegrator(provider, operation, outcome string, d time.Duration) {
 	r.integrator.WithLabelValues(provider, operation, outcome).Inc()
 	r.integratorD.WithLabelValues(provider, operation).Observe(d.Seconds())
+}
+
+// ObserveStorageWriteFailure counts an object store write the store refused.
+func (r *Registry) ObserveStorageWriteFailure(reason string) {
+	r.storageFail.WithLabelValues(reason).Inc()
+}
+
+// StorageWriteFailures is the counter for reason (tests and dashboards).
+func (r *Registry) StorageWriteFailures(reason string) prometheus.Counter {
+	return r.storageFail.WithLabelValues(reason)
 }
