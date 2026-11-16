@@ -59,6 +59,19 @@ desktop/
   doğrulanmadı; pilot mükellefte geçersiz kılma dosyasıyla düzeltilir.
   Okunan veri şimdilik sunucuya gönderilmez.
 
+## Arka planda çalışma (#204)
+
+- **Tepsi:** simge ve menü: Aç, İzlemeyi duraklat / sürdür, Oturum açılışında başlat, Çıkış. Sol tık pencereyi açar.
+- **Pencereyi kapatmak** uygulamayı kapatmaz: pencere gizlenir; sidecar ve klasör izleme sürer. Çıkış tepsi menüsünden. Tepsi kurulamazsa (masaüstü ortamı desteklemiyorsa) kapatmak uygulamadan çıkar.
+- **Otomatik başlatma** (`tauri-plugin-autostart`): varsayılan kapalı. Tepsiden ya da `set_autostart_enabled` komutuyla açılır. Oturum açılışında `--background` ile pencere göstermeden başlar.
+- **Tek örnek** (`tauri-plugin-single-instance`): ikinci açılış yeni süreç başlatmaz, açık pencereyi öne getirir.
+- **Sidecar denetimi** (`src/supervisor.rs`): kapanan ya da çöken sidecar 1, 2, 4, 8, 16 sn (en çok 16 sn) beklemeyle yeniden başlatılır. 60 sn sorunsuz çalışınca sayaç sıfırlanır.
+  - "İzlemeyi duraklat" sidecar'ı durdurur ve yeniden başlatmaz; "sürdür" başlatır.
+  - Komutlar: `shell_settings`, `set_watch_paused`.
+- **Kalıcı günlük** (`tauri-plugin-log`): uygulama günlük klasöründe `hakan.log` (Linux `~/.local/share/app.hakan.desktop/logs/`, macOS `~/Library/Logs/app.hakan.desktop/`, Windows `%LOCALAPPDATA%\app.hakan.desktop\logs\`).
+  - Dönerek tutulur: 5 dosya × 2 MB.
+  - Satırlar yazılmadan önce maskelenir (`src/logmask.rs`): e-posta, VKN/TCKN, IBAN, telefon, JWT, `Bearer` ve belirteç/şifre alanları.
+
 ## Protokol
 
 Her satır bir JSON nesnesi:
