@@ -24,7 +24,7 @@ type failureRecorder interface {
 // or aborted the request) it writes 499 instead: that is not a server fault.
 func InternalErr(w http.ResponseWriter, r *http.Request, err error, publicMessage string) {
 	if r != nil && r.Context().Err() != nil {
-		if rec, ok := w.(failureRecorder); ok {
+		if rec, ok := recorder[failureRecorder](w); ok {
 			if err == nil {
 				err = r.Context().Err()
 			}
@@ -34,7 +34,7 @@ func InternalErr(w http.ResponseWriter, r *http.Request, err error, publicMessag
 		return
 	}
 	if err != nil {
-		if rec, ok := w.(serverErrorRecorder); ok {
+		if rec, ok := recorder[serverErrorRecorder](w); ok {
 			rec.RecordServerError(err, publicMessage)
 		}
 	}
@@ -48,7 +48,46 @@ func RecordFailure(w http.ResponseWriter, err error) {
 	if err == nil {
 		return
 	}
-	if rec, ok := w.(failureRecorder); ok {
+	if rec, ok := recorder[failureRecorder](w); ok {
 		rec.RecordFailure(err)
+	}
+}
+
+// recorder finds T on w or on a writer it wraps. Middleware that wraps the
+// response writer (metrics, tracing, the RLS transaction buffer) exposes the
+// writer underneath through Unwrap, the http.ResponseController convention;
+// without the walk a 5xx cause or 4xx reason recorded deeper in the chain
+// never reaches the access log.
+func recorder[T any](w http.ResponseWriter) (T, bool) {
+	for i := 0; w != nil && i < 16; i++ {
+		if rec, ok := w.(T); ok {
+			return rec, true
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			break
+		}
+		w = u.Unwrap()
+	}
+	var zero T
+	return zero, false
+}
+
+// RecordServerErrorOn records a 5xx cause on w (or a writer it wraps)
+// without writing a response. For writers that buffer the response and
+// forward the recorders (rls.Middleware).
+func RecordServerErrorOn(w http.ResponseWriter, err error, publicMessage string) {
+	if err == nil {
+		return
+	}
+	if rec, ok := recorder[serverErrorRecorder](w); ok {
+		rec.RecordServerError(err, publicMessage)
+	}
+}
+
+// RecordErrorCodeOn records the API error code on w (or a writer it wraps).
+func RecordErrorCodeOn(w http.ResponseWriter, code string) {
+	if rec, ok := recorder[errorCodeRecorder](w); ok {
+		rec.RecordErrorCode(code)
 	}
 }

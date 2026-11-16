@@ -71,7 +71,7 @@ func Middleware(db Beginner, taxpayers TaxpayerLister, log *slog.Logger) func(ht
 				}
 				return
 			}
-			buf := &bufferedWriter{header: http.Header{}, status: http.StatusOK}
+			buf := &bufferedWriter{out: w, header: http.Header{}, status: http.StatusOK}
 			err := WithScope(ctx, db, s, func(ctx context.Context, _ pgx.Tx) error {
 				next.ServeHTTP(buf, r.WithContext(ctx))
 				if buf.status >= http.StatusBadRequest {
@@ -92,7 +92,11 @@ func Middleware(db Beginner, taxpayers TaxpayerLister, log *slog.Logger) func(ht
 var errRollback = errors.New("rls: handler answered with an error")
 
 // bufferedWriter holds the response until the transaction has committed.
+// It forwards the error recorders of the writer it wraps (the access log's
+// statusWriter), so a handler's 5xx cause and 4xx reason still reach the
+// log and error reporting.
 type bufferedWriter struct {
+	out         http.ResponseWriter
 	header      http.Header
 	status      int
 	wroteHeader bool
@@ -153,6 +157,10 @@ func (s *statusWriter) Flush() {
 	}
 }
 
+// Unwrap exposes the streamed writer so response recorders (5xx cause,
+// error code) reach the access log's recorder.
+func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
+
 // Narrow sets the taxpayers of the request's scope to one taxpayer (the
 // engagement's), on the transaction the context carries. Without one it
 // does nothing. RequireEngagement calls it: the scope opened for the office
@@ -164,4 +172,21 @@ func Narrow(ctx context.Context, taxpayerID int64) error {
 	}
 	_, err := tx.Exec(ctx, `SELECT set_config('app.taxpayer_ids', $1, true)`, idArray([]int64{taxpayerID}))
 	return err
+}
+
+// Recorders unwraps to the writer the response is flushed to, so
+// response.InternalErr / RecordFailure reach the access log's recorder. The
+// buffer has no Unwrap: http.ResponseController must not flush around it.
+func (b *bufferedWriter) RecordServerError(err error, publicMessage string) {
+	response.RecordServerErrorOn(b.out, err, publicMessage)
+}
+
+// RecordErrorCode forwards the API error code to the wrapped writer.
+func (b *bufferedWriter) RecordErrorCode(code string) {
+	response.RecordErrorCodeOn(b.out, code)
+}
+
+// RecordFailure forwards the 4xx cause to the wrapped writer.
+func (b *bufferedWriter) RecordFailure(err error) {
+	response.RecordFailure(b.out, err)
 }

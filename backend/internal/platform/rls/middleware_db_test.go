@@ -2,6 +2,7 @@ package rls_test
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
 // TestMiddlewareCommitsOnlySuccessfulAnswers (issue #166): the request runs
@@ -96,5 +98,34 @@ func TestMiddlewareCommitsOnlySuccessfulAnswers(t *testing.T) {
 	})))
 	if w.Code != http.StatusNoContent || len(lister) != 1 {
 		t.Fatalf("office route: %d, lister %v", w.Code, lister)
+	}
+}
+
+type causeRecorder struct {
+	*httptest.ResponseRecorder
+	cause error
+}
+
+func (c *causeRecorder) RecordServerError(err error, _ string) { c.cause = err }
+
+// TestMiddlewareForwardsServerErrorCause: a handler's 5xx cause recorded
+// inside the buffered transaction still reaches the access log's recorder.
+func TestMiddlewareForwardsServerErrorCause(t *testing.T) {
+	f := setup(t)
+	mw := rls.Middleware(f.d.Pool, nil, nil)
+	cause := errors.New("storage: s3 upload failed")
+	h := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response.InternalErr(w, r, cause, "upload failed")
+	}))
+	r := httptest.NewRequest(http.MethodPost, "/v1/tenant/x", nil)
+	rctx := authctx.WithPrincipal(r.Context(), authctx.Principal{UserInternal: f.ownerA})
+	rctx = orgctx.WithScope(rctx, orgctx.Scope{ID: f.orgA})
+	w := &causeRecorder{ResponseRecorder: httptest.NewRecorder()}
+	h.ServeHTTP(w, r.WithContext(rctx))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("status %d", w.Code)
+	}
+	if !errors.Is(w.cause, cause) {
+		t.Fatalf("cause not forwarded: %v", w.cause)
 	}
 }
