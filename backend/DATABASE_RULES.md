@@ -139,7 +139,7 @@ not the owner); a non-superuser owner sees and writes those tables only
 inside `rls.System` (`app.system`). A data migration touching any such table
 as a non-superuser owner must `SET LOCAL app.system = 'on'` first. The
 exception list is empty since #307; a new exception goes, with its reason,
-with their reason in `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
+into `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
 
 Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
 "reason", fn)`, the deliberate bypass for work that is not done on behalf of
