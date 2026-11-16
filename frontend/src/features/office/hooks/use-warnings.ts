@@ -11,6 +11,7 @@ import {
   warningKeys,
   warningService,
   type WarningDecisionAction,
+  type WarningGroupQuery,
   type WarningListQuery,
 } from "@/features/office/services/warnings.service";
 
@@ -53,6 +54,30 @@ export function useDecideWarning(slug: string) {
       action: WarningDecisionAction;
     }) =>
       warningService.decide(slug, vars.engagement, vars.warning, vars.action),
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: warningKeys.all(slug) }),
+  });
+}
+
+/** Uyarı grupları (koda göre sayılar). */
+export function useWarningGroups(
+  slug: string,
+  query: WarningGroupQuery,
+  engagement?: string,
+) {
+  return useQuery({
+    queryKey: warningKeys.groups(slug, query, engagement),
+    queryFn: () => warningService.groups(slug, query, engagement),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** "Tümünü gördüm": koddaki açık uyarıları toplu görüldü yapar. */
+export function useAcknowledgeWarningGroup(slug: string, engagement?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { code: string; period?: string }) =>
+      warningService.acknowledgeBulk(slug, vars, engagement),
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: warningKeys.all(slug) }),
   });
