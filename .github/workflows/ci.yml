@@ -460,7 +460,8 @@ jobs:
         working-directory: e2e
         env:
           CI: "true"
-        run: npx playwright test --grep @visual
+        # Ayrı çıktı klasörü: sonraki adımlar test-results/'u temizler.
+        run: npx playwright test --grep @visual --output=test-results-visual
       - name: Görsel regresyon sonucu
         if: steps.visual.outcome == 'failure'
         run: echo "::warning title=e2e::Görsel regresyon farkı var. Beklenen / gerçek / fark görüntüleri e2e-report artefaktında."
@@ -504,6 +505,7 @@ jobs:
           path: |
             e2e/playwright-report/
             e2e/test-results/
+            e2e/test-results-visual/
             e2e/.run/*.log
           retention-days: 7
           if-no-files-found: ignore
