@@ -32,7 +32,7 @@ En ağır uç ofis fatura listesiydi: `GET /v1/tenant/engagements/{uuid}/invoice
 
 | Değişiklik | Nerede |
 |---|---|
-| `idx_invoices_taxpayer_issue (taxpayer_id, issue_date DESC, id DESC)` | migration `000075` |
+| `idx_invoices_taxpayer_issue (taxpayer_id, issue_date DESC, id DESC)` | migration `000076` |
 | İmleçli (keyset) sayfalama: `?cursor=`, yanıtta `next_cursor` | ofis ve mükellef fatura listeleri |
 | Sayfa önce yalnızca kimliklerle seçilir; uyarı sayısı yalnızca dönen 50 satır için hesaplanır | `ListEngagementInvoices` |
 | Sayım görünürlüğü her farklı tarih için bir kez sorar; `MATERIALIZED` CTE koşulun yeniden satır taramasına itilmesini engeller | `CountEngagementInvoices` |
