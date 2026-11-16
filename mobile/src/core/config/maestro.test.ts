@@ -61,3 +61,21 @@ test('config runs the smoke flows in order and they all exist', () => {
   assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'tasks', 'signout']);
   for (const n of cfg.executionOrder.flowsOrder) assert.ok(names.has(n), `missing flow ${n}`);
 });
+
+test('the ids the flows tap exist in the app (#328)', () => {
+  const appDir = new URL('../../app/', import.meta.url);
+  const read = (dir: URL): string =>
+    readdirSync(dir, { withFileTypes: true })
+      .map((e) => (e.isDirectory() ? read(new URL(`${e.name}/`, dir)) : e.name.endsWith('.tsx') ? readFileSync(new URL(e.name, dir), 'utf8') : ''))
+      .join('\n');
+  const src = read(appDir) + readFileSync(new URL('../../../../packages/mobile-core/src/ui/sekme-cubugu.tsx', import.meta.url), 'utf8');
+  // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").
+  const has = (id: string) => {
+    if (src.includes(`"${id}"`) || src.includes(`'${id}'`)) return true;
+    const prefix = id.slice(0, id.lastIndexOf('-'));
+    return !!prefix && (src.includes(`\`${prefix}-\${`) || src.includes(`testIDOnek="${prefix}"`));
+  };
+  for (const f of flows()) {
+    for (const m of f.text.matchAll(/id: "([^"]+)"/g)) assert.ok(has(m[1]), `${f.file}: no testID ${m[1]}`);
+  }
+});
