@@ -159,11 +159,12 @@ export const tenantService = {
  * yet). The token travels in the body, never in an API URL.
  */
 export const invitationService = {
-  preview(token: string) {
+  /** `silent`: the caller renders a missing invitation itself (no toast). */
+  preview(token: string, options?: { silent?: boolean }) {
     return platformRequest<InvitationPreview>(
       "POST",
       "/v1/invitations/preview",
-      { body: { token } },
+      { body: { token }, silent: options?.silent },
     );
   },
   accept(token: string) {

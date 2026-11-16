@@ -44,24 +44,22 @@ type InvitationSummary = {
   status: string;
 };
 
-/**
- * Office invitations, mükellef invitations (issue #4) and add-mükellef
- * consent links (issue #7) share the sign-up form: each is tried in turn,
- * moving on only when the previous one does not know the token.
- */
-async function previewAny(token: string): Promise<InvitationSummary> {
-  try {
-    const inv = await invitationService.preview(token);
+type InvitationKind = InvitationSummary["kind"];
+
+const previewers: Record<
+  InvitationKind,
+  (token: string) => Promise<InvitationSummary>
+> = {
+  organization: async (token) => {
+    const inv = await invitationService.preview(token, { silent: true });
     return {
       kind: "organization",
       name: inv.organization.name,
       email: inv.email,
       status: inv.status,
     };
-  } catch (error) {
-    if (!isApiError(error) || !error.isNotFound) throw error;
-  }
-  try {
+  },
+  taxpayer: async (token) => {
     const inv = await taxpayerInvitationService.preview(token);
     return {
       kind: "taxpayer",
@@ -69,16 +67,54 @@ async function previewAny(token: string): Promise<InvitationSummary> {
       email: inv.email,
       status: inv.status,
     };
-  } catch (error) {
-    if (!isApiError(error) || !error.isNotFound) throw error;
+  },
+  consent: async (token) => {
+    const consent = await taxpayerConsentService.preview(token);
+    return {
+      kind: "consent",
+      name: consent.organization.name,
+      email: consent.contact_email,
+      status: consent.status,
+    };
+  },
+};
+
+/**
+ * The link says which flow it came from: the add-mükellef consent email
+ * (issue #7) returns to `/consent/<token>`, a mükellef invitation to
+ * `/invite/m/<token>`. That kind is asked first.
+ */
+export function kindFromNext(next: string | null): InvitationKind | null {
+  if (!next) return null;
+  if (next.startsWith("/consent/")) return "consent";
+  if (next.startsWith("/invite/m/")) return "taxpayer";
+  if (next.startsWith("/invite/")) return "organization";
+  return null;
+}
+
+/**
+ * Office invitations, mükellef invitations (issue #4) and add-mükellef
+ * consent links (issue #7) share the sign-up form: each is tried in turn,
+ * moving on only when the previous one does not know the token. The kind the
+ * `next` link names goes first; every preview is silent, because a token the
+ * first endpoint does not know is the normal case here, not an error (#146).
+ */
+export async function previewAny(
+  token: string,
+  hint: InvitationKind | null = null,
+): Promise<InvitationSummary> {
+  const order: InvitationKind[] = ["organization", "taxpayer", "consent"];
+  if (hint) order.sort((a, b) => Number(b === hint) - Number(a === hint));
+  let lastError: unknown;
+  for (const kind of order) {
+    try {
+      return await previewers[kind](token);
+    } catch (error) {
+      if (!isApiError(error) || !error.isNotFound) throw error;
+      lastError = error;
+    }
   }
-  const consent = await taxpayerConsentService.preview(token);
-  return {
-    kind: "consent",
-    name: consent.organization.name,
-    email: consent.contact_email,
-    status: consent.status,
-  };
+  throw lastError;
 }
 
 function invitationHref(
@@ -117,8 +153,8 @@ export function InvitationRegisterForm({
   const codeSchema = useMemo(() => createEmailCodeSchema(t), [t]);
 
   const preview = useQuery({
-    queryKey: ["invitation", "preview-any", token],
-    queryFn: () => previewAny(token),
+    queryKey: ["invitation", "preview-any", token, kindFromNext(next)],
+    queryFn: () => previewAny(token, kindFromNext(next)),
     retry: false,
     staleTime: 30_000,
     // The card explains failures; no global toast on top.
