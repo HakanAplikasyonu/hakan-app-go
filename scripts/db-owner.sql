@@ -20,7 +20,8 @@
 --     FORCE'lu tablolarda hiçbir şey görmezdi;
 --   - varsayılan yetkiler (000046 / 000074 ALTER DEFAULT PRIVILEGES): `from`
 --     için tanımlıydı; yeni sahibin oluşturacağı tablolar da uygulama
---     rollerine açılsın diye `to` için yeniden tanımlanır.
+--     rollerine açılsın diye `to` için yeniden tanımlanır, `from`'unkiler
+--     kaldırılır (kalsalardı yedek yeni sahiple geri yüklenemezdi).
 -- Uzantılar (pgcrypto, citext) taşınmaz: sahiplikleri değiştirilemez ve
 -- yalnızca DROP EXTENSION (down -all) için gerekir.
 \set ON_ERROR_STOP on
@@ -132,6 +133,18 @@ BEGIN
     LOOP
         EXECUTE stmt; -- idempotent; listed once below
     END LOOP;
+    -- The old owner's default privileges go: they would stay in the
+    -- database, pg_dump writes them out, and restoring the dump as the new
+    -- owner fails ("permission denied to change default privileges").
+    FOR r IN
+        SELECT d.defaclobjtype AS kind FROM pg_default_acl d
+        WHERE pg_get_userbyid(d.defaclrole) = v_from
+          AND d.defaclnamespace = 'public'::regnamespace
+    LOOP
+        stmt := format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA public REVOKE ALL ON %s FROM hakan_rls_app, hakan_rls_worker, hakan_rls_runtime',
+            v_from, CASE r.kind WHEN 'r' THEN 'TABLES' WHEN 'S' THEN 'SEQUENCES' WHEN 'f' THEN 'FUNCTIONS' WHEN 'T' THEN 'TYPES' ELSE 'SCHEMAS' END);
+        RAISE NOTICE '%', stmt; EXECUTE stmt; n := n + 1;
+    END LOOP;
     RAISE NOTICE 'db-owner: % object(s) moved from % to %; default privileges set for %', n, v_from, v_to, v_to;
 END
 $$;
@@ -154,6 +167,11 @@ BEGIN
     FROM pg_policies p WHERE p.schemaname = 'public' AND v_from = ANY (p.roles);
     IF left_over IS NOT NULL THEN
         RAISE EXCEPTION 'db-owner: policies still for %: %', v_from, left_over;
+    END IF;
+    SELECT string_agg(d.defaclobjtype::text, ', ') INTO left_over
+    FROM pg_default_acl d WHERE pg_get_userbyid(d.defaclrole) = v_from AND d.defaclnamespace = 'public'::regnamespace;
+    IF left_over IS NOT NULL THEN
+        RAISE EXCEPTION 'db-owner: default privileges still for %: %', v_from, left_over;
     END IF;
     -- Every forced table answers to the new owner inside rls.System.
     SELECT string_agg(c.relname, ', ') INTO missing
