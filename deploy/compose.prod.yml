@@ -1,0 +1,18 @@
+# Production stack on a plain Docker host (no Dokploy): the app stack of
+# ../compose.prod.yml plus a Caddy reverse proxy with automatic HTTPS.
+#
+#   scripts/prod-env.sh init                         # once: .env.server (secrets generated)
+#   docker compose -f deploy/compose.prod.yml up -d  # pull images, migrate, start
+#
+# Values come from ../.env.server (deploy/env/schema), then plain-host.env.
+# The migrate service runs the migrations once per deploy; backend and worker
+# start only after it succeeds. Steps and rollback: docs/deploy.md.
+# On Dokploy use ../compose.prod.yml directly (Traefik is the proxy there).
+# Needs Docker Compose 2.20+ (include).
+name: ${COMPOSE_PROJECT_NAME:-${NAME_PREFIX:-hakan}-prod}
+
+include:
+  - path: ../compose.prod.yml
+    env_file: [../.env.server, plain-host.env]
+  - path: proxy.yml
+    env_file: [../.env.server, plain-host.env]

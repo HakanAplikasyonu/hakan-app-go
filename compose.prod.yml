@@ -474,6 +474,8 @@ networks:
   app:
     name: ${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}
     driver: bridge
+  # Dokploy's shared proxy network (external). deploy/compose.prod.yml sets
+  # PROXY_NETWORK_EXTERNAL=false so a plain host without Dokploy creates it.
   dokploy-network:
-    name: dokploy-network
-    external: true
+    name: ${PROXY_NETWORK_NAME:-dokploy-network}
+    external: ${PROXY_NETWORK_EXTERNAL:-true}

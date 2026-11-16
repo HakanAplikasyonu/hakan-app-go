@@ -114,7 +114,8 @@ jobs:
               # Order matters: first match wins (case globs, * spans '/').
               case "$file" in
                 docs/*|*.md|.github/*)              : ;;   # nothing (before app dirs: backend/*.md is docs)
-                compose.prod.yml|deploy/*)          infra=true ;;
+                compose.prod.yml|deploy/*|scripts/prod-smoke.sh|scripts/prod-env.sh)
+                                                    infra=true ;;
                 */Dockerfile|Dockerfile)            infra=true ;;
                 # Image-shaping files outside the Dockerfile: the build loop
                 # (backend/cmd), the entrypoint, and the dependency manifests.
@@ -389,6 +390,46 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.image.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.service }}
+
+  # Production stack on an empty runner (#177, docs/deploy.md): build both
+  # images locally (no push), then scripts/prod-smoke.sh brings up
+  # deploy/compose.prod.yml (Postgres, Redis, SeaweedFS, Meilisearch,
+  # Centrifugo, migrate, backend, worker, frontend, Caddy) with throwaway
+  # secrets and checks migrations, /readyz and proxy -> frontend -> API.
+  # Same trigger as image-build; no registry login, no repository secrets.
+  prod-smoke:
+    needs: changes
+    if: >-
+      ( github.event_name != 'push' || github.ref != 'refs/heads/main' ) &&
+      ( needs.changes.outputs.infra == 'true' || needs.changes.outputs.full == 'true' )
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image (load, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          file: backend/Dockerfile
+          load: true
+          push: false
+          tags: local/hakan-backend:main
+          build-args: |
+            VERSION=smoke-${{ github.sha }}
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=backend
+      - name: Build frontend image (load, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          file: frontend/Dockerfile
+          load: true
+          push: false
+          tags: local/hakan-frontend:main
+          cache-from: type=gha,scope=frontend
+      - name: Smoke test deploy/compose.prod.yml
+        run: scripts/prod-smoke.sh
 
   # Main push: decide the release ONCE, before any image is built, so every
   # image bakes the same provenance and release-tag cuts exactly this version.
@@ -746,7 +787,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, mobile, desktop, image-build, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, mobile, desktop, image-build, prod-smoke, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

@@ -1,0 +1,33 @@
+# Reverse proxy (Caddy) for a plain Docker host. Loaded only by
+# deploy/compose.prod.yml; on Dokploy, Traefik routes to frontend/centrifugo
+# and this file is unused. Routes: deploy/caddy/Caddyfile.
+services:
+  proxy:
+    image: caddy:2.10-alpine
+    container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-proxy
+    restart: unless-stopped
+    environment:
+      PROXY_APP_SITE: ${PROXY_APP_SITE:?PROXY_APP_SITE is required}
+      PROXY_REALTIME_SITE: ${PROXY_REALTIME_SITE:?PROXY_REALTIME_SITE is required}
+      APP_NETWORK: ${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      centrifugo:
+        condition: service_healthy
+    networks:
+      - app
+
+volumes:
+  # Certificates live here: keep it across redeploys (Let's Encrypt rate limits).
+  caddy_data:
+    name: ${CADDY_DATA_VOLUME_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod-caddy-data}
+  caddy_config:
+    name: ${CADDY_CONFIG_VOLUME_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod-caddy-config}
