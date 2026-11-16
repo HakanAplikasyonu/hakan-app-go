@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -61,6 +62,7 @@ import (
 	oauthprovidermodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider"
 	oauthproviderhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/handler"
 	oauthproviderusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/usecase"
+	invoiceoffice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/office"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
@@ -383,6 +385,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// Kilitli döneme gelen fatura değiştirilmez, değişiklik talebi olur (#32).
 	ublSvc := invoiceupload.New(deps.DB, deps.Storage, ublEnq, log).WithPeriodGuard(periodsrepository.NewGuard())
 	invoiceupload.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceupload.NewHandler(ublSvc))
+	// Ofis paneli fatura listesi ve detayı (#142).
+	var ublDownload invoiceoffice.Downloader
+	if deps.Storage != nil {
+		ublDownload = func(r *http.Request, path string) (io.ReadCloser, int64, error) {
+			return deps.Storage.Download(r.Context(), path)
+		}
+	}
+	invoiceoffice.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceoffice.NewHandler(deps.Queries, ublDownload))
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/view"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -65,26 +66,7 @@ func mount(mux *http.ServeMux, h *Handler, mws ...func(http.Handler) http.Handle
 }
 
 // Invoice is the panel's invoice row. Amounts are decimal strings.
-type Invoice struct {
-	UUID             uuid.UUID `json:"uuid"`
-	ETTN             string    `json:"ettn,omitempty"`
-	InvoiceNumber    string    `json:"invoice_number"`
-	Direction        string    `json:"direction"`
-	Type             string    `json:"type"`
-	Profile          string    `json:"profile,omitempty"`
-	IssueDate        string    `json:"issue_date"`
-	Period           string    `json:"period"`
-	CounterpartyName string    `json:"counterparty_name,omitempty"`
-	CounterpartyID   string    `json:"counterparty_tax_id,omitempty"`
-	Currency         string    `json:"currency"`
-	TaxExclusive     string    `json:"tax_exclusive_amount"`
-	TaxAmount        string    `json:"tax_amount"`
-	Withholding      string    `json:"withholding_amount"`
-	Payable          string    `json:"payable_amount"`
-	Status           string    `json:"status"`
-	SourceSystem     string    `json:"source_system"`
-	CaptureMethod    string    `json:"capture_method"`
-}
+type Invoice = view.Invoice
 
 type invoicePage struct {
 	Items  []Invoice `json:"items"`
@@ -129,41 +111,7 @@ func (h *Handler) listInvoices(w http.ResponseWriter, r *http.Request) {
 }
 
 // InvoiceDetail is one invoice with lines, KDV summary and sources.
-type InvoiceDetail struct {
-	Invoice
-	Notes      string          `json:"notes,omitempty"`
-	Items      []InvoiceItem   `json:"items"`
-	TaxSummary []TaxSummaryRow `json:"tax_summary"`
-	Sources    []Source        `json:"sources"`
-}
-
-// InvoiceItem is one line.
-type InvoiceItem struct {
-	LineNo       int32  `json:"line_no"`
-	Name         string `json:"name"`
-	Quantity     string `json:"quantity"`
-	UnitCode     string `json:"unit_code,omitempty"`
-	UnitPrice    string `json:"unit_price"`
-	TaxRate      string `json:"tax_rate"`
-	TaxExclusive string `json:"tax_exclusive_amount"`
-	TaxAmount    string `json:"tax_amount"`
-}
-
-// TaxSummaryRow is one KDV rate.
-type TaxSummaryRow struct {
-	TaxRate     string `json:"tax_rate"`
-	Base        string `json:"base"`
-	VAT         string `json:"vat"`
-	Withholding string `json:"withholding"`
-}
-
-// Source is where the invoice came from.
-type Source struct {
-	SourceSystem  string    `json:"source_system"`
-	CaptureMethod string    `json:"capture_method"`
-	MatchRule     string    `json:"match_rule"`
-	FirstSeenAt   time.Time `json:"first_seen_at"`
-}
+type InvoiceDetail = view.Detail
 
 func (h *Handler) getInvoice(w http.ResponseWriter, r *http.Request) {
 	s := taxpayerctx.Must(r.Context())
@@ -182,44 +130,10 @@ func (h *Handler) getInvoice(w http.ResponseWriter, r *http.Request) {
 		response.InternalErr(w, r, err, "could not load invoice")
 		return
 	}
-	items, err := h.q.ListInvoiceItems(ctx, db.ListInvoiceItemsParams{TaxpayerID: s.ID, InvoiceID: inv.ID})
+	out, err := view.LoadDetail(ctx, h.q, inv)
 	if err != nil {
-		response.InternalErr(w, r, err, "could not load invoice lines")
+		response.InternalErr(w, r, err, "could not load invoice details")
 		return
-	}
-	sums, err := h.q.ListInvoiceTaxSummaries(ctx, db.ListInvoiceTaxSummariesParams{TaxpayerID: s.ID, InvoiceID: inv.ID})
-	if err != nil {
-		response.InternalErr(w, r, err, "could not load tax summary")
-		return
-	}
-	srcs, err := h.q.ListInvoiceSources(ctx, db.ListInvoiceSourcesParams{TaxpayerID: s.ID, InvoiceID: inv.ID})
-	if err != nil {
-		response.InternalErr(w, r, err, "could not load sources")
-		return
-	}
-	out := InvoiceDetail{
-		Invoice: Invoice{
-			UUID: inv.Uuid, ETTN: uuidText(inv.Ettn), InvoiceNumber: inv.InvoiceNumber, Direction: inv.Direction, Type: inv.Type,
-			Profile: inv.Profile.String, IssueDate: inv.IssueDate.Time.Format("2006-01-02"), Period: inv.Period,
-			CounterpartyName: inv.CustomerName.String, CounterpartyID: firstNonEmpty(inv.CustomerTaxNumber.String, inv.CustomerIdentityNumber.String),
-			Currency: inv.Currency, TaxExclusive: money(inv.TaxExclusiveAmount), TaxAmount: money(inv.TaxAmount),
-			Withholding: money(inv.WithholdingAmount), Payable: money(inv.PayableAmount),
-			Status: inv.StatusNormalized, SourceSystem: inv.SourceSystem, CaptureMethod: inv.CaptureMethod,
-		},
-		Notes: inv.Notes.String, Items: []InvoiceItem{}, TaxSummary: []TaxSummaryRow{}, Sources: []Source{},
-	}
-	for _, it := range items {
-		out.Items = append(out.Items, InvoiceItem{
-			LineNo: it.LineNo, Name: it.Name, Quantity: repository.Dec(it.Quantity).String(), UnitCode: it.UnitCode.String,
-			UnitPrice: repository.Dec(it.UnitPrice).String(), TaxRate: repository.Dec(it.TaxRate).String(),
-			TaxExclusive: money(it.TaxExclusiveAmount), TaxAmount: money(it.TotalTaxAmount),
-		})
-	}
-	for _, t := range sums {
-		out.TaxSummary = append(out.TaxSummary, TaxSummaryRow{TaxRate: repository.Dec(t.TaxRate).String(), Base: money(t.Base), VAT: money(t.Vat), Withholding: money(t.Withholding)})
-	}
-	for _, src := range srcs {
-		out.Sources = append(out.Sources, Source{SourceSystem: src.SourceSystem, CaptureMethod: src.CaptureMethod, MatchRule: src.MatchRule, FirstSeenAt: src.FirstSeenAt.Time})
 	}
 	response.JSON(w, r, http.StatusOK, out)
 }

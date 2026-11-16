@@ -2,111 +2,162 @@
 
 import { FileUp, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 
+import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-import { useOffice, useOfficeActions } from "../hooks/use-office";
-import { severityOf } from "../lib/warnings";
-import type { UploadFileResult, UploadReport } from "../types";
 import {
-  DemoNotice,
-  FilterSelect,
-  Figure,
-  OfficeDataGate,
-  Panel,
-  SeverityBadge,
-  TableBox,
-} from "./office-ui";
+  useCreateUBLUploads,
+  useUBLUpload,
+  useUBLUploads,
+} from "../hooks/use-office-invoices";
+import { severityOf } from "../lib/warnings";
+import type {
+  UBLUploadItem,
+  UBLUploadJob,
+} from "../services/office-invoices.service";
+import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import { Figure, Panel, SeverityBadge, TableBox } from "./office-ui";
 
-const outcomeClass: Record<UploadFileResult["outcome"], string> = {
-  imported: "bg-status-approved/12 text-status-approved",
+const itemClass: Record<UBLUploadItem["status"], string> = {
+  added: "bg-status-approved/12 text-status-approved",
   duplicate: "bg-secondary text-secondary-foreground",
-  not_ubl: "bg-status-warning/12 text-status-warning",
-  error: "bg-status-blocking/12 text-status-blocking",
+  failed: "bg-status-blocking/12 text-status-blocking",
 };
 
-function ReportTable({ report }: { report: UploadReport }) {
+const jobClass: Record<UBLUploadJob["status"], string> = {
+  queued: "bg-secondary text-secondary-foreground",
+  processing: "bg-status-review/12 text-status-review",
+  done: "bg-status-approved/12 text-status-approved",
+  failed: "bg-status-blocking/12 text-status-blocking",
+};
+
+function JobStatus({ status }: { status: UBLUploadJob["status"] }) {
+  const { t } = useLocale();
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
+        jobClass[status],
+      )}
+    >
+      {status === "queued" || status === "processing" ? (
+        <Loader2 className="size-3 animate-spin" aria-hidden />
+      ) : null}
+      {t(`office.api.upload_status_${status}`)}
+    </span>
+  );
+}
+
+function JobReport({
+  engagement,
+  jobId,
+}: {
+  engagement: string;
+  jobId: string;
+}) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const count = (o: UploadFileResult["outcome"]) =>
-    report.files.filter((f) => f.outcome === o).length;
+  const { data: job } = useUBLUpload(slug, engagement, jobId);
+  if (!job) return <Skeleton className="h-24 w-full" />;
+  const items = job.report?.items ?? [];
   return (
     <Panel
-      title={t("office.upload_report_title")}
-      description={t("office.upload_report_summary", {
-        imported: count("imported"),
-        duplicate: count("duplicate"),
-        skipped: count("not_ubl") + count("error"),
-        warnings: report.files.reduce((n, f) => n + f.warningCodes.length, 0),
-      })}
+      title={`${t("office.upload_report_title")} · ${job.file_name}`}
+      description={
+        job.report
+          ? t("office.api.upload_report_summary", {
+              added: job.report.added,
+              duplicate: job.report.duplicate,
+              failed: job.report.failed,
+            })
+          : undefined
+      }
+      actions={<JobStatus status={job.status} />}
     >
-      <TableBox>
-        <thead>
-          <tr>
-            <th>{t("office.col_file")}</th>
-            <th>{t("office.col_result")}</th>
-            <th>{t("office.col_number")}</th>
-            <th>{t("office.col_warnings")}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {report.files.map((f, i) => (
-            <tr key={i}>
-              <td className="max-w-80 truncate">
-                <Figure className="text-xs">{f.fileName}</Figure>
-              </td>
-              <td>
-                <span
-                  className={cn(
-                    "rounded-md px-2 py-0.5 text-xs font-medium",
-                    outcomeClass[f.outcome],
-                  )}
-                >
-                  {t(`office.outcome_${f.outcome}`)}
-                </span>
-              </td>
-              <td>
-                {f.invoiceId ? (
-                  <Link
-                    className="hover:underline"
-                    href={routes.tenant.invoice(slug, f.invoiceId)}
-                  >
-                    <Figure>{f.number}</Figure>
-                  </Link>
-                ) : (
-                  "—"
-                )}
-                {f.ettn ? (
-                  <Figure className="text-muted-foreground block text-[11px]">
-                    {f.ettn}
-                  </Figure>
-                ) : null}
-              </td>
-              <td>
-                <div className="flex flex-wrap gap-1">
-                  {f.warningCodes.length
-                    ? f.warningCodes.map((c) => (
-                        <span
-                          key={c}
-                          className="inline-flex items-center gap-1"
-                        >
-                          <SeverityBadge severity={severityOf(c)} />
-                          <Figure className="text-xs">{c}</Figure>
-                        </span>
-                      ))
-                    : "—"}
-                </div>
-              </td>
+      {job.error ? (
+        <p className="text-status-blocking px-4 py-3 text-sm">{job.error}</p>
+      ) : null}
+      {items.length ? (
+        <TableBox>
+          <thead>
+            <tr>
+              <th>{t("office.col_file")}</th>
+              <th>{t("office.col_result")}</th>
+              <th>{t("office.col_number")}</th>
+              <th>{t("office.col_warnings")}</th>
             </tr>
-          ))}
-        </tbody>
-      </TableBox>
+          </thead>
+          <tbody>
+            {items.map((f, i) => (
+              <tr key={i}>
+                <td className="max-w-80 truncate">
+                  <Figure className="text-xs">{f.name}</Figure>
+                </td>
+                <td>
+                  <span
+                    className={cn(
+                      "rounded-md px-2 py-0.5 text-xs font-medium",
+                      itemClass[f.status],
+                    )}
+                  >
+                    {t(`office.api.item_${f.status}`)}
+                  </span>
+                  {f.error ? (
+                    <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                      {f.error_code ? `${f.error_code}: ` : ""}
+                      {f.error}
+                    </span>
+                  ) : null}
+                </td>
+                <td>
+                  {f.invoice_uuid ? (
+                    <Link
+                      className="hover:underline"
+                      href={routes.tenant.invoice(
+                        slug,
+                        f.invoice_uuid,
+                        engagement,
+                      )}
+                    >
+                      <Figure>{f.invoice_number ?? f.invoice_uuid}</Figure>
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                  {f.ettn ? (
+                    <Figure className="text-muted-foreground block text-[11px]">
+                      {f.ettn}
+                    </Figure>
+                  ) : null}
+                </td>
+                <td>
+                  <div className="flex flex-wrap gap-1">
+                    {f.warnings?.length
+                      ? f.warnings.map((c) => (
+                          <span
+                            key={c}
+                            className="inline-flex items-center gap-1"
+                          >
+                            <SeverityBadge severity={severityOf(c)} />
+                            <Figure className="text-xs">{c}</Figure>
+                          </span>
+                        ))
+                      : "—"}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </TableBox>
+      ) : null}
     </Panel>
   );
 }
@@ -114,14 +165,14 @@ function ReportTable({ report }: { report: UploadReport }) {
 function UploadInner() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
-  const taxpayers = useOffice((s) => s.taxpayers);
-  const uploads = useOffice((s) => s.uploads);
-  const { importFiles } = useOfficeActions();
-  const [taxpayer, setTaxpayer] = useState(taxpayers[0]?.id ?? "");
+  const { options, selected, select, isLoading, isError } =
+    useSelectedEngagement(slug);
+  const engagement = selected?.engagement ?? "";
+  const uploads = useUBLUploads(slug, engagement);
+  const create = useCreateUBLUploads(slug, engagement);
   const [files, setFiles] = useState<File[]>([]);
-  const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [last, setLast] = useState<UploadReport | null>(null);
+  const [shown, setShown] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const accept = (list: FileList | null) => {
@@ -129,36 +180,60 @@ function UploadInner() {
     setFiles(Array.from(list).filter((f) => /\.(xml|zip)$/i.test(f.name)));
   };
 
-  const run = async () => {
-    if (!taxpayer || files.length === 0) return;
-    setBusy(true);
-    try {
-      setLast(await importFiles(taxpayer, files));
-      setFiles([]);
-      if (input.current) input.current.value = "";
-    } finally {
-      setBusy(false);
-    }
+  const run = () => {
+    if (!engagement || files.length === 0) return;
+    create.mutate(files, {
+      onSuccess: (jobs) => {
+        setFiles([]);
+        if (input.current) input.current.value = "";
+        if (jobs.length) setShown(jobs[jobs.length - 1].uuid);
+      },
+    });
   };
 
+  const header = (
+    <PageHeader
+      title={t("office.upload_title")}
+      description={t("office.upload_description")}
+      icon={<Upload className="size-6" />}
+    />
+  );
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <Skeleton className="h-48 w-full" />
+      </div>
+    );
+  }
+  if (isError || options.length === 0) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <EmptyState
+          title={
+            isError
+              ? t("office.api.load_error")
+              : t("office.api.no_engagements")
+          }
+        />
+      </div>
+    );
+  }
+
+  const jobs = uploads.data?.items ?? [];
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t("office.upload_title")}
-        description={t("office.upload_description")}
-        icon={<Upload className="size-6" />}
-      />
-      <DemoNotice />
+      {header}
       <Panel>
         <div className="space-y-4 p-4">
-          <FilterSelect
-            label={t("office.col_taxpayer")}
-            value={taxpayer}
-            onChange={setTaxpayer}
-            options={taxpayers.map((x) => ({
-              value: x.id,
-              label: `${x.title} · ${x.taxId}`,
-            }))}
+          <EngagementPicker
+            options={options}
+            selected={selected}
+            onSelect={(v) => {
+              setShown(null);
+              select(v);
+            }}
           />
           <label
             onDragOver={(e) => {
@@ -203,12 +278,19 @@ function UploadInner() {
               ))}
             </ul>
           ) : null}
+          {create.isError ? (
+            <p className="text-status-blocking text-sm">
+              {create.error instanceof Error
+                ? create.error.message
+                : t("office.api.upload_failed")}
+            </p>
+          ) : null}
           <div className="flex justify-end">
             <Button
               onClick={run}
-              disabled={busy || !taxpayer || files.length === 0}
+              disabled={create.isPending || !engagement || files.length === 0}
             >
-              {busy ? (
+              {create.isPending ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
                 <Upload className="size-4" />
@@ -219,33 +301,39 @@ function UploadInner() {
         </div>
       </Panel>
 
-      {last ? <ReportTable report={last} /> : null}
+      {shown ? <JobReport engagement={engagement} jobId={shown} /> : null}
 
-      {uploads.length ? (
-        <Panel title={t("office.upload_history")}>
+      {jobs.length ? (
+        <Panel title={t("office.api.upload_jobs_title")}>
           <ul className="divide-y text-sm">
-            {uploads.map((u) => (
+            {jobs.map((j) => (
               <li
-                key={u.id}
+                key={j.uuid}
                 className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
               >
-                <span>
-                  {taxpayers.find((x) => x.id === u.taxpayerId)?.title}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {t("office.upload_history_row", {
-                    files: u.files.length,
-                    imported: u.files.filter((f) => f.outcome === "imported")
-                      .length,
-                  })}{" "}
-                  ·{" "}
+                <Figure className="max-w-80 truncate text-xs">
+                  {j.file_name}
+                </Figure>
+                <span className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <JobStatus status={j.status} />
+                  {j.report
+                    ? t("office.api.upload_report_summary", {
+                        added: j.report.added,
+                        duplicate: j.report.duplicate,
+                        failed: j.report.failed,
+                      })
+                    : null}
                   <Figure>
-                    {new Date(u.createdAt).toLocaleString(
+                    {new Date(j.created_at).toLocaleString(
                       locale === "tr" ? "tr-TR" : "en-GB",
                     )}
                   </Figure>
                 </span>
-                <Button variant="ghost" size="sm" onClick={() => setLast(u)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShown(j.uuid)}
+                >
                   {t("office.upload_show_report")}
                 </Button>
               </li>
@@ -255,10 +343,10 @@ function UploadInner() {
       ) : null}
 
       <p className="text-muted-foreground text-xs">
-        {t("office.upload_footnote")}{" "}
+        {t("office.api.upload_footnote")}{" "}
         <Link
           className="text-brand hover:underline"
-          href={routes.tenant.invoices(slug)}
+          href={`${routes.tenant.invoices(slug)}?taxpayer=${encodeURIComponent(engagement)}`}
         >
           {t("office.nav_invoices")}
         </Link>
@@ -269,8 +357,8 @@ function UploadInner() {
 
 export function UploadPage() {
   return (
-    <OfficeDataGate>
+    <Suspense fallback={<Skeleton className="h-48 w-full" />}>
       <UploadInner />
-    </OfficeDataGate>
+    </Suspense>
   );
 }

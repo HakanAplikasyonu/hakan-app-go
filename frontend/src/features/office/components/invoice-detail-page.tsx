@@ -2,31 +2,37 @@
 
 import { ArrowLeft, FileText } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 
-import { formatAmount } from "../lib/decimal";
-import { useOffice } from "../hooks/use-office";
-import { AmountWaterfall } from "./amount-waterfall";
-import { InvoicePreview } from "./invoice-preview";
 import {
-  DemoNotice,
+  useEngagementInvoice,
+  useEngagementOptions,
+  useInvoiceUBL,
+} from "../hooks/use-office-invoices";
+import { formatAmount } from "../lib/decimal";
+import { toPanelInvoice } from "../lib/from-api";
+import { AmountWaterfall } from "./amount-waterfall";
+import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { InvoicePreview } from "./invoice-preview";
+import { InvoiceStateBadge } from "./invoices-page";
+import {
   Figure,
-  InvoiceStatusBadge,
   Money,
-  OfficeDataGate,
   Panel,
   SeverityBadge,
   TableBox,
   WarningStatusLabel,
   useWarningText,
 } from "./office-ui";
-import { WarningActions } from "./warning-actions";
 
 function Field({
   label,
@@ -46,59 +52,57 @@ function Field({
 function InvoiceDetailInner({ id }: { id: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const invoice = useOffice((s) => s.invoices.find((i) => i.id === id));
-  const taxpayer = useOffice((s) =>
-    s.taxpayers.find((x) => x.id === invoice?.taxpayerId),
-  );
-  const allWarnings = useOffice((s) => s.warnings);
-  const allSuggestions = useOffice((s) => s.suggestions);
+  const engagement = useSearchParams().get(ENGAGEMENT_PARAM) ?? "";
+  const detail = useEngagementInvoice(slug, engagement, id);
+  const ubl = useInvoiceUBL(slug, engagement, id, !!detail.data?.has_ubl);
+  const { options } = useEngagementOptions(slug);
+  const taxpayer = options.find((o) => o.engagement === engagement);
   const warningText = useWarningText();
+  const backHref = `${routes.tenant.invoices(slug)}${engagement ? `?${ENGAGEMENT_PARAM}=${encodeURIComponent(engagement)}` : ""}`;
 
-  if (!invoice) {
+  const invoice = useMemo(
+    () =>
+      detail.data ? toPanelInvoice(detail.data, engagement, ubl.data) : null,
+    [detail.data, engagement, ubl.data],
+  );
+
+  if (detail.isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  if (!engagement || !detail.data || !invoice) {
     return (
       <EmptyState
         title={t("office.invoice_not_found")}
         action={
           <Button asChild variant="outline">
-            <Link href={routes.tenant.invoices(slug)}>
-              {t("office.back_to_invoices")}
-            </Link>
+            <Link href={backHref}>{t("office.back_to_invoices")}</Link>
           </Button>
         }
       />
     );
   }
-  const warnings = allWarnings.filter((w) => w.entityId === invoice.id);
-  const suggestions = allSuggestions.filter((s) => s.invoiceId === invoice.id);
-  const pendingCount = suggestions.filter((s) => s.status === "pending").length;
+  const d = detail.data;
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title={invoice.number}
-        description={`${invoice.counterparty.title} · ${taxpayer?.title ?? ""}`}
+        title={d.invoice_number}
+        description={`${d.counterparty_name ?? ""} · ${taxpayer?.title ?? ""}`}
         icon={<FileText className="size-6" />}
         breadcrumbs={[
-          {
-            label: t("office.nav_invoices"),
-            href: routes.tenant.invoices(slug),
-          },
-          { label: invoice.number },
+          { label: t("office.nav_invoices"), href: backHref },
+          { label: d.invoice_number },
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <InvoiceStatusBadge status={invoice.status} />
-            {pendingCount ? (
-              <Button asChild size="sm">
-                <Link
-                  href={`${routes.tenant.review(slug)}?invoice=${invoice.id}`}
-                >
-                  {t("office.review_this_invoice", { count: pendingCount })}
-                </Link>
-              </Button>
-            ) : null}
+            <InvoiceStateBadge status={d.status} />
             <Button asChild size="sm" variant="ghost">
-              <Link href={routes.tenant.invoices(slug)}>
+              <Link href={backHref}>
                 <ArrowLeft className="size-4" />
                 {t("office.back_to_invoices")}
               </Link>
@@ -106,59 +110,73 @@ function InvoiceDetailInner({ id }: { id: string }) {
           </div>
         }
       />
-      <DemoNotice />
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
           <Panel title={t("office.invoice_info")}>
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 sm:grid-cols-3">
               <Field label="ETTN">
-                <Figure className="text-xs">{invoice.ettn}</Figure>
+                <Figure className="text-xs">{d.ettn ?? "—"}</Figure>
               </Field>
               <Field label={t("office.col_date")}>
-                <Figure>{invoice.issueDate}</Figure>
+                <Figure>{d.issue_date}</Figure>
               </Field>
               <Field label={t("office.col_direction")}>
                 {t(`office.direction_${invoice.direction}`)}
               </Field>
               <Field label={t("office.col_type")}>
-                {invoice.profile} · {invoice.typeCode}
+                {d.profile ? `${d.profile} · ` : ""}
+                {d.type}
               </Field>
               <Field label={t("office.col_counterparty")}>
-                {invoice.counterparty.title}
+                {d.counterparty_name ?? "—"}
               </Field>
               <Field
                 label={
-                  invoice.counterparty.taxId.length === 11 ? "TCKN" : "VKN"
+                  (d.counterparty_tax_id ?? "").length === 11 ? "TCKN" : "VKN"
                 }
               >
-                <Figure>{invoice.counterparty.taxId || "—"}</Figure>
+                <Figure>{d.counterparty_tax_id || "—"}</Figure>
               </Field>
               <Field label={t("office.col_currency")}>
-                <Figure>
-                  {invoice.currency}
-                  {invoice.exchangeRate ? ` · ${invoice.exchangeRate}` : ""}
-                </Figure>
+                <Figure>{d.currency}</Figure>
               </Field>
               <Field label={t("office.col_source")}>
-                {t(`office.source_${invoice.source}`)}
+                {d.sources.length
+                  ? d.sources.map((s) => s.source_system).join(", ")
+                  : d.source_system}
+              </Field>
+              <Field label={t("office.api.col_period")}>
+                <Figure>{d.period}</Figure>
               </Field>
             </dl>
           </Panel>
 
           <Panel
             title={t("office.warnings_on_invoice")}
-            description={warnings.length ? undefined : t("office.no_warnings")}
+            description={
+              d.warnings.length ? undefined : t("office.no_warnings")
+            }
           >
-            {warnings.length ? (
+            {d.warnings.length ? (
               <ul className="divide-y">
-                {warnings.map((w) => (
+                {d.warnings.map((w) => (
                   <li
-                    key={w.id}
+                    key={w.uuid}
                     className="flex flex-wrap items-center gap-3 px-4 py-2.5"
                   >
                     <SeverityBadge severity={w.severity} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm">{warningText(w)}</div>
+                      <div className="text-sm">
+                        {warningText({
+                          code: w.code,
+                          params: Object.fromEntries(
+                            Object.entries(w.params ?? {}).map(([k, v]) => [
+                              k,
+                              String(v),
+                            ]),
+                          ),
+                        })}
+                      </div>
                       <div className="flex gap-2">
                         <Figure className="text-muted-foreground text-xs">
                           {w.code}
@@ -166,7 +184,6 @@ function InvoiceDetailInner({ id }: { id: string }) {
                         <WarningStatusLabel status={w.status} />
                       </div>
                     </div>
-                    <WarningActions warning={w} />
                   </li>
                 ))}
               </ul>
@@ -181,48 +198,25 @@ function InvoiceDetailInner({ id }: { id: string }) {
                   <th className="text-right">{t("office.col_quantity")}</th>
                   <th className="text-right">{t("office.col_line_total")}</th>
                   <th className="text-right">KDV</th>
-                  <th>{t("office.col_account")}</th>
                 </tr>
               </thead>
               <tbody>
-                {invoice.lines.map((l) => {
-                  const s = suggestions.find((x) => x.lineId === l.id);
-                  return (
-                    <tr key={l.id}>
-                      <td>{l.name}</td>
-                      <td className="text-right whitespace-nowrap">
-                        <Figure>
-                          {formatAmount(l.quantity)} {l.unit}
-                        </Figure>
-                      </td>
-                      <td className="text-right">
-                        <Money
-                          value={l.lineTotal}
-                          currency={invoice.currency}
-                        />
-                      </td>
-                      <td className="text-right">
-                        <Figure>%{l.vatPercent}</Figure>
-                      </td>
-                      <td>
-                        {l.accountCode ? (
-                          <Figure className="text-status-approved font-medium">
-                            {l.accountCode}
-                          </Figure>
-                        ) : s?.status === "pending" ? (
-                          <span className="dark:text-status-review text-xs text-amber-800">
-                            <Figure>{s.accountCode}</Figure> ·{" "}
-                            {t("office.suggestion_pending")}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">
-                            —
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {invoice.lines.map((l) => (
+                  <tr key={l.id}>
+                    <td>{l.name}</td>
+                    <td className="text-right whitespace-nowrap">
+                      <Figure>
+                        {formatAmount(l.quantity)} {l.unit}
+                      </Figure>
+                    </td>
+                    <td className="text-right">
+                      <Money value={l.lineTotal} currency={d.currency} />
+                    </td>
+                    <td className="text-right">
+                      <Figure>%{l.vatPercent}</Figure>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </TableBox>
           </Panel>
@@ -246,7 +240,7 @@ function InvoiceDetailInner({ id }: { id: string }) {
                     <Figure>%{tx.percent}</Figure>
                   </dt>
                   <dd>
-                    <Money value={tx.amount} currency={invoice.currency} />
+                    <Money value={tx.amount} currency={d.currency} />
                   </dd>
                 </div>
               ))}
@@ -255,19 +249,13 @@ function InvoiceDetailInner({ id }: { id: string }) {
                   {t("office.col_base")}
                 </dt>
                 <dd>
-                  <Money
-                    value={invoice.totals.taxExclusive}
-                    currency={invoice.currency}
-                  />
+                  <Money value={d.tax_exclusive_amount} currency={d.currency} />
                 </dd>
               </div>
               <div className="flex justify-between gap-4 font-semibold">
                 <dt>{t("office.col_payable")}</dt>
                 <dd>
-                  <Money
-                    value={invoice.totals.payable}
-                    currency={invoice.currency}
-                  />
+                  <Money value={d.payable_amount} currency={d.currency} />
                 </dd>
               </div>
             </dl>
@@ -278,7 +266,11 @@ function InvoiceDetailInner({ id }: { id: string }) {
           title={t("office.preview_title")}
           className="min-w-0 xl:sticky xl:top-4 xl:self-start"
         >
-          <InvoicePreview invoice={invoice} />
+          {d.has_ubl && ubl.isLoading ? (
+            <Skeleton className="m-4 h-96" />
+          ) : (
+            <InvoicePreview invoice={invoice} />
+          )}
         </Panel>
       </div>
     </div>
@@ -287,8 +279,8 @@ function InvoiceDetailInner({ id }: { id: string }) {
 
 export function InvoiceDetailPage({ id }: { id: string }) {
   return (
-    <OfficeDataGate>
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
       <InvoiceDetailInner id={id} />
-    </OfficeDataGate>
+    </Suspense>
   );
 }
