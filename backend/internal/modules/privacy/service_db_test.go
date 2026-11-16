@@ -263,7 +263,7 @@ func TestRejectAndScope(t *testing.T) {
 	}
 }
 
-// Approval is for office owners and admins only (migration 000078).
+// Approval is for office owners and admins only (migration 000079).
 func TestPermissionSeeds(t *testing.T) {
 	d := testdb.Open(t)
 	rows, err := d.Pool.Query(context.Background(), `
