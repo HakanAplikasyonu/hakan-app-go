@@ -51,5 +51,9 @@
   "back_to_login": "Back to sign in",
   "continue": "Continue",
   "area_requires": "This area requires {{area}} access.",
-  "codes.LEGAL_VERSION_OUTDATED": "The text has been updated. Please read the new version and accept it again."
+  "codes.LEGAL_VERSION_OUTDATED": "The text has been updated. Please read the new version and accept it again.",
+  "codes.IMPORT_NO_HEADER": "No header row was found. The first row must hold at least the VKN/TCKN and Unvan columns.",
+  "codes.IMPORT_TOO_LARGE": "The file is too large. A list may have at most 1000 rows.",
+  "codes.IMPORT_FILE_INVALID": "The file could not be read. Upload a valid .xlsx or .csv file.",
+  "codes.IMPORT_ALREADY_SENT": "The invitations of this list were already sent."
 }

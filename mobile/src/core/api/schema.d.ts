@@ -2944,6 +2944,136 @@ export interface paths {
         patch: operations["patchTenantSettings"];
         trace?: never;
     };
+    "/v1/tenant/setup": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office setup wizard state (#273)
+         * @description Requires `tenant.settings.read`. Every step is `pending`, `done` or
+         *     `skipped`; a new office has every step pending. `completed_at` is set
+         *     once no step is pending. The panel shows the wizard while it is null.
+         */
+        get: operations["getTenantSetup"];
+        /**
+         * Save the wizard state (#273)
+         * @description Requires `tenant.settings.write`. Replaces the state; steps left out
+         *     are pending. A step whose status changes gets `updated_at` now.
+         *     `accounting_program` is `luca` or `zirve`. Kept apart from
+         *     `/v1/tenant/settings`.
+         */
+        put: operations["putTenantSetup"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/taxpayer-imports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk taxpayer imports of the office (#273)
+         * @description Requires `tenant.engagements.read`. Newest first, without rows.
+         */
+        get: operations["listTaxpayerImports"];
+        put?: never;
+        /**
+         * Upload a taxpayer list (.xlsx or .csv) (#273)
+         * @description Requires `tenant.engagements.write`. The first row holding a tax id
+         *     column (VKN / TCKN) and a title column is the header; the other
+         *     recognised columns are tax office and contact e-mail (required). At
+         *     most 1000 rows. Each row is checked (tax id checksum, e-mail,
+         *     duplicates in the file) and reported; nothing is sent yet.
+         *     `422`: `IMPORT_NO_HEADER`, `IMPORT_TOO_LARGE`, `IMPORT_FILE_INVALID`.
+         */
+        post: operations["createTaxpayerImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/taxpayer-imports/{uuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One import with its rows and, once sent, the outcome (#273)
+         * @description Requires `tenant.engagements.read`.
+         */
+        get: operations["getTaxpayerImport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/taxpayer-imports/{uuid}/send": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite the import's taxpayers (#273)
+         * @description Requires `tenant.engagements.write`. Opens one add-taxpayer request
+         *     (consent e-mail, #7) per valid row; invalid rows are `skipped`. Once
+         *     per import: a second call is `409 IMPORT_ALREADY_SENT`. The outcome
+         *     is reported per row (`requested`, `skipped`, `failed`). At most 3
+         *     sends and 30 uploads per office every 15 minutes (`429`).
+         */
+        post: operations["sendTaxpayerImport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/ai/usage": {
         parameters: {
             query?: never;
@@ -8836,6 +8966,83 @@ export interface components {
             settings?: {
                 [key: string]: unknown;
             };
+        };
+        OfficeSetupStep: {
+            /** @enum {string} */
+            status: "pending" | "done" | "skipped";
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        OfficeSetupState: {
+            /** @description Keys are office, team, taxpayers, accounting, integrations, invites. */
+            steps?: {
+                [key: string]: components["schemas"]["OfficeSetupStep"];
+            };
+            /** @enum {string} */
+            accounting_program?: "luca" | "zirve";
+            /** Format: uuid */
+            import_uuid?: string;
+            /** Format: date-time */
+            completed_at?: string;
+        };
+        EnvelopeOfficeSetupState: {
+            /** @enum {boolean} */
+            success: true;
+            data: WithRequired<components["schemas"]["OfficeSetupState"], "steps">;
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TaxpayerImportRowError: {
+            field: string;
+            /** @example TAX_ID_INVALID */
+            code: string;
+            message: string;
+        };
+        TaxpayerImportRow: {
+            /** @description Row number in the file (1-based) */
+            row: number;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            tax_office: string;
+            contact_email: string;
+            errors: components["schemas"]["TaxpayerImportRowError"][];
+        };
+        TaxpayerImportOutcome: {
+            row: number;
+            /** @enum {string} */
+            status: "requested" | "skipped" | "failed";
+            /** Format: uuid */
+            request_uuid?: string;
+            error?: string;
+        };
+        TaxpayerImport: {
+            /** Format: uuid */
+            uuid: string;
+            file_name: string;
+            total: number;
+            valid: number;
+            invalid: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            rows?: components["schemas"]["TaxpayerImportRow"][];
+            outcome?: components["schemas"]["TaxpayerImportOutcome"][];
+        };
+        EnvelopeTaxpayerImport: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerImport"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerImportList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["TaxpayerImport"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         TenantOrganization: {
             /** Format: uuid */
@@ -17010,6 +17217,211 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantSetup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Wizard state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeSetupState"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putTenantSetup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OfficeSetupState"];
+            };
+        };
+        responses: {
+            /** @description Saved state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeSetupState"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerImports: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Imports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerImportList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTaxpayerImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored with its row report */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerImport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            /** @description `IMPORT_NO_HEADER`, `IMPORT_TOO_LARGE` or `IMPORT_FILE_INVALID` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerImport"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendTaxpayerImport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent, with the outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerImport"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getTenantAIUsage: {
         parameters: {
             query?: {
@@ -24425,3 +24837,6 @@ export interface operations {
         };
     };
 }
+type WithRequired<T, K extends keyof T> = T & {
+    [P in K]-?: T[P];
+};

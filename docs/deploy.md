@@ -201,6 +201,19 @@ SeaweedFS dosyaları sabit boyutlu birimlere (volume) yazar.
 
 - **Diski izleme:** `seaweedfs_data` biriminin bulunduğu diskin doluluğu sunucu izlemesinden takip edilmeli. Üretimde nesne deposu için ayrı disk önerilir.
 
+## Yeni ofis açma ve kurulum sihirbazı (#273)
+
+Pilot ofis platform yöneticisinin hesabıyla açılır. Betik sunucuya değil API'ye konuşur; yöneticinin bilgisayarından çalıştırılabilir (`curl` ve `jq` gerekir):
+
+```bash
+API_URL=https://api.ornek.test scripts/new-office.sh --name "Örnek Mali Müşavirlik" --slug ornek-smmm --owner-email sahip@ornek.test
+```
+
+- Yönetici e-postası ve parolası `ADMIN_EMAIL` / `ADMIN_PASSWORD` ortam değişkenlerinden okunur; yoksa betik sorar (parola gizli girilir, komut satırına ve kabuk geçmişine düşmez). Doğrulayıcı uygulaması açıksa kod `ADMIN_TOTP` ile verilir ya da sorulur.
+- Betik ofisi açar (`POST /v1/platform/organizations`) ve sahibi `owner` rolüyle davet eder. Yönetici yeni ofisin ilk sahibi olarak kalır; sahip katıldıktan sonra üyeler sayfasından çıkarılabilir.
+- Sahip daveti kabul edip ofise girdiğinde ana sayfada "Ofis kurulumunu tamamlayın" kartı görünür; sihirbaz `/t/<slug>/setup` adresindedir. Adımlar: ofis bilgileri, ekip davetleri, Excel / CSV'den mükellef listesi (satır satır doğrulama raporu), muhasebe programı (Luca / Zirve), entegratör bağlantıları (mükellef onayından sonra engagement sayfasından), mükelleflere toplu onay e-postası. Her adım atlanabilir; sihirbaz yarıda bırakılıp kaldığı yerden sürdürülür.
+- Liste en çok 1000 satır olabilir. Toplu davet her geçerli satır için normal mükellef ekleme talebini açar (onay e-postası, #7). Ofis başına 15 dakikada en çok 3 gönderim ve 30 yükleme yapılabilir.
+
 ## Geri alma
 
 1. `BACKEND_IMAGE` / `FRONTEND_IMAGE`'ı önceki `v0.N` etiketine çevir ve `up -d`.

@@ -4477,6 +4477,178 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/setup:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTenantSetup
+      summary: Office setup wizard state (#273)
+      description: |
+        Requires `tenant.settings.read`. Every step is `pending`, `done` or
+        `skipped`; a new office has every step pending. `completed_at` is set
+        once no step is pending. The panel shows the wizard while it is null.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Wizard state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeSetupState"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putTenantSetup
+      summary: Save the wizard state (#273)
+      description: |
+        Requires `tenant.settings.write`. Replaces the state; steps left out
+        are pending. A step whose status changes gets `updated_at` now.
+        `accounting_program` is `luca` or `zirve`. Kept apart from
+        `/v1/tenant/settings`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfficeSetupState"
+      responses:
+        "200":
+          description: Saved state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeSetupState"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/taxpayer-imports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listTaxpayerImports
+      summary: Bulk taxpayer imports of the office (#273)
+      description: Requires `tenant.engagements.read`. Newest first, without rows.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Imports
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerImportList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: createTaxpayerImport
+      summary: Upload a taxpayer list (.xlsx or .csv) (#273)
+      description: |
+        Requires `tenant.engagements.write`. The first row holding a tax id
+        column (VKN / TCKN) and a title column is the header; the other
+        recognised columns are tax office and contact e-mail (required). At
+        most 1000 rows. Each row is checked (tax id checksum, e-mail,
+        duplicates in the file) and reported; nothing is sent yet.
+        `422`: `IMPORT_NO_HEADER`, `IMPORT_TOO_LARGE`, `IMPORT_FILE_INVALID`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored with its row report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerImport"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "422":
+          description: "`IMPORT_NO_HEADER`, `IMPORT_TOO_LARGE` or `IMPORT_FILE_INVALID`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/taxpayer-imports/{uuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: uuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Tenant]
+      operationId: getTaxpayerImport
+      summary: One import with its rows and, once sent, the outcome (#273)
+      description: Requires `tenant.engagements.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Import
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerImport"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/taxpayer-imports/{uuid}/send:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: uuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Tenant]
+      operationId: sendTaxpayerImport
+      summary: Invite the import's taxpayers (#273)
+      description: |
+        Requires `tenant.engagements.write`. Opens one add-taxpayer request
+        (consent e-mail, #7) per valid row; invalid rows are `skipped`. Once
+        per import: a second call is `409 IMPORT_ALREADY_SENT`. The outcome
+        is reported per row (`requested`, `skipped`, `failed`). At most 3
+        sends and 30 uploads per office every 15 minutes (`429`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Sent, with the outcome
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxpayerImport"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/ai/usage:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -11835,6 +12007,100 @@ components:
         settings:
           type: object
           additionalProperties: true
+
+    OfficeSetupStep:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [pending, done, skipped] }
+        updated_at: { type: string, format: date-time }
+    OfficeSetupState:
+      type: object
+      additionalProperties: false
+      properties:
+        steps:
+          type: object
+          description: Keys are office, team, taxpayers, accounting, integrations, invites.
+          additionalProperties: { $ref: "#/components/schemas/OfficeSetupStep" }
+        accounting_program: { type: string, enum: [luca, zirve] }
+        import_uuid: { type: string, format: uuid }
+        completed_at: { type: string, format: date-time }
+    EnvelopeOfficeSetupState:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          allOf:
+            - $ref: "#/components/schemas/OfficeSetupState"
+          required: [steps]
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    TaxpayerImportRowError:
+      type: object
+      required: [field, code, message]
+      properties:
+        field: { type: string }
+        code: { type: string, example: TAX_ID_INVALID }
+        message: { type: string }
+    TaxpayerImportRow:
+      type: object
+      required: [row, kind, tax_id, title, tax_office, contact_email, errors]
+      properties:
+        row: { type: integer, description: Row number in the file (1-based) }
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string }
+        title: { type: string }
+        tax_office: { type: string }
+        contact_email: { type: string }
+        errors:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerImportRowError" }
+    TaxpayerImportOutcome:
+      type: object
+      required: [row, status]
+      properties:
+        row: { type: integer }
+        status: { type: string, enum: [requested, skipped, failed] }
+        request_uuid: { type: string, format: uuid }
+        error: { type: string }
+    TaxpayerImport:
+      type: object
+      required: [uuid, file_name, total, valid, invalid, created_at, sent_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        file_name: { type: string }
+        total: { type: integer }
+        valid: { type: integer }
+        invalid: { type: integer }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerImportRow" }
+        outcome:
+          type: array
+          items: { $ref: "#/components/schemas/TaxpayerImportOutcome" }
+    EnvelopeTaxpayerImport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerImport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeTaxpayerImportList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/TaxpayerImport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TenantOrganization:
       type: object

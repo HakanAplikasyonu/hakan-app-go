@@ -30,6 +30,7 @@ import enSearch from "@/locales/en/search.json";
 import enErrors from "@/locales/en/errors.json";
 import enRealtime from "@/locales/en/realtime.json";
 import enSettings from "@/locales/en/settings.json";
+import enSetup from "@/locales/en/setup.json";
 import enStepup from "@/locales/en/stepup.json";
 import enStorage from "@/locales/en/storage.json";
 import enTable from "@/locales/en/table.json";
@@ -66,6 +67,7 @@ import trSearch from "@/locales/tr/search.json";
 import trErrors from "@/locales/tr/errors.json";
 import trRealtime from "@/locales/tr/realtime.json";
 import trSettings from "@/locales/tr/settings.json";
+import trSetup from "@/locales/tr/setup.json";
 import trStepup from "@/locales/tr/stepup.json";
 import trStorage from "@/locales/tr/storage.json";
 import trTable from "@/locales/tr/table.json";
@@ -113,6 +115,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: trHelp,
     legal: trLegal,
     petitions: trPetitions,
+    setup: trSetup,
   },
   en: {
     common: enCommon,
@@ -151,6 +154,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: enHelp,
     legal: enLegal,
     petitions: enPetitions,
+    setup: enSetup,
   },
 };
 export function loadMessages(locale: AppLocale) {

@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/templates"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
@@ -229,9 +230,27 @@ func (s *Service) scheduleDeliver(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	_, err = s.queue.Enqueue(task, asynq.Queue(queue.QueueNotifications))
+	opts := []asynq.Option{asynq.Queue(queue.QueueNotifications), asynq.MaxRetry(deliverMaxRetry)}
+	if _, inTx := dbtx.Tx(ctx); inTx {
+		// The row is written in the caller's transaction (request scope,
+		// #166) and is invisible to the worker until it commits. Give the
+		// commit a head start; Deliver retries if it still loses the race.
+		opts = append(opts, asynq.ProcessIn(deliverAfterCommit))
+	}
+	_, err = s.queue.Enqueue(task, opts...)
 	return err
 }
+
+// ErrNotificationNotVisible: the deliver task ran before the transaction
+// that wrote the notification committed (or that transaction rolled back).
+// The task is retried; a rolled-back row never appears and the retries run
+// out.
+var ErrNotificationNotVisible = errors.New("notifications: notification not visible yet")
+
+const (
+	deliverMaxRetry    = 8
+	deliverAfterCommit = 2 * time.Second
+)
 
 const DefaultStuckProcessingMinutes int32 = 2
 
@@ -246,7 +265,9 @@ func (s *Service) Deliver(ctx context.Context, id int64) error {
 		existing, getErr := s.q.GetNotificationByID(ctx, id)
 		if getErr != nil {
 			if errors.Is(getErr, pgx.ErrNoRows) {
-				return nil
+				// Dropping it here lost e-mails written inside a request
+				// transaction that had not committed yet (#273).
+				return fmt.Errorf("%w: %d", ErrNotificationNotVisible, id)
 			}
 			return getErr
 		}

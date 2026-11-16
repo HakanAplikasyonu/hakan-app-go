@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officesetup"
 	"net/http"
 
 	accessmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access"
@@ -67,6 +68,7 @@ type moduleHandlers struct {
 	// accountrules: hesap kodu kural motoru (issue #25).
 	accountrules *accountruleshandler.Handler
 	vat          *vatforecasthandler.Handler
+	setup        *officesetup.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -97,6 +99,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
 		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
+		officesetup.Module{H: h.setup},
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
 	}
 }

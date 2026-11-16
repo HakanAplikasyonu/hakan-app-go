@@ -75,6 +75,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	officedashmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officesetup"
 	organizationsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations"
 	orghandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/handler"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
@@ -335,6 +336,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		taxpayerResolver   taxpayerctx.Resolver
 		memberHandler      *taxpayersmodule.MemberHandler
 		onboardingHandler  *taxpayersmodule.OnboardingHandler
+		importHandler      *taxpayersmodule.ImportHandler
 		historyHandler     *taxpayersmodule.HistoryHandler
 	)
 	if cfg.Tenancy.Enabled {
@@ -362,6 +364,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			taxpayersmodule.OnboardingConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
 		uc.SetInvitationGate(taxpayersmodule.ChainGates(orgSvc, members, onboarding))
 		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, limiter).WithNotice(legalSvc)
+		// Kurulum sihirbazı (issue #273): Excel'den toplu mükellef aktarımı.
+		importHandler = taxpayersmodule.NewImportHandler(taxpayersmodule.NewImporter(deps.DB, onboarding)).WithLimiter(limiter)
 		// Office change (issue #8): history shares and archive reads.
 		historyHandler = taxpayersmodule.NewHistoryHandler(taxpayersmodule.NewHistory(deps.DB).WithConsents(legalSvc))
 		tenantResolver = orgCache
@@ -473,6 +477,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		}, bankws.Options{EgressIPs: cfg.Bank.EgressIPs, TechContact: cfg.Bank.TechContact})))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)
 	taxpayersmodule.RegisterOnboardingRoutes(mux, tokens, loader, tenantResolver, taxpayerResolver, onboardingHandler)
+	taxpayersmodule.RegisterImportRoutes(mux, tokens, loader, tenantResolver, importHandler)
 	taxpayersmodule.RegisterHistoryRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, historyHandler)
 	// Mükellef web paneli (issue #39): faturalar, fişler, belge yükleme.
 	portalH := taxpayerportal.NewHandler(deps.Queries, ublSvc)
@@ -598,6 +603,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},
 		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
+		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

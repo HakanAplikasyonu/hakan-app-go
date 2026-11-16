@@ -6,6 +6,7 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 |---|---|---|
 | `tests/smoke.spec.ts` | Doğrulama raporundaki duman akışı (`docs/dogrulama-raporu.md` §2.2): ofis girişi, realtime ve KVKK uçları, mükellef ekleme ve onay, UBL yükle, öneri ve onay, banka eşleme ve uyarılar, dönem kilidi, yevmiye, Luca / Zirve indirme, mükellef paneli, tenant izolasyonu | Demo ofisi, Atlas Gıda |
 | `tests/office-onboarding.spec.ts` | Ofis ana akışı baştan sona | Her koşuda yeni ofis, sahip ve VKN |
+| `tests/setup-wizard.spec.ts` | Pilot ofis kurulumu (#273): `scripts/new-office.sh` ofisi açar ve sahibi davet eder; sihirbazda ofis bilgileri, ekip daveti, 200 satırlık mükellef listesi (3 hatalı satır raporlanır), yarıda bırakıp devam, Luca, entegratör adımı atlanır, 197 mükellefe toplu onay e-postası; 10 dakika sınırı | Her koşuda yeni ofis, sahip ve VKN'ler |
 | `tests/taxpayer-invite.spec.ts` | Mükellef paneli daveti: davet e-postası → kayıt → kabul; yalnızca kendi şirketini görür | Demo ofisi, Selin Yılmaz'a yeni çalışan |
 | `tests/a11y.spec.ts` | Erişilebilirlik (#194): misafir, ofis ve mükellef ana sayfalarında axe-core (WCAG 2.1 A/AA); kritik ve ciddi ihlal testi kırar. Komut paleti klavyeyle (Ctrl+K / Esc) | Yalnızca okur |
 | `tests/access.spec.ts` | Rol bazlı erişim reddi: giriş yapmamış kullanıcı, stajyer (roller, davet, ayar, platform, atanmadığı mükellef; arayüz ve API), mükellef kullanıcısının ofis paneli | Yalnızca okur |
