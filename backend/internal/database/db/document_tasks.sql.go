@@ -65,6 +65,28 @@ func (q *Queries) CloseResolvedDocumentTasks(ctx context.Context, arg CloseResol
 	return result.RowsAffected(), nil
 }
 
+const completeDocumentTask = `-- name: CompleteDocumentTask :execrows
+UPDATE document_tasks
+SET status = 'matched', matched_at = NOW(), next_reminder_at = NULL
+WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
+  AND status IN ('open', 'submitted')
+`
+
+type CompleteDocumentTaskParams struct {
+	OrganizationID int64     `json:"organization_id"`
+	EngagementID   int64     `json:"engagement_id"`
+	Uuid           uuid.UUID `json:"uuid"`
+}
+
+// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
+func (q *Queries) CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, completeDocumentTask, arg.OrganizationID, arg.EngagementID, arg.Uuid)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countDocumentTasks = `-- name: CountDocumentTasks :one
 SELECT count(*) FROM document_tasks t
 WHERE t.organization_id = $1 AND t.engagement_id = $2
@@ -110,6 +132,54 @@ func (q *Queries) CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpa
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createDocumentRequest = `-- name: CreateDocumentRequest :one
+
+INSERT INTO document_tasks (
+    organization_id, engagement_id, taxpayer_id, bank_transaction_id, code, kind, period,
+    title, note, due_at, next_reminder_at, created_by
+)
+VALUES ($1, $2, $3, NULL, 'DOC_REQUEST', 'document_request', $4,
+        $5, $6, $7, $8, $9)
+RETURNING id, uuid
+`
+
+type CreateDocumentRequestParams struct {
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Period         string             `json:"period"`
+	Title          string             `json:"title"`
+	Note           string             `json:"note"`
+	DueAt          pgtype.Timestamptz `json:"due_at"`
+	NextReminderAt pgtype.Timestamptz `json:"next_reminder_at"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+}
+
+type CreateDocumentRequestRow struct {
+	ID   int64     `json:"id"`
+	Uuid uuid.UUID `json:"uuid"`
+}
+
+// ---------------------------------------------------------------------------
+// Müşavirin elle açtığı belge talebi (issue #240).
+// ---------------------------------------------------------------------------
+func (q *Queries) CreateDocumentRequest(ctx context.Context, arg CreateDocumentRequestParams) (CreateDocumentRequestRow, error) {
+	row := q.db.QueryRow(ctx, createDocumentRequest,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.Period,
+		arg.Title,
+		arg.Note,
+		arg.DueAt,
+		arg.NextReminderAt,
+		arg.CreatedBy,
+	)
+	var i CreateDocumentRequestRow
+	err := row.Scan(&i.ID, &i.Uuid)
+	return i, err
 }
 
 const createDocumentTasksFromWarnings = `-- name: CreateDocumentTasksFromWarnings :many
@@ -177,7 +247,7 @@ func (q *Queries) CreateDocumentTasksFromWarnings(ctx context.Context, arg Creat
 
 const getDocumentTask = `-- name: GetDocumentTask :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
+       t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
        t.created_at, t.updated_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -185,7 +255,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
        (SELECT count(*) FROM document_task_uploads u
         WHERE u.organization_id = t.organization_id AND u.engagement_id = t.engagement_id AND u.task_id = t.id)::bigint AS upload_count
 FROM document_tasks t
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.organization_id = $1 AND t.engagement_id = $2 AND t.uuid = $3
 `
 
@@ -201,11 +271,13 @@ type GetDocumentTaskRow struct {
 	OrganizationID      int64              `json:"organization_id"`
 	EngagementID        int64              `json:"engagement_id"`
 	TaxpayerID          int64              `json:"taxpayer_id"`
-	BankTransactionID   int64              `json:"bank_transaction_id"`
+	BankTransactionID   pgtype.Int8        `json:"bank_transaction_id"`
 	Code                string             `json:"code"`
 	Kind                string             `json:"kind"`
 	Period              string             `json:"period"`
 	Status              string             `json:"status"`
+	Title               string             `json:"title"`
+	RequestCount        int32              `json:"request_count"`
 	Note                string             `json:"note"`
 	DueAt               pgtype.Timestamptz `json:"due_at"`
 	ReminderCount       int32              `json:"reminder_count"`
@@ -217,13 +289,13 @@ type GetDocumentTaskRow struct {
 	CancelReason        pgtype.Text        `json:"cancel_reason"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
-	BankTransactionUuid uuid.UUID          `json:"bank_transaction_uuid"`
+	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
-	DebitCredit         string             `json:"debit_credit"`
+	DebitCredit         pgtype.Text        `json:"debit_credit"`
 	Amount              pgtype.Numeric     `json:"amount"`
-	Currency            string             `json:"currency"`
+	Currency            pgtype.Text        `json:"currency"`
 	CounterpartyName    pgtype.Text        `json:"counterparty_name"`
-	Description         string             `json:"description"`
+	Description         pgtype.Text        `json:"description"`
 	UploadCount         int64              `json:"upload_count"`
 }
 
@@ -241,6 +313,8 @@ func (q *Queries) GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams
 		&i.Kind,
 		&i.Period,
 		&i.Status,
+		&i.Title,
+		&i.RequestCount,
 		&i.Note,
 		&i.DueAt,
 		&i.ReminderCount,
@@ -265,7 +339,7 @@ func (q *Queries) GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams
 }
 
 const getDocumentTaskNotifyNames = `-- name: GetDocumentTaskNotifyNames :one
-SELECT o.name AS organization_name, tp.title AS taxpayer_title, tp.uuid AS taxpayer_uuid
+SELECT o.name AS organization_name, o.slug AS organization_slug, tp.title AS taxpayer_title, tp.uuid AS taxpayer_uuid
 FROM organizations o, taxpayers tp
 WHERE o.id = $1 AND tp.id = $2
 `
@@ -277,6 +351,7 @@ type GetDocumentTaskNotifyNamesParams struct {
 
 type GetDocumentTaskNotifyNamesRow struct {
 	OrganizationName string    `json:"organization_name"`
+	OrganizationSlug string    `json:"organization_slug"`
 	TaxpayerTitle    string    `json:"taxpayer_title"`
 	TaxpayerUuid     uuid.UUID `json:"taxpayer_uuid"`
 }
@@ -284,7 +359,12 @@ type GetDocumentTaskNotifyNamesRow struct {
 func (q *Queries) GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error) {
 	row := q.db.QueryRow(ctx, getDocumentTaskNotifyNames, arg.OrganizationID, arg.TaxpayerID)
 	var i GetDocumentTaskNotifyNamesRow
-	err := row.Scan(&i.OrganizationName, &i.TaxpayerTitle, &i.TaxpayerUuid)
+	err := row.Scan(
+		&i.OrganizationName,
+		&i.OrganizationSlug,
+		&i.TaxpayerTitle,
+		&i.TaxpayerUuid,
+	)
 	return i, err
 }
 
@@ -347,6 +427,22 @@ func (q *Queries) GetDocumentTaskUploadFile(ctx context.Context, arg GetDocument
 	return i, err
 }
 
+const getEngagementUUIDByID = `-- name: GetEngagementUUIDByID :one
+SELECT uuid FROM engagements WHERE organization_id = $1 AND id = $2
+`
+
+type GetEngagementUUIDByIDParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	ID             int64 `json:"id"`
+}
+
+func (q *Queries) GetEngagementUUIDByID(ctx context.Context, arg GetEngagementUUIDByIDParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getEngagementUUIDByID, arg.OrganizationID, arg.ID)
+	var uuid uuid.UUID
+	err := row.Scan(&uuid)
+	return uuid, err
+}
+
 const getMissingDocumentCandidate = `-- name: GetMissingDocumentCandidate :one
 SELECT bt.id, bt.uuid, bt.period, bt.debit_credit, bt.kind_detail, bt.match_status, bt.is_cancelled,
        bt.amount, bt.currency, bt.transaction_date, bt.counterparty_name,
@@ -400,7 +496,7 @@ func (q *Queries) GetMissingDocumentCandidate(ctx context.Context, arg GetMissin
 
 const getTaxpayerDocumentTask = `-- name: GetTaxpayerDocumentTask :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.submitted_at, t.matched_at,
+       t.code, t.kind, t.period, t.status, t.title, t.note, t.due_at, t.submitted_at, t.matched_at,
        t.created_at, t.updated_at,
        o.name AS organization_name,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -410,7 +506,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 JOIN organizations o ON o.id = t.organization_id
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = $1 AND e.taxpayer_id = $1 AND t.uuid = $2
 `
 
@@ -425,11 +521,12 @@ type GetTaxpayerDocumentTaskRow struct {
 	OrganizationID      int64              `json:"organization_id"`
 	EngagementID        int64              `json:"engagement_id"`
 	TaxpayerID          int64              `json:"taxpayer_id"`
-	BankTransactionID   int64              `json:"bank_transaction_id"`
+	BankTransactionID   pgtype.Int8        `json:"bank_transaction_id"`
 	Code                string             `json:"code"`
 	Kind                string             `json:"kind"`
 	Period              string             `json:"period"`
 	Status              string             `json:"status"`
+	Title               string             `json:"title"`
 	Note                string             `json:"note"`
 	DueAt               pgtype.Timestamptz `json:"due_at"`
 	SubmittedAt         pgtype.Timestamptz `json:"submitted_at"`
@@ -437,13 +534,13 @@ type GetTaxpayerDocumentTaskRow struct {
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 	OrganizationName    string             `json:"organization_name"`
-	BankTransactionUuid uuid.UUID          `json:"bank_transaction_uuid"`
+	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
-	DebitCredit         string             `json:"debit_credit"`
+	DebitCredit         pgtype.Text        `json:"debit_credit"`
 	Amount              pgtype.Numeric     `json:"amount"`
-	Currency            string             `json:"currency"`
+	Currency            pgtype.Text        `json:"currency"`
 	CounterpartyName    pgtype.Text        `json:"counterparty_name"`
-	Description         string             `json:"description"`
+	Description         pgtype.Text        `json:"description"`
 	UploadCount         int64              `json:"upload_count"`
 }
 
@@ -462,6 +559,7 @@ func (q *Queries) GetTaxpayerDocumentTask(ctx context.Context, arg GetTaxpayerDo
 		&i.Kind,
 		&i.Period,
 		&i.Status,
+		&i.Title,
 		&i.Note,
 		&i.DueAt,
 		&i.SubmittedAt,
@@ -598,6 +696,44 @@ func (q *Queries) IsBankTransactionCancelled(ctx context.Context, arg IsBankTran
 	return is_cancelled, err
 }
 
+const listDocumentTaskOfficeRecipients = `-- name: ListDocumentTaskOfficeRecipients :many
+SELECT DISTINCT m.user_id
+FROM organization_members m
+WHERE m.organization_id = $1
+  AND (m.user_id = $2::bigint
+       OR m.user_id IN (SELECT a.user_id FROM engagement_assignments a
+                        WHERE a.organization_id = $1 AND a.engagement_id = $3))
+ORDER BY m.user_id
+`
+
+type ListDocumentTaskOfficeRecipientsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	CreatedBy      pgtype.Int8 `json:"created_by"`
+	EngagementID   int64       `json:"engagement_id"`
+}
+
+// Yüklemeyi duyacak ofis üyeleri: görevi açan ve engagement'a atananlar
+// (hâlâ ofis üyesi olanlar).
+func (q *Queries) ListDocumentTaskOfficeRecipients(ctx context.Context, arg ListDocumentTaskOfficeRecipientsParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listDocumentTaskOfficeRecipients, arg.OrganizationID, arg.CreatedBy, arg.EngagementID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDocumentTaskRecipients = `-- name: ListDocumentTaskRecipients :many
 SELECT user_id FROM taxpayer_members WHERE taxpayer_id = $1 ORDER BY user_id
 `
@@ -678,7 +814,7 @@ func (q *Queries) ListDocumentTaskUploads(ctx context.Context, arg ListDocumentT
 
 const listDocumentTasks = `-- name: ListDocumentTasks :many
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
+       t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
        t.created_at, t.updated_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -686,7 +822,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
        (SELECT count(*) FROM document_task_uploads u
         WHERE u.organization_id = t.organization_id AND u.engagement_id = t.engagement_id AND u.task_id = t.id)::bigint AS upload_count
 FROM document_tasks t
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.organization_id = $1 AND t.engagement_id = $2
   AND ($3::text IS NULL OR t.status = $3)
   AND ($4::text IS NULL OR t.period = $4)
@@ -709,11 +845,13 @@ type ListDocumentTasksRow struct {
 	OrganizationID      int64              `json:"organization_id"`
 	EngagementID        int64              `json:"engagement_id"`
 	TaxpayerID          int64              `json:"taxpayer_id"`
-	BankTransactionID   int64              `json:"bank_transaction_id"`
+	BankTransactionID   pgtype.Int8        `json:"bank_transaction_id"`
 	Code                string             `json:"code"`
 	Kind                string             `json:"kind"`
 	Period              string             `json:"period"`
 	Status              string             `json:"status"`
+	Title               string             `json:"title"`
+	RequestCount        int32              `json:"request_count"`
 	Note                string             `json:"note"`
 	DueAt               pgtype.Timestamptz `json:"due_at"`
 	ReminderCount       int32              `json:"reminder_count"`
@@ -725,13 +863,13 @@ type ListDocumentTasksRow struct {
 	CancelReason        pgtype.Text        `json:"cancel_reason"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
-	BankTransactionUuid uuid.UUID          `json:"bank_transaction_uuid"`
+	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
-	DebitCredit         string             `json:"debit_credit"`
+	DebitCredit         pgtype.Text        `json:"debit_credit"`
 	Amount              pgtype.Numeric     `json:"amount"`
-	Currency            string             `json:"currency"`
+	Currency            pgtype.Text        `json:"currency"`
 	CounterpartyName    pgtype.Text        `json:"counterparty_name"`
-	Description         string             `json:"description"`
+	Description         pgtype.Text        `json:"description"`
 	UploadCount         int64              `json:"upload_count"`
 }
 
@@ -762,6 +900,8 @@ func (q *Queries) ListDocumentTasks(ctx context.Context, arg ListDocumentTasksPa
 			&i.Kind,
 			&i.Period,
 			&i.Status,
+			&i.Title,
+			&i.RequestCount,
 			&i.Note,
 			&i.DueAt,
 			&i.ReminderCount,
@@ -944,7 +1084,7 @@ func (q *Queries) ListMissingDocumentCandidates(ctx context.Context, arg ListMis
 const listTaxpayerDocumentTasks = `-- name: ListTaxpayerDocumentTasks :many
 
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.submitted_at, t.matched_at,
+       t.code, t.kind, t.period, t.status, t.title, t.note, t.due_at, t.submitted_at, t.matched_at,
        t.created_at, t.updated_at,
        o.name AS organization_name,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -954,7 +1094,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 JOIN organizations o ON o.id = t.organization_id
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = $1 AND e.taxpayer_id = $1
   AND ($2::text IS NULL OR t.status = $2)
 ORDER BY t.due_at, t.id
@@ -974,11 +1114,12 @@ type ListTaxpayerDocumentTasksRow struct {
 	OrganizationID      int64              `json:"organization_id"`
 	EngagementID        int64              `json:"engagement_id"`
 	TaxpayerID          int64              `json:"taxpayer_id"`
-	BankTransactionID   int64              `json:"bank_transaction_id"`
+	BankTransactionID   pgtype.Int8        `json:"bank_transaction_id"`
 	Code                string             `json:"code"`
 	Kind                string             `json:"kind"`
 	Period              string             `json:"period"`
 	Status              string             `json:"status"`
+	Title               string             `json:"title"`
 	Note                string             `json:"note"`
 	DueAt               pgtype.Timestamptz `json:"due_at"`
 	SubmittedAt         pgtype.Timestamptz `json:"submitted_at"`
@@ -986,13 +1127,13 @@ type ListTaxpayerDocumentTasksRow struct {
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 	OrganizationName    string             `json:"organization_name"`
-	BankTransactionUuid uuid.UUID          `json:"bank_transaction_uuid"`
+	BankTransactionUuid pgtype.UUID        `json:"bank_transaction_uuid"`
 	TransactionDate     pgtype.Date        `json:"transaction_date"`
-	DebitCredit         string             `json:"debit_credit"`
+	DebitCredit         pgtype.Text        `json:"debit_credit"`
 	Amount              pgtype.Numeric     `json:"amount"`
-	Currency            string             `json:"currency"`
+	Currency            pgtype.Text        `json:"currency"`
 	CounterpartyName    pgtype.Text        `json:"counterparty_name"`
-	Description         string             `json:"description"`
+	Description         pgtype.Text        `json:"description"`
 	UploadCount         int64              `json:"upload_count"`
 }
 
@@ -1027,6 +1168,7 @@ func (q *Queries) ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpaye
 			&i.Kind,
 			&i.Period,
 			&i.Status,
+			&i.Title,
 			&i.Note,
 			&i.DueAt,
 			&i.SubmittedAt,
@@ -1054,7 +1196,7 @@ func (q *Queries) ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpaye
 }
 
 const lockTaxpayerDocumentTask = `-- name: LockTaxpayerDocumentTask :one
-SELECT t.id, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id, t.status
+SELECT t.id, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id, t.status, t.kind, t.title, t.created_by
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 WHERE t.taxpayer_id = $1 AND e.taxpayer_id = $1 AND t.uuid = $2
@@ -1067,12 +1209,15 @@ type LockTaxpayerDocumentTaskParams struct {
 }
 
 type LockTaxpayerDocumentTaskRow struct {
-	ID                int64  `json:"id"`
-	OrganizationID    int64  `json:"organization_id"`
-	EngagementID      int64  `json:"engagement_id"`
-	TaxpayerID        int64  `json:"taxpayer_id"`
-	BankTransactionID int64  `json:"bank_transaction_id"`
-	Status            string `json:"status"`
+	ID                int64       `json:"id"`
+	OrganizationID    int64       `json:"organization_id"`
+	EngagementID      int64       `json:"engagement_id"`
+	TaxpayerID        int64       `json:"taxpayer_id"`
+	BankTransactionID pgtype.Int8 `json:"bank_transaction_id"`
+	Status            string      `json:"status"`
+	Kind              string      `json:"kind"`
+	Title             string      `json:"title"`
+	CreatedBy         pgtype.Int8 `json:"created_by"`
 }
 
 // tenant-lint: cross-org mükellef yüklemesi için görevi kilitler; taxpayer_id ve aktif engagement ile sınırlı
@@ -1086,6 +1231,9 @@ func (q *Queries) LockTaxpayerDocumentTask(ctx context.Context, arg LockTaxpayer
 		&i.TaxpayerID,
 		&i.BankTransactionID,
 		&i.Status,
+		&i.Kind,
+		&i.Title,
+		&i.CreatedBy,
 	)
 	return i, err
 }
@@ -1121,6 +1269,40 @@ func (q *Queries) MarkDocumentTasksReminded(ctx context.Context, arg MarkDocumen
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Ids,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const rerequestDocumentTask = `-- name: RerequestDocumentTask :execrows
+UPDATE document_tasks
+SET status = 'open', note = $1, due_at = $2, next_reminder_at = $3,
+    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1
+WHERE organization_id = $4 AND engagement_id = $5 AND uuid = $6
+  AND status = 'submitted'
+`
+
+type RerequestDocumentTaskParams struct {
+	Note           string             `json:"note"`
+	DueAt          pgtype.Timestamptz `json:"due_at"`
+	NextReminderAt pgtype.Timestamptz `json:"next_reminder_at"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+}
+
+// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
+// hatırlatma baştan kurulur.
+func (q *Queries) RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rerequestDocumentTask,
+		arg.Note,
+		arg.DueAt,
+		arg.NextReminderAt,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Uuid,
 	)
 	if err != nil {
 		return 0, err

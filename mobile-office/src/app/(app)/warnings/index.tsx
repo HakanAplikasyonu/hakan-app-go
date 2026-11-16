@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 
@@ -18,8 +18,10 @@ const filters: { key: WarningStatus | 'all'; label: string }[] = [
 export default function WarningsScreen() {
   const c = useColors();
   const router = useRouter();
+  const { engagement } = useLocalSearchParams<{ engagement?: string }>();
   const [status, setStatus] = useState<WarningStatus | 'all'>('open');
-  const q = useWarnings(status);
+  const [scoped, setScoped] = useState(!!engagement);
+  const q = useWarnings(status, scoped ? engagement : undefined);
   const items = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
   const total = q.data?.pages[0]?.total ?? 0;
 
@@ -53,9 +55,18 @@ export default function WarningsScreen() {
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
           q.data ? (
-            <Text variant="caption" tone="muted">
-              {total} uyarı
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text variant="caption" tone="muted" style={{ flex: 1 }}>
+                {total} uyarı{scoped ? ' · tek mükellef' : ''}
+              </Text>
+              {scoped ? (
+                <Pressable accessibilityRole="button" onPress={() => setScoped(false)}>
+                  <Text variant="caption" tone="brand">
+                    Tüm mükellefler
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           ) : undefined
         }
         ListEmptyComponent={q.isLoading ? <ActivityIndicator color={c.brand} /> : <Text tone="muted">Bu filtreye uyan uyarı yok.</Text>}

@@ -152,7 +152,7 @@ func (w *world) warningStatus(t *testing.T, txID int64) []string {
 func taskFor(t *testing.T, tasks []Task, txID int64, w *world) Task {
 	t.Helper()
 	for _, x := range tasks {
-		if x.bankTransactionID == txID {
+		if x.bankTransactionID.Int64 == txID {
 			return x
 		}
 	}

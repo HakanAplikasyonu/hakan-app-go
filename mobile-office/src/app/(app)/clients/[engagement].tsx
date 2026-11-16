@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 
-import { Card, Chip, Notice, Row, Screen, Text } from '@/components/ui';
+import { Button, Card, Chip, Notice, Row, Screen, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { useColors } from '@/core/theme';
@@ -16,12 +16,14 @@ import {
   useRecentReceipts,
 } from '@/features/clients/api';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
+import { taskTitle } from '@/features/doctasks/format';
 import { periodLabel } from '@/features/warnings/format';
 
 /** Mükellef ayrıntısı (#238): iletişim, dönem durumu, son belgeler, açık görevler. */
 export default function ClientDetailScreen() {
   const { engagement, title } = useLocalSearchParams<{ engagement: string; title?: string }>();
   const { can } = useAuth();
+  const router = useRouter();
   const org = useOrganization();
   const c = useColors();
   const [current, previous] = useMemo(() => recentPeriods(), []);
@@ -92,12 +94,30 @@ export default function ClientDetailScreen() {
         </Card>
       ) : null}
 
+      {can('tenant.doc_tasks.read') ? (
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {can('tenant.doc_tasks.write') ? (
+            <View style={{ flex: 1 }}>
+              <Button title="Belge iste" onPress={() => router.push({ pathname: '/tasks/new', params: { engagement, title: ct?.title ?? title ?? '' } })} />
+            </View>
+          ) : null}
+          <View style={{ flex: 1 }}>
+            <Button
+              title="Görevler"
+              variant="secondary"
+              onPress={() => router.push({ pathname: '/tasks', params: { engagement, title: ct?.title ?? title ?? '' } })}
+            />
+          </View>
+        </View>
+      ) : null}
+
       {tasks.data ? (
         <Section title={`Açık görevler (${tasks.data.total})`} empty={tasks.data.items.length === 0 ? 'Açık belge görevi yok.' : null}>
           {tasks.data.items.map((t) => (
             <Row
               key={t.uuid}
-              title={t.note || (t.kind === 'undocumented_payment' ? 'Belgesiz ödeme' : 'Faturasız tahsilat')}
+              onPress={() => router.push({ pathname: '/tasks/[uuid]', params: { uuid: t.uuid, engagement } })}
+              title={taskTitle(t)}
               subtitle={`${periodLabel(t.period)} · son gün ${new Date(t.due_at).toLocaleDateString('tr-TR')}${t.overdue ? ' · gecikti' : ''}`}
             />
           ))}

@@ -35,6 +35,24 @@ var catalog = map[string]pair{
 		tr: Text{"Toplu işlem tamamlandı", "{{succeeded}} kayıt üzerinde toplu işlem tamamlandı."},
 		en: Text{"Bulk action finished", "The bulk action on {{succeeded}} records has finished."},
 	},
+	// Belge görevleri (#200, #240, #241). Kilit ekranında mükellef adı ya da
+	// tutar görünmez.
+	"doc_tasks": {
+		tr: Text{"Belge talebi", "Mali müşavirinizin sizden beklediği belgeler var."},
+		en: Text{"Document request", "Your accountant is waiting for documents."},
+	},
+	"doc_task": {
+		tr: Text{"Yeni belge talebi", "Mali müşaviriniz sizden bir belge istiyor."},
+		en: Text{"New document request", "Your accountant requests a document."},
+	},
+	"doc_task_submitted": {
+		tr: Text{"Belge yüklendi", "Bir mükellef istediğiniz belgeyi yükledi."},
+		en: Text{"Document uploaded", "A client uploaded the document you requested."},
+	},
+	"warnings_blocker": {
+		tr: Text{"Kritik uyarı", "Bir mükellefinizde engelleyici uyarı açıldı."},
+		en: Text{"Critical warning", "A blocking warning was raised for one of your clients."},
+	},
 	"bulk.failed": {
 		tr: Text{"Toplu işlem başarısız", "Bir toplu işlem tamamlanamadı."},
 		en: Text{"Bulk action failed", "A bulk action could not be completed."},

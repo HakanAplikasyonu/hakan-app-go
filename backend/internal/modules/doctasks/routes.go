@@ -45,10 +45,13 @@ func (m Module) Routes(r *module.Router) {
 	read, write := rbac.PermTenantDocTasksRead, rbac.PermTenantDocTasksWrite
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/document-tasks"
 	r.Tenant("GET "+base, read, h.List, eng...)
+	r.Tenant("POST "+base, write, h.CreateRequest, eng...)
 	r.Tenant("POST "+base+"/detect", write, h.Detect, eng...)
 	r.Tenant("POST "+base+"/generate", write, h.Generate, eng...)
 	r.Tenant("GET "+base+"/{taskUuid}", read, h.Get, eng...)
 	r.Tenant("POST "+base+"/{taskUuid}/cancel", write, h.Cancel, eng...)
+	r.Tenant("POST "+base+"/{taskUuid}/complete", write, h.Complete, eng...)
+	r.Tenant("POST "+base+"/{taskUuid}/rerequest", write, h.Rerequest, eng...)
 	r.Tenant("GET "+base+"/{taskUuid}/uploads/{uploadUuid}/file", read, h.OfficeFile, eng...)
 }
 

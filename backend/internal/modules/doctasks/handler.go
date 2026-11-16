@@ -139,6 +139,52 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, t)
 }
 
+// CreateRequest: POST .../document-tasks (issue #240).
+func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
+	var body RequestInput
+	if !decode(w, r, &body) {
+		return
+	}
+	t, err := h.svc.CreateRequest(r.Context(), engagementctx.Must(r.Context()), userID(r), body)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, t)
+}
+
+// Complete: POST .../document-tasks/{taskUuid}/complete.
+func (h *Handler) Complete(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "taskUuid")
+	if !ok {
+		return
+	}
+	t, err := h.svc.Complete(r.Context(), engagementctx.Must(r.Context()), id)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, t)
+}
+
+// Rerequest: POST .../document-tasks/{taskUuid}/rerequest.
+func (h *Handler) Rerequest(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "taskUuid")
+	if !ok {
+		return
+	}
+	var body RerequestInput
+	if !decode(w, r, &body) {
+		return
+	}
+	t, err := h.svc.Rerequest(r.Context(), engagementctx.Must(r.Context()), id, body)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, t)
+}
+
 // OfficeFile: GET .../document-tasks/{taskUuid}/uploads/{uploadUuid}/file.
 func (h *Handler) OfficeFile(w http.ResponseWriter, r *http.Request) {
 	taskID, ok := pathUUID(w, r, "taskUuid")
@@ -324,6 +370,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.NotFound(w, r, "Document task not found")
 	case errors.Is(err, ErrClosed):
 		response.Conflict(w, r, "TASK_CLOSED", "The task is no longer open")
+	case errors.Is(err, ErrNotSubmitted):
+		response.Conflict(w, r, "TASK_NOT_SUBMITTED", "Only a submitted task can be requested again")
 	case errors.Is(err, ErrBadPeriod):
 		response.BadRequest(w, r, response.CodeValidationError, "period must be YYYY-MM")
 	case errors.Is(err, ErrBadInput):

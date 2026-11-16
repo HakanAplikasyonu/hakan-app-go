@@ -1,0 +1,12 @@
+DELETE FROM notification_templates WHERE code IN ('doc_tasks.requested', 'doc_tasks.submitted');
+DELETE FROM document_tasks WHERE kind = 'document_request';
+ALTER TABLE document_tasks DROP CONSTRAINT IF EXISTS chk_document_tasks_request_count;
+ALTER TABLE document_tasks DROP CONSTRAINT IF EXISTS chk_document_tasks_title;
+ALTER TABLE document_tasks DROP CONSTRAINT IF EXISTS chk_document_tasks_request;
+ALTER TABLE document_tasks DROP CONSTRAINT chk_document_tasks_kind;
+ALTER TABLE document_tasks ADD CONSTRAINT chk_document_tasks_kind CHECK (kind IN ('undocumented_payment', 'uninvoiced_collection'));
+ALTER TABLE document_tasks DROP CONSTRAINT chk_document_tasks_code;
+ALTER TABLE document_tasks ADD CONSTRAINT chk_document_tasks_code CHECK (code IN ('BNK_UNDOCUMENTED_PAYMENT', 'BNK_UNINVOICED_COLLECTION'));
+ALTER TABLE document_tasks DROP COLUMN request_count;
+ALTER TABLE document_tasks DROP COLUMN title;
+ALTER TABLE document_tasks ALTER COLUMN bank_transaction_id SET NOT NULL;

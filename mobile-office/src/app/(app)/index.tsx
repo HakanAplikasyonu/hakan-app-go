@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -6,6 +7,7 @@ import { BrandMark } from '@/components/brand-mark';
 import { Button, Card, Chip, Notice, Row, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
+import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { useColors } from '@/core/theme';
 import { useDashboard, type DashboardUpload } from '@/features/dashboard/api';
 import { clock, countLabel, greeting, uploadKindLabel, type UploadKind } from '@/features/dashboard/format';
@@ -17,6 +19,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const q = useDashboard();
   const d = q.data;
+  const [push, setPush] = useState<PushPermission | null>(null);
+  useEffect(() => {
+    getPushPermission()
+      .then(setPush)
+      .catch(() => setPush('unavailable'));
+  }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
@@ -35,6 +43,19 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {push === 'undetermined' ? (
+          <Card>
+            <Text variant="heading">Bildirimleri açın</Text>
+            <Text tone="muted">Mükellef belge yüklediğinde ve kritik uyarı açıldığında telefonunuza haber verelim.</Text>
+            <Button
+              title="Bildirimleri aç"
+              onPress={() =>
+                void enablePush().then((r) => setPush(r === 'registered' ? 'granted' : r === 'denied' ? 'denied' : 'unavailable'))
+              }
+            />
+          </Card>
+        ) : null}
 
         {q.isLoading ? <ActivityIndicator color={c.brand} style={{ marginTop: 32 }} /> : null}
         {q.error ? <Notice>{errorMessage(q.error)}</Notice> : null}

@@ -1,6 +1,6 @@
 // Kaynak: mobile/src/app/_layout.tsx (#236); ofis akışına uyarlandı.
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
@@ -8,15 +8,69 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
+import { Button, Screen, Text } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/core/auth/auth-provider';
+import { initSentry, reportError, wrapRoot } from '@/core/observability/sentry';
 import { installForegroundHandler } from '@/core/push/push';
+import { useNotificationRouting } from '@/core/push/use-notification-routing';
 import { useColors, useScheme } from '@/core/theme';
 
+initSentry();
 SplashScreen.preventAutoHideAsync().catch(() => {});
 installForegroundHandler();
 
+/**
+ * Kökün altındaki render hataları (#241; kaynak mobile/src/app/_layout.tsx,
+ * #202): Sentry açıksa raporlanır, kullanıcı boş ekran yerine yeniden dener.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    reportError(error, { boundary: 'root' });
+  }, [error]);
+  return (
+    <SafeAreaProvider>
+      <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
+        <BrandMark size={64} />
+        <View style={{ gap: 6, alignItems: 'center' }}>
+          <Text variant="title">Bir şeyler ters gitti</Text>
+          <Text tone="muted" style={{ textAlign: 'center' }}>
+            Ekran açılırken beklenmeyen bir hata oluştu. Tekrar deneyebilirsiniz.
+          </Text>
+        </View>
+        <Button title="Tekrar dene" onPress={retry} />
+      </Screen>
+    </SafeAreaProvider>
+  );
+}
+
+/** Bağlantısız açılış: oturum korunur, "Tekrar dene" yeniden denetler. */
+function OfflineScreen() {
+  const { retry } = useAuth();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
+      <BrandMark size={64} />
+      <View style={{ gap: 6, alignItems: 'center' }}>
+        <Text variant="title">Bağlantı yok</Text>
+        <Text tone="muted" style={{ textAlign: 'center' }}>
+          Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin; oturumunuz açık kalır.
+        </Text>
+      </View>
+      <Button
+        title="Tekrar dene"
+        loading={busy}
+        onPress={() => {
+          setBusy(true);
+          retry().finally(() => setBusy(false));
+        }}
+      />
+    </Screen>
+  );
+}
+
 function RootNavigator() {
   const { status } = useAuth();
+  useNotificationRouting();
   const c = useColors();
   const scheme = useScheme();
   const navTheme = useMemo(() => {
@@ -30,6 +84,8 @@ function RootNavigator() {
   useEffect(() => {
     if (status !== 'booting') SplashScreen.hideAsync().catch(() => {});
   }, [status]);
+
+  if (status === 'offline') return <OfflineScreen />;
 
   if (status === 'booting') {
     return (
@@ -61,7 +117,7 @@ function RootNavigator() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }));
   return (
     <SafeAreaProvider>
@@ -73,3 +129,5 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+export default wrapRoot(RootLayout);

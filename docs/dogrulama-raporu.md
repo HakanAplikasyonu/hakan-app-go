@@ -339,3 +339,115 @@ Zorlanmış tablolarda satır bazlı sızıntı testi (`rls_enforcement_db_test.
   - Worker'ın ayrı çıkış IP'li kopyası (`worker-egress`).
   - Sentry ve OpenTelemetry dışa aktarımı.
   - Demo verisine dayanan duman, davet ve erişim testlerinin üretim yığınında koşması.
+
+## 4. tur (#267)
+
+| | |
+|---|---|
+| Doğrulanan commit | main `07578ba`; #277 düzeltmesi (#282) yerelde uygulanarak |
+| Yığın | `scripts/e2e-up.sh` (yerel compose: Postgres, Redis, SeaweedFS, Centrifugo, Mailhog) + yerelde derlenen backend, demo verisi |
+| AI | Sahte, OpenAI uyumlu bir OCR sunucusu (`AI_PROVIDER=openai_compatible`, yerel). Gerçek sağlayıcı denenmedi |
+| Mobil | Expo web derlemesi (`expo export -p web`), Playwright ile 390×844 görünümde. Backend'de CORS olmadığından derleme ve `/v1` aynı kökenden sunuldu |
+| Masaüstü | Go sidecar başsız çalıştırıldı, satır tabanlı JSON protokolüyle sürüldü. Tauri kabuğu (pencere, tepsi) çalıştırılmadı |
+| Hesaplar | Demo: mükellef (Atlas Gıda), müşavir (demo ofis) |
+
+### Özet
+
+- **Mükellef mobil akışları gerçek backend'e karşı çalışıyor:** giriş, şirket seçimi, fiş yükleme, çevrimdışı kuyruk, belge görevi ve hesap silme.
+- **Turda bulunan iki engelleyici hata:**
+  - #277: AI açıkken mükellefin fiş yüklemesi 500 dönüyordu. Düzeltme [#282](https://github.com/HakanAplikasyonu/hakan-app-go/pull/282), birleşti.
+  - #281: mükellef kapsamında öneri yazılamadığı için inceleme kuyruğu boş kalıyor, mükellef düzeltmesi 500 dönüyor. Başka bir oturumda düzeltiliyor.
+- **Masaüstü ajanı** klasördeki UBL'i yükledi; fatura ofiste görünüyor. Ajanın ofise giden durum bilgisi gecikiyor (#284). Ofis panelinde ajan ekranı yok (#285).
+- **Deep link** zinciri sunucu tarafında ve eşleme fonksiyonunda doğrulandı. Gerçek cihazda bildirime dokunma denenmedi.
+
+### 4.1 Giriş ve şirket seçimi
+
+| Adım | Sonuç |
+|---|---|
+| E-posta ve parolayla giriş | ✅ |
+| Tek şirketi olan mükellef | ✅ Seçim ekranı atlanıyor, doğrudan ana sayfa (şirket adı, VKN ve rol başlıkta) |
+
+### 4.2 Fiş yükleme → ofis inceleme kuyruğu
+
+| Adım | Sonuç |
+|---|---|
+| Galeriden fiş seçip gönderme | ✅ Fiş ofisin fiş listesine düşüyor |
+| AI kapalıyken | ✅ Beklendiği gibi "Okunamadı" (`extract: AI is not configured`) |
+| AI açıkken (düzeltmeden önce) | ❌ `POST /v1/taxpayer/receipts` 500: AI maliyet kaydı mükellef kapsamında RLS'ye takılıyor ve isteğin işlemini iptal ediyor (#277) |
+| AI açıkken (#282 ile) | ✅ Fiş ofise taslak olarak geliyor; mobilde "Müşavir onayında · 10.10 ₺" |
+| Düşük güvenli alanın inceleme kuyruğuna düşmesi | ❌ Kuyruk boş: öneri satırı mükellef kapsamında yazılamıyor (#281). Mükellefin düzeltme göndermesi de 500 dönüyor (#281) |
+
+### 4.3 Çevrimdışı kuyruk
+
+| Adım | Sonuç |
+|---|---|
+| Bağlantı yokken fiş çekip gönderme | ✅ "Bağlantı yok. 1 fiş telefonda saklanıyor"; ofiste sayı değişmiyor |
+| Bağlantı gelince | ✅ Fiş kendiliğinden gönderiliyor; ofisteki fiş sayısı 7 → 8 |
+| Aynı görüntü ikinci kez | ✅ Ofiste "Daha önce gönderilmiş" (yinelenen) olarak işaretleniyor |
+
+Not: web derlemesinde rota parçaları tembel yüklendiği için ekranın çevrimdışına geçmeden önce bir kez açılmış olması gerekti. Bu yalnızca web'e özgü; native paket parçaları içinde taşıyor.
+
+### 4.4 Ofisin açtığı belge görevi
+
+| Adım | Sonuç |
+|---|---|
+| Ofis: banka hesabı tanımlama, CSV ekstre yükleme (3 hareket) | ✅ |
+| Ofis: `document-tasks/generate` (dönem 2026-11, tespitli, notlu) | ✅ 1 görev ("Tahsilat için fatura", 4.000,00 TRY), mükellefe e-posta ve uygulama içi bildirim |
+| Mobil ana sayfa ve "Tüm görevler" | ✅ Görev, tutar, karşı taraf, tarih, müşavirin notu ve son günle görünüyor |
+| Görev ekranında "Galeriden seç" ile fotoğraf | ✅ "Belge alındı ve hareketle eşleşti. Teşekkürler."; durum "Tamamlandı" |
+| Ofiste görev | ✅ `matched`, 1 yükleme |
+
+Not: ofisin varsayılan görev listesi yalnızca açık görevleri gösteriyor. Eşleşen görev `?status=matched` ya da `all` ile görünüyor.
+
+### 4.5 Bildirimden deep link
+
+| Adım | Sonuç |
+|---|---|
+| Görev bildiriminin `action_url`'i | ✅ `/m/{mükellef}/tasks/{görev}` (e-posta ve uygulama içi kayıtta) |
+| Push `data.url` | ✅ `BuildPushMessage` aynı yolu taşıyor (kodla doğrulandı) |
+| Mobil eşleme (`resolveLink`) | ✅ Bu URL → `/task/{görev}` ve doğru mükellef. Web derlemesinde `/task/{görev}` doğrudan açılıyor |
+| Gerçek cihazda bildirime dokunma | ⚠️ Denenmedi (cihaz ve Expo push anahtarı yok) |
+
+### 4.6 Hesap silme
+
+| Adım | Sonuç |
+|---|---|
+| Profil → "Hesabımı sil" | ✅ Onay kodu e-postası geliyor (Mailhog) |
+| Kodla onay | ✅ Oturum kapanıyor, giriş ekranına dönülüyor; hesap kapatıldı e-postası gidiyor |
+| Tekrar giriş | ✅ 403 `ACCOUNT_DEACTIVATED` |
+
+Not: profildeki sürüm web derlemesinde "Sürüm ?" görünüyor. Sürüm native ikiliden okunduğu için bu web'e özgü, hata değil. Hesap test sonrasında yerel veritabanında yeniden açıldı.
+
+### 4.7 Masaüstü ajanı: klasör izleme ve UBL
+
+| Adım | Sonuç |
+|---|---|
+| Sidecar ile giriş ve ofis seçimi | ✅ Ajan kaydı oluşuyor; ofiste `GET /v1/tenant/agents` → `online` |
+| Klasör izleme ekleme, klasöre UBL bırakma | ✅ Yaklaşık 30 sn sonra yükleniyor (iki taramada değişmemiş olmalı) |
+| Ofiste | ✅ UBL yükleme işi `done` (1 eklendi); fatura listesinde `ATL2026000000091` |
+| Yeniden başlatma | ✅ İzleme kalıcı; aynı dosya ikinci kez yüklenmiyor |
+| Ofise giden durum bilgisi | ❌ İzlenen klasör ve yüklenen dosya sayısı sonraki heartbeat'e (5 dk) kadar 0 görünüyor; `last_scan` sıfır zaman (#284) |
+| Ofis panelinde ajan listesi | ❌ Ekran yok; uç yalnızca API'de (#285) |
+| Pencere kapanınca izlemenin sürmesi | ⚠️ Tauri kabuğu çalıştırılmadı. Kodda pencere kapanınca tepsi hazırsa kapanma engelleniyor ve pencere gizleniyor (`desktop/src-tauri/src/lib.rs`); sidecar kabukla birlikte yaşadığı için izleme sürüyor. Sidecar'ın ön yüz olmadan tek başına izleyip yüklediği yukarıda doğrulandı |
+
+### 4.8 4. turda açılan issue'lar
+
+| Issue | Konu | Önem | Durum |
+|---|---|---|---|
+| [#277](https://github.com/HakanAplikasyonu/hakan-app-go/issues/277) | AI açıkken mükellefin fiş yüklemesi 500 (maliyet kaydı RLS) | Yüksek | ✅ [#282](https://github.com/HakanAplikasyonu/hakan-app-go/pull/282) birleşti |
+| [#281](https://github.com/HakanAplikasyonu/hakan-app-go/issues/281) | Mükellef kapsamında öneri yazılamıyor: inceleme kuyruğu boş, düzeltme 500 | Yüksek | Başka oturumda |
+| [#283](https://github.com/HakanAplikasyonu/hakan-app-go/issues/283) | Mobil ana sayfa "Fişlerim" özeti sunucudaki fişleri saymıyor | Düşük | Açık |
+| [#284](https://github.com/HakanAplikasyonu/hakan-app-go/issues/284) | Masaüstü ajanının durum bilgisi 5 dk gecikiyor, `last_scan` sıfır zaman | Düşük | Açık |
+| [#285](https://github.com/HakanAplikasyonu/hakan-app-go/issues/285) | Ofis panelinde masaüstü ajanı ekranı yok | Orta | Ürün kararı gerekiyor |
+
+Turla ilgili, ayrı açılmış iş: #279 (müşavirin elle açtığı belge isteğinin mobilde gösterilmesi).
+
+### 4.9 Karar bekleyenler ve doğrulanmayanlar
+
+- **Mükellef düzeltmesinin önceliği (#281):** mükellefin gönderdiği düzeltme güven 1 ile `auto_accepted` olarak yazılıyor ve modelin önerisini geçersiz kılıyor. Mükellef düzeltmesinin müşavir onayına mı düşeceği, yoksa doğrudan kabul mü edileceği ürün kararı.
+- **Ofis ajan ekranının yeri ve eylemleri (#285).**
+- **Doğrulanmayanlar:**
+  - Gerçek iOS/Android cihazda kamera, arka planda yükleme ve push bildirimine dokunma.
+  - Gerçek AI sağlayıcısı (sahte OCR sunucusu aynı kod yolunu kullanıyor).
+  - Tauri kabuğu: pencere, tepsi, anahtar zinciri ve otomatik güncelleme.
+  - Logo/Mikro yerel okuma.

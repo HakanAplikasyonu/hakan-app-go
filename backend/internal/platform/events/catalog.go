@@ -143,6 +143,9 @@ const (
 	TaxpayerInvitation     = "taxpayer.invitation"
 	DocTasksCreated        = "doc_tasks.created"
 	DocTasksReminder       = "doc_tasks.reminder"
+	DocTasksRequested      = "doc_tasks.requested"
+	DocTasksSubmitted      = "doc_tasks.submitted"
+	WarningsBlocker        = "warnings.blocker"
 	AgentsOffline          = "agents.offline"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
@@ -320,6 +323,9 @@ func catalogConstants() []string {
 		TaxpayerInvitation,
 		DocTasksCreated,
 		DocTasksReminder,
+		DocTasksRequested,
+		DocTasksSubmitted,
+		WarningsBlocker,
 		AgentsOffline,
 		NotificationsTest,
 		NotificationsQueued,

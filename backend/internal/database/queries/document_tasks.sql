@@ -58,7 +58,7 @@ RETURNING id;
 
 -- name: ListDocumentTasks :many
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
+       t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
        t.created_at, t.updated_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -66,7 +66,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
        (SELECT count(*) FROM document_task_uploads u
         WHERE u.organization_id = t.organization_id AND u.engagement_id = t.engagement_id AND u.task_id = t.id)::bigint AS upload_count
 FROM document_tasks t
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id
   AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status))
   AND (sqlc.narg(period)::text IS NULL OR t.period = sqlc.narg(period))
@@ -81,7 +81,7 @@ WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id
 
 -- name: GetDocumentTask :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
+       t.code, t.kind, t.period, t.status, t.title, t.request_count, t.note, t.due_at, t.reminder_count, t.last_reminded_at,
        t.next_reminder_at, t.submitted_at, t.matched_at, t.cancelled_at, t.cancel_reason,
        t.created_at, t.updated_at,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -89,7 +89,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
        (SELECT count(*) FROM document_task_uploads u
         WHERE u.organization_id = t.organization_id AND u.engagement_id = t.engagement_id AND u.task_id = t.id)::bigint AS upload_count
 FROM document_tasks t
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id AND t.uuid = @uuid;
 
 -- name: CancelDocumentTask :execrows
@@ -131,7 +131,7 @@ WHERE u.organization_id = @organization_id AND u.engagement_id = @engagement_id
 -- tenant-lint: cross-org mükellef kendi görevlerini görür; taxpayer_id ve aktif engagement ile sınırlı
 -- name: ListTaxpayerDocumentTasks :many
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.submitted_at, t.matched_at,
+       t.code, t.kind, t.period, t.status, t.title, t.note, t.due_at, t.submitted_at, t.matched_at,
        t.created_at, t.updated_at,
        o.name AS organization_name,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -141,7 +141,7 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 JOIN organizations o ON o.id = t.organization_id
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id
   AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status))
 ORDER BY t.due_at, t.id
@@ -158,7 +158,7 @@ WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id
 -- tenant-lint: cross-org mükellef kendi görevini okur; taxpayer_id ve aktif engagement ile sınırlı
 -- name: GetTaxpayerDocumentTask :one
 SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id,
-       t.code, t.kind, t.period, t.status, t.note, t.due_at, t.submitted_at, t.matched_at,
+       t.code, t.kind, t.period, t.status, t.title, t.note, t.due_at, t.submitted_at, t.matched_at,
        t.created_at, t.updated_at,
        o.name AS organization_name,
        bt.uuid AS bank_transaction_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
@@ -168,12 +168,12 @@ SELECT t.id, t.uuid, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_t
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 JOIN organizations o ON o.id = t.organization_id
-JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
+LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id AND t.uuid = @uuid;
 
 -- tenant-lint: cross-org mükellef yüklemesi için görevi kilitler; taxpayer_id ve aktif engagement ile sınırlı
 -- name: LockTaxpayerDocumentTask :one
-SELECT t.id, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id, t.status
+SELECT t.id, t.organization_id, t.engagement_id, t.taxpayer_id, t.bank_transaction_id, t.status, t.kind, t.title, t.created_by
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id AND t.uuid = @uuid
@@ -248,7 +248,7 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
 SELECT user_id FROM taxpayer_members WHERE taxpayer_id = @taxpayer_id ORDER BY user_id;
 
 -- name: GetDocumentTaskNotifyNames :one
-SELECT o.name AS organization_name, tp.title AS taxpayer_title, tp.uuid AS taxpayer_uuid
+SELECT o.name AS organization_name, o.slug AS organization_slug, tp.title AS taxpayer_title, tp.uuid AS taxpayer_uuid
 FROM organizations o, taxpayers tp
 WHERE o.id = @organization_id AND tp.id = @taxpayer_id;
 
@@ -256,3 +256,46 @@ WHERE o.id = @organization_id AND tp.id = @taxpayer_id;
 -- Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
 SELECT uuid FROM document_tasks
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id;
+
+-- ---------------------------------------------------------------------------
+-- Müşavirin elle açtığı belge talebi (issue #240).
+-- ---------------------------------------------------------------------------
+
+-- name: CreateDocumentRequest :one
+INSERT INTO document_tasks (
+    organization_id, engagement_id, taxpayer_id, bank_transaction_id, code, kind, period,
+    title, note, due_at, next_reminder_at, created_by
+)
+VALUES (@organization_id, @engagement_id, @taxpayer_id, NULL, 'DOC_REQUEST', 'document_request', @period,
+        @title, @note, @due_at, @next_reminder_at, sqlc.narg(created_by))
+RETURNING id, uuid;
+
+-- name: CompleteDocumentTask :execrows
+-- Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
+UPDATE document_tasks
+SET status = 'matched', matched_at = NOW(), next_reminder_at = NULL
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid
+  AND status IN ('open', 'submitted');
+
+-- name: RerequestDocumentTask :execrows
+-- Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
+-- hatırlatma baştan kurulur.
+UPDATE document_tasks
+SET status = 'open', note = @note, due_at = @due_at, next_reminder_at = @next_reminder_at,
+    reminder_count = 0, last_reminded_at = NULL, request_count = request_count + 1
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid
+  AND status = 'submitted';
+
+-- name: ListDocumentTaskOfficeRecipients :many
+-- Yüklemeyi duyacak ofis üyeleri: görevi açan ve engagement'a atananlar
+-- (hâlâ ofis üyesi olanlar).
+SELECT DISTINCT m.user_id
+FROM organization_members m
+WHERE m.organization_id = @organization_id
+  AND (m.user_id = sqlc.narg(created_by)::bigint
+       OR m.user_id IN (SELECT a.user_id FROM engagement_assignments a
+                        WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id))
+ORDER BY m.user_id;
+
+-- name: GetEngagementUUIDByID :one
+SELECT uuid FROM engagements WHERE organization_id = @organization_id AND id = @id;
