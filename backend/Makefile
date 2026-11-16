@@ -27,7 +27,7 @@ endef
 
 DB_URL ?= postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable
 
-.PHONY: tools run dev worker ping-job search-reindex build test lint fmt tidy sqlc migrate-up migrate-down migrate-create health create-super-admin demo-seed openapi-lint
+.PHONY: tools run dev worker ping-job search-reindex build test lint fmt tidy sqlc migrate-up migrate-down migrate-create health create-super-admin demo-seed perf-seed openapi-lint
 
 tools:
 	@echo "go:            $$(go version)"
@@ -97,6 +97,9 @@ SA_SURNAME  ?= Admin
 # Demo ofisi, üyeler, mükellefler ve engagement'lar (#17). ARGS=-reset baştan kurar.
 demo-seed:
 	@$(load_env) go run ./cmd/demo-seed $(ARGS)
+
+perf-seed:
+	@$(load_env) go run ./cmd/perf-seed $(ARGS)
 
 create-super-admin:
 	@$(load_env) go run ./cmd/create-super-admin \

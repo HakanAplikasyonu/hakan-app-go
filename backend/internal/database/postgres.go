@@ -26,6 +26,11 @@ func NewPostgresPool(ctx context.Context, cfg config.DBConfig) (*pgxpool.Pool, e
 	poolCfg.MinConns = 1
 	poolCfg.MaxConnLifetime = time.Hour
 	poolCfg.HealthCheckPeriod = 30 * time.Second
+	if cfg.PlanCacheMode != "" {
+		// Sent in the startup packet, so it holds for every statement of the
+		// session (issue #182, see config.DBConfig.PlanCacheMode).
+		poolCfg.ConnConfig.RuntimeParams["plan_cache_mode"] = cfg.PlanCacheMode
+	}
 	if cfg.RLSRuntime {
 		// Every connection runs as hakan_rls_runtime (issue #166): row level
 		// security applies to all queries. rls.WithScope and rls.System

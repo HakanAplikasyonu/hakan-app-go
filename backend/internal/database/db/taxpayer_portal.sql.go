@@ -86,7 +86,7 @@ const listTaxpayerInvoices = `-- name: ListTaxpayerInvoices :many
 SELECT uuid, ettn, invoice_number, direction, type, profile, issue_date, period,
        customer_name, customer_tax_number, customer_identity_number, currency,
        tax_exclusive_amount, tax_amount, withholding_amount, payable_amount,
-       status_normalized, source_system, capture_method
+       status_normalized, source_system, capture_method, id
 FROM invoices
 WHERE taxpayer_id = $1
   AND ($2::text IS NULL OR period = $2)
@@ -123,6 +123,7 @@ type ListTaxpayerInvoicesRow struct {
 	StatusNormalized       string         `json:"status_normalized"`
 	SourceSystem           string         `json:"source_system"`
 	CaptureMethod          string         `json:"capture_method"`
+	ID                     int64          `json:"id"`
 }
 
 // Mükellef web paneli (issue #39). Her sorgu X-Taxpayer ile çözülen
@@ -163,6 +164,102 @@ func (q *Queries) ListTaxpayerInvoices(ctx context.Context, arg ListTaxpayerInvo
 			&i.StatusNormalized,
 			&i.SourceSystem,
 			&i.CaptureMethod,
+			&i.ID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaxpayerInvoicesAfter = `-- name: ListTaxpayerInvoicesAfter :many
+SELECT uuid, ettn, invoice_number, direction, type, profile, issue_date, period,
+       customer_name, customer_tax_number, customer_identity_number, currency,
+       tax_exclusive_amount, tax_amount, withholding_amount, payable_amount,
+       status_normalized, source_system, capture_method, id
+FROM invoices
+WHERE taxpayer_id = $1
+  AND (issue_date, id) < ($2::date, $3::bigint)
+  AND ($4::text IS NULL OR period = $4)
+  AND ($5::text IS NULL OR direction = $5)
+ORDER BY issue_date DESC, id DESC
+LIMIT $6
+`
+
+type ListTaxpayerInvoicesAfterParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	CursorDate pgtype.Date `json:"cursor_date"`
+	CursorID   int64       `json:"cursor_id"`
+	Period     pgtype.Text `json:"period"`
+	Direction  pgtype.Text `json:"direction"`
+	Lim        int32       `json:"lim"`
+}
+
+type ListTaxpayerInvoicesAfterRow struct {
+	Uuid                   uuid.UUID      `json:"uuid"`
+	Ettn                   pgtype.UUID    `json:"ettn"`
+	InvoiceNumber          string         `json:"invoice_number"`
+	Direction              string         `json:"direction"`
+	Type                   string         `json:"type"`
+	Profile                pgtype.Text    `json:"profile"`
+	IssueDate              pgtype.Date    `json:"issue_date"`
+	Period                 string         `json:"period"`
+	CustomerName           pgtype.Text    `json:"customer_name"`
+	CustomerTaxNumber      pgtype.Text    `json:"customer_tax_number"`
+	CustomerIdentityNumber pgtype.Text    `json:"customer_identity_number"`
+	Currency               string         `json:"currency"`
+	TaxExclusiveAmount     pgtype.Numeric `json:"tax_exclusive_amount"`
+	TaxAmount              pgtype.Numeric `json:"tax_amount"`
+	WithholdingAmount      pgtype.Numeric `json:"withholding_amount"`
+	PayableAmount          pgtype.Numeric `json:"payable_amount"`
+	StatusNormalized       string         `json:"status_normalized"`
+	SourceSystem           string         `json:"source_system"`
+	CaptureMethod          string         `json:"capture_method"`
+	ID                     int64          `json:"id"`
+}
+
+// İmleçli sayfa (#182), bkz. ListEngagementInvoicesAfter.
+func (q *Queries) ListTaxpayerInvoicesAfter(ctx context.Context, arg ListTaxpayerInvoicesAfterParams) ([]ListTaxpayerInvoicesAfterRow, error) {
+	rows, err := q.db.Query(ctx, listTaxpayerInvoicesAfter,
+		arg.TaxpayerID,
+		arg.CursorDate,
+		arg.CursorID,
+		arg.Period,
+		arg.Direction,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTaxpayerInvoicesAfterRow{}
+	for rows.Next() {
+		var i ListTaxpayerInvoicesAfterRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Ettn,
+			&i.InvoiceNumber,
+			&i.Direction,
+			&i.Type,
+			&i.Profile,
+			&i.IssueDate,
+			&i.Period,
+			&i.CustomerName,
+			&i.CustomerTaxNumber,
+			&i.CustomerIdentityNumber,
+			&i.Currency,
+			&i.TaxExclusiveAmount,
+			&i.TaxAmount,
+			&i.WithholdingAmount,
+			&i.PayableAmount,
+			&i.StatusNormalized,
+			&i.SourceSystem,
+			&i.CaptureMethod,
+			&i.ID,
 		); err != nil {
 			return nil, err
 		}

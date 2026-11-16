@@ -18,7 +18,7 @@ endef
 
 FRONTEND_PORT ?= 3000
 
-.PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed \
+.PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed perf-seed perf-load \
 	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n
 
 infra:
@@ -175,6 +175,15 @@ SA_SURNAME  ?= Admin
 # Baştan kurmak için: make demo-seed ARGS=-reset
 demo-seed: migrate-up
 	@$(load_env) $(MAKE) -C backend demo-seed ARGS="$(ARGS)"
+
+# Yük testi verisi (#182): 500 mükellef, 10.000 fatura. Üretimde çalışmaz.
+# Baştan kurmak için: make perf-seed ARGS=-reset
+perf-seed: migrate-up
+	@$(load_env) $(MAKE) -C backend perf-seed ARGS="$(ARGS)"
+
+# k6 ile temel yük testi (docs/performans.md). k6 kurulu olmalı.
+perf-load:
+	k6 run scripts/perf/k6-invoices.js
 
 create-super-admin:
 	@$(load_env) $(MAKE) -C backend create-super-admin \
