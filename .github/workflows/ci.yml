@@ -698,9 +698,9 @@ jobs:
   # mobile/** diff -> no release. A real API change shows up as a committed
   # schema.d.ts diff, which IS a mobile/** change and does release.
   #
-  # This job (verification, never a release) also runs on backend changes so
-  # an API edit that forgot to regenerate the committed types fails here
-  # ("api:generate is up to date") instead of drifting silently.
+  # This job (verification, never a release) also runs on backend changes.
+  # Whether the committed types match openapi.yaml is the api-types job's
+  # check (#276), so an API edit that forgot to regenerate them fails there.
   # ---------------------------------------------------------------------------
   mobile:
     needs: changes
@@ -762,15 +762,8 @@ jobs:
         env:
           EXPO_PUBLIC_APP_ENV: preview
         run: npx expo prebuild --platform android --no-install --clean
-      - name: api:generate is up to date
-        if: steps.guard.outputs.present == 'true'
-        working-directory: mobile
-        run: |
-          npm run api:generate
-          if ! git diff --exit-code -- src/core/api/ || [ -n "$(git status --porcelain -- src/core/api/)" ]; then
-            echo "::error title=Stale mobile API types::Run 'npm run api:generate' in mobile/ and commit src/core/api/schema.d.ts."
-            exit 1
-          fi
+      # Committed API types are checked by the api-types job (#276), against
+      # the branch merged with main.
 
   # HAKAN (#236): müşavir mobil uygulaması (ayrı Expo projesi, app.hakan.office).
   # mobile/ işiyle aynı denetimler; backend değişince de çalışır ki API tipleri
@@ -791,16 +784,7 @@ jobs:
           cache-dependency-path: mobile-office/package-lock.json
       - name: Install
         run: npm ci
-      # Diğer şeritler openapi.yaml'ı değiştirip yalnızca mobile/ tiplerini
-      # yeniden üretebilir. Kırmızı yerine: tipleri burada üret, işlenmiş
-      # dosya eskiyse uyar; tip denetimi taze şemayla yapılır, gerçek bir API
-      # kırılması yine yakalanır.
-      - name: api:generate (stale → warning)
-        run: |
-          npm run api:generate
-          if ! git diff --quiet -- src/core/api/; then
-            echo "::warning title=Stale mobile-office API types::Run 'npm run api:generate' in mobile-office/ and commit src/core/api/schema.d.ts."
-          fi
+      # İşlenmiş API tipleri api-types işinde denetlenir (#276).
       - name: Lint
         run: npm run lint
       - name: Typecheck
@@ -937,9 +921,53 @@ jobs:
   # Single required status check. Passes when every gated job is success or
   # skipped; fails if any failed or was cancelled. Make THIS the required check
   # in branch protection (not the individual jobs, which skip by design).
+  # ---------------------------------------------------------------------------
+  # HAKAN (#276): API tipleri. frontend/src/generated/api.d.ts,
+  # mobile/src/core/api/schema.d.ts ve mobile-office/src/core/api/schema.d.ts
+  # backend/docs/openapi.yaml'dan üretilip işlenir. Bu iş üçünü yeniden üretir
+  # ve işlenmiş dosyalardan farklıysa düşer (zorunlu, kapıda).
+  #
+  # Dal main ile birleştirilerek denetlenir: openapi.yaml'a dokunan iki PR ayrı
+  # ayrı yeşil olup birlikte main'i kırabiliyordu (biri birleşince ötekinin
+  # tipleri eskir). Birleştirme çakışırsa dal kendi hâliyle denetlenir; çakışma
+  # zaten birleştirmeyi durdurur. Düzeltme: main'i al, make api-types, işle.
+  # ---------------------------------------------------------------------------
+  api-types:
+    needs: changes
+    if: >-
+      needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' ||
+      needs.changes.outputs.mobile == 'true' || needs.changes.outputs.mobile_office == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: main ile birleştir (yalnızca dallarda)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          git config user.name "ci"
+          git config user.email "ci@users.noreply.github.com"
+          git fetch --no-tags --quiet origin main
+          if git merge --no-edit --no-ff FETCH_HEAD >/dev/null 2>&1; then
+            echo "Denetim dal + main birleşimi üzerinde (\`$(git rev-parse --short FETCH_HEAD)\`)." >> "$GITHUB_STEP_SUMMARY"
+          else
+            git merge --abort || true
+            echo "::warning title=api-types::main ile birleştirme çakıştı; dal kendi hâliyle denetleniyor."
+          fi
+      - name: API tipleri güncel mi
+        run: |
+          if ! scripts/api-types.sh --check; then
+            echo "::error title=Eskimiş API tipleri::backend/docs/openapi.yaml ile işlenmiş tipler uyuşmuyor. main'i dala alın, 'make api-types' çalıştırın ve frontend/src/generated/api.d.ts, mobile/src/core/api/schema.d.ts, mobile-office/src/core/api/schema.d.ts dosyalarını işleyin."
+            exit 1
+          fi
+
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, security, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, security, api-types, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

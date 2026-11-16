@@ -18,7 +18,7 @@ endef
 
 FRONTEND_PORT ?= 3000
 
-.PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed perf-seed perf-load \
+.PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed perf-seed perf-load \
 	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n
 
 infra:
@@ -130,6 +130,15 @@ env-check: compose-env-check
 compose-env-check:
 	scripts/check-compose-env.sh
 	scripts/check-compose-env.test.sh
+
+# API tipleri (#276): backend/docs/openapi.yaml değişince frontend, mobile ve
+# mobile-office tiplerini birlikte üret. CI (api-types işi) main ile
+# birleştirilmiş hâli api-types-check ile denetler.
+api-types:
+	scripts/api-types.sh
+
+api-types-check:
+	scripts/api-types.sh --check
 
 prod-config:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml config
