@@ -24,6 +24,7 @@ import { SessionManager } from "@/features/account/components/session-manager";
 import { TotpManager } from "@/features/account/components/totp-manager";
 import { ProfileEditForm } from "@/features/account/components/profile-edit-form";
 import { ProfilePermissionsList } from "@/features/account/components/profile-permissions-list";
+import { MyLegalAcceptancesCard } from "@/features/legal";
 import { isApiError } from "@/lib/api";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -261,6 +262,8 @@ export function AccountProfilePage({ shell }: { shell: AccountShell }) {
           <ProfilePermissionsList granted={user?.permissions} />
         </CardContent>
       </Card>
+
+      <MyLegalAcceptancesCard />
 
       <Card className="border-destructive/40 shadow-none">
         <CardHeader>

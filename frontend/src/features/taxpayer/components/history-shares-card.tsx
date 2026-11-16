@@ -15,6 +15,11 @@ import {
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
+  isLegalVersionOutdated,
+  LegalConsentCheckbox,
+  useLegalConsent,
+} from "@/features/legal";
+import {
   useCreateHistoryShare,
   useHistoryShares,
   useRevokeHistoryShare,
@@ -30,6 +35,10 @@ import { useLocale } from "@/providers/locale-provider";
  * sees documents from before the engagement only with the owner's consent,
  * which can be revoked. Only owners can read the list; for anyone else the
  * call is refused and the card stays hidden.
+ *
+ * Sharing is an explicit consent (KVKK md. 5/1, issue #57): the owner ticks
+ * the `history_share_consent` text and its version is sent with the share;
+ * revoking withdraws it.
  */
 export function HistorySharesCard({ taxpayer }: { taxpayer: string }) {
   const { t, locale } = useLocale();
@@ -42,6 +51,7 @@ export function HistorySharesCard({ taxpayer }: { taxpayer: string }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [rangeError, setRangeError] = useState<string | null>(null);
+  const consent = useLegalConsent("history_share_consent", query.isSuccess);
 
   if (!query.isSuccess) return null;
   const items = query.data.items;
@@ -54,15 +64,24 @@ export function HistorySharesCard({ taxpayer }: { taxpayer: string }) {
       return;
     }
     setRangeError(null);
+    const accepted = consent.acceptance;
+    if (!accepted) return; // the submit button is disabled until ticked
     create.mutate(
       {
         ...(fromDate ? { from_date: fromDate } : {}),
         ...(toDate ? { to_date: toDate } : {}),
+        consent_version: accepted.version,
+        consent_language: accepted.language,
       },
       {
         onSuccess: () => {
           setFromDate("");
           setToDate("");
+          // Each share is a consent of its own: ask again next time.
+          consent.reset();
+        },
+        onError: (error) => {
+          if (isLegalVersionOutdated(error)) consent.markOutdated();
         },
       },
     );
@@ -112,7 +131,10 @@ export function HistorySharesCard({ taxpayer }: { taxpayer: string }) {
                 aria-invalid={rangeError ? true : undefined}
               />
             </div>
-            <Button type="submit" disabled={create.isPending}>
+            <Button
+              type="submit"
+              disabled={create.isPending || !consent.acceptance}
+            >
               <Share2 className="size-4" />
               {t("taxpayer.history_submit")}
             </Button>
@@ -120,6 +142,11 @@ export function HistorySharesCard({ taxpayer }: { taxpayer: string }) {
           <p className="text-muted-foreground text-xs">
             {t("taxpayer.history_form_hint")}
           </p>
+          <LegalConsentCheckbox
+            consent={consent}
+            label={t("taxpayer.history_consent_label")}
+            disabled={create.isPending}
+          />
           {rangeError ? (
             <p role="alert" className="text-destructive text-sm">
               {rangeError}

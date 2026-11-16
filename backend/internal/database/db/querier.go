@@ -253,6 +253,9 @@ type Querier interface {
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
+	// KVKK hukuki metinleri ve onaylar (issue #57). Platform geneli tablolar;
+	// ofis ve mükellef kapsamı onay kaydının kendisindedir.
+	GetCurrentLegalDocument(ctx context.Context, arg GetCurrentLegalDocumentParams) (LegalDocument, error)
 	GetDesktopAgent(ctx context.Context, arg GetDesktopAgentParams) (DesktopAgent, error)
 	GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams) (GetDocumentTaskRow, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
@@ -279,6 +282,8 @@ type Querier interface {
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
 	GetLatestDataWarning(ctx context.Context, arg GetLatestDataWarningParams) (DataWarning, error)
+	GetLegalDocumentByUUID(ctx context.Context, argUuid uuid.UUID) (LegalDocument, error)
+	GetLegalDocumentVersion(ctx context.Context, arg GetLegalDocumentVersionParams) (LegalDocument, error)
 	GetLogPurgeRuleByUUID(ctx context.Context, argUuid uuid.UUID) (LogPurgeRule, error)
 	GetMissingDocumentCandidate(ctx context.Context, arg GetMissingDocumentCandidateParams) (GetMissingDocumentCandidateRow, error)
 	GetNotificationByID(ctx context.Context, id int64) (Notification, error)
@@ -297,6 +302,8 @@ type Querier interface {
 	GetOrganizationByUUID(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	// Lookup by the hashed bearer token (the plain token is never stored).
 	GetOrganizationInvitationByTokenHash(ctx context.Context, tokenHash string) (GetOrganizationInvitationByTokenHashRow, error)
+	// Ofisin bu türdeki en son geçerli onayı.
+	GetOrganizationLegalAcceptance(ctx context.Context, arg GetOrganizationLegalAcceptanceParams) (GetOrganizationLegalAcceptanceRow, error)
 	GetOrganizationMember(ctx context.Context, arg GetOrganizationMemberParams) (GetOrganizationMemberRow, error)
 	GetOrganizationMemberByUserUUID(ctx context.Context, arg GetOrganizationMemberByUserUUIDParams) (GetOrganizationMemberByUserUUIDRow, error)
 	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
@@ -392,6 +399,9 @@ type Querier interface {
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
+	InsertLegalAcceptance(ctx context.Context, arg InsertLegalAcceptanceParams) (LegalAcceptance, error)
+	// Sürüm numarası türün ve dilin en büyük sürümünün bir fazlası.
+	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
 	InsertPeriodLock(ctx context.Context, arg InsertPeriodLockParams) (PeriodLock, error)
@@ -440,6 +450,7 @@ type Querier interface {
 	ListAllExcelImportRows(ctx context.Context, arg ListAllExcelImportRowsParams) ([]ExcelImportRow, error)
 	ListAllExportJobs(ctx context.Context, arg ListAllExportJobsParams) ([]ExportJob, error)
 	ListAllImportJobs(ctx context.Context, arg ListAllImportJobsParams) ([]ImportJob, error)
+	ListAllLegalDocuments(ctx context.Context) ([]LegalDocument, error)
 	ListAllPermissionSlugs(ctx context.Context) ([]string, error)
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
@@ -468,6 +479,7 @@ type Querier interface {
 	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
 	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
 	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)
+	ListCurrentLegalDocuments(ctx context.Context, language string) ([]LegalDocument, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
@@ -615,6 +627,7 @@ type Querier interface {
 	// tenant-lint: org-wide ofis inceleme kuyruğu; read_all yoksa engagement_assignments ile süzülür
 	ListTenantSuggestions(ctx context.Context, arg ListTenantSuggestionsParams) ([]ListTenantSuggestionsRow, error)
 	ListUBLUploadJobs(ctx context.Context, arg ListUBLUploadJobsParams) ([]UblUploadJob, error)
+	ListUserLegalAcceptances(ctx context.Context, userID int64) ([]ListUserLegalAcceptancesRow, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
 	ListUserRolesByUserUUID(ctx context.Context, argUuid uuid.UUID) ([]Role, error)
@@ -689,6 +702,7 @@ type Querier interface {
 	// üzere 'pending'e döner (tam tarama, yeniden ilk yükleme). Çalışan ya da
 	// hatalı pencere olduğu gibi kalır.
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
+	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
@@ -705,6 +719,7 @@ type Querier interface {
 	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
 	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
 	RetireAccountRule(ctx context.Context, arg RetireAccountRuleParams) (int64, error)
+	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
@@ -860,6 +875,7 @@ type Querier interface {
 	VATForecastLines(ctx context.Context, arg VATForecastLinesParams) ([]VATForecastLinesRow, error)
 	// Plaka mükellefin listesinde ve fiş tarihi geçerlilik aralığında mı (T8).
 	VehicleRegisteredOn(ctx context.Context, arg VehicleRegisteredOnParams) (bool, error)
+	WithdrawLegalAcceptancesBySubject(ctx context.Context, subjectUuid pgtype.UUID) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

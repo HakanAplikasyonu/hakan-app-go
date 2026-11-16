@@ -62,6 +62,8 @@ import (
 	oauthproviderhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/handler"
 	oauthproviderusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/usecase"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
+	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
+	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
 	logsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/usecase"
 	notifmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications"
@@ -309,6 +311,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	// Organizations (tenant core). Platform management is always mounted;
 	// the /v1/tenant/* shell only with TENANCY_ENABLED.
+	// KVKK metinleri ve onay kayıtları (issue #57).
+	legalSvc := legalusecase.NewPostgres(deps.DB)
 	orgRepo := orgrepository.NewPostgres(deps.DB, deps.Queries)
 	orgSvc := orgusecase.New(orgRepo, nil)
 	organizationsmodule.RegisterRoutes(mux, orghandler.New(orgSvc, activityRec), tokens, loader)
@@ -346,9 +350,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		onboarding := taxpayersmodule.NewOnboarding(deps.DB, notifSvc, orgCache,
 			taxpayersmodule.OnboardingConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
 		uc.SetInvitationGate(taxpayersmodule.ChainGates(orgSvc, members, onboarding))
-		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, ratelimit.New(deps.Redis, cfg.App.Env))
+		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, ratelimit.New(deps.Redis, cfg.App.Env)).WithNotice(legalSvc)
 		// Office change (issue #8): history shares and archive reads.
-		historyHandler = taxpayersmodule.NewHistoryHandler(taxpayersmodule.NewHistory(deps.DB))
+		historyHandler = taxpayersmodule.NewHistoryHandler(taxpayersmodule.NewHistory(deps.DB).WithConsents(legalSvc))
 		tenantResolver = orgCache
 		// Engagements (issue #2): assignment changes bump the organization's
 		// cache version, so engagement and membership answers expire together.
@@ -530,6 +534,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
 		agents:   agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		legal:    legalhandler.New(legalSvc),
 		doctasks: doctasksmodule.NewHandler(docTasksSvc),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,

@@ -48,5 +48,6 @@
   "sign_in": "Sign in",
   "back_to_login": "Back to sign in",
   "continue": "Continue",
-  "area_requires": "This area requires {{area}} access."
+  "area_requires": "This area requires {{area}} access.",
+  "codes.LEGAL_VERSION_OUTDATED": "The text has been updated. Please read the new version and accept it again."
 }
