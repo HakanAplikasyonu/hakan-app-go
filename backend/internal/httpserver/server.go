@@ -581,10 +581,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
-		agents:     agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
-		legal:      legalhandler.New(legalSvc),
-		doctasks:   doctasksmodule.NewHandler(docTasksSvc),
-		officedash: &officedashmodule.Handler{Q: deps.Queries},
+		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		legal:         legalhandler.New(legalSvc),
+		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
+		officedash:    &officedashmodule.Handler{Q: deps.Queries},
+		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

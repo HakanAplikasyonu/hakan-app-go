@@ -451,7 +451,7 @@ func (q *Queries) LockOnboardingRequest(ctx context.Context, id int64) (Taxpayer
 }
 
 const lockTaxpayerByTaxID = `-- name: LockTaxpayerByTaxID :one
-SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office FROM taxpayers WHERE tax_id = $1 FOR UPDATE
+SELECT id, uuid, created_at, updated_at, kind, tax_id, title, tax_office, contact_phone, contact_email FROM taxpayers WHERE tax_id = $1 FOR UPDATE
 `
 
 func (q *Queries) LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error) {
@@ -466,6 +466,8 @@ func (q *Queries) LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpay
 		&i.TaxID,
 		&i.Title,
 		&i.TaxOffice,
+		&i.ContactPhone,
+		&i.ContactEmail,
 	)
 	return i, err
 }

@@ -3167,6 +3167,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/clients": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office taxpayer list (müşavir mobil)
+         * @description Requires `tenant.engagements.read`. Active engagements of the office
+         *     with the taxpayer identity and open warning / task counts, ordered by
+         *     title. Without `tenant.engagements.read_all` only engagements assigned
+         *     to the caller. `q` matches the title (contains, case-insensitive) or
+         *     the start of the tax id. Keyset pagination: pass `next_cursor` back as
+         *     `cursor` (issue #182); null on the last page.
+         */
+        get: operations["listOfficeClients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/contacts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer contact details
+         * @description Requires `tenant.engagements.read` and engagement access. The
+         *     taxpayer's identity, its contact phone / e-mail (may be null) and the
+         *     active mükellef accounts (owner first, at most 20).
+         */
+        get: operations["getEngagementContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/image": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                receiptUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Receipt photo (preview)
+         * @description Requires `tenant.receipts.read` and engagement access. The captured
+         *     photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
+         *     not an image.
+         */
+        get: operations["getEngagementReceiptImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/warnings": {
         parameters: {
             query?: never;
@@ -5358,6 +5450,168 @@ export interface paths {
          * @description Requires `tenant.journals.read`. The storage path comes from the export record, never from the request.
          */
         get: operations["downloadJournalExportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/privacy-requests": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * KVKK data subject requests of the engagement
+         * @description Requires `tenant.privacy.request`. Newest first (issue
+         */
+        get: operations["listPrivacyRequests"];
+        put?: never;
+        /**
+         * Open a data subject request (export or erasure)
+         * @description Requires `tenant.privacy.request`. The request stays `pending` until an
+         *     office owner/admin approves it. `subject_type: user` needs
+         *     `subject_user_uuid` of a user of this engagement's taxpayer
+         *     (`422 PRIVACY_SUBJECT_UNKNOWN` otherwise).
+         */
+        post: operations["createPrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One data subject request
+         * @description Requires `tenant.privacy.request`.
+         */
+        get: operations["getPrivacyRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve and run a pending request
+         * @description Requires `tenant.privacy.approve` (owner/admin). An export becomes
+         *     downloadable until `expires_at`. An erasure anonymises in the same
+         *     transaction: taxpayer users with no other office or taxpayer tie are
+         *     anonymised (personal fields replaced, sessions, devices, passkeys,
+         *     sign-in links and notifications deleted), every user's link to the
+         *     taxpayer is removed, invitation and onboarding contact e-mails are
+         *     masked. Accounting records, the taxpayer identity, consent records
+         *     and the audit log are kept; `summary.retained` says until when.
+         *     `409 PRIVACY_REQUEST_DECIDED` when not pending.
+         */
+        post: operations["approvePrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/reject": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a pending request
+         * @description Requires `tenant.privacy.approve`. `note` is required (`400 NOTE_REQUIRED`).
+         */
+        post: operations["rejectPrivacyRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download an approved export (ZIP of JSON files)
+         * @description Requires `tenant.privacy.approve`. `manifest.json` lists the files.
+         *     Built from current data at download time; every download is written
+         *     to the audit log. `409 PRIVACY_EXPORT_NOT_READY` (not an approved
+         *     export), `410 PRIVACY_EXPORT_EXPIRED`.
+         */
+        get: operations["downloadPrivacyExport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8572,6 +8826,66 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        OfficeClient: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            tax_office: string;
+            /** Format: int64 */
+            open_warnings: number;
+            /** Format: int64 */
+            open_blockers: number;
+            /**
+             * Format: int64
+             * @description Document tasks open or submitted
+             */
+            open_tasks: number;
+            assigned_to_me: boolean;
+        };
+        OfficeClientPage: {
+            items: components["schemas"]["OfficeClient"][];
+            /** Format: int32 */
+            limit: number;
+            /** @description Cursor of the next page (`?cursor=`); null on the last page. */
+            next_cursor: string | null;
+        };
+        EnvelopeOfficeClientPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeClientPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EngagementContacts: {
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            tax_office: string;
+            phone: string | null;
+            email: string | null;
+            members: {
+                /** Format: uuid */
+                uuid: string;
+                name: string;
+                surname: string;
+                email: string;
+                /** @enum {string} */
+                role: "owner" | "employee";
+            }[];
+        };
+        EnvelopeEngagementContacts: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementContacts"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeOfficeDashboard: {
             /** @enum {boolean} */
             success: true;
@@ -10485,6 +10799,61 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["JournalExportDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PrivacyRequestInput: {
+            /** @enum {string} */
+            kind: "export" | "erasure";
+            /** @enum {string} */
+            subject_type: "taxpayer" | "user";
+            /**
+             * Format: uuid
+             * @description Required when subject_type is user
+             */
+            subject_user_uuid?: string;
+            reason?: string;
+        };
+        PrivacyDecisionInput: {
+            note?: string;
+        };
+        PrivacyRequest: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "export" | "erasure";
+            /** @enum {string} */
+            subject_type: "taxpayer" | "user";
+            /** Format: uuid */
+            subject_user_uuid?: string;
+            /** @enum {string} */
+            status: "pending" | "rejected" | "completed" | "failed";
+            reason: string;
+            decision_note: string;
+            /** @description What the request did (erasure counts, `retained` with `retention_until`) or `export_expires_at`. */
+            summary: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            decided_at?: string;
+            /** Format: date-time */
+            completed_at?: string;
+            /** Format: date-time */
+            expires_at?: string;
+        };
+        EnvelopePrivacyRequest: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["PrivacyRequest"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopePrivacyRequestList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["PrivacyRequest"][];
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeJournalExportSettings: {
@@ -16759,6 +17128,107 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listOfficeClients: {
+        parameters: {
+            query?: {
+                q?: string;
+                filter?: "all" | "warnings" | "tasks" | "mine";
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taxpayers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeClientPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementContacts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementContacts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementReceiptImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                receiptUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listOfficeWarnings: {
         parameters: {
             query?: {
@@ -20299,6 +20769,238 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPrivacyRequests: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePrivacyRequestList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Opened */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePrivacyRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `PRIVACY_SUBJECT_UNKNOWN` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePrivacyRequest"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approvePrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PrivacyDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description Completed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePrivacyRequest"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rejectPrivacyRequest: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyDecisionInput"];
+            };
+        };
+        responses: {
+            /** @description Rejected */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePrivacyRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadPrivacyExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                requestUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP archive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `PRIVACY_EXPORT_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

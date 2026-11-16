@@ -136,8 +136,9 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string, nTaxpayers, nInv
 		args []any
 	}{
 		{"taxpayers", `
-			INSERT INTO taxpayers (kind, tax_id, title, tax_office)
-			SELECT 'legal', $1 || lpad(g::text, 8, '0'), 'Perf Mükellef ' || g || ' Ltd. Şti.', 'Perf VD'
+			INSERT INTO taxpayers (kind, tax_id, title, tax_office, contact_phone, contact_email)
+			SELECT 'legal', $1 || lpad(g::text, 8, '0'), 'Perf Mükellef ' || g || ' Ltd. Şti.', 'Perf VD',
+			       '+90 555 ' || lpad(g::text, 7, '0'), 'mukellef' || g || '@perf.test'
 			FROM generate_series(1, $2) g`, []any{taxIDPrefix, nTaxpayers}},
 		{"engagements", `
 			INSERT INTO engagements (organization_id, taxpayer_id, status, started_at)

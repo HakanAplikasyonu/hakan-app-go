@@ -291,6 +291,8 @@ type Querier interface {
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
+	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
+	GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error)
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -547,6 +549,7 @@ type Querier interface {
 	// karşılaştırması idx_invoices_taxpayer_issue indeksinde sınır koşuludur,
 	// derin sayfa da ilk sayfa kadar ucuzdur.
 	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
+	ListEngagementTaxpayerMembers(ctx context.Context, arg ListEngagementTaxpayerMembersParams) ([]ListEngagementTaxpayerMembersRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
 	ListEngagementVisibleInvoices(ctx context.Context, arg ListEngagementVisibleInvoicesParams) ([]ListEngagementVisibleInvoicesRow, error)
@@ -598,6 +601,10 @@ type Querier interface {
 	ListOAuthAccountsByUserID(ctx context.Context, userID int64) ([]ListOAuthAccountsByUserIDRow, error)
 	ListOAuthAccountsForUserIDs(ctx context.Context, userIds []int64) ([]ListOAuthAccountsForUserIDsRow, error)
 	ListOAuthProviderSettings(ctx context.Context) ([]OauthProviderSetting, error)
+	// Müşavir mobil mükellef listesi ve ayrıntısı (issue #238). İstekler RLS
+	// kapsamında (issue #166) çalışır; süzgeçler burada da açıkça yazılır.
+	// tenant-lint: org-wide ofis mükellef listesi; read_all yoksa engagement_assignments ile süzülür
+	ListOfficeClients(ctx context.Context, arg ListOfficeClientsParams) ([]ListOfficeClientsRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
