@@ -160,6 +160,13 @@ engagement's taxpayer (`rls.Narrow`). Writes are buffered and roll back on
 4xx/5xx; GET/HEAD stream. Inside the scope every RLS table, enforced or in
 transition, is filtered by the scope policies.
 
+**Workers.** A job working for one office puts its own transactions under
+`rls.Job(orgID, taxpayerID...)` with `rls.Apply(ctx, tx, scope)` (worker
+role), skipped when `rls.InScope(ctx)` (already in a request scope). Jobs
+that scan every office (reminders, offline sweeps) run in one `rls.System`
+transaction with a reason. Questions that are not one tenant's ("which
+office serves this taxpayer now") read through `rls.System`.
+
 Exceptions, on purpose:
 - Secrets (`secret_records`, platform) are read and written by the vault on
   its own connection, never in a tenant scope.
@@ -175,7 +182,9 @@ inserter to `leakFixtures` (`rls_enforcement_db_test.go`). A data migration
 touching an enforced table as a non-superuser owner must
 `SET LOCAL app.system = 'on'` first.
 
-Tests: `TestRLSCoversScopedTables` (every listed table has a policy),
+Tests: `TestScopedPoliciesMatchTemplates` (every listed table carries
+exactly its template policy, nothing wider; the template behaviour is tested
+in `internal/platform/rls`), `TestRLSCoversScopedTables` (every listed table has a policy),
 `TestRLSEnforcement` (every RLS table is in one state, the list matches),
 `TestEnforcedTablesDoNotLeak` (per enforced table: unscoped sees and writes
 nothing, office A sees and writes only its own rows, System sees all, the

@@ -81,6 +81,28 @@ func WithScope(ctx context.Context, db Beginner, s Scope, fn func(ctx context.Co
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	s.Role = role
+	if err := Apply(ctx, tx, s); err != nil {
+		return err
+	}
+	if err := fn(dbtx.WithTx(ctx, tx), tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Apply puts an open transaction under s (SET LOCAL ROLE and the context
+// settings) until it ends. For code that already owns its transaction, such
+// as a worker's per-item transaction (issue #166). Do not use it on a
+// savepoint you will release inside another scope: SET LOCAL outlives it.
+func Apply(ctx context.Context, tx pgx.Tx, s Scope) error {
+	role := s.Role
+	if role == "" {
+		role = RoleApp
+	}
+	if role != RoleApp && role != RoleWorker {
+		return fmt.Errorf("%w: %q", ErrUnknownRole, role)
+	}
 	if _, err := tx.Exec(ctx, "SET LOCAL ROLE "+string(role)); err != nil {
 		return fmt.Errorf("rls: set role: %w", err)
 	}
@@ -93,10 +115,7 @@ func WithScope(ctx context.Context, db Beginner, s Scope, fn func(ctx context.Co
 	); err != nil {
 		return fmt.Errorf("rls: set context: %w", err)
 	}
-	if err := fn(dbtx.WithTx(ctx, tx), tx); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 func idOrEmpty(id int64) string {
@@ -154,4 +173,17 @@ func System(ctx context.Context, db Beginner, reason string, fn func(ctx context
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// InScope reports whether ctx carries a scoped (or System) transaction: work
+// started there is already under row level security.
+func InScope(ctx context.Context) bool {
+	_, ok := dbtx.Tx(ctx)
+	return ok
+}
+
+// Job is the scope of a background job working for one office's engagement
+// of a taxpayer (worker role, all of the office's engagements visible).
+func Job(orgID int64, taxpayerIDs ...int64) Scope {
+	return Scope{Role: RoleWorker, OrganizationID: orgID, EngagementsReadAll: true, TaxpayerIDs: taxpayerIDs}
 }
