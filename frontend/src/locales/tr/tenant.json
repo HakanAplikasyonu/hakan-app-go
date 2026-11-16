@@ -82,6 +82,7 @@
   "roles_description_label": "Açıklama",
   "roles_permissions": "İzinler",
   "roles_owner_locked": "Sahip rolü her zaman tüm izinlere sahiptir; izinleri değiştirilemez.",
+  "roles_grant_hint": "Yalnızca sizde olan izinleri ekleyebilirsiniz. Rolde zaten olan izinler kalabilir ya da çıkarılabilir.",
   "roles_validation_key": "Geçerli bir anahtar girin (ör. kidemli_personel).",
   "roles_validation_name": "Ad zorunludur.",
   "settings_title": "Organizasyon ayarları",

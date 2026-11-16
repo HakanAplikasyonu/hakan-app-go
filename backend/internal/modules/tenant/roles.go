@@ -51,6 +51,7 @@ func (h *Handler) createRole(w http.ResponseWriter, r *http.Request) {
 	}
 	role, err := h.svc.CreateRole(r.Context(), s.ID, orgusecase.RoleInput{
 		Key: in.Key, Name: in.Name, Description: in.Description, Permissions: in.Permissions,
+		Grantor: grantor(s),
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -73,6 +74,7 @@ func (h *Handler) patchRole(w http.ResponseWriter, r *http.Request) {
 	}
 	role, err := h.svc.UpdateRole(r.Context(), s.ID, orgusecase.RoleInput{
 		Key: key, Name: in.Name, Description: in.Description, Permissions: in.Permissions,
+		Grantor: grantor(s),
 	})
 	if err != nil {
 		writeError(w, r, err)

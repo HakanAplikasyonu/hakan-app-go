@@ -106,6 +106,7 @@ func TestCustomRoleAppliesOnlyInItsOffice(t *testing.T) {
 	role, err := e.svc.CreateRole(ctx, orgA, usecase.RoleInput{
 		Key: "kidemli", Name: ptr("Kıdemli müşavir"),
 		Permissions: &[]string{"tenant.engagements.read", "tenant.engagements.read_all", "tenant.engagements.read"},
+		Grantor:     usecase.OwnerGrantor,
 	})
 	if err != nil {
 		t.Fatalf("create role: %v", err)
@@ -118,7 +119,7 @@ func TestCustomRoleAppliesOnlyInItsOffice(t *testing.T) {
 	}
 
 	before = e.inv.n.Load()
-	if _, err := e.svc.ChangeMemberRole(ctx, orgAUUID, uUUID, "kidemli", "owner"); err != nil {
+	if _, err := e.svc.ChangeMemberRole(ctx, orgAUUID, uUUID, "kidemli", usecase.OwnerGrantor); err != nil {
 		t.Fatalf("assign custom role: %v", err)
 	}
 	if e.inv.n.Load() <= before {
@@ -141,7 +142,7 @@ func TestCustomRoleAppliesOnlyInItsOffice(t *testing.T) {
 	}
 
 	// Başka ofisin rolü atanamıyor: B'de "kidemli" yok.
-	if _, err := e.svc.ChangeMemberRole(ctx, orgBUUID, uUUID, "kidemli", "owner"); !errors.Is(err, usecase.ErrRoleNotFound) {
+	if _, err := e.svc.ChangeMemberRole(ctx, orgBUUID, uUUID, "kidemli", usecase.OwnerGrantor); !errors.Is(err, usecase.ErrRoleNotFound) {
 		t.Fatalf("assigning office A's role in office B: %v, want ErrRoleNotFound", err)
 	}
 	// Veritabanı da reddeder (doğrudan yazım).
@@ -158,7 +159,7 @@ func TestCustomRoleAppliesOnlyInItsOffice(t *testing.T) {
 
 	// İzin değişikliği o ofiste hemen geçerli; önbellek sayacı artar.
 	before = e.inv.n.Load()
-	if _, err := e.svc.UpdateRole(ctx, orgA, usecase.RoleInput{Key: "kidemli", Permissions: &[]string{"tenant.engagements.read"}}); err != nil {
+	if _, err := e.svc.UpdateRole(ctx, orgA, usecase.RoleInput{Key: "kidemli", Permissions: &[]string{"tenant.engagements.read"}, Grantor: usecase.OwnerGrantor}); err != nil {
 		t.Fatal(err)
 	}
 	if e.inv.n.Load() <= before {
@@ -173,7 +174,7 @@ func TestCustomRoleAppliesOnlyInItsOffice(t *testing.T) {
 	if err := e.svc.DeleteRole(ctx, orgA, "kidemli"); !errors.Is(err, usecase.ErrRoleInUse) {
 		t.Fatalf("delete in-use role: %v", err)
 	}
-	if _, err := e.svc.ChangeMemberRole(ctx, orgAUUID, uUUID, "member", "owner"); err != nil {
+	if _, err := e.svc.ChangeMemberRole(ctx, orgAUUID, uUUID, "member", usecase.OwnerGrantor); err != nil {
 		t.Fatal(err)
 	}
 	if err := e.svc.DeleteRole(ctx, orgA, "kidemli"); err != nil {
@@ -195,14 +196,14 @@ func TestSystemRolesAndOwnerProtection(t *testing.T) {
 			t.Errorf("delete system role %s: %v", k, err)
 		}
 	}
-	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{Key: "owner", Permissions: &[]string{}}); !errors.Is(err, usecase.ErrInvalidRequest) {
+	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{Key: "owner", Permissions: &[]string{}, Grantor: usecase.OwnerGrantor}); !errors.Is(err, usecase.ErrInvalidRequest) {
 		t.Fatalf("editing owner permissions: %v", err)
 	}
 	// Sistem rolünün adı ve izinleri değişebilir.
-	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{Key: "intern", Name: ptr("Aday"), Permissions: &[]string{"tenant.settings.read"}}); err != nil {
+	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{Key: "intern", Name: ptr("Aday"), Permissions: &[]string{"tenant.settings.read"}, Grantor: usecase.OwnerGrantor}); err != nil {
 		t.Fatalf("edit system role: %v", err)
 	}
-	if _, err := e.svc.CreateRole(ctx, org, usecase.RoleInput{Key: "admin", Name: ptr("x"), Permissions: &[]string{}}); !errors.Is(err, usecase.ErrRoleKeyTaken) {
+	if _, err := e.svc.CreateRole(ctx, org, usecase.RoleInput{Key: "admin", Name: ptr("x"), Permissions: &[]string{}, Grantor: usecase.OwnerGrantor}); !errors.Is(err, usecase.ErrRoleKeyTaken) {
 		t.Fatalf("duplicate key: %v", err)
 	}
 	for _, bad := range []usecase.RoleInput{
@@ -215,8 +216,77 @@ func TestSystemRolesAndOwnerProtection(t *testing.T) {
 		}
 	}
 	// Son sahip koruması korunur.
-	if _, err := e.svc.ChangeMemberRole(ctx, orgUUID, ownerUUID, "admin", "owner"); !errors.Is(err, usecase.ErrLastOrganizationOwner) {
+	if _, err := e.svc.ChangeMemberRole(ctx, orgUUID, ownerUUID, "admin", usecase.OwnerGrantor); !errors.Is(err, usecase.ErrLastOrganizationOwner) {
 		t.Fatalf("demoting last owner: %v", err)
+	}
+}
+
+// TestRolePermissionsCannotEscalate: rol yazma izni olan kullanıcı yalnızca
+// kendisinde olan izinleri bir role koyabilir ya da rolle verebilir (#167).
+func TestRolePermissionsCannotEscalate(t *testing.T) {
+	e := newRoleEnv(t)
+	ctx := context.Background()
+	org := e.d.Organization(t)
+	owner, staff := e.d.User(t), e.d.User(t)
+	e.d.Member(t, org, owner, "owner")
+	e.d.Member(t, org, staff, "member")
+	_, orgUUID, staffUUID := e.uuids(t, org, staff)
+	lead := usecase.Grantor{Role: "ekip_lideri", Permissions: []string{
+		"tenant.roles.write", "tenant.members.write", "tenant.engagements.read",
+	}}
+
+	// Kendisinde olmayan izinle yeni rol açılamaz.
+	_, err := e.svc.CreateRole(ctx, org, usecase.RoleInput{
+		Key: "genis", Name: ptr("Geniş"), Grantor: lead,
+		Permissions: &[]string{"tenant.engagements.read", "tenant.engagements.read_all"},
+	})
+	if !errors.Is(err, usecase.ErrPermissionEscalation) {
+		t.Fatalf("create with foreign permission: %v", err)
+	}
+	if _, err := e.svc.CreateRole(ctx, org, usecase.RoleInput{
+		Key: "dar", Name: ptr("Dar"), Grantor: lead, Permissions: &[]string{"tenant.engagements.read"},
+	}); err != nil {
+		t.Fatalf("create within own permissions: %v", err)
+	}
+
+	// Var olan role yeni izin eklenemez; rolde zaten olan izin kalabilir,
+	// izin çıkarılabilir.
+	if _, err := e.svc.CreateRole(ctx, org, usecase.RoleInput{
+		Key: "genis", Name: ptr("Geniş"), Grantor: usecase.OwnerGrantor,
+		Permissions: &[]string{"tenant.engagements.read", "tenant.engagements.read_all"},
+	}); err != nil {
+		t.Fatalf("owner create: %v", err)
+	}
+	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{
+		Key: "dar", Grantor: lead, Permissions: &[]string{"tenant.engagements.read", "tenant.settings.write"},
+	}); !errors.Is(err, usecase.ErrPermissionEscalation) {
+		t.Fatalf("adding foreign permission: %v", err)
+	}
+	if _, err := e.svc.UpdateRole(ctx, org, usecase.RoleInput{
+		Key: "genis", Name: ptr("Geniş ekip"), Grantor: lead,
+		Permissions: &[]string{"tenant.engagements.read_all"},
+	}); err != nil {
+		t.Fatalf("keeping existing and removing permissions: %v", err)
+	}
+	roles, err := e.svc.ListRoles(ctx, org)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range roles {
+		if r.Key == "dar" && (len(r.Permissions) != 1 || r.Permissions[0] != "tenant.engagements.read") {
+			t.Fatalf("rejected update changed the role: %v", r.Permissions)
+		}
+	}
+
+	// Kendisinde olmayan izni taşıyan rol üyeye verilemez.
+	if _, err := e.svc.ChangeMemberRole(ctx, orgUUID, staffUUID, "genis", lead); !errors.Is(err, usecase.ErrPermissionEscalation) {
+		t.Fatalf("assigning broader role: %v", err)
+	}
+	if _, err := e.svc.ChangeMemberRole(ctx, orgUUID, staffUUID, "dar", lead); err != nil {
+		t.Fatalf("assigning role within own permissions: %v", err)
+	}
+	if _, err := e.svc.ChangeMemberRole(ctx, orgUUID, staffUUID, "genis", usecase.OwnerGrantor); err != nil {
+		t.Fatalf("owner assigning: %v", err)
 	}
 }
 

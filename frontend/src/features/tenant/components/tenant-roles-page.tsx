@@ -1,7 +1,7 @@
 "use client";
 
 import { Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { z } from "zod";
 
@@ -54,9 +54,12 @@ type DialogState = { mode: "create" } | { mode: "edit"; role: TenantRole };
 function PermissionChecklist({
   items,
   disabled,
+  canGrant,
 }: {
   items: readonly TenantPermission[];
   disabled: boolean;
+  /** Permissions the user may add; the API refuses others (issue #167). */
+  canGrant: (slug: string) => boolean;
 }) {
   const { control } = useFormContext<RoleFormValues>();
   return (
@@ -80,7 +83,9 @@ function PermissionChecklist({
                   <Checkbox
                     id={id}
                     checked={selected.has(p.slug)}
-                    disabled={disabled}
+                    disabled={
+                      disabled || (!selected.has(p.slug) && !canGrant(p.slug))
+                    }
                     onCheckedChange={(v) => toggle(p.slug, v === true)}
                   />
                   <label
@@ -116,6 +121,16 @@ function RoleDialog({
   const patch = usePatchTenantRole(slug);
   const editing = state.mode === "edit" ? state.role : null;
   const isOwner = editing?.key === OWNER_ROLE_KEY;
+  // Only permissions the user holds can be added; ones the role already has
+  // may stay or be removed (issue #167).
+  const tenant = useTenant();
+  const canGrant = useCallback(
+    (perm: string) =>
+      tenant.role.key === OWNER_ROLE_KEY ||
+      tenant.permissions.includes(perm) ||
+      (editing?.permissions.includes(perm) ?? false),
+    [tenant.role.key, tenant.permissions, editing],
+  );
 
   const schema = useMemo(
     () =>
@@ -225,7 +240,18 @@ function RoleDialog({
               />
             ) : null}
             {items.length ? (
-              <PermissionChecklist items={items} disabled={isOwner} />
+              <>
+                <PermissionChecklist
+                  items={items}
+                  disabled={isOwner}
+                  canGrant={canGrant}
+                />
+                {isOwner ? null : (
+                  <p className="text-muted-foreground text-xs">
+                    {t("tenant.roles_grant_hint")}
+                  </p>
+                )}
+              </>
             ) : null}
           </div>
         </AppForm>

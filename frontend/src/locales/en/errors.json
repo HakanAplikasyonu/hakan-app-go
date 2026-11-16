@@ -28,6 +28,7 @@
   "codes.ORGANIZATION_ACCESS_EXPIRED": "This organization's access period has ended.",
   "codes.ORGANIZATION_REQUIRED": "Choose an organization first.",
   "codes.OWNER_ROLE_REQUIRED": "Only an organization owner can do this.",
+  "codes.PERMISSION_ESCALATION": "You can only grant permissions you hold yourself.",
   "codes.ALREADY_MEMBER": "This person is already a member of the organization.",
   "codes.INVITATION_NOT_FOUND": "This invitation link is not valid.",
   "codes.INVITATION_UNAVAILABLE": "This invitation was already used, revoked or has expired.",

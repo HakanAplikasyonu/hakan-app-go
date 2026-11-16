@@ -2190,8 +2190,9 @@ export interface paths {
          * @description Requires `tenant.roles.write`. `key` is lowercase letters, digits and
          *     `_` (2-32, starting with a letter), unique in the organization and not
          *     a template key. `permissions` must be `tenant.*` slugs from
-         *     `GET /v1/tenant/role-permissions`. Bumps the organization's cache
-         *     version.
+         *     `GET /v1/tenant/role-permissions`. A caller who is not the owner may
+         *     only use permissions it holds itself (`403 PERMISSION_ESCALATION`).
+         *     Bumps the organization's cache version.
          */
         post: operations["postTenantRole"];
         delete?: never;
@@ -2231,8 +2232,10 @@ export interface paths {
          * Update an office role
          * @description Requires `tenant.roles.write`. Name, description and permissions of
          *     system and custom roles can change; the `owner` role always keeps every
-         *     tenant permission (its permissions cannot be edited). Bumps the
-         *     organization's cache version.
+         *     tenant permission (its permissions cannot be edited). A caller who is
+         *     not the owner may only add permissions it holds itself; permissions
+         *     the role already has may stay or be removed (`403
+         *     PERMISSION_ESCALATION`). Bumps the organization's cache version.
          */
         patch: operations["patchTenantRole"];
         trace?: never;
@@ -2314,7 +2317,9 @@ export interface paths {
          * Change a member's role
          * @description Requires `tenant.members.write`. Only an owner may grant or take away
          *     the owner role (`403 OWNER_ROLE_REQUIRED`); the last owner cannot be
-         *     demoted (`409 LAST_ORGANIZATION_OWNER`).
+         *     demoted (`409 LAST_ORGANIZATION_OWNER`). A caller who is not the owner
+         *     may only give a role whose permissions it holds itself (`403
+         *     PERMISSION_ESCALATION`).
          */
         patch: operations["changeTenantMemberRole"];
         trace?: never;
@@ -2876,7 +2881,9 @@ export interface paths {
          *     its token) and enqueues an email with a single-use `/invite/{token}`
          *     link valid for `TENANCY_INVITE_TTL`. A new invitation replaces older
          *     open ones for the same address. Inviting as owner needs the owner role
-         *     (`403 OWNER_ROLE_REQUIRED`); an address that already belongs to a
+         *     (`403 OWNER_ROLE_REQUIRED`); a caller who is not the owner may only
+         *     invite with a role whose permissions it holds itself (`403
+         *     PERMISSION_ESCALATION`); an address that already belongs to a
          *     member gets `409 ALREADY_MEMBER`. Rate limited per organization.
          */
         post: operations["createTenantInvitation"];

@@ -127,8 +127,11 @@ type CreateInvitationInput struct {
 	InviterUserID  int64
 	InviterName    string
 	InviterRoleKey string
-	Email          string
-	RoleKey        string
+	// InviterPermissions are the tenant permissions the inviter holds; the
+	// invited role may not grant more (issue #167).
+	InviterPermissions []string
+	Email              string
+	RoleKey            string
 }
 
 // AcceptedInvitation tells the caller where the new membership lives.

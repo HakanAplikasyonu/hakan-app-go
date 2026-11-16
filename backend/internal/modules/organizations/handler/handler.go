@@ -223,7 +223,7 @@ func (h *Handler) PatchMember(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSON(w, r, &in); err != nil {
 		return
 	}
-	member, err := h.svc.ChangeMemberRole(r.Context(), orgID, userID, in.RoleKey, orgctx.RoleOwner) // platform admins act with owner rights
+	member, err := h.svc.ChangeMemberRole(r.Context(), orgID, userID, in.RoleKey, orgusecase.OwnerGrantor) // platform admins act with owner rights
 	if err != nil {
 		writeError(w, r, err)
 		return
