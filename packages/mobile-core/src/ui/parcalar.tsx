@@ -56,7 +56,7 @@ export function EkranBasligi({ baslik, ust, sag }: { baslik: string; ust?: strin
 export type HapTonu = 'notr' | 'brand' | 'ok' | 'warn' | 'danger';
 
 /** Hap (badge pill): 22 px, yuvarlak. */
-export function Hap({ metin, ton = 'notr', style }: { metin: string; ton?: HapTonu; style?: StyleProp<ViewStyle> }) {
+export function Hap({ metin, ton = 'notr', style, testID }: { metin: string; ton?: HapTonu; style?: StyleProp<ViewStyle>; testID?: string }) {
   const { colors: c } = useTheme();
   const renk = {
     notr: [c.surface3, c.text2],
@@ -66,7 +66,7 @@ export function Hap({ metin, ton = 'notr', style }: { metin: string; ton?: HapTo
     danger: [c.dangerTint, c.danger],
   }[ton];
   return (
-    <View style={[styles.hap, { backgroundColor: renk[0] }, style]}>
+    <View testID={testID} style={[styles.hap, { backgroundColor: renk[0] }, style]}>
       <Text style={[styles.hapText, { color: renk[1] }]} numberOfLines={1}>
         {metin}
       </Text>
