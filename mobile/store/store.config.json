@@ -1,0 +1,29 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 HAKAN",
+    "categories": ["FINANCE", "BUSINESS"],
+    "info": {
+      "tr-TR": {
+        "title": "Hakan Mükellef",
+        "subtitle": "Mali müşavirinizle bağlantı",
+        "description": "Hakan Mükellef, mali müşavirinizle çalışan şirketler için mobil uygulamadır.\n\n• Fiş ve Z raporu: Kamerayla fotoğraf çekin ya da galeriden seçin; belge müşavirinizin ofisine gider ve inceleme durumunu buradan izlersiniz.\n• Görevler: Müşavirinizin sizden beklediği belgeleri ve son tarihleri tek listede görün.\n• Birden çok şirket: Yetkili olduğunuz şirketler arasında geçiş yapın.\n• Bildirimler: Yeni görev ve belge durumu değişikliklerinden haberdar olun.\n\nUygulamayı kullanmak için mali müşavirinizin Hakan platformunu kullanması ve sizi şirketinizin mükellef paneline davet etmesi gerekir.",
+        "keywords": ["mali müşavir", "fiş", "Z raporu", "muhasebe", "fatura", "mükellef"],
+        "releaseNotes": "İlk sürüm: fiş ve Z raporu gönderme, görevler, bildirimler.",
+        "marketingUrl": "https://example.com/hakan",
+        "supportUrl": "https://example.com/hakan/destek",
+        "privacyPolicyUrl": "https://example.com/hakan/gizlilik"
+      }
+    },
+    "review": {
+      "firstName": "TBD",
+      "lastName": "TBD",
+      "email": "review@example.com",
+      "phone": "+90 000 000 00 00",
+      "demoUsername": "review@example.com",
+      "demoPassword": "TBD",
+      "demoRequired": true,
+      "notes": "Taslak: inceleme hesabı canlı ortamda açılacak (bkz. store/README.md)."
+    }
+  }
+}

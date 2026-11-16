@@ -653,6 +653,9 @@ jobs:
           working-directory: desktop/sidecar
       - name: Install
         run: npm ci
+      # HAKAN (#183): sürüm betikleri (güncelleyici manifesti, kanal seçimi).
+      - name: Release scripts test
+        run: npm test
       - name: Build sidecar
         run: npm run sidecar
       - name: Linux packages for Tauri
