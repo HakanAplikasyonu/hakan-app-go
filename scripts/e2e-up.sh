@@ -63,8 +63,18 @@ wait_for() { # name url tries
   return 1
 }
 
-echo "== compose (temiz birimlerle)"
+echo "== önceki koşu kapatılıyor"
+# Eski API / frontend portu tutarsa yenisi bağlanamaz ve hazır olma
+# denetimi eskisine cevap verir: önce önceki süreçleri ve compose'u kapat.
+E2E_DIR="$DIR" "$ROOT/scripts/e2e-down.sh" >/dev/null 2>&1 || true
 docker compose "${compose_args[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+for port in 8080 3000; do
+  if curl -fsS -o /dev/null "http://127.0.0.1:$port/" 2>/dev/null || curl -fsS -o /dev/null "http://127.0.0.1:$port/healthz" 2>/dev/null; then
+    echo "port $port hâlâ kullanımda: önceki süreci kapatın" >&2; exit 1
+  fi
+done
+
+echo "== compose (temiz birimlerle)"
 docker compose "${compose_args[@]}" up -d postgres redis seaweedfs mailhog centrifugo
 for svc in postgres redis seaweedfs centrifugo; do
   for _ in $(seq 1 60); do

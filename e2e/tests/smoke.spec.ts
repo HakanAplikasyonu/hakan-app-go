@@ -133,10 +133,11 @@ test("inceleme: fatura detayından öneri, kuyruktan onay", async () => {
   await expect(office.getByText(/öneri hazır/)).toBeVisible();
 
   await office.goto(officePath("/review"));
-  const pending = office.getByText(/\d+ öneri bekliyor/);
+  // Kuyruk yüklenirken kısa süre "0 öneri bekliyor" görünür: sıfırdan büyük
+  // sayıyı bekle (aksi halde ara durumu okuyup kararsız düşer).
+  const pending = office.getByText(/^[1-9]\d* öneri bekliyor/);
   await expect(pending).toBeVisible();
   const before = Number((await pending.innerText()).match(/\d+/)![0]);
-  expect(before).toBeGreaterThan(0);
   await office.getByRole("button", { name: "Onayla", exact: true }).first().click();
   await expect(office.getByText(`${before - 1} öneri bekliyor`)).toBeVisible();
 

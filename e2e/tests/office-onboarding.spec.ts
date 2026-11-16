@@ -119,10 +119,11 @@ test("hesap önerisi: fatura detayından üret, kuyruktan onayla", async () => {
   await expect(owner.getByText(/öneri hazır/)).toBeVisible();
 
   await owner.goto(`/t/${slug}/review`);
-  const pending = owner.getByText(/\d+ öneri bekliyor/);
+  // Kuyruk yüklenirken kısa süre "0 öneri bekliyor" görünür: sıfırdan büyük
+  // sayıyı bekle (aksi halde ara durumu okuyup kararsız düşer).
+  const pending = owner.getByText(/^[1-9]\d* öneri bekliyor/);
   await expect(pending).toBeVisible();
   const before = Number((await pending.innerText()).match(/\d+/)![0]);
-  expect(before).toBeGreaterThan(0);
   await owner.getByRole("button", { name: "Onayla", exact: true }).first().click();
   await expect(owner.getByText(`${before - 1} öneri bekliyor`)).toBeVisible();
 });
