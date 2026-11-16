@@ -64,7 +64,7 @@ type WatchStats struct {
 	Folders   int       `json:"watched_folders"`
 	Uploaded  int       `json:"uploaded"`
 	Failed    int       `json:"failed"`
-	LastScan  time.Time `json:"last_scan"`
+	LastScan  time.Time `json:"last_scan,omitzero"` // tarama yapılmadıysa gönderilmez (#284)
 	LastError string    `json:"last_error,omitempty"`
 }
 

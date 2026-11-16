@@ -34,6 +34,10 @@ type Runtime struct {
 	lastBeat  time.Time
 	beatError string
 	interval  time.Duration
+	// kick heartbeat'i beklemeden gönderir; rescan taramayı hemen başlatır
+	// (#284). İkisi de tek elemanlı: üst üste gelen istekler birleşir.
+	kick   chan struct{}
+	rescan chan struct{}
 }
 
 // NewRuntime durumu dataDir'den yükler.
@@ -46,7 +50,10 @@ func NewRuntime(dataDir, version string, emit Emitter) (*Runtime, error) {
 		emit = func(string, any) {}
 	}
 	c := NewClient(nil)
-	r := &Runtime{Client: c, State: st, Version: version, emit: emit, interval: DefaultHeartbeat}
+	r := &Runtime{
+		Client: c, State: st, Version: version, emit: emit, interval: DefaultHeartbeat,
+		kick: make(chan struct{}, 1), rescan: make(chan struct{}, 1),
+	}
 	// Yenileme belirteci kabuğa gider; kabuk anahtar zincirine yazar. Ön
 	// yüze iletilmez.
 	c.OnRotate = func(rt string) { emit("auth.rotated", map[string]string{"refresh_token": rt}) }
@@ -248,7 +255,16 @@ func (r *Runtime) beatLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(d):
+		case <-r.kick:
 		}
+	}
+}
+
+// signal tek elemanlı kanala bekletmeden yazar; dolusa istek zaten sırada.
+func signal(ch chan struct{}) {
+	select {
+	case ch <- struct{}{}:
+	default:
 	}
 }
 
@@ -287,12 +303,20 @@ func (r *Runtime) Beat(ctx context.Context) {
 func (r *Runtime) scanLoop(ctx context.Context) {
 	t := time.NewTicker(ScanInterval)
 	defer t.Stop()
+	prev := r.Watcher.Stats()
 	for {
 		r.Watcher.Scan(ctx, time.Now())
+		// Ofisteki görünüm sonraki heartbeat'i (5 dk) beklemesin: izlenen
+		// klasör, yüklenen ya da hatalı sayısı değişince hemen bildir (#284).
+		if cur := r.Watcher.Stats(); statsChanged(prev, cur) {
+			signal(r.kick)
+			prev = cur
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+		case <-r.rescan:
 		}
 	}
 }
@@ -320,13 +344,16 @@ func (r *Runtime) AddWatch(path, engagementUUID, label string) (Watch, error) {
 		}
 		d.Watches = append(d.Watches, w)
 	})
+	if err == nil {
+		signal(r.rescan)
+	}
 	return w, err
 }
 
 // RemoveWatch klasörü izlemeden çıkarır.
 func (r *Runtime) RemoveWatch(path string) error {
 	path = filepath.Clean(strings.TrimSpace(path))
-	return r.State.Update(func(d *stateData) {
+	err := r.State.Update(func(d *stateData) {
 		out := d.Watches[:0]
 		for _, w := range d.Watches {
 			if w.Path != path {
@@ -335,4 +362,12 @@ func (r *Runtime) RemoveWatch(path string) error {
 		}
 		d.Watches = out
 	})
+	if err == nil {
+		signal(r.rescan)
+	}
+	return err
+}
+
+func statsChanged(a, b WatchStats) bool {
+	return a.Folders != b.Folders || a.Uploaded != b.Uploaded || a.Failed != b.Failed || a.LastError != b.LastError
 }
