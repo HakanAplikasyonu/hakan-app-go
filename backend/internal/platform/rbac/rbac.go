@@ -111,6 +111,10 @@ const (
 	PermTenantAgentsWrite = "tenant.agents.write"
 	// KVKK (issue #57): veri işleyen sözleşmesini ofis adına kabul.
 	PermTenantLegalAccept = "tenant.legal.accept"
+	// Yevmiye taslağı ve muhasebe programı çıktısı (issue #143, #26).
+	PermTenantJournalsRead   = "tenant.journals.read"
+	PermTenantJournalsWrite  = "tenant.journals.write"
+	PermTenantJournalsExport = "tenant.journals.export"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

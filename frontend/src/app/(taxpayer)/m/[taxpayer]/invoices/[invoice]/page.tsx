@@ -12,7 +12,9 @@ export default function Page({ params }: PageProps) {
   const { taxpayer, invoice } = use(params);
   return (
     <TaxpayerShell taxpayer={taxpayer}>
-      {() => <TaxpayerInvoiceDetailPage taxpayer={taxpayer} invoice={invoice} />}
+      {() => (
+        <TaxpayerInvoiceDetailPage taxpayer={taxpayer} invoice={invoice} />
+      )}
     </TaxpayerShell>
   );
 }

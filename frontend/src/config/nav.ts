@@ -1,6 +1,7 @@
 import {
   Activity,
   Bell,
+  BookOpenCheck,
   ClipboardCheck,
   FileText,
   TriangleAlert,
@@ -328,6 +329,13 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.nav_upload",
             href: routes.tenant.upload(slug),
             icon: Upload,
+          },
+          {
+            id: "journals",
+            titleKey: "office.journals.nav",
+            href: routes.tenant.journals(slug),
+            icon: BookOpenCheck,
+            permission: permissions.tenant.journals.read,
           },
         ],
       },
