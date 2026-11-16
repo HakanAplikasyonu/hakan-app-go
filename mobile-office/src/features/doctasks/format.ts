@@ -21,7 +21,7 @@ export function taskTitle(t: { kind: string; title?: string }): string {
 }
 
 /** Hızlı son tarih seçenekleri (gün). */
-export const dueChoices = [3, 7, 14, 30] as const;
+export const dueChoices = [3, 7, 14] as const;
 
 /** Bugünden `days` gün sonrası, Türkiye saatiyle "YYYY-MM-DD". */
 export function dueDateFromDays(days: number, now: Date = new Date()): string {
@@ -56,3 +56,22 @@ export function actions(status: TaskStatus) {
 
 /** Sık istenen belgeler: formda tek dokunuşla başlık. */
 export const commonRequests = ['Kira kontratı', 'Banka ekstresi', 'SGK bildirgesi', 'Gider faturası', 'Z raporu', 'Vergi levhası'];
+
+/**
+ * "Tarih" seçeneği: "GG.AA.YYYY" (ya da "YYYY-AA-GG") → bugünden gün farkı
+ * (Türkiye takvimi). Geçersiz ya da 1–90 dışında ise null.
+ */
+export function daysUntilDate(text: string, now: Date = new Date()): number | null {
+  const t = text.trim();
+  const tr = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(t);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  const [y, m, d] = tr ? [Number(tr[3]), Number(tr[2]), Number(tr[1])] : iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : [0, 0, 0];
+  if (!y) return null;
+  const target = Date.UTC(y, m - 1, d);
+  const check = new Date(target);
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) return null;
+  const today = Date.parse(`${dueDateFromDays(0, now)}T00:00:00Z`);
+  const days = Math.round((target - today) / 86_400_000);
+  return days >= 1 && days <= 90 ? days : null;
+}
+

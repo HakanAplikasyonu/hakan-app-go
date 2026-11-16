@@ -14,13 +14,11 @@ export default function AppLayout() {
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
       }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="clients/index" options={{ headerShown: true, title: 'Mükellefler' }} />
+      <Stack.Screen name="(tabs)" />
       <Stack.Screen name="clients/[engagement]" options={{ headerShown: true, title: 'Mükellef' }} />
       <Stack.Screen name="tasks/index" options={{ headerShown: true, title: 'Belge görevleri' }} />
-      <Stack.Screen name="tasks/new" options={{ headerShown: true, title: 'Belge iste', presentation: 'modal' }} />
+      <Stack.Screen name="tasks/new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="tasks/[uuid]" options={{ headerShown: true, title: 'Görev' }} />
-      <Stack.Screen name="review/index" options={{ headerShown: true, title: 'İnceleme kuyruğu' }} />
       <Stack.Screen name="review/[uuid]" options={{ headerShown: true, title: 'Öneri' }} />
       <Stack.Screen name="warnings/index" options={{ headerShown: true, title: 'Uyarılar' }} />
       <Stack.Screen name="warnings/[uuid]" options={{ headerShown: true, title: 'Uyarı' }} />

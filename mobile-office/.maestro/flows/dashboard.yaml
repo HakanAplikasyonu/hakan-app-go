@@ -1,5 +1,6 @@
-# Pano: dört sayaç gerçek API'den dolar; uyarılar ekranı açılır, derin
-# bağlantı hakanofis://warnings aynı ekranı açar (#241).
+# Pano (arayüz v1, #327): dönem tacı, onay kuyruğu kartı ve üç sayaç gerçek
+# API'den dolar; alt sekmeler açılır; derin bağlantı hakanofis://warnings
+# uyarılar ekranını açar (#241).
 appId: app.hakan.office
 name: dashboard
 tags: [smoke]
@@ -7,14 +8,23 @@ tags: [smoke]
 - launchApp
 - extendedWaitUntil:
     visible:
-      id: "stat-review"
+      id: "stat-uploads"
     timeout: 20000
+- assertVisible:
+    id: "period-crown"
 - assertVisible:
     id: "stat-tasks"
 - assertVisible:
     id: "stat-warnings"
+- tapOn:
+    id: "tab-notifications"
+- assertVisible: "Bildirimler"
 - assertVisible:
-    id: "stat-uploads"
+    id: "inbox-filter-blocker"
+- tapOn:
+    id: "tab-clients"
+- assertVisible:
+    id: "clients-search"
 - openLink: "hakanofis://warnings"
 - assertVisible: "Uyarılar"
 - back

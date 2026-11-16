@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { clientSubtitle, mailHref, money, normalizeSearch, recentPeriods, telHref } from './format.ts';
+import { clientSubtitle, mailHref, money, normalizeSearch, recentPeriods, telHref, initials, clientCrown } from './format.ts';
 
 test('normalizeSearch', () => {
   assert.equal(normalizeSearch(' a '), undefined);
@@ -32,4 +32,17 @@ test('money and subtitle', () => {
     'VKN 1234567890 · 1 engelleyici · 2 açık görev',
   );
   assert.equal(clientSubtitle({ tax_id: '1', kind: 'individual', open_warnings: 2, open_blockers: 0, open_tasks: 0 }), 'TCKN 1 · 2 uyarı');
+});
+
+test('initials skip company suffixes', () => {
+  assert.equal(initials('Atlas Gıda Ticaret A.Ş.'), 'AG');
+  assert.equal(initials('Kuzey Lojistik Ltd. Şti.'), 'KL');
+  assert.equal(initials('ışık'), 'I');
+  assert.equal(initials(''), '?');
+});
+
+test('client crown', () => {
+  assert.equal(clientCrown({ open_blockers: 2, open_tasks: 1 }), 'sorun');
+  assert.equal(clientCrown({ open_blockers: 0, open_tasks: 1 }), 'bekleniyor');
+  assert.equal(clientCrown({ open_blockers: 0, open_tasks: 0 }), 'yuklendi');
 });

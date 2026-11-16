@@ -67,8 +67,22 @@ test('config runs login, dashboard, review approval and task creation in order',
 
 test('the ids the flows tap exist in the screens', () => {
   const src = (p: string) => readFileSync(new URL(`../../app/${p}`, import.meta.url), 'utf8');
-  const screens = [src('login.tsx'), src('(app)/index.tsx'), src('(app)/clients/index.tsx'), src('(app)/review/index.tsx'), src('(app)/tasks/new.tsx')].join('\n');
+  const screens = [
+    src('login.tsx'),
+    src('(app)/(tabs)/_layout.tsx'),
+    src('(app)/(tabs)/index.tsx'),
+    src('(app)/(tabs)/clients/index.tsx'),
+    src('(app)/(tabs)/review/index.tsx'),
+    src('(app)/(tabs)/notifications.tsx'),
+    src('(app)/tasks/new.tsx'),
+  ].join('\n');
+  // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").
+  const has = (id: string) => {
+    if (screens.includes(`"${id}"`) || screens.includes(`'${id}'`)) return true;
+    const prefix = id.slice(0, id.lastIndexOf('-'));
+    return !!prefix && (screens.includes(`\`${prefix}-\${`) || screens.includes(`testIDOnek="${prefix}"`));
+  };
   for (const f of flows()) {
-    for (const m of f.text.matchAll(/id: "([^"]+)"/g)) assert.ok(screens.includes(`"${m[1]}"`), `${f.file}: no testID ${m[1]}`);
+    for (const m of f.text.matchAll(/id: "([^"]+)"/g)) assert.ok(has(m[1]), `${f.file}: no testID ${m[1]}`);
   }
 });

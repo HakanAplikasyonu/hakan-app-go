@@ -63,11 +63,35 @@ export async function runSequential<T>(items: readonly T[], fn: (item: T) => Pro
   return { ok, failed };
 }
 
-/** Kaydırma hareketi: eşik aşılınca karar (sağa onay, sola reddet). */
-export type SwipeAction = 'accept' | 'reject' | null;
-export function swipeAction(dx: number, width: number, threshold = 0.35): SwipeAction {
+/** Kaydırma hareketi: eşik aşılınca karar (sağa onay, sola reddet, yukarı düzelt). */
+export type SwipeAction = 'accept' | 'reject' | 'correct' | null;
+export function swipeAction(dx: number, width: number, threshold = 0.35, dy = 0, height = 0): SwipeAction {
+  'worklet';
   const limit = Math.max(60, width * threshold);
+  const up = Math.max(80, height * 0.25);
+  // Yukarı hareket yataydan baskınsa düzelt; aksi halde yatay eşik.
+  if (height > 0 && dy <= -up && Math.abs(dy) > Math.abs(dx)) return 'correct';
   if (dx >= limit) return 'accept';
   if (dx <= -limit) return 'reject';
   return null;
+}
+
+/** Kart yığınında kartın eğimi (derece): yatay kaymayla en çok ±8°. */
+export function cardTilt(dx: number, width: number): number {
+  'worklet';
+  if (!width) return 0;
+  return Math.max(-8, Math.min(8, (dx / width) * 16));
+}
+
+/** Kuyruk ilerlemesi: bu oturumda karar verilen / (karar + kalan), 0..1. */
+export function queueProgress(decided: number, remaining: number): number {
+  const all = decided + remaining;
+  return all > 0 ? Math.min(1, decided / all) : 0;
+}
+
+/** Tahmini süre: öneri başına ortalama 6 sn (tasarım). "~5 dk", "1 dk'dan az". */
+export function queueEta(count: number, secondsEach = 6): string {
+  if (count <= 0) return '';
+  const secs = count * secondsEach;
+  return secs < 60 ? "1 dk'dan az" : `~${Math.round(secs / 60)} dk`;
 }
