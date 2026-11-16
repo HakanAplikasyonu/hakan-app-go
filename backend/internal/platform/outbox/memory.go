@@ -7,9 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // Memory is an in-process outbox for unit tests.
@@ -95,7 +97,7 @@ func (m *Memory) claimBatch(_ context.Context, limit int32, lease time.Duration)
 		r.AvailableAt = now.Add(lease)
 		cp := *r
 		out = append(out, cp)
-		if int32(len(out)) >= limit {
+		if intconv.Int32(len(out)) >= limit {
 			break
 		}
 	}

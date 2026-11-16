@@ -10,6 +10,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	notifmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
@@ -18,9 +22,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
-	"github.com/google/uuid"
-	"github.com/hibiken/asynq"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 var (
@@ -176,7 +178,7 @@ func (s *Service) ProcessExport(ctx context.Context, jobID int64) error {
 		return s.fail(ctx, jobID, err.Error())
 	}
 	completed, err := s.q.MarkExportJobCompleted(ctx, db.MarkExportJobCompletedParams{
-		ID: jobID, FileKey: pgtype.Text{String: key, Valid: true}, RowCount: int32(len(ds.Rows)),
+		ID: jobID, FileKey: pgtype.Text{String: key, Valid: true}, RowCount: intconv.Int32(len(ds.Rows)),
 	})
 	if err != nil {
 		return err

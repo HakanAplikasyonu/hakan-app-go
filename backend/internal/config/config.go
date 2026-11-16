@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // Config holds process configuration loaded from the environment.
@@ -408,7 +410,7 @@ func Load() (Config, error) {
 			Password: getEnv("DB_PASSWORD", defaultDBPassword),
 			Name:     getEnv("DB_NAME", "app"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
-			MaxConns: int32(getInt("DB_MAX_CONNS", 20)),
+			MaxConns: intconv.Int32(getInt("DB_MAX_CONNS", 20)),
 			// RLS for every query (issue #166); false is the emergency switch.
 			RLSRuntime:    getBool("DB_RLS_RUNTIME", true),
 			PlanCacheMode: strings.TrimSpace(getEnv("DB_PLAN_CACHE_MODE", "force_custom_plan")),

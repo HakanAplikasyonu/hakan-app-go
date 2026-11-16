@@ -7,13 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/password"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/totp"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 var (
@@ -274,7 +276,7 @@ func pgInt4(v *int) pgtype.Int4 {
 	if v == nil {
 		return pgtype.Int4{}
 	}
-	return pgtype.Int4{Int32: int32(*v), Valid: true}
+	return pgtype.Int4{Int32: intconv.Int32(*v), Valid: true}
 }
 
 func pgBool(v *bool) pgtype.Bool {

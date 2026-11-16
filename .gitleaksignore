@@ -1,0 +1,8 @@
+# gitleaks false positives (#192, docs/guvenlik-taramalari.md). One fingerprint per line:
+# <commit>:<file>:<rule>:<line>. Add an entry only with a reason above it.
+#
+# vault_test.go: fixed test credential proving the vault never stores plaintext.
+3dc9296102ce792334f8e507cb570f16a2155da5:backend/internal/platform/secrets/vault_test.go:generic-api-key:68
+d96f7dba5cf4bf2fe02954f7699341f4d5081992:backend/internal/platform/secrets/vault_test.go:generic-api-key:68
+# .env.server.example: blank REDIS_PASSWORD followed by the generator comment (no value).
+cec6a2e875f94f636c12e7524a685e1404a031e5:.env.server.example:generic-api-key:41

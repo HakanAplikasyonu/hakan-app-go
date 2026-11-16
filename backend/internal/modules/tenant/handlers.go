@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	orgmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/model"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
@@ -17,8 +20,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
-	"github.com/google/uuid"
 )
 
 // OrganizationService is the slice of the organizations usecase the tenant
@@ -381,12 +384,8 @@ func (h *Handler) allow(w http.ResponseWriter, r *http.Request, action, subject 
 
 func pageParams(r *http.Request) (int32, int32) {
 	limit, offset := int32(50), int32(0)
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 100 {
-		limit = int32(v)
-	}
-	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v >= 0 {
-		offset = int32(v)
-	}
+	limit = intconv.ParseInt32(r.URL.Query().Get("limit"), limit, 1, 100)
+	offset = intconv.ParseInt32(r.URL.Query().Get("offset"), offset, 0, math.MaxInt32)
 	return limit, offset
 }
 

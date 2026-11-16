@@ -13,6 +13,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // dateFieldCreated: go-ubltr listings bound the creation / receive time
@@ -163,7 +164,7 @@ func (j *job) listWindows(ctx context.Context, planned []window) error {
 		}
 	}
 	queue, err := q.ListResumableSyncWindows(ctx, db.ListResumableSyncWindowsParams{
-		TaxpayerID: j.conn.TaxpayerID, ConnectionID: j.conn.ID, MaxAttempts: int32(j.s.cfg.MaxWindowAttempts),
+		TaxpayerID: j.conn.TaxpayerID, ConnectionID: j.conn.ID, MaxAttempts: intconv.Int32(j.s.cfg.MaxWindowAttempts),
 	})
 	if err != nil {
 		return err

@@ -21,6 +21,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // UBL failure codes (entegrator_documents.ubl_error.code, 37 §5.4).
@@ -54,7 +55,7 @@ func (j *job) ublQueue(ctx context.Context) error {
 	for {
 		rows, err := j.s.q.ListEntegratorUBLQueue(ctx, db.ListEntegratorUBLQueueParams{
 			TaxpayerID: j.conn.TaxpayerID, ConnectionID: j.conn.ID, AfterID: after,
-			MaxAttempts: int32(j.s.cfg.MaxUBLAttempts), Lim: ublBatch,
+			MaxAttempts: intconv.Int32(j.s.cfg.MaxUBLAttempts), Lim: ublBatch,
 		})
 		if err != nil {
 			return err
