@@ -1,6 +1,9 @@
 # Dependabot (#192, docs/guvenlik-taramalari.md): weekly version updates,
 # minor/patch grouped per ecosystem to keep the PR count low. Security
 # updates are opened as they are published (repository setting).
+#
+# Major versions are never proposed (ignore "*" semver-major in every block):
+# they are planned upgrades, done by hand with their migration steps.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -9,6 +12,9 @@ updates:
     open-pull-requests-limit: 5
     groups:
       go-minor-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
     commit-message: { prefix: "chore(deps)" }
 
   - package-ecosystem: npm
@@ -18,9 +24,9 @@ updates:
     groups:
       npm-minor-patch: { update-types: [minor, patch] }
     ignore:
-      # Expo SDK packages move together with `npx expo install --fix`.
-      - dependency-name: "expo*"
+      - dependency-name: "*"
         update-types: [version-update:semver-major]
+      # React Native minors follow the Expo SDK (`npx expo install --fix`).
       - dependency-name: "react-native"
         update-types: [version-update:semver-major, version-update:semver-minor]
     commit-message: { prefix: "chore(deps)" }
@@ -30,11 +36,21 @@ updates:
     schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
     groups:
       actions: { patterns: ["*"] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
     commit-message: { prefix: "chore(ci)" }
 
   - package-ecosystem: docker
     directories: ["/backend", "/frontend", "/deploy/backup"]
     schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+      # Go toolchain images (1.26 -> 1.27 is "minor" for Docker tags): the
+      # version is pinned in go.mod and upgraded together with it, by hand.
+      - dependency-name: "golang"
+        update-types: [version-update:semver-minor]
     commit-message: { prefix: "chore(deps)" }
 
   - package-ecosystem: cargo
@@ -43,4 +59,7 @@ updates:
     open-pull-requests-limit: 3
     groups:
       cargo-minor-patch: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
     commit-message: { prefix: "chore(deps)" }
