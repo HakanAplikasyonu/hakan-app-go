@@ -84,7 +84,7 @@ test('icon and splash differ from the mükellef app (#242)', () => {
     const mukellef = createHash('sha256').update(bytes(`../mobile/assets/${f}`)).digest('hex');
     assert.notEqual(office, mukellef, `${f} is the mükellef app's`);
   }
-  assert.equal(app.android.adaptiveIcon.backgroundColor, '#1447E6');
+  assert.equal(app.android.adaptiveIcon.backgroundColor, '#2448FF');
 });
 
 test('store placeholders come from the environment and are all listed', () => {

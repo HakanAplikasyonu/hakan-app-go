@@ -16,7 +16,7 @@ import { chromium } from "playwright";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const uiDir = path.resolve(here, "../../ui");
 const mockPath = path.join(here, "mock-tauri.js");
-const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 let server, base, browser;
@@ -222,6 +222,50 @@ test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => 
   // Ping / yeniden başlat yalnızca Gelişmiş sekmesinde.
   await page.getByRole("tab", { name: "Klasörler" }).click();
   assert.equal(await page.getByRole("button", { name: /^(Ping|Yerel ajan)/i }).count(), 0);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
+test("arayüz v1 temeli (#324): tema, yazı tipi ve ortak bileşenler", async () => {
+  const { page, errors } = await open();
+  // Varsayılan M3 + sistemi izle.
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "m3-light");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.waitForFunction(() => document.documentElement.dataset.theme === "m3-dark");
+  const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.equal(bg, "rgb(10, 10, 10)");
+  await page.evaluate(async () => (await import("./tema.js")).temaSec({ palet: "n3", kip: "light" }));
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), "n3-light");
+
+  await page.evaluate(() => document.fonts.ready);
+  assert.ok(await page.evaluate(() => document.fonts.check("13px Inter")), "Inter yüklenmeli");
+
+  const out = await page.evaluate(async () => {
+    const ui = await import("./hakan-ui.js");
+    const tac = ui.TacRozeti({ durum: "onaylandi" });
+    const etiketli = ui.TacRozeti({ durum: "sorun", boyut: 30, etiket: true, metin: "Okunamadı" });
+    const guven = ui.GuvenOlcegi({ deger: 0.42, kaynak: "kural" });
+    const yukleyici = ui.KristalYukleyici({ gecikme: 0 });
+    const bos = ui.BosDurum({ baslik: "Kuyruk boş, taç tamam" });
+    document.body.append(tac, etiketli, guven, yukleyici, bos);
+    return {
+      tac: tac.getAttribute("aria-label"),
+      sagDolu: getComputedStyle(tac.children[2]).backgroundColor,
+      etiket: etiketli.textContent,
+      kademe: guven.dataset.kademe,
+      guvenAd: guven.getAttribute("aria-label"),
+      yukleyici: yukleyici.getAttribute("role"),
+      kademeler: [0.59, 0.6, 0.9].map((d) => ui.guvenKademesi(d)),
+    };
+  });
+  assert.equal(out.tac, "Müşavir onayladı");
+  assert.equal(out.sagDolu, "rgb(10, 10, 10)"); // n3-light --c-dark
+  assert.equal(out.etiket, "Okunamadı");
+  assert.equal(out.kademe, "yuksek"); // kural eşleşmesi her zaman yüksek
+  assert.match(out.guvenAd, /^Yüksek güven · %42 · kural eşleşmesi$/);
+  assert.equal(out.yukleyici, "status");
+  assert.deepEqual(out.kademeler, ["dusuk", "orta", "yuksek"]);
+  await page.getByRole("heading", { name: "Kuyruk boş, taç tamam" }).waitFor();
   assert.deepEqual(errors, []);
   await page.close();
 });

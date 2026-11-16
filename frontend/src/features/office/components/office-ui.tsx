@@ -8,7 +8,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { formatAmount, formatMoney } from "../lib/decimal";
 import type { DataWarning, Invoice, Severity } from "../types";
 
-/** Tutar, hesap kodu, VKN, ETTN: Geist Mono + hizalı rakam (D19). */
+/** Tutar, hesap kodu, VKN, ETTN: JetBrains Mono + hizalı rakam (arayüz v1). */
 export function Figure({
   children,
   className,

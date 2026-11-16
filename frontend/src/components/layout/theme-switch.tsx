@@ -2,29 +2,18 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
-import { brand } from "@/config/brand";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * Üst çubukta hızlı açık/koyu geçişi. Paleti ve "sistemi izle"yi Ayarlar →
+ * Görünüm yönetir (GorunumAyari); bu düğme yalnızca kipi değiştirir.
+ * theme-color meta etiketi ThemeProvider'da güncellenir.
+ */
 export function ThemeSwitch() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
   const { t } = useLocale();
-
-  useEffect(() => {
-    const color =
-      resolvedTheme === "dark" ? brand.colors.navy : brand.colors.white;
-    document
-      .querySelector("meta[name='theme-color']")
-      ?.setAttribute("content", color);
-  }, [resolvedTheme]);
-
-  useEffect(() => {
-    if (theme === "system") {
-      setTheme(resolvedTheme === "dark" ? "dark" : "light");
-    }
-  }, [resolvedTheme, setTheme, theme]);
 
   return (
     <Button

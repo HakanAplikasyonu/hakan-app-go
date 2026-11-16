@@ -1,4 +1,9 @@
-/** Renk paleti (D19, docs/brand). Değerler frontend/src/styles/theme.css ile aynı tutulur. */
+/**
+ * Eski renk adları (D19 dönemi). Arayüz v1 (#324) ile değerler tokens.ts'ten
+ * türetilir; yeni kod `useTheme().colors` kullanır.
+ */
+import { colors, type Colors } from './tokens.ts';
+
 export type Palette = {
   background: string;
   surface: string;
@@ -14,33 +19,31 @@ export type Palette = {
   warning: string;
 };
 
+const cache = new WeakMap<Colors, Palette>();
+
+export function paletteFrom(c: Colors): Palette {
+  let p = cache.get(c);
+  if (!p) {
+    p = {
+      background: c.bg,
+      surface: c.surface,
+      border: c.line,
+      text: c.text,
+      muted: c.text3,
+      primary: c.brand,
+      primaryText: c.onBrand,
+      brand: c.brandText,
+      check: c.crystal.mid,
+      danger: c.danger,
+      success: c.ok,
+      warning: c.warn,
+    };
+    cache.set(c, p);
+  }
+  return p;
+}
+
 export const palettes: Record<'light' | 'dark', Palette> = {
-  light: {
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    border: '#E2E8F0',
-    text: '#0F172A',
-    muted: '#64748B',
-    primary: '#0F172A',
-    primaryText: '#F8FAFC',
-    brand: '#1447E6',
-    check: '#5B8CFF',
-    danger: '#E7000B',
-    success: '#009689',
-    warning: '#F54900',
-  },
-  dark: {
-    background: '#020617',
-    surface: '#0F172A',
-    border: '#1E293B',
-    text: '#F8FAFC',
-    muted: '#94A3B8',
-    primary: '#F8FAFC',
-    primaryText: '#0F172A',
-    brand: '#5B8CFF',
-    check: '#1447E6',
-    danger: '#FB2C36',
-    success: '#00BBA7',
-    warning: '#FF6900',
-  },
+  light: paletteFrom(colors['m3-light']),
+  dark: paletteFrom(colors['m3-dark']),
 };

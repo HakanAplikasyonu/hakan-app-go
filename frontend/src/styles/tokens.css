@@ -1,0 +1,148 @@
+/*
+ * HAKAN tasarım token'ları · v1 (onaylı tuval: docs/tasarim/README.md)
+ * Web (Next.js, Tailwind v4 + shadcn) ve Tauri ajanı bu dosyayı aynen kullanır.
+ * Tema seçimi: <html data-theme="m3-light|m3-dark|n3-light|n3-dark">.
+ * Varsayılan M3; "sistemi izle" seçiliyse prefers-color-scheme ile m3-light/m3-dark.
+ * Renkler logo PDF'inden piksel ölçümüyle alındı (tasarim-referans/logo-ornekleri.pdf).
+ */
+:root,
+[data-theme="m3-light"] {
+  --bg: #f3f3f5;
+  --surface: #ffffff;
+  --surface-2: #f8f8fa;
+  --surface-3: #ededf1;
+  --line: #e3e3e9;
+  --line-strong: #cacad3;
+  --text: #0a0a0a;
+  --text-2: #4a4a55;
+  --text-3: #6b6b76;
+  --brand: #2448ff;
+  --on-brand: #ffffff;
+  --brand-text: #2448ff;
+  --brand-ink: #102290;
+  --brand-soft: #cfd8ff;
+  --brand-tint: #eef1ff;
+  --c-light: #cfd8ff;
+  --c-mid: #2448ff;
+  --c-dark: #102290;
+  --ok: #0e7a4e;
+  --ok-tint: #e3f4ec;
+  --warn: #9a5800;
+  --warn-tint: #fff1dc;
+  --danger: #c0261c;
+  --danger-tint: #fde7e5;
+  --info: #2448ff;
+  --info-tint: #eef1ff;
+  --focus: #2448ff;
+  --shadow: 0 1px 2px rgba(10, 10, 10, 0.05), 0 4px 16px rgba(10, 10, 10, 0.06);
+  --shadow-lg: 0 12px 40px rgba(10, 10, 10, 0.14);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --font-display: "Inter Tight", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-theme="m3-dark"] {
+  --bg: #0a0a0a;
+  --surface: #131316;
+  --surface-2: #1a1a1e;
+  --surface-3: #232329;
+  --line: #26262c;
+  --line-strong: #3a3a43;
+  --text: #f3f3f5;
+  --text-2: #b4b4be;
+  --text-3: #8c8c97;
+  --brand: #2448ff;
+  --on-brand: #ffffff;
+  --brand-text: #93a5ff;
+  --brand-ink: #cfd8ff;
+  --brand-soft: #1e2c8f;
+  --brand-tint: #151b45;
+  --c-light: #cfd8ff;
+  --c-mid: #2448ff;
+  --c-dark: #102290;
+  --ok: #4fd39a;
+  --ok-tint: #0f2a1f;
+  --warn: #ffb54d;
+  --warn-tint: #2e2210;
+  --danger: #ff7a70;
+  --danger-tint: #331614;
+  --info: #93a5ff;
+  --info-tint: #151b45;
+  --focus: #93a5ff;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+[data-theme="n3-light"] {
+  --bg: #f3f3f5;
+  --surface: #ffffff;
+  --surface-2: #f8f8fa;
+  --surface-3: #ededf1;
+  --line: #e3e3e9;
+  --line-strong: #cacad3;
+  --text: #0a0a0a;
+  --text-2: #4a4a55;
+  --text-3: #6b6b76;
+  --brand: #01ff11;
+  --on-brand: #0a0a0a;
+  --brand-text: #067a12;
+  --brand-ink: #0a0a0a;
+  --brand-soft: #d4d3d8;
+  --brand-tint: #e6ffe8;
+  --c-light: #d4d3d8;
+  --c-mid: #01ff11;
+  --c-dark: #0a0a0a;
+  --ok: #067a12;
+  --ok-tint: #e6ffe8;
+  --warn: #9a5800;
+  --warn-tint: #fff1dc;
+  --danger: #c0261c;
+  --danger-tint: #fde7e5;
+  --info: #0a0a0a;
+  --info-tint: #ededf1;
+  --focus: #0a0a0a;
+}
+[data-theme="n3-dark"] {
+  --bg: #0a0a0a;
+  --surface: #131316;
+  --surface-2: #1a1a1e;
+  --surface-3: #232329;
+  --line: #26262c;
+  --line-strong: #3a3a43;
+  --text: #f3f3f5;
+  --text-2: #b4b4be;
+  --text-3: #8c8c97;
+  --brand: #01ff11;
+  --on-brand: #0a0a0a;
+  --brand-text: #01ff11;
+  --brand-ink: #f3f3f5;
+  --brand-soft: #2a2a30;
+  --brand-tint: #0d2410;
+  --c-light: #d4d3d8;
+  --c-mid: #01ff11;
+  --c-dark: #f3f3f5;
+  --ok: #01ff11;
+  --ok-tint: #0d2410;
+  --warn: #ffb54d;
+  --warn-tint: #2e2210;
+  --danger: #ff7a70;
+  --danger-tint: #331614;
+  --info: #f3f3f5;
+  --info-tint: #232329;
+  --focus: #01ff11;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}

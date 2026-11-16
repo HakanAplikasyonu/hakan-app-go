@@ -1,6 +1,9 @@
 // Kaynak: mobile/src/app/_layout.tsx (#236); ofis akışına uyarlandı.
 import { OfflineScreen, RootErrorScreen } from '@hakan/mobile-core/screens';
+import { hakanFonts } from '@hakan/mobile-core/ui/fonts';
+import { loadThemePreference } from '@hakan/mobile-core/ui/theme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -84,6 +87,14 @@ function RootNavigator() {
 
 function RootLayout() {
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }));
+  // Arayüz v1 (#324): Inter / Inter Tight / JetBrains Mono ve kayıtlı tema
+  // (Ayarlar → Görünüm). Yazı tipleri yüklenene kadar açılış ekranı kalır;
+  // yüklenemezse sistem yazı tipiyle devam edilir.
+  const [fontsLoaded, fontError] = useFonts(hakanFonts);
+  useEffect(() => {
+    loadThemePreference().catch(() => {});
+  }, []);
+  if (!fontsLoaded && !fontError) return null;
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>

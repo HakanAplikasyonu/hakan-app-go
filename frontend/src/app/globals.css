@@ -18,6 +18,22 @@
 
   body {
     @apply bg-background text-foreground has-[div[data-variant="inset"]]:bg-sidebar min-h-svh w-full font-sans;
+    /* Web gövde 14/20 (docs/tasarim/README.md, Tipografi). */
+    font-size: 14px;
+    line-height: 20px;
+    font-feature-settings: "cv11", "ss01";
+  }
+
+  /* "Hareketi azalt": yalnızca opaklık geçişi kalır. */
+  @media (prefers-reduced-motion: reduce) {
+    /* data-hk-motion: KristalYukleyici kendi opaklık geçişini yönetir. */
+    *:not([data-hk-motion]),
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-property: opacity !important;
+    }
   }
 
   h1,
@@ -25,7 +41,8 @@
   h3,
   h4,
   .font-display {
-    font-family: var(--font-sans);
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   body[data-scroll-locked] {
