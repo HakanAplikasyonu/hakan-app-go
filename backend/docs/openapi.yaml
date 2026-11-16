@@ -12835,7 +12835,7 @@ components:
       required: [name, status]
       properties:
         name: { type: string, description: File name (inside the ZIP) }
-        status: { type: string, enum: [added, duplicate, failed] }
+        status: { type: string, enum: [added, duplicate, failed, held], description: "held: the period is locked; a change request was opened instead (#32)" }
         ettn: { type: string, format: uuid }
         invoice_number: { type: string }
         invoice_uuid: { type: string, format: uuid }
@@ -12849,6 +12849,7 @@ components:
           enum: [unreadable, unsupported_document, xsd_invalid, PARTY_MISMATCH, mapping_failed, store_failed]
         error: { type: string }
         warnings: { type: array, items: { type: string }, description: Warning codes raised for an added invoice }
+        change_request_uuid: { type: string, format: uuid, description: Set when status is held }
 
     UBLUploadReport:
       type: object
@@ -12858,6 +12859,7 @@ components:
         added: { type: integer }
         duplicate: { type: integer }
         failed: { type: integer }
+        held: { type: integer, description: Invoices of a locked period sent to a change request (#32) }
         items:
           type: [array, "null"]
           items: { $ref: "#/components/schemas/UBLUploadItem" }

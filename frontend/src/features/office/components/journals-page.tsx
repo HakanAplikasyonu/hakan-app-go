@@ -30,6 +30,7 @@ import {
   useJournalExports,
 } from "../hooks/use-journals";
 import { sub, sum, toMinor } from "../lib/decimal";
+import { useOfficeMessages } from "../lib/messages";
 import {
   journalService,
   type JournalDraft,
@@ -49,7 +50,25 @@ const emptyLine = (): LineRow => ({
   debit: "",
   credit: "",
 });
-const thisMonth = () => new Date().toISOString().slice(0, 7);
+/**
+ * The period an office usually closes: the month before the current one
+ * (#161: in November the work is on October).
+ */
+const defaultPeriod = () => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
+/** A date inside period: today in the current month, else its last day. */
+const dateIn = (period: string) => {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}$/.test(period) || today.startsWith(period)) return today;
+  const [y, m] = period.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${period}-${String(last).padStart(2, "0")}`;
+};
 
 const statusClass: Record<JournalDraft["status"], string> = {
   draft: "bg-secondary text-secondary-foreground",
@@ -57,16 +76,18 @@ const statusClass: Record<JournalDraft["status"], string> = {
   exported: "bg-brand/12 text-brand",
 };
 
-function errorText(err: unknown, fallback: string) {
-  if (isApiError(err)) return err.message || fallback;
-  return err instanceof Error ? err.message : fallback;
-}
-
-function NewDraft({ engagement }: { engagement: string }) {
+function NewDraft({
+  engagement,
+  period,
+}: {
+  engagement: string;
+  period: string;
+}) {
   const { t } = useLocale();
   const { slug } = useTenant();
+  const { apiError } = useOfficeMessages();
   const { create } = useJournalActions(slug, engagement);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => dateIn(period));
   const [description, setDescription] = useState("");
   const [lines, setLines] = useState<LineRow[]>([emptyLine(), emptyLine()]);
   const debit = sum(lines.map((l) => l.debit || "0"));
@@ -217,7 +238,7 @@ function NewDraft({ engagement }: { engagement: string }) {
         </div>
         {create.isError ? (
           <p className="text-status-blocking text-sm">
-            {errorText(create.error, t("office.api.load_error"))}
+            {apiError(create.error)}
           </p>
         ) : null}
         <p className="text-muted-foreground text-xs">
@@ -237,6 +258,7 @@ function ExportPanel({
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
+  const { apiError, exportIssue, driverLabel } = useOfficeMessages();
   const drivers = useExportDrivers(slug);
   const { export: run } = useJournalActions(slug, engagement);
   const items = drivers.data?.items ?? [];
@@ -260,7 +282,10 @@ function ExportPanel({
             label={t("office.journals.driver")}
             value={driver}
             onChange={setDriver}
-            options={items.map((d) => ({ value: d.name, label: d.name }))}
+            options={items.map((d) => ({
+              value: d.name,
+              label: driverLabel(d.name),
+            }))}
           />
           {chosen && !chosen.verified ? (
             <span className="bg-status-warning/12 text-status-warning rounded-md px-2 py-0.5 text-xs">
@@ -294,17 +319,14 @@ function ExportPanel({
             </p>
             <ul className="space-y-0.5 text-xs">
               {blocked.map((d, i) => (
-                <li key={i}>
-                  <Figure>{d.code}</Figure> {d.field ? `· ${d.field}` : ""}{" "}
-                  <span className="text-muted-foreground">{d.message}</span>
+                <li key={i} title={d.code}>
+                  {exportIssue(d)}
                 </li>
               ))}
             </ul>
           </div>
         ) : run.isError ? (
-          <p className="text-status-blocking text-sm">
-            {errorText(run.error, t("office.api.load_error"))}
-          </p>
+          <p className="text-status-blocking text-sm">{apiError(run.error)}</p>
         ) : null}
         {run.data ? (
           <div className="text-sm">
@@ -345,7 +367,8 @@ function JournalsInner() {
   const { options, selected, select, isLoading, isError } =
     useSelectedEngagement(slug);
   const engagement = selected?.engagement ?? "";
-  const [period, setPeriod] = useState(thisMonth);
+  const { apiError, driverLabel } = useOfficeMessages();
+  const [period, setPeriod] = useState(defaultPeriod);
   const drafts = useJournalDrafts(slug, engagement, period);
   const exports = useJournalExports(slug, engagement);
   const { approve, reverse } = useJournalActions(slug, engagement);
@@ -406,12 +429,12 @@ function JournalsInner() {
         </label>
       </div>
 
-      <NewDraft engagement={engagement} />
+      <NewDraft key={period} engagement={engagement} period={period} />
 
       <Panel title={t("office.journals.drafts_title")}>
         {actionError ? (
           <p className="text-status-blocking px-4 pt-3 text-sm">
-            {errorText(actionError, t("office.api.load_error"))}
+            {apiError(actionError)}
           </p>
         ) : null}
         {drafts.isLoading ? (
@@ -506,7 +529,7 @@ function JournalsInner() {
                 className="flex flex-wrap items-center justify-between gap-2 px-4 py-2"
               >
                 <span>
-                  <Figure className="font-medium">{b.driver}</Figure>{" "}
+                  <span className="font-medium">{driverLabel(b.driver)}</span>{" "}
                   <span className="text-muted-foreground text-xs">
                     {b.period ?? ""} ·{" "}
                     {t("office.journals.history_row", {

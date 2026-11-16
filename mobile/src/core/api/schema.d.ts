@@ -9545,8 +9545,11 @@ export interface components {
         UBLUploadItem: {
             /** @description File name (inside the ZIP) */
             name: string;
-            /** @enum {string} */
-            status: "added" | "duplicate" | "failed";
+            /**
+             * @description held: the period is locked; a change request was opened instead (#32)
+             * @enum {string}
+             */
+            status: "added" | "duplicate" | "failed" | "held";
             /** Format: uuid */
             ettn?: string;
             invoice_number?: string;
@@ -9564,12 +9567,19 @@ export interface components {
             error?: string;
             /** @description Warning codes raised for an added invoice */
             warnings?: string[];
+            /**
+             * Format: uuid
+             * @description Set when status is held
+             */
+            change_request_uuid?: string;
         };
         UBLUploadReport: {
             total: number;
             added: number;
             duplicate: number;
             failed: number;
+            /** @description Invoices of a locked period sent to a change request (#32) */
+            held?: number;
             items: components["schemas"]["UBLUploadItem"][] | null;
         };
         UBLUploadJob: {

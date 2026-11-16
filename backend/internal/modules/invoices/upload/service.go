@@ -157,7 +157,7 @@ type ItemResult struct {
 	Status        string    `json:"status"`
 	ETTN          string    `json:"ettn,omitempty"`
 	InvoiceNumber string    `json:"invoice_number,omitempty"`
-	InvoiceUUID   uuid.UUID `json:"invoice_uuid,omitempty"`
+	InvoiceUUID   uuid.UUID `json:"invoice_uuid,omitzero"`
 	// Outcome / MatchRule: how the invoice was matched (`01` §6, #12).
 	Outcome   string   `json:"outcome,omitempty"`
 	MatchRule string   `json:"match_rule,omitempty"`

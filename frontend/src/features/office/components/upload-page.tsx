@@ -18,6 +18,7 @@ import {
   useUBLUpload,
   useUBLUploads,
 } from "../hooks/use-office-invoices";
+import { isRealUUID, useOfficeMessages } from "../lib/messages";
 import { severityOf } from "../lib/warnings";
 import type {
   UBLUploadItem,
@@ -30,6 +31,7 @@ const itemClass: Record<UBLUploadItem["status"], string> = {
   added: "bg-status-approved/12 text-status-approved",
   duplicate: "bg-secondary text-secondary-foreground",
   failed: "bg-status-blocking/12 text-status-blocking",
+  held: "bg-status-review/12 text-status-review",
 };
 
 const jobClass: Record<UBLUploadJob["status"], string> = {
@@ -65,6 +67,7 @@ function JobReport({
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
+  const { uploadError } = useOfficeMessages();
   const { data: job } = useUBLUpload(slug, engagement, jobId);
   if (!job) return <Skeleton className="h-24 w-full" />;
   const items = job.report?.items ?? [];
@@ -82,8 +85,10 @@ function JobReport({
       }
       actions={<JobStatus status={job.status} />}
     >
-      {job.error ? (
-        <p className="text-status-blocking px-4 py-3 text-sm">{job.error}</p>
+      {job.status === "failed" ? (
+        <p className="text-status-blocking px-4 py-3 text-sm">
+          {t("office.errors.upload.job_failed")}
+        </p>
       ) : null}
       {items.length ? (
         <TableBox>
@@ -110,15 +115,21 @@ function JobReport({
                   >
                     {t(`office.api.item_${f.status}`)}
                   </span>
-                  {f.error ? (
+                  {f.status === "failed" ? (
+                    <span
+                      className="text-muted-foreground mt-0.5 block text-[11px]"
+                      title={f.error_code}
+                    >
+                      {uploadError(f.error_code)}
+                    </span>
+                  ) : f.status === "held" ? (
                     <span className="text-muted-foreground mt-0.5 block text-[11px]">
-                      {f.error_code ? `${f.error_code}: ` : ""}
-                      {f.error}
+                      {t("office.errors.upload.held")}
                     </span>
                   ) : null}
                 </td>
                 <td>
-                  {f.invoice_uuid ? (
+                  {isRealUUID(f.invoice_uuid) ? (
                     <Link
                       className="hover:underline"
                       href={routes.tenant.invoice(
@@ -127,12 +138,14 @@ function JobReport({
                         engagement,
                       )}
                     >
-                      <Figure>{f.invoice_number ?? f.invoice_uuid}</Figure>
+                      <Figure>
+                        {f.invoice_number || t("office.api.open_invoice")}
+                      </Figure>
                     </Link>
                   ) : (
                     "—"
                   )}
-                  {f.ettn ? (
+                  {isRealUUID(f.ettn) ? (
                     <Figure className="text-muted-foreground block text-[11px]">
                       {f.ettn}
                     </Figure>
@@ -165,6 +178,7 @@ function JobReport({
 function UploadInner() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  const { apiError } = useOfficeMessages();
   const { options, selected, select, isLoading, isError } =
     useSelectedEngagement(slug);
   const engagement = selected?.engagement ?? "";
@@ -280,9 +294,7 @@ function UploadInner() {
           ) : null}
           {create.isError ? (
             <p className="text-status-blocking text-sm">
-              {create.error instanceof Error
-                ? create.error.message
-                : t("office.api.upload_failed")}
+              {apiError(create.error)}
             </p>
           ) : null}
           <div className="flex justify-end">
