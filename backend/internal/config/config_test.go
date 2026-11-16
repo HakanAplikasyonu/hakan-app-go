@@ -18,6 +18,7 @@ func validProdConfig() Config {
 	c.JWT.AccessSecret = strings.Repeat("a", 40)
 	c.JWT.RefreshSecret = strings.Repeat("b", 40)
 	c.Encryption.Key = strings.Repeat("k", 32)
+	c.Encryption.FieldKey = strings.Repeat("f", 32)
 	c.Auth.AdapterSecret = strings.Repeat("s", 40)
 	c.Centrifugo.Enabled = true
 	c.Centrifugo.APIKey = "real-api-key"
@@ -36,6 +37,8 @@ func TestValidateRejectsDefaultSecretsInProduction(t *testing.T) {
 	mutations := map[string]func(*Config){
 		"default encryption key": func(c *Config) { c.Encryption.Key = defaultEncryptionKey },
 		"empty encryption key":   func(c *Config) { c.Encryption.Key = "" },
+		"default field key":      func(c *Config) { c.Encryption.FieldKey = defaultFieldEncryptionKey },
+		"empty field key":        func(c *Config) { c.Encryption.FieldKey = "" },
 		"default adapter secret": func(c *Config) { c.Auth.AdapterSecret = defaultAdapterSecret },
 		"default centrifugo":     func(c *Config) { c.Centrifugo.TokenHMAC = defaultCentrifugoTokenHMAC },
 		"short jwt secret":       func(c *Config) { c.JWT.AccessSecret = "short" },

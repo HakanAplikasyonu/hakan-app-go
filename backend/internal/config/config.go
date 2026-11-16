@@ -180,6 +180,15 @@ type EncryptionConfig struct {
 	// SecretsActiveKeyID picks the KEK for new records and rotation; empty
 	// means the last SecretsKeyring entry (or "app").
 	SecretsActiveKeyID string
+	// FieldKey (FIELD_ENCRYPTION_KEY, base64 of 32 bytes) is the KEK of
+	// field-level encryption (#168: raw bank / invoice payloads), KEK id
+	// "field". It must differ from Key and the vault keys. FieldKeyring
+	// (FIELD_ENCRYPTION_KEYRING, "id:base64,…") adds keys for rotation and
+	// FieldActiveKeyID (FIELD_ENCRYPTION_ACTIVE_KEY_ID) picks the active one.
+	// See backend/docs/alan-sifreleme.md.
+	FieldKey         string
+	FieldKeyring     string
+	FieldActiveKeyID string
 }
 
 type HTTPConfig struct {
@@ -333,6 +342,9 @@ func Load() (Config, error) {
 			Key:                getEnv("APP_ENCRYPTION_KEY", defaultEncryptionKey),
 			SecretsKeyring:     getEnv("SECRETS_KEYRING", ""),
 			SecretsActiveKeyID: getEnv("SECRETS_ACTIVE_KEY_ID", ""),
+			FieldKey:           getEnv("FIELD_ENCRYPTION_KEY", defaultFieldEncryptionKey),
+			FieldKeyring:       getEnv("FIELD_ENCRYPTION_KEYRING", ""),
+			FieldActiveKeyID:   getEnv("FIELD_ENCRYPTION_ACTIVE_KEY_ID", ""),
 		},
 		HTTP: HTTPConfig{
 			Addr:         getEnv("APP_HTTP_ADDR", ":8080"),

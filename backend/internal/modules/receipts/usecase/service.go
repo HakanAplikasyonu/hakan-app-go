@@ -28,6 +28,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
@@ -199,7 +200,10 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 			TaxpayerID: sc.TaxpayerID, SourceID: sourceID, SaleDate: optDate(date, hasDate), Period: period,
 			ZReportNumber: text(res.Get(extract.FieldZNumber)), OkcSerialNumber: text(res.Get(extract.FieldOKCSerial)),
 			TotalAmount: optNum(total, hasTotal), TaxAmount: optNum(tax, hasTax), OcrConfidence: conf, OcrFields: fieldsJSON,
-			AttachmentID: pgtype.Int8{Int64: att.ID, Valid: true}, RawPayload: raw, ContentHash: text(hexSum),
+			AttachmentID: pgtype.Int8{Int64: att.ID, Valid: true}, ContentHash: text(hexSum),
+		}
+		if p.RawPayload, err = secrets.SealField(secrets.PurposeRetailSaleRawPayload, raw); err != nil {
+			return View{}, err
 		}
 		if hasTotal && hasTax {
 			p.SubtotalAmount = optNum(total.Sub(tax), true)
@@ -218,7 +222,10 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 			ReceiptNumber: text(res.Get(extract.FieldReceiptNumber)), ZReportNumber: text(res.Get(extract.FieldZNumber)),
 			OkcSerialNumber: text(res.Get(extract.FieldOKCSerial)), VehiclePlate: text(res.Get(extract.FieldPlate)),
 			PaymentMethod: text(res.Get(extract.FieldPaymentMethod)), OcrConfidence: conf, OcrFields: fieldsJSON,
-			AttachmentID: pgtype.Int8{Int64: att.ID, Valid: true}, RawPayload: raw, ContentHash: text(hexSum),
+			AttachmentID: pgtype.Int8{Int64: att.ID, Valid: true}, ContentHash: text(hexSum),
+		}
+		if p.RawPayload, err = secrets.SealField(secrets.PurposeExpenseRawPayload, raw); err != nil {
+			return View{}, err
 		}
 		if r, ok := res.Decimal(extract.FieldTaxRate); ok {
 			p.TaxRate = optNum(r, true)

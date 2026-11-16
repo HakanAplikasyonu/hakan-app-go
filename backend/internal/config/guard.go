@@ -49,6 +49,7 @@ const (
 	defaultJWTRefreshSecret    = "app-dev-refresh-secret-change-me-32b"
 	defaultAdapterSecret       = "app-dev-auth-adapter-secret-change-me"
 	defaultEncryptionKey       = "app-dev-encryption-key-32bytes!!"
+	defaultFieldEncryptionKey  = "app-dev-field-encrypt-key-32byte"
 	defaultCentrifugoAPIKey    = "app-centrifugo-api-key-change-me"
 	defaultCentrifugoTokenHMAC = "app-centrifugo-token-hmac-change-me"
 	defaultMeiliMasterKey      = "app-dev-meili-master-key-change-me"
@@ -84,6 +85,8 @@ var managedSecrets = []managedSecret{
 	{Key: "AUTH_ADAPTER_SECRET", Value: func(c Config) string { return c.Auth.AdapterSecret }, Defaults: []string{defaultAdapterSecret}},
 	// Encrypts credentials at rest: a public key would expose all of them.
 	{Key: "APP_ENCRYPTION_KEY", Value: func(c Config) string { return c.Encryption.Key }, Defaults: []string{defaultEncryptionKey}},
+	// Field-level encryption KEK (#168), separate from APP_ENCRYPTION_KEY.
+	{Key: "FIELD_ENCRYPTION_KEY", Value: func(c Config) string { return c.Encryption.FieldKey }, Defaults: []string{defaultFieldEncryptionKey}},
 	{
 		Key: "CENTRIFUGO_API_KEY", Value: func(c Config) string { return c.Centrifugo.APIKey },
 		Defaults: []string{defaultCentrifugoAPIKey}, Applies: func(c Config) bool { return c.Centrifugo.Enabled },

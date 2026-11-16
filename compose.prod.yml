@@ -70,6 +70,11 @@ x-backend-environment: &backend-environment
   # APP_ENCRYPTION_KEY ile çalışır (KEK kimliği "app").
   SECRETS_KEYRING: ${SECRETS_KEYRING:-}
   SECRETS_ACTIVE_KEY_ID: ${SECRETS_ACTIVE_KEY_ID:-}
+  # Alan düzeyinde şifreleme KEK'i (ham banka/fatura verisi, backend/docs/alan-sifreleme.md).
+  # APP_ENCRYPTION_KEY'den ayrıdır. Döndürme: KEYRING'e anahtar ekle, ACTIVE'i ayarla, field-crypt rotate.
+  FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?FIELD_ENCRYPTION_KEY is required}
+  FIELD_ENCRYPTION_KEYRING: ${FIELD_ENCRYPTION_KEYRING:-}
+  FIELD_ENCRYPTION_ACTIVE_KEY_ID: ${FIELD_ENCRYPTION_ACTIVE_KEY_ID:-}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
   # Public origin for links the API generates (e-mail links, step-up
   # origin). Defaults to AUTH_URL.

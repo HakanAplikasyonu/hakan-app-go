@@ -12,6 +12,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
 
 // dateFieldCreated: go-ubltr listings bound the creation / receive time
@@ -298,7 +299,14 @@ func (j *job) index(ctx context.Context, kind provider.DocumentKind, dir provide
 		return nil
 	}
 	n := NormalizeStatus(j.c.Name(), it)
-	header, _ := json.Marshal(it)
+	header, err := json.Marshal(it)
+	if err != nil {
+		return err
+	}
+	// The listed header carries counterparty data; it is sealed (#168).
+	if header, err = secrets.SealField(secrets.PurposeEntegratorHeader, header); err != nil {
+		return err
+	}
 	var issue pgtype.Date
 	if d, err := time.Parse(time.DateOnly, it.IssueDate); err == nil {
 		issue = pgtype.Date{Time: d, Valid: true}

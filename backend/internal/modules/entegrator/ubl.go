@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
@@ -100,7 +101,8 @@ func (j *job) fetchUBL(ctx context.Context, d db.EntegratorDocument) error {
 	// The integrator gets the ETTN as it listed it (the index keeps it lower-case).
 	ref := d.Ettn
 	var listed provider.DocumentInfo
-	if json.Unmarshal(d.HeaderRaw, &listed) == nil && strings.EqualFold(listed.UUID, d.Ettn) {
+	if header, err := secrets.OpenField(secrets.PurposeEntegratorHeader, d.HeaderRaw); err == nil &&
+		json.Unmarshal(header, &listed) == nil && strings.EqualFold(listed.UUID, d.Ettn) {
 		ref = listed.UUID
 	}
 	cctx, cancel := context.WithTimeout(ctx, j.s.cfg.CallTimeout)

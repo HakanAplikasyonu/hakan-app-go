@@ -46,6 +46,11 @@ SECRETS_ACTIVE_KEY_ID=k2026b
 Anahtarı listede olmayan bir kayıt "failed" sayılır, olduğu gibi bırakılır ve
 komut 1 ile çıkar.
 
+## Alan şifreleme
+
+Ham banka/fatura verisi gibi JSONB kolonlar aynı zarf şifrelemeyle ama ayrı bir
+anahtar halkasıyla (`FIELD_ENCRYPTION_KEY`) mühürlenir: [alan-sifreleme.md](alan-sifreleme.md).
+
 ## İleride
 
 `secrets.Vault` arayüzü ayrı bir arka uca (HashiCorp Vault, bulut KMS)
