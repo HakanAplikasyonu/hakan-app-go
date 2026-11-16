@@ -13,7 +13,8 @@
   --secondary: oklch(0.968 0.007 247.896);
   --secondary-foreground: oklch(0.208 0.042 265.755);
   --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
+  /* #194: muted zemin (#f1f5f9) üzerinde ≥ 4.5:1 kontrast için koyulaştırıldı. */
+  --muted-foreground: oklch(0.5 0.046 257.417);
   --accent: oklch(0.968 0.007 247.896);
   --accent-foreground: oklch(0.208 0.042 265.755);
   --destructive: oklch(0.577 0.245 27.325);
@@ -39,13 +40,13 @@
   --brand-foreground: #ffffff;
   --brand-check: #5b8cff;
   /* Durum renkleri: onaylandı / inceleme / uyarı / engelleyici */
-  --status-approved: #009689;
+  --status-approved: #006b63; /* #194: ≥ 4.5:1 beyaz ve %20 açık zeminde (önce #009689) */
   --status-approved-foreground: #ffffff;
   --status-review: #ffb900;
   --status-review-foreground: #0f172b;
-  --status-warning: #f54900;
+  --status-warning: #ad3a00; /* #194: önce #f54900 */
   --status-warning-foreground: #ffffff;
-  --status-blocking: #e7000b;
+  --status-blocking: #b80008; /* #194: önce #e7000b */
   --status-blocking-foreground: #ffffff;
 }
 

@@ -3,6 +3,7 @@
 import type { ColumnDef, RowData } from "@tanstack/react-table";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { useLocale } from "@/providers/locale-provider";
 
 export function createSelectColumnDef<TData extends RowData>(): ColumnDef<
   TData,
@@ -21,7 +22,8 @@ export function createSelectColumnDef<TData extends RowData>(): ColumnDef<
       enableHiding: false,
     },
     header: ({ table }) => (
-      <Checkbox
+      <LabeledCheckbox
+        labelKey="common.select_all"
         checked={
           table.getIsAllPageRowsSelected() ||
           (table.getIsSomePageRowsSelected() && "indeterminate")
@@ -29,16 +31,24 @@ export function createSelectColumnDef<TData extends RowData>(): ColumnDef<
         onCheckedChange={(value) =>
           table.toggleAllPageRowsSelected(Boolean(value))
         }
-        aria-label="Select all"
       />
     ),
     cell: ({ row }) => (
-      <Checkbox
+      <LabeledCheckbox
+        labelKey="common.select_row"
         checked={row.getIsSelected()}
         disabled={!row.getCanSelect()}
         onCheckedChange={(value) => row.toggleSelected(Boolean(value))}
-        aria-label="Select row"
       />
     ),
   };
+}
+
+/** Tablo seçim kutusu, Türkçe erişilebilir adla (#194). */
+function LabeledCheckbox({
+  labelKey,
+  ...props
+}: React.ComponentProps<typeof Checkbox> & { labelKey: string }) {
+  const { t } = useLocale();
+  return <Checkbox aria-label={t(labelKey)} {...props} />;
 }

@@ -31,5 +31,11 @@
   "theme_dark": "Dark",
   "theme_system": "System",
   "no_results": "No results found",
-  "copy": "Copy"
+  "copy": "Copy",
+  "toggle_sidebar": "Toggle sidebar",
+  "breadcrumb": "Breadcrumb",
+  "select_all": "Select all",
+  "select_row": "Select row",
+  "reorder": "Reorder",
+  "live_notifications": "Live notifications"
 }

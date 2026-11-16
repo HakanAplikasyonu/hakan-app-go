@@ -130,6 +130,7 @@ function NewDraft({ engagement }: { engagement: string }) {
           <Input
             className="h-8 max-w-md flex-1"
             placeholder={t("office.journals.description")}
+            aria-label={t("office.journals.description")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -151,6 +152,7 @@ function NewDraft({ engagement }: { engagement: string }) {
                   <Input
                     className="h-8 w-36 font-mono"
                     placeholder="770.01"
+                    aria-label={`${t("office.col_account")} ${i + 1}`}
                     value={l.account}
                     onChange={(e) => set(i, "account", e.target.value)}
                   />
@@ -158,6 +160,7 @@ function NewDraft({ engagement }: { engagement: string }) {
                 <td>
                   <Input
                     className="h-8"
+                    aria-label={`${t("office.journals.line_description")} ${i + 1}`}
                     value={l.description}
                     onChange={(e) => set(i, "description", e.target.value)}
                   />
@@ -166,6 +169,7 @@ function NewDraft({ engagement }: { engagement: string }) {
                   <Input
                     className="h-8 w-32 text-right font-mono"
                     inputMode="decimal"
+                    aria-label={`${t("office.journals.debit")} ${i + 1}`}
                     value={l.debit}
                     onChange={(e) => set(i, "debit", e.target.value)}
                   />
@@ -174,6 +178,7 @@ function NewDraft({ engagement }: { engagement: string }) {
                   <Input
                     className="h-8 w-32 text-right font-mono"
                     inputMode="decimal"
+                    aria-label={`${t("office.journals.credit")} ${i + 1}`}
                     value={l.credit}
                     onChange={(e) => set(i, "credit", e.target.value)}
                   />

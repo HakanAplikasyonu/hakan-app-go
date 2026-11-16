@@ -344,7 +344,7 @@ function UploadInner() {
       <p className="text-muted-foreground text-xs">
         {t("office.api.upload_footnote")}{" "}
         <Link
-          className="text-brand hover:underline"
+          className="text-brand underline underline-offset-2"
           href={`${routes.tenant.invoices(slug)}?taxpayer=${encodeURIComponent(engagement)}`}
         >
           {t("office.nav_invoices")}
