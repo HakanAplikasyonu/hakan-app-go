@@ -539,6 +539,13 @@ func (u *AuthUseCase) ResolvePermissions(ctx context.Context, roles []string, is
 			set[p] = struct{}{}
 		}
 	}
+	// Taban izin: oturum açmış her kullanıcı auth.session taşır. Tenancy
+	// kipindeki ofis ve mükellef rolleri (ve rolü olmayan, yalnızca üyelikle
+	// gelen kullanıcılar) bu izni rolden almaz; realtime token, onay, arama ve
+	// QR giriş onayı gibi oturum uçları bu yüzden 403 dönüyordu (#141). Diğer
+	// izinler rolden gelmeye devam eder. Çağıranlar devre dışı kullanıcıyı
+	// buraya gelmeden reddeder (identity loader, giriş akışları).
+	set[rbac.PermAuthSession] = struct{}{}
 	out := make([]string, 0, len(set))
 	for p := range set {
 		out = append(out, p)

@@ -22,15 +22,19 @@
 --   platform    kapsamlı rollere hiç satır yok
 -- Bağlam yoksa (ayar boş) hiçbir politika satır döndürmez.
 
+-- Roller küme genelidir. Aynı sunucuda eşzamanlı göçler (paralel test
+-- veritabanları) aynı rolü aynı anda oluşturursa ikinci işlem
+-- duplicate_object yerine unique_violation (pg_authid) alır; ikisi de
+-- "rol zaten var" demektir.
 DO $$
 BEGIN
     BEGIN
         CREATE ROLE hakan_rls_app NOLOGIN NOBYPASSRLS;
-    EXCEPTION WHEN duplicate_object THEN NULL;
+    EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
     END;
     BEGIN
         CREATE ROLE hakan_rls_worker NOLOGIN NOBYPASSRLS;
-    EXCEPTION WHEN duplicate_object THEN NULL;
+    EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL;
     END;
 END
 $$;
