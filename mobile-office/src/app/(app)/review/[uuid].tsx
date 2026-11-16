@@ -10,7 +10,7 @@ import { useColors } from '@/core/theme';
 import { receiptImageSource } from '@/features/clients/api';
 import { money } from '@/features/clients/format';
 import { useDecide, useSuggestion, useSuggestionContext } from '@/features/review/api';
-import { confidenceBand, confidencePercent, fieldLabel, proposedCode } from '@/features/review/format';
+import { confidenceBand, confidencePercent, fieldLabel, proposedCode, proposedText } from '@/features/review/format';
 import { ReasonSheet, type ReasonSheetMode } from '@/features/review/reason-sheet';
 import { periodLabel } from '@/features/warnings/format';
 
@@ -95,7 +95,7 @@ export default function SuggestionScreen() {
               label={`Güven ${confidencePercent(sug.confidence)}`}
             />
           </View>
-          <Text variant="title">{code ?? '—'}</Text>
+          <Text variant="title">{sug ? proposedText(sug.proposed_value) || '—' : '—'}</Text>
           <Text variant="caption" tone="muted">
             Gerekçe
           </Text>

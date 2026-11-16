@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { bulkTargets, groupQueue, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
+import { bulkTargets, fieldLabel, groupQueue, proposedText, suggestionLabel, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
 
 test('proposedCode', () => {
   assert.equal(proposedCode({ account_code: '770.01' }), '770.01');
@@ -95,4 +95,23 @@ test('groupQueue: güvene göre, önce düşük, boş grup yok', () => {
       ['high', ['1', '3']],
     ],
   );
+});
+
+test('alan adları Türkçe, ham ad gösterilmez (#375)', () => {
+  assert.equal(fieldLabel('total_amount'), 'Fiş toplamı');
+  assert.equal(fieldLabel('tax_amount'), 'KDV tutarı');
+  assert.equal(fieldLabel('match'), 'Banka eşleşmesi');
+  assert.equal(fieldLabel('yeni_alan'), 'Yeni alan');
+});
+
+test('önerilen değer: tutar, tarih, eşleşme puanı; JSON yok (#375)', () => {
+  assert.equal(proposedText({ account_code: '770.01' }), '770.01');
+  assert.equal(proposedText('1250.00'), '1.250,00');
+  assert.equal(proposedText('2026-10-05'), '05.10.2026');
+  assert.equal(proposedText('Z-0091'), 'Z-0091');
+  const match = { bank_transaction_id: 1, score: 73, invoices: [{ id: 5, number: 'ATL2026000000102', parts: { amount: 40 } }] };
+  assert.equal(proposedText(match), '%73');
+  assert.ok(!proposedText({ a: { b: 1 } }).includes('{'));
+  assert.equal(suggestionLabel({ kind: 'bank_match', target_field: 'match', proposed_value: match }), 'Banka eşleşmesi: Fatura ATL2026000000102');
+  assert.equal(suggestionLabel({ kind: 'receipt_field', target_field: 'tax_amount', proposed_value: '208.33' }), 'KDV tutarı');
 });

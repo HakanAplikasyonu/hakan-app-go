@@ -19,6 +19,7 @@ import {
   type ReviewListFilter,
   type ReviewSuggestion,
 } from "../services/review.service";
+import { valueText } from "../lib/suggestion-label";
 
 /** Auto-accept threshold the server falls back to (`review.DefaultPolicy`). */
 const DEFAULT_THRESHOLD = 0.95;
@@ -166,24 +167,13 @@ export function suggestionContext(s: ReviewSuggestion) {
   };
 }
 
-/** Short label for a non-account value (other suggestion kinds). */
+/**
+ * Short label for a suggestion value: account code, tr-TR amount, date,
+ * match score. Never raw JSON (#375).
+ */
 export function valueLabel(value: unknown) {
-  const { code } = accountValue(value);
-  if (code) return code;
-  if (value === null || value === undefined) return "";
-  if (typeof value === "number") return trNumber.format(value);
-  if (typeof value === "string") {
-    // Ondalık tutarlar ("1250.00") tr-TR biçiminde; fiş no gibi kodlar olduğu gibi.
-    return DECIMAL_RE.test(value) ? trNumber.format(Number(value)) : value;
-  }
-  return JSON.stringify(value);
+  return valueText(value);
 }
-
-const DECIMAL_RE = /^-?\d+\.\d+$/;
-const trNumber = new Intl.NumberFormat("tr-TR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
 
 /**
  * The corrected value keeps the proposed shape with the new code; a code
