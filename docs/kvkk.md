@@ -72,7 +72,31 @@ Periyodik imha işi (süresi dolan veriyi silme, yok etme ya da anonimleştirme,
 imha tutanağı) bu dilimin kapsamı dışında. Önce süreler hukukça
 kesinleşmeli.
 
-## 5. Hukukçunun doğrulayacakları
+## 5. Yapay zekâ sağlayıcısına giden veri (issue #169)
+
+Sağlayıcıya giden her istek sunucuda maskelenir (`AI_MASKING=true`). Yanıttaki belirteçler sunucuda geri açılır.
+
+- **Metin:**
+  - VKN, TCKN, IBAN, e-posta ve telefon numarası maskelenir.
+  - Çağrıyı yapan modülün verdiği adlar (mükellef unvanı, karşı taraflar) maskelenir.
+  - Kayıtlı olmayan adlar da sezgisel olarak yakalanır:
+    - hukuki biçimle biten unvanlar (A.Ş., Ltd. Şti. …),
+    - yaygın bir Türkçe ad ve ardından büyük harfle başlayan kelime,
+    - "Sayın …" ve "… Bey/Hanım" kalıpları,
+    - "Ad Soyad:", "Müşteri:", "Kasiyer:" gibi etiketlerin değeri.
+  - Sezgi gizleme yönünde hata yapar.
+- **Görsel (fiş fotoğrafı):** `AI_IMAGE_REDACTION=required` varsayılandır.
+  - Görsel önce sunucuda OCR'dan (tesseract, Türkçe) geçer.
+  - Metindeki kurallara uyan bölgeler siyahla kapatılır.
+  - Sağlayıcıya kapatılmış görsel ve kapatılan bölgelerin belirteçleri gider. Belirteçler `[VKN_1]` gibidir, değerler gitmez.
+  - Yeniden kodlama EXIF ve konum bilgisini de siler.
+  - OCR motoru yoksa görsel hiç gönderilmez ve fiş okuma başarısız olur.
+  - `off` görseli olduğu gibi gönderir; yalnızca yerel geliştirme içindir.
+- **Durum:** gizlilik ucu (`GET /v1/tenant/ai/privacy`) etkin durumu `image_redaction` alanında gösterir.
+
+OCR okuyamadığı ya da yanlış okuduğu bölgeyi kapatamaz. Bulanık ya da eğik fotoğrafta kişisel veri kalabilir; bu yüzden maskeli verinin hukuki niteliği (md. 9) hâlâ hukukçunun kararıdır (6. bölüm, 5. madde).
+
+## 6. Hukukçunun doğrulayacakları
 
 1. Rol dağılımı: platform mali verilerde veri işleyen, hesap verisinde veri sorumlusu.
 2. Geçmiş dönem paylaşımının hukuki sebebi. Açık rıza mı, yoksa ofis değişikliğinde sözleşmenin ifası mı? Açık rıza seçildiği için geri alınabilir ve hizmet şartına bağlanmadı.

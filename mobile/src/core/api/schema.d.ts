@@ -7708,7 +7708,16 @@ export interface components {
         AIPrivacy: {
             enabled: boolean;
             masking: boolean;
-            masked_kinds: ("VKN" | "TCKN" | "IBAN" | "AD")[];
+            masked_kinds: ("VKN" | "TCKN" | "IBAN" | "AD" | "EPOSTA" | "TEL")[];
+            /**
+             * @description `required`: images (receipt photos) are sent only after an OCR
+             *     pre-pass blacks out VKN, TCKN, IBAN, names, e-mail and phone
+             *     numbers. `unavailable`: required, but no OCR engine is installed,
+             *     so image calls are refused. `off`: images are sent as they are
+             *     (also when masking is off).
+             * @enum {string}
+             */
+            image_redaction: "required" | "unavailable" | "off";
             primary: components["schemas"]["AIProviderPrivacy"] | null;
             fallback: components["schemas"]["AIProviderPrivacy"] | null;
         };

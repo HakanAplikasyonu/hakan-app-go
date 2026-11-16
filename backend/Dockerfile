@@ -34,7 +34,9 @@ FROM migrate/migrate:v4.19.1 AS migrate
 
 FROM alpine:3.22 AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata \
+# tesseract: OCR pre-pass that blacks out personal data in receipt photos
+# before they go to the AI provider (AI_IMAGE_REDACTION, issue #169).
+RUN apk add --no-cache ca-certificates tzdata tesseract-ocr tesseract-ocr-data-tur \
     && adduser -D -H -u 10001 appuser
 
 WORKDIR /app

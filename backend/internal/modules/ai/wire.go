@@ -6,6 +6,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/provider"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/redact"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/usecase"
 )
 
@@ -38,10 +39,20 @@ func NewService(cfg config.AIConfig, store usecase.UsageStore, log *slog.Logger)
 			fallback = &usecase.Backend{Provider: p, Model: cfg.FallbackModel}
 		}
 	}
-	return usecase.New(primary, fallback, store, usecase.Options{
+	opts := usecase.Options{
 		Masking:              cfg.Masking,
 		DisableProviderStore: cfg.DisableProviderStore,
 		MaxTokens:            cfg.MaxTokens,
 		Logger:               log,
-	})
+		ImageRedaction:       cfg.ImageRedaction,
+	}
+	if cfg.Masking && cfg.ImageRedaction != usecase.RedactionOff && primary != nil {
+		if ocr, err := redact.NewTesseract(cfg.OCRTesseractPath, cfg.OCRLang); err == nil {
+			opts.ImageRedactor = redact.New(ocr)
+		} else {
+			log.Warn("ai: image redaction is required but no OCR engine was found; image calls will be refused",
+				"err", err)
+		}
+	}
+	return usecase.New(primary, fallback, store, opts)
 }

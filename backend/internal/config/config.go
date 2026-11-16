@@ -92,6 +92,15 @@ type AIConfig struct {
 	// (no retention for evals / training).
 	DisableProviderStore bool
 	MaxTokens            int
+	// ImageRedaction: "required" (default) blacks out VKN, TCKN, IBAN and
+	// names in images with an OCR pre-pass before they are sent, and refuses
+	// image calls when no OCR engine is found; "off" sends images as they
+	// are (issue #169).
+	ImageRedaction string
+	// OCRTesseractPath is the tesseract binary (default: from PATH).
+	OCRTesseractPath string
+	// OCRLang is the tesseract language (default "tur").
+	OCRLang string
 }
 
 type TenancyConfig struct {
@@ -483,6 +492,9 @@ func Load() (Config, error) {
 			Masking:              getBool("AI_MASKING", true),
 			DisableProviderStore: getBool("AI_DISABLE_PROVIDER_STORE", true),
 			MaxTokens:            getInt("AI_MAX_TOKENS", 4096),
+			ImageRedaction:       strings.ToLower(strings.TrimSpace(getEnv("AI_IMAGE_REDACTION", "required"))),
+			OCRTesseractPath:     getEnv("AI_OCR_TESSERACT_PATH", "tesseract"),
+			OCRLang:              getEnv("AI_OCR_LANG", "tur"),
 		},
 	}
 
@@ -548,6 +560,11 @@ func (c Config) validate() error {
 	}
 	if c.App.Env != "development" && c.App.Env != "test" && c.SMTP.TLSInsecureSkipVerify {
 		return fmt.Errorf("config: SMTP_TLS_INSECURE_SKIP_VERIFY must not be set outside development")
+	}
+	switch c.AI.ImageRedaction {
+	case "", "required", "off":
+	default:
+		return fmt.Errorf("config: AI_IMAGE_REDACTION must be required or off")
 	}
 	return nil
 }

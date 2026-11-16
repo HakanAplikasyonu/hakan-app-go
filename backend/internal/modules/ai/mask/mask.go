@@ -8,7 +8,13 @@
 //   - TCKN: a standalone run of exactly 11 digits that does not start with 0.
 //   - VKN: a standalone run of exactly 10 digits.
 //   - Name: every name registered with AddNames (case-insensitive), e.g. the
-//     taxpayer's title, its counterparties and their contacts.
+//     taxpayer's title, its counterparties and their contacts; and names found
+//     in free text (issue #169, see detect.go): company titles ending in a
+//     legal form (A.Ş., Ltd. Şti. …), a common Turkish first name followed by
+//     a capitalized word, words after "Sayın" or before "Bey"/"Hanım", and the
+//     value after labels such as "Ad Soyad:" or "Müşteri:".
+//   - E-mail addresses and Turkish phone numbers written with +90 or a
+//     leading 0.
 //
 // "Standalone" means not adjacent to another digit, so "VKN:1234567890" is
 // masked while a 12-digit invoice number is not. Masking errs on the side of
@@ -33,17 +39,19 @@ import (
 type Kind string
 
 const (
-	KindVKN  Kind = "VKN"
-	KindTCKN Kind = "TCKN"
-	KindIBAN Kind = "IBAN"
-	KindName Kind = "AD"
+	KindVKN   Kind = "VKN"
+	KindTCKN  Kind = "TCKN"
+	KindIBAN  Kind = "IBAN"
+	KindName  Kind = "AD"
+	KindEmail Kind = "EPOSTA"
+	KindPhone Kind = "TEL"
 )
 
 // ibanRe matches IBAN-shaped strings, optionally grouped by spaces.
 var ibanRe = regexp.MustCompile(`(?i)\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b`)
 
 // tokenRe matches the tokens this package produces.
-var tokenRe = regexp.MustCompile(`\[(VKN|TCKN|IBAN|AD)_(\d+)\]`)
+var tokenRe = regexp.MustCompile(`\[(VKN|TCKN|IBAN|AD|EPOSTA|TEL)_(\d+)\]`)
 
 // Masker masks and unmasks text.
 type Masker struct {
@@ -107,20 +115,135 @@ func (m *Masker) Mask(s string) string {
 	if s == "" {
 		return s
 	}
+	spans := m.Find(s)
+	if len(spans) == 0 {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	last := 0
+	for _, sp := range spans {
+		b.WriteString(s[last:sp.Start])
+		b.WriteString(sp.Token)
+		last = sp.End
+	}
+	b.WriteString(s[last:])
+	return b.String()
+}
+
+// Span is one identifier found in a text: byte offsets [Start, End), its
+// kind and the token that replaces it.
+type Span struct {
+	Start, End int
+	Kind       Kind
+	Token      string
+}
+
+// Find returns the identifiers in s, sorted and non-overlapping, and
+// registers their tokens (so Unmask restores them). Tokens already in s are
+// left alone. Earlier detectors win an overlap: IBAN, e-mail, phone,
+// VKN/TCKN, registered names, then names found by the heuristics.
+func (m *Masker) Find(s string) []Span {
+	if s == "" {
+		return nil
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	s = ibanRe.ReplaceAllStringFunc(s, func(v string) string {
-		norm := strings.ToUpper(strings.ReplaceAll(v, " ", ""))
-		if !looksLikeIBAN(norm) {
-			return v
-		}
-		return m.token(KindIBAN, norm, v)
-	})
-	s = m.maskDigitRuns(s)
-	if m.nameRe != nil {
-		s = m.replaceNames(s)
+	f := finder{s: s}
+	for _, loc := range tokenRe.FindAllStringIndex(s, -1) {
+		f.taken = append(f.taken, [2]int{loc[0], loc[1]})
 	}
-	return s
+	for _, loc := range ibanRe.FindAllStringIndex(s, -1) {
+		v := s[loc[0]:loc[1]]
+		norm := strings.ToUpper(strings.ReplaceAll(v, " ", ""))
+		if looksLikeIBAN(norm) {
+			f.add(m, loc[0], loc[1], KindIBAN, norm)
+		}
+	}
+	for _, loc := range emailRe.FindAllStringIndex(s, -1) {
+		f.add(m, loc[0], loc[1], KindEmail, strings.ToLower(s[loc[0]:loc[1]]))
+	}
+	for _, loc := range phoneRe.FindAllStringIndex(s, -1) {
+		if adjacentDigit(s, loc[0], loc[1]) {
+			continue
+		}
+		f.add(m, loc[0], loc[1], KindPhone, phoneDigits(s[loc[0]:loc[1]]))
+	}
+	for i := 0; i < len(s); {
+		if !isDigit(rune(s[i])) {
+			i++
+			continue
+		}
+		j := i
+		for j < len(s) && isDigit(rune(s[j])) {
+			j++
+		}
+		switch run := s[i:j]; {
+		case len(run) == 10:
+			f.add(m, i, j, KindVKN, run)
+		case len(run) == 11 && run[0] != '0':
+			f.add(m, i, j, KindTCKN, run)
+		}
+		i = j
+	}
+	if m.nameRe != nil {
+		for _, loc := range m.nameRe.FindAllStringSubmatchIndex(s, -1) {
+			f.addName(m, loc[2], loc[3])
+		}
+		// The pattern consumes one boundary rune on each side, so a name
+		// right after another one (one rune apart) needs a second pass.
+		for _, loc := range m.nameRe.FindAllStringSubmatchIndex(f.blanked(), -1) {
+			f.addName(m, loc[2], loc[3])
+		}
+	}
+	for _, r := range detectNames(s) {
+		f.addName(m, r[0], r[1])
+	}
+	sort.Slice(f.spans, func(i, j int) bool { return f.spans[i].Start < f.spans[j].Start })
+	return f.spans
+}
+
+// finder collects non-overlapping spans of one text.
+type finder struct {
+	s     string
+	taken [][2]int
+	spans []Span
+}
+
+func (f *finder) free(start, end int) bool {
+	for _, t := range f.taken {
+		if start < t[1] && t[0] < end {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *finder) add(m *Masker, start, end int, kind Kind, norm string) {
+	if start >= end || !f.free(start, end) {
+		return
+	}
+	f.taken = append(f.taken, [2]int{start, end})
+	f.spans = append(f.spans, Span{Start: start, End: end, Kind: kind, Token: m.token(kind, norm, f.s[start:end])})
+}
+
+func (f *finder) addName(m *Masker, start, end int) {
+	if start < 0 || start >= end {
+		return
+	}
+	f.add(m, start, end, KindName, foldName(f.s[start:end]))
+}
+
+// blanked is s with every taken range replaced by spaces of the same byte
+// length, so offsets stay valid.
+func (f *finder) blanked() string {
+	b := []byte(f.s)
+	for _, t := range f.taken {
+		for i := t[0]; i < t[1]; i++ {
+			b[i] = ' '
+		}
+	}
+	return string(b)
 }
 
 // Unmask restores the original values of tokens in s. Unknown tokens are left
@@ -171,51 +294,6 @@ func (m *Masker) token(kind Kind, norm, original string) string {
 	return tok
 }
 
-// maskDigitRuns masks maximal digit runs of length 10 (VKN) or 11 (TCKN).
-// Digits inside an existing token are skipped.
-func (m *Masker) maskDigitRuns(s string) string {
-	var b strings.Builder
-	b.Grow(len(s))
-	rs := []rune(s)
-	for i := 0; i < len(rs); {
-		if !isDigit(rs[i]) || insideToken(rs, i) {
-			b.WriteRune(rs[i])
-			i++
-			continue
-		}
-		j := i
-		for j < len(rs) && isDigit(rs[j]) {
-			j++
-		}
-		run := string(rs[i:j])
-		switch {
-		case len(run) == 10:
-			b.WriteString(m.token(KindVKN, run, run))
-		case len(run) == 11 && run[0] != '0':
-			b.WriteString(m.token(KindTCKN, run, run))
-		default:
-			b.WriteString(run)
-		}
-		i = j
-	}
-	return b.String()
-}
-
-func (m *Masker) replaceNames(s string) string {
-	// The regex consumes one boundary rune on each side; loop so adjacent
-	// names separated by a single rune are all replaced.
-	for {
-		loc := m.nameRe.FindStringSubmatchIndex(s)
-		if loc == nil {
-			return s
-		}
-		start, end := loc[2], loc[3]
-		v := s[start:end]
-		norm := foldName(v)
-		s = s[:start] + m.token(KindName, norm, v) + s[end:]
-	}
-}
-
 // foldName normalizes a name for token lookup: single spaces, lower case,
 // Turkish i variants folded together.
 func foldName(v string) string {
@@ -237,15 +315,6 @@ func namePattern(w string) string {
 		}
 	}
 	return b.String()
-}
-
-// insideToken reports whether position i sits inside "[KIND_n]".
-func insideToken(rs []rune, i int) bool {
-	j := i
-	for j > 0 && isDigit(rs[j-1]) {
-		j--
-	}
-	return j > 0 && rs[j-1] == '_'
 }
 
 func isDigit(r rune) bool { return r >= '0' && r <= '9' }

@@ -35,6 +35,7 @@ require (
 	github.com/shopspring/decimal v1.4.0
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/crypto v0.54.0
+	golang.org/x/image v0.38.0
 	golang.org/x/text v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
 )
