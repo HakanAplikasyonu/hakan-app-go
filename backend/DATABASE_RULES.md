@@ -138,7 +138,8 @@ template), in transition or enforced. The runtime role is not affected (it is
 not the owner); a non-superuser owner sees and writes those tables only
 inside `rls.System` (`app.system`). A data migration touching any such table
 as a non-superuser owner must `SET LOCAL app.system = 'on'` first. The
-deliberate exceptions (boilerplate tables with office-less rows) are listed
+deliberate exceptions (notifications and activity_events, which also need a
+user_id condition) are listed
 with their reason in `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
 
 Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
@@ -154,7 +155,16 @@ SELECT rls_apply_org('my_table');         -- organization_id
 SELECT rls_apply_engagement('my_table');  -- organization_id + engagement_id
 SELECT rls_apply_taxpayer('my_table');    -- taxpayer_id
 SELECT rls_apply_platform('my_table');    -- no rows for scoped roles
+SELECT rls_apply_org_shared('my_table');  -- organization_id, NULL = platform row
 ```
+
+`rls_apply_org_shared` (migration 000087, #307) is for tables whose
+organization_id NULL rows belong to the platform (system roles, global Excel
+templates, office-less IO engine jobs): a scope reads its own office's rows
+and the NULL rows, writes only its own office's rows; a NULL row is written
+only through `rls.System` (or unscoped, while the table is in transition).
+List the table in `internal/database/shared_tables.txt`
+(`TestSharedTablesPolicies`).
 
 How code joins a scope: `database.NewQueries(pool)` (and `database.Ambient`)
 run each statement on the transaction carried by the context, so a

@@ -224,6 +224,7 @@ func TestWriteEndpointsNo5xx(t *testing.T) {
 	}
 
 	e := newSweepEnv(t)
+	e.sharedReads(t)
 	var late, last []specOp
 	run := func(op specOp) {
 		key := op.method + " " + op.path
@@ -563,4 +564,20 @@ func firstLine(s string) string {
 		s = s[:160]
 	}
 	return s
+}
+
+// sharedReads (issue #307): inside the office's request scope the
+// platform's rows of the rls_apply_org_shared tables stay visible: the
+// system roles in the role list (every permission screen reads them).
+func (e *sweepEnv) sharedReads(t *testing.T) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/v1/tenant/roles", nil)
+	req.Header.Set("Authorization", "Bearer "+e.ownerTok)
+	req.Header.Set("X-Organization", "demo-smmm")
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, `"key":"owner"`) || !strings.Contains(body, `"key":"member"`) {
+		t.Fatalf("GET /v1/tenant/roles in the office scope = %d %s, want the system roles", rec.Code, firstLine(body))
+	}
 }
