@@ -18,10 +18,19 @@ mkdir -p "$out/recordings" "$out/debug"
 maestro=${MAESTRO_BIN:-$HOME/.maestro/bin/maestro}
 
 adb wait-for-device
+until [ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; do sleep 2; done
 # Açılış animasyonları akışları yavaşlatır ve zaman aşımına sokar.
 adb shell settings put global window_animation_scale 0
 adb shell settings put global transition_animation_scale 0
 adb shell settings put global animator_duration_scale 0
+# Yeni açılan emülatörde sistem uygulamaları (Pixel Launcher) bir süre yanıt
+# vermeyebiliyor; "isn't responding" penceresi uygulamanın üstüne çıkıp ilk
+# akışı düşürüyordu (#300, ilk koşu). Hata pencerelerini kapat, sistemi
+# oturt, açık kalan pencereyi kapat.
+adb shell settings put global hide_error_dialogs 1
+adb shell input keyevent KEYCODE_HOME
+sleep 30
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
 adb install -r -g "$apk"
 adb logcat -c || true
 
