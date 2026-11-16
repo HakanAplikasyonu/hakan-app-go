@@ -719,6 +719,13 @@ type Querier interface {
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
 	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
+	// Müşavir mobil ana panosu (issue #237). Ofis çapında sayılar; read_all
+	// izni olmayan üye yalnızca atandığı engagement'ları görür. İstek RLS
+	// kapsamında (issue #166) çalışır, süzgeç burada da açıkça yazılır.
+	// tenant-lint: org-wide ofis panosu sayıları; read_all yoksa engagement_assignments ile süzülür
+	OfficeDashboardCounts(ctx context.Context, arg OfficeDashboardCountsParams) (OfficeDashboardCountsRow, error)
+	// tenant-lint: org-wide ofis panosu son yüklemeler; read_all yoksa engagement_assignments ile süzülür
+	OfficeDashboardRecentUploads(ctx context.Context, arg OfficeDashboardRecentUploadsParams) ([]OfficeDashboardRecentUploadsRow, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)

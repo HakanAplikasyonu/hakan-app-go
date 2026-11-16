@@ -22,6 +22,7 @@ import (
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
+	officedashmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	periodsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods"
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	receiptsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts"
@@ -59,6 +60,8 @@ type moduleHandlers struct {
 	agents      *agentshandler.Handler
 	legal       *legalhandler.Handler
 	doctasks    *doctasksmodule.Handler
+	// officedash: ofis ana panosu (issue #237).
+	officedash *officedashmodule.Handler
 	// accountrules: hesap kodu kural motoru (issue #25).
 	accountrules *accountruleshandler.Handler
 	vat          *vatforecasthandler.Handler
@@ -92,5 +95,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
 		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
+		officedashmodule.Module{H: h.officedash},
 	}
 }
