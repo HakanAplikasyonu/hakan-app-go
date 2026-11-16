@@ -21,6 +21,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
@@ -171,8 +172,17 @@ func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 
 	// Re-run the control for this transaction. A failure here leaves the
 	// match in place; the next detection run resolves the warning.
+	// The warnings are the office's records: in the mükellef panel's
+	// taxpayer scope (no office) they were invisible and could not be
+	// resolved, so run the control as the task's office (issue #281).
 	sub := engine.Subject{OrganizationID: task.OrganizationID, EngagementID: task.EngagementID, TaxpayerID: taxpayerID}
-	if rep, err := s.DetectTransaction(ctx, sub, task.BankTransactionID); err != nil {
+	var rep DetectReport
+	err = rls.ForOffice(ctx, task.OrganizationID, taxpayerID, func(ctx context.Context) error {
+		var err error
+		rep, err = s.DetectTransaction(ctx, sub, task.BankTransactionID)
+		return err
+	})
+	if err != nil {
 		s.log.Warn("doctasks_redetect_failed", "error", err, "task", taskID)
 	} else {
 		res.WarningResolved = rep.AutoResolved > 0
