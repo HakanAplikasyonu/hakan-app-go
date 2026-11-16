@@ -32,7 +32,7 @@ RUN if [ -n "${RELEASE_JSON_B64}" ]; then \
 
 FROM migrate/migrate:v4.20.1 AS migrate
 
-FROM alpine:3.22 AS runtime
+FROM alpine:3.24 AS runtime
 
 # tesseract: OCR pre-pass that blacks out personal data in receipt photos
 # before they go to the AI provider (AI_IMAGE_REDACTION, issue #169).
