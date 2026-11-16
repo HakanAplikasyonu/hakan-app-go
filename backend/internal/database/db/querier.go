@@ -146,6 +146,7 @@ type Querier interface {
 	CreateOrganizationRole(ctx context.Context, arg CreateOrganizationRoleParams) (Role, error)
 	// Dilekçeler (issue #56).
 	CreatePetition(ctx context.Context, arg CreatePetitionParams) (Petition, error)
+	// session_uuid: a new one at sign-in, the session's own on rotation (#323).
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSourceConnection(ctx context.Context, arg CreateSourceConnectionParams) (SourceConnection, error)
@@ -223,6 +224,8 @@ type Querier interface {
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
 	EndEngagementByID(ctx context.Context, id int64) error
+	// Sign-out: the token's whole session ends, its access tokens with it (#323).
+	EndRefreshSessionByHash(ctx context.Context, tokenHash string) (int64, error)
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
@@ -817,6 +820,8 @@ type Querier interface {
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	// Access tokens of an ended (or unknown) session are refused (#323).
+	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
@@ -839,17 +844,21 @@ type Querier interface {
 	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
+	// Password change / reset, deactivation: every session ends (#323).
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
 	RevokeDesktopAgent(ctx context.Context, arg RevokeDesktopAgentParams) (int64, error)
 	RevokeHistoryShare(ctx context.Context, arg RevokeHistoryShareParams) (int64, error)
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.
 	RevokeOrganizationInvitation(ctx context.Context, arg RevokeOrganizationInvitationParams) (OrganizationInvitation, error)
+	// $2 is the caller's session (session_uuid) (#323).
 	RevokeOtherRefreshTokensForUser(ctx context.Context, arg RevokeOtherRefreshTokensForUserParams) error
 	// A new invitation replaces older open ones for the same address.
 	RevokePendingOrganizationInvitationsForEmail(ctx context.Context, arg RevokePendingOrganizationInvitationsForEmailParams) (int64, error)
 	RevokePendingTaxpayerInvitationsForEmail(ctx context.Context, arg RevokePendingTaxpayerInvitationsForEmailParams) error
+	// Rotation: the token is used up, the session goes on.
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) (int64, error)
+	// $1 is the session (session_uuid): the whole session ends (#323).
 	RevokeRefreshTokenByUUIDForUser(ctx context.Context, arg RevokeRefreshTokenByUUIDForUserParams) (int64, error)
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	RevokeTaxpayerInvitation(ctx context.Context, arg RevokeTaxpayerInvitationParams) (int64, error)

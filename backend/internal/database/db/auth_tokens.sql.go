@@ -14,9 +14,9 @@ import (
 )
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
-INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, impersonator_user_id)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at
+INSERT INTO refresh_tokens (user_id, token_hash, expires_at, user_agent, ip_address, impersonator_user_id, session_uuid)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at, session_uuid, ended_at
 `
 
 type CreateRefreshTokenParams struct {
@@ -26,8 +26,10 @@ type CreateRefreshTokenParams struct {
 	UserAgent          pgtype.Text        `json:"user_agent"`
 	IpAddress          *netip.Addr        `json:"ip_address"`
 	ImpersonatorUserID pgtype.Int8        `json:"impersonator_user_id"`
+	SessionUuid        uuid.UUID          `json:"session_uuid"`
 }
 
+// session_uuid: a new one at sign-in, the session's own on rotation (#323).
 func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error) {
 	row := q.db.QueryRow(ctx, createRefreshToken,
 		arg.UserID,
@@ -36,6 +38,7 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 		arg.UserAgent,
 		arg.IpAddress,
 		arg.ImpersonatorUserID,
+		arg.SessionUuid,
 	)
 	var i RefreshToken
 	err := row.Scan(
@@ -49,12 +52,30 @@ func (q *Queries) CreateRefreshToken(ctx context.Context, arg CreateRefreshToken
 		&i.IpAddress,
 		&i.ImpersonatorUserID,
 		&i.CreatedAt,
+		&i.SessionUuid,
+		&i.EndedAt,
 	)
 	return i, err
 }
 
+const endRefreshSessionByHash = `-- name: EndRefreshSessionByHash :execrows
+UPDATE refresh_tokens
+SET revoked_at = COALESCE(revoked_at, NOW()), ended_at = NOW()
+WHERE session_uuid = (SELECT r.session_uuid FROM refresh_tokens r WHERE r.token_hash = $1)
+  AND ended_at IS NULL
+`
+
+// Sign-out: the token's whole session ends, its access tokens with it (#323).
+func (q *Queries) EndRefreshSessionByHash(ctx context.Context, tokenHash string) (int64, error) {
+	result, err := q.db.Exec(ctx, endRefreshSessionByHash, tokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getValidRefreshTokenByHash = `-- name: GetValidRefreshTokenByHash :one
-SELECT id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at
+SELECT id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at, session_uuid, ended_at
 FROM refresh_tokens
 WHERE token_hash = $1
   AND revoked_at IS NULL
@@ -75,12 +96,14 @@ func (q *Queries) GetValidRefreshTokenByHash(ctx context.Context, tokenHash stri
 		&i.IpAddress,
 		&i.ImpersonatorUserID,
 		&i.CreatedAt,
+		&i.SessionUuid,
+		&i.EndedAt,
 	)
 	return i, err
 }
 
 const listActiveRefreshTokensByUserID = `-- name: ListActiveRefreshTokensByUserID :many
-SELECT id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at
+SELECT id, uuid, user_id, token_hash, expires_at, revoked_at, user_agent, ip_address, impersonator_user_id, created_at, session_uuid, ended_at
 FROM refresh_tokens
 WHERE user_id = $1
   AND revoked_at IS NULL
@@ -108,6 +131,8 @@ func (q *Queries) ListActiveRefreshTokensByUserID(ctx context.Context, userID in
 			&i.IpAddress,
 			&i.ImpersonatorUserID,
 			&i.CreatedAt,
+			&i.SessionUuid,
+			&i.EndedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -119,13 +144,34 @@ func (q *Queries) ListActiveRefreshTokensByUserID(ctx context.Context, userID in
 	return items, nil
 }
 
-const revokeAllRefreshTokensForUser = `-- name: RevokeAllRefreshTokensForUser :exec
-UPDATE refresh_tokens
-SET revoked_at = NOW()
-WHERE user_id = $1
-  AND revoked_at IS NULL
+const refreshSessionEnded = `-- name: RefreshSessionEnded :one
+SELECT NOT EXISTS (
+    SELECT 1 FROM refresh_tokens
+    WHERE session_uuid = $1 AND user_id = $2 AND ended_at IS NULL
+)::boolean AS ended
 `
 
+type RefreshSessionEndedParams struct {
+	SessionUuid uuid.UUID `json:"session_uuid"`
+	UserID      int64     `json:"user_id"`
+}
+
+// Access tokens of an ended (or unknown) session are refused (#323).
+func (q *Queries) RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error) {
+	row := q.db.QueryRow(ctx, refreshSessionEnded, arg.SessionUuid, arg.UserID)
+	var ended pgtype.Bool
+	err := row.Scan(&ended)
+	return ended, err
+}
+
+const revokeAllRefreshTokensForUser = `-- name: RevokeAllRefreshTokensForUser :exec
+UPDATE refresh_tokens
+SET revoked_at = COALESCE(revoked_at, NOW()), ended_at = NOW()
+WHERE user_id = $1
+  AND ended_at IS NULL
+`
+
+// Password change / reset, deactivation: every session ends (#323).
 func (q *Queries) RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error {
 	_, err := q.db.Exec(ctx, revokeAllRefreshTokensForUser, userID)
 	return err
@@ -133,19 +179,20 @@ func (q *Queries) RevokeAllRefreshTokensForUser(ctx context.Context, userID int6
 
 const revokeOtherRefreshTokensForUser = `-- name: RevokeOtherRefreshTokensForUser :exec
 UPDATE refresh_tokens
-SET revoked_at = NOW()
+SET revoked_at = COALESCE(revoked_at, NOW()), ended_at = NOW()
 WHERE user_id = $1
-  AND uuid <> $2
-  AND revoked_at IS NULL
+  AND session_uuid <> $2
+  AND ended_at IS NULL
 `
 
 type RevokeOtherRefreshTokensForUserParams struct {
-	UserID int64     `json:"user_id"`
-	Uuid   uuid.UUID `json:"uuid"`
+	UserID      int64     `json:"user_id"`
+	SessionUuid uuid.UUID `json:"session_uuid"`
 }
 
+// $2 is the caller's session (session_uuid) (#323).
 func (q *Queries) RevokeOtherRefreshTokensForUser(ctx context.Context, arg RevokeOtherRefreshTokensForUserParams) error {
-	_, err := q.db.Exec(ctx, revokeOtherRefreshTokensForUser, arg.UserID, arg.Uuid)
+	_, err := q.db.Exec(ctx, revokeOtherRefreshTokensForUser, arg.UserID, arg.SessionUuid)
 	return err
 }
 
@@ -156,6 +203,7 @@ WHERE token_hash = $1
   AND revoked_at IS NULL
 `
 
+// Rotation: the token is used up, the session goes on.
 func (q *Queries) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) (int64, error) {
 	result, err := q.db.Exec(ctx, revokeRefreshTokenByHash, tokenHash)
 	if err != nil {
@@ -166,19 +214,20 @@ func (q *Queries) RevokeRefreshTokenByHash(ctx context.Context, tokenHash string
 
 const revokeRefreshTokenByUUIDForUser = `-- name: RevokeRefreshTokenByUUIDForUser :execrows
 UPDATE refresh_tokens
-SET revoked_at = NOW()
-WHERE uuid = $1
+SET revoked_at = COALESCE(revoked_at, NOW()), ended_at = NOW()
+WHERE session_uuid = $1
   AND user_id = $2
-  AND revoked_at IS NULL
+  AND ended_at IS NULL
 `
 
 type RevokeRefreshTokenByUUIDForUserParams struct {
-	Uuid   uuid.UUID `json:"uuid"`
-	UserID int64     `json:"user_id"`
+	SessionUuid uuid.UUID `json:"session_uuid"`
+	UserID      int64     `json:"user_id"`
 }
 
+// $1 is the session (session_uuid): the whole session ends (#323).
 func (q *Queries) RevokeRefreshTokenByUUIDForUser(ctx context.Context, arg RevokeRefreshTokenByUUIDForUserParams) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeRefreshTokenByUUIDForUser, arg.Uuid, arg.UserID)
+	result, err := q.db.Exec(ctx, revokeRefreshTokenByUUIDForUser, arg.SessionUuid, arg.UserID)
 	if err != nil {
 		return 0, err
 	}

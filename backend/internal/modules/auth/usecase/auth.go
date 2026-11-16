@@ -24,6 +24,7 @@ import (
 var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserDisabled       = errors.New("user is disabled")
+	ErrSessionEnded       = errors.New("session has ended")
 	ErrForbidden          = errors.New("forbidden")
 	ErrNotFound           = errors.New("not found")
 	ErrConflict           = errors.New("conflict")
@@ -66,6 +67,8 @@ type Repository interface {
 	SaveRefresh(ctx context.Context, userID int64, hash string, expiresAt time.Time, meta model.SessionMeta) (uuid.UUID, error)
 	GetRefreshSession(ctx context.Context, hash string) (model.RefreshSession, error)
 	RevokeRefresh(ctx context.Context, hash string) error
+	EndRefreshSession(ctx context.Context, hash string) error
+	RefreshSessionEnded(ctx context.Context, userID int64, session uuid.UUID) (bool, error)
 	RevokeAllRefresh(ctx context.Context, userID int64) error
 	ListActiveSessions(ctx context.Context, userID int64) ([]model.DeviceSession, error)
 	RevokeSession(ctx context.Context, userID int64, sessionUUID uuid.UUID) error
@@ -449,6 +452,8 @@ func (u *AuthUseCase) Refresh(ctx context.Context, rawToken string, meta model.S
 		return model.Tokens{}, userStatusError(user)
 	}
 	meta.ImpersonatorUserID = session.ImpersonatorUserID
+	// The rotated token continues the session: same sid in the new access token.
+	meta.SessionUUID = session.SessionUUID
 	return u.issueTokensForUser(ctx, user, meta)
 }
 
@@ -458,7 +463,7 @@ func (u *AuthUseCase) Logout(ctx context.Context, rawToken string) error {
 	if strings.TrimSpace(rawToken) == "" {
 		return nil
 	}
-	if err := u.repo.RevokeRefresh(ctx, tokenHash(rawToken)); err != nil && !errors.Is(err, repository.ErrNotFound) {
+	if err := u.repo.EndRefreshSession(ctx, tokenHash(rawToken)); err != nil && !errors.Is(err, repository.ErrNotFound) {
 		return err
 	}
 	return nil
@@ -551,6 +556,17 @@ func (u *AuthUseCase) ResolvePermissions(ctx context.Context, roles []string, is
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// SessionEnded reports whether an access token's session has ended: signed
+// out, revoked from the session list, closed by "sign out other sessions",
+// a password change or reset, or account deactivation (#323). Access tokens
+// carry the session as sid; one without a sid has no session to check.
+func (u *AuthUseCase) SessionEnded(ctx context.Context, userID int64, session uuid.UUID) (bool, error) {
+	if session == uuid.Nil {
+		return false, nil
+	}
+	return u.repo.RefreshSessionEnded(ctx, userID, session)
 }
 
 // LoadUserByUUID is used by middleware identity hydration.

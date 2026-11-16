@@ -456,7 +456,9 @@ func (s *Service) GetOwned(ctx context.Context, userID int64, id uuid.UUID) (mod
 		return model.Notification{}, err
 	}
 	if !row.UserID.Valid || row.UserID.Int64 != userID {
-		return model.Notification{}, ErrForbidden
+		// Another user's notification does not exist for the caller: 404,
+		// not 403, so its id reveals nothing (#323).
+		return model.Notification{}, ErrNotFound
 	}
 	// Same rule as the inbox list: email bodies carry one-time codes and links.
 	if row.Channel == model.ChannelEmail {
@@ -490,7 +492,7 @@ func (s *Service) RedeemAction(ctx context.Context, userID int64, id uuid.UUID, 
 		return model.Notification{}, "", err
 	}
 	if !row.UserID.Valid || row.UserID.Int64 != userID {
-		return model.Notification{}, "", ErrForbidden
+		return model.Notification{}, "", ErrNotFound // as GetOwned (#323)
 	}
 	if !row.ActionUrl.Valid || strings.TrimSpace(row.ActionUrl.String) == "" {
 		return model.Notification{}, "", fmt.Errorf("%w: action url missing", ErrInvalidRequest)

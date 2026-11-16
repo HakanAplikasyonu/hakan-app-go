@@ -1335,6 +1335,8 @@ type RefreshToken struct {
 	IpAddress          *netip.Addr        `json:"ip_address"`
 	ImpersonatorUserID pgtype.Int8        `json:"impersonator_user_id"`
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	SessionUuid        uuid.UUID          `json:"session_uuid"`
+	EndedAt            pgtype.Timestamptz `json:"ended_at"`
 }
 
 type RetailSale struct {
