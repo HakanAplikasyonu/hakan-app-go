@@ -18,6 +18,7 @@ import {
   usePeriodMatrix,
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress, statusOf } from "../lib/command";
+import { OfflineAgentsCard } from "./agents-page";
 import { CellBadge, monthLabel } from "./command-center";
 import { Figure, Money, Panel, TableBox } from "./office-ui";
 
@@ -97,6 +98,7 @@ export function OfficeHome() {
         })}
         icon={<Building2 className="size-6" />}
       />
+      <OfflineAgentsCard />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat
           label={t("office.stat_taxpayers")}

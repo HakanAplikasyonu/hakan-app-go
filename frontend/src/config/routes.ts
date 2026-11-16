@@ -133,6 +133,8 @@ export const routes = {
     /** One engagement; opens on its documents. */
     engagement: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}`,
+    /** Desktop agents of the office (#285). */
+    agents: (slug: string) => `/t/${encodeURIComponent(slug)}/agents`,
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,

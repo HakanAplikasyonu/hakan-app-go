@@ -68,6 +68,9 @@ export const Permission = {
   TenantJournalsRead: "tenant.journals.read",
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
+  /** Desktop agents of the office (issue #51, #285). */
+  TenantAgentsRead: "tenant.agents.read",
+  TenantAgentsWrite: "tenant.agents.write",
   TenantPrivacyRequest: "tenant.privacy.request",
   TenantPrivacyApprove: "tenant.privacy.approve",
 } as const;
@@ -189,6 +192,10 @@ export const permissions = {
       read: Permission.TenantJournalsRead,
       write: Permission.TenantJournalsWrite,
       export: Permission.TenantJournalsExport,
+    },
+    agents: {
+      read: Permission.TenantAgentsRead,
+      write: Permission.TenantAgentsWrite,
     },
     privacy: {
       request: Permission.TenantPrivacyRequest,

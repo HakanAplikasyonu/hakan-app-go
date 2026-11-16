@@ -81,7 +81,7 @@ Faturalar üç yoldan gelir:
 | Yol | Nasıl |
 |---|---|
 | UBL yükleme | Ofis panelinde **UBL yükle** ya da mükellef panelinde **Belge yükle** (XML / ZIP) |
-| Masaüstü ajanı | Ofis bilgisayarındaki bir klasörü izler, düşen XML / ZIP'i yükler: [Masaüstü ajanı kılavuzu](masaustu.md) |
+| Masaüstü ajanı | Ofis bilgisayarındaki bir klasörü izler, düşen XML / ZIP'i yükler: [Masaüstü ajanı kılavuzu](masaustu.md). Ajanların durumu **Masaüstü ajanları** sayfasında: [ajanları aç](/t?to=agents) |
 | Ön muhasebe programları | Paraşüt, KolayBi ve Easytrade bağlantıları, mükellef (hizmet ilişkisi) başına |
 
 > Paraşüt, KolayBi ve Easytrade bağlantılarının ofis panelinde henüz ekranı yoktur. Bağlantı şimdilik API ile ya da destek ekibi aracılığıyla kurulur. Paraşüt'te mükellef uygulamaya yetki verir, sonra şirket seçilir. KolayBi ve Easytrade'de mükellefin API bilgileri girilir. Bağlantıdan sonra senkronizasyon elle ya da zamanlanmış olarak çalışır; gelen kayıtlar **Faturalar** ve **Uyarılar** ekranlarında görünür.
@@ -146,6 +146,8 @@ olmayan mükellef beyana hazır sayılır; kilitli dönem onaylanmış sayılır
   her denemede uzar (en çok 15 dakika). Bu bir saldırı belirtisi olabilir;
   ofis etkinlik kaydında `Başarısız denemelerden sonra giriş kilitlendi`
   olayı görünür.
-- Ayrılan çalışanı **Üyeler**'den hemen çıkarın. Kullandığı bilgisayardaki
-  masaüstü ajanında oturumu kapatın; ofise üyeliği kalmayan kullanıcının
-  ajanı yükleme yapamaz.
+- Ayrılan çalışanı **Üyeler**'den hemen çıkarın ve kullandığı bilgisayarın
+  ajanını **Masaüstü ajanları** sayfasından **Kaldır**'ın.
+- Genel bakışta "masaüstü ajanı çevrimdışı" kartı görünürse o bilgisayarda
+  klasör izleme durmuştur; [Masaüstü ajanı kılavuzu](masaustu.md#sorun-giderme)ndaki
+  adımlara bakın.

@@ -66,6 +66,15 @@ test.describe("@docs ofis paneli görüntüleri", () => {
         { timeout: 90_000 },
       )
       .toBe(true);
+    // Masaüstü ajanları sayfası (#285) için iki örnek ajan (aynı makine
+    // kimliği yeniden kaydı günceller, koşular çoğalmaz).
+    for (const [machine_id, name, platform] of [
+      ["kilavuz-pc-0001", "Muhasebe-PC-01", "windows"],
+      ["kilavuz-mac-0002", "Ortak-Mac", "macos"],
+    ]) {
+      const res = await api.post("/v1/tenant/agents", { machine_id, name, platform, version: "0.1.0" });
+      expect(res.status(), await res.text()).toBe(200);
+    }
     await api.dispose();
   });
 
@@ -83,6 +92,7 @@ test.describe("@docs ofis paneli görüntüleri", () => {
       ["ofis-inceleme-studyosu", "/review/studio", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-uyarilar", "/warnings", () => expect(page.getByRole("heading").first()).toBeVisible()],
       ["ofis-yevmiye", `/journals?taxpayer=${atlas}`, () => expect(page.getByRole("heading").first()).toBeVisible()],
+      ["ofis-masaustu-ajanlari", "/agents", () => expect(page.getByText("Muhasebe-PC-01").first()).toBeVisible()],
     ];
     for (const [name, p, ready] of screens) {
       await test.step(name, async () => {
@@ -229,7 +239,7 @@ test.describe("@docs masaüstü görüntüleri", () => {
 });
 
 test.describe("yardım sayfaları (#274)", () => {
-  test("ofis panelinden ve mükellef panelinden Yardım açılır", async ({ page }) => {
+  test("ofis panelinden ve mükellef panelinden Yardım açılır", async ({ page, browser }) => {
     await page.goto("/yardim");
     await expect(page.getByRole("heading", { name: "Yardım" })).toBeVisible();
     for (const title of ["Ofis yöneticisi kılavuzu", "Ofis çalışanı kılavuzu", "Mükellef kılavuzu", "Masaüstü ajanı kılavuzu"]) {
@@ -246,11 +256,17 @@ test.describe("yardım sayfaları (#274)", () => {
     await page.getByRole("link", { name: "Yardım" }).first().click();
     await expect(page).toHaveURL(/\/yardim$/);
 
-    await page.context().clearCookies();
-    await uiLogin(page, DEMO.taxpayerUser);
-    await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
-    await page.getByRole("link", { name: "Yardım" }).first().click();
-    await expect(page).toHaveURL(/\/yardim\/mukellef$/);
-    await expect(page.getByRole("heading", { name: "Mükellef kılavuzu" })).toBeVisible();
+    // Mükellef ayrı bir tarayıcı bağlamında: çerez silmek oturumu her zaman
+    // hemen kapatmıyordu, giriş formu bazen hiç görünmüyordu.
+    const tp = await (await browser.newContext()).newPage();
+    try {
+      await uiLogin(tp, DEMO.taxpayerUser);
+      await tp.waitForURL(/\/m\/[0-9a-f-]{36}/);
+      await tp.getByRole("link", { name: "Yardım" }).first().click();
+      await expect(tp).toHaveURL(/\/yardim\/mukellef$/);
+      await expect(tp.getByRole("heading", { name: "Mükellef kılavuzu" })).toBeVisible();
+    } finally {
+      await tp.context().close();
+    }
   });
 });
