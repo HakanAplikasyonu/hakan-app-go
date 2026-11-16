@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Mükellefler</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}
+.big3{display:inline-flex;align-items:flex-end;gap:3px;height:30px}
+.big3 i{display:block;width:9px;background:var(--surface-3);clip-path:polygon(0 4px,50% 0,100% 4px,100% 100%,0 100%)}
+.big3 i:nth-child(1),.big3 i:nth-child(3){height:21px}.big3 i:nth-child(2){height:30px}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="mukellef" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-wrap:wrap">
+  <section style="flex:1 1 340px;max-width:440px;border-right:1px solid var(--line);background:var(--surface);min-width:0">
+    <div class="col" style="gap:12px;padding:20px 18px 12px">
+      <div class="row"><h1 style="font-size:20px">Mükellefler</h1><span class="pill">38</span><button type="button" class="btn btn-sm btn-pri" style="margin-left:auto">+ Mükellef ekle</button></div>
+      <div class="search"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 100-14 7 7 0 000 14M20 20l-4-4"></path></svg>Unvan, VKN / TCKN</div>
+      <div class="row wrap" style="gap:6px"><span class="pill pill-brand" style="height:26px">Benim 14</span><span class="pill" style="height:26px">Engel var 6</span><span class="pill" style="height:26px">Veri bekleniyor 5</span><span class="pill" style="height:26px">Onay bekliyor 2</span></div>
+    </div>
+    <sc-for list="{{list}}" as="m" hint-placeholder-count="9">
+      <div class="row" style="{{m.st}}">
+        <span class="av av-sq" style="background:{{m.avbg}}">{{m.ini}}</span>
+        <div class="col grow" style="min-width:0"><b class="t-sm" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{m.ad}}</b><span class="t-xs t-3"><span class="mono">{{m.vkn}}</span> · {{m.vd}}</span></div>
+        <span class="{{m.cc}}"><i></i><i></i><i></i></span>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="flex:999 1 560px;min-width:0;padding:24px 32px;display:flex;flex-direction:column;gap:20px">
+    <div class="row wrap" style="gap:16px;align-items:flex-start">
+      <span class="av av-sq" style="width:56px;height:56px;font-size:18px;border-radius:14px;background:var(--brand);color:var(--on-brand)">AG</span>
+      <div class="col grow" style="gap:6px">
+        <h2 style="font-size:26px">Atlas Gıda Ticaret A.Ş.</h2>
+        <div class="row wrap t-sm t-2" style="gap:14px"><span>VKN <span class="mono">9000000017</span></span><span>Kadıköy VD</span><span>Tüzel kişi</span><span class="row" style="gap:6px">Atanan <span class="av" style="width:22px;height:22px;font-size:9px">AD</span>Ayşe Demir</span></div>
+      </div>
+      <div class="row" style="gap:8px"><button type="button" class="btn">Belge iste</button><button type="button" class="btn btn-dark">Luca çıktısı al</button><button type="button" class="btn btn-icon" aria-label="Diğer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg></button></div>
+    </div>
+
+    <div class="card card-pad col" style="gap:14px">
+      <div class="row"><b>Dönem şeridi</b><span class="t-xs t-3" style="margin-left:auto">her dönem bir taç: veri · onay · aktarım</span></div>
+      <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px">
+        <sc-for list="{{donem}}" as="d" hint-placeholder-count="6">
+          <div class="col" style="{{d.st}}">
+            <span class="mono t-xs t-3">{{d.ay}}</span>
+            <span class="big3"><i style="{{d.a}}"></i><i style="{{d.b}}"></i><i style="{{d.c}}"></i></span>
+            <span class="t-xs t-b">{{d.lbl}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div class="row" style="gap:4px;border-bottom:1px solid var(--line)">
+      <span class="t-sm t-b" style="padding:10px 12px;border-bottom:2px solid var(--brand);color:var(--brand-text)">2026-10 özeti</span>
+      <span class="t-sm t-2" style="padding:10px 12px">Faturalar 212</span><span class="t-sm t-2" style="padding:10px 12px">Fişler 64</span><span class="t-sm t-2" style="padding:10px 12px">Banka 148</span><span class="t-sm t-2" style="padding:10px 12px">Görevler 3</span><span class="t-sm t-2" style="padding:10px 12px">Mizan hafızası</span><span class="t-sm t-2" style="padding:10px 12px">Dilekçeler</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+      <div class="card card-pad col" style="gap:12px">
+        <b>Beyana hazırlık</b>
+        <div class="row t-sm"><span class="crown s3"><i></i><i></i><i></i></span><span class="grow">Onaylı belge</span><b class="num">187 / 276</b></div>
+        <div class="row t-sm"><span class="crown s1"><i></i><i></i><i></i></span><span class="grow">Kuyrukta öneri</span><b class="num">31</b></div>
+        <div class="row t-sm"><span class="crown err"><i></i><i></i><i></i></span><span class="grow">Engelleyici uyarı</span><b class="num" style="color:var(--danger)">3</b></div>
+        <div class="row t-sm"><span class="crown"><i></i><i></i><i></i></span><span class="grow">Eksik belge görevi</span><b class="num">2</b></div>
+        <a href="OfisKuyruk.dc.html" class="btn btn-pri" style="margin-top:4px">Atlas Gıda kuyruğunu aç · 31</a>
+      </div>
+      <div class="card card-pad col" style="gap:12px">
+        <b>KDV tahmini</b>
+        <div class="row t-sm"><span class="t-2 grow">Hesaplanan (391)</span><span class="num">₺ 284.120</span></div>
+        <div class="row t-sm"><span class="t-2 grow">İndirilecek (191)</span><span class="num">₺ 211.904</span></div>
+        <div class="divider"></div>
+        <div class="row"><span class="t-b grow">Ödenecek</span><span class="num t-b" style="font-size:18px">₺ 72.216</span></div>
+        <span class="t-xs t-3">Onaylanmamış 31 öneri dahil değil</span>
+      </div>
+      <div class="card card-pad col" style="gap:10px">
+        <div class="row"><b class="grow">Açık belge görevleri</b><a href="#" class="t-sm t-b" style="color:var(--brand-text);text-decoration:none">Belge iste</a></div>
+        <div class="row t-sm" style="gap:10px"><span class="pill pill-danger">Gecikti</span><span class="grow">Banka ekstresi · Eylül</span></div>
+        <div class="row t-sm" style="gap:10px"><span class="pill">Bekliyor</span><span class="grow">Ödeme için belge · 18.500 ₺</span></div>
+        <div class="row t-sm" style="gap:10px"><span class="pill pill-brand">Yüklendi</span><span class="grow">Kira kontratı</span></div>
+        <div class="divider"></div>
+        <div class="row t-xs t-3"><span class="dot" style="color:var(--ok)"></span>Masaüstü ajanı: Atlas-Muhasebe · 4 dk önce eşitledi</div>
+      </div>
+    </div>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const M = (ad,ini,vkn,vd,cc,on) => ({ad,ini,vkn,vd,cc,avbg: on?'var(--brand)':'var(--brand-soft)', st:'gap:12px;padding:12px 18px;border-top:1px solid var(--line);'+(on?'background:var(--brand-tint);box-shadow:inset 3px 0 0 var(--brand)':'')});
+    const list = [
+      M('Atlas Gıda Ticaret A.Ş.','AG','9000000017','Kadıköy VD','crown err',true),
+      M('Defne Eczanesi','DE','TCKN ··· 9072','Çankaya VD','crown err'),
+      M('Kuzey Lojistik Ltd. Şti.','KL','4810293847','Tuzla VD','crown err'),
+      M('Lale Kafe','LK','TCKN ··· 1186','Beşiktaş VD','crown s2'),
+      M('Marmara Tekstil A.Ş.','MT','6120047731','Bursa Uludağ VD','crown s1'),
+      M('Ova Tarım Kooperatifi','OT','7731209945','Konya Meram VD','crown s3'),
+      M('Selin Yılmaz','SY','TCKN ··· 4416','Çankaya VD','crown'),
+      M('Yavuz Oto Servis','YO','9182736450','Ümraniye VD','crown s1'),
+      M('Zeren Mimarlık Ltd. Şti.','ZM','9981203345','Kozyatağı VD','crown s3')
+    ];
+    const on = 'background:var(--c-light)', on2='background:var(--c-mid)', on3='background:var(--c-dark)', er='background:var(--danger)';
+    const D = (ay,a,b,c,lbl,cur) => ({ay,a,b,c,lbl,st:'gap:8px;align-items:center;padding:12px 6px;border-radius:12px;'+(cur?'background:var(--brand-tint);outline:1.5px solid var(--brand)':'')});
+    const donem = [D('2026-05',on,on2,on3,'Beyan'),D('2026-06',on,on2,on3,'Beyan'),D('2026-07',on,on2,on3,'Beyan'),D('2026-08',on,on2,on3,'Çıktı alındı'),D('2026-09',on,'',on3,'Onaylandı'),D('2026-10',on,'',er,'Engel var',true)];
+    return { tema: this.props.tema ?? 'm3-light', list, donem };
+  }
+}
+</script>
+</body>
+</html>

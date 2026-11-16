@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mükellef mobil uygulaması</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit;text-decoration:none}
+.hd{padding:56px 20px 14px;display:flex;align-items:center;gap:10px}
+.bd{flex:1;overflow:hidden;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.li{display:flex;align-items:center;gap:12px;padding:14px;border-top:1px solid var(--line)}
+.corner{position:absolute;width:34px;height:34px;border-color:#2448FF;border-style:solid}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:2270px;height:980px;padding:40px;display:flex;gap:60px;align-items:flex-start;background:var(--bg)">
+
+  <div class="col" style="gap:10px"><span class="t-cap">1 · Ana sayfa</span>
+  <div class="phone">
+    <div class="hd"><span class="av av-sq" style="background:var(--brand);color:var(--on-brand)">AG</span><div class="col grow"><b>Atlas Gıda</b><span class="t-xs t-3">Demir Mali Müşavirlik</span></div><a href="#" aria-label="Bildirimler" class="btn btn-icon btn-ghost" style="position:relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10 20a2.2 2.2 0 004 0"></path></svg><span style="position:absolute;top:6px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--danger)"></span></a></div>
+    <div class="bd">
+      <a href="#" class="chamfer" style="background:var(--brand);color:var(--on-brand);border-radius:20px;padding:22px;display:flex;flex-direction:column;gap:18px;min-height:170px">
+        <div class="row"><span style="width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v12H4zM12 17a4 4 0 100-8 4 4 0 000 8"></path></svg></span></div>
+        <div class="col" style="gap:4px"><b style="font:700 24px 'Inter Tight'">Fiş / Z raporu çek</b><span style="opacity:.85;font-size:14px">Çek, gönder, gerisini müşavirin halleder.</span></div>
+      </a>
+      <div class="card" style="overflow:hidden">
+        <div class="row" style="padding:14px"><b class="grow">Müşavirinin istedikleri</b><span class="pill pill-danger">1 gecikti</span></div>
+        <div class="li"><span class="crown"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Banka ekstresi · Eylül</b><span class="t-xs" style="color:var(--danger)">2 gün gecikti</span></div><svg class="ic ic-sm t-3" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></div>
+        <div class="li"><span class="crown"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Ödeme için belge · 18.500 ₺</b><span class="t-xs t-3">14 Ekim banka çıkışı · 5 gün kaldı</span></div><svg class="ic ic-sm t-3" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></div>
+      </div>
+      <div class="card" style="padding:14px;display:flex;align-items:center;gap:12px"><span class="loader" style="height:22px;gap:2px"><i style="width:7px;height:15px"></i><i style="width:7px;height:22px"></i><i style="width:7px;height:15px"></i></span><div class="col grow"><b class="t-sm">2 fiş telefonda bekliyor</b><span class="t-xs t-3">Bağlantı gelince kendiliğinden gönderilecek</span></div></div>
+    </div>
+    <nav class="tabbar" aria-label="Alt menü"><a href="#" class="tab on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11l3-3 3 3v9M10 20V7l3-4 3 4v13M16 20v-9l3-3 3 3v9"></path></svg>Ana</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"></path></svg>İstekler</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 21z"></path></svg>Geçmiş</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8M4 21a8 8 0 0116 0"></path></svg>Profil</a></nav>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">2 · Fiş çek</span>
+  <div class="phone" style="background:#0A0A0A;border-color:#0A0A0A">
+    <div class="hd" style="color:#fff"><button type="button" class="btn btn-icon" aria-label="Kapat" style="background:rgba(255,255,255,.12);border-color:transparent;color:#fff"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button><div class="grow"></div><span class="row" style="gap:2px;padding:3px;background:rgba(255,255,255,.12);border-radius:10px;font-size:12px;font-weight:600"><span style="padding:6px 10px;border-radius:8px;background:#fff;color:#0A0A0A">Gider fişi</span><span style="padding:6px 10px">Akaryakıt</span><span style="padding:6px 10px">Z raporu</span></span></div>
+    <div style="flex:1;position:relative;margin:10px 28px;border-radius:12px;background:linear-gradient(160deg,#2a2a2e,#151517)">
+      <div style="position:absolute;left:44px;right:44px;top:50px;bottom:70px;background:#ECEAE4;border-radius:4px;transform:rotate(-2deg);padding:18px 16px;display:flex;flex-direction:column;gap:7px;font:500 10px 'JetBrains Mono',monospace;color:#333">
+        <b style="text-align:center;font-size:11px">YILDIZ MARKET LTD.ŞTİ.</b><span style="text-align:center">VKN 9420018733</span><span>TARİH 10.10.2026  FİŞ NO 0412</span><span>----------------------------</span><span>DETERJAN       %20    189,00</span><span>KAĞIT HAVLU    %20    214,50</span><span>SU 19LT        %1      90,00</span><span>----------------------------</span><b>TOPLAM             1.533,60</b><span>KDV                  113,60</span>
+      </div>
+      <span class="corner" style="left:30px;top:36px;border-width:3px 0 0 3px;border-radius:10px 0 0 0"></span><span class="corner" style="right:30px;top:36px;border-width:3px 3px 0 0;border-radius:0 10px 0 0"></span><span class="corner" style="left:30px;bottom:56px;border-width:0 0 3px 3px;border-radius:0 0 0 10px"></span><span class="corner" style="right:30px;bottom:56px;border-width:0 3px 3px 0;border-radius:0 0 10px 0"></span>
+      <span class="pill" style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:#2448FF;color:#fff">Fiş algılandı · sabit tut</span>
+    </div>
+    <div class="row" style="justify-content:space-between;padding:20px 40px 44px;color:#fff">
+      <span class="col" style="align-items:center;gap:4px;font-size:11px"><span style="width:44px;height:44px;border-radius:10px;background:#333"></span>Galeri</span>
+      <button type="button" aria-label="Çek" style="width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:#fff;box-shadow:inset 0 0 0 4px #0A0A0A"></button>
+      <span class="col" style="align-items:center;gap:4px;font-size:11px"><span class="pill" style="background:#2448FF;color:#fff">3</span>Seri</span>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">3 · Eksik belge talebi</span>
+  <div class="phone">
+    <div class="hd"><a href="#" class="btn btn-icon btn-ghost" aria-label="Geri"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a><b class="grow">İstek</b></div>
+    <div class="bd" style="gap:16px">
+      <div class="col" style="gap:8px"><span class="pill" style="align-self:flex-start">Ödeme için belge</span><h2 style="font-size:24px">14 Ekim'deki 18.500 ₺ ödemenin belgesi</h2><p class="t-2" style="font-size:15px">Banka hesabınızdan <b style="color:var(--text)">Ege Gayrimenkul Ltd. Şti.</b>'ye yapılan ödemenin faturası ya da makbuzu.</p></div>
+      <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="row t-sm"><span class="t-3 grow">İsteyen</span><b>Ayşe Demir</b></div>
+        <div class="row t-sm"><span class="t-3 grow">Son gün</span><b>21 Kasım · 5 gün</b></div>
+        <div class="row t-sm"><span class="t-3 grow">Not</span><span>Kira faturası olabilir</span></div>
+      </div>
+      <div class="col" style="gap:8px"><span class="t-cap">Eklenen</span><div class="row" style="gap:8px"><span style="width:72px;height:92px;border-radius:10px;background:#ECEAE4;border:1px solid var(--line)"></span><span style="width:72px;height:92px;border-radius:10px;border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center;color:var(--text-3)">+</span></div></div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-lg btn-pri" style="height:52px">Gönder</button>
+      <button type="button" class="btn btn-lg btn-ghost">Bu belge bende yok</button>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">4 · Bildirimler (yeni ekran)</span>
+  <div class="phone">
+    <div class="hd"><h2 style="font-size:26px" class="grow">Bildirimler</h2><a href="#" class="t-sm t-b" style="color:var(--brand-text)">Tümü okundu</a></div>
+    <div class="bd" style="padding:0;gap:0">
+      <span class="t-cap" style="padding:8px 20px">Bugün</span>
+      <sc-for list="{{bild}}" as="b" hint-placeholder-count="5">
+        <div class="row" style="{{b.st}}"><span style="width:40px;height:40px;border-radius:12px;background:{{b.bg}};color:{{b.fg}};display:flex;align-items:center;justify-content:center;flex:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="{{b.d}}"></path></svg></span><div class="col grow" style="gap:2px"><b class="t-sm">{{b.t}}</b><span class="t-xs t-2">{{b.s}}</span></div><span class="t-xs t-3">{{b.z}}</span></div>
+      </sc-for>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">5 · Geçmiş</span>
+  <div class="phone">
+    <div class="hd"><h2 style="font-size:26px" class="grow">Geçmiş</h2></div>
+    <div style="padding:0 16px 10px"><div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px"><span class="btn btn-sm grow" style="border-color:transparent;box-shadow:var(--shadow)">Fişler</span><span class="btn btn-sm btn-ghost grow">Faturalar</span><span class="btn btn-sm btn-ghost grow">İstekler</span></div></div>
+    <div class="bd" style="padding:0;gap:0">
+      <span class="t-cap" style="padding:8px 20px">Ekim 2026 · 64 fiş · ₺ 41.208</span>
+      <sc-for list="{{gec}}" as="g" hint-placeholder-count="7">
+        <div class="row" style="gap:12px;padding:13px 20px;border-top:1px solid var(--line)"><span class="{{g.c}}"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">{{g.k}}</b><span class="t-xs" style="color:{{g.dc}}">{{g.d}}</span></div><span class="num t-sm t-b">{{g.t}}</span></div>
+      </sc-for>
+    </div>
+    <nav class="tabbar" aria-label="Alt menü"><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11l3-3 3 3v9M10 20V7l3-4 3 4v13M16 20v-9l3-3 3 3v9"></path></svg>Ana</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"></path></svg>İstekler</a><a href="#" class="tab on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 21z"></path></svg>Geçmiş</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8M4 21a8 8 0 0116 0"></path></svg>Profil</a></nav>
+  </div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":2270,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const B = (t,s,z,d,bg,fg,unread) => ({t,s,z,d,bg,fg,st:'gap:12px;padding:14px 20px;border-top:1px solid var(--line);'+(unread?'background:var(--brand-tint)':'')});
+    const bild = [
+      B('Yeni istek: banka ekstresi','Ayşe Demir Eylül ekstresini istedi','09:40','M4 4h16v12H8l-4 4z','var(--brand-tint)','var(--brand-text)',true),
+      B('Fişin okunamadı','Opet · 9 Eki. Daha net bir fotoğraf çeker misin?','08:12','M12 3l9.5 17h-19zM12 10v4M12 17h.01','var(--danger-tint)','var(--danger)',true),
+      B('12 fiş onaylandı','Müşavirin Ekim fişlerini onayladı','Dün','M4 12.5l5 5L20 6.5','var(--ok-tint)','var(--ok)'),
+      B('Ekim beyanı hazırlanıyor','Son gün 28 Kasım','Dün','M12 8v4l3 2M12 21a9 9 0 100-18 9 9 0 000 18','var(--surface-3)','var(--text-2)'),
+      B('Plaka kayıtlı değil','34 KLJ 210 araç listende yok','2 gün','M3 13h18M5 13l2-6h10l2 6v5H5z','var(--warn-tint)','var(--warn)')
+    ];
+    const G = (k,d,t,c,dc) => ({k,d,t,c,dc: dc||'var(--text-3)'});
+    const gec = [
+      G('Opet Akaryakıt','Telefonda bekliyor · bağlantı yok','6.212,40','crown','var(--warn)'),
+      G('Yıldız Market','Müşavir onayında','1.533,60','crown s1'),
+      G('Kalem Kırtasiye','Onaylandı','4.212,00','crown s2'),
+      G('Opet Akaryakıt','Okunamadı · tekrar çek','2.140,00','crown err','var(--danger)'),
+      G('Z raporu · Z-0091','Daha önce gönderilmiş','12.840,00','crown err','var(--danger)'),
+      G('Temiz Ofis Hizmetleri','Luca\'ya aktarıldı','2.880,00','crown s3'),
+      G('Yıldız Market','Luca\'ya aktarıldı','884,20','crown s3')
+    ];
+    return { tema: this.props.tema ?? 'm3-light', bild, gec };
+  }
+}
+</script>
+</body>
+</html>

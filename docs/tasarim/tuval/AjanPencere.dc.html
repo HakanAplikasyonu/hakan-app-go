@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Masaüstü ajanı · ana pencere</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit;text-decoration:none}
+.sn{display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:8px;color:var(--text-2);font-weight:500;font-size:13px;border:0;background:transparent;font-family:inherit;cursor:pointer;width:100%;text-align:left}
+.sn.on{background:var(--surface);color:var(--text);font-weight:600;box-shadow:var(--shadow)}
+.sn .cnt{margin-left:auto;font:600 11px 'JetBrains Mono',monospace}
+.fl{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--line)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:1200px;height:780px;padding:30px;background:var(--surface-3)">
+<div style="width:100%;height:100%;border-radius:12px;overflow:hidden;display:flex;border:1px solid var(--line-strong);box-shadow:var(--shadow-lg);background:var(--bg)">
+  <aside style="width:220px;flex:none;padding:14px 10px;display:flex;flex-direction:column;gap:2px;background:var(--surface-2);border-right:1px solid var(--line)">
+    <div class="row" style="gap:6px;padding:2px 6px 16px"><span style="width:11px;height:11px;border-radius:50%;background:#FF5F57"></span><span style="width:11px;height:11px;border-radius:50%;background:#FEBC2E"></span><span style="width:11px;height:11px;border-radius:50%;background:#28C840"></span></div>
+    <div class="row" style="gap:10px;padding:4px 8px 14px"><svg viewBox="0 0 181 198" width="20" height="22" aria-hidden="true"><polygon points="0,86 28,59 28,198 0,198" style="fill:var(--c-light)"></polygon><polygon points="28,59 56,86 56,198 28,198" style="fill:var(--c-mid)"></polygon><polygon points="63,36 91,0 91,198 63,198" style="fill:var(--c-mid)"></polygon><polygon points="91,0 119,36 119,198 91,198" style="fill:var(--c-dark)"></polygon><polygon points="125,86 153,59 153,198 125,198" style="fill:var(--c-dark)"></polygon><polygon points="153,59 181,86 181,198 153,198" style="fill:var(--c-light)"></polygon></svg><span style="font:800 19px/1 'Inter Tight';letter-spacing:-.05em">hakan</span><span class="t-xs t-3">ajan</span></div>
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5"><button type="button" class="{{t.cls}}" onClick="{{t.pick}}"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="{{t.d}}"></path></svg>{{t.ad}}<span class="cnt" style="color:{{t.cc}}">{{t.n}}</span></button></sc-for>
+    <div style="flex:1"></div>
+    <div class="card" style="padding:10px;display:flex;flex-direction:column;gap:4px"><span class="row t-xs"><span class="dot" style="color:var(--ok)"></span><b>Bağlı</b></span><span class="t-xs t-3">Demir Mali Müşavirlik<br>Ofis-PC · 1.4.2</span></div>
+  </aside>
+
+  <main style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <sc-if value="{{t0}}" hint-placeholder-val="{{ true }}">
+      <div class="row" style="padding:22px 24px 14px;gap:12px"><div class="col grow"><h1 style="font-size:22px">İzlenen klasörler</h1><span class="t-sm t-2">Her klasör bir mükellefe bağlı. Dosyalar taşınmaz, silinmez; yalnızca okunur.</span></div><button type="button" class="btn btn-pri">+ Klasör ekle</button></div>
+      <div style="padding:0 24px 24px;display:flex;flex-direction:column;gap:14px;overflow:hidden">
+        <div class="card" style="overflow:hidden">
+          <sc-for list="{{folders}}" as="f" hint-placeholder-count="5">
+            <div class="fl"><span style="width:36px;height:36px;border-radius:9px;background:var(--brand-tint);color:var(--brand-text);display:flex;align-items:center;justify-content:center;flex:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"></path></svg></span>
+            <div class="col grow" style="min-width:0"><b class="t-sm">{{f.m}}</b><span class="mono t-xs t-3" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{f.p}}</span></div>
+            <span class="t-xs t-2" style="width:110px">{{f.s}}</span><span class="{{f.pc}}">{{f.d}}</span><button type="button" class="btn btn-sm btn-icon btn-ghost" aria-label="Seçenekler"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg></button></div>
+          </sc-for>
+        </div>
+        <div class="row" style="gap:14px;padding:16px;border:1.5px dashed var(--line-strong);border-radius:12px"><svg class="ic ic-lg t-3" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"></path></svg><span class="t-sm t-2 grow">Klasörü buraya sürükle, sonra hangi mükellefe ait olduğunu seç.</span></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{t1}}" hint-placeholder-val="{{ false }}">
+      <div class="row" style="padding:22px 24px 14px;gap:12px"><div class="col grow"><h1 style="font-size:22px">Gönderim geçmişi</h1><span class="t-sm t-2">Bugün 34 dosya · son 7 gün 412</span></div><div class="search" style="width:240px">Dosya ya da mükellef ara</div></div>
+      <div style="padding:0 24px 24px;overflow:hidden"><div class="card" style="overflow:hidden">
+        <table class="tbl"><thead><tr><th></th><th>Dosya</th><th>Mükellef</th><th>Sonuç</th><th>Zaman</th></tr></thead><tbody>
+          <sc-for list="{{hist}}" as="h" hint-placeholder-count="8"><tr><td style="width:28px"><span class="{{h.c}}"><i></i><i></i><i></i></span></td><td class="mono t-xs">{{h.f}}</td><td class="t-sm">{{h.m}}</td><td><span class="{{h.pc}}">{{h.r}}</span></td><td class="t-xs t-3">{{h.z}}</td></tr></sc-for>
+        </tbody></table></div></div>
+    </sc-if>
+    <sc-if value="{{t2}}" hint-placeholder-val="{{ false }}">
+      <div class="row" style="padding:22px 24px 14px;gap:12px"><div class="col grow"><h1 style="font-size:22px">Sorunlar</h1><span class="t-sm t-2">Geçici hatalar kendiliğinden yeniden denenir. Kalıcı olanlar senin kararını bekler.</span></div><button type="button" class="btn btn-pri">Hepsini yeniden dene</button></div>
+      <div style="padding:0 24px 24px;display:flex;flex-direction:column;gap:12px">
+        <div class="card" style="padding:16px;display:flex;gap:14px;align-items:flex-start"><span class="crown err" style="margin-top:3px"><i></i><i></i><i></i></span><div class="col grow" style="gap:4px"><b>2 dosya · sunucuya ulaşılamadı</b><span class="t-sm t-2">Ağ hatası. 4 dk sonra otomatik yeniden denenecek (3. deneme).</span><div class="bar" style="width:220px;margin-top:6px"><i style="width:60%;background:var(--warn)"></i></div></div><button type="button" class="btn btn-sm">Şimdi dene</button></div>
+        <div class="card" style="padding:16px;display:flex;gap:14px;align-items:flex-start"><span class="crown err" style="margin-top:3px"><i></i><i></i><i></i></span><div class="col grow" style="gap:4px"><b>tarama_0091.pdf · UBL değil</b><span class="t-sm t-2">Bu bir PDF; e-Fatura XML'i değil. Ajan yalnızca .xml ve .zip gönderir. Mükellef mobil uygulamadan fotoğraf olarak yükleyebilir.</span></div><button type="button" class="btn btn-sm">Klasörde göster</button><button type="button" class="btn btn-sm btn-ghost">Yok say</button></div>
+        <div class="card" style="padding:16px;display:flex;gap:14px;align-items:flex-start"><span class="crown s1" style="margin-top:3px"><i></i><i></i><i></i></span><div class="col grow" style="gap:4px"><b>3 dosya · zaten var</b><span class="t-sm t-2">Aynı dosya daha önce gönderilmiş (SHA-256). İşlem gerekmez.</span></div></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{t3}}" hint-placeholder-val="{{ false }}">
+      <div class="row" style="padding:22px 24px 14px"><h1 style="font-size:22px">Muhasebe programı</h1></div>
+      <div style="padding:0 24px;display:flex;flex-direction:column;gap:14px;max-width:620px">
+        <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px;width:max-content"><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Logo Tiger</span><span class="btn btn-sm btn-ghost">Logo GO</span><span class="btn btn-sm btn-ghost">Mikro</span></div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px"><div><label class="label" for="s1">Sunucu</label><input class="input mono" id="s1" value="OFIS-PC\SQLEXPRESS"></div><div><label class="label" for="s2">Veritabanı</label><input class="input mono" id="s2" value="LOGODB"></div><div><label class="label" for="s3">Firma no</label><input class="input mono" id="s3" value="014"></div><div><label class="label" for="s4">Dönem no</label><input class="input mono" id="s4" value="02"></div></div>
+        <div class="row" style="gap:10px;padding:12px;border-radius:10px;background:var(--ok-tint);color:var(--ok)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg><span class="t-sm">Bağlantı başarılı · salt okunur kullanıcı</span></div>
+        <div class="row" style="gap:8px"><button type="button" class="btn">Bağlantıyı dene</button><button type="button" class="btn">Geçen ayı önizle</button></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{t4}}" hint-placeholder-val="{{ false }}">
+      <div class="row" style="padding:22px 24px 14px"><h1 style="font-size:22px">Ayarlar</h1></div>
+      <div style="padding:0 24px;display:flex;flex-direction:column;gap:12px;max-width:620px">
+        <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:10px"><div class="row"><b class="grow">Güncellemeler</b><span class="pill pill-brand">1.5.0 hazır</span></div><span class="t-sm t-2">Klasör izleme güncelleme sırasında 20 sn durur, kaçan dosya olmaz.</span><div class="row" style="gap:8px"><button type="button" class="btn btn-pri">Güncelle ve yeniden başlat</button><span class="t-xs t-3">Kanal: Kararlı ▾</span></div></div>
+        <div class="card" style="overflow:hidden"><div class="fl" style="border-top:0"><span class="grow t-sm">Bilgisayar açılınca başlat</span><span style="width:36px;height:22px;border-radius:999px;background:var(--brand);position:relative"><span style="position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--on-brand)"></span></span></div><div class="fl"><span class="grow t-sm">Pencere kapanınca tepside çalışmaya devam et</span><span style="width:36px;height:22px;border-radius:999px;background:var(--brand);position:relative"><span style="position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--on-brand)"></span></span></div><div class="fl"><span class="grow t-sm">Tarama aralığı</span><span class="mono t-sm">15 sn</span></div></div>
+        <div class="row" style="gap:8px"><button type="button" class="btn btn-ghost">Günlük dosyasını aç</button><button type="button" class="btn btn-ghost">Yerel e-Fatura denetimi</button><div style="flex:1"></div><button type="button" class="btn btn-danger">Oturumu kapat</button></div>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1200,"height":780}}'>
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { tab: 0 }; }
+  renderVals() {
+    const T = [['Klasörler','M3 6h6l2 2h10v11H3z','6',''],['Geçmiş','M12 8v4l3 2M12 21a9 9 0 100-18 9 9 0 000 18','',''],['Sorunlar','M12 3l9.5 17h-19zM12 10v4M12 17h.01','3','var(--danger)'],['Muhasebe programı','M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6',''],['Ayarlar','M12 15a3 3 0 100-6 3 3 0 000 6M4 12h2M18 12h2M12 4v2M12 18v2','•','var(--brand-text)']];
+    const tab = this.state.tab;
+    const tabs = T.map((t,i) => ({ad:t[0],d:t[1],n:t[2],cc:t[3]||'var(--text-3)',cls:'sn'+(i===tab?' on':''),pick:()=>this.setState({tab:i})}));
+    const F = (m,p,s,d,pc) => ({m,p,s,d,pc});
+    const folders = [F('Atlas Gıda Ticaret A.Ş.','D:\\Mukellefler\\Atlas\\eFatura','2 dk önce · 12','İzleniyor','pill pill-ok'),F('Kuzey Lojistik Ltd. Şti.','D:\\Mukellefler\\Kuzey\\Gelen','2 dk önce · 18','İzleniyor','pill pill-ok'),F('Marmara Tekstil A.Ş.','\\\\NAS\\marmara\\efatura','2 dk önce · 4','İzleniyor','pill pill-ok'),F('Defne Eczanesi','C:\\Users\\ofis\\Desktop\\Defne','—','Klasör bulunamadı','pill pill-danger'),F('Lale Kafe','D:\\Mukellefler\\Lale','dün','Duraklatıldı','pill')];
+    const H = (f,m,r,z,k) => ({f,m,r,z,c:k==='ok'?'crown s1':k==='dup'?'crown s1':'crown err',pc:k==='ok'?'pill pill-ok':k==='dup'?'pill':'pill pill-danger'});
+    const hist = [H('KLM2026000184213.xml','Atlas Gıda','Eklendi','10:40','ok'),H('ekim-faturalar.zip (18)','Kuzey Lojistik','17 eklendi · 1 zaten var','10:12','ok'),H('TKN2026000391827.xml','Atlas Gıda','Yeniden denenecek','09:58','err'),H('MVT2026000004410.xml','Marmara Tekstil','Eklendi','09:41','ok'),H('tarama_0091.pdf','Atlas Gıda','UBL değil','09:30','err'),H('EGE2026000000910.xml','Defne Eczanesi','Zaten var','dün','dup')];
+    const v = {}; for (let i=0;i<5;i++) v['t'+i] = i===tab;
+    return { tema: this.props.tema ?? 'm3-light', tabs, folders, hist, ...v };
+  }
+}
+</script>
+</body>
+</html>

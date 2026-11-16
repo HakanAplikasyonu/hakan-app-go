@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Mizan hafızası ve kurallar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="mizan" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column">
+  <div class="topbar" style="flex-wrap:wrap;height:auto;min-height:60px;padding:10px 24px">
+    <h1 style="font-size:20px">Mizan hafızası</h1>
+    <button type="button" class="btn" style="gap:8px;margin-left:8px"><span class="av av-sq" style="width:22px;height:22px;font-size:9px">AG</span>Atlas Gıda Ticaret A.Ş.<svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+    <div style="flex:1"></div>
+    <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px"><span class="btn btn-sm btn-ghost">Hafıza 214</span><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Kurallar 18</span><span class="btn btn-sm btn-ghost">Hesap planı</span><span class="btn btn-sm btn-ghost">Mizan</span></div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;flex:1;min-height:0">
+    <section style="flex:999 1 560px;min-width:0;padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div class="card card-pad col" style="gap:6px"><span class="t-sm t-2">Kuralla gelen öneri</span><span class="kpi">%41</span><span class="t-xs t-3">bu dönem · 113 / 276</span></div>
+        <div class="card card-pad col" style="gap:6px"><span class="t-sm t-2">Geçmiş onaydan</span><span class="kpi">%37</span><span class="t-xs t-3">214 karşı taraf hatırlanıyor</span></div>
+        <div class="card card-pad col" style="gap:6px"><span class="t-sm t-2">Kuralı bozan düzeltme</span><span class="kpi" style="color:var(--warn)">3</span><span class="t-xs t-3">gözden geçir</span></div>
+      </div>
+
+      <div class="card" style="overflow:hidden">
+        <div class="row" style="padding:14px 18px;gap:10px"><h3 style="font-size:16px" class="grow">Kurallar</h3><span class="t-xs t-3">Kurallar sırayla denenir, ilk eşleşen kazanır</span><button type="button" class="btn btn-sm btn-pri">+ Yeni kural</button></div>
+        <div style="overflow-x:auto">
+        <table class="tbl" style="min-width:680px">
+          <thead><tr><th>#</th><th>Koşul</th><th>Hesap</th><th>Kapsam</th><th style="text-align:right">İsabet</th><th>Durum</th></tr></thead>
+          <tbody>
+            <sc-for list="{{rules}}" as="r" hint-placeholder-count="7">
+              <tr class="{{r.cls}}"><td class="mono t-3">{{r.n}}</td>
+                <td><div class="col" style="gap:2px"><span class="t-sm"><b>{{r.a}}</b> {{r.b}}</span><span class="t-xs t-3">{{r.c}}</span></div></td>
+                <td><span class="code code-b">{{r.kod}}</span></td>
+                <td><span class="pill">{{r.kap}}</span></td>
+                <td class="num" style="text-align:right">{{r.hit}}</td>
+                <td><span class="{{r.dp}}"><span class="dot"></span>{{r.d}}</span></td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <div class="card" style="overflow:hidden">
+        <div class="row" style="padding:14px 18px"><h3 style="font-size:16px" class="grow">Hafıza · karşı taraf → hesap</h3><span class="t-xs t-3">Onayladıkça öğrenir, kural yazmaya gerek kalmaz</span></div>
+        <sc-for list="{{mem}}" as="m" hint-placeholder-count="4">
+          <div class="row wrap" style="gap:12px;padding:12px 18px;border-top:1px solid var(--line)">
+            <b class="t-sm" style="flex:1 1 220px">{{m.k}}</b>
+            <div class="row" style="gap:4px;flex:2 1 300px"><sc-for list="{{m.dag}}" as="x" hint-placeholder-count="2"><span style="height:24px;border-radius:6px;display:inline-flex;align-items:center;padding:0 8px;font:600 11.5px 'JetBrains Mono',monospace;width:{{x.w}};background:{{x.bg}};color:{{x.fg}};overflow:hidden;white-space:nowrap">{{x.kod}} · {{x.n}}</span></sc-for></div>
+            <button type="button" class="btn btn-sm">{{m.act}}</button>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <aside style="flex:1 1 380px;max-width:460px;border-left:1px solid var(--line);background:var(--surface);padding:22px;display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div class="row"><h2 style="font-size:20px" class="grow">Kural #4 düzenle</h2><span class="pill pill-ok"><span class="dot"></span>Aktif</span></div>
+      <div class="col" style="gap:8px">
+        <span class="label" style="margin:0">Eğer</span>
+        <div class="row" style="gap:6px"><span class="pill" style="height:32px">Karşı taraf VKN</span><span class="t-3 t-sm">eşittir</span><span class="code">6120047731</span></div>
+        <div class="row" style="gap:6px"><span class="t-3 t-sm" style="width:24px">ve</span><span class="pill" style="height:32px">Satır metni</span><span class="t-3 t-sm">içerir</span><span class="code">"kumaş"</span></div>
+        <button type="button" class="btn btn-sm btn-ghost" style="align-self:flex-start">+ Koşul ekle</button>
+      </div>
+      <div class="col" style="gap:8px">
+        <span class="label" style="margin:0">O zaman</span>
+        <div class="row" style="gap:8px;padding:10px;border:1px solid var(--brand);border-radius:10px;background:var(--brand-tint)"><span class="code code-b">153.01</span><span class="grow t-sm">Ticari mallar</span><span class="t-xs t-3">KDV → 191.01</span></div>
+      </div>
+      <div class="col" style="gap:8px">
+        <span class="label" style="margin:0">Kapsam</span>
+        <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px"><span class="btn btn-sm grow" style="border-color:transparent;box-shadow:var(--shadow)">Yalnızca Atlas Gıda</span><span class="btn btn-sm btn-ghost grow">Tüm ofis</span></div>
+      </div>
+      <div class="card card-pad col" style="gap:10px;background:var(--surface-2)">
+        <span class="t-cap">Kaydetmeden önce · son 6 ay</span>
+        <div class="row t-sm"><span class="crown s2"><i></i><i></i><i></i></span><span class="grow">42 belge bu kurala uyuyor</span></div>
+        <div class="row t-sm"><span class="conf c3"><i></i><i></i><i></i></span><span class="grow">39'u zaten 153.01 ile onaylanmış</span></div>
+        <div class="row t-sm" style="color:var(--warn)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg><span class="grow">3'ü 255.01 Demirbaş ile onaylanmış</span><a href="#" class="t-b" style="color:inherit">Gör</a></div>
+      </div>
+      <div class="row" style="gap:8px;margin-top:auto"><button type="button" class="btn btn-ghost" style="color:var(--danger)">Emekliye ayır</button><div style="flex:1"></div><button type="button" class="btn">Vazgeç</button><button type="button" class="btn btn-pri">Kaydet</button></div>
+    </aside>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const R = (n,a,b,c,kod,kap,hit,d,sel) => ({n,a,b,c,kod,kap,hit,d,cls: sel?'sel':'',dp: d==='Aktif'?'pill pill-ok':d==='Çakışma'?'pill pill-warn':'pill'});
+    const rules = [
+      R('1','Karşı taraf','Kalem Kırtasiye','VKN 3920018874','770.01.003','Tüm ofis','212','Aktif'),
+      R('2','Satır metni','"motorin" ya da "benzin"','plaka mükellefin araç listesinde','770.01.005','Tüm ofis','1.084','Aktif'),
+      R('3','Karşı taraf','Ege Gayrimenkul','senaryo TICARIFATURA','770.01.001','Defne Eczanesi','9','Aktif'),
+      R('4','Karşı taraf','Marmara Tekstil','satır metni "kumaş" içerir','153.01','Atlas Gıda','39','Çakışma',true),
+      R('5','Tutar','> 30.000 ₺','satır metni "bilgisayar"','255.01','Tüm ofis','17','Aktif'),
+      R('6','Banka hareketi','BSMV','banka ekstresi kalemi','780.01','Tüm ofis','640','Aktif'),
+      R('7','Karşı taraf','Bulut Yazılım','2025 sonrası','770.01.010','Zeren Mimarlık','—','Emekli')
+    ];
+    const S = (kod,n,w,strong) => ({kod,n,w,bg: strong?'var(--brand-tint)':'var(--warn-tint)',fg: strong?'var(--brand-text)':'var(--warn)'});
+    const mem = [
+      {k:'Opet Akaryakıt İstasyonu',dag:[S('770.01.005','31×','100%',true)],act:'Kural yap'},
+      {k:'Mavi Tasarım Ajansı',dag:[S('770.01.008','2×','62%',true),S('760.01','1×','38%')],act:'Netleştir'},
+      {k:'Yıldız Market Ltd. Şti.',dag:[S('153.01','22×','85%',true),S('770.01.006','4×','15%')],act:'Kural yap'},
+      {k:'Temiz Ofis Hizmetleri',dag:[S('770.01.006','3×','100%',true)],act:'Kural yap'}
+    ];
+    return { tema: this.props.tema ?? 'm3-light', rules, mem };
+  }
+}
+</script>
+</body>
+</html>

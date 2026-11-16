@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis kurulumu sihirbazı</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}
+.st{display:flex;gap:12px;align-items:center;padding:10px 12px;border-radius:10px;border:0;background:transparent;font:inherit;color:var(--text-2);text-align:left;cursor:pointer;width:100%}
+.st.on{background:var(--brand-tint);color:var(--text)}
+.st .n{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font:600 12px 'JetBrains Mono',monospace;background:var(--surface-3);flex:none}
+.st.ok .n{background:var(--ok);color:#fff}.st.on .n{background:var(--brand);color:var(--on-brand)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+  <aside style="flex:1 1 300px;max-width:360px;background:var(--surface);border-right:1px solid var(--line);padding:28px 20px;display:flex;flex-direction:column;gap:18px">
+    <div class="row" style="gap:10px;padding:0 8px">
+      <svg viewBox="0 0 181 198" width="22" height="24" aria-hidden="true"><polygon points="0,86 28,59 28,198 0,198" style="fill:var(--c-light)"></polygon><polygon points="28,59 56,86 56,198 28,198" style="fill:var(--c-mid)"></polygon><polygon points="63,36 91,0 91,198 63,198" style="fill:var(--c-mid)"></polygon><polygon points="91,0 119,36 119,198 91,198" style="fill:var(--c-dark)"></polygon><polygon points="125,86 153,59 153,198 125,198" style="fill:var(--c-dark)"></polygon><polygon points="153,59 181,86 181,198 153,198" style="fill:var(--c-light)"></polygon></svg>
+      <span style="font:800 21px/1 'Inter Tight',sans-serif;letter-spacing:-.05em">hakan</span>
+    </div>
+    <div class="col" style="gap:6px;padding:0 8px"><span class="t-cap">Ofis kurulumu</span><b style="font-size:18px">Demir Mali Müşavirlik</b><div class="bar"><i style="width:{{yuzde}}"></i></div><span class="t-xs t-3">{{ilerleme}}</span></div>
+    <nav class="col" style="gap:2px" aria-label="Kurulum adımları">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="6">
+        <button type="button" class="{{s.cls}}" onClick="{{s.pick}}"><span class="n">{{s.n}}</span><span class="col grow"><span class="t-sm t-b">{{s.ad}}</span><span class="t-xs t-3">{{s.durum}}</span></span></button>
+      </sc-for>
+    </nav>
+    <div style="flex:1"></div>
+    <p class="t-xs t-3" style="padding:0 8px">Yarıda bırakabilirsin; Genel bakış'taki kurulum kartından devam edersin.</p>
+  </aside>
+
+  <main style="flex:999 1 560px;min-width:0;padding:48px 56px;display:flex;flex-direction:column;gap:24px;max-width:960px">
+    <span class="t-cap">Adım {{adimNo}} / 6</span>
+    <sc-if value="{{s1}}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:32px">Ofis bilgileri</h1>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:640px">
+        <div style="grid-column:1/-1"><label class="label" for="o1">Ofis adı</label><input class="input" id="o1" value="Demir Mali Müşavirlik"></div>
+        <div><label class="label" for="o2">Ruhsat no</label><input class="input mono" id="o2" value="34-SMMM-018842"></div>
+        <div><label class="label" for="o3">Adres (panel)</label><input class="input mono" id="o3" value="demir-smmm"></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:32px">Ekibini davet et</h1>
+      <div class="card" style="max-width:680px">
+        <div class="row" style="padding:14px 16px;gap:10px"><span class="av">AD</span><span class="grow">ayse@demirsmmm.com.tr</span><span class="pill">Mali Müşavir</span></div>
+        <div class="row" style="padding:14px 16px;gap:10px;border-top:1px solid var(--line)"><span class="av">CK</span><span class="grow">can@demirsmmm.com.tr</span><span class="pill">Stajyer</span></div>
+        <div class="row" style="padding:12px 16px;border-top:1px solid var(--line)"><input class="input grow" value="" placeholder="e-posta ekle" aria-label="E-posta"></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{s3}}" hint-placeholder-val="{{ true }}">
+      <h1 style="font-size:32px">Mükellef listeni yükle</h1>
+      <p class="t-2" style="max-width:620px">Mevcut programından aldığın Excel ya da CSV yeterli. Satırları biz kontrol edelim, hatalıları burada düzelt.</p>
+      <div class="row" style="gap:14px;padding:18px;border:1.5px dashed var(--line-strong);border-radius:14px;background:var(--surface)"><svg class="ic ic-lg" viewBox="0 0 24 24" style="color:var(--brand-text)" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM9 13h6M9 17h6"></path></svg><div class="col grow"><b>mukellefler.xlsx</b><span class="t-xs t-3">41 satır · 38 geçerli · 3 düzeltilmeli</span></div><button type="button" class="btn btn-sm">Değiştir</button></div>
+      <div class="card" style="overflow:hidden">
+        <div style="overflow-x:auto">
+        <table class="tbl" style="min-width:600px"><thead><tr><th></th><th>Unvan</th><th>VKN / TCKN</th><th>Vergi dairesi</th><th>Sorun</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill pill-danger">Hata</span></td><td>Kuzey Lojistik Ltd. Şti.</td><td><input class="input mono" value="481029384" style="height:30px;border-color:var(--danger)" aria-label="VKN"></td><td>Tuzla VD</td><td class="t-xs" style="color:var(--danger)">VKN 10 hane olmalı</td></tr>
+          <tr><td><span class="pill pill-danger">Hata</span></td><td>Defne Eczanesi</td><td class="mono">—</td><td>Çankaya VD</td><td class="t-xs" style="color:var(--danger)">Kimlik no eksik</td></tr>
+          <tr><td><span class="pill pill-warn">Kontrol</span></td><td>Atlas Gıda Tic. A.Ş.</td><td class="mono">9000000017</td><td>Kadıköy VD</td><td class="t-xs" style="color:var(--warn)">Panelde zaten var · birleştirilecek</td></tr>
+          <tr><td><span class="pill pill-ok">Geçerli</span></td><td>Marmara Tekstil A.Ş.</td><td class="mono">6120047731</td><td>Bursa Uludağ VD</td><td></td></tr>
+        </tbody></table>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:32px">Muhasebe programın</h1>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;max-width:720px">
+        <div class="card card-pad col" style="gap:6px;border-color:var(--brand);background:var(--brand-tint)"><b>Luca</b><span class="t-xs t-3">Fiş aktarım dosyası</span></div>
+        <div class="card card-pad col" style="gap:6px"><b>Zirve</b><span class="t-xs t-3">Şablon doğrulanmadı</span></div>
+        <div class="card card-pad col" style="gap:6px"><b>Sadece Excel</b><span class="t-xs t-3">Formüllü dosya</span></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{s5}}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:32px">Faturalar nereden gelsin?</h1>
+      <div class="col" style="gap:10px;max-width:680px">
+        <div class="card card-pad row" style="gap:12px"><b class="grow">Entegratör bağlantısı (QNB, EDM)</b><span class="pill">Bekliyor</span><button type="button" class="btn btn-sm">Bağla</button></div>
+        <div class="card card-pad row" style="gap:12px"><b class="grow">Masaüstü ajanı · klasör izleme</b><span class="pill pill-ok">1 bilgisayar</span><button type="button" class="btn btn-sm">İndir</button></div>
+        <div class="card card-pad row" style="gap:12px"><b class="grow">Elle UBL / ZIP yükleme</b><span class="pill pill-ok">Hazır</span></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{s6}}" hint-placeholder-val="{{ false }}">
+      <h1 style="font-size:32px">Mükelleflerini davet et</h1>
+      <p class="t-2" style="max-width:620px">Her mükellefe uygulama bağlantısı ve KVKK onayı gider. Onaylayan mükellef fiş yüklemeye başlar.</p>
+      <div class="card card-pad row" style="gap:12px;max-width:680px"><span class="crown s1"><i></i><i></i><i></i></span><b class="grow">38 mükellef seçili</b><button type="button" class="btn btn-pri">Davetleri gönder</button></div>
+    </sc-if>
+    <div class="row" style="gap:10px;margin-top:auto;padding-top:20px;border-top:1px solid var(--line)">
+      <button type="button" class="btn btn-lg btn-ghost" onClick="{{geri}}">Geri</button>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-lg" onClick="{{atla}}">Bu adımı atla</button>
+      <button type="button" class="btn btn-lg btn-pri" onClick="{{ileri}}">Kaydet ve devam et</button>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { step: 2, st: ['ok','ok','','','',''] }; }
+  renderVals() {
+    const names = ['Ofis bilgileri','Ekip','Mükellef listesi','Muhasebe programı','Entegratör bağlantıları','Mükellef davetleri'];
+    const { step, st } = this.state;
+    const steps = names.map((ad,i) => ({ad, n: st[i]==='ok' ? '✓' : String(i+1), durum: i===step ? 'Şimdi' : st[i]==='ok' ? 'Tamamlandı' : st[i]==='skip' ? 'Atlandı' : 'Bekliyor', cls: 'st' + (i===step ? ' on' : st[i]==='ok' ? ' ok' : ''), pick: () => this.setState({step:i})}));
+    const set = (v) => { const s2 = st.slice(); s2[step] = v; this.setState({st: s2, step: Math.min(5, step+1)}); };
+    const done = st.filter(x => x==='ok').length;
+    const v = {}; for (let i=0;i<6;i++) v['s'+(i+1)] = i===step;
+    return { tema: this.props.tema ?? 'm3-light', steps, ...v, adimNo: String(step+1), yuzde: Math.round(done/6*100)+'%', ilerleme: done+' / 6 adım tamam',
+      ileri: () => set('ok'), atla: () => set('skip'), geri: () => this.setState({step: Math.max(0, step-1)}) };
+  }
+}
+</script>
+</body>
+</html>

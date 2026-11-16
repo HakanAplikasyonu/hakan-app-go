@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Faturalar ve fişler</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="belge" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column">
+  <div class="topbar" style="flex-wrap:wrap;height:auto;min-height:60px;padding:10px 24px">
+    <h1 style="font-size:20px">Faturalar ve fişler</h1>
+    <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px;margin-left:8px"><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Faturalar 1.284</span><span class="btn btn-sm btn-ghost">Fişler 412</span><span class="btn btn-sm btn-ghost">Banka 2.031</span><span class="btn btn-sm btn-ghost">Yüklemeler</span></div>
+    <div style="flex:1"></div>
+    <button type="button" class="btn" style="gap:6px"><span class="t-3">Dönem</span><b class="mono">2026-10</b></button>
+    <button type="button" class="btn btn-pri">UBL yükle</button>
+  </div>
+  <div class="row wrap" style="gap:12px;padding:12px 24px;border-bottom:1px solid var(--line);background:var(--surface)">
+    <span class="loader" style="height:18px;gap:2px"><i style="width:6px;height:12px"></i><i style="width:6px;height:18px"></i><i style="width:6px;height:12px"></i></span>
+    <span class="t-sm grow"><b>atlas-ekim.zip</b> işleniyor · 184 / 212 dosya · 3 zaten var · 1 okunamadı</span>
+    <div class="bar" style="width:200px"><i style="width:87%"></i></div>
+  </div>
+  <div class="row wrap" style="gap:6px;padding:12px 24px">
+    <span class="pill" style="height:28px;border:1px solid var(--line-strong);background:var(--surface)">Mükellef: Tümü ▾</span><span class="pill pill-brand" style="height:28px">Yön: Alış ✕</span><span class="pill" style="height:28px;border:1px solid var(--line-strong);background:var(--surface)">Durum ▾</span><span class="pill" style="height:28px;border:1px solid var(--line-strong);background:var(--surface)">Kaynak ▾</span><span class="pill" style="height:28px;border:1px dashed var(--line-strong);background:transparent">+ Filtre</span>
+    <span class="t-xs t-3" style="margin-left:auto">Görünümü kaydet</span>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;flex:1;min-height:0">
+    <div style="flex:999 1 560px;min-width:0;overflow-x:auto;padding:0 24px 24px">
+      <div class="card" style="overflow:hidden;min-width:720px">
+      <table class="tbl">
+        <thead><tr><th></th><th>Tarih</th><th>Karşı taraf</th><th>Tür</th><th>Kaynak</th><th style="text-align:right">Matrah</th><th style="text-align:right">KDV</th><th style="text-align:right">Ödenecek</th><th>Hesap</th></tr></thead>
+        <tbody>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+            <tr class="{{r.cls}}">
+              <td style="width:30px"><span class="{{r.cc}}"><i></i><i></i><i></i></span></td>
+              <td class="num t-2">{{r.t}}</td>
+              <td><div class="col"><b class="t-sm">{{r.k}}</b><span class="t-xs t-3">{{r.m}}</span></div></td>
+              <td><span class="pill">{{r.tur}}</span></td>
+              <td class="t-xs t-2">{{r.src}}</td>
+              <td class="num" style="text-align:right">{{r.mat}}</td><td class="num t-2" style="text-align:right">{{r.kdv}}</td><td class="num t-b" style="text-align:right">{{r.top}}</td>
+              <td><span class="{{r.kc}}">{{r.kod}}</span></td>
+            </tr>
+          </sc-for>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <aside style="flex:1 1 380px;max-width:460px;border-left:1px solid var(--line);background:var(--surface);padding:22px;display:flex;flex-direction:column;gap:16px;min-width:0">
+      <div class="row"><span class="pill pill-brand">e-Fatura · TICARIFATURA</span><button type="button" class="btn btn-icon btn-ghost" aria-label="Kapat" style="margin-left:auto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
+      <div class="col" style="gap:4px"><h2 style="font-size:20px">Kuzey Akaryakıt Ltd. Şti.</h2><span class="t-xs t-3 mono">ETTN 7c1e…a90f · KZY2026000031144</span><span class="t-sm t-2">Alış · Kuzey Lojistik · 12 Eki 2026</span></div>
+      <div class="row" style="gap:10px;padding:12px;border-radius:12px;background:var(--danger-tint);color:var(--danger)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg><span class="t-sm grow"><b>Engelleyici:</b> KDV toplamı satırlarla tutmuyor (TAX_TOTAL_MISMATCH)</span></div>
+      <div class="col" style="gap:8px">
+        <span class="t-cap">Tutar şelalesi</span>
+        <div class="row t-sm"><span class="grow t-2">Matrah</span><span class="num">48.200,00</span></div>
+        <div class="row t-sm"><span class="grow t-2">+ KDV %20</span><span class="num">9.640,00</span></div>
+        <div class="row t-sm"><span class="grow t-2">− Tevkifat 5/10</span><span class="num">−4.820,00</span></div>
+        <div class="divider"></div>
+        <div class="row t-sm"><span class="grow t-b">Hesaplanan ödenecek</span><span class="num t-b">53.020,00</span></div>
+        <div class="row t-sm" style="color:var(--danger)"><span class="grow t-b">Faturadaki ödenecek</span><span class="num t-b">57.840,00</span></div>
+        <span class="t-xs" style="color:var(--danger)">Fark 4.820,00 ₺ · tevkifat satırı faturada yansıtılmamış olabilir</span>
+      </div>
+      <div class="card" style="overflow:hidden">
+        <table class="tbl"><thead><tr><th>Mal / hizmet</th><th style="text-align:right">Tutar</th><th>Hesap</th></tr></thead>
+        <tbody><tr><td class="t-sm">Taşıma hizmeti · Ekim</td><td class="num" style="text-align:right">48.200,00</td><td><span class="code code-b">760.01</span></td></tr></tbody></table>
+      </div>
+      <div class="row" style="gap:8px;margin-top:auto"><button type="button" class="btn grow">Faturayı görüntüle</button><button type="button" class="btn grow">Mükelleften düzeltme iste</button></div>
+    </aside>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const R = (t,k,m,tur,src,mat,kdv,top,kod,cc,sel) => ({t,k,m,tur,src,mat,kdv,top,kod,cc,cls: sel?'sel':'',kc: kod==='—'?'t-3':(cc==='crown s1'?'code code-b':'code')});
+    const rows = [
+      R('12.10','Kuzey Akaryakıt Ltd. Şti.','Kuzey Lojistik','e-Fatura','Entegratör','48.200,00','9.640,00','57.840,00','760.01','crown err',true),
+      R('12.10','Kalem Kırtasiye San. Tic.','Atlas Gıda','e-Arşiv','Masaüstü ajanı','3.510,00','702,00','4.212,00','770.01.003','crown s1'),
+      R('11.10','Mavi Tasarım Ajansı','Marmara Tekstil','e-Fatura','Masaüstü ajanı','11.800,00','2.360,00','14.160,00','760.01','crown s1'),
+      R('10.10','Yıldız Market Ltd. Şti.','Lale Kafe','Fiş','Mükellef mobil','1.420,00','113,60','1.533,60','153.01','crown s2'),
+      R('09.10','Opet Akaryakıt İstasyonu','Kuzey Lojistik','Fiş','Mükellef mobil','5.177,00','1.035,40','6.212,40','770.01.005','crown s2'),
+      R('08.10','Bulut Yazılım A.Ş.','Zeren Mimarlık','e-Fatura','UBL yükleme','9.000,00','1.800,00','10.800,00','770.01.010','crown s3'),
+      R('06.10','Teknosa İç ve Dış Tic.','Atlas Gıda','e-Fatura','Masaüstü ajanı','32.000,00','6.400,00','38.400,00','—','crown'),
+      R('03.10','Ege Gayrimenkul Ltd. Şti.','Defne Eczanesi','e-Fatura','Entegratör','37.500,00','7.500,00','45.000,00','770.01.001','crown s3'),
+      R('02.10','Temiz Ofis Hizmetleri','Yavuz Oto Servis','e-Arşiv','UBL yükleme','2.400,00','480,00','2.880,00','770.01.006','crown s2'),
+      R('01.10','Marmara Tekstil A.Ş.','Ova Tarım Koop.','e-Fatura','Entegratör','64.000,00','6.400,00','70.400,00','153.01','crown s3')
+    ];
+    return { tema: this.props.tema ?? 'm3-light', rows };
+  }
+}
+</script>
+</body>
+</html>

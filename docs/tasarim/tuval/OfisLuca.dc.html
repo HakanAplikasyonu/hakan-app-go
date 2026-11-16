@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Yevmiye ve Luca çıktısı</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}
+.prog{display:flex;flex-direction:column;gap:6px;padding:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;text-align:left;font:inherit;color:inherit}
+.prog.on{border-color:var(--brand);background:var(--brand-tint)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="luca" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column">
+  <div class="topbar" style="flex-wrap:wrap;height:auto;min-height:60px;padding:10px 24px">
+    <h1 style="font-size:20px">Yevmiye ve çıktı</h1>
+    <button type="button" class="btn" style="gap:8px;margin-left:8px"><span class="av av-sq" style="width:22px;height:22px;font-size:9px">MT</span>Marmara Tekstil A.Ş. ▾</button>
+    <button type="button" class="btn" style="gap:6px"><span class="t-3">Dönem</span><b class="mono">2026-10</b></button>
+    <div style="flex:1"></div>
+    <button type="button" class="btn">+ Yeni fiş</button>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;flex:1;min-height:0">
+    <section style="flex:999 1 560px;min-width:0;padding:24px;display:flex;flex-direction:column;gap:16px">
+      <div class="row wrap" style="gap:8px"><span class="pill" style="height:28px">Taslak 3</span><span class="pill pill-brand" style="height:28px">Onaylı 186</span><span class="pill pill-ok" style="height:28px">Aktarıldı 0</span><span class="t-xs t-3" style="margin-left:auto">Borç = Alacak = ₺ 4.218.904,12</span></div>
+      <div class="card" style="overflow:hidden">
+        <div style="overflow-x:auto">
+        <table class="tbl" style="min-width:640px">
+          <thead><tr><th></th><th>Fiş</th><th>Tarih</th><th>Açıklama</th><th style="text-align:right">Borç</th><th style="text-align:right">Alacak</th><th>Durum</th></tr></thead>
+          <tbody>
+            <sc-for list="{{fis}}" as="f" hint-placeholder-count="8">
+              <tr><td style="width:30px"><span class="{{f.cc}}"><i></i><i></i><i></i></span></td><td class="mono t-sm">{{f.no}}</td><td class="num t-2">{{f.t}}</td><td class="t-sm">{{f.a}}</td><td class="num" style="text-align:right">{{f.b}}</td><td class="num" style="text-align:right">{{f.al}}</td><td><span class="{{f.pc}}">{{f.d}}</span></td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div class="card" style="overflow:hidden">
+        <div class="row" style="padding:14px 18px"><h3 style="font-size:16px" class="grow">Önceki çıktılar</h3></div>
+        <sc-for list="{{gecmis}}" as="g" hint-placeholder-count="3">
+          <div class="row wrap" style="gap:12px;padding:12px 18px;border-top:1px solid var(--line)"><span class="crown s3"><i></i><i></i><i></i></span><b class="t-sm mono">{{g.d}}</b><span class="t-sm t-2 grow">{{g.p}} · {{g.n}} fiş · {{g.k}}</span><span class="t-xs t-3">{{g.t}}</span><button type="button" class="btn btn-sm">İndir</button></div>
+        </sc-for>
+      </div>
+    </section>
+
+    <aside style="flex:1 1 380px;max-width:460px;border-left:1px solid var(--line);background:var(--surface);padding:22px;display:flex;flex-direction:column;gap:18px;min-width:0">
+      <div class="col" style="gap:4px"><span class="t-cap">Çıktı al · 2026-10</span><h2 style="font-size:22px">Marmara Tekstil'i Luca'ya gönder</h2></div>
+      <div class="col" style="gap:10px">
+        <span class="label" style="margin:0">Ön kontrol</span>
+        <div class="row t-sm"><span style="color:var(--ok)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></span><span class="grow">Bütün fişler dengeli</span></div>
+        <div class="row t-sm"><span style="color:var(--ok)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></span><span class="grow">Engelleyici uyarı yok</span></div>
+        <div class="row t-sm" style="color:var(--warn)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg><span class="grow">3 taslak fiş çıktıya girmeyecek</span><a href="#" class="t-b" style="color:inherit">Onayla</a></div>
+        <div class="row t-sm"><span style="color:var(--ok)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></span><span class="grow">Dönem kilitlenecek</span><span class="t-xs t-3">açmak gerekçe ister</span></div>
+      </div>
+      <div class="col" style="gap:8px">
+        <span class="label" style="margin:0">Muhasebe programı</span>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <sc-for list="{{progs}}" as="p" hint-placeholder-count="3"><button type="button" class="{{p.cls}}" onClick="{{p.pick}}"><b>{{p.ad}}</b><span class="t-xs t-3">{{p.alt}}</span></button></sc-for>
+        </div>
+        <span class="t-xs t-3">{{progNot}}</span>
+      </div>
+      <div class="card card-pad col" style="gap:8px;background:var(--surface-2)">
+        <div class="row t-sm"><span class="grow t-2">Fiş sayısı</span><b class="num">186</b></div>
+        <div class="row t-sm"><span class="grow t-2">Satır</span><b class="num">1.402</b></div>
+        <div class="row t-sm"><span class="grow t-2">Dosya</span><span class="mono t-xs">{{dosya}}</span></div>
+      </div>
+      <button type="button" class="btn btn-lg btn-pri" style="margin-top:auto"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21h14M12 3v12M7 10l5 5 5-5"></path></svg>Çıktıyı oluştur ve dönemi kilitle</button>
+    </aside>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { prog: 0 }; }
+  renderVals() {
+    const F = (no,t,a,b,al,d) => ({no,t,a,b,al,d,cc: d==='Taslak'?'crown s1':'crown s2',pc: d==='Taslak'?'pill':'pill pill-brand'});
+    const fis = [
+      F('M-0412','31.10','Ekim satış faturaları toplu','1.284.000,00','1.284.000,00','Onaylı'),
+      F('M-0411','31.10','Banka masrafları · BSMV','1.842,60','1.842,60','Onaylı'),
+      F('M-0410','28.10','SGK prim ödemesi · Eylül','86.412,00','86.412,00','Onaylı'),
+      F('M-0409','25.10','Kumaş alımı · Marmara İplik','412.800,00','412.800,00','Onaylı'),
+      F('M-0408','22.10','Akaryakıt fişleri · 14 adet','18.204,40','18.204,40','Taslak'),
+      F('M-0407','20.10','Kira · Ekim','45.000,00','45.000,00','Onaylı')
+    ];
+    const gecmis = [{d:'2026-09',p:'Luca',n:'171',k:'Mert Demir',t:'3 Eki'},{d:'2026-08',p:'Luca',n:'164',k:'Ayşe Demir',t:'4 Eyl'},{d:'2026-07',p:'Excel (formüllü)',n:'158',k:'Ayşe Demir',t:'2 Ağu'}];
+    const P = [{ad:'Luca',alt:'fiş aktarım',not:'Luca fiş içe aktarım biçimi. Şablon ofis örneğiyle doğrulandı.',f:'marmara_2026-10_luca.xlsx'},{ad:'Excel',alt:'formüllü',not:'Kontrol için formüllü Excel: toplamlar canlı hesaplanır.',f:'marmara_2026-10.xlsx'},{ad:'Zirve',alt:'şablon doğrulanmadı',not:'Zirve şablonu henüz doğrulanmadı: önce örnek dosyayla deneyin.',f:'marmara_2026-10_zirve.txt'}];
+    const s = this.state.prog;
+    const progs = P.map((p,i) => ({...p, cls: 'prog'+(i===s?' on':''), pick: () => this.setState({prog:i})}));
+    return { tema: this.props.tema ?? 'm3-light', fis, gecmis, progs, progNot: P[s].not, dosya: P[s].f };
+  }
+}
+</script>
+</body>
+</html>

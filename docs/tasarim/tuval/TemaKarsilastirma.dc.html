@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Tema karşılaştırma</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}
+.fr{width:720px;height:500px;overflow:hidden;border-radius:14px;border:1px solid #CACAD3;position:relative}
+.fr>.in{width:1440px;height:1000px;transform:scale(.5);transform-origin:0 0;position:absolute;top:0;left:0}
+</style>
+</helmet>
+<div class="hk" data-theme="m3-light" style="width:1560px;height:1180px;padding:40px;display:flex;flex-direction:column;gap:24px">
+  <div class="row" style="gap:16px;align-items:flex-end"><div class="col grow" style="gap:6px"><span class="t-cap">Aynı pano, dört tema</span><h1 style="font-size:30px">M3 Kristal mavi (ana) ve N3 yeşil (alternatif)</h1></div><p class="t-sm t-2" style="max-width:420px">Bütün ekranlarda Tweaks → tema ile tek tek de değiştirilebilir. N3'te yeşil yalnızca dolgu; metin siyah kalır.</p></div>
+  <div style="display:grid;grid-template-columns:repeat(2,720px);gap:28px 40px">
+    <div class="col" style="gap:8px"><b class="t-sm">M3 · açık</b><div class="fr"><div class="in"><dc-import name="OfisPano" tema="m3-light" hint-size="1440px,1000px"></dc-import></div></div></div>
+    <div class="col" style="gap:8px"><b class="t-sm">M3 · koyu</b><div class="fr"><div class="in"><dc-import name="OfisPano" tema="m3-dark" hint-size="1440px,1000px"></dc-import></div></div></div>
+    <div class="col" style="gap:8px"><b class="t-sm">N3 · açık</b><div class="fr"><div class="in"><dc-import name="OfisPano" tema="n3-light" hint-size="1440px,1000px"></dc-import></div></div></div>
+    <div class="col" style="gap:8px"><b class="t-sm">N3 · koyu</b><div class="fr"><div class="in"><dc-import name="OfisPano" tema="n3-dark" hint-size="1440px,1000px"></dc-import></div></div></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1560,"height":1180}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>

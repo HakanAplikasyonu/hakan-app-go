@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Bileşenler</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:#2448FF}a:hover{color:#102290}</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:1440px;min-height:1500px;padding:72px 80px;display:flex;flex-direction:column;gap:32px">
+<header class="row" style="justify-content:space-between;align-items:flex-end">
+  <div class="col" style="gap:10px"><span class="t-cap">Bileşen kütüphanesi · packages/ui</span><h1 style="font-size:44px">Bileşenler</h1></div>
+  <p class="t-2" style="max-width:520px">Her bileşen web'de shadcn tabanlı, Expo'da aynı ad ve prop'larla. Tweaks menüsünden temayı değiştirip koyu modu görebilirsin.</p>
+</header>
+
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px">
+  <section class="card card-pad col" style="gap:18px">
+    <h3 style="font-size:18px">Button</h3>
+    <div class="row wrap" style="gap:10px">
+      <button class="btn btn-pri" type="button">Onayla</button>
+      <button class="btn btn-dark" type="button">Luca'ya aktar</button>
+      <button class="btn" type="button">Düzelt</button>
+      <button class="btn btn-ghost" type="button">Atla</button>
+      <button class="btn btn-danger" type="button">Reddet</button>
+      <button class="btn btn-icon" type="button" aria-label="Diğer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg></button>
+    </div>
+    <div class="row wrap" style="gap:10px">
+      <button class="btn btn-pri btn-lg" type="button"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg>Onayla <span class="kbd" style="background:transparent;color:inherit;border-color:rgba(255,255,255,.4)">A</span></button>
+      <button class="btn btn-lg" type="button">Kural yap <span class="kbd">K</span></button>
+      <button class="btn btn-sm" type="button">Küçük</button>
+      <button class="btn btn-pri" type="button" style="opacity:.45" disabled>Pasif</button>
+    </div>
+    <p class="t-xs t-3">Yükseklik: sm 30 · md 36 · lg 44 (mobilde en az 44). Klavye kısayolu buton içinde gösterilir.</p>
+  </section>
+
+  <section class="card card-pad col" style="gap:18px">
+    <h3 style="font-size:18px">Durum etiketi (Badge) ve taç</h3>
+    <div class="row wrap" style="gap:8px">
+      <span class="pill"><span class="crown"><i></i><i></i><i></i></span>Bekleniyor</span>
+      <span class="pill pill-brand"><span class="crown s1"><i></i><i></i><i></i></span>Öneri hazır</span>
+      <span class="pill pill-ok"><span class="crown s2"><i></i><i></i><i></i></span>Onaylandı</span>
+      <span class="pill pill-ok"><span class="crown s3"><i></i><i></i><i></i></span>Aktarıldı</span>
+      <span class="pill pill-danger"><span class="crown err"><i></i><i></i><i></i></span>Okunamadı</span>
+    </div>
+    <div class="row wrap" style="gap:8px">
+      <span class="pill pill-warn"><span class="dot"></span>Uyarı</span>
+      <span class="pill pill-danger"><span class="dot"></span>Engelleyici</span>
+      <span class="pill"><span class="dot"></span>Bilgi</span>
+      <span class="pill pill-brand">e-Fatura</span><span class="pill">e-Arşiv</span><span class="pill">Fiş</span><span class="pill">Banka</span>
+    </div>
+    <div class="row" style="gap:16px"><span class="row t-sm"><span class="conf c3"><i></i><i></i><i></i></span>Yüksek</span><span class="row t-sm"><span class="conf c2"><i></i><i></i><i></i></span>Orta</span><span class="row t-sm"><span class="conf c1"><i></i><i></i><i></i></span>Düşük</span></div>
+  </section>
+
+  <section class="card card-pad col" style="gap:16px">
+    <h3 style="font-size:18px">Form</h3>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+      <div><label class="label" for="f1">VKN / TCKN</label><input class="input mono" id="f1" value="4810293847"></div>
+      <div><label class="label" for="f2">Dönem</label><input class="input" id="f2" value="Kasım 2026"></div>
+      <div><label class="label" for="f3">Hesap kodu</label><input class="input mono" id="f3" value="770.01.003" style="border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-tint)"></div>
+      <div><label class="label" for="f4">Tutar</label><input class="input num" id="f4" value="12.480,00 ₺" style="border-color:var(--danger)"><span class="t-xs" style="color:var(--danger);display:block;margin-top:6px">Fatura toplamıyla eşleşmiyor (12.840,00 ₺)</span></div>
+    </div>
+    <div class="row" style="gap:20px">
+      <label class="row t-sm"><span style="width:36px;height:22px;border-radius:999px;background:var(--brand);position:relative;display:inline-block"><span style="position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--on-brand)"></span></span>Otomatik onay</label>
+      <label class="row t-sm"><span style="width:18px;height:18px;border-radius:5px;background:var(--brand);display:inline-flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;stroke:var(--on-brand);stroke-width:3" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></span>Kural olarak kaydet</label>
+    </div>
+  </section>
+
+  <section class="card card-pad col" style="gap:14px">
+    <h3 style="font-size:18px">Hesap kodu seçici (Combobox)</h3>
+    <div class="search" style="background:var(--surface);border-color:var(--brand);height:40px"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 100-14 7 7 0 000 14M20 20l-4-4"></path></svg><span style="color:var(--text)">kırtasiye</span></div>
+    <div class="card" style="box-shadow:var(--shadow-lg);padding:6px">
+      <div class="row" style="padding:9px 10px;border-radius:8px;background:var(--brand-tint)"><span class="code code-b">770.01.003</span><span class="grow">Kırtasiye giderleri</span><span class="pill pill-ok">Geçmiş 14×</span></div>
+      <div class="row" style="padding:9px 10px"><span class="code">760.01.003</span><span class="grow">Pazarlama · kırtasiye</span><span class="t-xs t-3">2×</span></div>
+      <div class="row" style="padding:9px 10px"><span class="code">153.01</span><span class="grow t-2">Ticari mallar</span></div>
+      <div class="divider" style="margin:4px 0"></div>
+      <div class="row t-xs t-3" style="padding:6px 10px"><span class="kbd">↑↓</span> gez <span class="kbd">↵</span> seç <span class="kbd">esc</span> kapat</div>
+    </div>
+  </section>
+</div>
+
+<section class="card card-pad col" style="gap:16px">
+  <div class="row"><h3 style="font-size:18px">Öneri kartı · çekirdek bileşen</h3><span class="t-cap" style="margin-left:auto">web kuyruğu, müşavir mobil, mükellef detayı aynı veriyi gösterir</span></div>
+  <div class="card chamfer" style="display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) auto;gap:24px;padding:20px;align-items:center;border-color:var(--line-strong)">
+    <div class="col" style="gap:6px">
+      <div class="row"><span class="pill pill-brand">e-Fatura</span><span class="t-xs t-3 mono">GIB2026000184213</span></div>
+      <b style="font-size:16px">Kalem Kırtasiye San. Tic. Ltd. Şti.</b>
+      <span class="t-sm t-2">Mükellef: Atlas Gıda Ticaret A.Ş. · 12 Kas 2026</span>
+    </div>
+    <div class="col" style="gap:8px">
+      <div class="row"><span class="code code-b" style="font-size:14px">770.01.003</span><b>Kırtasiye giderleri</b></div>
+      <div class="row t-sm t-2"><span class="conf c3"><i></i><i></i><i></i></span>Yüksek güven · bu tedarikçi 14 kez 770.01.003'e işlendi</div>
+    </div>
+    <div class="col" style="align-items:flex-end;gap:10px">
+      <span class="num" style="font:700 22px Inter">4.212,00 ₺</span>
+      <div class="row"><button class="btn" type="button">Düzelt</button><button class="btn" type="button">Kural yap</button><button class="btn btn-pri" type="button">Onayla</button></div>
+    </div>
+  </div>
+</section>
+
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px">
+  <section class="card card-pad col" style="gap:12px">
+    <h3 style="font-size:18px">Toast</h3>
+    <div class="row" style="background:var(--text);color:var(--bg);border-radius:12px;padding:12px 14px;gap:12px;box-shadow:var(--shadow-lg)"><span class="crown s2"><i></i><i></i><i></i></span><span class="grow t-sm">18 öneri onaylandı</span><button class="btn btn-sm" type="button" style="background:transparent;color:inherit;border-color:rgba(127,127,127,.5)">Geri al</button></div>
+    <div class="row" style="background:var(--surface);border:1px solid var(--danger);border-radius:12px;padding:12px 14px;gap:12px"><svg class="ic" viewBox="0 0 24 24" style="color:var(--danger)" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg><span class="grow t-sm">Luca dosyası oluşturulamadı</span><a href="#" class="t-sm t-b">Ayrıntı</a></div>
+    <p class="t-xs t-3">Toplu işlemler 6 sn geri alınabilir.</p>
+  </section>
+  <section class="card card-pad col" style="gap:12px">
+    <h3 style="font-size:18px">Sekme ve filtre</h3>
+    <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px;width:max-content"><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Tümü <span class="t-3">124</span></span><span class="btn btn-sm btn-ghost">Düşük güven <span>9</span></span><span class="btn btn-sm btn-ghost">Yeni karşı taraf</span></div>
+    <div class="row wrap" style="gap:6px"><span class="pill" style="height:28px;border:1px solid var(--line-strong);background:var(--surface)">Mükellef: Tümü ▾</span><span class="pill pill-brand" style="height:28px">Dönem: Kasım 2026 ✕</span><span class="pill" style="height:28px;border:1px dashed var(--line-strong);background:transparent">+ Filtre</span></div>
+  </section>
+  <section class="card card-pad col" style="gap:12px">
+    <h3 style="font-size:18px">Komut paleti</h3>
+    <div class="card" style="box-shadow:var(--shadow-lg);overflow:hidden">
+      <div class="row" style="padding:12px 14px;border-bottom:1px solid var(--line)"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 100-14 7 7 0 000 14M20 20l-4-4"></path></svg><span class="t-sm">atlas</span><span class="kbd" style="margin-left:auto">⌘K</span></div>
+      <div class="row t-sm" style="padding:10px 14px;background:var(--brand-tint)"><span class="av av-sq" style="width:24px;height:24px;font-size:10px">AG</span>Atlas Gıda Ticaret A.Ş.</div>
+      <div class="row t-sm t-2" style="padding:10px 14px">Atlas Gıda · 2026-11 dönemi</div>
+    </div>
+  </section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  renderVals() { return { tema: this.props.tema ?? 'm3-light' }; }
+}
+</script>
+</body>
+</html>

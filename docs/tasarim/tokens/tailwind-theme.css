@@ -1,0 +1,38 @@
+/*
+ * Tailwind v4 + shadcn eşlemesi. frontend/src/styles/theme.css içindeki
+ * slate/brand katmanının yerine geçer: önce tokens.css import edilir, sonra bu dosya.
+ *   @import "./tokens.css";  @import "./tailwind-theme.css";
+ */
+:root{
+  /* shadcn anlam değişkenleri → HAKAN token'ları */
+  --background:var(--bg);--foreground:var(--text);
+  --card:var(--surface);--card-foreground:var(--text);
+  --popover:var(--surface);--popover-foreground:var(--text);
+  --primary:var(--brand);--primary-foreground:var(--on-brand);
+  --secondary:var(--surface-3);--secondary-foreground:var(--text);
+  --muted:var(--surface-2);--muted-foreground:var(--text-3);
+  --accent:var(--brand-tint);--accent-foreground:var(--brand-text);
+  --destructive:var(--danger);--border:var(--line);--input:var(--line-strong);--ring:var(--focus);
+  --radius:var(--radius-md);
+  /* mevcut durum token adları korunur (geçiş kolaylığı) */
+  --status-approved:var(--ok);--status-review:var(--warn);--status-warning:var(--warn);--status-blocking:var(--danger);
+}
+@theme inline{
+  --color-background:var(--background);--color-foreground:var(--foreground);
+  --color-card:var(--card);--color-card-foreground:var(--card-foreground);
+  --color-popover:var(--popover);--color-popover-foreground:var(--popover-foreground);
+  --color-primary:var(--primary);--color-primary-foreground:var(--primary-foreground);
+  --color-secondary:var(--secondary);--color-secondary-foreground:var(--secondary-foreground);
+  --color-muted:var(--muted);--color-muted-foreground:var(--muted-foreground);
+  --color-accent:var(--accent);--color-accent-foreground:var(--accent-foreground);
+  --color-destructive:var(--destructive);--color-border:var(--border);--color-input:var(--input);--color-ring:var(--ring);
+  --color-surface:var(--surface);--color-surface-2:var(--surface-2);--color-surface-3:var(--surface-3);
+  --color-line:var(--line);--color-line-strong:var(--line-strong);
+  --color-text-2:var(--text-2);--color-text-3:var(--text-3);
+  --color-brand:var(--brand);--color-on-brand:var(--on-brand);--color-brand-text:var(--brand-text);--color-brand-ink:var(--brand-ink);--color-brand-soft:var(--brand-soft);--color-brand-tint:var(--brand-tint);
+  --color-crystal-light:var(--c-light);--color-crystal-mid:var(--c-mid);--color-crystal-dark:var(--c-dark);
+  --color-ok:var(--ok);--color-ok-tint:var(--ok-tint);--color-warn:var(--warn);--color-warn-tint:var(--warn-tint);--color-danger:var(--danger);--color-danger-tint:var(--danger-tint);
+  --font-sans:var(--font-sans);--font-mono:var(--font-mono);--font-display:var(--font-display);
+  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;--radius-xl:22px;
+  --shadow-card:var(--shadow);--shadow-overlay:var(--shadow-lg);
+}

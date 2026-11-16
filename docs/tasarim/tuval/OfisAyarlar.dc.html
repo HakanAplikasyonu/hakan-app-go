@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Ayarlar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}
+.thm{display:flex;flex-direction:column;gap:8px;padding:10px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface)}
+.thm.on{border-color:var(--brand)}
+.thm .pv{height:70px;border-radius:8px;display:flex;align-items:flex-end;gap:3px;padding:10px}
+.thm .pv i{display:block;width:10px;clip-path:polygon(0 4px,50% 0,100% 4px,100% 100%,0 100%)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="ayar" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-wrap:wrap;align-content:flex-start">
+  <nav style="flex:1 1 200px;max-width:240px;padding:28px 16px;display:flex;flex-direction:column;gap:2px" aria-label="Ayarlar menüsü">
+    <h1 style="font-size:20px;padding:0 10px 14px">Ayarlar</h1>
+    <a class="nav" href="#">Ofis bilgileri</a><a class="nav" href="#">Ekip ve roller</a><a class="nav on" href="#">Yapay zekâ ve onay</a><a class="nav" href="#">Masaüstü ajanları</a><a class="nav" href="#">Entegrasyonlar</a><a class="nav" href="#">Bildirimler</a><a class="nav" href="#">Görünüm</a><a class="nav" href="#">Güvenlik</a>
+  </nav>
+  <div style="flex:999 1 560px;min-width:0;padding:28px 32px;display:flex;flex-direction:column;gap:20px;max-width:900px">
+    <section class="card card-pad col" style="gap:18px">
+      <div class="col" style="gap:4px"><h2 style="font-size:20px">Yapay zekâ ve onay</h2><p class="t-sm t-2">Önerilerin ne zaman kendiliğinden onaylanacağına sen karar verirsin.</p></div>
+      <div class="col" style="gap:10px">
+        <div class="row"><span class="label grow" style="margin:0">Otomatik onay eşiği</span><b class="num">%95</b></div>
+        <div style="position:relative;height:28px"><div class="bar" style="position:absolute;top:11px;left:0;right:0"><i style="width:95%"></i></div><span style="position:absolute;left:95%;top:4px;width:20px;height:20px;margin-left:-10px;border-radius:50%;background:var(--surface);border:2px solid var(--brand);box-shadow:var(--shadow)"></span></div>
+        <div class="row t-xs t-3"><span class="grow">%80 · daha az kuyruk</span><span>%99 · daha çok kontrol</span></div>
+        <div class="row t-sm" style="gap:10px;padding:12px;border-radius:10px;background:var(--surface-2)"><span class="conf c3"><i></i><i></i><i></i></span><span class="grow">Son 30 günde bu eşikle <b>2.418</b> öneri kendiliğinden onaylanırdı; <b>7</b>'si sonra düzeltildi (%0,3).</span></div>
+      </div>
+      <div class="divider"></div>
+      <div class="row" style="gap:12px"><div class="col grow"><b class="t-sm">Kural ile gelen öneriler eşikten bağımsız onaylansın</b><span class="t-xs t-3">Kuralı yazan müşavir zaten karar vermiş sayılır</span></div><span style="width:40px;height:24px;border-radius:999px;background:var(--brand);position:relative;flex:none"><span style="position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:var(--on-brand)"></span></span></div>
+      <div class="row" style="gap:12px"><div class="col grow"><b class="t-sm">Stajyer onayı müşavir onayı ister</b><span class="t-xs t-3">Stajyerin onayladığı fiş, müşavir görene kadar sağ kristali doldurmaz</span></div><span style="width:40px;height:24px;border-radius:999px;background:var(--brand);position:relative;flex:none"><span style="position:absolute;right:3px;top:3px;width:18px;height:18px;border-radius:50%;background:var(--on-brand)"></span></span></div>
+    </section>
+
+    <section class="card" style="overflow:hidden">
+      <div class="row" style="padding:18px 20px"><h2 style="font-size:20px" class="grow">Masaüstü ajanları</h2><button type="button" class="btn btn-sm">Ajanı indir</button></div>
+      <div style="overflow-x:auto">
+      <table class="tbl" style="min-width:600px"><thead><tr><th>Ad</th><th>Platform</th><th>Sürüm</th><th>Durum</th><th>Son görülme</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><b>Ofis-PC</b></td><td>Windows 11</td><td class="mono">1.4.2</td><td><span class="pill pill-ok"><span class="dot"></span>Çevrimiçi</span></td><td class="t-2">2 dk önce</td><td><button type="button" class="btn btn-sm btn-ghost">Kaldır</button></td></tr>
+        <tr><td><b>Atlas-Muhasebe</b></td><td>Windows 10</td><td class="mono">1.4.2</td><td><span class="pill pill-ok"><span class="dot"></span>Çevrimiçi</span></td><td class="t-2">4 dk önce</td><td><button type="button" class="btn btn-sm btn-ghost">Kaldır</button></td></tr>
+        <tr><td><b>Mert-MacBook</b></td><td>macOS 16</td><td class="mono">1.3.9</td><td><span class="pill pill-danger"><span class="dot"></span>Çevrimdışı</span></td><td class="t-2">2 gün önce<br><span class="t-xs" style="color:var(--danger)">Sunucuya ulaşılamıyor</span></td><td><button type="button" class="btn btn-sm btn-ghost">Kaldır</button></td></tr>
+      </tbody></table>
+      </div>
+    </section>
+
+    <section class="card card-pad col" style="gap:14px">
+      <div class="col" style="gap:4px"><h2 style="font-size:20px">Görünüm</h2><p class="t-sm t-2">Tema yalnızca senin hesabın için. Varsayılan: sistemi izle.</p></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px">
+        <div class="thm on"><div class="pv" style="background:#F3F3F5"><i style="height:22px;background:#CFD8FF"></i><i style="height:32px;background:#2448FF"></i><i style="height:22px;background:#102290"></i></div><span class="t-sm t-b">Kristal mavi · açık</span></div>
+        <div class="thm"><div class="pv" style="background:#0A0A0A"><i style="height:22px;background:#CFD8FF"></i><i style="height:32px;background:#2448FF"></i><i style="height:22px;background:#102290"></i></div><span class="t-sm t-b">Kristal mavi · koyu</span></div>
+        <div class="thm"><div class="pv" style="background:#F3F3F5"><i style="height:22px;background:#D4D3D8"></i><i style="height:32px;background:#01FF11"></i><i style="height:22px;background:#0A0A0A"></i></div><span class="t-sm t-b">Yeşil · açık</span></div>
+        <div class="thm"><div class="pv" style="background:#0A0A0A"><i style="height:22px;background:#D4D3D8"></i><i style="height:32px;background:#01FF11"></i><i style="height:22px;background:#F3F3F5"></i></div><span class="t-sm t-b">Yeşil · koyu</span></div>
+      </div>
+      <div class="row t-sm" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px;width:max-content"><span class="btn btn-sm btn-ghost">Açık</span><span class="btn btn-sm btn-ghost">Koyu</span><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Sistemi izle</span></div>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return { tema: this.props.tema ?? 'm3-light' }; }
+}
+</script>
+</body>
+</html>
