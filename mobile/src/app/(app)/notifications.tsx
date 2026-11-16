@@ -1,5 +1,6 @@
-import { crownFor, inboxA11yLabel, inboxTime, unreadCount, type InboxItem } from '@hakan/mobile-core/notifications/inbox';
-import { BosDurum, KristalYukleyici, TacRozeti } from '@hakan/mobile-core/hakan';
+import { inboxA11yLabel, inboxTime, unreadCount, type InboxItem, type InboxKind } from '@hakan/mobile-core/notifications/inbox';
+import { BosDurum, KristalYukleyici } from '@hakan/mobile-core/hakan';
+import { Ikon, type IkonAdi } from '@hakan/mobile-core/ui/ikon';
 import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
 import { metin, Satir } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
@@ -78,7 +79,7 @@ export default function NotificationsScreen() {
             testID="inbox-row"
             ilk={index === 0}
             vurgulu={!item.read}
-            sol={<TacRozeti durum={crownFor(item.kind)} />}
+            sol={<TurIkonu kind={item.kind} />}
             baslik={item.title}
             alt={item.body || undefined}
             sag={<Text style={[metin.xs, { color: c.text3 }]}>{inboxTime(item.createdAt)}</Text>}
@@ -88,5 +89,24 @@ export default function NotificationsScreen() {
         )}
       />
     </SafeAreaView>
+  );
+}
+
+/** Tür ikonu (MukellefMobil · 4): 40 px yuvarlak kare, türün renk tonunda. */
+function TurIkonu({ kind }: { kind: InboxKind }) {
+  const { colors: c } = useTheme();
+  const [ad, bg, fg]: [IkonAdi, string, string] = {
+    task: ['talep', c.brandTint, c.brandText],
+    blocker: ['uyari', c.dangerTint, c.danger],
+    agent: ['uyari', c.dangerTint, c.danger],
+    upload: ['onayla', c.okTint, c.ok],
+    export: ['onayla', c.okTint, c.ok],
+    reminder: ['saat', c.warnTint, c.warn],
+    other: ['bildirim', c.surface3, c.text2],
+  }[kind] as [IkonAdi, string, string];
+  return (
+    <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+      <Ikon ad={ad} renk={fg} />
+    </View>
   );
 }
