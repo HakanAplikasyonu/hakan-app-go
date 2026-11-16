@@ -11,6 +11,7 @@ export type AccountRuleCandidate =
 export type AccountRulePromoteInput =
   components["schemas"]["AccountRulePromoteInput"];
 export type AccountRule = components["schemas"]["AccountRule"];
+export type MissingPlanAccount = components["schemas"]["MissingPlanAccount"];
 
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
@@ -32,6 +33,8 @@ export const accountMemoryKeys = {
     [...base(slug, engagement), "candidates"] as const,
   rules: (slug: string, engagement: string) =>
     [...base(slug, engagement), "rules"] as const,
+  missing: (slug: string, engagement: string) =>
+    [...base(slug, engagement), "missing"] as const,
 };
 
 /**
@@ -87,6 +90,50 @@ export const accountMemoryService = {
       "DELETE",
       `${eng(engagement)}/account-rules/${encodeURIComponent(ruleKey)}`,
     );
+  },
+  /** Applied codes the active plan lacks (#319): accounts to open in Luca. */
+  missing(slug: string, engagement: string) {
+    return tenantRequest<{ items: MissingPlanAccount[] }>(
+      slug,
+      "GET",
+      `${eng(engagement)}/account-plan/missing`,
+    );
+  },
+  /** Downloads the missing-account template (.xlsx) for Luca. */
+  async downloadMissingTemplate(
+    slug: string,
+    engagement: string,
+    accounts: MissingPlanAccount[],
+  ) {
+    const root = apiConfig.baseUrl.replace(/\/$/, "");
+    const response = await fetch(
+      `${root}${eng(engagement)}/account-plan/missing-template`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          [ORGANIZATION_HEADER]: slug,
+        },
+        body: JSON.stringify({
+          accounts: accounts.map((a) => ({ code: a.code, name: a.name })),
+        }),
+      },
+    );
+    if (!response.ok) {
+      const payload = await response.json().catch(() => undefined);
+      return unwrap<never>({ data: payload, response });
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "eksik-hesaplar.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   },
   rules(slug: string, engagement: string) {
     return tenantRequest<{ items: AccountRule[] }>(

@@ -6,6 +6,7 @@ import {
   accountMemoryKeys,
   accountMemoryService,
   type AccountRulePromoteInput,
+  type MissingPlanAccount,
 } from "../services/account-memory.service";
 import { reviewKeys } from "../services/review.service";
 
@@ -33,6 +34,14 @@ export function useEngagementRules(slug: string, engagement: string) {
   });
 }
 
+export function useMissingPlanAccounts(slug: string, engagement: string) {
+  return useQuery({
+    queryKey: accountMemoryKeys.missing(slug, engagement),
+    queryFn: () => accountMemoryService.missing(slug, engagement),
+    enabled: !!engagement,
+  });
+}
+
 export function useAccountMemoryActions(slug: string, engagement: string) {
   const qc = useQueryClient();
   const refresh = () => {
@@ -51,6 +60,14 @@ export function useAccountMemoryActions(slug: string, engagement: string) {
       mutationFn: (ruleKey: string) =>
         accountMemoryService.retireRule(slug, engagement, ruleKey),
       onSuccess: refresh,
+    }),
+    downloadTemplate: useMutation({
+      mutationFn: (accounts: MissingPlanAccount[]) =>
+        accountMemoryService.downloadMissingTemplate(
+          slug,
+          engagement,
+          accounts,
+        ),
     }),
     promote: useMutation({
       mutationFn: (input: AccountRulePromoteInput) =>

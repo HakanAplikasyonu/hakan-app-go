@@ -43,6 +43,7 @@ document_tasks engagement
 document_task_uploads engagement
 account_rules
 account_assignments engagement
+counterparty_accounts engagement
 vat_carry_forwards engagement
 desktop_agents
 organization_billing

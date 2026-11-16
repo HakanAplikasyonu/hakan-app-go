@@ -45,7 +45,10 @@ var (
 	confHistoryN  = decimal.RequireFromString("0.8500")
 	confCariNew   = decimal.RequireFromString("0.7000")
 	confCariFound = decimal.RequireFromString("0.9000")
-	one           = decimal.NewFromInt(1)
+	// The accountant confirmed this VKN → cari before (#319): applied
+	// without asking (above the review queue's auto-accept threshold).
+	confCariMemory = decimal.RequireFromString("0.9700")
+	one            = decimal.NewFromInt(1)
 )
 
 func refFor(id int64, version int) string { return fmt.Sprintf("account_rule:%d@v%d", id, version) }
@@ -180,6 +183,7 @@ func (s *Service) SuggestInvoice(ctx context.Context, sub Subject, invoiceUUID u
 		}
 	}
 	var out []SuggestionView
+	plans := map[string][]engine.PlanAccount{}
 	for _, l := range inv.Lines {
 		x := engine.Context{
 			Direction: inv.Direction, InvoiceType: inv.Type, CounterpartyTaxID: firstNonEmpty(inv.TaxNumber, inv.IdentityNumber),
@@ -195,6 +199,9 @@ func (s *Service) SuggestInvoice(ctx context.Context, sub Subject, invoiceUUID u
 		}
 		if l.TaxRate.IsPositive() && done[l.ID][FieldVATAccount] == "" {
 			if a, ok := engine.Pick(rules, engine.RoleVAT, x); ok {
+				if a, err = s.vatSubAccount(ctx, sub, plans, a, l.TaxRate); err != nil {
+					return nil, err
+				}
 				v, err := s.submit(ctx, sub, inv, &l, TargetItem, l.ID, FieldVATAccount, a, cpKey, nil)
 				if err != nil {
 					return nil, err
@@ -230,6 +237,54 @@ func (s *Service) SuggestInvoice(ctx context.Context, sub Subject, invoiceUUID u
 	return out, nil
 }
 
+// AutoResult is what AutoSuggest did.
+type AutoResult struct {
+	Invoices    int `json:"invoices"`
+	Suggestions int `json:"suggestions"`
+	// Applied: suggestions above the review queue's auto-accept threshold
+	// (a rule the accountant made, a remembered cari): applied without
+	// entering the queue.
+	Applied int `json:"applied"`
+	// Skipped: the engagement has no plan and no rule yet.
+	Skipped bool `json:"skipped"`
+}
+
+// AutoSuggest proposes account codes for newly stored invoices (#319): the
+// UBL upload job calls it through the queue once the invoices are written.
+// It runs only for engagements with an imported plan or an active rule;
+// suggestions confident enough (a promoted rule, a remembered cari) are
+// applied by the review queue right away, the rest wait there. An invoice
+// that is gone (deleted, other taxpayer) is skipped. "Hesap kodu öner"
+// (SuggestInvoice) stays for a manual re-run.
+func (s *Service) AutoSuggest(ctx context.Context, sub Subject, invoices []uuid.UUID) (AutoResult, error) {
+	var res AutoResult
+	ok, err := s.store.HasMemory(ctx, sub)
+	if err != nil {
+		return res, err
+	}
+	if !ok {
+		res.Skipped = true
+		return res, nil
+	}
+	for _, id := range invoices {
+		views, err := s.SuggestInvoice(ctx, sub, id)
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return res, fmt.Errorf("suggest invoice %s: %w", id, err)
+		}
+		res.Invoices++
+		res.Suggestions += len(views)
+		for _, v := range views {
+			if v.Status == string(reviewusecase.StatusAutoAccepted) {
+				res.Applied++
+			}
+		}
+	}
+	return res, nil
+}
+
 // lineAssignment: engagement rule > counterparty history > platform default.
 func lineAssignment(rules []engine.Rule, x engine.Context, history []HistoryRow) engine.Assignment {
 	if a, ok := engine.Pick(rules, engine.RoleLine, x); ok && a.RuleID != 0 {
@@ -250,25 +305,61 @@ func lineAssignment(rules []engine.Rule, x engine.Context, history []HistoryRow)
 	return a
 }
 
+// vatSubAccount moves a VAT account to the plan's sub-account for the
+// line's rate (#319): "191" → "191.01 İNDİRİLECEK KDV %20". With no plan,
+// no sub-accounts or no unique rate match the code stays as picked.
+func (s *Service) vatSubAccount(ctx context.Context, sub Subject, plans map[string][]engine.PlanAccount, a engine.Assignment, rate decimal.Decimal) (engine.Assignment, error) {
+	if len(a.AccountCode) < 3 {
+		return a, nil
+	}
+	main := a.AccountCode[:3]
+	plan, ok := plans[main]
+	if !ok {
+		var err error
+		if plan, err = s.store.PlanUnder(ctx, sub, main); err != nil {
+			return a, err
+		}
+		plans[main] = plan
+	}
+	if p, ok := engine.VATSubAccount(a.AccountCode, rate, plan); ok {
+		a.Rationale += fmt.Sprintf("; hesap planında %%%s oranlı alt hesap: %s %s", rate.String(), p.Code, p.Name)
+		a.AccountCode = p.Code
+	}
+	return a, nil
+}
+
 var errNoCounterpartyMain = errors.New("accountrules: no cari main account for this invoice direction")
 
 func (s *Service) counterpartyAssignment(ctx context.Context, sub Subject, rules []engine.Rule, inv Invoice) (engine.Assignment, map[string]any, error) {
 	x := engine.Context{Direction: inv.Direction, InvoiceType: inv.Type,
 		CounterpartyTaxID: firstNonEmpty(inv.TaxNumber, inv.IdentityNumber), CounterpartyName: inv.CustomerName}
 	a, _ := engine.Pick(rules, engine.RoleCounterparty, x)
-	if a.RuleID != 0 {
+	// Order (#319): the engagement's own cari rule > the cari the accountant
+	// confirmed for this VKN > an office template rule > the plan account
+	// with the same name > a new account.
+	if a.RuleID != 0 && a.Tier == 0 {
 		return a, nil, nil
 	}
-	// Platform default gives the main account (120 / 320); find or open the
-	// cari sub-account in the target plan (#30).
-	main := a.AccountCode
-	if len(main) > 3 {
-		main = main[:3]
-	}
+	main := mainOf(rules, x)
 	if main == "" {
 		// No default for this direction (neither incoming nor outgoing):
 		// proposing ".01.001" would be nonsense; leave the cari to the office.
 		return a, nil, errNoCounterpartyMain
+	}
+	if taxID := x.CounterpartyTaxID; taxID != "" {
+		code, name, ok, err := s.store.CounterpartyAccount(ctx, sub, taxID, main)
+		if err != nil {
+			return a, nil, err
+		}
+		if ok {
+			return engine.Assignment{Role: engine.RoleCounterparty, AccountCode: code, Confidence: confCariMemory,
+					RuleRef:   "memory:counterparty_tax_id",
+					Rationale: fmt.Sprintf("Bu VKN (%s) için daha önce onaylanan cari hesap: %s %s", taxID, code, name)},
+				map[string]any{"open_new": false, "account_name": name}, nil
+		}
+	}
+	if a.RuleID != 0 {
+		return a, nil, nil
 	}
 	plan, err := s.store.PlanUnder(ctx, sub, main)
 	if err != nil {
@@ -289,6 +380,22 @@ func (s *Service) counterpartyAssignment(ctx context.Context, sub Subject, rules
 		RuleRef: "global:counterparty_open", Rationale: why}, extra, nil
 }
 
+// mainOf is the cari main account (120 / 320) of the platform default for
+// the invoice direction.
+func mainOf(rules []engine.Rule, x engine.Context) string {
+	var defaults []engine.Rule
+	for _, r := range rules {
+		if r.ID == 0 {
+			defaults = append(defaults, r)
+		}
+	}
+	a, _ := engine.Pick(defaults, engine.RoleCounterparty, x)
+	if len(a.AccountCode) > 3 {
+		return a.AccountCode[:3]
+	}
+	return a.AccountCode
+}
+
 func (s *Service) submit(ctx context.Context, sub Subject, inv Invoice, l *InvoiceLine, targetType string, targetID int64,
 	field string, a engine.Assignment, cpKey string, extra map[string]any) (SuggestionView, error) {
 	value := map[string]any{"account_code": a.AccountCode}
@@ -302,6 +409,9 @@ func (s *Service) submit(ctx context.Context, sub Subject, inv Invoice, l *Invoi
 	inputs := map[string]any{
 		"invoice_uuid": inv.UUID.String(), "direction": inv.Direction, "invoice_type": inv.Type,
 		"counterparty_key": cpKey, "counterparty_name": inv.CustomerName, "matched": a.Matched,
+	}
+	if t := firstNonEmpty(inv.TaxNumber, inv.IdentityNumber); t != "" {
+		inputs["counterparty_tax_id"] = t
 	}
 	if a.RuleID != 0 {
 		inputs["rule_id"] = a.RuleID

@@ -19,9 +19,12 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
-// Mizan hafızası uçtan uca (#310): gerçek Postgres ve gerçek HTTP katmanıyla,
-// Luca mizanı içe aktarma → öneri → düzeltme → kural adayı → terfi → ikinci
-// ayda otomatik kodlama → Luca çıktısında plan denetimi.
+// Mizan hafızası uçtan uca (#310, #319): gerçek Postgres ve gerçek HTTP
+// katmanıyla, Luca mizanı içe aktarma → yükleme sonrası kendiliğinden öneri
+// (KDV alt hesabı, unvanla cari) → cari onayı (VKN ile hatırlanır) →
+// düzeltme → kural adayı → terfi (şablon kuralından önce gelir) → ikinci
+// ayda yalnızca yükleme ile otomatik kodlama → Luca çıktısında plan denetimi
+// (normalize kod, ana hesap reddi).
 //
 // Fikstürler: testdata/mizan (go run testdata/mizan/generate.go). Mükellef
 // Oğuz Gıda; Korkmaz Gıda planda 120.01.006, Deniz Ambalaj planda
@@ -161,6 +164,78 @@ func (m *mizanEnv) suggest(t *testing.T, number string) []suggestion {
 	return out.Items
 }
 
+// stored returns the live (not superseded) suggestions of an invoice, as
+// the automatic run after the upload left them.
+func (m *mizanEnv) stored(t *testing.T, number string) []suggestion {
+	t.Helper()
+	inv := m.invoiceUUID(t, number)
+	var out []suggestion
+	if err := rls.System(context.Background(), m.d.Pool, "test: mizan suggestions", func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
+			SELECT uuid::text, target_type, target_field, COALESCE((inputs->>'line_no')::int, 0),
+			       proposed_value->>'account_code', confidence::text, status, COALESCE(rule_ref, ''),
+			       (proposed_value->>'open_new')::boolean, COALESCE(proposed_value->>'account_name', '')
+			FROM suggestions
+			WHERE kind = 'account_code' AND inputs->>'invoice_uuid' = $1 AND status <> 'superseded'
+			ORDER BY id`, inv)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var s suggestion
+			if err := rows.Scan(&s.UUID, &s.TargetType, &s.TargetField, &s.LineNo, &s.AccountCode, &s.Confidence,
+				&s.Status, &s.RuleRef, &s.OpenNew, &s.AccountName); err != nil {
+				return err
+			}
+			out = append(out, s)
+		}
+		return rows.Err()
+	}); err != nil {
+		t.Fatalf("suggestions of %s: %v", number, err)
+	}
+	return out
+}
+
+// counterpartyMemory is VKN → remembered cari of the Oğuz engagement.
+func (m *mizanEnv) counterpartyMemory(t *testing.T) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	if err := rls.System(context.Background(), m.d.Pool, "test: mizan cari memory", func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT c.counterparty_tax_id, c.account_code FROM counterparty_accounts c
+			JOIN engagements e ON e.id = c.engagement_id WHERE e.uuid = $1`, m.eng)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var k, v string
+			if err := rows.Scan(&k, &v); err != nil {
+				return err
+			}
+			out[k] = v
+		}
+		return rows.Err()
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// forgetCustomerAssignment drops the cari code of a customer record, as when
+// the record is re-created.
+func (m *mizanEnv) forgetCustomerAssignment(t *testing.T, vkn string) {
+	t.Helper()
+	if err := rls.System(context.Background(), m.d.Pool, "test: mizan forget cari", func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `DELETE FROM account_assignments a USING customers c, engagements e
+			WHERE a.target_type = 'customer' AND a.target_id = c.id AND c.tax_number = $1
+			  AND a.engagement_id = e.id AND e.uuid = $2`, vkn, m.eng)
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func pick(items []suggestion, targetType, field string) []suggestion {
 	var out []suggestion
 	for _, s := range items {
@@ -191,29 +266,44 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 		}
 	}
 
-	// 2. İlk ay faturaları.
+	// 2. İlk ay faturaları: yükleme bitince öneriler kendiliğinden üretilir
+	// (#319); "Hesap kodu öner"e basılmaz.
 	for _, f := range []string{"2026-10-korkmaz-satis.xml", "2026-10-deniz-alis.xml", "2026-10-yeni-lojistik-alis.xml"} {
 		if code := m.upload(t, m.base()+"/ubl-uploads", "ubl/"+f, nil); code != http.StatusAccepted {
 			t.Fatalf("upload %s: %d", f, code)
 		}
 	}
 
-	// Planda olan cari: mevcut hesap önerilir.
-	korkmaz := pick(m.suggest(t, "OGZ2026000001001"), "customer", "account_code")
-	if len(korkmaz) != 1 || korkmaz[0].AccountCode != "120.01.006" || korkmaz[0].OpenNew == nil || *korkmaz[0].OpenNew {
-		t.Fatalf("Korkmaz cari önerisi = %+v, want 120.01.006 without open_new", korkmaz)
+	// Planda olan cari: mevcut hesap önerilir (unvan eşleşmesi: mizanda
+	// "KORKMAZ GIDA SAN. VE TİC. A.Ş.").
+	korkmaz := pick(m.stored(t, "OGZ2026000001001"), "customer", "account_code")
+	if len(korkmaz) != 1 || korkmaz[0].AccountCode != "120.01.006" || korkmaz[0].Status != "pending" ||
+		korkmaz[0].OpenNew == nil || *korkmaz[0].OpenNew {
+		t.Fatalf("Korkmaz cari önerisi = %+v, want pending 120.01.006 without open_new", korkmaz)
+	}
+	// Satış KDV'si %1: plandaki 391.03 "HESAPLANAN KDV %1" alt hesabı.
+	for _, v := range pick(m.stored(t, "OGZ2026000001001"), "invoice_item", "vat_account_code") {
+		if v.AccountCode != "391.03" {
+			t.Fatalf("Korkmaz KDV hesabı = %+v, want 391.03", v)
+		}
 	}
 	// Planda olmayan cari: sıradaki boş kod, "açılmalı".
-	yeni := pick(m.suggest(t, "YNL2026000000318"), "customer", "account_code")
+	yeni := pick(m.stored(t, "YNL2026000000318"), "customer", "account_code")
 	if len(yeni) != 1 || yeni[0].AccountCode != "320.01.007" || yeni[0].OpenNew == nil || !*yeni[0].OpenNew ||
 		yeni[0].AccountName != "Yeni Lojistik Taşımacılık A.Ş." {
 		t.Fatalf("Yeni Lojistik cari önerisi = %+v, want 320.01.007 open_new", yeni)
 	}
 
 	// 3. Deniz Ambalaj kalemleri varsayılan 153'e düşer; müşavir 150.01'e düzeltir.
-	deniz := m.suggest(t, "DNZ2026000004521")
-	if c := pick(deniz, "customer", "account_code"); len(c) != 1 || c[0].AccountCode != "320.01.002" {
-		t.Fatalf("Deniz cari önerisi = %+v, want 320.01.002", c)
+	deniz := m.stored(t, "DNZ2026000004521")
+	denizCari := pick(deniz, "customer", "account_code")
+	if len(denizCari) != 1 || denizCari[0].AccountCode != "320.01.002" {
+		t.Fatalf("Deniz cari önerisi = %+v, want 320.01.002", denizCari)
+	}
+	for _, v := range pick(deniz, "invoice_item", "vat_account_code") {
+		if v.AccountCode != "191.01" {
+			t.Fatalf("Deniz KDV hesabı = %+v, want 191.01 (%%20)", v)
+		}
 	}
 	lines := pick(deniz, "invoice_item", "account_code")
 	if len(lines) != 3 {
@@ -223,6 +313,22 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 		if s.AccountCode != "153" || s.Status != "pending" {
 			t.Fatalf("Deniz kalem önerisi = %+v, want pending 153", s)
 		}
+	}
+	// Müşavir carileri onaylar; Yeni Lojistik'i Luca'da 320.01.099 koduyla
+	// açtığı için düzeltir. Kararlar VKN ile hatırlanır (#319).
+	for _, c := range []suggestion{korkmaz[0], denizCari[0]} {
+		var dto map[string]any
+		if code := m.api(t, http.MethodPost, m.base()+"/suggestions/"+c.UUID+"/accept", map[string]any{"reason": "cari doğru"}, &dto); code != http.StatusOK {
+			t.Fatalf("accept cari %s: %d", c.AccountCode, code)
+		}
+	}
+	if code := m.api(t, http.MethodPost, m.base()+"/suggestions/"+yeni[0].UUID+"/correct", map[string]any{
+		"reason": "Luca'da açılan kod", "value": map[string]any{"account_code": "320.01.099"},
+	}, nil); code != http.StatusOK {
+		t.Fatalf("correct Yeni cari: %d", code)
+	}
+	if mem := m.counterpartyMemory(t); mem[korkmazVKN] != "120.01.006" || mem[denizVKN] != "320.01.002" || mem[yeniVKN] != "320.01.099" {
+		t.Fatalf("cari hafızası = %v", mem)
 	}
 	candidates := func() []map[string]any {
 		var out struct {
@@ -268,14 +374,27 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 	if left := candidates(); len(left) != 0 {
 		t.Fatalf("terfiden sonra aday kaldı: %v", left)
 	}
+	// Ofis şablonunda daha düşük öncelik numaralı genel bir alış kuralı olsa
+	// bile mükellefe terfi edilmiş kural kazanır (#319: mükellef > şablon).
+	if code := m.api(t, http.MethodPost, "/v1/tenant/account-rules", map[string]any{
+		"role": "line", "priority": 5, "name": "Şablon: alışlar genel gider", "conditions": map[string]any{"direction": "incoming"},
+		"account_code": "770.01", "confidence": "0.80",
+	}, nil); code != http.StatusCreated {
+		t.Fatalf("office template rule: %d", code)
+	}
+	if code := m.api(t, http.MethodPost, m.base()+"/account-rules/apply-template", map[string]any{}, nil); code != http.StatusOK {
+		t.Fatalf("apply template: %d", code)
+	}
 
-	// 6. İkinci ay: Deniz Ambalaj kalemleri soru sorulmadan 150.01.
+	// 6. İkinci ay: yalnızca yükleme. Deniz Ambalaj kalemleri ve bilinen
+	// cariler soru sorulmadan kodlanır.
 	for _, f := range []string{"2026-11-korkmaz-satis.xml", "2026-11-deniz-alis.xml", "2026-11-yeni-lojistik-alis.xml"} {
 		if code := m.upload(t, m.base()+"/ubl-uploads", "ubl/"+f, nil); code != http.StatusAccepted {
 			t.Fatalf("upload %s: %d", f, code)
 		}
 	}
-	auto := pick(m.suggest(t, "DNZ2026000004890"), "invoice_item", "account_code")
+	nov := m.stored(t, "DNZ2026000004890")
+	auto := pick(nov, "invoice_item", "account_code")
 	if len(auto) != 3 {
 		t.Fatalf("ikinci ay Deniz kalemleri = %+v, want 3", auto)
 	}
@@ -286,13 +405,27 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 		}
 		autoIDs[s.UUID] = true
 	}
+	// Cariler zaten kodlu: ikinci ayda cari için soru sorulmaz.
+	for _, n := range []string{"DNZ2026000004890", "OGZ2026000001044", "YNL2026000000402"} {
+		if cari := pick(m.stored(t, n), "customer", "account_code"); len(cari) != 0 {
+			t.Fatalf("%s cari yeniden soruldu: %+v", n, cari)
+		}
+	}
+	// Cari kaydı yeniden oluşursa (kaynakta silinip yeniden gelme, birleştirme)
+	// eşleme VKN ile bulunur ve sorulmadan uygulanır; unvan eşleşmesi
+	// (planda yok → "açılmalı 320.01.007") devreye girmez.
+	m.forgetCustomerAssignment(t, yeniVKN)
+	cari := pick(m.suggest(t, "YNL2026000000402"), "customer", "account_code")
+	if len(cari) != 1 || cari[0].AccountCode != "320.01.099" || cari[0].Status != "auto_accepted" || cari[0].RuleRef != "memory:counterparty_tax_id" {
+		t.Fatalf("Yeni Lojistik cari = %+v, want auto_accepted 320.01.099 from the VKN memory", cari)
+	}
 	// İnceleme kuyruğuna düşmez.
 	var queue struct {
 		Items []struct {
 			UUID string `json:"uuid"`
 		} `json:"items"`
 	}
-	if code := m.api(t, http.MethodGet, m.base()+"/suggestions?limit=200", nil, &queue); code != http.StatusOK {
+	if code := m.api(t, http.MethodGet, m.base()+"/suggestions?limit=100", nil, &queue); code != http.StatusOK {
 		t.Fatalf("queue: %d", code)
 	}
 	for _, q := range queue.Items {
@@ -300,11 +433,16 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 			t.Fatalf("otomatik kodlanan kalem kuyrukta: %s", q.UUID)
 		}
 	}
-	// Kural başka firmanın kalemlerine dokunmaz.
-	for _, s := range pick(m.suggest(t, "YNL2026000000402"), "invoice_item", "account_code") {
-		if s.AccountCode == correctedTo || s.Status == "auto_accepted" {
-			t.Fatalf("Yeni Lojistik kalemi kurala takıldı: %+v", s)
+	// Mükellef kuralı başka firmanın kalemine dokunmaz; o kalem şablon
+	// kuralını alır ve kuyrukta bekler.
+	for _, s := range pick(m.stored(t, "YNL2026000000402"), "invoice_item", "account_code") {
+		if s.AccountCode != "770.01" || s.Status != "pending" {
+			t.Fatalf("Yeni Lojistik kalemi = %+v, want pending 770.01 (office template)", s)
 		}
+	}
+	// "Hesap kodu öner" elle yeniden üretim için kalır: kodlanmış alanlar atlanır.
+	if again := m.suggest(t, "DNZ2026000004890"); len(pick(again, "invoice_item", "account_code")) != 0 {
+		t.Fatalf("elle yeniden öneri kodlanmış kalemleri yeniden önerdi: %+v", again)
 	}
 
 	// 7. Luca çıktısı: plandaki kodlarla uyarı yok; planda olmayan kodla var.
@@ -354,6 +492,9 @@ func TestMizanMemoryEndToEnd(t *testing.T) {
 	if rec.Code != http.StatusUnprocessableEntity || !strings.Contains(body, "ACCOUNT_NOT_IN_TARGET_PLAN") || !strings.Contains(body, "320.01.007") {
 		t.Fatalf("Luca çıktısı (planda olmayan 320.01.007) = %d %s, want EXPORT_BLOCKED with ACCOUNT_NOT_IN_TARGET_PLAN", rec.Code, body)
 	}
-	_ = korkmazVKN
-	_ = yeniVKN
+	// 153 planda var ama alt hesabı (153.01) olan ana hesap: Luca ana hesaba
+	// fiş almaz, o satır da engellenir (#319).
+	if !strings.Contains(body, "group_account") || !strings.Contains(body, `\"account\":\"153\"`) {
+		t.Fatalf("Luca çıktısı: ana hesap 153 reddedilmedi: %s", body)
+	}
 }

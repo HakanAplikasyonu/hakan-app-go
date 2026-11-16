@@ -243,8 +243,12 @@ func (p *Postgres) History(ctx context.Context, s usecase.Subject, field, direct
 
 // PlanUnder implements usecase.Store.
 func (p *Postgres) PlanUnder(ctx context.Context, s usecase.Subject, mainCode string) ([]engine.PlanAccount, error) {
+	target, err := p.q.ActiveAccountPlanTarget(ctx, db.ActiveAccountPlanTargetParams{OrganizationID: s.OrganizationID, EngagementID: s.EngagementID})
+	if err != nil {
+		return nil, fmt.Errorf("plan target: %w", err)
+	}
 	rows, err := p.q.ListAccountPlanCodesUnder(ctx, db.ListAccountPlanCodesUnderParams{
-		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Target: "luca", MainCode: mainCode,
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Target: target, MainCode: mainCode,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("plan accounts: %w", err)
@@ -254,6 +258,20 @@ func (p *Postgres) PlanUnder(ctx context.Context, s usecase.Subject, mainCode st
 		out = append(out, engine.PlanAccount{Code: r.Code, Name: r.Name, IsLeaf: r.IsLeaf})
 	}
 	return out, nil
+}
+
+// CounterpartyAccount implements usecase.Store.
+func (p *Postgres) CounterpartyAccount(ctx context.Context, s usecase.Subject, taxID, mainCode string) (string, string, bool, error) {
+	row, err := p.q.GetCounterpartyAccount(ctx, db.GetCounterpartyAccountParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, CounterpartyTaxID: taxID, MainCode: mainCode,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", false, nil
+	}
+	if err != nil {
+		return "", "", false, fmt.Errorf("counterparty account: %w", err)
+	}
+	return row.AccountCode, row.AccountName, true, nil
 }
 
 // Assigned implements usecase.Store: target id → field → code.
@@ -291,4 +309,13 @@ func (p *Postgres) Candidates(ctx context.Context, s usecase.Subject, minCount i
 		})
 	}
 	return out, nil
+}
+
+// HasMemory implements usecase.Store.
+func (p *Postgres) HasMemory(ctx context.Context, s usecase.Subject) (bool, error) {
+	ok, err := p.q.EngagementHasAccountMemory(ctx, db.EngagementHasAccountMemoryParams{OrganizationID: s.OrganizationID, EngagementID: s.EngagementID})
+	if err != nil {
+		return false, fmt.Errorf("account memory: %w", err)
+	}
+	return ok, nil
 }

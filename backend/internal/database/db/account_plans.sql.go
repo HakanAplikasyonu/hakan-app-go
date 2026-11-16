@@ -347,3 +347,55 @@ func (q *Queries) ListAccountPlanImports(ctx context.Context, arg ListAccountPla
 	}
 	return items, nil
 }
+
+const listAssignedCodesMissingFromPlan = `-- name: ListAssignedCodesMissingFromPlan :many
+SELECT a.account_code::text AS code,
+       COALESCE(MAX(NULLIF(c.account_name, '')), MAX(s.proposed_value->>'account_name'), '')::text AS name,
+       COUNT(*)::bigint AS uses
+FROM account_assignments a
+LEFT JOIN counterparty_accounts c
+       ON c.organization_id = a.organization_id AND c.engagement_id = a.engagement_id AND c.account_code = a.account_code
+LEFT JOIN suggestions s ON s.organization_id = a.organization_id AND s.id = a.suggestion_id
+WHERE a.organization_id = $1 AND a.engagement_id = $2
+  AND NOT EXISTS (SELECT 1 FROM account_plan_accounts p
+                  WHERE p.organization_id = a.organization_id AND p.engagement_id = a.engagement_id
+                    AND p.target = $3 AND p.code = a.account_code)
+GROUP BY a.account_code
+ORDER BY a.account_code
+LIMIT 5000
+`
+
+type ListAssignedCodesMissingFromPlanParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Target         string `json:"target"`
+}
+
+type ListAssignedCodesMissingFromPlanRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+	Uses int64  `json:"uses"`
+}
+
+// "Açılmalı" hesaplar (#319): mükellefe uygulanmış ama etkin planda
+// olmayan hesap kodları; ad, cari hafızasından ya da önerinin önerdiği
+// addan. Eksik hesap şablonunu (Luca) besler.
+func (q *Queries) ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error) {
+	rows, err := q.db.Query(ctx, listAssignedCodesMissingFromPlan, arg.OrganizationID, arg.EngagementID, arg.Target)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAssignedCodesMissingFromPlanRow{}
+	for rows.Next() {
+		var i ListAssignedCodesMissingFromPlanRow
+		if err := rows.Scan(&i.Code, &i.Name, &i.Uses); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

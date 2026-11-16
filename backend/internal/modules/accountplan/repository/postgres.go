@@ -172,3 +172,18 @@ func fromImport(r db.AccountPlanImport) usecase.Import {
 		CreatedAt: r.CreatedAt.Time,
 	}
 }
+
+// MissingAssigned implements usecase.Store.
+func (p *Postgres) MissingAssigned(ctx context.Context, s usecase.Subject, target string) ([]usecase.MissingAccount, error) {
+	rows, err := p.q.ListAssignedCodesMissingFromPlan(ctx, db.ListAssignedCodesMissingFromPlanParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Target: target,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("missing accounts: %w", err)
+	}
+	out := make([]usecase.MissingAccount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.MissingAccount{Code: r.Code, Name: r.Name, Uses: r.Uses})
+	}
+	return out, nil
+}

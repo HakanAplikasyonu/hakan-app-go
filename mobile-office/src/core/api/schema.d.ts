@@ -6650,6 +6650,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/missing": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Applied account codes the active plan lacks
+         * @description Requires `tenant.account_plan.read`. Account codes the office applied for the engagement (accepted or auto-applied suggestions, e.g. a cari to open) that the active plan of `target` does not have (#319). They block the export until they are opened in the program and the plan is imported again; send them to `missing-template`. Empty with no plan loaded.
+         */
+        get: operations["listMissingPlanAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/account-plan/missing-template": {
         parameters: {
             query?: never;
@@ -11734,6 +11762,17 @@ export interface components {
                 [key: string]: string;
             };
         };
+        MissingPlanAccount: {
+            /** @example 320.01.007 */
+            code: string;
+            /** @example Yeni Lojistik Taşımacılık A.Ş. */
+            name: string;
+            /**
+             * Format: int64
+             * @description Applied codes (lines, cari) pointing at it
+             */
+            uses: number;
+        };
         AccountPlanImport: {
             /** Format: uuid */
             uuid: string;
@@ -11802,6 +11841,14 @@ export interface components {
                 missing: string[];
                 non_leaf: string[];
                 invalid: string[];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeMissingPlanAccounts: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["MissingPlanAccount"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -23230,6 +23277,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeAccountPlanCheck"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listMissingPlanAccounts: {
+        parameters: {
+            query?: {
+                target?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeMissingPlanAccounts"];
                 };
             };
             400: components["responses"]["BadRequest"];
