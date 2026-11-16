@@ -60,6 +60,7 @@ type Querier interface {
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
 	CountDocumentTasks(ctx context.Context, arg CountDocumentTasksParams) (int64, error)
+	CountEngagementInvoices(ctx context.Context, arg CountEngagementInvoicesParams) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
@@ -263,6 +264,7 @@ type Querier interface {
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
+	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
 	GetEntegratorDocument(ctx context.Context, arg GetEntegratorDocumentParams) (EntegratorDocument, error)
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
@@ -275,6 +277,7 @@ type Querier interface {
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice, error)
+	GetInvoiceAttachment(ctx context.Context, arg GetInvoiceAttachmentParams) (Attachment, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
 	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
@@ -501,6 +504,10 @@ type Querier interface {
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
+	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
+	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
+	// görür (engagement_document_visible, issue #8).
+	ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
 	ListEngagementVisibleInvoices(ctx context.Context, arg ListEngagementVisibleInvoicesParams) ([]ListEngagementVisibleInvoicesRow, error)
@@ -532,6 +539,8 @@ type Querier interface {
 	ListInvoiceMatchCandidates(ctx context.Context, arg ListInvoiceMatchCandidatesParams) ([]ListInvoiceMatchCandidatesRow, error)
 	ListInvoiceSources(ctx context.Context, arg ListInvoiceSourcesParams) ([]InvoiceSource, error)
 	ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTaxSummariesParams) ([]InvoiceTaxSummary, error)
+	// Faturanın ve satırlarının bu engagement'taki uyarıları.
+	ListInvoiceWarnings(ctx context.Context, arg ListInvoiceWarningsParams) ([]DataWarning, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
 	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
 	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)

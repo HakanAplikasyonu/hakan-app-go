@@ -177,7 +177,11 @@ function ReviewRow({
               <span>·</span>
               <Link
                 className="hover:underline"
-                href={routes.tenant.invoice(slug, ctx.invoiceUuid)}
+                href={routes.tenant.invoice(
+                  slug,
+                  ctx.invoiceUuid,
+                  s.engagement_uuid ?? undefined,
+                )}
               >
                 {ctx.lineNo
                   ? t("office.review_api.invoice_line", { line: ctx.lineNo })

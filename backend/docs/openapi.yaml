@@ -6918,6 +6918,84 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Invoices]
+      operationId: listEngagementInvoices
+      summary: Invoices of the engagement's taxpayer (office panel)
+      description: |
+        Requires `tenant.invoices.read` and engagement access. Only invoices the
+        office may see are listed: its own period plus whatever the taxpayer
+        shared from before it (issue #8). Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: direction, in: query, required: false, schema: { type: string, enum: [outgoing, incoming] } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Invoice page
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoicePage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Invoices]
+      operationId: getEngagementInvoice
+      summary: One invoice with lines, KDV summary, sources and warnings
+      description: Requires `tenant.invoices.read` and engagement access. 404 when the office may not see the invoice.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/ubl:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Invoices]
+      operationId: getEngagementInvoiceUBL
+      summary: The stored UBL-TR XML of the invoice (for the preview)
+      description: Requires `tenant.invoices.read` and engagement access. 404 when no UBL is stored.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: UBL-TR XML
+          content:
+            application/xml:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-matching:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -13008,6 +13086,64 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EngagementDocumentList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    OfficeInvoice:
+      allOf:
+        - $ref: "#/components/schemas/TaxpayerInvoice"
+        - type: object
+          required: [open_warnings]
+          properties:
+            open_warnings: { type: integer, format: int64, description: Open data warnings on the invoice in this engagement }
+
+    OfficeInvoicePage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OfficeInvoice" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    OfficeInvoiceWarning:
+      type: object
+      required: [uuid, entity_type, code, severity, status, params, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        entity_type: { type: string, enum: [invoice, invoice_item] }
+        code: { type: string, example: TAX_TOTAL_MISMATCH }
+        severity: { $ref: "#/components/schemas/WarningSeverity" }
+        status: { type: string, enum: [open, acknowledged, resolved, auto_resolved] }
+        params: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+
+    OfficeInvoiceDetail:
+      allOf:
+        - $ref: "#/components/schemas/TaxpayerInvoiceDetail"
+        - type: object
+          required: [has_ubl, warnings]
+          properties:
+            has_ubl: { type: boolean, description: "A UBL-TR XML is stored (GET .../ubl)" }
+            warnings:
+              type: array
+              items: { $ref: "#/components/schemas/OfficeInvoiceWarning" }
+
+    EnvelopeOfficeInvoicePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeInvoicePage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeOfficeInvoiceDetail:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeInvoiceDetail" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TaxpayerInvoice:

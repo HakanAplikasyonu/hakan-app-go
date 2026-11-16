@@ -4951,6 +4951,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Invoices of the engagement's taxpayer (office panel)
+         * @description Requires `tenant.invoices.read` and engagement access. Only invoices the
+         *     office may see are listed: its own period plus whatever the taxpayer
+         *     shared from before it (issue #8). Newest first.
+         */
+        get: operations["listEngagementInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One invoice with lines, KDV summary, sources and warnings
+         * @description Requires `tenant.invoices.read` and engagement access. 404 when the office may not see the invoice.
+         */
+        get: operations["getEngagementInvoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/ubl": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The stored UBL-TR XML of the invoice (for the preview)
+         * @description Requires `tenant.invoices.read` and engagement access. 404 when no UBL is stored.
+         */
+        get: operations["getEngagementInvoiceUBL"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-matching": {
         parameters: {
             query?: never;
@@ -9676,6 +9764,55 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["EngagementDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        OfficeInvoice: components["schemas"]["TaxpayerInvoice"] & {
+            /**
+             * Format: int64
+             * @description Open data warnings on the invoice in this engagement
+             */
+            open_warnings: number;
+        };
+        OfficeInvoicePage: {
+            items: components["schemas"]["OfficeInvoice"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        OfficeInvoiceWarning: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            entity_type: "invoice" | "invoice_item";
+            /** @example TAX_TOTAL_MISMATCH */
+            code: string;
+            severity: components["schemas"]["WarningSeverity"];
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved" | "auto_resolved";
+            params: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        OfficeInvoiceDetail: components["schemas"]["TaxpayerInvoiceDetail"] & {
+            /** @description A UBL-TR XML is stored (GET .../ubl) */
+            has_ubl: boolean;
+            warnings: components["schemas"]["OfficeInvoiceWarning"][];
+        };
+        EnvelopeOfficeInvoicePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeInvoicePage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeOfficeInvoiceDetail: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeInvoiceDetail"];
             meta: components["schemas"]["ResponseMeta"];
         };
         TaxpayerInvoice: {
@@ -18824,6 +18961,109 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeUBLUploadJob"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementInvoices: {
+        parameters: {
+            query?: {
+                period?: string;
+                direction?: "outgoing" | "incoming";
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoice page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoicePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementInvoiceUBL: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description UBL-TR XML */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": string;
                 };
             };
             401: components["responses"]["Unauthenticated"];

@@ -7,29 +7,40 @@ import { Suspense } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-import { sum } from "../lib/decimal";
-import { useOffice } from "../hooks/use-office";
-import type { Invoice } from "../types";
-import {
-  DemoNotice,
-  FilterSelect,
-  Figure,
-  InvoiceStatusBadge,
-  Money,
-  OfficeDataGate,
-  Panel,
-  TableBox,
-} from "./office-ui";
+import { useEngagementInvoices } from "../hooks/use-office-invoices";
+import { directionOf } from "../lib/from-api";
+import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
 
-type Dir = "all" | Invoice["direction"];
-type St = "all" | Invoice["status"];
+type Dir = "all" | "outgoing" | "incoming";
+const PAGE = 50;
 
-export function vatOf(inv: Invoice) {
-  return sum(inv.taxes.filter((t) => t.code === "0015").map((t) => t.amount));
+const stateClass: Record<string, string> = {
+  active: "bg-status-approved/12 text-status-approved",
+  draft: "bg-secondary text-secondary-foreground",
+  cancelled: "bg-status-blocking/12 text-status-blocking",
+};
+
+/** status_normalized of the invoice (30 §8): counts in the declaration or not. */
+export function InvoiceStateBadge({ status }: { status: string }) {
+  const { t } = useLocale();
+  return (
+    <span
+      className={cn(
+        "rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        stateClass[status] ?? stateClass.draft,
+      )}
+    >
+      {t(`office.api.invoice_state_${status}`)}
+    </span>
+  );
 }
 
 function InvoicesInner() {
@@ -38,56 +49,69 @@ function InvoicesInner() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const taxpayers = useOffice((s) => s.taxpayers);
-  const invoices = useOffice((s) => s.invoices);
-  const warnings = useOffice((s) => s.warnings);
+  const { options, selected, select, isLoading, isError } =
+    useSelectedEngagement(slug);
+  const engagement = selected?.engagement ?? "";
 
-  const taxpayer = params.get("taxpayer") ?? "all";
   const direction = (params.get("direction") ?? "all") as Dir;
-  const status = (params.get("status") ?? "all") as St;
+  const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params);
-    if (value === "all") next.delete(key);
+    if (value === "all" || value === "0") next.delete(key);
     else next.set(key, value);
+    if (key !== "offset") next.delete("offset");
     router.replace(`${pathname}?${next.toString()}`);
   };
-
-  const rows = invoices
-    .filter((i) => taxpayer === "all" || i.taxpayerId === taxpayer)
-    .filter((i) => direction === "all" || i.direction === direction)
-    .filter((i) => status === "all" || i.status === status)
-    .sort(
-      (a, b) =>
-        b.issueDate.localeCompare(a.issueDate) ||
-        b.number.localeCompare(a.number),
-    );
-
-  const tpName = (id: string) =>
-    taxpayers.find((x) => x.id === id)?.title ?? "";
-  const openWarnings = (id: string) =>
-    warnings.filter((w) => w.entityId === id && w.status === "open");
+  const list = useEngagementInvoices(slug, engagement, {
+    direction: direction === "all" ? undefined : direction,
+    limit: PAGE,
+    offset,
+  });
   const fmtDate = (d: string) =>
     new Date(`${d}T00:00:00`).toLocaleDateString(
       locale === "tr" ? "tr-TR" : "en-GB",
     );
 
+  const header = (
+    <PageHeader
+      title={t("office.invoices_title")}
+      description={t("office.invoices_description")}
+      icon={<FileText className="size-6" />}
+    />
+  );
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+  if (isError || options.length === 0) {
+    return (
+      <div className="space-y-4">
+        {header}
+        <EmptyState
+          title={
+            isError
+              ? t("office.api.load_error")
+              : t("office.api.no_engagements")
+          }
+        />
+      </div>
+    );
+  }
+
+  const rows = list.data?.items ?? [];
+  const total = list.data?.total ?? 0;
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={t("office.invoices_title")}
-        description={t("office.invoices_description")}
-        icon={<FileText className="size-6" />}
-      />
-      <DemoNotice />
+      {header}
       <div className="flex flex-wrap gap-3">
-        <FilterSelect
-          label={t("office.col_taxpayer")}
-          value={taxpayer}
-          onChange={(v) => setParam("taxpayer", v)}
-          options={[
-            { value: "all", label: t("office.filter_all") },
-            ...taxpayers.map((x) => ({ value: x.id, label: x.title })),
-          ]}
+        <EngagementPicker
+          options={options}
+          selected={selected}
+          onSelect={select}
         />
         <FilterSelect<Dir>
           label={t("office.col_direction")}
@@ -95,23 +119,17 @@ function InvoicesInner() {
           onChange={(v) => setParam("direction", v)}
           options={[
             { value: "all", label: t("office.filter_all") },
-            { value: "sales", label: t("office.direction_sales") },
-            { value: "purchase", label: t("office.direction_purchase") },
-          ]}
-        />
-        <FilterSelect<St>
-          label={t("office.col_status")}
-          value={status}
-          onChange={(v) => setParam("status", v)}
-          options={[
-            { value: "all", label: t("office.filter_all") },
-            { value: "in_review", label: t("office.invoice_status_in_review") },
-            { value: "approved", label: t("office.invoice_status_approved") },
+            { value: "outgoing", label: t("office.direction_sales") },
+            { value: "incoming", label: t("office.direction_purchase") },
           ]}
         />
       </div>
       <Panel>
-        {rows.length === 0 ? (
+        {list.isLoading ? (
+          <Skeleton className="m-4 h-40" />
+        ) : list.isError ? (
+          <EmptyState className="m-4" title={t("office.api.load_error")} />
+        ) : rows.length === 0 ? (
           <EmptyState className="m-4" title={t("office.invoices_empty")} />
         ) : (
           <TableBox>
@@ -129,78 +147,79 @@ function InvoicesInner() {
             </thead>
             <tbody>
               {rows.map((inv) => {
-                const ws = openWarnings(inv.id);
-                const blocker = ws.some((w) => w.severity === "blocker");
+                const dir = directionOf(inv.direction);
                 return (
-                  <tr key={inv.id} className="hover:bg-muted/40">
+                  <tr key={inv.uuid} className="hover:bg-muted/40">
                     <td className="whitespace-nowrap">
-                      <Figure>{fmtDate(inv.issueDate)}</Figure>
+                      <Figure>{fmtDate(inv.issue_date)}</Figure>
                     </td>
                     <td>
                       <div className="flex items-center gap-1.5">
                         <Link
-                          href={routes.tenant.invoice(slug, inv.id)}
+                          href={routes.tenant.invoice(
+                            slug,
+                            inv.uuid,
+                            engagement,
+                          )}
                           className="hover:underline"
                         >
-                          <Figure className="font-medium">{inv.number}</Figure>
+                          <Figure className="font-medium">
+                            {inv.invoice_number}
+                          </Figure>
                         </Link>
-                        {ws.length ? (
+                        {inv.open_warnings ? (
                           <span
-                            className={`inline-flex items-center gap-0.5 text-xs ${blocker ? "text-status-blocking" : "text-status-warning"}`}
+                            className="text-status-warning inline-flex items-center gap-0.5 text-xs"
                             title={t("office.open_warnings", {
-                              count: ws.length,
+                              count: inv.open_warnings,
                             })}
                           >
                             <TriangleAlert className="size-3.5" aria-hidden />
-                            <Figure>{ws.length}</Figure>
+                            <Figure>{inv.open_warnings}</Figure>
                           </span>
                         ) : null}
                       </div>
-                      {taxpayer === "all" ? (
-                        <div className="text-muted-foreground text-xs">
-                          {tpName(inv.taxpayerId)}
-                        </div>
-                      ) : null}
                     </td>
                     <td>
                       <div className="max-w-64 truncate">
-                        {inv.counterparty.title}
+                        {inv.counterparty_name ?? ""}
                       </div>
                       <Figure className="text-muted-foreground text-xs">
-                        {inv.counterparty.taxId}
+                        {inv.counterparty_tax_id ?? ""}
                       </Figure>
                     </td>
                     <td className="text-xs">
                       <span
                         className={
-                          inv.direction === "sales"
+                          dir === "sales"
                             ? "text-status-approved"
                             : "text-brand"
                         }
                       >
-                        {t(`office.direction_${inv.direction}`)}
+                        {t(`office.direction_${dir}`)}
                       </span>
                       <div className="text-muted-foreground">
-                        {inv.profile} · {inv.typeCode}
+                        {inv.profile ? `${inv.profile} · ` : ""}
+                        {inv.type}
                       </div>
                     </td>
                     <td className="text-right">
                       <Money
-                        value={inv.totals.taxExclusive}
+                        value={inv.tax_exclusive_amount}
                         currency={inv.currency}
                       />
                     </td>
                     <td className="text-right">
-                      <Money value={vatOf(inv)} currency={inv.currency} />
+                      <Money value={inv.tax_amount} currency={inv.currency} />
                     </td>
                     <td className="text-right font-medium">
                       <Money
-                        value={inv.totals.payable}
+                        value={inv.payable_amount}
                         currency={inv.currency}
                       />
                     </td>
                     <td>
-                      <InvoiceStatusBadge status={inv.status} />
+                      <InvoiceStateBadge status={inv.status} />
                     </td>
                   </tr>
                 );
@@ -209,16 +228,43 @@ function InvoicesInner() {
           </TableBox>
         )}
       </Panel>
+      {total > PAGE ? (
+        <div className="flex items-center justify-end gap-2 text-xs">
+          <span className="text-muted-foreground">
+            {t("office.api.page_of", {
+              from: offset + 1,
+              to: Math.min(offset + PAGE, total),
+              total,
+            })}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={offset === 0}
+            onClick={() =>
+              setParam("offset", String(Math.max(0, offset - PAGE)))
+            }
+          >
+            {t("office.api.prev")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={offset + PAGE >= total}
+            onClick={() => setParam("offset", String(offset + PAGE))}
+          >
+            {t("office.api.next")}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 export function InvoicesPage() {
   return (
-    <OfficeDataGate>
-      <Suspense>
-        <InvoicesInner />
-      </Suspense>
-    </OfficeDataGate>
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <InvoicesInner />
+    </Suspense>
   );
 }

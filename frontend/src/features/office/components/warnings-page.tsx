@@ -115,7 +115,7 @@ function WarningRow({
       <td>
         {w.entity_type === "invoice" && w.entity_uuid ? (
           <Link
-            href={routes.tenant.invoice(slug, w.entity_uuid)}
+            href={routes.tenant.invoice(slug, w.entity_uuid, w.engagement_uuid)}
             className="text-brand hover:underline"
           >
             {t("office.warnings_api.open_invoice")}
