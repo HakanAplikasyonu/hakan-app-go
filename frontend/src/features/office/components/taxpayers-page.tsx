@@ -205,7 +205,7 @@ export function TaxpayersPage() {
                     <td>
                       <Link
                         className="font-medium hover:underline"
-                        href={routes.tenant.engagementDocuments(
+                        href={routes.tenant.engagement(
                           slug,
                           r.engagement_uuid,
                         )}

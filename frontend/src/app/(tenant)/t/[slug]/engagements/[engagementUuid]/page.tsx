@@ -1,11 +1,9 @@
-import { redirect } from "next/navigation";
+import { EngagementOverviewPage } from "@/features/office";
 
-import { routes } from "@/config/routes";
+type Props = { params: Promise<{ engagementUuid: string }> };
 
-type Props = { params: Promise<{ slug: string; engagementUuid: string }> };
-
-/** `/t/{slug}/engagements/{uuid}`: the engagement opens on its documents. */
+/** `/t/{slug}/engagements/{uuid}`: mükellef özeti ve dönem şeridi (#329). */
 export default async function EngagementRoute({ params }: Props) {
-  const { slug, engagementUuid } = await params;
-  redirect(routes.tenant.engagementDocuments(slug, engagementUuid));
+  const { engagementUuid } = await params;
+  return <EngagementOverviewPage engagement={engagementUuid} />;
 }
