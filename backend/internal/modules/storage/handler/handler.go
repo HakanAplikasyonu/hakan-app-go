@@ -1,16 +1,20 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/model"
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/filetype"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/resourcemeta"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -21,6 +25,33 @@ type Handler struct {
 	// maxUploadBytes caps a single multipart upload request body. A
 	// non-positive value falls back to defaultMaxUploadBytes.
 	maxUploadBytes int64
+	// audit records refused uploads (security.upload_rejected); may be nil.
+	audit *activity.Recorder
+}
+
+// WithAudit records refused uploads in the activity log (#180).
+func (h *Handler) WithAudit(rec *activity.Recorder) *Handler {
+	h.audit = rec
+	return h
+}
+
+func (h *Handler) reportRejected(r *http.Request, filename string, cause error) {
+	if h.audit == nil {
+		return
+	}
+	reason := "blocked_type"
+	if errors.Is(cause, filetype.ErrMismatch) {
+		reason = "type_mismatch"
+	}
+	var actorID *int64
+	if p, ok := authctx.PrincipalFrom(r.Context()); ok && p.UserInternal != 0 {
+		id := p.UserInternal
+		actorID = &id
+	}
+	h.audit.Record(r.Context(), actorID, "security.upload_rejected", "storage", nil, map[string]any{
+		"reason":    reason,
+		"extension": strings.ToLower(path.Ext(filename)),
+	}, r)
 }
 
 // defaultMaxUploadBytes is used when no positive limit is configured.
@@ -147,13 +178,28 @@ func (h *Handler) Upload(w http.ResponseWriter, r *http.Request) {
 			"upload exceeds the maximum allowed size")
 		return
 	}
+	// The first bytes decide the type (#180): executables, scripts and HTML
+	// are refused, and an image/PDF claim must match the content.
+	head := make([]byte, filetype.SniffLen)
+	n, err := io.ReadFull(file, head)
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		response.BadRequest(w, r, response.CodeValidationError, "could not read the file")
+		return
+	}
+	head = head[:n]
+	contentType, err := filetype.Inspect(head, header.Filename, header.Header.Get("Content-Type"))
+	if err != nil {
+		h.reportRejected(r, header.Filename, err)
+		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE_TYPE", "this file type is not allowed")
+		return
+	}
 	obj, err := h.svc.Upload(r.Context(), actor(r), model.UploadMeta{
 		Prefix:      r.FormValue("prefix"),
 		Key:         r.FormValue("key"),
 		Filename:    header.Filename,
-		ContentType: header.Header.Get("Content-Type"),
+		ContentType: contentType,
 		Size:        header.Size,
-	}, file)
+	}, io.MultiReader(bytes.NewReader(head), file))
 	if err != nil {
 		writeErr(w, r, err)
 		return

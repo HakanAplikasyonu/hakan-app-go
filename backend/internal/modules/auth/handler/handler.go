@@ -105,16 +105,33 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSON(w, r, &in); err != nil {
 		return
 	}
+	ip := sessionMeta(r).IP
 	if h.limiter != nil {
-		ok, retry := h.limiter.AllowLogin(r.Context(), sessionMeta(r).IP, in.Email)
+		ok, retry := h.limiter.AllowLogin(r.Context(), ip, in.Email)
 		if h.writeRateLimited(w, r, ok, retry) {
+			return
+		}
+		// Progressive backoff (#180): after repeated failures the account
+		// (or the IP) waits longer and longer, whatever the password.
+		if locked, wait := h.limiter.LoginLocked(r.Context(), ip, in.Email); locked {
+			h.writeLoginLocked(w, r, ip, in.Email, wait)
 			return
 		}
 	}
 	tokens, err := h.uc.Login(r.Context(), in.Email, in.Password, in.TOTPCode, sessionMeta(r))
 	if err != nil {
+		if h.limiter != nil && (errors.Is(err, usecase.ErrInvalidCredentials) || errors.Is(err, usecase.ErrInvalidMFACode)) {
+			if lock := h.limiter.LoginFailed(r.Context(), ip, in.Email); lock > 0 {
+				h.limiter.Report(r, ratelimit.Event{
+					Kind: "login_locked", Action: "login", Email: ratelimit.MaskEmail(in.Email), IP: ip, Retry: lock,
+				}, "login|"+strings.ToLower(strings.TrimSpace(in.Email)))
+			}
+		}
 		writeUsecaseError(w, r, err)
 		return
+	}
+	if h.limiter != nil {
+		h.limiter.LoginSucceeded(r.Context(), in.Email)
 	}
 	response.JSON(w, r, http.StatusOK, tokens)
 }

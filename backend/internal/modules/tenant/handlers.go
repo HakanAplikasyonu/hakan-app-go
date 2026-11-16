@@ -375,6 +375,7 @@ func (h *Handler) allow(w http.ResponseWriter, r *http.Request, action, subject 
 	if ok {
 		return true
 	}
+	h.limiter.Report(r, ratelimit.Event{Kind: "rate_limited", Action: action, IP: clientip.From(r), Retry: retry}, action+"|"+subject)
 	if retry > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 	}

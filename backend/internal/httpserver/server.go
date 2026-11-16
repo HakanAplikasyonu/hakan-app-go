@@ -134,7 +134,6 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx/orgcache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
@@ -313,8 +312,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	s.oauthProvSvc = oauthProvSvc
 	s.authSettings = authSettingsSvc
 
+	// One limiter for the whole API (#180): the in-process store must be
+	// shared, and abuse events go to the activity log.
+	limiter := newRateLimiter(cfg, deps, activityRec)
 	h := authhandler.New(uc, oauthUC, githubSvc, oauthProvSvc, authSettingsSvc, cfg.Auth.AdapterSecret, stepUpSvc, activityRec)
-	h.SetRateLimiter(ratelimit.New(deps.Redis, cfg.App.Env))
+	h.SetRateLimiter(limiter)
 	loader := identity.Loader{UC: uc}
 	authmodule.RegisterRoutes(mux, h, tokens, loader, stepUpSvc)
 
@@ -341,7 +343,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		orgSvc.SetInvitations(orgRepo, notifSvc, orgusecase.InvitationConfig{
 			TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL,
 		}, log)
-		tenantHandler = tenantmodule.NewHandler(orgSvc, activityRec, ratelimit.New(deps.Redis, cfg.App.Env))
+		tenantHandler = tenantmodule.NewHandler(orgSvc, activityRec, limiter)
 		// /me lists memberships only when the /t shell exists: the frontend
 		// routes members into it, which would dead-end with tenancy off.
 		uc.SetOrganizationsLister(orgSvc)
@@ -352,14 +354,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			taxpayersmodule.InvitationConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
 		uc.SetTaxpayersLister(members)
 		taxpayerResolver = members
-		memberHandler = taxpayersmodule.NewMemberHandler(members, ratelimit.New(deps.Redis, cfg.App.Env))
+		memberHandler = taxpayersmodule.NewMemberHandler(members, limiter)
 		orgCache := orgcache.New(orgSvc, deps.Redis, cfg.Tenancy.CacheTTL, cfg.App.Env)
 		orgSvc.SetInvalidator(orgCache)
 		// Add-mükellef flow (issue #7): consent tokens also open sign-up.
 		onboarding := taxpayersmodule.NewOnboarding(deps.DB, notifSvc, orgCache,
 			taxpayersmodule.OnboardingConfig{TTL: cfg.Tenancy.InviteTTL, FrontendURL: cfg.Auth.FrontendURL}, log)
 		uc.SetInvitationGate(taxpayersmodule.ChainGates(orgSvc, members, onboarding))
-		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, ratelimit.New(deps.Redis, cfg.App.Env)).WithNotice(legalSvc)
+		onboardingHandler = taxpayersmodule.NewOnboardingHandler(onboarding, limiter).WithNotice(legalSvc)
 		// Office change (issue #8): history shares and archive reads.
 		historyHandler = taxpayersmodule.NewHistoryHandler(taxpayersmodule.NewHistory(deps.DB).WithConsents(legalSvc))
 		tenantResolver = orgCache
@@ -506,10 +508,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		qrIssuer = rtIssuer
 	}
 	qrSvc := qrlogin.NewService(qrlogin.NewStore(deps.Redis, cfg.App.Env), uc, qrIssuer, deps.Realtime, cfg.Auth.FrontendURL, log)
-	qrlogin.RegisterRoutes(mux, qrlogin.NewHandler(qrSvc, qrGeo, ratelimit.New(deps.Redis, cfg.App.Env)), tokens, loader)
+	qrlogin.RegisterRoutes(mux, qrlogin.NewHandler(qrSvc, qrGeo, limiter), tokens, loader)
 
 	nh := notifhandler.New(notifSvc)
-	nh.SetRateLimiter(ratelimit.New(deps.Redis, cfg.App.Env))
+	nh.SetRateLimiter(limiter)
 	notifmodule.RegisterRoutes(mux, nh, tokens, loader)
 	notifmodule.RegisterEventHandlers(eventBus, notifSvc, log)
 
@@ -607,7 +609,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	storagemodule.RegisterRoutes(
 		mux,
-		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log), cfg.Storage.MaxBytes),
+		storagehandler.New(storageusecase.New(deps.Storage, deps.Queries, log), cfg.Storage.MaxBytes).WithAudit(activityRec),
 		tokens,
 		loader,
 	)
@@ -618,7 +620,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	s.http = &http.Server{
 		Addr:         cfg.HTTP.Addr,
-		Handler:      tracing.HTTP(middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(metrics.Default.HTTP(mux))))),
+		Handler:      tracing.HTTP(middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(metrics.Default.HTTP(limiter.UploadGuard(mux)))))),
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,

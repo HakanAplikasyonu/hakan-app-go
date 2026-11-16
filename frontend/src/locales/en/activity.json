@@ -39,6 +39,8 @@
   "resources.platform.integrations.apple": "Apple integration",
   "resources.auth.step_up": "Step-up verification",
   "resources.auth.account": "Account",
+  "resources.security": "Security",
+  "resources.storage": "File storage",
   "actions.organizations.created": "Organization created",
   "actions.organizations.updated": "Organization updated",
   "actions.organizations.deleted": "Organization deleted",
@@ -52,5 +54,8 @@
   "actions.organizations.invitation_revoked": "Invitation revoked",
   "actions.organizations.invitation_accepted": "Invitation accepted",
   "actions.vat.opening.set": "VAT opening carry-forward set",
-  "actions.vat.opening.delete": "VAT opening carry-forward deleted"
+  "actions.vat.opening.delete": "VAT opening carry-forward deleted",
+  "actions.security.rate_limited": "Rate limit hit",
+  "actions.security.login_locked": "Sign-in locked after failed attempts",
+  "actions.security.upload_rejected": "Upload rejected (file type)"
 }

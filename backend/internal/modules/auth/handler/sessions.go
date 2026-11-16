@@ -3,10 +3,13 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 	"github.com/google/uuid"
 )
@@ -59,9 +62,26 @@ func (h *Handler) writeRateLimited(w http.ResponseWriter, r *http.Request, allow
 	if allowed {
 		return false
 	}
+	if h.limiter != nil {
+		ip := clientip.From(r)
+		h.limiter.Report(r, ratelimit.Event{Kind: "rate_limited", Action: r.URL.Path, IP: ip, Retry: retry}, r.URL.Path+"|"+ip)
+	}
 	if retry > 0 {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
 	}
 	response.TooManyRequests(w, r, "Too many attempts. Try again later.")
 	return true
+}
+
+// writeLoginLocked answers a login during a backoff lock. It is the same 429
+// as the window limit, so the response does not tell whether the account
+// exists or how many attempts were made.
+func (h *Handler) writeLoginLocked(w http.ResponseWriter, r *http.Request, ip, email string, wait time.Duration) {
+	h.limiter.Report(r, ratelimit.Event{
+		Kind: "login_locked", Action: "login", Email: ratelimit.MaskEmail(email), IP: ip, Retry: wait,
+	}, "login|"+strings.ToLower(strings.TrimSpace(email)))
+	if wait > 0 {
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+	}
+	response.TooManyRequests(w, r, "Too many attempts. Try again later.")
 }
