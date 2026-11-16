@@ -54,6 +54,21 @@ npx eas-cli build --profile development
 
 Diğer profiller: `development-simulator`, `preview`, `production`.
 
+## Bildirim ve bağlantılar (#201)
+
+- **Bildirime dokunma:** backend push'un `data.url` alanına bildirimin web yolunu koyar, örneğin `/m/{mükellef}/tasks`. Uygulama bu yolu kendi ekranına çevirir (`src/core/push/links.ts`). Uygulama bildirimle soğuk açıldıysa hedef, oturum hazır olana kadar bekletilir. Bağlantı kullanıcının başka bir şirketine aitse önce o şirket seçilir.
+- **Şema:** `hakan://tasks`, `hakan://task/{uuid}`, `hakan://receipts`, `hakan://receipts/{id}`, `hakan://capture`.
+- **Universal / app link:** derlemede `EXPO_PUBLIC_APP_LINK_DOMAIN` verilirse (panelin alan adı, örneğin `app.example.com`) iki yapılandırma eklenir:
+  - iOS: `applinks:<alan>` associated domain.
+  - Android: `https://<alan>/m/...` için doğrulanan intent filter.
+
+  Bu bağlantıların açılması için alan adının iki dosyayı da sunması gerekir:
+  - `/.well-known/apple-app-site-association`: Team ID ve bundle id `app.hakan.mukellef`.
+  - `/.well-known/assetlinks.json`: paket `app.hakan.mukellef` ve imza SHA-256'sı.
+
+  Değişken boşsa yalnızca şema çalışır.
+- Tanınmayan bağlantı ana ekranı açar (`src/app/+native-intent.tsx`).
+
 ## Dizinler
 
 - `src/app/` ekranlar (expo-router). `(app)/` giriş ve şirket seçimi sonrası.

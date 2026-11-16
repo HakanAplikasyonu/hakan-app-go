@@ -286,6 +286,8 @@ type Querier interface {
 	GetDesktopAgent(ctx context.Context, arg GetDesktopAgentParams) (DesktopAgent, error)
 	GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams) (GetDocumentTaskRow, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
+	// Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
+	GetDocumentTaskUUID(ctx context.Context, arg GetDocumentTaskUUIDParams) (uuid.UUID, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)

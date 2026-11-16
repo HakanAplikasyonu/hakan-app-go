@@ -9,6 +9,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BrandMark } from '@/components/brand-mark';
 import { AuthProvider, useAuth } from '@/core/auth/auth-provider';
 import { installForegroundHandler } from '@/core/push/push';
+import { useNotificationRouting } from '@/core/push/use-notification-routing';
 import { useColors, useScheme } from '@/core/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -16,6 +17,7 @@ installForegroundHandler();
 
 function RootNavigator() {
   const { status } = useAuth();
+  useNotificationRouting();
   const c = useColors();
   const scheme = useScheme();
   const navTheme = useMemo(() => {

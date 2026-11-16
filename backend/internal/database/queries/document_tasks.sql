@@ -251,3 +251,8 @@ SELECT user_id FROM taxpayer_members WHERE taxpayer_id = @taxpayer_id ORDER BY u
 SELECT o.name AS organization_name, tp.title AS taxpayer_title, tp.uuid AS taxpayer_uuid
 FROM organizations o, taxpayers tp
 WHERE o.id = @organization_id AND tp.id = @taxpayer_id;
+
+-- name: GetDocumentTaskUUID :one
+-- Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
+SELECT uuid FROM document_tasks
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id;

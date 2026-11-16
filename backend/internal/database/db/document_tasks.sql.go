@@ -288,6 +288,25 @@ func (q *Queries) GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumen
 	return i, err
 }
 
+const getDocumentTaskUUID = `-- name: GetDocumentTaskUUID :one
+SELECT uuid FROM document_tasks
+WHERE organization_id = $1 AND engagement_id = $2 AND id = $3
+`
+
+type GetDocumentTaskUUIDParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+	ID             int64 `json:"id"`
+}
+
+// Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
+func (q *Queries) GetDocumentTaskUUID(ctx context.Context, arg GetDocumentTaskUUIDParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getDocumentTaskUUID, arg.OrganizationID, arg.EngagementID, arg.ID)
+	var uuid uuid.UUID
+	err := row.Scan(&uuid)
+	return uuid, err
+}
+
 const getDocumentTaskUploadFile = `-- name: GetDocumentTaskUploadFile :one
 SELECT a.storage_key, a.content_type, a.file_name, a.size_bytes
 FROM document_task_uploads u
