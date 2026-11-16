@@ -104,6 +104,8 @@ type Querier interface {
 	CountPrivacyUserTies(ctx context.Context, arg CountPrivacyUserTiesParams) (CountPrivacyUserTiesRow, error)
 	CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error)
 	CountRoles(ctx context.Context, q_ pgtype.Text) (int64, error)
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	CountScopedInbox(ctx context.Context, arg CountScopedInboxParams) (CountScopedInboxRow, error)
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
@@ -111,7 +113,7 @@ type Querier interface {
 	CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
-	CountTaxpayerReceiptCaptures(ctx context.Context, taxpayerID int64) (int64, error)
+	CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTaxpayerReceiptCapturesParams) (int64, error)
 	CountTaxpayers(ctx context.Context, q_ pgtype.Text) (int64, error)
 	// tenant-lint: org-wide ofis uyarı listesi sayımı; ListTenantDataWarnings ile aynı süzgeç
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
@@ -697,6 +699,12 @@ type Querier interface {
 	ListRolesFiltered(ctx context.Context, arg ListRolesFilteredParams) ([]Role, error)
 	ListRolesForExport(ctx context.Context, q_ pgtype.Text) ([]Role, error)
 	ListRolesForUserIDs(ctx context.Context, userIds []int64) ([]ListRolesForUserIDsRow, error)
+	// Scoped inbox (issue #333): the caller's in-app notifications for one office
+	// (organization_id) or one company (payload taxpayer_uuid, the mükellef
+	// panel), optionally unread only and in one month (period, YYYY-MM, office
+	// time). Email rows are never listed (see ListNotificationsForUser).
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	ListScopedInbox(ctx context.Context, arg ListScopedInboxParams) ([]Notification, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
@@ -803,6 +811,10 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	MarkScopedInboxAllRead(ctx context.Context, arg MarkScopedInboxAllReadParams) (int64, error)
+	// tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle
+	MarkScopedInboxRead(ctx context.Context, arg MarkScopedInboxReadParams) (Notification, error)
 	// tenant-lint: cross-org zamanlanmış sağlık taraması bütün ofislerin sessiz ajanlarını işaretler
 	// @silent_before'dan beri haber vermeyen çevrimiçi ajanlar offline olur.
 	// Dönen satırlar bu çalıştırmada offline'a geçenlerdir (bildirim bir kez).

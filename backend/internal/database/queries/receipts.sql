@@ -133,13 +133,15 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 SELECT * FROM receipt_captures
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period))
 ORDER BY created_at DESC, id DESC
 LIMIT @lim OFFSET @off;
 
 -- name: CountReceiptCaptures :one
 SELECT count(*)::bigint FROM receipt_captures
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
-  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text);
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period));
 
 -- name: SetReceiptCaptureStatus :one
 UPDATE receipt_captures SET status = @status

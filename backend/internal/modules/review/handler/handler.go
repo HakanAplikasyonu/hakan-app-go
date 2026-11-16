@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
@@ -101,6 +102,10 @@ func (h *Handler) ListEngagement(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request, f usecase.Filter) {
 	q := r.URL.Query()
+	var ok bool
+	if f.Period, ok = periodq.Parse(w, r); !ok {
+		return
+	}
 	f.Limit, f.Offset = apiquery.DefaultLimit, 0
 	f.Limit = intconv.ParseInt32(q.Get("limit"), f.Limit, 1, apiquery.MaxLimit)
 	f.Offset = intconv.ParseInt32(q.Get("offset"), f.Offset, 0, 1_000_000)

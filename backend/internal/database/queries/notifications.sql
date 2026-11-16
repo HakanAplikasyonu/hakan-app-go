@@ -224,3 +224,52 @@ WHERE user_id = $1 AND endpoint = $2;
 
 -- name: ListPushSubscriptionsByUser :many
 SELECT * FROM push_subscriptions WHERE user_id = $1;
+
+-- Scoped inbox (issue #333): the caller's in-app notifications for one office
+-- (organization_id) or one company (payload taxpayer_uuid, the mükellef
+-- panel), optionally unread only and in one month (period, YYYY-MM, office
+-- time). Email rows are never listed (see ListNotificationsForUser).
+-- tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+-- name: ListScopedInbox :many
+SELECT * FROM notifications
+WHERE user_id = sqlc.arg(user_id)
+  AND channel = 'inapp'
+  AND (sqlc.narg(organization_id)::bigint IS NULL OR organization_id = sqlc.narg(organization_id))
+  AND (sqlc.narg(taxpayer_uuid)::text IS NULL OR payload ->> 'taxpayer_uuid' = sqlc.narg(taxpayer_uuid))
+  AND (sqlc.narg(unread)::bool IS NOT TRUE OR read_at IS NULL)
+  AND (sqlc.narg(period)::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = sqlc.narg(period))
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);
+
+-- tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+-- name: CountScopedInbox :one
+SELECT COUNT(*)::bigint AS total,
+       COUNT(*) FILTER (WHERE read_at IS NULL)::bigint AS unread
+FROM notifications
+WHERE user_id = sqlc.arg(user_id)
+  AND channel = 'inapp'
+  AND (sqlc.narg(organization_id)::bigint IS NULL OR organization_id = sqlc.narg(organization_id))
+  AND (sqlc.narg(taxpayer_uuid)::text IS NULL OR payload ->> 'taxpayer_uuid' = sqlc.narg(taxpayer_uuid))
+  AND (sqlc.narg(unread)::bool IS NOT TRUE OR read_at IS NULL)
+  AND (sqlc.narg(period)::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = sqlc.narg(period));
+
+-- tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle
+-- name: MarkScopedInboxRead :one
+UPDATE notifications
+SET status = 'read', read_at = COALESCE(read_at, NOW())
+WHERE uuid = sqlc.arg(uuid)
+  AND user_id = sqlc.arg(user_id)
+  AND channel = 'inapp'
+  AND (sqlc.narg(organization_id)::bigint IS NULL OR organization_id = sqlc.narg(organization_id))
+  AND (sqlc.narg(taxpayer_uuid)::text IS NULL OR payload ->> 'taxpayer_uuid' = sqlc.narg(taxpayer_uuid))
+RETURNING *;
+
+-- tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+-- name: MarkScopedInboxAllRead :execrows
+UPDATE notifications
+SET status = 'read', read_at = NOW()
+WHERE user_id = sqlc.arg(user_id)
+  AND channel = 'inapp'
+  AND read_at IS NULL
+  AND (sqlc.narg(organization_id)::bigint IS NULL OR organization_id = sqlc.narg(organization_id))
+  AND (sqlc.narg(taxpayer_uuid)::text IS NULL OR payload ->> 'taxpayer_uuid' = sqlc.narg(taxpayer_uuid));

@@ -89,6 +89,8 @@ var taxpayerWrites = map[string]sweepCase{
 	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"1300,00"}]}`},
 	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},
+	"POST /v1/taxpayer/notifications/read-all":             {},
+	"POST /v1/taxpayer/notifications/{uuid}/read":          {},
 }
 
 // sweepRange is the sync window of the source connections.
@@ -111,6 +113,8 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                       {},
 	"POST /v1/tenant/leave":                                                                       {last: true},
 	"POST /v1/tenant/invitations":                                                                 {body: `{"email":"yeni.uye@example.test","role_key":"member"}`},
+	"POST /v1/tenant/notifications/read-all":                                                      {},
+	"POST /v1/tenant/notifications/{uuid}/read":                                                   {},
 	"DELETE /v1/tenant/invitations/{uuid}":                                                        {},
 	"PATCH /v1/tenant/settings":                                                                   {body: `{"name":"Demir Mali Müşavirlik (demo)"}`},
 	"PUT /v1/tenant/setup":                                                                        {body: `{"steps":{"office":{"status":"done"}},"accounting_program":"luca"}`},
@@ -558,6 +562,8 @@ var uuidQueries = map[string]string{
 	"/v1/tenant/taxpayer-imports/":      `SELECT uuid::text FROM taxpayer_import_batches WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"/v1/taxpayer/onboarding-requests/": `SELECT uuid::text FROM taxpayer_onboarding_requests t WHERE $1 > 0 AND $2 > 0 AND t.tax_id = (SELECT tax_id FROM taxpayers WHERE id = $3) ORDER BY id DESC LIMIT 1`,
 	"/v1/taxpayer/history-shares/":      `SELECT uuid::text FROM taxpayer_history_shares WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"/v1/tenant/notifications/":         `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.organization_id = $1 AND u.email = 'sahip@demo.hakan.local' AND n.channel = 'inapp' AND $2 > 0 AND $3 > 0 ORDER BY n.id DESC LIMIT 1`,
+	"/v1/taxpayer/notifications/":       `SELECT n.uuid::text FROM notifications n JOIN users u ON u.id = n.user_id WHERE u.email = 'mukellef@demo.hakan.local' AND n.channel = 'inapp' AND n.payload ->> 'taxpayer_uuid' = (SELECT uuid::text FROM taxpayers WHERE id = $3) AND $1 > 0 AND $2 > 0 ORDER BY n.id DESC LIMIT 1`,
 	"/v1/taxpayer/receipts/":            `SELECT uuid::text FROM receipt_captures WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 

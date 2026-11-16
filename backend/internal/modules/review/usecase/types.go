@@ -188,6 +188,7 @@ type Filter struct {
 	Status         string
 	Kind           string
 	RuleCandidate  *bool
+	Period         string // YYYY-MM, the suggestion's period (#333); "" = any
 	Limit, Offset  int32
 }
 

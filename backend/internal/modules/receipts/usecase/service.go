@@ -428,12 +428,14 @@ func (s *Service) Get(ctx context.Context, sc engagementctx.Scope, id uuid.UUID)
 }
 
 // List returns one page of captures.
-func (s *Service) List(ctx context.Context, sc engagementctx.Scope, status string, limit, offset int32) ([]View, int64, error) {
-	rows, err := s.q.ListReceiptCaptures(ctx, db.ListReceiptCapturesParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Status: text(status), Lim: limit, Off: offset})
+// period (YYYY-MM, #333) is the draft's period, or the upload month when
+// there is no draft; "" = any.
+func (s *Service) List(ctx context.Context, sc engagementctx.Scope, status, period string, limit, offset int32) ([]View, int64, error) {
+	rows, err := s.q.ListReceiptCaptures(ctx, db.ListReceiptCapturesParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Status: text(status), Period: text(period), Lim: limit, Off: offset})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountReceiptCaptures(ctx, db.CountReceiptCapturesParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Status: text(status)})
+	total, err := s.q.CountReceiptCaptures(ctx, db.CountReceiptCapturesParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Status: text(status), Period: text(period)})
 	if err != nil {
 		return nil, 0, err
 	}

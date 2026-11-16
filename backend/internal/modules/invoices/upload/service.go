@@ -246,9 +246,11 @@ func (s *Service) Get(ctx context.Context, scope engagementctx.Scope, id uuid.UU
 	return view(row), nil
 }
 
-// List returns the engagement's jobs, newest first (reports omitted).
-func (s *Service) List(ctx context.Context, scope engagementctx.Scope, limit, offset int32) ([]Job, error) {
-	rows, err := s.q.ListUBLUploadJobs(ctx, db.ListUBLUploadJobsParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Lim: limit, Off: offset})
+// List returns the engagement's jobs, newest first (reports omitted);
+// period (YYYY-MM, #333) is the upload month, "" = any.
+func (s *Service) List(ctx context.Context, scope engagementctx.Scope, period string, limit, offset int32) ([]Job, error) {
+	rows, err := s.q.ListUBLUploadJobs(ctx, db.ListUBLUploadJobsParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID,
+		Period: pgtype.Text{String: period, Valid: period != ""}, Lim: limit, Off: offset})
 	if err != nil {
 		return nil, err
 	}
