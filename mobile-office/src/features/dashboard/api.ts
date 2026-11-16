@@ -16,3 +16,22 @@ export function useDashboard() {
     refetchInterval: 60_000,
   });
 }
+
+type PeriodMatrix = { periods: string[]; items: Schemas['PeriodMatrixRow'][]; total: number; limit: number; offset: number };
+
+/**
+ * Dönem tacı (MusavirMobil · 1): beyan dönemi için beyana hazır / toplam.
+ * `GET /v1/tenant/periods/matrix` (#32), tek dönem. `tenant.engagements.read_all`
+ * yetkisi olmayan kullanıcıda yalnızca kendisine atanan mükellefler döner.
+ * İlk sayfa 100 satır; toplam `total` alanından gelir, hazır sayısı ilk sayfadan.
+ */
+export function usePeriodCrown(period: string, enabled = true) {
+  const org = useOrganization();
+  return useQuery({
+    queryKey: ['period-crown', org, period],
+    enabled,
+    queryFn: () =>
+      api.get<PeriodMatrix>('/v1/tenant/periods/matrix', { organization: org, query: { until: period, periods: 1, limit: 100 } }),
+    staleTime: 5 * 60_000,
+  });
+}

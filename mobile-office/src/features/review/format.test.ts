@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { bulkTargets, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, runSequential, swipeAction } from './format.ts';
+import { bulkTargets, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
 
 test('proposedCode', () => {
   assert.equal(proposedCode({ account_code: '770.01' }), '770.01');
@@ -49,4 +49,24 @@ test('swipe threshold', () => {
   assert.equal(swipeAction(-200, 400), 'reject');
   assert.equal(swipeAction(50, 400), null);
   assert.equal(swipeAction(70, 100), 'accept'); // minimum 60 px
+});
+
+test('swipe up corrects when vertical dominates', () => {
+  assert.equal(swipeAction(10, 400, 0.35, -150, 430), 'correct');
+  assert.equal(swipeAction(200, 400, 0.35, -150, 430), 'accept'); // yatay baskın
+  assert.equal(swipeAction(0, 400, 0.35, -50, 430), null);
+  assert.equal(swipeAction(0, 400, 0.35, -150), null); // yükseklik yok: düzeltme kapalı
+});
+
+test('card tilt, progress and eta', () => {
+  assert.equal(cardTilt(0, 400), 0);
+  assert.equal(cardTilt(400, 400), 8);
+  assert.equal(cardTilt(-100, 400), -4);
+  assert.equal(cardTilt(10, 0), 0);
+  assert.equal(queueProgress(0, 48), 0);
+  assert.equal(queueProgress(12, 36), 0.25);
+  assert.equal(queueProgress(0, 0), 0);
+  assert.equal(queueEta(48), '~5 dk');
+  assert.equal(queueEta(5), "1 dk'dan az");
+  assert.equal(queueEta(0), '');
 });
