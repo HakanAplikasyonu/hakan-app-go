@@ -8,8 +8,10 @@ import { useAuth } from '@/core/auth/auth-provider';
 import { initials, kindLabel, roleLabel } from '@/core/auth/taxpayers';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { useColors } from '@/core/theme';
+import { receiptsSummaryLine, serverOnly } from '@/features/receipts/history';
 import { useReceipts } from '@/features/receipts/provider';
 import { QueueBanner } from '@/features/receipts/queue-banner';
+import { useReceiptHistory } from '@/features/receipts/use-history';
 import { openTask, useTasks } from '@/features/tasks/use-tasks';
 
 /** Mükellef ana sayfası: fiş çek, görevler, fişlerim. */
@@ -19,6 +21,7 @@ export default function HomeScreen() {
   const [push, setPush] = useState<PushPermission>('unavailable');
   const [pushBusy, setPushBusy] = useState(false);
   const { summary, items } = useReceipts();
+  const { history } = useReceiptHistory();
   const { tasks } = useTasks();
 
   useEffect(() => {
@@ -86,11 +89,7 @@ export default function HomeScreen() {
 
       <Row
         title="Fişlerim"
-        subtitle={
-          items.length
-            ? `${summary.uploaded} gönderildi${summary.waiting + summary.blocked ? ` · ${summary.waiting + summary.blocked} bekliyor` : ''}${summary.failed ? ` · ${summary.failed} hatalı` : ''}`
-            : 'Henüz fiş çekmediniz'
-        }
+        subtitle={receiptsSummaryLine(summary, serverOnly(history, items, t.uuid).length)}
         onPress={() => router.push('/receipts')}
         trailing={<Text tone="muted">›</Text>}
       />

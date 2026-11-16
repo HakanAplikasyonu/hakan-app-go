@@ -4,7 +4,7 @@
  * Telefonda olmayan (başka cihazdan çekilmiş ya da uygulama yeniden kurulmuş)
  * fişler geçmişten gösterilir; telefondaki kuyrukta zaten olanlar tekrarlanmaz.
  */
-import type { QueueItem } from './queue';
+import type { QueueItem, QueueSummary } from './queue';
 
 /** Minimal shape of a server-side receipt (api.ts ServerReceipt). */
 export type HistoryReceipt = { uuid: string; created_at: string };
@@ -26,4 +26,20 @@ const statusLabels: Record<string, string> = {
 /** Label of a server-side receipt status. */
 export function historyStatusLabel(status: string): string {
   return statusLabels[status] ?? status;
+}
+
+/**
+ * Ana sayfadaki "Fişlerim" satırı (#283): telefondaki kuyruk ve sunucuda olup
+ * telefonda olmayan fişler birlikte sayılır. Yeni cihazda ya da yeniden
+ * kurulumdan sonra kuyruk boş olsa da daha önce gönderilenler görünür.
+ */
+export function receiptsSummaryLine(s: QueueSummary, earlier: number): string {
+  const sent = s.uploaded + earlier;
+  const waiting = s.waiting + s.blocked;
+  if (sent + waiting + s.failed === 0) return 'Henüz fiş çekmediniz';
+  const parts: string[] = [];
+  if (sent || !(waiting || s.failed)) parts.push(`${sent} gönderildi`);
+  if (waiting) parts.push(`${waiting} bekliyor`);
+  if (s.failed) parts.push(`${s.failed} hatalı`);
+  return parts.join(' · ');
 }
