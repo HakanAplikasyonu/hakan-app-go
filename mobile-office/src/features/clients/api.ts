@@ -68,3 +68,17 @@ export function receiptImageSource(org: string, engagement: string, receipt: str
     cacheKey: `receipt-${receipt}`,
   };
 }
+
+/**
+ * Engagement → mükellef unvanı (tablet onay listesinin grup başlıkları).
+ * Sunucunun izin verdiği en büyük sayfa (100); bulunamayan grup "Mükellef" olur.
+ */
+export function useClientTitles() {
+  const org = useOrganization();
+  const q = useQuery({
+    queryKey: ['clients', org, 'titles'],
+    queryFn: () => api.get<ClientPage>('/v1/tenant/clients', { organization: org, query: { limit: 100 } }),
+    staleTime: 5 * 60_000,
+  });
+  return q.data?.items;
+}

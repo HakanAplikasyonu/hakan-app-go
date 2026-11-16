@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { bulkTargets, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
+import { bulkTargets, groupQueue, cardTilt, confidenceBand, confidencePercent, isValidAccountCode, proposedCode, queueEta, queueProgress, runSequential, swipeAction } from './format.ts';
 
 test('proposedCode', () => {
   assert.equal(proposedCode({ account_code: '770.01' }), '770.01');
@@ -69,4 +69,30 @@ test('card tilt, progress and eta', () => {
   assert.equal(queueEta(48), '~5 dk');
   assert.equal(queueEta(5), "1 dk'dan az");
   assert.equal(queueEta(0), '');
+});
+
+test('groupQueue: mükellefe göre, ilk görünüş sırası', () => {
+  const s = (uuid: string, e: string | undefined, c = '0.9') => ({ uuid, engagement_uuid: e, confidence: c });
+  const list = [s('1', 'a'), s('2', 'b'), s('3', 'a'), s('4', undefined)];
+  const g = groupQueue(list, 'mukellef', (e) => ({ a: 'Atlas', b: 'Kuzey' })[e]);
+  assert.deepEqual(
+    g.map((x) => [x.title, x.data.map((d) => d.uuid)]),
+    [
+      ['Atlas', ['1', '3']],
+      ['Kuzey', ['2']],
+      ['Mükellef', ['4']],
+    ],
+  );
+});
+
+test('groupQueue: güvene göre, önce düşük, boş grup yok', () => {
+  const s = (uuid: string, c: string) => ({ uuid, engagement_uuid: 'a', confidence: c });
+  const g = groupQueue([s('1', '0.95'), s('2', '0.40'), s('3', '0.90')], 'guven', () => 'x');
+  assert.deepEqual(
+    g.map((x) => [x.key, x.data.map((d) => d.uuid)]),
+    [
+      ['low', ['2']],
+      ['high', ['1', '3']],
+    ],
+  );
 });
