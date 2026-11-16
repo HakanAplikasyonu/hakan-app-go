@@ -105,6 +105,7 @@ type job struct {
 	cnt      *Counters
 	planned  []window
 	last     time.Time
+	lastList time.Time
 }
 
 // throttle keeps RequestGap between integrator calls.
@@ -122,6 +123,27 @@ func (j *job) throttle(ctx context.Context) error {
 		}
 	}
 	j.last = time.Now()
+	return nil
+}
+
+// throttleList keeps the profile's ListGap between listing calls. A
+// negative Config.RequestGap (tests) turns all pacing off.
+func (j *job) throttleList(ctx context.Context, gap time.Duration) error {
+	if gap <= 0 || j.s.cfg.RequestGap < 0 {
+		return nil
+	}
+	if !j.lastList.IsZero() {
+		if wait := gap - time.Since(j.lastList); wait > 0 {
+			t := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return ctx.Err()
+			case <-t.C:
+			}
+		}
+	}
+	j.lastList = time.Now()
 	return nil
 }
 
@@ -195,6 +217,9 @@ func (j *job) runWindow(ctx context.Context, w db.SyncWindow) ([]db.SyncWindow, 
 	}
 	cursor := w.PageCursor.String
 	for pages := 1; ; pages++ {
+		if err := j.throttleList(ctx, prof.ListGap); err != nil {
+			return nil, err
+		}
 		if err := j.throttle(ctx); err != nil {
 			return nil, err
 		}
