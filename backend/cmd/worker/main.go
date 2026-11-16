@@ -197,6 +197,7 @@ func main() {
 	egressCfg := egress.Config{
 		ProxyURL: cfg.Egress.ProxyURL, ExpectedIPs: cfg.Egress.ExpectedIPs,
 		CheckURL: cfg.Egress.CheckURL, CheckInterval: cfg.Egress.CheckInterval,
+		ProxyHosts: cfg.Egress.ProxyHosts,
 	}
 	egressHTTP, err := egressCfg.HTTPClient(0)
 	if err != nil {

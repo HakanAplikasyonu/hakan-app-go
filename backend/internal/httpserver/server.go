@@ -451,14 +451,22 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))
 	// Banka web servisi (issue #49): şube talimatı + sabit IP ile ilk banka.
-	// Kimlik bilgileri sır kasasında (purpose bank_connection).
+	// Kimlik bilgileri sır kasasında (purpose bank_connection). Banka
+	// çağrıları egress vekilinden (EGRESS_PROXY_URL, EGRESS_PROXY_HOSTS)
+	// sabit IP ile çıkar (issue #256); diğer hostlar doğrudan.
+	bankHTTP, err := egress.Config{
+		ProxyURL: cfg.Egress.ProxyURL, CheckURL: cfg.Egress.CheckURL, ProxyHosts: cfg.Egress.ProxyHosts,
+	}.HTTPClient(2 * time.Minute)
+	if err != nil {
+		return nil, err
+	}
 	bankws.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankws.NewHandler(bankws.NewService(deps.DB, sourceVault, bankSvc, bankws.Registry{
 			"vakifbank": func(env string) bankws.Adapter {
 				if env == bankws.EnvTest {
-					return vakifbank.New(vakifbank.TestEndpoint, nil)
+					return vakifbank.New(vakifbank.TestEndpoint, bankHTTP)
 				}
-				return vakifbank.New(vakifbank.ProductionEndpoint, nil)
+				return vakifbank.New(vakifbank.ProductionEndpoint, bankHTTP)
 			},
 		}, bankws.Options{EgressIPs: cfg.Bank.EgressIPs, TechContact: cfg.Bank.TechContact})))
 	taxpayersmodule.RegisterMemberRoutes(mux, tokens, loader, tenantResolver, engagementResolver, taxpayerResolver, memberHandler)

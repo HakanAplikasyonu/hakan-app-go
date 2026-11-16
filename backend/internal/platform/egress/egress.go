@@ -47,6 +47,13 @@ type Config struct {
 	CheckURL string
 	// CheckInterval is the period of the IP check.
 	CheckInterval time.Duration
+	// ProxyHosts limits ProxyURL to these hosts; any other host is called
+	// directly (issue #256: only the allowlisting integrator and bank hosts
+	// leave from the fixed IP). ".example.com" also covers subdomains, the
+	// same rule as squid's dstdomain in deploy/egress-proxy. Empty: every
+	// call goes through ProxyURL. The CheckURL host is always proxied so
+	// the IP check sees the address the integrators see.
+	ProxyHosts []string
 }
 
 // Normalize fills defaults.
@@ -64,7 +71,46 @@ func (c Config) Normalize() Config {
 		}
 	}
 	c.ExpectedIPs = out
+	hosts := make([]string, 0, len(c.ProxyHosts)+1)
+	for _, h := range c.ProxyHosts {
+		if h = strings.ToLower(strings.TrimSpace(h)); h != "" {
+			hosts = append(hosts, h)
+		}
+	}
+	if len(hosts) > 0 {
+		if u, err := url.Parse(c.CheckURL); err == nil && u.Hostname() != "" && !matchHost(hosts, u.Hostname()) {
+			hosts = append(hosts, strings.ToLower(u.Hostname()))
+		}
+	}
+	c.ProxyHosts = hosts
 	return c
+}
+
+// matchHost reports whether host is in hosts: an exact name, or under a
+// ".domain" entry (which also matches the domain itself).
+func matchHost(hosts []string, host string) bool {
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	for _, h := range hosts {
+		if strings.HasPrefix(h, ".") {
+			if host == h[1:] || strings.HasSuffix(host, h) {
+				return true
+			}
+			continue
+		}
+		if host == h {
+			return true
+		}
+	}
+	return false
+}
+
+// Proxied reports whether a call to host goes through ProxyURL.
+func (c Config) Proxied(host string) bool {
+	if strings.TrimSpace(c.ProxyURL) == "" {
+		return false
+	}
+	n := c.Normalize()
+	return len(n.ProxyHosts) == 0 || matchHost(n.ProxyHosts, host)
 }
 
 // Validate checks the configuration without contacting anything.
@@ -83,6 +129,15 @@ func (c Config) Validate() error {
 	for _, ip := range c.ExpectedIPs {
 		if net.ParseIP(strings.TrimSpace(ip)) == nil {
 			return fmt.Errorf("egress: EGRESS_EXPECTED_IPS has an invalid IP %q", ip)
+		}
+	}
+	for _, h := range c.ProxyHosts {
+		h = strings.TrimSpace(h)
+		if h == "" {
+			continue
+		}
+		if strings.Trim(h, ".") == "" || strings.ContainsAny(h, "/:@ *") {
+			return fmt.Errorf("egress: EGRESS_PROXY_HOSTS has an invalid host %q", h)
 		}
 	}
 	return nil
@@ -107,7 +162,13 @@ func (c Config) HTTPClient(timeout time.Duration) (*http.Client, error) {
 	tr.Proxy = nil
 	if p := strings.TrimSpace(c.ProxyURL); p != "" {
 		u, _ := url.Parse(p)
-		tr.Proxy = http.ProxyURL(u)
+		n := c.Normalize()
+		tr.Proxy = func(req *http.Request) (*url.URL, error) {
+			if len(n.ProxyHosts) == 0 || matchHost(n.ProxyHosts, req.URL.Hostname()) {
+				return u, nil
+			}
+			return nil, nil // not an allowlisting host: direct
+		}
 	}
 	return &http.Client{Transport: tr, Timeout: timeout}, nil
 }
