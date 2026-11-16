@@ -6,6 +6,7 @@ import { api } from '@/core/api/client';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { env } from '@/core/config/env';
+import { versionLabel } from '@/core/config/version';
 
 /**
  * Profil ve hesap (#202): gizlilik ve destek bağlantıları (yapılandırmadan),
@@ -87,6 +88,9 @@ export default function ProfileScreen() {
           </View>
         )}
       </Card>
+      <Text variant="caption" tone="muted" style={{ textAlign: 'center' }} testID="app-version">
+        {versionLabel()}
+      </Text>
     </Screen>
   );
 }

@@ -19,3 +19,6 @@ npm-debug.*
 # Native folders are generated (CNG): configure them in app.json / plugins.
 /ios
 /android
+
+# Store submit credentials (eas.json submit; never committed, #203)
+secrets/

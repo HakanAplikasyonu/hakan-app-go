@@ -82,6 +82,22 @@ Diğer profiller: `development-simulator`, `preview`, `production`.
   - Boş bağlantılar ekranda gösterilmez.
 - **Sentry kaynak eşlemeleri:** `eas.json` içinde `SENTRY_DISABLE_AUTO_UPLOAD=true` olduğu için yükleme kapalıdır. Açmak için EAS secret'ına `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` eklenir ve bu değişken kaldırılır.
 
+## Duman testleri ve sürüm (#203)
+
+- **Maestro** (`.maestro/`): giriş → şirket seçimi → fiş çek → görevler (deep link dahil) → profil ve çıkış. Bir geliştirme ya da preview derlemesi kurulu emülatörde şöyle çalışır:
+
+  ```bash
+  maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
+  ```
+
+  CI'da emülatörde **çalıştırılmaz**. Çalıştırmak için önce yerel bir Android derlemesi (Gradle, yaklaşık 15-25 dakika), ardından bir emülatör ve test verisi olan bir backend gerekir; bu, mobil işi her değişiklikte çok ağırlaştırır. CI bunun yerine iki şey yapar:
+  - `npm test` (`src/core/config/maestro.test.ts`): akışların YAML'ı, `appId`, komutları, sırası ve kullandığı env değişkenleri denetlenir.
+  - `expo prebuild` (Android): yerel proje yapılandırması üretilir. Eklentiler (expo-updates, Sentry, bildirim, bağlantılar) burada bozulursa iş düşer.
+- **Sürüm bilgisi:** profil ekranı gerçek sürümü ve derleme numarasını (expo-application) ve varsa OTA güncellemesini gösterir.
+- **OTA** (expo-updates): `runtimeVersion` politikası `appVersion`. Güncelleme yalnızca aynı uygulama sürümünün derlemelerine, kendi kanalında (`eas.json`: development, preview, production) gider. Yayın komutu: `npx eas-cli update --channel preview`. EAS proje kimliği yokken güncelleme kapalıdır.
+- **Gönderim:** `eas.json` `submit` profilleri. Android: internal kanalda taslak. iOS: kimlikler `TBD_…` yer tutucusu. Eksik dış bilgilerin listesi: `store/README.md`.
+- **Yerel preview derlemesi:** Android SDK ile `npx eas-cli build --profile preview --platform android --local`, ya da `npx expo prebuild` ve ardından `cd android && ./gradlew assembleRelease`.
+
 ## Dizinler
 
 - `src/app/` ekranlar (expo-router). `(app)/` giriş ve şirket seçimi sonrası.

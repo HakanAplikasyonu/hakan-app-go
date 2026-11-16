@@ -1,0 +1,63 @@
+// Maestro duman akışlarının sözdizimi denetimi (#203). Emülatörde çalıştırma
+// CI'da yok (gerekçe: mobile/README.md, "Duman testleri"); bu test akışların
+// bozulmadan kalmasını sağlar: YAML geçerli, appId doğru, yalnızca bilinen
+// komutlar, config sırası var olan akışları gösterir, env değişkenleri belgeli.
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
+import { test } from 'node:test';
+
+import { parse, parseAllDocuments } from 'yaml';
+
+const dir = new URL('../../../.maestro/', import.meta.url);
+const flowsDir = new URL('flows/', dir);
+const app = JSON.parse(readFileSync(new URL('../../../app.json', import.meta.url), 'utf8')).expo;
+
+const COMMANDS = new Set([
+  'launchApp', 'stopApp', 'clearState', 'tapOn', 'longPressOn', 'doubleTapOn', 'inputText', 'eraseText',
+  'hideKeyboard', 'pressKey', 'back', 'scroll', 'scrollUntilVisible', 'swipe', 'assertVisible',
+  'assertNotVisible', 'assertTrue', 'extendedWaitUntil', 'waitForAnimationToEnd', 'runFlow', 'openLink',
+  'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat',
+]);
+const ALLOWED_ENV = new Set(['MAESTRO_EMAIL', 'MAESTRO_PASSWORD']);
+
+function flows() {
+  return readdirSync(flowsDir)
+    .filter((f) => f.endsWith('.yaml'))
+    .map((f) => {
+      const text = readFileSync(new URL(f, flowsDir), 'utf8');
+      const docs = parseAllDocuments(text);
+      for (const d of docs) assert.equal(d.errors.length, 0, `${f}: ${d.errors.map((e) => e.message).join('; ')}`);
+      return { file: f, text, header: docs[0]?.toJS(), steps: docs[1]?.toJS() };
+    });
+}
+
+function checkSteps(file: string, steps: unknown) {
+  assert.ok(Array.isArray(steps) && steps.length > 0, `${file}: no commands`);
+  for (const step of steps as unknown[]) {
+    const name = typeof step === 'string' ? step : Object.keys(step as object)[0];
+    assert.ok(COMMANDS.has(name), `${file}: unknown command ${name}`);
+    if (name === 'runFlow' && typeof step === 'object') {
+      const body = (step as Record<string, { commands?: unknown }>).runFlow;
+      if (body && typeof body === 'object' && 'commands' in body) checkSteps(file, body.commands);
+    }
+  }
+}
+
+test('every flow is valid Maestro YAML for this app', () => {
+  const all = flows();
+  assert.ok(all.length >= 5, 'login, select-taxpayer, capture, tasks, signout');
+  for (const f of all) {
+    assert.equal(f.header?.appId, app.ios.bundleIdentifier, `${f.file}: appId`);
+    assert.equal(f.header?.appId, app.android.package, `${f.file}: appId`);
+    assert.ok(f.header?.name, `${f.file}: name`);
+    checkSteps(f.file, f.steps);
+    for (const m of f.text.matchAll(/\$\{([A-Z_]+)\}/g)) assert.ok(ALLOWED_ENV.has(m[1]), `${f.file}: undocumented env ${m[1]}`);
+  }
+});
+
+test('config runs the smoke flows in order and they all exist', () => {
+  const cfg = parse(readFileSync(new URL('config.yaml', dir), 'utf8'));
+  const names = new Set(flows().map((f) => f.header.name));
+  assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'tasks', 'signout']);
+  for (const n of cfg.executionOrder.flowsOrder) assert.ok(names.has(n), `missing flow ${n}`);
+});
