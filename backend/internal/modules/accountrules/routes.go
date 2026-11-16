@@ -35,6 +35,12 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("PUT "+office+"/{ruleKey}", write, h.UpdateRule)
 	r.Tenant("DELETE "+office+"/{ruleKey}", write, h.RetireRule)
 	r.Tenant("GET "+office+"/{ruleKey}/versions", read, h.Versions)
+	// Kural önizlemesi ve kural adayı eşiği (#333). Ayarı yazmak ofis sahibi /
+	// yöneticisinin (tenant.settings.write).
+	r.Tenant("POST "+office+"/preview", read, h.PreviewRule)
+	r.Tenant("GET /v1/tenant/account-rule-settings", read, h.RuleSettings)
+	r.Tenant("PUT /v1/tenant/account-rule-settings", rbac.PermTenantSettingsWrite, h.PutRuleSettings)
+	r.Tenant("GET /v1/tenant/account-rule-settings/preview", read, h.PreviewRuleSettings)
 	if m.Engagements == nil {
 		return
 	}
@@ -45,6 +51,7 @@ func (m Module) Routes(r *module.Router) {
 	base := "/v1/tenant/engagements/{engagementUuid}"
 	r.Tenant("GET "+base+"/account-rules", read, h.ListRules, eng...)
 	r.Tenant("POST "+base+"/account-rules", write, h.CreateRule, eng...)
+	r.Tenant("POST "+base+"/account-rules/preview", read, h.PreviewRule, eng...)
 	r.Tenant("POST "+base+"/account-rules/apply-template", write, h.ApplyTemplate, eng...)
 	r.Tenant("PUT "+base+"/account-rules/{ruleKey}", write, h.UpdateRule, eng...)
 	r.Tenant("DELETE "+base+"/account-rules/{ruleKey}", write, h.RetireRule, eng...)

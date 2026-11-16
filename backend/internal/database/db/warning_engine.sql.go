@@ -12,6 +12,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const acknowledgeTenantDataWarningsByCode = `-- name: AcknowledgeTenantDataWarningsByCode :execrows
+UPDATE data_warnings w
+SET status = 'acknowledged', resolved_by = $1, resolved_at = NOW()
+WHERE w.organization_id = $2
+  AND ($3::bigint IS NULL OR w.engagement_id = $3::bigint)
+  AND ($4::bool OR w.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = $2 AND a.user_id = $5))
+  AND w.engagement_id IN (
+        SELECT e.id FROM engagements e
+        WHERE e.organization_id = $2 AND e.status = 'active')
+  AND w.code = $6 AND w.status = 'open'
+  AND ($7::text IS NULL OR w.period = $7::text)
+`
+
+type AcknowledgeTenantDataWarningsByCodeParams struct {
+	ResolvedBy     pgtype.Int8 `json:"resolved_by"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	AllEngagements bool        `json:"all_engagements"`
+	UserID         int64       `json:"user_id"`
+	Code           string      `json:"code"`
+	Period         pgtype.Text `json:"period"`
+}
+
+// tenant-lint: org-wide toplu "görüldü" (#333); read_all yoksa engagement_assignments ile süzülür, yalnızca aktif engagement
+// DecideDataWarning'in toplu hâli: kapsamdaki bu kodlu bütün açık uyarılar.
+func (q *Queries) AcknowledgeTenantDataWarningsByCode(ctx context.Context, arg AcknowledgeTenantDataWarningsByCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, acknowledgeTenantDataWarningsByCode,
+		arg.ResolvedBy,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Code,
+		arg.Period,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const autoResolveDataWarnings = `-- name: AutoResolveDataWarnings :execrows
 UPDATE data_warnings
 SET status = 'auto_resolved', resolved_at = NOW(), resolved_by = NULL
@@ -150,6 +193,81 @@ func (q *Queries) GetLatestDataWarning(ctx context.Context, arg GetLatestDataWar
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const groupTenantDataWarnings = `-- name: GroupTenantDataWarnings :many
+SELECT w.code,
+       (CASE max(CASE w.severity WHEN 'blocker' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END)
+            WHEN 3 THEN 'blocker' WHEN 2 THEN 'warning' ELSE 'info' END)::text AS severity,
+       count(*)::bigint AS warning_count,
+       count(DISTINCT w.engagement_id)::bigint AS engagement_count,
+       max(w.updated_at)::timestamptz AS latest_at
+FROM data_warnings w
+WHERE w.organization_id = $1
+  AND ($2::bigint IS NULL OR w.engagement_id = $2::bigint)
+  AND ($3::bool OR w.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = $1 AND a.user_id = $4))
+  AND ($5::text IS NULL OR w.period = $5::text)
+  AND ($6::text IS NULL OR w.severity = $6::text)
+  AND ($7::text IS NULL OR w.status = $7::text)
+GROUP BY w.code
+ORDER BY max(CASE w.severity WHEN 'blocker' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END) DESC,
+         count(*) DESC, w.code
+`
+
+type GroupTenantDataWarningsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	AllEngagements bool        `json:"all_engagements"`
+	UserID         int64       `json:"user_id"`
+	Period         pgtype.Text `json:"period"`
+	Severity       pgtype.Text `json:"severity"`
+	Status         pgtype.Text `json:"status"`
+}
+
+type GroupTenantDataWarningsRow struct {
+	Code            string             `json:"code"`
+	Severity        string             `json:"severity"`
+	WarningCount    int64              `json:"warning_count"`
+	EngagementCount int64              `json:"engagement_count"`
+	LatestAt        pgtype.Timestamptz `json:"latest_at"`
+}
+
+// tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
+// Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
+func (q *Queries) GroupTenantDataWarnings(ctx context.Context, arg GroupTenantDataWarningsParams) ([]GroupTenantDataWarningsRow, error) {
+	rows, err := q.db.Query(ctx, groupTenantDataWarnings,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Period,
+		arg.Severity,
+		arg.Status,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GroupTenantDataWarningsRow{}
+	for rows.Next() {
+		var i GroupTenantDataWarningsRow
+		if err := rows.Scan(
+			&i.Code,
+			&i.Severity,
+			&i.WarningCount,
+			&i.EngagementCount,
+			&i.LatestAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listTenantDataWarnings = `-- name: ListTenantDataWarnings :many

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
@@ -296,8 +297,8 @@ func (p *Postgres) Assigned(ctx context.Context, s usecase.Subject, targetType s
 }
 
 // Candidates implements usecase.Store.
-func (p *Postgres) Candidates(ctx context.Context, s usecase.Subject, minCount int64) ([]usecase.Candidate, error) {
-	rows, err := p.q.AccountRuleCandidates(ctx, db.AccountRuleCandidatesParams{OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, MinCount: minCount})
+func (p *Postgres) Candidates(ctx context.Context, s usecase.Subject, minCount int64, includeAccepts bool) ([]usecase.Candidate, error) {
+	rows, err := p.q.AccountRuleCandidates(ctx, db.AccountRuleCandidatesParams{OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, MinCount: minCount, IncludeAccepts: includeAccepts})
 	if err != nil {
 		return nil, fmt.Errorf("candidates: %w", err)
 	}
@@ -318,4 +319,65 @@ func (p *Postgres) HasMemory(ctx context.Context, s usecase.Subject) (bool, erro
 		return false, fmt.Errorf("account memory: %w", err)
 	}
 	return ok, nil
+}
+
+// RuleSettings implements usecase.Store.
+func (p *Postgres) RuleSettings(ctx context.Context, org int64) (usecase.RuleSettings, error) {
+	row, err := p.q.GetAccountRuleSettings(ctx, org)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return usecase.DefaultRuleSettings(), nil
+	}
+	if err != nil {
+		return usecase.RuleSettings{}, fmt.Errorf("rule settings: %w", err)
+	}
+	t := row.UpdatedAt.Time
+	return usecase.RuleSettings{MinCount: int(row.RuleCandidateMinCount), Decisions: row.RuleCandidateDecisions, UpdatedAt: &t}, nil
+}
+
+// SaveRuleSettings implements usecase.Store.
+func (p *Postgres) SaveRuleSettings(ctx context.Context, org int64, in usecase.RuleSettings, userID int64) (usecase.RuleSettings, error) {
+	row, err := p.q.UpsertAccountRuleSettings(ctx, db.UpsertAccountRuleSettingsParams{
+		OrganizationID: org, RuleCandidateMinCount: int32(in.MinCount), RuleCandidateDecisions: in.Decisions, //nolint:gosec // 2..10
+		UpdatedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
+	})
+	if err != nil {
+		return usecase.RuleSettings{}, fmt.Errorf("save rule settings: %w", err)
+	}
+	t := row.UpdatedAt.Time
+	return usecase.RuleSettings{MinCount: int(row.RuleCandidateMinCount), Decisions: row.RuleCandidateDecisions, UpdatedAt: &t}, nil
+}
+
+// ActiveEngagements implements usecase.Store.
+func (p *Postgres) ActiveEngagements(ctx context.Context, org int64) ([]usecase.Subject, error) {
+	rows, err := p.q.ListActiveEngagementsForRules(ctx, org)
+	if err != nil {
+		return nil, fmt.Errorf("active engagements: %w", err)
+	}
+	out := make([]usecase.Subject, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.Subject{OrganizationID: org, EngagementID: r.ID, TaxpayerID: r.TaxpayerID})
+	}
+	return out, nil
+}
+
+// PreviewLines implements usecase.Store.
+func (p *Postgres) PreviewLines(ctx context.Context, org, eng int64, since time.Time, limit int32) ([]usecase.PreviewLine, error) {
+	rows, err := p.q.RulePreviewLines(ctx, db.RulePreviewLinesParams{
+		OrganizationID: org, EngagementID: pgtype.Int8{Int64: eng, Valid: eng > 0},
+		Since: pgtype.Date{Time: since, Valid: true}, Lim: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("rule preview lines: %w", err)
+	}
+	out := make([]usecase.PreviewLine, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.PreviewLine{
+			EngagementID: r.EngagementID, InvoiceID: r.InvoiceID, InvoiceUUID: r.InvoiceUuid, InvoiceNumber: r.InvoiceNumber,
+			IssueDate: r.IssueDate.Time, Direction: r.Direction, InvoiceType: r.Type, CustomerID: r.CustomerID.Int64,
+			TaxNumber: r.CustomerTaxNumber, IdentityNumber: r.CustomerIdentityNumber, CustomerName: r.CustomerName,
+			ItemID: r.ItemID, ItemName: r.ItemName, LineType: r.LineType, TaxRate: fromNumeric(r.TaxRate),
+			LineCode: r.LineCode.String, VATCode: r.VatCode.String, CustomerCode: r.CustomerCode.String,
+		})
+	}
+	return out, nil
 }

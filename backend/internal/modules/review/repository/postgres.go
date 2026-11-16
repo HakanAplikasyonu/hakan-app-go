@@ -224,6 +224,25 @@ func (p *Postgres) Settings(ctx context.Context, organizationID, engagementID in
 	return out, nil
 }
 
+// ImpactCounts implements usecase.Store: one aggregate over the office's
+// decided suggestions.
+func (p *Postgres) ImpactCounts(ctx context.Context, f usecase.ImpactFilter) (usecase.ImpactCounts, error) {
+	if f.Months < 1 || f.Months > usecase.MaxImpactMonths {
+		return usecase.ImpactCounts{}, fmt.Errorf("%w: months", usecase.ErrInvalid)
+	}
+	r, err := p.q.ReviewThresholdImpact(ctx, db.ReviewThresholdImpactParams{
+		Threshold: toNumeric(f.Threshold), OrganizationID: f.OrganizationID, AllEngagements: f.AllEngagements,
+		UserID: f.UserID, Months: int32(f.Months), Kind: optText(f.Kind), //nolint:gosec // bounded above
+	})
+	if err != nil {
+		return usecase.ImpactCounts{}, fmt.Errorf("review threshold impact: %w", err)
+	}
+	return usecase.ImpactCounts{
+		Decided: r.Decided, WouldAutoAccept: r.WouldAutoAccept, WouldAutoAcceptThenCorrected: r.WouldAutoAcceptThenCorrected,
+		CurrentlyAutoAccepted: r.CurrentlyAutoAccepted, WouldGoToQueue: r.WouldGoToQueue,
+	}, nil
+}
+
 // UpsertSetting implements usecase.Store.
 func (p *Postgres) UpsertSetting(ctx context.Context, organizationID, engagementID int64, row usecase.SettingRow, userID int64) error {
 	auto := pgtype.Bool{}

@@ -24,6 +24,8 @@ type WarningQueries interface {
 	ListTenantDataWarnings(ctx context.Context, arg db.ListTenantDataWarningsParams) ([]db.ListTenantDataWarningsRow, error)
 	CountTenantDataWarnings(ctx context.Context, arg db.CountTenantDataWarningsParams) (int64, error)
 	DecideDataWarning(ctx context.Context, arg db.DecideDataWarningParams) (int64, error)
+	GroupTenantDataWarnings(ctx context.Context, arg db.GroupTenantDataWarningsParams) ([]db.GroupTenantDataWarningsRow, error)
+	AcknowledgeTenantDataWarningsByCode(ctx context.Context, arg db.AcknowledgeTenantDataWarningsByCodeParams) (int64, error)
 }
 
 // Warnings is the Postgres engine.Store over data_warnings.
@@ -117,10 +119,7 @@ type Row struct {
 
 // List returns one page of warnings and the total.
 func (p *Warnings) List(ctx context.Context, f Filter) ([]Row, int64, error) {
-	eng := pgtype.Int8{}
-	if f.EngagementID > 0 {
-		eng = pgtype.Int8{Int64: f.EngagementID, Valid: true}
-	}
+	eng := optID(f.EngagementID)
 	rows, err := p.q.ListTenantDataWarnings(ctx, db.ListTenantDataWarningsParams{
 		OrganizationID: f.OrganizationID, EngagementID: eng, AllEngagements: f.AllEngagements, UserID: f.UserID,
 		Period: optText(f.Period), Code: optText(f.Code), Severity: optText(f.Severity),
@@ -179,6 +178,63 @@ func (p *Warnings) Decide(ctx context.Context, organizationID, engagementID int6
 		return false, fmt.Errorf("decide data warning: %w", err)
 	}
 	return n > 0, nil
+}
+
+// Group is the warnings of one code in scope (issue #333).
+type Group struct {
+	Code     string `json:"code"`
+	Severity string `json:"severity"`
+	Count    int64  `json:"count"`
+	// Engagements is the number of distinct engagements (office view only).
+	Engagements *int64    `json:"engagements,omitempty"`
+	LatestAt    time.Time `json:"latest_at"`
+}
+
+// Groups counts the warnings matching f (Code, EntityType, Limit and
+// Offset are ignored) by code: heaviest severity first, then most frequent.
+func (p *Warnings) Groups(ctx context.Context, f Filter) ([]Group, error) {
+	rows, err := p.q.GroupTenantDataWarnings(ctx, db.GroupTenantDataWarningsParams{
+		OrganizationID: f.OrganizationID, EngagementID: optID(f.EngagementID), AllEngagements: f.AllEngagements,
+		UserID: f.UserID, Period: optText(f.Period), Severity: optText(f.Severity), Status: optText(f.Status),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("group data warnings: %w", err)
+	}
+	out := make([]Group, 0, len(rows))
+	for _, r := range rows {
+		g := Group{Code: r.Code, Severity: r.Severity, Count: r.WarningCount, LatestAt: r.LatestAt.Time}
+		if f.EngagementID == 0 {
+			n := r.EngagementCount
+			g.Engagements = &n
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// AcknowledgeByCode acknowledges every open warning of f.Code (and f.Period
+// when set) in scope, as Decide does for one: who and when are stored on
+// the row. Only active engagements are touched. Returns how many changed.
+func (p *Warnings) AcknowledgeByCode(ctx context.Context, f Filter) (int64, error) {
+	by := pgtype.Int8{}
+	if f.UserID > 0 {
+		by = pgtype.Int8{Int64: f.UserID, Valid: true}
+	}
+	n, err := p.q.AcknowledgeTenantDataWarningsByCode(ctx, db.AcknowledgeTenantDataWarningsByCodeParams{
+		ResolvedBy: by, OrganizationID: f.OrganizationID, EngagementID: optID(f.EngagementID),
+		AllEngagements: f.AllEngagements, UserID: f.UserID, Code: f.Code, Period: optText(f.Period),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("acknowledge data warnings: %w", err)
+	}
+	return n, nil
+}
+
+func optID(id int64) pgtype.Int8 {
+	if id <= 0 {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: id, Valid: true}
 }
 
 func optInt8(v *int64) pgtype.Int8 {

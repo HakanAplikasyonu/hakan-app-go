@@ -261,6 +261,40 @@ func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request, eng int64)
 	response.JSON(w, r, http.StatusOK, out)
 }
 
+// ThresholdImpact: GET /v1/tenant/review/threshold-impact?threshold=&months=&kind=
+// (issue #333): what an office-wide threshold would have done. Without
+// tenant.engagements.read_all only assigned engagements are counted.
+func (h *Handler) ThresholdImpact(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	raw := q.Get("threshold")
+	if raw == "" {
+		response.BadRequest(w, r, response.CodeValidationError, "threshold is required")
+		return
+	}
+	thr, err := decimal.NewFromString(raw)
+	if err != nil {
+		response.BadRequest(w, r, response.CodeValidationError, "threshold must be a decimal")
+		return
+	}
+	months := 0
+	if v := q.Get("months"); v != "" {
+		if months, err = strconv.Atoi(v); err != nil || months <= 0 {
+			response.BadRequest(w, r, response.CodeValidationError, "months must be between 1 and 24")
+			return
+		}
+	}
+	s := orgctx.Must(r.Context())
+	out, err := h.svc.ThresholdImpact(r.Context(), usecase.ImpactFilter{
+		OrganizationID: s.ID, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), UserID: userID(r),
+		Threshold: thr, Months: months, Kind: q.Get("kind"),
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
 type putSetting struct {
 	Kind       string  `json:"kind"`
 	AutoAccept *bool   `json:"auto_accept"`

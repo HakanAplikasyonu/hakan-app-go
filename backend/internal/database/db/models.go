@@ -77,6 +77,14 @@ type AccountRule struct {
 	RetiredAt      pgtype.Timestamptz `json:"retired_at"`
 }
 
+type AccountRuleSetting struct {
+	OrganizationID         int64              `json:"organization_id"`
+	RuleCandidateMinCount  int32              `json:"rule_candidate_min_count"`
+	RuleCandidateDecisions string             `json:"rule_candidate_decisions"`
+	UpdatedBy              pgtype.Int8        `json:"updated_by"`
+	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ActivityEvent struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

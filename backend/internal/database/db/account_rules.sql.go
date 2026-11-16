@@ -23,18 +23,19 @@ SELECT (s.inputs->>'counterparty_key')::text AS counterparty_key,
 FROM suggestions s
 WHERE s.organization_id = $1 AND s.engagement_id = $2
   AND s.kind = 'account_code' AND s.target_type = 'invoice_item' AND s.target_field = 'account_code'
-  AND s.status IN ('accepted', 'corrected')
+  AND (s.status = 'corrected' OR ($3::bool AND s.status = 'accepted'))
   AND (s.rule_ref IS NULL OR s.rule_ref NOT LIKE 'account_rule:%')
   AND s.inputs ? 'counterparty_key'
   AND s.applied_value ? 'account_code'
 GROUP BY 1, 3, 4, 5
-HAVING COUNT(*) >= $3::bigint
+HAVING COUNT(*) >= $4::bigint
 ORDER BY decisions DESC, account_code
 `
 
 type AccountRuleCandidatesParams struct {
 	OrganizationID int64 `json:"organization_id"`
 	EngagementID   int64 `json:"engagement_id"`
+	IncludeAccepts bool  `json:"include_accepts"`
 	MinCount       int64 `json:"min_count"`
 }
 
@@ -52,7 +53,12 @@ type AccountRuleCandidatesRow struct {
 // düzeltme / kabul kararları (kural dışı önerilerde). min_count kez
 // tekrarlanınca "kural yapılsın mı?" sorulur.
 func (q *Queries) AccountRuleCandidates(ctx context.Context, arg AccountRuleCandidatesParams) ([]AccountRuleCandidatesRow, error) {
-	rows, err := q.db.Query(ctx, accountRuleCandidates, arg.OrganizationID, arg.EngagementID, arg.MinCount)
+	rows, err := q.db.Query(ctx, accountRuleCandidates,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.IncludeAccepts,
+		arg.MinCount,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -279,6 +285,23 @@ func (q *Queries) GetAccountRuleByID(ctx context.Context, arg GetAccountRuleByID
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.RetiredAt,
+	)
+	return i, err
+}
+
+const getAccountRuleSettings = `-- name: GetAccountRuleSettings :one
+SELECT organization_id, rule_candidate_min_count, rule_candidate_decisions, updated_by, updated_at FROM account_rule_settings WHERE organization_id = $1
+`
+
+func (q *Queries) GetAccountRuleSettings(ctx context.Context, organizationID int64) (AccountRuleSetting, error) {
+	row := q.db.QueryRow(ctx, getAccountRuleSettings, organizationID)
+	var i AccountRuleSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.RuleCandidateMinCount,
+		&i.RuleCandidateDecisions,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -673,6 +696,38 @@ func (q *Queries) ListAccountRules(ctx context.Context, arg ListAccountRulesPara
 	return items, nil
 }
 
+const listActiveEngagementsForRules = `-- name: ListActiveEngagementsForRules :many
+SELECT e.id, e.taxpayer_id FROM engagements e
+WHERE e.organization_id = $1 AND e.ended_at IS NULL
+ORDER BY e.id
+`
+
+type ListActiveEngagementsForRulesRow struct {
+	ID         int64 `json:"id"`
+	TaxpayerID int64 `json:"taxpayer_id"`
+}
+
+// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
+func (q *Queries) ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error) {
+	rows, err := q.db.Query(ctx, listActiveEngagementsForRules, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListActiveEngagementsForRulesRow{}
+	for rows.Next() {
+		var i ListActiveEngagementsForRulesRow
+		if err := rows.Scan(&i.ID, &i.TaxpayerID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const retireAccountRule = `-- name: RetireAccountRule :execrows
 UPDATE account_rules SET status = 'retired', retired_at = NOW()
 WHERE organization_id = $1 AND id = $2 AND status = 'active'
@@ -689,6 +744,106 @@ func (q *Queries) RetireAccountRule(ctx context.Context, arg RetireAccountRulePa
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const rulePreviewLines = `-- name: RulePreviewLines :many
+SELECT e.id AS engagement_id, i.id AS invoice_id, i.uuid AS invoice_uuid, i.invoice_number, i.issue_date,
+       i.direction, i.type, i.customer_id,
+       COALESCE(i.customer_tax_number, '')::text AS customer_tax_number,
+       COALESCE(i.customer_identity_number, '')::text AS customer_identity_number,
+       COALESCE(i.customer_name, '')::text AS customer_name,
+       it.id AS item_id, it.name AS item_name, it.line_type, it.tax_rate,
+       la.account_code AS line_code, va.account_code AS vat_code, ca.account_code AS customer_code
+FROM engagements e
+JOIN invoices i ON i.taxpayer_id = e.taxpayer_id
+JOIN invoice_items it ON it.taxpayer_id = i.taxpayer_id AND it.invoice_id = i.id
+LEFT JOIN account_assignments la ON la.organization_id = e.organization_id AND la.engagement_id = e.id
+     AND la.target_type = 'invoice_item' AND la.target_id = it.id AND la.field = 'account_code'
+LEFT JOIN account_assignments va ON va.organization_id = e.organization_id AND va.engagement_id = e.id
+     AND va.target_type = 'invoice_item' AND va.target_id = it.id AND va.field = 'vat_account_code'
+LEFT JOIN account_assignments ca ON ca.organization_id = e.organization_id AND ca.engagement_id = e.id
+     AND ca.target_type = 'customer' AND ca.target_id = i.customer_id AND ca.field = 'account_code'
+WHERE e.organization_id = $1 AND e.ended_at IS NULL
+  AND ($2::bigint IS NULL OR e.id = $2)
+  AND i.issue_date >= $3::date
+ORDER BY i.issue_date DESC, i.id, it.line_no
+LIMIT $4
+`
+
+type RulePreviewLinesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	Since          pgtype.Date `json:"since"`
+	Lim            int32       `json:"lim"`
+}
+
+type RulePreviewLinesRow struct {
+	EngagementID           int64          `json:"engagement_id"`
+	InvoiceID              int64          `json:"invoice_id"`
+	InvoiceUuid            uuid.UUID      `json:"invoice_uuid"`
+	InvoiceNumber          string         `json:"invoice_number"`
+	IssueDate              pgtype.Date    `json:"issue_date"`
+	Direction              string         `json:"direction"`
+	Type                   string         `json:"type"`
+	CustomerID             pgtype.Int8    `json:"customer_id"`
+	CustomerTaxNumber      string         `json:"customer_tax_number"`
+	CustomerIdentityNumber string         `json:"customer_identity_number"`
+	CustomerName           string         `json:"customer_name"`
+	ItemID                 int64          `json:"item_id"`
+	ItemName               string         `json:"item_name"`
+	LineType               string         `json:"line_type"`
+	TaxRate                pgtype.Numeric `json:"tax_rate"`
+	LineCode               pgtype.Text    `json:"line_code"`
+	VatCode                pgtype.Text    `json:"vat_code"`
+	CustomerCode           pgtype.Text    `json:"customer_code"`
+}
+
+// Kural önizlemesi (#333): kaydedilmemiş bir kuralın son N ayda hangi fatura
+// satırlarına uyacağı ve o satırlara onaylanmış hesap kodları. engagement_id
+// verilmezse ofisin bütün aktif engagement'ları (ofis şablon kuralı).
+// tenant-lint: org-wide engagement verilmezse ofisin bütün aktif engagement'ları; organization_id ile sınırlı
+func (q *Queries) RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error) {
+	rows, err := q.db.Query(ctx, rulePreviewLines,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Since,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RulePreviewLinesRow{}
+	for rows.Next() {
+		var i RulePreviewLinesRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.InvoiceID,
+			&i.InvoiceUuid,
+			&i.InvoiceNumber,
+			&i.IssueDate,
+			&i.Direction,
+			&i.Type,
+			&i.CustomerID,
+			&i.CustomerTaxNumber,
+			&i.CustomerIdentityNumber,
+			&i.CustomerName,
+			&i.ItemID,
+			&i.ItemName,
+			&i.LineType,
+			&i.TaxRate,
+			&i.LineCode,
+			&i.VatCode,
+			&i.CustomerCode,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const upsertAccountAssignment = `-- name: UpsertAccountAssignment :one
@@ -737,6 +892,41 @@ func (q *Queries) UpsertAccountAssignment(ctx context.Context, arg UpsertAccount
 	var previous_code string
 	err := row.Scan(&previous_code)
 	return previous_code, err
+}
+
+const upsertAccountRuleSettings = `-- name: UpsertAccountRuleSettings :one
+INSERT INTO account_rule_settings (organization_id, rule_candidate_min_count, rule_candidate_decisions, updated_by, updated_at)
+VALUES ($1, $2, $3, $4, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET rule_candidate_min_count = EXCLUDED.rule_candidate_min_count,
+    rule_candidate_decisions = EXCLUDED.rule_candidate_decisions,
+    updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, rule_candidate_min_count, rule_candidate_decisions, updated_by, updated_at
+`
+
+type UpsertAccountRuleSettingsParams struct {
+	OrganizationID         int64       `json:"organization_id"`
+	RuleCandidateMinCount  int32       `json:"rule_candidate_min_count"`
+	RuleCandidateDecisions string      `json:"rule_candidate_decisions"`
+	UpdatedBy              pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertAccountRuleSettings(ctx context.Context, arg UpsertAccountRuleSettingsParams) (AccountRuleSetting, error) {
+	row := q.db.QueryRow(ctx, upsertAccountRuleSettings,
+		arg.OrganizationID,
+		arg.RuleCandidateMinCount,
+		arg.RuleCandidateDecisions,
+		arg.UpdatedBy,
+	)
+	var i AccountRuleSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.RuleCandidateMinCount,
+		&i.RuleCandidateDecisions,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertCounterpartyAccount = `-- name: UpsertCounterpartyAccount :exec

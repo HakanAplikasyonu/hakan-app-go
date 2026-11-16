@@ -610,7 +610,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		excel:    excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log)),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
-			WithControls(warningscontrols.New(deps.Queries, warningEngine)),
+			WithControls(warningscontrols.New(deps.Queries, warningEngine)).
+			WithActivity(activityRec),
 		review:       reviewhandler.New(reviewSvc, activityRec),
 		receipts:     receiptshandler.New(receiptsSvc),
 		accountrules: accountruleshandler.New(accountRulesSvc),

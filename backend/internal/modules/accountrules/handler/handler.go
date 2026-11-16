@@ -4,7 +4,10 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
@@ -199,9 +202,88 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrNotFound):
 		response.NotFound(w, r, err.Error())
-	case errors.Is(err, usecase.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
+	case errors.Is(err, usecase.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid), errors.Is(err, usecase.ErrInvalidSettings):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	default:
 		response.InternalErr(w, r, err, "Unexpected server error")
 	}
+}
+
+// RuleSettings: GET /v1/tenant/account-rule-settings (#333).
+func (h *Handler) RuleSettings(w http.ResponseWriter, r *http.Request) {
+	set, err := h.svc.RuleSettings(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, set)
+}
+
+type ruleSettingsBody struct {
+	MinCount  int    `json:"rule_candidate_min_count"`
+	Decisions string `json:"rule_candidate_decisions"`
+}
+
+// PutRuleSettings: PUT /v1/tenant/account-rule-settings — owner / admin
+// (tenant.settings.write).
+func (h *Handler) PutRuleSettings(w http.ResponseWriter, r *http.Request) {
+	var in ruleSettingsBody
+	if !decode(w, r, &in) {
+		return
+	}
+	set, err := h.svc.SaveRuleSettings(r.Context(), orgctx.Must(r.Context()).ID,
+		usecase.RuleSettings{MinCount: in.MinCount, Decisions: in.Decisions}, userID(r))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, set)
+}
+
+// PreviewRuleSettings: GET /v1/tenant/account-rule-settings/preview
+// ?rule_candidate_min_count=&rule_candidate_decisions= — the candidate
+// count today and under the proposed setting; nothing is stored.
+func (h *Handler) PreviewRuleSettings(w http.ResponseWriter, r *http.Request) {
+	org := orgctx.Must(r.Context()).ID
+	cur, err := h.svc.RuleSettings(r.Context(), org)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	proposed := usecase.RuleSettings{MinCount: cur.MinCount, Decisions: cur.Decisions}
+	q := r.URL.Query()
+	if v := q.Get("rule_candidate_min_count"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			writeError(w, r, fmt.Errorf("%w: rule_candidate_min_count must be a number", usecase.ErrInvalidSettings))
+			return
+		}
+		proposed.MinCount = n
+	}
+	if v := q.Get("rule_candidate_decisions"); v != "" {
+		proposed.Decisions = v
+	}
+	out, err := h.svc.PreviewRuleSettings(r.Context(), org, proposed)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+// PreviewRule: POST /v1/tenant/account-rules/preview (office template, every
+// active engagement) and POST .../engagements/{e}/account-rules/preview —
+// what an unsaved rule would match in the last 6 months (#333).
+func (h *Handler) PreviewRule(w http.ResponseWriter, r *http.Request) {
+	var in usecase.RuleInput
+	if !decode(w, r, &in) {
+		return
+	}
+	org, eng := level(r)
+	out, err := h.svc.PreviewRule(r.Context(), org, eng, in, time.Now())
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
 }

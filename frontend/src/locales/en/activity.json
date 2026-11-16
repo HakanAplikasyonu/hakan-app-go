@@ -57,5 +57,6 @@
   "actions.vat.opening.delete": "VAT opening carry-forward deleted",
   "actions.security.rate_limited": "Rate limit hit",
   "actions.security.login_locked": "Sign-in locked after failed attempts",
-  "actions.security.upload_rejected": "Upload rejected (file type)"
+  "actions.security.upload_rejected": "Upload rejected (file type)",
+  "actions.warnings.acknowledge_bulk": "Warnings acknowledged in bulk"
 }

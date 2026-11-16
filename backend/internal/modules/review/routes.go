@@ -32,6 +32,7 @@ func (m Module) Routes(r *module.Router) {
 	read, decide, settings := rbac.PermTenantReviewRead, rbac.PermTenantReviewDecide, rbac.PermTenantReviewSettingsWrite
 	r.Tenant("GET /v1/tenant/review/suggestions", read, h.ListOffice)
 	r.Tenant("GET /v1/tenant/review/settings", read, h.GetOfficeSettings)
+	r.Tenant("GET /v1/tenant/review/threshold-impact", read, h.ThresholdImpact)
 	r.Tenant("PUT /v1/tenant/review/settings", settings, h.PutOfficeSetting)
 	r.Tenant("DELETE /v1/tenant/review/settings/{kind}", settings, h.DeleteOfficeSetting)
 	if m.Engagements == nil {

@@ -3623,6 +3623,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/warnings/groups": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office data warnings grouped by code
+         * @description Requires `tenant.warnings.read`. Same visibility as
+         *     `GET /v1/tenant/warnings`: without `tenant.engagements.read_all` only
+         *     engagements assigned to the caller are counted. One row per code:
+         *     heaviest severity among its warnings, warning count, number of
+         *     distinct engagements and the latest update. Ordered blocker, warning,
+         *     info, then by count (descending). Status defaults to `open`; `all`
+         *     counts every status.
+         */
+        get: operations["listOfficeWarningGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/warnings/acknowledge-bulk": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge every open warning of a code across the office
+         * @description Requires `tenant.warnings.write`. Sets every open warning of `code`
+         *     (in `period` when given) to acknowledged, recording who and when on
+         *     each row as the single acknowledge does. Only engagements the caller
+         *     may see are touched (without `tenant.engagements.read_all`: assigned
+         *     ones), and only active engagements. The note goes to the activity log.
+         *     Returns how many warnings changed (0 is not an error).
+         */
+        post: operations["acknowledgeOfficeWarningsBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/warnings": {
         parameters: {
             query?: never;
@@ -3645,6 +3708,67 @@ export interface paths {
         get: operations["listEngagementWarnings"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warnings/groups": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Data warnings of one engagement grouped by code
+         * @description Requires `tenant.warnings.read`, `tenant.engagements.read` and
+         *     engagement access. As the office groups, without `engagements`.
+         */
+        get: operations["listEngagementWarningGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge every open warning of a code in one engagement
+         * @description Requires `tenant.warnings.write` and engagement access. Sets every
+         *     open warning of `code` (in `period` when given) of the engagement to
+         *     acknowledged, recording who and when on each row as the single
+         *     acknowledge does. The note goes to the activity log. Returns how many
+         *     warnings changed (0 is not an error).
+         */
+        post: operations["acknowledgeEngagementWarningsBulk"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4227,6 +4351,40 @@ export interface paths {
          * @description Requires `tenant.review.settings.write`. kind `*` = every kind; null fields inherit.
          */
         put: operations["putOfficeReviewSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/review/threshold-impact": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What an office-wide auto-accept threshold would have done
+         * @description Requires `tenant.review.read`. Over the office's suggestions decided
+         *     in the last `months` months (pending and superseded ones are not
+         *     decisions), counts how many a threshold of `threshold` would have
+         *     applied automatically (confidence >= threshold), how many of those a
+         *     person later corrected or rejected, how many are auto-accepted today
+         *     and how many would have gone to the queue. Without
+         *     `tenant.engagements.read_all` only assigned engagements are counted.
+         *     `current_threshold` / `current_auto_accept` are the office's effective
+         *     policy for `kind` (or `*`), as in `GET /v1/tenant/review/settings`.
+         */
+        get: operations["getReviewThresholdImpact"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -7565,6 +7723,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/account-rules/preview": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview an unsaved office rule over every active engagement (#333)
+         * @description Requires `tenant.account_rules.read`. Evaluates the rule (same body as
+         *     creating one; nothing is stored) over the invoice lines of the last 6
+         *     months of every active engagement of the office. A line / VAT rule
+         *     matches lines, a counterparty rule whole invoices. "approved" is the
+         *     field's confirmed account code; `approved_different` counts the
+         *     matches confirmed with another code. At most 20 000 lines are
+         *     evaluated (`truncated`).
+         */
+        post: operations["previewOfficeAccountRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-rules/preview": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview an unsaved company rule over the last 6 months (#333)
+         * @description Like the office preview, for this engagement only. Requires `tenant.account_rules.read`.
+         */
+        post: operations["previewEngagementAccountRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/account-rule-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's rule candidate setting (#333)
+         * @description Requires `tenant.account_rules.read`. How many matching decisions
+         *     (2–10, default 3) make a "make it a rule?" candidate and which
+         *     decisions count (`corrections_only` or `corrections_and_accepts`,
+         *     the default). Automatic acceptances never count. `default` is true
+         *     while the office has not set one.
+         */
+        get: operations["getAccountRuleSettings"];
+        /**
+         * Set the office's rule candidate setting (#333)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putAccountRuleSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/account-rule-settings/preview": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Candidates today and under a proposed setting (#333)
+         * @description Requires `tenant.account_rules.read`. Counts the open candidates (not
+         *     yet covered by a rule) over every active engagement, under the
+         *     current setting and under the proposed one (query parameters; a
+         *     missing one keeps the current value). Nothing is stored.
+         */
+        get: operations["previewAccountRuleSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rules": {
         parameters: {
             query?: never;
@@ -8621,6 +8902,70 @@ export interface components {
                 /** @enum {string} */
                 status: "acknowledged" | "resolved";
             };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WarningGroup: {
+            code: string;
+            severity: components["schemas"]["WarningSeverity"];
+            /** Format: int64 */
+            count: number;
+            /**
+             * Format: int64
+             * @description Distinct engagements; office view only
+             */
+            engagements?: number;
+            /** Format: date-time */
+            latest_at: string;
+        };
+        EnvelopeWarningGroups: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["WarningGroup"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WarningBulkAcknowledgeInput: {
+            /** @description Catalog warning code */
+            code: string;
+            period?: string;
+            note?: string;
+        };
+        EnvelopeWarningBulkAcknowledge: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                /** Format: int64 */
+                acknowledged: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReviewThresholdImpact: {
+            /** @example 0.90 */
+            threshold: string;
+            months: number;
+            kind: string | null;
+            /** @example 0.9500 */
+            current_threshold: string;
+            current_auto_accept: boolean;
+            /** Format: int64 */
+            decided: number;
+            /** Format: int64 */
+            would_auto_accept: number;
+            /**
+             * Format: int64
+             * @description Of would_auto_accept: corrected or rejected by a person
+             */
+            would_auto_accept_then_corrected: number;
+            /** Format: int64 */
+            currently_auto_accepted: number;
+            /** Format: int64 */
+            would_go_to_queue: number;
+        };
+        EnvelopeReviewThresholdImpact: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ReviewThresholdImpact"];
             meta: components["schemas"]["ResponseMeta"];
         };
         Suggestion: {
@@ -12387,6 +12732,70 @@ export interface components {
             line_type?: "goods" | "service" | "fixed_asset_candidate" | "discount" | "expense" | "unknown";
             /** @example 20 */
             tax_rate?: string;
+        };
+        AccountRuleSettingsInput: {
+            rule_candidate_min_count: number;
+            /** @enum {string} */
+            rule_candidate_decisions: "corrections_only" | "corrections_and_accepts";
+        };
+        AccountRuleSettings: {
+            rule_candidate_min_count: number;
+            /** @enum {string} */
+            rule_candidate_decisions: "corrections_only" | "corrections_and_accepts";
+            /** Format: date-time */
+            updated_at?: string;
+            /** @description True while the office has not set one */
+            default: boolean;
+        };
+        EnvelopeAccountRuleSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AccountRuleSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        AccountRuleSettingsPreviewSide: components["schemas"]["AccountRuleSettings"] & {
+            candidates: number;
+            /** @description Engagements with at least one candidate */
+            engagements: number;
+        };
+        EnvelopeAccountRuleSettingsPreview: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                current: components["schemas"]["AccountRuleSettingsPreviewSide"];
+                proposed: components["schemas"]["AccountRuleSettingsPreviewSide"];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        AccountRulePreview: {
+            /** @example 6 */
+            months: number;
+            /** Format: date */
+            since: string;
+            /** @description Invoices the rule fits */
+            documents: number;
+            /** @description Lines (or invoices for a counterparty rule) the rule fits */
+            lines: number;
+            /** @description Matches with a confirmed account code */
+            approved: number;
+            /** @description Matches confirmed with another code than the rule's */
+            approved_different: number;
+            truncated: boolean;
+            samples: {
+                /** Format: uuid */
+                invoice_uuid: string;
+                invoice_number: string;
+                /** Format: date */
+                issue_date: string;
+                item_name?: string;
+                approved_code: string;
+            }[];
+        };
+        EnvelopeAccountRulePreview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AccountRulePreview"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         AccountRuleInput: {
             /**
@@ -18422,6 +18831,74 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listOfficeWarningGroups: {
+        parameters: {
+            query?: {
+                period?: string;
+                severity?: components["schemas"]["WarningSeverity"];
+                status?: "open" | "acknowledged" | "resolved" | "auto_resolved" | "all";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningGroups"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acknowledgeOfficeWarningsBulk: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarningBulkAcknowledgeInput"];
+            };
+        };
+        responses: {
+            /** @description Acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningBulkAcknowledge"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listEngagementWarnings: {
         parameters: {
             query?: {
@@ -18454,6 +18931,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeDataWarningPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementWarningGroups: {
+        parameters: {
+            query?: {
+                period?: string;
+                severity?: components["schemas"]["WarningSeverity"];
+                status?: "open" | "acknowledged" | "resolved" | "auto_resolved" | "all";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningGroups"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acknowledgeEngagementWarningsBulk: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WarningBulkAcknowledgeInput"];
+            };
+        };
+        responses: {
+            /** @description Acknowledged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWarningBulkAcknowledge"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -19531,6 +20082,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeReviewSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getReviewThresholdImpact: {
+        parameters: {
+            query: {
+                /** @description 0.50–1.00, at most two decimals */
+                threshold: string;
+                months?: number;
+                /** @description Suggestion kind; omitted = every kind */
+                kind?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Impact summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReviewThresholdImpact"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -24806,6 +25393,172 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewOfficeAccountRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountRulePreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewEngagementAccountRule: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountRulePreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getAccountRuleSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountRuleSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putAccountRuleSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountRuleSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountRuleSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewAccountRuleSettings: {
+        parameters: {
+            query?: {
+                rule_candidate_min_count?: number;
+                rule_candidate_decisions?: "corrections_only" | "corrections_and_accepts";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Both sides */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAccountRuleSettingsPreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

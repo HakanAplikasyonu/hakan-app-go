@@ -39,6 +39,12 @@ const (
 // authzTable classifies every operation (generated from the observed
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
+	// Rule preview and rule candidate setting (#333); the setting is written by owner / admin.
+	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,
+	"POST /v1/tenant/engagements/{engagementUuid}/account-rules/preview": azTenantReadAction,
+	"GET /v1/tenant/account-rule-settings":                               azTenantRead,
+	"PUT /v1/tenant/account-rule-settings":                               azTenantWrite,
+	"GET /v1/tenant/account-rule-settings/preview":                       azTenantRead,
 	"GET /healthz":                                                                  azPublic,
 	"GET /readyz":                                                                   azPublic,
 	"GET /v1/app/config":                                                            azPublic,
@@ -356,6 +362,8 @@ var authzTable = map[string]authzClass{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                                   azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                                      azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/warnings":                                                  azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/warnings/groups":                                           azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk":                                azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge":                       azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve":                           azTenantWrite,
 	"GET /v1/tenant/excel-import-templates":                                                                 azTenantRead,
@@ -377,6 +385,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/periods/matrix":                                                                         azTenantRead,
 	"GET /v1/tenant/petition-templates":                                                                     azTenantRead,
 	"GET /v1/tenant/review/settings":                                                                        azTenantRead,
+	"GET /v1/tenant/review/threshold-impact":                                                                azTenantRead,
 	"PUT /v1/tenant/review/settings":                                                                        azTenantWrite,
 	"DELETE /v1/tenant/review/settings/{kind}":                                                              azTenantWrite,
 	"GET /v1/tenant/review/suggestions":                                                                     azTenantRead,
@@ -401,4 +410,6 @@ var authzTable = map[string]authzClass{
 	"DELETE /v1/tenant/warning-rules/{code}":                                                                azTenantWrite,
 	"PUT /v1/tenant/warning-rules/{code}":                                                                   azTenantWrite,
 	"GET /v1/tenant/warnings":                                                                               azTenantRead,
+	"GET /v1/tenant/warnings/groups":                                                                        azTenantRead,
+	"POST /v1/tenant/warnings/acknowledge-bulk":                                                             azTenantWrite,
 }

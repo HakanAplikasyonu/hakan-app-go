@@ -23,6 +23,9 @@ type Querier interface {
 	// düzeltme / kabul kararları (kural dışı önerilerde). min_count kez
 	// tekrarlanınca "kural yapılsın mı?" sorulur.
 	AccountRuleCandidates(ctx context.Context, arg AccountRuleCandidatesParams) ([]AccountRuleCandidatesRow, error)
+	// tenant-lint: org-wide toplu "görüldü" (#333); read_all yoksa engagement_assignments ile süzülür, yalnızca aktif engagement
+	// DecideDataWarning'in toplu hâli: kapsamdaki bu kodlu bütün açık uyarılar.
+	AcknowledgeTenantDataWarningsByCode(ctx context.Context, arg AcknowledgeTenantDataWarningsByCodeParams) (int64, error)
 	// Kilitleme: o mükellef + döneme süren fatura yazımları bitene kadar bekler.
 	AcquirePeriodLockExclusive(ctx context.Context, arg AcquirePeriodLockExclusiveParams) error
 	// Dönem yönetimi (issue #32): kilit, hazırlık durumu, değişiklik talepleri.
@@ -279,6 +282,7 @@ type Querier interface {
 	// tenant-lint: cross-org worker finishes the job it claimed by id
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
 	GetAccountRuleByID(ctx context.Context, arg GetAccountRuleByIDParams) (AccountRule, error)
+	GetAccountRuleSettings(ctx context.Context, organizationID int64) (AccountRuleSetting, error)
 	GetActiveAccountPlanImport(ctx context.Context, arg GetActiveAccountPlanImportParams) (AccountPlanImport, error)
 	GetActiveAccountRuleForUpdate(ctx context.Context, arg GetActiveAccountRuleForUpdateParams) (AccountRule, error)
 	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
@@ -435,6 +439,9 @@ type Querier interface {
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
+	// tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
+	// Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
+	GroupTenantDataWarnings(ctx context.Context, arg GroupTenantDataWarningsParams) ([]GroupTenantDataWarningsRow, error)
 	HasActivePushDevices(ctx context.Context, userID int64) (bool, error)
 	HasPendingOwnerOrganizationInvitationForEmail(ctx context.Context, arg HasPendingOwnerOrganizationInvitationForEmailParams) (bool, error)
 	// Önceki durumu da döner: offline → online geçişi kayda değer.
@@ -512,6 +519,8 @@ type Querier interface {
 	ListAccountRuleVersions(ctx context.Context, arg ListAccountRuleVersionsParams) ([]AccountRule, error)
 	// Bir seviyenin (ofis şablonu: engagement_id NULL) kuralları.
 	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
+	// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
+	ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
 	ListActivePushDevicesByUser(ctx context.Context, userID int64) ([]PushDevice, error)
@@ -873,6 +882,9 @@ type Querier interface {
 	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
+	// tenant-lint: org-wide eşik etkisi özeti (#333); yalnızca sayım, read_all yoksa engagement_assignments ile süzülür
+	// Son @months ayda karara bağlanmış (bekleyen ve yerine yenisi gelen hariç) öneriler.
+	ReviewThresholdImpact(ctx context.Context, arg ReviewThresholdImpactParams) (ReviewThresholdImpactRow, error)
 	// Password change / reset, deactivation: every session ends (#323).
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
 	RevokeDesktopAgent(ctx context.Context, arg RevokeDesktopAgentParams) (int64, error)
@@ -892,6 +904,11 @@ type Querier interface {
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	RevokeTaxpayerInvitation(ctx context.Context, arg RevokeTaxpayerInvitationParams) (int64, error)
 	RewrapSecretRecord(ctx context.Context, arg RewrapSecretRecordParams) (int64, error)
+	// Kural önizlemesi (#333): kaydedilmemiş bir kuralın son N ayda hangi fatura
+	// satırlarına uyacağı ve o satırlara onaylanmış hesap kodları. engagement_id
+	// verilmezse ofisin bütün aktif engagement'ları (ofis şablon kuralı).
+	// tenant-lint: org-wide engagement verilmezse ofisin bütün aktif engagement'ları; organization_id ile sınırlı
+	RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
@@ -978,6 +995,7 @@ type Querier interface {
 	UpdateWebAuthnCredentialName(ctx context.Context, arg UpdateWebAuthnCredentialNameParams) (WebauthnCredential, error)
 	// Önceki değeri döndürür (inceleme kuyruğu geri alma için saklar).
 	UpsertAccountAssignment(ctx context.Context, arg UpsertAccountAssignmentParams) (string, error)
+	UpsertAccountRuleSettings(ctx context.Context, arg UpsertAccountRuleSettingsParams) (AccountRuleSetting, error)
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error

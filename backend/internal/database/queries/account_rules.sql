@@ -94,7 +94,7 @@ SELECT (s.inputs->>'counterparty_key')::text AS counterparty_key,
 FROM suggestions s
 WHERE s.organization_id = @organization_id AND s.engagement_id = @engagement_id
   AND s.kind = 'account_code' AND s.target_type = 'invoice_item' AND s.target_field = 'account_code'
-  AND s.status IN ('accepted', 'corrected')
+  AND (s.status = 'corrected' OR (@include_accepts::bool AND s.status = 'accepted'))
   AND (s.rule_ref IS NULL OR s.rule_ref NOT LIKE 'account_rule:%')
   AND s.inputs ? 'counterparty_key'
   AND s.applied_value ? 'account_code'
@@ -150,3 +150,48 @@ SELECT (EXISTS (SELECT 1 FROM account_plan_imports p
      OR EXISTS (SELECT 1 FROM account_rules r
                 WHERE r.organization_id = @organization_id AND r.engagement_id = @engagement_id
                   AND r.status = 'active'))::boolean AS has_memory;
+
+-- name: GetAccountRuleSettings :one
+SELECT * FROM account_rule_settings WHERE organization_id = @organization_id;
+
+-- name: UpsertAccountRuleSettings :one
+INSERT INTO account_rule_settings (organization_id, rule_candidate_min_count, rule_candidate_decisions, updated_by, updated_at)
+VALUES (@organization_id, @rule_candidate_min_count, @rule_candidate_decisions, sqlc.narg(updated_by), NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET rule_candidate_min_count = EXCLUDED.rule_candidate_min_count,
+    rule_candidate_decisions = EXCLUDED.rule_candidate_decisions,
+    updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING *;
+
+-- tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
+-- name: ListActiveEngagementsForRules :many
+SELECT e.id, e.taxpayer_id FROM engagements e
+WHERE e.organization_id = @organization_id AND e.ended_at IS NULL
+ORDER BY e.id;
+
+-- Kural önizlemesi (#333): kaydedilmemiş bir kuralın son N ayda hangi fatura
+-- satırlarına uyacağı ve o satırlara onaylanmış hesap kodları. engagement_id
+-- verilmezse ofisin bütün aktif engagement'ları (ofis şablon kuralı).
+-- tenant-lint: org-wide engagement verilmezse ofisin bütün aktif engagement'ları; organization_id ile sınırlı
+-- name: RulePreviewLines :many
+SELECT e.id AS engagement_id, i.id AS invoice_id, i.uuid AS invoice_uuid, i.invoice_number, i.issue_date,
+       i.direction, i.type, i.customer_id,
+       COALESCE(i.customer_tax_number, '')::text AS customer_tax_number,
+       COALESCE(i.customer_identity_number, '')::text AS customer_identity_number,
+       COALESCE(i.customer_name, '')::text AS customer_name,
+       it.id AS item_id, it.name AS item_name, it.line_type, it.tax_rate,
+       la.account_code AS line_code, va.account_code AS vat_code, ca.account_code AS customer_code
+FROM engagements e
+JOIN invoices i ON i.taxpayer_id = e.taxpayer_id
+JOIN invoice_items it ON it.taxpayer_id = i.taxpayer_id AND it.invoice_id = i.id
+LEFT JOIN account_assignments la ON la.organization_id = e.organization_id AND la.engagement_id = e.id
+     AND la.target_type = 'invoice_item' AND la.target_id = it.id AND la.field = 'account_code'
+LEFT JOIN account_assignments va ON va.organization_id = e.organization_id AND va.engagement_id = e.id
+     AND va.target_type = 'invoice_item' AND va.target_id = it.id AND va.field = 'vat_account_code'
+LEFT JOIN account_assignments ca ON ca.organization_id = e.organization_id AND ca.engagement_id = e.id
+     AND ca.target_type = 'customer' AND ca.target_id = i.customer_id AND ca.field = 'account_code'
+WHERE e.organization_id = @organization_id AND e.ended_at IS NULL
+  AND (sqlc.narg(engagement_id)::bigint IS NULL OR e.id = sqlc.narg(engagement_id))
+  AND i.issue_date >= @since::date
+ORDER BY i.issue_date DESC, i.id, it.line_no
+LIMIT @lim;

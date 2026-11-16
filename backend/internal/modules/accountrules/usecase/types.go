@@ -119,7 +119,16 @@ type Store interface {
 	// TCKN under mainCode (#319); ok false when none.
 	CounterpartyAccount(ctx context.Context, s Subject, taxID, mainCode string) (code, name string, ok bool, err error)
 	Assigned(ctx context.Context, s Subject, targetType string, ids []int64) (map[int64]map[string]string, error)
-	Candidates(ctx context.Context, s Subject, minCount int64) ([]Candidate, error)
+	Candidates(ctx context.Context, s Subject, minCount int64, includeAccepts bool) ([]Candidate, error)
+	// RuleSettings is the office's rule candidate setting (#333); the
+	// default when the office has none.
+	RuleSettings(ctx context.Context, org int64) (RuleSettings, error)
+	SaveRuleSettings(ctx context.Context, org int64, in RuleSettings, userID int64) (RuleSettings, error)
+	// ActiveEngagements lists the office's active engagements (id, taxpayer).
+	ActiveEngagements(ctx context.Context, org int64) ([]Subject, error)
+	// PreviewLines are the invoice lines of the last months for a rule
+	// preview: one engagement, or every active one of the office (eng 0).
+	PreviewLines(ctx context.Context, org, eng int64, since time.Time, limit int32) ([]PreviewLine, error)
 	// HasMemory reports whether the engagement has an imported plan or an
 	// active rule (#319: automatic suggestions run only then).
 	HasMemory(ctx context.Context, s Subject) (bool, error)

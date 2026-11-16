@@ -458,8 +458,18 @@ func (s *Service) activeRules(ctx context.Context, sub Subject) ([]engine.Rule, 
 }
 
 // Candidates returns repeated decisions that no active rule covers yet.
+// The office's rule candidate setting decides how many decisions and which
+// ones count (#333).
 func (s *Service) Candidates(ctx context.Context, sub Subject) ([]Candidate, error) {
-	cs, err := s.store.Candidates(ctx, sub, MinCandidateDecisions)
+	set, err := s.store.RuleSettings(ctx, sub.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	return s.candidates(ctx, sub, set)
+}
+
+func (s *Service) candidates(ctx context.Context, sub Subject, set RuleSettings) ([]Candidate, error) {
+	cs, err := s.store.Candidates(ctx, sub, int64(set.MinCount), set.includeAccepts())
 	if err != nil {
 		return nil, err
 	}

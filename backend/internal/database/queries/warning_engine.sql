@@ -59,3 +59,41 @@ WHERE w.organization_id = @organization_id
   AND (sqlc.narg(severity)::text IS NULL OR w.severity = sqlc.narg(severity)::text)
   AND (sqlc.narg(status)::text IS NULL OR w.status = sqlc.narg(status)::text)
   AND (sqlc.narg(entity_type)::text IS NULL OR w.entity_type = sqlc.narg(entity_type)::text);
+
+-- tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
+-- name: GroupTenantDataWarnings :many
+-- Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
+SELECT w.code,
+       (CASE max(CASE w.severity WHEN 'blocker' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END)
+            WHEN 3 THEN 'blocker' WHEN 2 THEN 'warning' ELSE 'info' END)::text AS severity,
+       count(*)::bigint AS warning_count,
+       count(DISTINCT w.engagement_id)::bigint AS engagement_count,
+       max(w.updated_at)::timestamptz AS latest_at
+FROM data_warnings w
+WHERE w.organization_id = @organization_id
+  AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
+  AND (@all_engagements::bool OR w.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
+  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(severity)::text IS NULL OR w.severity = sqlc.narg(severity)::text)
+  AND (sqlc.narg(status)::text IS NULL OR w.status = sqlc.narg(status)::text)
+GROUP BY w.code
+ORDER BY max(CASE w.severity WHEN 'blocker' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END) DESC,
+         count(*) DESC, w.code;
+
+-- tenant-lint: org-wide toplu "görüldü" (#333); read_all yoksa engagement_assignments ile süzülür, yalnızca aktif engagement
+-- name: AcknowledgeTenantDataWarningsByCode :execrows
+-- DecideDataWarning'in toplu hâli: kapsamdaki bu kodlu bütün açık uyarılar.
+UPDATE data_warnings w
+SET status = 'acknowledged', resolved_by = sqlc.narg(resolved_by), resolved_at = NOW()
+WHERE w.organization_id = @organization_id
+  AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
+  AND (@all_engagements::bool OR w.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
+  AND w.engagement_id IN (
+        SELECT e.id FROM engagements e
+        WHERE e.organization_id = @organization_id AND e.status = 'active')
+  AND w.code = @code AND w.status = 'open'
+  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text);

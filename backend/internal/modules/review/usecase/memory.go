@@ -165,6 +165,35 @@ func (m *MemoryStore) DeleteSetting(_ context.Context, _, engagementID int64, ki
 	return false, nil
 }
 
+// ImpactCounts implements Store.
+// No assignment filtering: tests pass AllEngagements.
+func (m *MemoryStore) ImpactCounts(_ context.Context, f ImpactFilter) (ImpactCounts, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	organizationID, threshold, kind := f.OrganizationID, f.Threshold, f.Kind
+	since := time.Now().AddDate(0, -f.Months, 0)
+	var c ImpactCounts
+	for _, r := range m.rows {
+		if r.OrganizationID != organizationID || r.Status == StatusPending || r.Status == StatusSuperseded ||
+			r.DecidedAt == nil || r.DecidedAt.Before(since) || (kind != "" && r.Input.Kind != kind) {
+			continue
+		}
+		c.Decided++
+		if r.Input.Confidence.GreaterThanOrEqual(threshold) {
+			c.WouldAutoAccept++
+			if (r.Status == StatusCorrected || r.Status == StatusRejected) && r.DecidedBy != nil {
+				c.WouldAutoAcceptThenCorrected++
+			}
+		} else {
+			c.WouldGoToQueue++
+		}
+		if r.Status == StatusAutoAccepted {
+			c.CurrentlyAutoAccepted++
+		}
+	}
+	return c, nil
+}
+
 func sameTarget(a, b Input) bool {
 	return a.Kind == b.Kind && a.TargetType == b.TargetType && a.TargetField == b.TargetField &&
 		((a.TargetID == nil && b.TargetID == nil) || (a.TargetID != nil && b.TargetID != nil && *a.TargetID == *b.TargetID))
