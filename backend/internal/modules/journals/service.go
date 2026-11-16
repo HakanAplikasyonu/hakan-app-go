@@ -20,6 +20,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -63,7 +64,10 @@ type Service struct {
 
 // New builds the service.
 func New(pool DB, store ObjectStore) *Service {
-	return &Service{db: pool, q: db.New(pool), store: store, now: time.Now}
+	// Ambient: statements and transactions join the request's row level
+	// security scope when there is one (issue #166).
+	amb := database.Ambient{Pool: pool}
+	return &Service{db: amb, q: db.New(amb), store: store, now: time.Now}
 }
 
 // WithPlanLoader sets how the target account plan is found.

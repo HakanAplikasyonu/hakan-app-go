@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
 	invoicerepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
@@ -18,6 +20,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningsrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -116,8 +119,19 @@ func assertMatches(t *testing.T, name string, f usecase.Forecast, ref sqlTotals)
 	}
 }
 
+// officeScope is the scope rls.Middleware builds for an office user with
+// read_all on an office-wide route.
+func officeScope(t *testing.T, pool *pgxpool.Pool, orgID int64) rls.Scope {
+	t.Helper()
+	ids, err := database.VisibleTaxpayers(pool)(context.Background(), orgID, 0, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return rls.Scope{OrganizationID: orgID, EngagementsReadAll: true, TaxpayerIDs: ids}
+}
+
 func newService(pool *pgxpool.Pool, now *time.Time) *usecase.Service {
-	q := db.New(pool)
+	q := database.NewQueries(pool)
 	cfg := warningsrepo.NewConfig(q)
 	return usecase.New(repository.New(q), cfg, engine.New(warningsrepo.NewWarnings(q), cfg)).
 		WithClock(func() time.Time { return *now })
@@ -126,109 +140,115 @@ func newService(pool *pgxpool.Pool, now *time.Time) *usecase.Service {
 // Kabul ölçütü (#33): demo verisinde tahmin, invoice_tax_summary toplamıyla aynı.
 func TestDemoForecastMatchesInvoiceTaxSummaries(t *testing.T) {
 	d := testdb.Open(t)
-	ctx := context.Background()
 	orgID, tps := loadDemo(t, d)
 	now := time.Date(2026, 11, 15, 10, 0, 0, 0, usecase.Istanbul)
 	svc := newService(d.Pool, &now)
 
-	byKey := map[string]usecase.Forecast{}
-	for _, tp := range tps {
-		f, err := svc.Forecast(ctx, tp.sub, demoPeriod)
+	// The service runs as the API runs it: in the office's row level
+	// security scope (vat_carry_forwards is enforced, issue #166).
+	if err := rls.WithScope(context.Background(), d.Pool, officeScope(t, d.Pool, orgID), func(ctx context.Context, _ pgx.Tx) error {
+		byKey := map[string]usecase.Forecast{}
+		for _, tp := range tps {
+			f, err := svc.Forecast(ctx, tp.sub, demoPeriod)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertMatches(t, tp.key, f, referenceTotals(t, d.Pool, tp.sub.TaxpayerID, demoPeriod))
+			if f.Totals.InvoiceCount != int64(tp.invoice) {
+				t.Errorf("%s: %d invoices counted, %d demo files loaded", tp.key, f.Totals.InvoiceCount, tp.invoice)
+			}
+			if f.CarryForward.Source != "none" || !f.Totals.CarriedIn.Dec().IsZero() {
+				t.Errorf("%s: no earlier data, carry %+v", tp.key, f.CarryForward)
+			}
+			if f.Calendar.DueDate != "2026-11-30" || f.Calendar.DaysLeft != 15 || !f.Calendar.RolledForward {
+				t.Errorf("%s: calendar %+v", tp.key, f.Calendar)
+			}
+			t.Logf("%s %s: hesaplanan %s (tevkifat %s), indirilecek %s, net %s, faturalar %d",
+				tp.key, demoPeriod, f.Totals.OutputVAT.Dec().StringFixed(2), f.Totals.OutputWithholding.Dec().StringFixed(2),
+				f.Totals.InputVAT.Dec().StringFixed(2), f.Totals.Net.Dec().StringFixed(2), f.Totals.InvoiceCount)
+			byKey[tp.key] = f
+		}
+		atlas, selin := byKey["atlas"], byKey["selin"]
+		// The demo set covers tevkifat (atlas-03) and an incoming return
+		// (atlas-05); make sure they are really in the numbers.
+		if !atlas.Totals.OutputWithholding.Dec().IsPositive() || !atlas.Totals.InputVAT.Dec().IsPositive() || !atlas.Totals.OutputVAT.Dec().IsPositive() {
+			t.Errorf("atlas totals look empty: %+v", atlas.Totals)
+		}
+		if !selin.Totals.OutputVAT.Dec().IsZero() || !selin.Totals.InputVAT.Dec().IsPositive() || !selin.Totals.CarryOut.Dec().IsPositive() {
+			t.Errorf("selin only buys: %+v", selin.Totals)
+		}
+		hasIade := false
+		for _, l := range atlas.Lines {
+			if l.Type == "IADE" && l.Direction == usecase.DirectionIncoming {
+				hasIade = true
+			}
+		}
+		if !hasIade {
+			t.Error("atlas IADE line missing")
+		}
+
+		// Cancelled and deleted-at-source invoices drop out on both sides.
+		a := tps[0]
+		if _, err := d.Pool.Exec(ctx, `UPDATE invoices SET status_normalized = 'cancelled'
+		WHERE id = (SELECT id FROM invoices WHERE taxpayer_id = $1 AND direction = 'outgoing' ORDER BY id LIMIT 1)`, a.sub.TaxpayerID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := d.Pool.Exec(ctx, `UPDATE invoices SET deleted_at_source = NOW()
+		WHERE id = (SELECT id FROM invoices WHERE taxpayer_id = $1 AND direction = 'incoming' ORDER BY id LIMIT 1)`, a.sub.TaxpayerID); err != nil {
+			t.Fatal(err)
+		}
+		f, err := svc.Forecast(ctx, a.sub, demoPeriod)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assertMatches(t, tp.key, f, referenceTotals(t, d.Pool, tp.sub.TaxpayerID, demoPeriod))
-		if f.Totals.InvoiceCount != int64(tp.invoice) {
-			t.Errorf("%s: %d invoices counted, %d demo files loaded", tp.key, f.Totals.InvoiceCount, tp.invoice)
+		assertMatches(t, "atlas after cancel", f, referenceTotals(t, d.Pool, a.sub.TaxpayerID, demoPeriod))
+		if f.Excluded.Cancelled != 1 || f.Excluded.DeletedAtSource != 1 || f.Totals.OutputVAT.Dec().Equal(atlas.Totals.OutputVAT.Dec()) {
+			t.Errorf("exclusions not applied: %+v %+v", f.Excluded, f.Totals)
 		}
-		if f.CarryForward.Source != "none" || !f.Totals.CarriedIn.Dec().IsZero() {
-			t.Errorf("%s: no earlier data, carry %+v", tp.key, f.CarryForward)
-		}
-		if f.Calendar.DueDate != "2026-11-30" || f.Calendar.DaysLeft != 15 || !f.Calendar.RolledForward {
-			t.Errorf("%s: calendar %+v", tp.key, f.Calendar)
-		}
-		t.Logf("%s %s: hesaplanan %s (tevkifat %s), indirilecek %s, net %s, faturalar %d",
-			tp.key, demoPeriod, f.Totals.OutputVAT.Dec().StringFixed(2), f.Totals.OutputWithholding.Dec().StringFixed(2),
-			f.Totals.InputVAT.Dec().StringFixed(2), f.Totals.Net.Dec().StringFixed(2), f.Totals.InvoiceCount)
-		byKey[tp.key] = f
-	}
-	atlas, selin := byKey["atlas"], byKey["selin"]
-	// The demo set covers tevkifat (atlas-03) and an incoming return
-	// (atlas-05); make sure they are really in the numbers.
-	if !atlas.Totals.OutputWithholding.Dec().IsPositive() || !atlas.Totals.InputVAT.Dec().IsPositive() || !atlas.Totals.OutputVAT.Dec().IsPositive() {
-		t.Errorf("atlas totals look empty: %+v", atlas.Totals)
-	}
-	if !selin.Totals.OutputVAT.Dec().IsZero() || !selin.Totals.InputVAT.Dec().IsPositive() || !selin.Totals.CarryOut.Dec().IsPositive() {
-		t.Errorf("selin only buys: %+v", selin.Totals)
-	}
-	hasIade := false
-	for _, l := range atlas.Lines {
-		if l.Type == "IADE" && l.Direction == usecase.DirectionIncoming {
-			hasIade = true
-		}
-	}
-	if !hasIade {
-		t.Error("atlas IADE line missing")
-	}
 
-	// Cancelled and deleted-at-source invoices drop out on both sides.
-	a := tps[0]
-	if _, err := d.Pool.Exec(ctx, `UPDATE invoices SET status_normalized = 'cancelled'
-		WHERE id = (SELECT id FROM invoices WHERE taxpayer_id = $1 AND direction = 'outgoing' ORDER BY id LIMIT 1)`, a.sub.TaxpayerID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := d.Pool.Exec(ctx, `UPDATE invoices SET deleted_at_source = NOW()
-		WHERE id = (SELECT id FROM invoices WHERE taxpayer_id = $1 AND direction = 'incoming' ORDER BY id LIMIT 1)`, a.sub.TaxpayerID); err != nil {
-		t.Fatal(err)
-	}
-	f, err := svc.Forecast(ctx, a.sub, demoPeriod)
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertMatches(t, "atlas after cancel", f, referenceTotals(t, d.Pool, a.sub.TaxpayerID, demoPeriod))
-	if f.Excluded.Cancelled != 1 || f.Excluded.DeletedAtSource != 1 || f.Totals.OutputVAT.Dec().Equal(atlas.Totals.OutputVAT.Dec()) {
-		t.Errorf("exclusions not applied: %+v %+v", f.Excluded, f.Totals)
-	}
+		// Devreden KDV: November has no data; selin's October credit carries in.
+		s := tps[1]
+		nov, err := svc.Forecast(ctx, s.sub, "2026-11")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if nov.CarryForward.Source != "computed" || !nov.Totals.CarriedIn.Dec().Equal(selin.Totals.CarryOut.Dec()) {
+			t.Errorf("carry into 2026-11: %s, want %s (%+v)", nov.Totals.CarriedIn.Dec(), selin.Totals.CarryOut.Dec(), nov.CarryForward)
+		}
+		// A manual opening into October restarts the chain.
+		if _, err := svc.SetOpening(ctx, s.sub, usecase.OpeningInput{Period: demoPeriod, Amount: "1000.00"}, 0); err != nil {
+			t.Fatal(err)
+		}
+		oct, _ := svc.Forecast(ctx, s.sub, demoPeriod)
+		nov, _ = svc.Forecast(ctx, s.sub, "2026-11")
+		if !oct.Totals.CarriedIn.Dec().Equal(decimal.NewFromInt(1000)) || oct.CarryForward.Source != "opening" ||
+			!nov.Totals.CarriedIn.Dec().Equal(oct.Totals.CarryOut.Dec()) {
+			t.Errorf("opening: oct %+v nov %+v", oct.Totals, nov.Totals)
+		}
+		ops, err := svc.ListOpenings(ctx, s.sub)
+		if err != nil || len(ops) != 1 || ops[0].Period != demoPeriod {
+			t.Fatalf("openings %v %+v", err, ops)
+		}
+		// Openings are office work product: another office's engagement of the
+		// same taxpayer does not see them.
+		if err := svc.DeleteOpening(ctx, usecase.Subject{OrganizationID: d.Organization(t), EngagementID: s.sub.EngagementID}, demoPeriod); err != usecase.ErrOpeningNotFound {
+			t.Fatalf("cross-office delete: %v", err)
+		}
+		if err := svc.DeleteOpening(ctx, s.sub, demoPeriod); err != nil {
+			t.Fatal(err)
+		}
 
-	// Devreden KDV: November has no data; selin's October credit carries in.
-	s := tps[1]
-	nov, err := svc.Forecast(ctx, s.sub, "2026-11")
-	if err != nil {
+		items, total, err := svc.Office(ctx, usecase.OfficeFilter{OrganizationID: orgID, AllEngagements: true, Limit: 20}, demoPeriod)
+		if err != nil || total != 2 || len(items) != 2 {
+			t.Fatalf("office %v %d %d", err, total, len(items))
+		}
+		items, total, _ = svc.Office(ctx, usecase.OfficeFilter{OrganizationID: orgID, UserID: d.User(t), Limit: 20}, demoPeriod)
+		if total != 0 || len(items) != 0 {
+			t.Fatalf("unassigned member sees %d", total)
+		}
+		return nil
+	}); err != nil {
 		t.Fatal(err)
-	}
-	if nov.CarryForward.Source != "computed" || !nov.Totals.CarriedIn.Dec().Equal(selin.Totals.CarryOut.Dec()) {
-		t.Errorf("carry into 2026-11: %s, want %s (%+v)", nov.Totals.CarriedIn.Dec(), selin.Totals.CarryOut.Dec(), nov.CarryForward)
-	}
-	// A manual opening into October restarts the chain.
-	if _, err := svc.SetOpening(ctx, s.sub, usecase.OpeningInput{Period: demoPeriod, Amount: "1000.00"}, 0); err != nil {
-		t.Fatal(err)
-	}
-	oct, _ := svc.Forecast(ctx, s.sub, demoPeriod)
-	nov, _ = svc.Forecast(ctx, s.sub, "2026-11")
-	if !oct.Totals.CarriedIn.Dec().Equal(decimal.NewFromInt(1000)) || oct.CarryForward.Source != "opening" ||
-		!nov.Totals.CarriedIn.Dec().Equal(oct.Totals.CarryOut.Dec()) {
-		t.Errorf("opening: oct %+v nov %+v", oct.Totals, nov.Totals)
-	}
-	ops, err := svc.ListOpenings(ctx, s.sub)
-	if err != nil || len(ops) != 1 || ops[0].Period != demoPeriod {
-		t.Fatalf("openings %v %+v", err, ops)
-	}
-	// Openings are office work product: another office's engagement of the
-	// same taxpayer does not see them.
-	if err := svc.DeleteOpening(ctx, usecase.Subject{OrganizationID: d.Organization(t), EngagementID: s.sub.EngagementID}, demoPeriod); err != usecase.ErrOpeningNotFound {
-		t.Fatalf("cross-office delete: %v", err)
-	}
-	if err := svc.DeleteOpening(ctx, s.sub, demoPeriod); err != nil {
-		t.Fatal(err)
-	}
-
-	items, total, err := svc.Office(ctx, usecase.OfficeFilter{OrganizationID: orgID, AllEngagements: true, Limit: 20}, demoPeriod)
-	if err != nil || total != 2 || len(items) != 2 {
-		t.Fatalf("office %v %d %d", err, total, len(items))
-	}
-	items, total, _ = svc.Office(ctx, usecase.OfficeFilter{OrganizationID: orgID, UserID: d.User(t), Limit: 20}, demoPeriod)
-	if total != 0 || len(items) != 0 {
-		t.Fatalf("unassigned member sees %d", total)
 	}
 }
 

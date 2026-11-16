@@ -36,6 +36,7 @@ func NewHandler(svc *Service, files FileStore) *Handler { return &Handler{svc: s
 // nothing.
 func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
 	orgResolver orgctx.Resolver, engResolver engagementctx.Resolver, h *Handler,
+	scope func(http.Handler) http.Handler,
 ) {
 	if orgResolver == nil || engResolver == nil || h == nil {
 		return
@@ -49,6 +50,14 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	engaged := func(perm string, fn http.HandlerFunc) http.Handler {
 		return middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng)
 	}
+	// Routes reading export_settings (enforced, issue #166) run in one row
+	// level security transaction.
+	scoped := func(perm string, fn http.HandlerFunc) http.Handler {
+		if scope == nil {
+			return engaged(perm, fn)
+		}
+		return middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng, scope)
+	}
 	read, write, export := rbac.PermTenantJournalsRead, rbac.PermTenantJournalsWrite, rbac.PermTenantJournalsExport
 	mux.Handle("GET /v1/tenant/export-drivers", tenant(read, h.drivers))
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
@@ -58,11 +67,11 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/approve", engaged(write, h.approve))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
-	mux.Handle("POST "+base+"/journal-exports", engaged(export, h.export))
+	mux.Handle("POST "+base+"/journal-exports", scoped(export, h.export))
 	mux.Handle("GET "+base+"/journal-exports/{batchUuid}", engaged(read, h.getBatch))
 	mux.Handle("GET "+base+"/journal-exports/{batchUuid}/files/{fileName}", engaged(read, h.download))
-	mux.Handle("GET "+base+"/journal-export-settings", engaged(read, h.getSettings))
-	mux.Handle("PUT "+base+"/journal-export-settings", engaged(export, h.putSettings))
+	mux.Handle("GET "+base+"/journal-export-settings", scoped(read, h.getSettings))
+	mux.Handle("PUT "+base+"/journal-export-settings", scoped(export, h.putSettings))
 }
 
 func (h *Handler) drivers(w http.ResponseWriter, r *http.Request) {

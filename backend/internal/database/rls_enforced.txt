@@ -11,3 +11,5 @@
 #   4. rls_enforcement_db_test.go içindeki leakFixtures'a satır ekleyicisini
 #      yaz: kiracılar arası sızıntı testi her tablo için çalışır.
 petitions
+vat_carry_forwards
+export_settings

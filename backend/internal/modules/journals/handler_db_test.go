@@ -11,6 +11,9 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 func (e env) do(t *testing.T, fn http.HandlerFunc, method, body string, pv map[string]string) *httptest.ResponseRecorder {
@@ -27,8 +30,11 @@ func (e env) do(t *testing.T, fn http.HandlerFunc, method, body string, pv map[s
 	}
 	ctx := engagementctx.WithScope(r.Context(), e.scope)
 	ctx = authctx.WithPrincipal(ctx, authctx.Principal{UserInternal: e.actor})
+	ctx = orgctx.WithScope(ctx, orgctx.Scope{ID: e.scope.OrganizationID, Permissions: []string{rbac.PermTenantEngagementsReadAll}})
 	w := httptest.NewRecorder()
-	fn(w, r.WithContext(ctx))
+	// As in the API (issue #166): one row level security transaction per
+	// request.
+	rls.Middleware(e.pool, nil, nil)(fn).ServeHTTP(w, r.WithContext(ctx))
 	return w
 }
 

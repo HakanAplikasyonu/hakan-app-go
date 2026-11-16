@@ -62,5 +62,7 @@ func Ping(ctx context.Context, pool *pgxpool.Pool) error {
 
 // NewQueries returns sqlc Queries backed by the given pool.
 func NewQueries(pool *pgxpool.Pool) *db.Queries {
-	return db.New(pool)
+	// Statements join the context's transaction when there is one (issue
+	// #166): code inside rls.WithScope / rls.System stays in that scope.
+	return db.New(NewAmbient(pool))
 }
