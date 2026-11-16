@@ -25,7 +25,7 @@ RUN if [ -n "${RELEASE_JSON_B64}" ]; then \
     fi && \
     BI=github.com/HakanAplikasyonu/hakan-app-go/backend/internal/buildinfo && \
     LDFLAGS="-s -w -X ${BI}.Version=${VERSION} -X ${BI}.GitSHA=${GIT_SHA} -X ${BI}.BuildTime=${BUILD_TIME}" && \
-    for cmd in server worker release-record create-super-admin secrets-rotate field-crypt; do \
+    for cmd in server worker release-record create-super-admin secrets-rotate field-crypt egress-check; do \
       CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
       go build -trimpath -ldflags="${LDFLAGS}" -o "/out/${cmd}" "./cmd/${cmd}" || exit 1; \
     done
@@ -48,6 +48,7 @@ COPY --from=builder /out/release-record /app/release-record
 COPY --from=builder /out/create-super-admin /app/create-super-admin
 COPY --from=builder /out/secrets-rotate /app/secrets-rotate
 COPY --from=builder /out/field-crypt /app/field-crypt
+COPY --from=builder /out/egress-check /app/egress-check
 COPY migrations /app/migrations
 COPY deploy/docker/entrypoint.sh /app/entrypoint.sh
 

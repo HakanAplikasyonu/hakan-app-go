@@ -3983,6 +3983,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/context": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                suggestionUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Document behind a suggestion (müşavir mobil review)
+         * @description Requires `tenant.review.read` and engagement access. For an invoice
+         *     item suggestion: the invoice and the line. When the suggestion comes
+         *     from a receipt capture: the receipt, whose photo is served by
+         *     `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+         */
+        get: operations["getSuggestionContext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept": {
         parameters: {
             query?: never;
@@ -8886,6 +8918,43 @@ export interface components {
             data: components["schemas"]["EngagementContacts"];
             meta: components["schemas"]["ResponseMeta"];
         };
+        SuggestionContext: {
+            /** Format: uuid */
+            suggestion_uuid: string;
+            invoice: {
+                /** Format: uuid */
+                uuid: string;
+                invoice_number: string;
+                /** @enum {string} */
+                direction: "incoming" | "outgoing";
+                /** Format: date */
+                issue_date: string;
+                currency: string;
+                /** @description Decimal string */
+                payable_amount: string;
+                counterparty_name: string;
+            } | null;
+            item: {
+                /** Format: int32 */
+                line_no: number;
+                name: string;
+                quantity: string;
+                unit_code: string | null;
+                line_amount: string;
+                tax_rate: string;
+            } | null;
+            receipt: {
+                /** Format: uuid */
+                uuid: string;
+                media_type: string;
+            } | null;
+        };
+        EnvelopeSuggestionContext: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SuggestionContext"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeOfficeDashboard: {
             /** @enum {boolean} */
             success: true;
@@ -10601,8 +10670,11 @@ export interface components {
             document_no?: string;
             /** Format: date-time */
             document_date?: string;
-            /** @description With source_id: where the line came from (e.g. invoice) */
-            source_kind?: string;
+            /**
+             * @description With source_id: where the line came from. invoice_item + the item id: an accepted account code suggestion for that item is written to the line while the draft is not approved (issue #239).
+             * @enum {string}
+             */
+            source_kind?: "invoice" | "invoice_item" | "bank_transaction" | "receipt" | "manual";
             source_id?: string;
             confidence?: string;
         };
@@ -12036,6 +12108,19 @@ export interface components {
         };
     };
     responses: {
+        /**
+         * @description `STORAGE_UNAVAILABLE`: the object store refused the write (full or
+         *     unavailable, #247). Retry after `Retry-After` seconds.
+         */
+        StorageUnavailable: {
+            headers: {
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Validation or malformed request */
         BadRequest: {
             headers: {
@@ -17989,7 +18074,7 @@ export interface operations {
             };
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
-            /** @description `RECEIPTS_UNAVAILABLE` ya da `AI_UNAVAILABLE` */
+            /** @description `RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247) */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -18172,6 +18257,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getTaxpayerUpload: {
@@ -18460,6 +18546,40 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSuggestionContext: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                suggestionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSuggestionContext"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
@@ -18801,6 +18921,7 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getExcelImport: {
@@ -19196,6 +19317,7 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getReceiptCapture: {
@@ -20263,6 +20385,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getTenantUBLUpload: {
@@ -23364,6 +23487,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     downloadTaxpayerDocumentTaskUpload: {

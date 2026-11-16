@@ -368,6 +368,8 @@ type Querier interface {
 	GetStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) (StorageTrash, error)
 	GetSuggestion(ctx context.Context, arg GetSuggestionParams) (Suggestion, error)
 	GetSuggestionForUpdate(ctx context.Context, arg GetSuggestionForUpdateParams) (Suggestion, error)
+	// Müşavir mobil inceleme kuyruğu (issue #239).
+	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
@@ -872,6 +874,9 @@ type Querier interface {
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
+	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
+	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
+	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
 	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)

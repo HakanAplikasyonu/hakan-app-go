@@ -5757,6 +5757,34 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/context:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: suggestionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Review]
+      operationId: getSuggestionContext
+      summary: Document behind a suggestion (müşavir mobil review)
+      description: |
+        Requires `tenant.review.read` and engagement access. For an invoice
+        item suggestion: the invoice and the line. When the suggestion comes
+        from a receipt capture: the receipt, whose photo is served by
+        `.../receipts/{receiptUuid}/image`. Sections that do not apply are null.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSuggestionContext"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -11845,6 +11873,51 @@ components:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/EngagementContacts" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
+    SuggestionContext:
+      type: object
+      required: [suggestion_uuid, invoice, item, receipt]
+      properties:
+        suggestion_uuid: { type: string, format: uuid }
+        invoice:
+          oneOf:
+            - type: object
+              required: [uuid, invoice_number, direction, issue_date, currency, payable_amount, counterparty_name]
+              properties:
+                uuid: { type: string, format: uuid }
+                invoice_number: { type: string }
+                direction: { type: string, enum: [incoming, outgoing] }
+                issue_date: { type: string, format: date }
+                currency: { type: string }
+                payable_amount: { type: string, description: "Decimal string" }
+                counterparty_name: { type: string }
+            - type: "null"
+        item:
+          oneOf:
+            - type: object
+              required: [line_no, name, quantity, unit_code, line_amount, tax_rate]
+              properties:
+                line_no: { type: integer, format: int32 }
+                name: { type: string }
+                quantity: { type: string }
+                unit_code: { type: ["string", "null"] }
+                line_amount: { type: string }
+                tax_rate: { type: string }
+            - type: "null"
+        receipt:
+          oneOf:
+            - type: object
+              required: [uuid, media_type]
+              properties:
+                uuid: { type: string, format: uuid }
+                media_type: { type: string }
+            - type: "null"
+    EnvelopeSuggestionContext:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SuggestionContext" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeOfficeDashboard:
       type: object
       required: [success, data, meta]
@@ -14080,7 +14153,7 @@ components:
         foreign_amount: { type: string }
         document_no: { type: string }
         document_date: { type: string, format: date-time }
-        source_kind: { type: string, description: "With source_id: where the line came from (e.g. invoice)" }
+        source_kind: { type: string, enum: [invoice, invoice_item, bank_transaction, receipt, manual], description: "With source_id: where the line came from. invoice_item + the item id: an accepted account code suggestion for that item is written to the line while the draft is not approved (issue #239)." }
         source_id: { type: string }
         confidence: { type: string }
 

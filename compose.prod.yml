@@ -27,6 +27,12 @@ x-frontend-image: &frontend-image
   image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required}
   pull_policy: ${IMAGE_PULL_POLICY:-always}
 
+# Sabit çıkış IP'si isteyen hostlar (issue #256): İşNet e-fatura servisleri ve
+# Vakıfbank hesap hareketi servisi (docs/kaynak 32 §1, 22 §1), artı IP
+# denetiminin hostu. Backend ve worker yalnızca bu hostlar için egress
+# vekiline gider; egress-proxy de yalnızca bunlara izin verir.
+x-egress-proxy-hosts: &egress-proxy-hosts ${EGRESS_PROXY_HOSTS:-einvoiceservicetest.isnet.net.tr,einvoiceservice.isnet.net.tr,vbtestservice.vakifbank.com.tr,vbservice.vakifbank.com.tr,api.ipify.org}
+
 x-backend-environment: &backend-environment
   APP_NAME: ${APP_NAME:-api}
   APP_ENV: production
@@ -150,7 +156,10 @@ x-backend-environment: &backend-environment
   # Sabit çıkış IP'si (issue #45). WORKER_POOL: all | general | fixed-egress.
   # worker-egress profili açılınca ana worker'da WORKER_POOL=general yapın.
   WORKER_POOL: ${WORKER_POOL:-all}
-  EGRESS_PROXY_URL: ${EGRESS_PROXY_URL:-}
+  # Varsayılan: yığındaki egress-proxy (issue #256). Boş değer vekili kapatır
+  # (çağrılar doğrudan çıkar); başka bir sabit IP'li vekil de verilebilir.
+  EGRESS_PROXY_URL: ${EGRESS_PROXY_URL-http://egress-proxy.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:3128}
+  EGRESS_PROXY_HOSTS: *egress-proxy-hosts
   EGRESS_EXPECTED_IPS: ${EGRESS_EXPECTED_IPS:-}
   EGRESS_IP_CHECK_URL: ${EGRESS_IP_CHECK_URL:-https://api.ipify.org}
   EGRESS_CHECK_INTERVAL: ${EGRESS_CHECK_INTERVAL:-15m}
@@ -355,6 +364,33 @@ services:
       - app
       - dokploy-network
 
+  # Egress vekili (issue #256): İşNet ve Vakıfbank yalnızca izin listesindeki
+  # sabit IP'den gelen çağrıyı kabul ediyor. Backend ve worker bu hostlara
+  # buradan çıkar (EGRESS_PROXY_URL, EGRESS_PROXY_HOSTS); vekil yalnızca
+  # EGRESS_PROXY_HOSTS'taki hostlara HTTPS CONNECT verir, gerisini 403 ile
+  # reddeder. Çıkış IP'si bu sunucunun IP'sidir: entegratöre ve bankaya
+  # bildirilen IP budur (docs/deploy.md, "Sabit çıkış IP'si").
+  egress-proxy:
+    image: ubuntu/squid:6.6-24.04_edge
+    container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-egress-proxy
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/hakan/start.sh"]
+    environment:
+      EGRESS_PROXY_HOSTS: *egress-proxy-hosts
+    volumes:
+      - ./deploy/egress-proxy/squid.conf:/etc/squid/hakan.conf:ro
+      - ./deploy/egress-proxy/start.sh:/hakan/start.sh:ro
+    expose:
+      - "3128"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/3128"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+    networks:
+      - app
+
   migrate:
     <<: *backend-image
     container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-migrate
@@ -434,7 +470,8 @@ services:
   #   1. Bu servisi çıkış IP'si sabit bir sunucuda çalıştırın (Dokploy uzak
   #      sunucu / ayrı node), EGRESS_PROXY_URL boş kalsın.
   #   2. Bu sunucuda çalıştırın, çağrılar sabit IP'li bir ileri vekilden
-  #      (squid / tinyproxy / socks5) çıksın: EGRESS_PROXY_URL=http://...
+  #      çıksın. Varsayılan, yığındaki egress-proxy (#256); başka bir vekil
+  #      için EGRESS_PROXY_URL=http://...
   # İki durumda da EGRESS_EXPECTED_IPS'e allowlist'teki IP'yi yazın; IP
   # değişirse egress denetimi düşer (log + Sentry) ve
   # GET /v1/platform/egress durumu gösterir.
