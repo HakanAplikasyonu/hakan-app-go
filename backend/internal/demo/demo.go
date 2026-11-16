@@ -55,9 +55,15 @@ var Members = []Member{
 	{Email: "stajyer@" + EmailDomain, Name: "Can", Surname: "Kaya", RoleKey: "member", Title: "Stajyer"},
 }
 
-// TaxpayerUser is the taxpayer-side account (G4). It is created as a plain
-// user; linking it to Atlas Gıda needs taxpayer_members from issue #4.
+// TaxpayerUser is the taxpayer-side account (G4). The seed makes it a
+// TaxpayerUserRole member (taxpayer_members, issue #4) of TaxpayerUserOf.
 var TaxpayerUser = Member{Email: "mukellef@" + EmailDomain, Name: "Okan", Surname: "Atlas", Title: "Atlas Gıda yetkilisi"}
+
+// TaxpayerUserOf is the Taxpayer.Key the taxpayer-side account belongs to.
+const (
+	TaxpayerUserOf   = "atlas"
+	TaxpayerUserRole = "owner"
+)
 
 var Taxpayers = []Taxpayer{
 	{
