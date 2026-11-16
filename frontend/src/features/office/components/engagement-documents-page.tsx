@@ -21,6 +21,7 @@ import type { EngagementDocument } from "@/features/office/services/engagement-d
 import { currency, date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
+import { EngagementTabs } from "./engagement-overview";
 
 const PAGE_SIZE = 25;
 
@@ -218,6 +219,7 @@ export function EngagementDocumentsPage({
       }
     >
       <div className="space-y-6">
+        <EngagementTabs engagement={engagementUuid} />
         <EntitySectionCard title={t("office.engagement_history_title")}>
           <HistorySharesLine engagement={engagementUuid} enabled={canRead} />
         </EntitySectionCard>

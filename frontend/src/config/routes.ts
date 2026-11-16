@@ -119,6 +119,9 @@ export const routes = {
     taxpayerRequests: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/taxpayer-requests`,
     invoices: (slug: string) => `/t/${encodeURIComponent(slug)}/invoices`,
+    /** Faturalar, bir mükellefe süzülmüş (engagement seçici, #142). */
+    invoicesFor: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/invoices?taxpayer=${encodeURIComponent(engagementUuid)}`,
     /** Office invoice detail; `engagement` selects whose invoice (#142). */
     invoice: (slug: string, id: string, engagement?: string) =>
       `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}${engagement ? `?taxpayer=${encodeURIComponent(engagement)}` : ""}`,
