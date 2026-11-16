@@ -31,12 +31,12 @@ import (
 func (s *Service) ListMine(ctx context.Context, taxpayerID int64, f Filter) ([]Task, int64, error) {
 	status := optText(f.Status)
 	rows, err := s.q.ListTaxpayerDocumentTasks(ctx, db.ListTaxpayerDocumentTasksParams{
-		TaxpayerID: taxpayerID, Status: status, Lim: f.Limit, Off: f.Offset,
+		TaxpayerID: taxpayerID, Status: status, Period: optText(f.Period), Lim: f.Limit, Off: f.Offset,
 	})
 	if err != nil {
 		return nil, 0, err
 	}
-	total, err := s.q.CountTaxpayerDocumentTasks(ctx, db.CountTaxpayerDocumentTasksParams{TaxpayerID: taxpayerID, Status: status})
+	total, err := s.q.CountTaxpayerDocumentTasks(ctx, db.CountTaxpayerDocumentTasksParams{TaxpayerID: taxpayerID, Status: status, Period: optText(f.Period)})
 	if err != nil {
 		return nil, 0, err
 	}

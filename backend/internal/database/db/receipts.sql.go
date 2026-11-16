@@ -16,16 +16,23 @@ const countReceiptCaptures = `-- name: CountReceiptCaptures :one
 SELECT count(*)::bigint FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR status = $3::text)
+  AND ($4::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = $4)
 `
 
 type CountReceiptCapturesParams struct {
 	OrganizationID int64       `json:"organization_id"`
 	EngagementID   int64       `json:"engagement_id"`
 	Status         pgtype.Text `json:"status"`
+	Period         pgtype.Text `json:"period"`
 }
 
 func (q *Queries) CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countReceiptCaptures, arg.OrganizationID, arg.EngagementID, arg.Status)
+	row := q.db.QueryRow(ctx, countReceiptCaptures,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Status,
+		arg.Period,
+	)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -659,14 +666,16 @@ const listReceiptCaptures = `-- name: ListReceiptCaptures :many
 SELECT id, uuid, organization_id, engagement_id, taxpayer_id, uploaded_by, attachment_id, media_type, kind, status, fields, model, expense_id, retail_sale_id, duplicate_of, error, created_at, updated_at, client_key FROM receipt_captures
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR status = $3::text)
+  AND ($4::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = $4)
 ORDER BY created_at DESC, id DESC
-LIMIT $5 OFFSET $4
+LIMIT $6 OFFSET $5
 `
 
 type ListReceiptCapturesParams struct {
 	OrganizationID int64       `json:"organization_id"`
 	EngagementID   int64       `json:"engagement_id"`
 	Status         pgtype.Text `json:"status"`
+	Period         pgtype.Text `json:"period"`
 	Off            int32       `json:"off"`
 	Lim            int32       `json:"lim"`
 }
@@ -676,6 +685,7 @@ func (q *Queries) ListReceiptCaptures(ctx context.Context, arg ListReceiptCaptur
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Status,
+		arg.Period,
 		arg.Off,
 		arg.Lim,
 	)

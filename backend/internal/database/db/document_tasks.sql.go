@@ -119,16 +119,18 @@ FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 WHERE t.taxpayer_id = $1 AND e.taxpayer_id = $1
   AND ($2::text IS NULL OR t.status = $2)
+  AND ($3::text IS NULL OR t.period = $3)
 `
 
 type CountTaxpayerDocumentTasksParams struct {
 	TaxpayerID int64       `json:"taxpayer_id"`
 	Status     pgtype.Text `json:"status"`
+	Period     pgtype.Text `json:"period"`
 }
 
 // tenant-lint: cross-org mükellef kendi görevlerini sayar; taxpayer_id ve aktif engagement ile sınırlı
 func (q *Queries) CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countTaxpayerDocumentTasks, arg.TaxpayerID, arg.Status)
+	row := q.db.QueryRow(ctx, countTaxpayerDocumentTasks, arg.TaxpayerID, arg.Status, arg.Period)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -1097,13 +1099,15 @@ JOIN organizations o ON o.id = t.organization_id
 LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = $1 AND e.taxpayer_id = $1
   AND ($2::text IS NULL OR t.status = $2)
+  AND ($3::text IS NULL OR t.period = $3)
 ORDER BY t.due_at, t.id
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListTaxpayerDocumentTasksParams struct {
 	TaxpayerID int64       `json:"taxpayer_id"`
 	Status     pgtype.Text `json:"status"`
+	Period     pgtype.Text `json:"period"`
 	Off        int32       `json:"off"`
 	Lim        int32       `json:"lim"`
 }
@@ -1147,6 +1151,7 @@ func (q *Queries) ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpaye
 	rows, err := q.db.Query(ctx, listTaxpayerDocumentTasks,
 		arg.TaxpayerID,
 		arg.Status,
+		arg.Period,
 		arg.Off,
 		arg.Lim,
 	)

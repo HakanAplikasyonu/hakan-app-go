@@ -50,6 +50,10 @@ type Querier interface {
 	MarkNotificationFailed(ctx context.Context, arg db.MarkNotificationFailedParams) (db.Notification, error)
 	MarkNotificationRead(ctx context.Context, arg db.MarkNotificationReadParams) (db.Notification, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
+	ListScopedInbox(ctx context.Context, arg db.ListScopedInboxParams) ([]db.Notification, error)
+	CountScopedInbox(ctx context.Context, arg db.CountScopedInboxParams) (db.CountScopedInboxRow, error)
+	MarkScopedInboxRead(ctx context.Context, arg db.MarkScopedInboxReadParams) (db.Notification, error)
+	MarkScopedInboxAllRead(ctx context.Context, arg db.MarkScopedInboxAllReadParams) (int64, error)
 	InsertNotificationHistory(ctx context.Context, arg db.InsertNotificationHistoryParams) (db.NotificationHistory, error)
 	GetTemplateByCodeChannelLang(ctx context.Context, arg db.GetTemplateByCodeChannelLangParams) (db.NotificationTemplate, error)
 	GetNotificationPreferences(ctx context.Context, userID int64) (db.NotificationPreference, error)
@@ -751,3 +755,88 @@ func mustJSON(v any) []byte {
 
 // Ensure time import used (CreatedAt mapping).
 var _ = time.Time{}
+
+// InboxScope narrows the caller's inbox to one office (OrganizationID) or
+// one company (TaxpayerUUID, the mükellef panel), issue #333.
+type InboxScope struct {
+	OrganizationID int64
+	TaxpayerUUID   *uuid.UUID
+}
+
+func (sc InboxScope) params() (pgtype.Int8, pgtype.Text) {
+	org := pgtype.Int8{Int64: sc.OrganizationID, Valid: sc.OrganizationID > 0}
+	var tp pgtype.Text
+	if sc.TaxpayerUUID != nil {
+		tp = pgtype.Text{String: sc.TaxpayerUUID.String(), Valid: true}
+	}
+	return org, tp
+}
+
+// ScopedInbox is a page of the scoped inbox with its unread count.
+type ScopedInbox struct {
+	Items  []model.Notification `json:"items"`
+	Total  int64                `json:"total"`
+	Unread int64                `json:"unread"`
+	Limit  int32                `json:"limit"`
+	Offset int32                `json:"offset"`
+}
+
+// ListScopedInbox lists the caller's in-app notifications in one office or
+// company, newest first; period is YYYY-MM (office time) or "".
+func (s *Service) ListScopedInbox(ctx context.Context, userID int64, sc InboxScope, unreadOnly bool, period string, limit, offset int32) (ScopedInbox, error) {
+	org, tp := sc.params()
+	unread := pgtype.Bool{Bool: true, Valid: unreadOnly}
+	per := optionalText(period)
+	rows, err := s.q.ListScopedInbox(ctx, db.ListScopedInboxParams{
+		UserID: pgtype.Int8{Int64: userID, Valid: true}, OrganizationID: org, TaxpayerUuid: tp,
+		Unread: unread, Period: per, LimitCount: limit, OffsetCount: offset,
+	})
+	if err != nil {
+		return ScopedInbox{}, err
+	}
+	n, err := s.q.CountScopedInbox(ctx, db.CountScopedInboxParams{
+		UserID: pgtype.Int8{Int64: userID, Valid: true}, OrganizationID: org, TaxpayerUuid: tp, Unread: unread, Period: per,
+	})
+	if err != nil {
+		return ScopedInbox{}, err
+	}
+	out := ScopedInbox{Items: make([]model.Notification, 0, len(rows)), Total: n.Total, Unread: n.Unread, Limit: limit, Offset: offset}
+	for _, r := range rows {
+		out.Items = append(out.Items, s.project(r))
+	}
+	return out, nil
+}
+
+// ScopedUnread counts the caller's unread in-app notifications in the scope.
+func (s *Service) ScopedUnread(ctx context.Context, userID int64, sc InboxScope) (int64, error) {
+	org, tp := sc.params()
+	n, err := s.q.CountScopedInbox(ctx, db.CountScopedInboxParams{
+		UserID: pgtype.Int8{Int64: userID, Valid: true}, OrganizationID: org, TaxpayerUuid: tp,
+	})
+	return n.Unread, err
+}
+
+// MarkScopedRead marks one of the caller's notifications in the scope read;
+// another user's or another scope's notification is ErrNotFound.
+func (s *Service) MarkScopedRead(ctx context.Context, userID int64, sc InboxScope, id uuid.UUID) (model.Notification, error) {
+	org, tp := sc.params()
+	row, err := s.q.MarkScopedInboxRead(ctx, db.MarkScopedInboxReadParams{
+		Uuid: id, UserID: pgtype.Int8{Int64: userID, Valid: true}, OrganizationID: org, TaxpayerUuid: tp,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.Notification{}, ErrNotFound
+	}
+	if err != nil {
+		return model.Notification{}, err
+	}
+	return s.project(row), nil
+}
+
+// MarkScopedAllRead marks every unread notification of the caller in the
+// scope read and returns how many.
+func (s *Service) MarkScopedAllRead(ctx context.Context, userID int64, sc InboxScope) (int64, error) {
+	org, tp := sc.params()
+	return s.q.MarkScopedInboxAllRead(ctx, db.MarkScopedInboxAllReadParams{
+		UserID: pgtype.Int8{Int64: userID, Valid: true}, OrganizationID: org, TaxpayerUuid: tp,
+	})
+}
