@@ -15,6 +15,8 @@ export default function AppLayout() {
         headerBackButtonDisplayMode: 'minimal',
       }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="warnings/index" options={{ headerShown: true, title: 'Uyarılar' }} />
+      <Stack.Screen name="warnings/[uuid]" options={{ headerShown: true, title: 'Uyarı' }} />
     </Stack>
   );
 }

@@ -74,6 +74,7 @@ import (
 	notifhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
+	officedashmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	organizationsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations"
 	orghandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/handler"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
@@ -580,9 +581,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		periods:     periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:   summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
-		agents:   agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
-		legal:    legalhandler.New(legalSvc),
-		doctasks: doctasksmodule.NewHandler(docTasksSvc),
+		agents:     agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
+		legal:      legalhandler.New(legalSvc),
+		doctasks:   doctasksmodule.NewHandler(docTasksSvc),
+		officedash: &officedashmodule.Handler{Q: deps.Queries},
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

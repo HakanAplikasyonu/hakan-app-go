@@ -79,6 +79,8 @@ tags:
       geçmedi, hepsi taslak (`draft: true`) ve önizleme ile PDF bunu yazar.
   - name: TaxpayerPortal
     description: Mükellef kullanıcıları (ofis daveti, `X-Taxpayer` başlığı ile mükellef kabuğu). `TENANCY_ENABLED`.
+  - name: Dashboard
+    description: Ofis ana panosu (müşavir mobil, issue #237)
   - name: Warnings
     description: Warning engine (05-uyari-kodlari.md) rule configuration and warnings
   - name: Review
@@ -4672,6 +4674,35 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/dashboard:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Dashboard]
+      operationId: getOfficeDashboard
+      summary: Office home dashboard
+      description: |
+        Requires `tenant.engagements.read`. Counts of the review queue
+        (pending suggestions), document tasks (open, submitted, overdue),
+        open data warnings by severity and today's uploads (receipts, UBL
+        uploads, document task uploads since midnight Europe/Istanbul), plus
+        the latest uploads of the day (at most 10). Active engagements only;
+        without `tenant.engagements.read_all` only engagements assigned to the
+        caller. A section the caller may not read (`tenant.review.read`,
+        `tenant.doc_tasks.read`, `tenant.warnings.read`) is `null`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeDashboard"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/warnings:
     parameters:
@@ -11600,6 +11631,69 @@ components:
           type: array
           description: "`tenant.*` permission slugs granted in this organization only"
           items: { type: string }
+
+    OfficeDashboard:
+      type: object
+      required: [generated_at, since, review, doc_tasks, warnings, uploads]
+      properties:
+        generated_at: { type: string, format: date-time }
+        since: { type: string, format: date-time, description: "Start of today (Europe/Istanbul)" }
+        review:
+          oneOf:
+            - type: object
+              required: [pending]
+              properties:
+                pending: { type: integer, format: int64 }
+            - type: "null"
+        doc_tasks:
+          oneOf:
+            - type: object
+              required: [open, submitted, overdue]
+              properties:
+                open: { type: integer, format: int64 }
+                submitted: { type: integer, format: int64 }
+                overdue: { type: integer, format: int64, description: "Open tasks past due_at" }
+            - type: "null"
+        warnings:
+          oneOf:
+            - type: object
+              required: [open, blocker, warning, info]
+              properties:
+                open: { type: integer, format: int64 }
+                blocker: { type: integer, format: int64 }
+                warning: { type: integer, format: int64 }
+                info: { type: integer, format: int64 }
+            - type: "null"
+        uploads:
+          type: object
+          required: [total, receipts, invoices, documents, recent]
+          properties:
+            total: { type: integer, format: int64 }
+            receipts: { type: integer, format: int64 }
+            invoices: { type: integer, format: int64 }
+            documents: { type: integer, format: int64 }
+            recent:
+              type: array
+              items: { $ref: "#/components/schemas/OfficeDashboardUpload" }
+    OfficeDashboardUpload:
+      type: object
+      required: [kind, uuid, engagement_uuid, taxpayer_uuid, taxpayer_title, status, task_uuid, created_at]
+      properties:
+        kind: { type: string, enum: [receipt, invoice, document] }
+        uuid: { type: string, format: uuid, description: "Receipt capture, UBL upload job or document task upload" }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        status: { type: string, description: "Status of the receipt, the upload job or the document task" }
+        task_uuid: { type: ["string", "null"], format: uuid, description: "Document task of a document upload" }
+        created_at: { type: string, format: date-time }
+    EnvelopeOfficeDashboard:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeDashboard" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeTenantContext:
       type: object
