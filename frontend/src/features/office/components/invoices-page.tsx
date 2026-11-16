@@ -1,11 +1,12 @@
 "use client";
 
-import { FileText, TriangleAlert } from "lucide-react";
+import { FileText, PanelRightOpen, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { TacRozeti } from "@/components/hakan";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,16 +18,18 @@ import { useLocale } from "@/providers/locale-provider";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import { directionOf } from "../lib/from-api";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import { InvoiceDrawer } from "./invoice-drawer";
 import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
 import { useOfficePeriod } from "../period";
 
 type Dir = "all" | "outgoing" | "incoming";
 const PAGE = 50;
 
+// Tint token'ları (dört temada 4.5:1; saydam karışım seçili satırda yetmiyordu).
 const stateClass: Record<string, string> = {
-  active: "bg-status-approved/12 text-status-approved",
-  draft: "bg-secondary text-secondary-foreground",
-  cancelled: "bg-status-blocking/12 text-status-blocking",
+  active: "bg-ok-tint text-ok",
+  draft: "bg-surface-3 text-text-2",
+  cancelled: "bg-danger-tint text-danger",
 };
 
 /** status_normalized of the invoice (30 §8): counts in the declaration or not. */
@@ -55,12 +58,14 @@ function InvoicesInner() {
   const engagement = selected?.engagement ?? "";
 
   const direction = (params.get("direction") ?? "all") as Dir;
+  // Çekmecedeki fatura URL'de (#329): geri tuşu ve paylaşılan bağlantı çalışır.
+  const open = params.get("invoice");
   const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params);
-    if (value === "all" || value === "0") next.delete(key);
+    if (value === "all" || value === "0" || value === "") next.delete(key);
     else next.set(key, value);
-    if (key !== "offset") next.delete("offset");
+    if (key !== "offset" && key !== "invoice") next.delete("offset");
     router.replace(`${pathname}?${next.toString()}`);
   };
   const { period } = useOfficePeriod();
@@ -138,6 +143,9 @@ function InvoicesInner() {
           <TableBox>
             <thead>
               <tr>
+                <th className="w-8">
+                  <span className="sr-only">{t("office.col_status")}</span>
+                </th>
                 <th>{t("office.col_date")}</th>
                 <th>{t("office.col_number")}</th>
                 <th>{t("office.col_counterparty")}</th>
@@ -146,13 +154,35 @@ function InvoicesInner() {
                 <th className="text-right">{t("office.col_vat")}</th>
                 <th className="text-right">{t("office.col_payable")}</th>
                 <th>{t("office.col_status")}</th>
+                <th className="w-10">
+                  <span className="sr-only">{t("office.drawer.preview")}</span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((inv) => {
                 const dir = directionOf(inv.direction);
                 return (
-                  <tr key={inv.uuid} className="hover:bg-muted/40">
+                  <tr
+                    key={inv.uuid}
+                    aria-selected={open === inv.uuid}
+                    onClick={(e) => {
+                      // Bağlantı ve düğmeler kendi işini yapar; satırın geri
+                      // kalanı çekmeceyi açar.
+                      if ((e.target as HTMLElement).closest("a,button")) return;
+                      setParam("invoice", inv.uuid);
+                    }}
+                    className={cn(
+                      "hover:bg-muted/40 cursor-pointer",
+                      open === inv.uuid && "bg-brand-tint hover:bg-brand-tint",
+                    )}
+                  >
+                    <td>
+                      <TacRozeti
+                        durum={inv.open_warnings ? "sorun" : "yuklendi"}
+                        boyut={16}
+                      />
+                    </td>
                     <td className="whitespace-nowrap">
                       <Figure>{fmtDate(inv.issue_date)}</Figure>
                     </td>
@@ -224,6 +254,21 @@ function InvoicesInner() {
                     <td>
                       <InvoiceStateBadge status={inv.status} />
                     </td>
+                    <td>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-11 md:size-8"
+                        aria-haspopup="dialog"
+                        aria-label={t("office.drawer.preview_of", {
+                          number: inv.invoice_number,
+                        })}
+                        onClick={() => setParam("invoice", inv.uuid)}
+                      >
+                        <PanelRightOpen className="size-4" aria-hidden />
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -231,6 +276,12 @@ function InvoicesInner() {
           </TableBox>
         )}
       </Panel>
+      <InvoiceDrawer
+        engagement={engagement}
+        invoice={open}
+        taxpayerTitle={selected?.title}
+        onClose={() => setParam("invoice", "")}
+      />
       {total > PAGE ? (
         <div className="flex items-center justify-end gap-2 text-xs">
           <span className="text-muted-foreground">
