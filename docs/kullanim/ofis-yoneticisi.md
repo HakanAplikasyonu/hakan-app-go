@@ -31,6 +31,22 @@ gerekiyorsa platform yöneticisine yazın.
 Ofis adına veri işleme sözleşmesi (KVKK) onayı da bu sayfadadır. Sözleşme
 metni `/legal/...` sayfalarında yayımlanır; bu kılavuz o metinleri özetlemez.
 
+Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
+
+- **Ofis bilgileri:** ad ve veri işleme sözleşmesi.
+- **Yapay zekâ ve onay:**
+  - **Otomatik onay eşiği** (%80–99): güveni bu değerin üstündeki hesap kodu
+    önerileri kuyruğa düşmeden onaylanır. Kaydırırken son 30 günde bu eşikle
+    kaç önerinin kendiliğinden onaylanacağı, bunlardan kaçının sonradan
+    düzeltildiği ve kaçının kuyruğa düşeceği gösterilir. Otomatik onayı
+    tamamen kapatabilirsiniz.
+  - **Kural adayı eşiği:** kaç tutarlı karardan sonra kural adayı
+    çıkacağı (2–10) ve hangi kararların sayılacağı. Bu ayarı ofis sahibi ve
+    yöneticisi değiştirir.
+- **Masaüstü ajanları:** ofise bağlı ajanlar ve durumları.
+- **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
+  Yalnızca sizin hesabınız için geçerlidir.
+
 ## 3. Kullanıcılar ve roller
 
 **Üyeler** sayfasında ofisteki kişiler ve rolleri listelenir.

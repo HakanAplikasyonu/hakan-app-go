@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { OfficeDpaCard } from "@/features/legal";
+import { AgentsPanel } from "@/features/office/components/agents-page";
+import { AiApprovalSettings } from "@/features/office/components/ai-approval-settings";
 import {
   usePatchTenantSettings,
   useTenantSettings,
@@ -20,6 +22,69 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
+
+type SectionId = "office" | "ai" | "agents" | "appearance";
+
+/** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
+function SettingsNav({
+  sections,
+}: {
+  sections: { id: SectionId; label: string }[];
+}) {
+  const { t } = useLocale();
+  return (
+    <nav
+      aria-label={t("tenant.settings_nav_label")}
+      className="lg:sticky lg:top-20 lg:self-start"
+    >
+      <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
+        {sections.map((s) => (
+          <li key={s.id} className="shrink-0">
+            <a
+              href={`#${s.id}`}
+              className="hover:bg-surface-2 text-text-2 hover:text-foreground flex min-h-11 items-center rounded-[10px] px-3 text-sm font-medium whitespace-nowrap"
+            >
+              {s.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+function Section({
+  id,
+  title,
+  description,
+  children,
+}: {
+  id: SectionId;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      aria-labelledby={`${id}-heading`}
+      className="scroll-mt-20 space-y-4"
+    >
+      <div>
+        <h2
+          id={`${id}-heading`}
+          className="font-display text-xl font-semibold tracking-tight"
+        >
+          {title}
+        </h2>
+        {description ? (
+          <p className="text-text-2 text-sm">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 /**
  * `/t/{slug}/settings` — organization name. The app-defined `settings`
@@ -46,6 +111,20 @@ export function TenantSettingsPage() {
     [t],
   );
   const settings = query.data;
+  const showAi =
+    can(permissions.tenant.review.read) ||
+    can(permissions.tenant.accountRules.read);
+  const showAgents = can(permissions.tenant.agents.read);
+  const sections: { id: SectionId; label: string }[] = [
+    { id: "office", label: t("tenant.settings_section_office") },
+    ...(showAi
+      ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
+      : []),
+    ...(showAgents
+      ? [{ id: "agents" as const, label: t("tenant.settings_section_agents") }]
+      : []),
+    { id: "appearance", label: t("tenant.settings_section_appearance") },
+  ];
 
   return (
     <EntityPage
@@ -66,65 +145,88 @@ export function TenantSettingsPage() {
         { label: t("tenant.settings_title") },
       ]}
     >
-      {query.isLoading ? <Loading label={t("common.loading")} /> : null}
-      {query.isError ? (
-        <ErrorState
-          title={t("common.error_generic")}
-          onRetry={() => void query.refetch()}
-          retryLabel={t("common.retry")}
-        />
-      ) : null}
-      {settings ? (
-        <EntitySectionCard title={t("tenant.settings_title")}>
-          <AppForm
-            key={settings.name}
-            id="tenant-settings-form"
-            schema={schema}
-            defaultValues={{ name: settings.name }}
-            onSubmit={async (values: { name: string }) => {
-              await patch.mutateAsync({ name: values.name.trim() });
-            }}
-          >
-            {(form) => (
-              <div className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <AppInput
-                    name="name"
-                    label={t("tenant.settings_name")}
-                    startIcon={Building2}
-                    disabled={!canWrite}
-                  />
-                  <div className="space-y-2">
-                    <div className="text-sm font-medium">
-                      {t("tenant.settings_slug")}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <SettingsNav sections={sections} />
+        <div className="flex min-w-0 flex-col gap-10">
+          <Section id="office" title={t("tenant.settings_section_office")}>
+            {query.isLoading ? <Loading label={t("common.loading")} /> : null}
+            {query.isError ? (
+              <ErrorState
+                title={t("common.error_generic")}
+                onRetry={() => void query.refetch()}
+                retryLabel={t("common.retry")}
+              />
+            ) : null}
+            {settings ? (
+              <EntitySectionCard title={t("tenant.settings_title")}>
+                <AppForm
+                  key={settings.name}
+                  id="tenant-settings-form"
+                  schema={schema}
+                  defaultValues={{ name: settings.name }}
+                  onSubmit={async (values: { name: string }) => {
+                    await patch.mutateAsync({ name: values.name.trim() });
+                  }}
+                >
+                  {(form) => (
+                    <div className="space-y-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <AppInput
+                          name="name"
+                          label={t("tenant.settings_name")}
+                          startIcon={Building2}
+                          disabled={!canWrite}
+                        />
+                        <div className="space-y-2">
+                          <div className="text-sm font-medium">
+                            {t("tenant.settings_slug")}
+                          </div>
+                          <code className="bg-muted block rounded-md px-3 py-2 text-sm">
+                            /t/{settings.slug}
+                          </code>
+                        </div>
+                      </div>
+                      {canWrite ? (
+                        <div className="flex justify-end">
+                          <Button
+                            type="submit"
+                            disabled={
+                              patch.isPending ||
+                              form.formState.isSubmitting ||
+                              !form.formState.isDirty
+                            }
+                          >
+                            {t("tenant.settings_save")}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
-                    <code className="bg-muted block rounded-md px-3 py-2 text-sm">
-                      /t/{settings.slug}
-                    </code>
-                  </div>
-                </div>
-                {canWrite ? (
-                  <div className="flex justify-end">
-                    <Button
-                      type="submit"
-                      disabled={
-                        patch.isPending ||
-                        form.formState.isSubmitting ||
-                        !form.formState.isDirty
-                      }
-                    >
-                      {t("tenant.settings_save")}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </AppForm>
-        </EntitySectionCard>
-      ) : null}
-      <OfficeDpaCard slug={tenant.slug} />
-      {/* Ayarlar → Görünüm (arayüz v1, #324): hesaba özel tema. */}
-      <GorunumAyari />
+                  )}
+                </AppForm>
+              </EntitySectionCard>
+            ) : null}
+            <OfficeDpaCard slug={tenant.slug} />
+          </Section>
+          {showAi ? (
+            <Section
+              id="ai"
+              title={t("tenant.settings_section_ai")}
+              description={t("tenant.settings_section_ai_description")}
+            >
+              <AiApprovalSettings />
+            </Section>
+          ) : null}
+          {showAgents ? (
+            <Section id="agents" title={t("tenant.settings_section_agents")}>
+              <AgentsPanel />
+            </Section>
+          ) : null}
+          {/* Görünüm (arayüz v1, #324): hesaba özel tema. */}
+          <div id="appearance" className="scroll-mt-20">
+            <GorunumAyari />
+          </div>
+        </div>
+      </div>
     </EntityPage>
   );
 }

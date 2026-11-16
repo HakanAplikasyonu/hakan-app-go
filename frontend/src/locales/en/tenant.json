@@ -114,5 +114,11 @@
   "accept_status_revoked": "This invitation was revoked.",
   "accept_not_found_title": "Invitation not found",
   "accept_not_found_description": "The link is invalid or incomplete. Check the address in your email.",
-  "accept_done": "You joined {{name}}."
+  "accept_done": "You joined {{name}}.",
+  "settings_nav_label": "Settings menu",
+  "settings_section_agents": "Desktop agents",
+  "settings_section_ai": "AI and approval",
+  "settings_section_ai_description": "Auto-approval and rule candidate settings apply to every taxpayer of the office.",
+  "settings_section_appearance": "Appearance",
+  "settings_section_office": "Office details"
 }

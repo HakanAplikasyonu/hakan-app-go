@@ -16,12 +16,12 @@ Mizan hafızası bu farkı mükellef bazında hatırlar:
    firmanın kalemleri kuraldaki koda kendiliğinden yazılır; inceleme
    kuyruğunuza düşmez.
 
-Ekran: kenar çubuğunda **Hesap planı ve kurallar**.
+Ekran: kenar çubuğunda **Mizan hafızası**.
 
 ## 1. Mizanı yükleyin
 
 Luca'da mükellefin mizanını (ya da hesap planını) **Excel (.xlsx)** veya
-**CSV** olarak dışa alın. **Hesap planı ve kurallar** sayfasında mükellefi
+**CSV** olarak dışa alın. **Mizan hafızası** sayfasında mükellefi
 seçin, dosyayı seçip **İçe aktar**'a basın.
 
 ![Mizan içe aktarıldı](../../frontend/public/yardim/img/mizan-hesap-plani.jpg)
@@ -97,13 +97,26 @@ yükleyin: hesap listeden düşer.
 ## 4. Kural adayı: "Kural yapılsın mı?"
 
 Aynı firmanın kalemleri **en az 3 kez** aynı hesap koduna işlendiğinde
-**Hesap planı ve kurallar** sayfasındaki **Kural adayları** listesinde
-görünür.
+**Mizan hafızası** sayfasındaki **Kural adayları** listesinde
+görünür. Bu sayı (2–10) ve hangi kararların sayılacağı (yalnızca
+düzeltmeler ya da düzeltmeler ve onaylar) **Ayarlar → Yapay zekâ ve onay**
+bölümünden değiştirilir; değiştirmeden önce bugünkü ve yeni ayarla kaç aday
+çıkacağı gösterilir.
 
 ![Kural adayı](../../frontend/public/yardim/img/mizan-kural-adayi.jpg)
 
 **Kural yap**'a bastığınızda kural yalnızca **bu mükellef** için oluşur ve
 **Etkin kurallar** listesine geçer. Kaynağı "Kararlarınızdan" diye yazar.
+
+### Elle kural yazmak
+
+**Etkin kurallar** panelindeki **+ Yeni kural** sağda kural editörünü açar.
+Koşulları (karşı taraf VKN'si, adında geçen metin, satır metninde geçen
+kelimeler, yön, KDV oranı) ve hesap kodunu yazın. Kaydetmeden önce
+**Kaydetmeden önce · son 6 ay** kutusu kuralın kaç belgeye uyduğunu, kaçının
+zaten bu kodla, kaçının başka bir kodla onaylandığını ve örnek faturaları
+gösterir. Başka kodla onaylananlar kırmızıdır: kuralı daraltmak için
+koşul ekleyin. Kural yalnızca seçili mükellef için kaydedilir.
 
 ## 5. Sonraki aylar: soru sorulmadan
 

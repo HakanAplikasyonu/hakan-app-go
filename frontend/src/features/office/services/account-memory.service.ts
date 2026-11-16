@@ -11,6 +11,8 @@ export type AccountRuleCandidate =
 export type AccountRulePromoteInput =
   components["schemas"]["AccountRulePromoteInput"];
 export type AccountRule = components["schemas"]["AccountRule"];
+export type AccountRuleInput = components["schemas"]["AccountRuleInput"];
+export type AccountRulePreview = components["schemas"]["AccountRulePreview"];
 export type MissingPlanAccount = components["schemas"]["MissingPlanAccount"];
 
 const eng = (engagement: string) =>
@@ -134,6 +136,23 @@ export const accountMemoryService = {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
+  },
+  /** "Kaydetmeden önce" (#333): kural son 6 ayda neye uyardı. */
+  previewRule(slug: string, engagement: string, input: AccountRuleInput) {
+    return tenantRequest<AccountRulePreview>(
+      slug,
+      "POST",
+      `${eng(engagement)}/account-rules/preview`,
+      { body: input, silent: true },
+    );
+  },
+  createRule(slug: string, engagement: string, input: AccountRuleInput) {
+    return tenantRequest<AccountRule>(
+      slug,
+      "POST",
+      `${eng(engagement)}/account-rules`,
+      { body: input },
+    );
   },
   rules(slug: string, engagement: string) {
     return tenantRequest<{ items: AccountRule[] }>(
