@@ -214,6 +214,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/accounts":             azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/check":               azTenantReadAction,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/imports":              azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/missing":              azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/imports":             azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/missing-template":    azTenantReadAction,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-rule-candidates":           azTenantRead,
