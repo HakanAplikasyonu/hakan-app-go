@@ -1,3 +1,7 @@
+import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import {
   expect,
   request as pwRequest,
@@ -15,6 +19,8 @@ export const DEMO = {
   owner: "sahip@demo.hakan.local",
   intern: "stajyer@demo.hakan.local",
   taxpayerUser: "mukellef@demo.hakan.local",
+  admin: process.env.E2E_SA_EMAIL ?? "sa@e2e.local",
+  adminPassword: process.env.E2E_SA_PASSWORD ?? "E2e-Admin-123!",
   atlas: { title: "Atlas Gıda Ticaret A.Ş.", taxId: "9000000017" },
   selin: { title: "Selin Yılmaz", taxId: "10000000146" },
   ublDir: "../backend/internal/demo/ubl",
@@ -88,17 +94,22 @@ export async function engagementOf(api: Api, title: string): Promise<string> {
   throw new Error(`engagement not found for ${title}`);
 }
 
-/** Mailhog'da `to` adresine giden son e-postadaki onay bağlantısının belirteci. */
-export async function consentTokenFor(to: string): Promise<string> {
+/**
+ * Mailhog'da `to` adresine giden e-postalardaki `path` bağlantısının
+ * belirteci (ör. "/consent/", "/invite/", "/invite/m/"). Belirteçler URL-güvenli
+ * base64; quoted-printable satır kırılmaları önce birleştirilir.
+ */
+export async function mailToken(to: string, route: string): Promise<string> {
   const ctx = await pwRequest.newContext({ baseURL: MAIL_URL });
+  const re = new RegExp(`${escapeRe(route)}([A-Za-z0-9_-]{20,})`);
   try {
-    for (let i = 0; i < 30; i++) {
-      const res = await ctx.get("/api/v2/search", { params: { kind: "to", query: to, limit: "5" } });
+    for (let i = 0; i < 45; i++) {
+      const res = await ctx.get("/api/v2/search", { params: { kind: "to", query: to, limit: "10" } });
       if (res.ok()) {
         const body = await res.json();
         for (const m of body.items ?? []) {
-          const raw: string = (m.Content?.Body ?? "").replace(/=\r?\n/g, "");
-          const hit = raw.match(/\/consent\/([A-Za-z0-9_-]{20,})/);
+          const raw: string = (m.Content?.Body ?? "").replace(/=\r?\n/g, "").replace(/=3D/g, "=");
+          const hit = raw.match(re);
           if (hit) return hit[1];
         }
       }
@@ -107,7 +118,64 @@ export async function consentTokenFor(to: string): Promise<string> {
   } finally {
     await ctx.dispose();
   }
-  throw new Error(`no consent mail for ${to}`);
+  throw new Error(`no ${route} mail for ${to}`);
+}
+
+/** Mükellef ekleme onay e-postasındaki belirteç. */
+export const consentTokenFor = (to: string) => mailToken(to, "/consent/");
+
+/**
+ * Davet ya da onay belirteciyle hesap oluşturur ve `next` sayfasına döner
+ * (`/platform/register?invitation=...`).
+ */
+export async function registerWithToken(
+  page: Page,
+  token: string,
+  next: string,
+  person: { name: string; surname: string; password: string },
+) {
+  await page.goto(`/platform/register?invitation=${token}&next=${encodeURIComponent(next)}`);
+  await page.locator('input[name="name"]').fill(person.name);
+  await page.locator('input[name="surname"]').fill(person.surname);
+  await page.locator('input[type="password"]').first().fill(person.password);
+  await expect(page.getByText("Kayıt bulunamadı")).toHaveCount(0); // #146
+  await page.locator('button[type="submit"]').click();
+  await page.waitForURL((u) => u.pathname === next);
+}
+
+/** Her koşuda farklı, kontrol hanesi geçerli bir VKN (9 hane + kontrol). */
+export function uniqueVkn(): string {
+  const base = `7${String(Date.now()).slice(-6)}${String(Math.floor(Math.random() * 100)).padStart(2, "0")}`;
+  const d = base.split("").map(Number);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    const t = (d[i] + 9 - i) % 10;
+    if (t === 0) continue;
+    let v = (t * 2 ** (9 - i)) % 9;
+    if (v === 0) v = 9;
+    sum += v;
+  }
+  return base + String((10 - (sum % 10)) % 10);
+}
+
+/** Benzersiz e-posta (Mailhog'da aramak ve kayıt çakışmasını önlemek için). */
+export const uniqueEmail = (tag: string) =>
+  `e2e-${tag}-${Date.now()}-${Math.floor(Math.random() * 1e4)}@deneme.local`;
+
+/**
+ * Demo Atlas UBL'lerinden yeni bir mükellef için fatura üretir: VKN, unvan
+ * ve ETTN değişir; tutarlar ve yapı aynı kalır (XSD + Schematron geçerli).
+ */
+export function deriveUbl(file: string, vkn: string, title: string): { name: string; mimeType: string; buffer: Buffer } {
+  let xml = readFileSync(path.join(DEMO.ublDir, file), "utf8");
+  // ETTN: ilk UUID öğesi (önekli ya da varsayılan ad alanlı yazılabilir).
+  const ettn = xml.match(/<(?:cbc:)?UUID\b[^>]*>([^<]+)<\/(?:cbc:)?UUID>/)?.[1];
+  if (!ettn) throw new Error(`no ETTN in ${file}`);
+  xml = xml
+    .split(DEMO.atlas.taxId).join(vkn)
+    .split(DEMO.atlas.title).join(title)
+    .split(ettn).join(randomUUID().toUpperCase());
+  return { name: file.replace("atlas-", "e2e-"), mimeType: "application/xml", buffer: Buffer.from(xml, "utf8") };
 }
 
 /** Ofis ekranlarındaki mükellef seçimi (yerel <select>). */

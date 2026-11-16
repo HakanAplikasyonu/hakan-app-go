@@ -8,13 +8,15 @@ import { defineConfig, devices } from "@playwright/test";
  *   E2E_API_URL   Go API (varsayılan http://127.0.0.1:8080)
  *   E2E_MAIL_URL  Mailhog HTTP API (varsayılan http://127.0.0.1:8025)
  *
- * Akış tek bir sıralı senaryodur: her adım bir öncekinin ürettiği veriye
- * dayanır (yüklenen fatura → öneri → yevmiye ...). Bu yüzden tek worker.
+ * Paralellik dosya düzeyindedir: her dosya ayrı bir worker'da koşar.
+ * Dosya içindeki akışlar `serial`dır (adım bir öncekinin verisini kullanır).
+ * Dosyalar birbirinin verisine dokunmaz (bkz. her dosyanın başındaki not).
+ * Yeniden deneme yok: kararsız (flaky) test gizlenmez, düşer.
  */
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: false,
-  workers: 1,
+  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : 3,
   retries: 0,
   forbidOnly: !!process.env.CI,
   timeout: 120_000,
@@ -26,8 +28,10 @@ export default defineConfig({
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     locale: "tr-TR",
     timezoneId: "Europe/Istanbul",
+    // Başarısızlıkta iz, ekran görüntüsü ve video (CI artefaktı: e2e-report).
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    video: "retain-on-failure",
     acceptDownloads: true,
     actionTimeout: 20_000,
     navigationTimeout: 60_000,

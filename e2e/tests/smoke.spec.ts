@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -10,8 +10,10 @@ import {
   engagementOf,
   officePath,
   pickTaxpayer,
+  registerWithToken,
   uiLogin,
 } from "./lib";
+import { exportAndDownload, newApprovedEntry } from "./journal";
 
 /**
  * Duman akışı (#170, docs/dogrulama-raporu.md §2.2): ofis girişi → mükellef
@@ -76,13 +78,11 @@ test("mükellef ekleme: onay e-postası, kayıt ve onay", async ({ browser }) =>
   const token = await consentTokenFor(email);
   const owner = await (await browser.newContext()).newPage();
   try {
-    await owner.goto(`/platform/register?invitation=${token}&next=${encodeURIComponent(`/consent/${token}`)}`);
-    await owner.locator('input[name="name"]').fill("Deneme");
-    await owner.locator('input[name="surname"]').fill("Sahibi");
-    await owner.locator('input[type="password"]').first().fill("E2e-Parola-123!");
-    await expect(owner.getByText("Kayıt bulunamadı")).toHaveCount(0); // #146
-    await owner.locator('button[type="submit"]').click();
-    await owner.waitForURL(`**/consent/${token}`);
+    await registerWithToken(owner, token, `/consent/${token}`, {
+      name: "Deneme",
+      surname: "Sahibi",
+      password: "E2e-Parola-123!",
+    });
     // Aydınlatma metni onayı işaretlenmeden "Onayla" kapalı kalır.
     await expect(owner.getByRole("checkbox").first()).toBeVisible();
     for (const box of await owner.getByRole("checkbox").all()) await box.check();
@@ -133,10 +133,11 @@ test("inceleme: fatura detayından öneri, kuyruktan onay", async () => {
   await expect(office.getByText(/öneri hazır/)).toBeVisible();
 
   await office.goto(officePath("/review"));
-  const pending = office.getByText(/\d+ öneri bekliyor/);
+  // Kuyruk yüklenirken kısa süre "0 öneri bekliyor" görünür: sıfırdan büyük
+  // sayıyı bekle (aksi halde ara durumu okuyup kararsız düşer).
+  const pending = office.getByText(/^[1-9]\d* öneri bekliyor/);
   await expect(pending).toBeVisible();
   const before = Number((await pending.innerText()).match(/\d+/)![0]);
-  expect(before).toBeGreaterThan(0);
   await office.getByRole("button", { name: "Onayla", exact: true }).first().click();
   await expect(office.getByText(`${before - 1} öneri bekliyor`)).toBeVisible();
 
@@ -183,42 +184,6 @@ test("dönem kilidi: kilit API ile, dönem matrisinde kilitli ve komuta merkezi 
   );
   expect(JSON.stringify(matrix)).toContain('"locked":true');
 });
-
-async function newApprovedEntry(page: Page, description: string) {
-  await page.getByPlaceholder(/açıklama/i).first().fill(description);
-  const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
-  const lines: [string, string, string, string][] = [
-    ["120.01", "Yıldız Market", "1200", ""],
-    ["600.01", "Satış", "", "1000"],
-    ["391.01", "Hesaplanan KDV", "", "200"],
-  ];
-  while ((await rows.count()) < lines.length) {
-    await page.getByRole("button", { name: "Satır ekle" }).click();
-  }
-  for (let i = 0; i < lines.length; i++) {
-    const inputs = rows.nth(i).locator("input");
-    for (let j = 0; j < 4; j++) if (lines[i][j]) await inputs.nth(j).fill(lines[i][j]);
-  }
-  await page.getByRole("button", { name: "Taslağı kaydet" }).click();
-  const row = page.locator("tr", { hasText: "Taslak" }).first();
-  await expect(row).toBeVisible();
-  await row.getByRole("button", { name: /Onayla/ }).click();
-  await expect(page.locator("tr", { hasText: "Onaylı" }).first()).toBeVisible();
-}
-
-async function exportAndDownload(page: Page, driver: "luca" | "zirve") {
-  await page.locator('select:has(option[value="luca"])').selectOption(driver);
-  await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
-  await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
-  const file = page.getByRole("button", { name: new RegExp(`^${driver}_fis_\\d{4}-\\d{2}\\.xlsx$`) }).first();
-  const [download] = await Promise.all([page.waitForEvent("download"), file.click()]);
-  const saved = test.info().outputPath(download.suggestedFilename());
-  await download.saveAs(saved);
-  expect(download.suggestedFilename()).toMatch(new RegExp(`^${driver}_fis_`));
-  const bytes = readFileSync(saved);
-  expect(statSync(saved).size).toBeGreaterThan(1000);
-  expect(bytes.subarray(0, 2).toString()).toBe("PK"); // xlsx = zip
-}
 
 test("yevmiye: taslak, onay, Luca ve Zirve dosyası indirme", async () => {
   await office.goto(officePath("/journals"));

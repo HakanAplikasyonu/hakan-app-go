@@ -10,6 +10,7 @@
 #   E2E_PG_PORT       compose Postgres'inin host portu (varsayılan 5432)
 #   E2E_COMPOSE_FILES ek compose dosyaları, ":" ile ayrılmış (ör. yerel override)
 #   E2E_SKIP_BUILD=1  frontend derlemesini atla (önceki .next kullanılır)
+#   E2E_SA_EMAIL / E2E_SA_PASSWORD  oluşturulan platform yöneticisi
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -62,8 +63,18 @@ wait_for() { # name url tries
   return 1
 }
 
-echo "== compose (temiz birimlerle)"
+echo "== önceki koşu kapatılıyor"
+# Eski API / frontend portu tutarsa yenisi bağlanamaz ve hazır olma
+# denetimi eskisine cevap verir: önce önceki süreçleri ve compose'u kapat.
+E2E_DIR="$DIR" "$ROOT/scripts/e2e-down.sh" >/dev/null 2>&1 || true
 docker compose "${compose_args[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+for port in 8080 3000; do
+  if curl -fsS -o /dev/null "http://127.0.0.1:$port/" 2>/dev/null || curl -fsS -o /dev/null "http://127.0.0.1:$port/healthz" 2>/dev/null; then
+    echo "port $port hâlâ kullanımda: önceki süreci kapatın" >&2; exit 1
+  fi
+done
+
+echo "== compose (temiz birimlerle)"
 docker compose "${compose_args[@]}" up -d postgres redis seaweedfs mailhog centrifugo
 for svc in postgres redis seaweedfs centrifugo; do
   for _ in $(seq 1 60); do
@@ -84,6 +95,10 @@ if ! command -v migrate >/dev/null 2>&1; then
 fi
 make -C "$ROOT" migrate-up ENV_FILE="$ENV_FILE" MIGRATE="$MIGRATE_CMD"
 (cd "$ROOT/backend" && go run ./cmd/demo-seed -reset)
+# Platform yöneticisi: yeni ofis açma senaryosu (ofis kaydı) için.
+(cd "$ROOT/backend" && go run ./cmd/create-super-admin \
+  -email "${E2E_SA_EMAIL:-sa@e2e.local}" -password "${E2E_SA_PASSWORD:-E2e-Admin-123!}" \
+  -name Platform -surname Yönetici)
 
 echo "== API"
 (cd "$ROOT/backend" && go build -o "$DIR/server" ./cmd/server)
