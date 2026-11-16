@@ -108,6 +108,22 @@ export function useReviewDecision() {
   });
 }
 
+/** Asks the server for account-code suggestions for one invoice (#160). */
+export function useSuggestInvoiceAccounts() {
+  const { slug } = useTenant();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      engagement,
+      invoice,
+    }: {
+      engagement: string;
+      invoice: string;
+    }) => reviewService.suggestInvoice(slug, engagement, invoice),
+    onSettled: () => qc.invalidateQueries({ queryKey: reviewKeys.all(slug) }),
+  });
+}
+
 // --- Suggestion helpers -----------------------------------------------------
 
 export function confidenceOf(s: ReviewSuggestion) {
