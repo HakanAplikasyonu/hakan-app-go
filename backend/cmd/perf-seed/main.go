@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
@@ -32,6 +33,7 @@ import (
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/password"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 const (
@@ -128,11 +130,6 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string, nTaxpayers, nInv
 		return fmt.Errorf("organization: %w", err)
 	}
 
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
 	steps := []struct {
 		name string
 		sql  string
@@ -171,27 +168,28 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string, nTaxpayers, nInv
 			FROM invoices i JOIN engagements e ON e.taxpayer_id = i.taxpayer_id AND e.organization_id = $1
 			WHERE i.source_system = $2 AND i.id % 20 = 0`, []any{org.ID, sourceSystem}},
 	}
-	for _, st := range steps {
-		tag, err := tx.Exec(ctx, st.sql, st.args...)
-		if err != nil {
-			return fmt.Errorf("%s: %w", st.name, err)
+	// Bulk rows span every taxpayer of the office: one system transaction.
+	return rls.System(ctx, pool, "perf-seed bulk data", func(ctx context.Context, tx pgx.Tx) error {
+		for _, st := range steps {
+			tag, err := tx.Exec(ctx, st.sql, st.args...)
+			if err != nil {
+				return fmt.Errorf("%s: %w", st.name, err)
+			}
+			fmt.Printf("%-12s %d\n", st.name, tag.RowsAffected())
 		}
-		fmt.Printf("%-12s %d\n", st.name, tag.RowsAffected())
-	}
-	if err := tx.Commit(ctx); err != nil {
+		_, err := tx.Exec(ctx, `ANALYZE taxpayers, engagements, invoices, data_warnings`)
 		return err
-	}
-	_, err = pool.Exec(ctx, `ANALYZE taxpayers, engagements, invoices, data_warnings`)
-	return err
+	})
 }
 
 // drop removes the perf office, its taxpayers and their data.
 func drop(ctx context.Context, pool *pgxpool.Pool) error {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	return rls.System(ctx, pool, "perf-seed reset", func(ctx context.Context, tx pgx.Tx) error {
+		return dropTx(ctx, tx)
+	})
+}
+
+func dropTx(ctx context.Context, tx pgx.Tx) error {
 	for _, q := range []string{
 		`DELETE FROM data_warnings WHERE producer = 'perf_seed'`,
 		`DELETE FROM invoices WHERE source_system = 'perf_seed'`,
@@ -203,7 +201,7 @@ func drop(ctx context.Context, pool *pgxpool.Pool) error {
 			return fmt.Errorf("%s: %w", q, err)
 		}
 	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 func fatal(format string, args ...any) {
