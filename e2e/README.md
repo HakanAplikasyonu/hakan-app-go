@@ -79,7 +79,7 @@ Görüntüler `tests/gorsel.spec.ts-snapshots/` altındaki temel görüntülerle
   cd e2e && npx playwright test --grep @visual --update-snapshots
   ```
 
-- **CI'da fark çıkarsa:** `e2e-report` artefaktındaki `test-results/` klasöründe her ekran için `-expected`, `-actual` ve `-diff` görüntüleri bulunur.
+- **CI'da fark çıkarsa:** `e2e-report` artefaktındaki `test-results-visual/` klasöründe her farklı ekran için `-expected`, `-actual` ve `-diff` görüntüleri bulunur. Karşılaştırma yumuşaktır: bir fark diğer çekimleri durdurmaz. Fark yalnızca yazı tipi işlemesinden geliyorsa `-actual` görüntülerini `tests/gorsel.spec.ts-snapshots/` altına (`-chromium-linux.png` adıyla) kopyalayın.
 
 `e2e-report` artefaktında şunlar bulunur:
 - HTML rapor,

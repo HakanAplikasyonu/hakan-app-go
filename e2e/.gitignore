@@ -1,4 +1,5 @@
 node_modules/
 .run/
 test-results/
+test-results-visual/
 playwright-report/
