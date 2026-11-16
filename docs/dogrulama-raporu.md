@@ -114,3 +114,107 @@ Doğrulamada açık kalan dış bağımlılık: #58 (pilot ofis ve örnek dosyal
 - **Dış servisler:** entegratör, banka web servisi, Paraşüt/Easytrade/KolayBi ve Meilisearch araması gerçek servisle denenmedi. Arama bu ortamda kapalı (`SEARCH_ENABLED=false`).
 - **Kilitli döneme fatura gelmesi:** dönem kilitlendikten sonra değişen bir fatura gelince değişiklik talebi ve `LOCKED_PERIOD_CHANGE` üretimi uçtan uca denenmedi (backend testlerinde var).
 - **Uyarı motoru:** demo UBL setiyle fatura uyarısı üretmedi. Veri temiz mi, yoksa yükleme sonrası kural çalışmıyor mu, ayrıca bakılmadı. BNK uyarıları çalışıyor.
+
+---
+
+## 2. tur
+
+| | |
+|---|---|
+| Doğrulanan commit | `a514b93` (main, 2026-11-16). 1. turdaki bulguların kapandığı sürüm: #147, #149, #150, #152–#159 |
+| Ortam | 1. turla aynı. Compose birimleri (`down -v`) silinerek temiz veritabanıyla başlandı |
+
+### Özet
+
+- **1. turdaki 7 bulgunun hepsi düzelmiş**:
+  - Ofis panelinin bütün ekranları artık API'den okuyor; Luca ve Zirve dosyaları panelden indiriliyor.
+  - Realtime ve KVKK uçları 403 vermiyor; `-reset` veriyle çalışıyor.
+- **Testler:** backend (113 paket), frontend ve mobil yeşil.
+- **Kurulum:** migration'lar 1 → 73 temiz uygulandı.
+- **Tenant izolasyonu:** yeni uçlar (yevmiye, çıktı, kasa) dahil sızıntı yok.
+- **Yeni bulgular (2):**
+  - Hesap kodu önerileri arayüzden üretilemiyordu (#160 → [#162](https://github.com/HakanAplikasyonu/hakan-app-go/pull/162), birleşti).
+  - Ofis panelinde ham İngilizce hata metinleri ve sürücü adları vardı (#161 → [#163](https://github.com/HakanAplikasyonu/hakan-app-go/pull/163)).
+
+### 2.1 Testler ve kurulum
+
+| Adım | Sonuç |
+|---|---|
+| Backend `TESTDB_REQUIRED=1 go test ./...` | ✅ 113 paket |
+| Frontend `tsc --noEmit`, `eslint .` | ✅ |
+| Mobil `tsc --noEmit`, `node --test`, `expo lint` | ✅ 24/24 |
+| `make check-i18n` | ✅ 0 hata, 27 uyarı (1. turda 30) |
+| `docker compose up`, birimler silinmiş | ✅ |
+| Migration 1 → 73 (boş veritabanı) | ✅ `73`, dirty değil |
+| `make demo-seed` | ✅ `mukellef@demo` artık Atlas Gıda'nın sahibi (`/m`) |
+| `make demo-seed ARGS=-reset`: fatura (7), banka hareketi (2) ve yevmiye fişi (2) varken | ✅ ofis silindi ve yeniden kuruldu. Demo verisi sıfırlandı, mükellef üyeliği yeniden bağlandı (#148) |
+
+### 2.2 Ofis paneli akışı (tarayıcı, `sahip@demo`)
+
+| Adım | Sonuç |
+|---|---|
+| UBL yükle (Atlas, 7 XML) | ✅ sunucuda işlendi: 7 eklendi, rapor ve "Son yüklemeler" ekranda |
+| Faturalar | ✅ 7 fatura API'den listelendi (matrah, KDV, ödenecek, durum) |
+| Fatura detayı → "Hesap kodu öner" (#162) | ✅ 3 öneri, bildirim ve kuyruk bağlantısı. Tekrar tıklayınca yeni kayıt oluşmuyor |
+| İnceleme kuyruğu → Onayla | ✅ 2 öneri arayüzden onaylandı. Sunucuda `accepted: 2`, kuyruk 19 → 17 |
+| Uyarılar | ✅ banka eşlemenin ürettiği `BNK_UNINVOICED_COLLECTION` ekranda; "Gördüm" ve "Çözüldü" eylemleri var |
+| Genel bakış ve komuta merkezi | ✅ dönem durumu (Hazır), engelleyici ve değişiklik talebi sayıları, KDV tahmini (Atlas ₺8.564,85, beyan son günü) API'den |
+| Yevmiye taslağı | ✅ 3 satırlı fiş kaydedildi ("2026-11 / 1", Taslak) ve onaylandı (Onaylı) |
+| Luca çıktısı | ✅ "1 fiş aktarıldı", `luca_fis_2026-11.xlsx` indirildi. Sütunlar: Fiş No, Fiş Tarihi, Hesap Kodu, Borç, Alacak |
+| Zirve çıktısı | ✅ ikinci fişle "1 fiş aktarıldı", `zirve_fis_2026-11.xlsx` indirildi. Sütunlar: Fiş No, Fiş Tarihi, Fiş Türü, Fiş Açıklaması, Hesap Kodu, Açıklama, Evrak No, Evrak Tarihi, Borç, Alacak |
+| Aktarılmış fiş | ✅ "Aktarıldı" ve "Geri al". Aynı fiş ikinci programa aktarılmıyor (`NOTHING_TO_EXPORT`); bu tasarım gereği |
+| Mükellef ekleme (onay bağlantısıyla kayıt ve onay) | ✅ kayıt sayfasında yanlış uyarı ve 404 isteği yok (#146); talep `approved` |
+| Mükellef paneli (`mukellef@demo`) | ✅ girişte `/m/<Atlas>` açılıyor; ofisin yüklediği 7 fatura görünüyor |
+| Ayarlar → Veri İşleyen Sözleşmesi | ✅ "Sürüm 1 kabul edildi" |
+
+Bütün ofis sayfaları tarandı (genel bakış, komuta merkezi, mükellefler, faturalar, inceleme kuyruğu ve stüdyosu, uyarılar, yevmiye, üyeler, ayarlar):
+
+- "Demo verisi" uyarısı kalmamış.
+- Sayfa hatası ve hatalı istek yok.
+- Realtime göstergesi her sayfada "RT connected".
+
+### 2.3 Realtime ve KVKK uçları
+
+| Kullanıcı | `POST /v1/realtime/connection-token` | `GET /v1/me/legal-acceptances` | `/v1/auth/me` → `auth.session` |
+|---|---|---|---|
+| `sahip@demo` (ofis sahibi) | ✅ 200 | ✅ 200 | ✅ var |
+| `stajyer@demo` (ofis personeli) | ✅ 200 | ✅ 200 | ✅ var |
+| `mukellef@demo` (mükellef) | ✅ 200 | ✅ 200 | ✅ var |
+
+### 2.4 Tenant izolasyonu
+
+İkinci ofisin sahibi birinci ofisin Atlas engagement'ına şu uçlardan erişmeye çalıştı; hepsi `NO_ENGAGEMENT_ACCESS` döndü:
+- engagement
+- faturalar
+- uyarılar
+- kasa ve banka hesapları
+- yevmiye taslakları
+- çıktılar
+- dönem kilidi
+
+İkinci ofisin kendi listeleri (engagement, öneri, uyarı) boş. Diğer denemeler:
+- Atanmamış stajyerin Atlas yevmiyesine erişimi `NO_ENGAGEMENT_ACCESS`.
+- Atlas'ın mükellef kullanıcısının Selin'in faturalarına erişimi `NO_TAXPAYER_MEMBERSHIP`.
+
+### 2.5 Türkçe metin
+
+- `check-i18n`: 0 hata.
+- #163 ile düzeltilen ham İngilizce metinler:
+  - Yükleme raporundaki dosya hatası (`PARTY_MISMATCH: own VKN/TCKN…`) ve fatura üretmeyen dosyada görünen sıfır UUID.
+  - Yevmiye çıktı hatası (`no approved entries to export`).
+  - Program listesindeki ham sürücü kimlikleri (`excel_formula`, `luca`, `zirve`).
+- Düzeltmeler tarayıcıda doğrulandı: "Fatura bu şirkete ait değil", "Excel (formüllü) / Luca / Zirve", "Bu dönemde aktarılacak onaylı fiş yok…".
+
+### 2.6 2. turda açılan issue'lar
+
+| Issue | Konu | Önem | Durum |
+|---|---|---|---|
+| [#160](https://github.com/HakanAplikasyonu/hakan-app-go/issues/160) | Hesap kodu önerileri hiç üretilmiyor; inceleme kuyruğu arayüz akışında hep boş | Yüksek | ✅ [#162](https://github.com/HakanAplikasyonu/hakan-app-go/pull/162) birleşti (fatura detayında düğme). Otomatik üretim ürün kararı, issue'da |
+| [#161](https://github.com/HakanAplikasyonu/hakan-app-go/issues/161) | Ofis panelinde ham İngilizce hata metinleri ve sürücü adları | Düşük | [#163](https://github.com/HakanAplikasyonu/hakan-app-go/pull/163), auto-merge açık |
+
+### 2.7 Karar bekleyenler ve doğrulanmayanlar
+
+- **Hesap kodu önerileri:** fatura içe aktarılınca otomatik mi üretilsin, toplu tetikleme mi olsun (#160)?
+- **Yevmiye ekranının varsayılan dönemi:** ekran içinde bulunulan ayı açıyor, faturalar çoğunlukla bir önceki aya ait (#161'deki not).
+- **1. turun §6 listesi geçerli:** mobil uygulama cihazda, masaüstü ajanı, gerçek dış servisler ve kilitli döneme fatura gelmesi bu turda da denenmedi.
+- **Fatura uyarıları:** demo UBL seti fatura uyarısı üretmedi; uyarı ekranı BNK uyarısıyla doğrulandı.
