@@ -67,7 +67,15 @@ test('config runs login, dashboard, review approval and task creation in order',
 
 test('the ids the flows tap exist in the screens', () => {
   const src = (p: string) => readFileSync(new URL(`../../app/${p}`, import.meta.url), 'utf8');
-  const screens = [src('login.tsx'), src('(app)/index.tsx'), src('(app)/clients/index.tsx'), src('(app)/review/index.tsx'), src('(app)/tasks/new.tsx')].join('\n');
+  const screens = [
+    src('login.tsx'),
+    src('(app)/(tabs)/_layout.tsx'),
+    src('(app)/(tabs)/index.tsx'),
+    src('(app)/(tabs)/clients/index.tsx'),
+    src('(app)/(tabs)/review/index.tsx'),
+    src('(app)/(tabs)/notifications.tsx'),
+    src('(app)/tasks/new.tsx'),
+  ].join('\n');
   for (const f of flows()) {
     for (const m of f.text.matchAll(/id: "([^"]+)"/g)) assert.ok(screens.includes(`"${m[1]}"`), `${f.file}: no testID ${m[1]}`);
   }
