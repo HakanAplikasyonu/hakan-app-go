@@ -134,7 +134,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out.Items = append(out.Items, Row{Invoice: view.FromInvoice(row.Invoice), OpenWarnings: row.OpenWarnings})
 	}
-	if n := len(rows); n > 0 && int32(n) == limit {
+	if n := len(rows); n > 0 && n == int(limit) {
 		next := pagecursor.Encode(rows[n-1].Invoice.IssueDate.Time, rows[n-1].Invoice.ID)
 		out.NextCursor = &next
 	}
