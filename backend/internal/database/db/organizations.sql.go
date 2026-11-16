@@ -156,7 +156,7 @@ INSERT INTO organizations (
     COALESCE($5, NOW()), $6,
     COALESCE($7, '{}'::jsonb)
 )
-RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 `
 
 type CreateOrganizationParams struct {
@@ -193,6 +193,7 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -260,7 +261,7 @@ func (q *Queries) DeleteOrganizationMember(ctx context.Context, arg DeleteOrgani
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at FROM organizations
+SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state FROM organizations
 WHERE id = $1 AND deleted_at IS NULL
 `
 
@@ -280,12 +281,13 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id int64) (Organizati
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
 
 const getOrganizationBySlug = `-- name: GetOrganizationBySlug :one
-SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at FROM organizations
+SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state FROM organizations
 WHERE slug = $1 AND deleted_at IS NULL
 `
 
@@ -305,12 +307,13 @@ func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organ
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
 
 const getOrganizationByUUID = `-- name: GetOrganizationByUUID :one
-SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at FROM organizations
+SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state FROM organizations
 WHERE uuid = $1 AND deleted_at IS NULL
 `
 
@@ -330,6 +333,7 @@ func (q *Queries) GetOrganizationByUUID(ctx context.Context, argUuid uuid.UUID) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -774,7 +778,7 @@ func (q *Queries) ListOrganizationMembershipsByUser(ctx context.Context, userID 
 }
 
 const listOrganizationsFiltered = `-- name: ListOrganizationsFiltered :many
-SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 FROM organizations
 WHERE deleted_at IS NULL
   AND ($1::text IS NULL OR status = $1)
@@ -836,6 +840,7 @@ func (q *Queries) ListOrganizationsFiltered(ctx context.Context, arg ListOrganiz
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.SetupState,
 		); err != nil {
 			return nil, err
 		}
@@ -953,7 +958,7 @@ func (q *Queries) ListTenantRolePermissionSlugsByRoleID(ctx context.Context, rol
 }
 
 const lockOrganizationRow = `-- name: LockOrganizationRow :one
-SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at FROM organizations
+SELECT id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state FROM organizations
 WHERE id = $1 AND deleted_at IS NULL
 FOR UPDATE
 `
@@ -974,6 +979,7 @@ func (q *Queries) LockOrganizationRow(ctx context.Context, id int64) (Organizati
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -1131,7 +1137,7 @@ UPDATE organizations
 SET access_starts_at = COALESCE($1, access_starts_at),
     access_ends_at = $2
 WHERE uuid = $3 AND deleted_at IS NULL
-RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 `
 
 type SetOrganizationAccessWindowParams struct {
@@ -1156,6 +1162,7 @@ func (q *Queries) SetOrganizationAccessWindow(ctx context.Context, arg SetOrgani
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -1164,7 +1171,7 @@ const setOrganizationStatus = `-- name: SetOrganizationStatus :one
 UPDATE organizations
 SET status = $1
 WHERE uuid = $2 AND deleted_at IS NULL
-RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 `
 
 type SetOrganizationStatusParams struct {
@@ -1188,6 +1195,7 @@ func (q *Queries) SetOrganizationStatus(ctx context.Context, arg SetOrganization
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -1209,7 +1217,7 @@ const softDeleteOrganization = `-- name: SoftDeleteOrganization :one
 UPDATE organizations
 SET deleted_at = NOW()
 WHERE uuid = $1 AND deleted_at IS NULL
-RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 `
 
 func (q *Queries) SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error) {
@@ -1228,6 +1236,7 @@ func (q *Queries) SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID)
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }
@@ -1239,7 +1248,7 @@ SET name = COALESCE($1, name),
     logo_object_key = COALESCE($3, logo_object_key),
     settings = COALESCE($4, settings)
 WHERE uuid = $5 AND deleted_at IS NULL
-RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at
+RETURNING id, uuid, slug, name, logo_object_key, status, access_starts_at, access_ends_at, settings, created_at, updated_at, deleted_at, setup_state
 `
 
 type UpdateOrganizationParams struct {
@@ -1272,6 +1281,7 @@ func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganization
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.SetupState,
 	)
 	return i, err
 }

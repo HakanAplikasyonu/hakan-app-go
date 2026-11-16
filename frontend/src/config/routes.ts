@@ -112,6 +112,8 @@ export const routes = {
     members: (slug: string) => `/t/${encodeURIComponent(slug)}/members`,
     roles: (slug: string) => `/t/${encodeURIComponent(slug)}/roles`,
     settings: (slug: string) => `/t/${encodeURIComponent(slug)}/settings`,
+    /** Office setup wizard (issue #273). */
+    setup: (slug: string) => `/t/${encodeURIComponent(slug)}/setup`,
     taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
     /** "Mükellef ekle": consent requests the office sent (issue #7). */
     taxpayerRequests: (slug: string) =>
@@ -128,6 +130,9 @@ export const routes = {
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */
     journals: (slug: string) => `/t/${encodeURIComponent(slug)}/journals`,
+    /** One engagement; opens on its documents. */
+    engagement: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}`,
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,

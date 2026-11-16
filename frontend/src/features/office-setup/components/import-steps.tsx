@@ -1,0 +1,306 @@
+"use client";
+
+import { Send } from "lucide-react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
+
+import { Loading } from "@/components/common/loading";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { ApiError } from "@/lib/api";
+import { useLocale } from "@/providers/locale-provider";
+
+import {
+  useSaveOfficeSetup,
+  useStoreTaxpayerImport,
+  useTaxpayerImport,
+} from "../hooks/use-office-setup";
+import { setupInput } from "../lib/steps";
+import {
+  taxpayerImportService,
+  type TaxpayerImport,
+} from "../services/office-setup.service";
+import { StepActions, StepError } from "./step-actions";
+import type { SetupStepProps } from "./step-props";
+
+const ACCEPT = ".xlsx,.csv";
+const ACCEPTED_EXTENSIONS = [".xlsx", ".csv"];
+
+const th = "py-2 pe-3 text-start font-medium";
+
+/** Localized message of a failed call (codes map to errors.codes.*). */
+function errorText(error: unknown, fallback: string) {
+  return error instanceof ApiError ? error.message : fallback;
+}
+
+// --- Mükellef listesi ---
+
+function ImportSummary({ batch }: { batch: TaxpayerImport }) {
+  const { t } = useLocale();
+  const invalidRows = (batch.rows ?? []).filter((r) => r.errors.length > 0);
+  return (
+    <div className="mt-4 space-y-3">
+      <p className="text-muted-foreground text-xs">
+        {t("setup.taxpayers_current_file", { name: batch.file_name })}
+      </p>
+      <p className="text-sm font-medium" data-testid="setup-import-summary">
+        {t("setup.taxpayers_summary", {
+          valid: batch.valid,
+          invalid: batch.invalid,
+        })}
+      </p>
+      {invalidRows.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="mb-2 text-start text-sm font-medium">
+              {t("setup.taxpayers_invalid_title")}
+            </caption>
+            <thead>
+              <tr className="text-muted-foreground border-b text-xs">
+                <th className={th}>{t("setup.taxpayers_col_row")}</th>
+                <th className={th}>{t("setup.taxpayers_col_tax_id")}</th>
+                <th className={th}>{t("setup.taxpayers_col_title")}</th>
+                <th className={th}>{t("setup.taxpayers_col_errors")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invalidRows.map((r) => (
+                <tr key={r.row} className="border-b last:border-0">
+                  <td className="figure py-2 pe-3">{r.row}</td>
+                  <td className="figure py-2 pe-3">{r.tax_id}</td>
+                  <td className="py-2 pe-3">{r.title}</td>
+                  <td className="text-destructive py-2 pe-3">
+                    {r.errors.map((e) => e.message).join("; ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function TaxpayersStep(props: SetupStepProps) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const save = useSaveOfficeSetup(slug);
+  const store = useStoreTaxpayerImport(slug);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // The last upload, shown even if saving its uuid to the state failed.
+  const [uploaded, setUploaded] = useState<string | undefined>();
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const importUuid = uploaded ?? props.state.import_uuid;
+  const batch = useTaxpayerImport(slug, importUuid);
+
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.toLowerCase();
+    if (!ACCEPTED_EXTENSIONS.some((ext) => name.endsWith(ext))) {
+      setError(t("setup.taxpayers_file_type"));
+      e.target.value = "";
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      const created = await taxpayerImportService.create(slug, file);
+      store(created);
+      setUploaded(created.uuid);
+      try {
+        await save.mutateAsync(
+          setupInput(props.state, { importUuid: created.uuid }),
+        );
+      } catch {
+        // toasted by the mutation cache; the summary still shows
+      }
+    } catch (err) {
+      setError(errorText(err, t("setup.taxpayers_upload_failed")));
+    } finally {
+      setUploading(false);
+      // Allows choosing the same file again after fixing it.
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-muted-foreground mb-4 text-sm">
+        {t("setup.taxpayers_description")}
+      </p>
+      <div className="grid max-w-md gap-2">
+        <Label htmlFor="setup-taxpayer-file">{t("setup.taxpayers_file")}</Label>
+        <Input
+          ref={inputRef}
+          id="setup-taxpayer-file"
+          name="file"
+          type="file"
+          accept={ACCEPT}
+          disabled={uploading}
+          aria-describedby="setup-taxpayer-file-hint"
+          onChange={(e) => void onFile(e)}
+          className="h-auto py-1.5"
+        />
+        <p
+          id="setup-taxpayer-file-hint"
+          className="text-muted-foreground text-xs"
+        >
+          {t("setup.taxpayers_replace_hint")}
+        </p>
+      </div>
+      {uploading ? (
+        <Loading
+          label={t("setup.taxpayers_uploading")}
+          className="mt-3 justify-start"
+        />
+      ) : null}
+      <StepError message={error} />
+      {importUuid && batch.isLoading ? (
+        <Loading label={t("common.loading")} className="mt-3 justify-start" />
+      ) : null}
+      {importUuid && batch.isError ? (
+        <StepError message={t("setup.taxpayers_load_failed")} />
+      ) : null}
+      {batch.data ? <ImportSummary batch={batch.data} /> : null}
+      <StepActions
+        isLast={props.isLast}
+        busy={props.saving || uploading}
+        onSkip={() => void props.onSkip()}
+        onSave={() => void props.onDone()}
+      />
+    </div>
+  );
+}
+
+// --- Mükellef davetleri ---
+
+function SendOutcome({ batch }: { batch: TaxpayerImport }) {
+  const { t } = useLocale();
+  const outcome = batch.outcome ?? [];
+  const count = (status: "requested" | "skipped" | "failed") =>
+    outcome.filter((o) => o.status === status).length;
+  const failed = outcome.filter((o) => o.status === "failed");
+  const rows = new Map((batch.rows ?? []).map((r) => [r.row, r]));
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium" data-testid="setup-invites-result">
+        {t("setup.invites_result", {
+          requested: count("requested"),
+          skipped: count("skipped"),
+          failed: count("failed"),
+        })}
+      </p>
+      {failed.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <caption className="mb-2 text-start text-sm font-medium">
+              {t("setup.invites_failed_title")}
+            </caption>
+            <thead>
+              <tr className="text-muted-foreground border-b text-xs">
+                <th className={th}>{t("setup.taxpayers_col_row")}</th>
+                <th className={th}>{t("setup.taxpayers_col_tax_id")}</th>
+                <th className={th}>{t("setup.taxpayers_col_title")}</th>
+                <th className={th}>{t("setup.invites_col_error")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failed.map((o) => (
+                <tr key={o.row} className="border-b last:border-0">
+                  <td className="figure py-2 pe-3">{o.row}</td>
+                  <td className="figure py-2 pe-3">
+                    {rows.get(o.row)?.tax_id ?? ""}
+                  </td>
+                  <td className="py-2 pe-3">{rows.get(o.row)?.title ?? ""}</td>
+                  <td className="text-destructive py-2 pe-3">
+                    {o.error ?? ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function InvitesStep(props: SetupStepProps) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const importUuid = props.state.import_uuid;
+  const batch = useTaxpayerImport(slug, importUuid);
+  const store = useStoreTaxpayerImport(slug);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onSend = async () => {
+    if (!importUuid) return;
+    setError(null);
+    setSending(true);
+    try {
+      store(await taxpayerImportService.send(slug, importUuid));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "IMPORT_ALREADY_SENT") {
+        // Sent from another tab: show what was sent.
+        await batch.refetch();
+      } else {
+        setError(errorText(err, t("common.error_generic")));
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  let body: ReactNode;
+  if (!importUuid) {
+    body = (
+      <p className="text-muted-foreground text-sm">
+        {t("setup.invites_no_import")}
+      </p>
+    );
+  } else if (batch.isLoading) {
+    body = <Loading label={t("common.loading")} className="justify-start" />;
+  } else if (!batch.data) {
+    body = <StepError message={t("setup.taxpayers_load_failed")} />;
+  } else if (batch.data.sent_at) {
+    body = <SendOutcome batch={batch.data} />;
+  } else {
+    body = (
+      <div className="space-y-3">
+        <p className="text-sm font-medium">
+          {t("setup.invites_pending", { valid: batch.data.valid })}
+        </p>
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={sending || batch.data.valid === 0}
+          onClick={() => void onSend()}
+        >
+          <Send className="size-4" aria-hidden />
+          {t("setup.invites_send")}
+        </Button>
+        <StepError message={error} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p className="text-muted-foreground mb-4 text-sm">
+        {t("setup.invites_description")}
+      </p>
+      {body}
+      <StepActions
+        isLast={props.isLast}
+        busy={props.saving || sending}
+        onSkip={() => void props.onSkip()}
+        onSave={() => void props.onDone()}
+      />
+    </div>
+  );
+}

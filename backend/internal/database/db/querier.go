@@ -154,6 +154,8 @@ type Querier interface {
 	// tarafı mükellefe yalnızca aktif ve erişilebilir bir engagement üzerinden
 	// ulaşır (GetTaxpayerForOfficeMember).
 	CreateTaxpayer(ctx context.Context, arg CreateTaxpayerParams) (Taxpayer, error)
+	// Toplu mükellef aktarımı (issue #273). Ofis kapsamlı.
+	CreateTaxpayerImportBatch(ctx context.Context, arg CreateTaxpayerImportBatchParams) (TaxpayerImportBatch, error)
 	CreateTaxpayerInvitation(ctx context.Context, arg CreateTaxpayerInvitationParams) (TaxpayerInvitation, error)
 	CreateUBLUploadJob(ctx context.Context, arg CreateUBLUploadJobParams) (UblUploadJob, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
@@ -348,6 +350,9 @@ type Querier interface {
 	GetOrganizationMember(ctx context.Context, arg GetOrganizationMemberParams) (GetOrganizationMemberRow, error)
 	GetOrganizationMemberByUserUUID(ctx context.Context, arg GetOrganizationMemberByUserUUIDParams) (GetOrganizationMemberByUserUUIDRow, error)
 	GetOrganizationRoleByKey(ctx context.Context, arg GetOrganizationRoleByKeyParams) (Role, error)
+	// Kurulum sihirbazının durumu organizations.settings içindeki "setup"
+	// anahtarında; ayarların geri kalanına dokunulmaz.
+	GetOrganizationSetup(ctx context.Context, organizationID int64) ([]byte, error)
 	// tenant-lint: cross-org mükellef sahibi talebi uuid ve kendi VKN'siyle bulur
 	GetPendingOnboardingRequestForTaxID(ctx context.Context, arg GetPendingOnboardingRequestForTaxIDParams) (GetPendingOnboardingRequestForTaxIDRow, error)
 	GetPeriodLock(ctx context.Context, arg GetPeriodLockParams) (PeriodLock, error)
@@ -393,6 +398,7 @@ type Querier interface {
 	// ended engagement, another office's engagement or a missing assignment all
 	// return no row.
 	GetTaxpayerForOfficeMember(ctx context.Context, arg GetTaxpayerForOfficeMemberParams) (Taxpayer, error)
+	GetTaxpayerImportBatch(ctx context.Context, arg GetTaxpayerImportBatchParams) (TaxpayerImportBatch, error)
 	// The invitation link carries only the token: the holder is not an office
 	// member, so the lookup cannot be organization-scoped.
 	// tenant-lint: cross-org davet bağlantısı, yalnızca token özetiyle tek satır
@@ -693,6 +699,7 @@ type Querier interface {
 	// ---------------------------------------------------------------------------
 	// tenant-lint: cross-org mükellef kendi görevlerini görür; taxpayer_id ve aktif engagement ile sınırlı
 	ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpayerDocumentTasksParams) ([]ListTaxpayerDocumentTasksRow, error)
+	ListTaxpayerImportBatches(ctx context.Context, arg ListTaxpayerImportBatchesParams) ([]ListTaxpayerImportBatchesRow, error)
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
 	// Mükellef web paneli (issue #39). Her sorgu X-Taxpayer ile çözülen
 	// mükellefin taxpayer_id'siyle sınırlıdır; ofis bağlamı (organization_id)
@@ -743,6 +750,7 @@ type Querier interface {
 	LockTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// tenant-lint: cross-org mükellef yüklemesi için görevi kilitler; taxpayer_id ve aktif engagement ile sınırlı
 	LockTaxpayerDocumentTask(ctx context.Context, arg LockTaxpayerDocumentTaskParams) (LockTaxpayerDocumentTaskRow, error)
+	LockTaxpayerImportBatch(ctx context.Context, arg LockTaxpayerImportBatchParams) (TaxpayerImportBatch, error)
 	MarkAllNotificationsReadForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	MarkBankConnectionSynced(ctx context.Context, arg MarkBankConnectionSyncedParams) error
 	MarkBulkJobCompleted(ctx context.Context, arg MarkBulkJobCompletedParams) (BulkJob, error)
@@ -779,6 +787,8 @@ type Querier interface {
 	// @silent_before'dan beri haber vermeyen çevrimiçi ajanlar offline olur.
 	// Dönen satırlar bu çalıştırmada offline'a geçenlerdir (bildirim bir kez).
 	MarkSilentDesktopAgentsOffline(ctx context.Context, arg MarkSilentDesktopAgentsOfflineParams) ([]MarkSilentDesktopAgentsOfflineRow, error)
+	MarkTaxpayerImportBatchSent(ctx context.Context, arg MarkTaxpayerImportBatchSentParams) (int64, error)
+	MarkTaxpayerImportBatchSentOutcome(ctx context.Context, arg MarkTaxpayerImportBatchSentOutcomeParams) (int64, error)
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
 	MaskPrivacyInvitations(ctx context.Context, arg MaskPrivacyInvitationsParams) (int64, error)
@@ -861,6 +871,7 @@ type Querier interface {
 	// Entegratör durumu (30 §8) faturaya işlenir.
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
+	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)

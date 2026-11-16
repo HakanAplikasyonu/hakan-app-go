@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 
@@ -15,6 +16,7 @@ type deliverTestQuerier struct {
 	pushTestQuerier
 	row      db.Notification
 	claimErr error
+	getErr   error
 	sent     int
 	stuck    []int64
 }
@@ -27,6 +29,9 @@ func (d *deliverTestQuerier) MarkNotificationProcessing(context.Context, int64) 
 }
 
 func (d *deliverTestQuerier) GetNotificationByID(context.Context, int64) (db.Notification, error) {
+	if d.getErr != nil {
+		return db.Notification{}, d.getErr
+	}
 	return d.row, nil
 }
 
@@ -58,6 +63,22 @@ func TestDeliverResumesProcessingAfterClaimMiss(t *testing.T) {
 	}
 	if q.sent != 1 {
 		t.Fatalf("MarkNotificationSent calls = %d, want 1", q.sent)
+	}
+}
+
+// The task ran before the writing transaction committed (#273): the row is
+// not visible yet, so the task fails and is retried instead of being
+// dropped with the notification left queued forever.
+func TestDeliverRetriesInvisibleRow(t *testing.T) {
+	t.Parallel()
+
+	q := &deliverTestQuerier{claimErr: pgx.ErrNoRows, getErr: pgx.ErrNoRows}
+	svc := New(q, nil, []providers.Provider{providers.InappProvider{}}, slog.Default())
+	if err := svc.Deliver(context.Background(), 7); !errors.Is(err, ErrNotificationNotVisible) {
+		t.Fatalf("Deliver = %v, want ErrNotificationNotVisible", err)
+	}
+	if q.sent != 0 {
+		t.Fatalf("MarkNotificationSent calls = %d, want 0", q.sent)
 	}
 }
 

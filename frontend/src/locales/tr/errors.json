@@ -51,5 +51,9 @@
   "back_to_login": "Girişe dön",
   "continue": "Devam et",
   "area_requires": "Bu alan yalnızca {{area}} erişimi gerektirir.",
-  "codes.LEGAL_VERSION_OUTDATED": "Metin güncellendi. Lütfen yeni sürümü okuyup yeniden onaylayın."
+  "codes.LEGAL_VERSION_OUTDATED": "Metin güncellendi. Lütfen yeni sürümü okuyup yeniden onaylayın.",
+  "codes.IMPORT_NO_HEADER": "Dosyada başlık satırı bulunamadı. İlk satırda en az VKN/TCKN ve Unvan sütunları olmalı.",
+  "codes.IMPORT_TOO_LARGE": "Dosya çok büyük. Bir listede en fazla 1000 satır olabilir.",
+  "codes.IMPORT_FILE_INVALID": "Dosya okunamadı. Geçerli bir .xlsx ya da .csv dosyası yükleyin.",
+  "codes.IMPORT_ALREADY_SENT": "Bu listenin davetleri daha önce gönderildi."
 }

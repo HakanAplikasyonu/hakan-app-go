@@ -1114,6 +1114,7 @@ type Organization struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	SetupState     []byte             `json:"setup_state"`
 }
 
 type OrganizationBilling struct {
@@ -1599,6 +1600,22 @@ type TaxpayerHistoryShare struct {
 	GrantedAt      pgtype.Timestamptz `json:"granted_at"`
 	RevokedBy      pgtype.Int8        `json:"revoked_by"`
 	RevokedAt      pgtype.Timestamptz `json:"revoked_at"`
+}
+
+type TaxpayerImportBatch struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	FileName       string             `json:"file_name"`
+	Rows           []byte             `json:"rows"`
+	Total          int32              `json:"total"`
+	Valid          int32              `json:"valid"`
+	Invalid        int32              `json:"invalid"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	Outcome        []byte             `json:"outcome"`
 }
 
 type TaxpayerInvitation struct {
