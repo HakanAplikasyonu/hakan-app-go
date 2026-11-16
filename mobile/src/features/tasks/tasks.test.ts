@@ -29,6 +29,7 @@ const task = (uuid: string, over: Partial<ServerTask> = {}): ServerTask => ({
   kind: 'undocumented_payment',
   period: '2026-10',
   status: 'open',
+  title: '',
   note: '',
   due_at: '2026-11-20T21:00:00Z',
   overdue: false,
