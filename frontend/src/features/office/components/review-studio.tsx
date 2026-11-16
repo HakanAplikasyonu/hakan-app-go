@@ -658,7 +658,11 @@ function StudioInner() {
               ) : null}
               {ctx.invoiceUuid ? (
                 <Link
-                  href={routes.tenant.invoice(slug, ctx.invoiceUuid)}
+                  href={routes.tenant.invoice(
+                    slug,
+                    ctx.invoiceUuid,
+                    current?.engagement_uuid ?? undefined,
+                  )}
                   className="text-brand hover:underline"
                 >
                   {t("office.review_api.invoice_link")}
