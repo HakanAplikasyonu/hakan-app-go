@@ -1,4 +1,5 @@
 // Kaynak: mobile/src/app/_layout.tsx (#236); ofis akışına uyarlandı.
+import { OfflineScreen, RootErrorScreen } from '@hakan/mobile-core/screens';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -8,7 +9,6 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BrandMark } from '@/components/brand-mark';
-import { Button, Screen, Text } from '@/components/ui';
 import { AuthProvider, useAuth } from '@/core/auth/auth-provider';
 import { initSentry, reportError, wrapRoot } from '@/core/observability/sentry';
 import { installForegroundHandler } from '@/core/push/push';
@@ -24,48 +24,13 @@ installForegroundHandler();
  * #202): Sentry açıksa raporlanır, kullanıcı boş ekran yerine yeniden dener.
  */
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
-  useEffect(() => {
-    reportError(error, { boundary: 'root' });
-  }, [error]);
-  return (
-    <SafeAreaProvider>
-      <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-        <BrandMark size={64} />
-        <View style={{ gap: 6, alignItems: 'center' }}>
-          <Text variant="title">Bir şeyler ters gitti</Text>
-          <Text tone="muted" style={{ textAlign: 'center' }}>
-            Ekran açılırken beklenmeyen bir hata oluştu. Tekrar deneyebilirsiniz.
-          </Text>
-        </View>
-        <Button title="Tekrar dene" onPress={retry} />
-      </Screen>
-    </SafeAreaProvider>
-  );
+  return <RootErrorScreen error={error} retry={retry} mark={<BrandMark size={64} />} report={reportError} />;
 }
 
 /** Bağlantısız açılış: oturum korunur, "Tekrar dene" yeniden denetler. */
-function OfflineScreen() {
+function Offline() {
   const { retry } = useAuth();
-  const [busy, setBusy] = useState(false);
-  return (
-    <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-      <BrandMark size={64} />
-      <View style={{ gap: 6, alignItems: 'center' }}>
-        <Text variant="title">Bağlantı yok</Text>
-        <Text tone="muted" style={{ textAlign: 'center' }}>
-          Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin; oturumunuz açık kalır.
-        </Text>
-      </View>
-      <Button
-        title="Tekrar dene"
-        loading={busy}
-        onPress={() => {
-          setBusy(true);
-          retry().finally(() => setBusy(false));
-        }}
-      />
-    </Screen>
-  );
+  return <OfflineScreen mark={<BrandMark size={64} />} retry={retry} />;
 }
 
 function RootNavigator() {
@@ -85,7 +50,7 @@ function RootNavigator() {
     if (status !== 'booting') SplashScreen.hideAsync().catch(() => {});
   }, [status]);
 
-  if (status === 'offline') return <OfflineScreen />;
+  if (status === 'offline') return <Offline />;
 
   if (status === 'booting') {
     return (

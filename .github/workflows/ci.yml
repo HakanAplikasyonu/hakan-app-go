@@ -31,6 +31,8 @@ jobs:
   #   frontend/**           -> frontend, contracts
   #   mobile/**             -> mobile, mobile_release (see the OpenAPI note in
   #                            the mobile job; openapi.yaml NEVER maps to mobile)
+  #   packages/mobile-core/** -> mobile, mobile_office, mobile_release (#295:
+  #                            both apps bundle the shared core)
   #   Dockerfiles / compose.prod.yml / deploy/** -> infra (image build)
   #   backend/cmd/** , backend/deploy/** , go.mod/go.sum , frontend
   #   package.json / pnpm-lock.yaml / next.config.* -> their app + infra
@@ -132,6 +134,7 @@ jobs:
                 frontend/*)                         frontend=true; contracts=true ;;
                 mobile/*)                           mobile=true ;;
                 mobile-office/*)                    mobile_office=true ;;
+                packages/mobile-core/*)             mobile=true; mobile_office=true ;;
                 *)                                  : ;;   # unmapped -> nothing
               esac
             done <<< "$files"
@@ -173,7 +176,7 @@ jobs:
             while IFS= read -r file; do
               case "$file" in
                 *.md) ;;
-                mobile/*) mobile_release=true ;;
+                mobile/*|packages/mobile-core/*) mobile_release=true ;;
               esac
             done <<< "$files"
           fi
@@ -775,6 +778,13 @@ jobs:
         if: steps.guard.outputs.present == 'true'
         working-directory: mobile
         run: npm test --if-present
+      # #295: ortak çekirdek (packages/mobile-core) saf modüllerin birim testleri.
+      # Tip denetimi ve lint iki uygulamanın kendi adımlarında (paket kaynağı
+      # uygulamaların içe aktarmalarıyla derlenir).
+      - name: Test (packages/mobile-core)
+        if: steps.guard.outputs.present == 'true'
+        working-directory: packages/mobile-core
+        run: npm test
       # #203: config plugins (expo-updates, Sentry, notifications, app links)
       # must still produce a native project; the emulator Maestro run is
       # documented in mobile/README.md ("Duman testleri") and not run here.
@@ -813,6 +823,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
       - name: Test
+        run: npm test
+      - name: Test (packages/mobile-core)
+        working-directory: packages/mobile-core
         run: npm test
       # #242: eklentiler (expo-updates, Sentry, bildirim, bağlantılar) yerel
       # projeyi üretebilmeli. Emülatörde Maestro çalıştırması CI'da yok
