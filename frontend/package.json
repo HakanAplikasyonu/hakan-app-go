@@ -24,7 +24,7 @@
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
-    "@hookform/resolvers": "^5.4.0",
+    "@hookform/resolvers": "^7.0.6",
     "@lexical/code": "^0.48.0",
     "@lexical/code-prism": "^0.48.0",
     "@lexical/code-shiki": "^0.48.0",
