@@ -35,10 +35,12 @@ export function Money({
   );
 }
 
+// Tasarımdaki pill-* renkleri: tint zemin + aynı ailenin metin token'ı
+// (dört temada 4.5:1; saydam karışım gri zeminde yetmiyordu).
 const severityClass: Record<Severity, string> = {
-  info: "bg-brand/10 text-brand",
-  warning: "bg-status-warning/12 text-status-warning",
-  blocker: "bg-status-blocking/12 text-status-blocking",
+  info: "bg-brand-tint text-brand-text",
+  warning: "bg-warn-tint text-warn",
+  blocker: "bg-danger-tint text-danger",
 };
 
 export function SeverityBadge({ severity }: { severity: Severity }) {

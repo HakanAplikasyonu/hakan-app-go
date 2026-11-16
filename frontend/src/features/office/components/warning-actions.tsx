@@ -39,6 +39,7 @@ export function ApiWarningActions({ warning }: { warning: ApiDataWarning }) {
         <Button
           variant="outline"
           size="sm"
+          className="min-h-11 md:min-h-8"
           disabled={decide.isPending}
           onClick={() => run("acknowledge")}
         >
@@ -47,6 +48,7 @@ export function ApiWarningActions({ warning }: { warning: ApiDataWarning }) {
         <Button
           variant="outline"
           size="sm"
+          className="min-h-11 md:min-h-8"
           disabled={decide.isPending}
           onClick={() => run("resolve")}
         >
