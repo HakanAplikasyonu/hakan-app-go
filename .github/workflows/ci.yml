@@ -52,6 +52,7 @@ jobs:
       full: ${{ steps.f.outputs.full }}
       mobile_release: ${{ steps.f.outputs.mobile_release }}
       images: ${{ steps.f.outputs.images }}
+      e2e: ${{ steps.f.outputs.e2e }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -145,6 +146,19 @@ jobs:
             backend=true; frontend=true; contracts=true; infra=true; mobile=true; desktop=true
           fi
 
+          # HAKAN (#170): uçtan uca duman testi. Backend ya da frontend
+          # değişince (main ve full dahil) ve testin kendi dosyaları değişince.
+          e2e=false
+          if [ "$backend" = "true" ] || [ "$frontend" = "true" ]; then e2e=true; fi
+          if [ -n "$files" ]; then
+            while IFS= read -r file; do
+              case "$file" in
+                *.md) ;;
+                e2e/*|scripts/e2e-*|compose.local.yml|.env.example) e2e=true ;;
+              esac
+            done <<< "$files"
+          fi
+
           # mobile_release: ONLY a real (non-doc) mobile/** diff. Never set by
           # `full`, and never by backend/docs/openapi.yaml — see the mobile job.
           mobile_release=false
@@ -169,6 +183,7 @@ jobs:
             echo "full=$full"
             echo "mobile_release=$mobile_release"
             echo "images=$images"
+            echo "e2e=$e2e"
           } >> "$GITHUB_OUTPUT"
 
           echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile desktop=$desktop full=$full mobile_release=$mobile_release"
@@ -255,6 +270,70 @@ jobs:
         run: node scripts/check-i18n.mjs
       - name: Build
         run: pnpm build
+
+  # HAKAN (#170): uçtan uca duman testi (Playwright). scripts/e2e-up.sh
+  # compose altyapısını kurar, migration'ları sıfırdan uygular, demo seed'i
+  # yükler, API'yi ve Next.js üretim derlemesini başlatır; e2e/ testleri
+  # ofis paneli → mükellef paneli → Luca/Zirve indirme akışını koşar.
+  # İlk aşamada zorunlu değil: `ci` kapısının needs listesinde yok ve
+  # continue-on-error ile iş düşse de iş akışı kırmızıya dönmez.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Install e2e and Chromium
+        working-directory: e2e
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Typecheck e2e
+        working-directory: e2e
+        run: npm run typecheck
+      - name: Start environment
+        run: scripts/e2e-up.sh
+      - name: Playwright
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test
+      - name: Logs on failure
+        if: failure()
+        run: |
+          for f in e2e/.run/server.log e2e/.run/frontend.log; do
+            echo "::group::$f"; tail -200 "$f" || true; echo "::endgroup::"
+          done
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+            e2e/.run/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+      - name: Stop environment
+        if: always()
+        run: scripts/e2e-down.sh
 
   # Env config (docs/design/env-core.md): .env.server.example matches
   # deploy/env/schema, .env.example has every schema key, prod-env tests pass

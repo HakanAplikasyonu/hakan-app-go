@@ -1,0 +1,15 @@
+{
+  "name": "@app/e2e",
+  "private": true,
+  "description": "Uçtan uca duman testi (#170): ofis paneli, mükellef paneli ve çıktı akışı.",
+  "scripts": {
+    "test": "playwright test",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.19.1",
+    "typescript": "^5.9.3"
+  }
+}
