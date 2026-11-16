@@ -66,6 +66,7 @@ export async function runSequential<T>(items: readonly T[], fn: (item: T) => Pro
 /** Kaydırma hareketi: eşik aşılınca karar (sağa onay, sola reddet, yukarı düzelt). */
 export type SwipeAction = 'accept' | 'reject' | 'correct' | null;
 export function swipeAction(dx: number, width: number, threshold = 0.35, dy = 0, height = 0): SwipeAction {
+  'worklet';
   const limit = Math.max(60, width * threshold);
   const up = Math.max(80, height * 0.25);
   // Yukarı hareket yataydan baskınsa düzelt; aksi halde yatay eşik.
@@ -77,6 +78,7 @@ export function swipeAction(dx: number, width: number, threshold = 0.35, dy = 0,
 
 /** Kart yığınında kartın eğimi (derece): yatay kaymayla en çok ±8°. */
 export function cardTilt(dx: number, width: number): number {
+  'worklet';
   if (!width) return 0;
   return Math.max(-8, Math.min(8, (dx / width) * 16));
 }
