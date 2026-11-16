@@ -31,8 +31,13 @@
   --secondary: var(--surface-3);
   --secondary-foreground: var(--text);
   --muted: var(--surface-2);
-  /* text-3 surface-2 üzerinde 4.5:1 sağlar (#194 ölçütü korunur). */
-  --muted-foreground: var(--text-3);
+  /*
+   * Tasarım eşlemesi text-3; ancak text-3 (#6B6B76) açık zeminde ~4.6:1 ve
+   * tonlu kutularda (ör. bg-status-blocking/5) 4.39:1'e düşüyor. 4.5:1 kuralı
+   * (#194, README Erişilebilirlik) için text-2 kullanılır. t-3 / text-text-3
+   * yalnızca beyaz yüzeyde ikincil etiketler için kalır.
+   */
+  --muted-foreground: var(--text-2);
   --accent: var(--brand-tint);
   --accent-foreground: var(--brand-text);
   --destructive: var(--danger);
@@ -213,4 +218,14 @@
   .hk-yukleyici > i {
     animation-name: hk-fade;
   }
+}
+
+/*
+ * Metin olarak marka rengi: `--brand` dolgu içindir (N3'te #01FF11 beyaz
+ * zeminde, M3 koyuda #2448FF siyah zeminde okunmaz). Metin her zaman
+ * `--brand-text` ile yazılır; dolgu (bg-primary, bg-brand) değişmez.
+ */
+.text-primary,
+.text-brand {
+  color: var(--brand-text);
 }
