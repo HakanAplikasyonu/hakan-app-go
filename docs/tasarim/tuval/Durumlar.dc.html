@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Boş, yükleme ve hata durumları</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}
+.st-card{border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:36px 28px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;min-height:400px;justify-content:center}
+.ghost{display:flex;align-items:flex-end;gap:8px}
+.ghost i{display:block;width:30px;border:2px dashed var(--line-strong);clip-path:polygon(0 12px,50% 0,100% 12px,100% 100%,0 100%);background:var(--surface-2)}
+</style>
+</helmet>
+<div class="hk" data-theme="m3-light" style="width:1440px;height:1100px;padding:48px 56px;display:flex;flex-direction:column;gap:24px">
+  <div class="row" style="align-items:flex-end;gap:20px"><div class="col grow" style="gap:8px"><span class="t-cap">Ortak durumlar · açık ve koyu yan yana</span><h1 style="font-size:32px">Her boşluk bir sonraki adımı söyler</h1></div><p class="t-sm t-2" style="max-width:440px">Kural: boş durum = ne olduğu + neden + tek düğme. Hata = ne oldu + veri güvende mi + ne yapmalı. Teknik kod yalnızca "Ayrıntı"da.</p></div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px">
+    <div class="hk st-card" data-theme="m3-light">
+      <div class="ghost" style="height:72px"><i style="height:50px"></i><i style="height:72px"></i><i style="height:50px"></i></div>
+      <h3 style="font-size:19px">Kuyruk boş, taç tamam</h3><p class="t-sm t-2" style="max-width:300px">Bekleyen öneri yok. Yeni belge geldiğinde burada görünecek.</p><button type="button" class="btn">Uyarılara bak</button><span class="t-cap" style="margin-top:8px">Boş · başarı</span>
+    </div>
+    <div class="hk st-card" data-theme="m3-dark">
+      <div class="ghost" style="height:72px"><i style="height:50px"></i><i style="height:72px"></i><i style="height:50px"></i></div>
+      <h3 style="font-size:19px">Henüz mükellef yok</h3><p class="t-sm t-2" style="max-width:300px">Listeni Excel'den yükle ya da tek tek ekle. Davet ettiğin mükellef fiş göndermeye başlar.</p><div class="row" style="gap:8px"><button type="button" class="btn">Tek ekle</button><button type="button" class="btn btn-pri">Excel yükle</button></div><span class="t-cap" style="margin-top:8px">Boş · ilk kullanım · koyu</span>
+    </div>
+    <div class="hk st-card" data-theme="m3-light" style="align-items:stretch;text-align:left;justify-content:flex-start">
+      <div class="row" style="gap:12px"><div class="skel" style="width:32px;height:32px;border-radius:9px"></div><div class="col grow" style="gap:6px"><div class="skel" style="height:12px;width:60%"></div><div class="skel" style="height:10px;width:35%"></div></div></div>
+      <div class="divider"></div>
+      <div class="row" style="gap:12px"><div class="skel" style="width:16px;height:16px"></div><div class="skel grow" style="height:12px"></div><div class="skel" style="height:12px;width:70px"></div></div>
+      <div class="row" style="gap:12px"><div class="skel" style="width:16px;height:16px"></div><div class="skel grow" style="height:12px"></div><div class="skel" style="height:12px;width:70px"></div></div>
+      <div class="row" style="gap:12px"><div class="skel" style="width:16px;height:16px"></div><div class="skel grow" style="height:12px"></div><div class="skel" style="height:12px;width:70px"></div></div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px"><span class="loader"><i></i><i></i><i></i></span><span class="t-sm t-2">Luca dosyası hazırlanıyor · 186 fiş</span></div>
+      <span class="t-cap" style="text-align:center">Yükleme · iskelet + 400 ms sonra kristal</span>
+    </div>
+    <div class="hk st-card" data-theme="m3-dark">
+      <span style="width:64px;height:64px;border-radius:18px;background:var(--danger-tint);color:var(--danger);display:flex;align-items:center;justify-content:center"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"></path></svg></span>
+      <h3 style="font-size:19px">Sunucuya ulaşılamıyor</h3><p class="t-sm t-2" style="max-width:300px">Yaptığın son 3 onay telefonda saklandı; bağlantı gelince gönderilecek. Hiçbir şey kaybolmadı.</p><button type="button" class="btn btn-pri">Yeniden dene</button><a href="#" class="t-xs t-3" style="color:var(--text-3)">Ayrıntı · NETWORK_TIMEOUT</a><span class="t-cap" style="margin-top:8px">Hata · geçici · koyu</span>
+    </div>
+    <div class="hk st-card" data-theme="m3-light">
+      <span style="width:64px;height:64px;border-radius:18px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 11V8a6 6 0 0112 0v3M5 11h14v10H5z"></path></svg></span>
+      <h3 style="font-size:19px">Bu sayfa için yetkin yok</h3><p class="t-sm t-2" style="max-width:300px">Rolün: Stajyer. Luca çıktısı almak için ofis sahibi ya da yöneticinden yetki iste.</p><button type="button" class="btn">Mert Demir'e sor</button><span class="t-cap" style="margin-top:8px">Yetki · 403</span>
+    </div>
+    <div class="hk st-card" data-theme="n3-dark">
+      <span class="crown s3" style="height:72px;gap:6px"><i style="width:22px;height:50px"></i><i style="width:22px;height:72px"></i><i style="width:22px;height:50px"></i></span>
+      <h3 style="font-size:19px">Ekim dönemi tamam</h3><p class="t-sm t-2" style="max-width:300px">38 mükellefin tamamı Luca'ya aktarıldı. Dönem kilitlendi.</p><button type="button" class="btn btn-pri">Kasım'a geç</button><span class="t-cap" style="margin-top:8px">Kutlama · tek an · N3 koyu</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>

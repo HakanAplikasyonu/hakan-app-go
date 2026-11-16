@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mükellef web portalı</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit;text-decoration:none}
+.tb{padding:0 4px;height:60px;display:flex;align-items:center;font-weight:600;font-size:14px;color:var(--text-2);border-bottom:2px solid transparent}
+.tb.on{color:var(--text);border-bottom-color:var(--brand)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="min-height:960px;display:flex;flex-direction:column">
+  <header style="background:var(--surface);border-bottom:1px solid var(--line)">
+    <div class="row wrap" style="max-width:1200px;margin:0 auto;padding:0 24px;gap:24px">
+      <div class="row" style="gap:10px;height:60px">
+        <svg viewBox="0 0 181 198" width="22" height="24" aria-hidden="true"><polygon points="0,86 28,59 28,198 0,198" style="fill:var(--c-light)"></polygon><polygon points="28,59 56,86 56,198 28,198" style="fill:var(--c-mid)"></polygon><polygon points="63,36 91,0 91,198 63,198" style="fill:var(--c-mid)"></polygon><polygon points="91,0 119,36 119,198 91,198" style="fill:var(--c-dark)"></polygon><polygon points="125,86 153,59 153,198 125,198" style="fill:var(--c-dark)"></polygon><polygon points="153,59 181,86 181,198 153,198" style="fill:var(--c-light)"></polygon></svg>
+        <span style="font:800 21px/1 'Inter Tight',sans-serif;letter-spacing:-.05em">hakan</span>
+      </div>
+      <nav class="row wrap" style="gap:22px" aria-label="Portal menüsü"><a href="#" class="tb on">Özet</a><a href="#" class="tb">İstekler <span class="pill pill-danger" style="height:18px;margin-left:4px">2</span></a><a href="#" class="tb">Faturalar</a><a href="#" class="tb">Fişler</a><a href="#" class="tb">Belge yükle</a></nav>
+      <div style="flex:1"></div>
+      <button type="button" class="btn" style="gap:8px"><span class="av av-sq" style="width:22px;height:22px;font-size:9px;background:var(--brand);color:var(--on-brand)">AG</span>Atlas Gıda Ticaret A.Ş. ▾</button>
+      <span class="av">OA</span>
+    </div>
+  </header>
+  <main style="max-width:1200px;width:100%;margin:0 auto;padding:32px 24px;display:flex;flex-direction:column;gap:24px">
+    <div class="col" style="gap:6px"><span class="t-3 t-sm">Müşavirin: Demir Mali Müşavirlik · Ayşe Demir</span><h1 style="font-size:30px">Merhaba Okan. Ekim için 2 şey eksik.</h1></div>
+
+    <div class="card row wrap" style="gap:16px;padding:18px 20px;border-color:var(--brand);background:var(--brand-tint)">
+      <svg class="ic ic-lg" viewBox="0 0 24 24" style="color:var(--brand-text)" aria-hidden="true"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"></path></svg>
+      <div class="col grow" style="min-width:260px"><b>Demir Mali Müşavirlik geçmiş verilerinizi görmek istiyor</b><span class="t-sm t-2">2025 ve sonrası e-faturalarınız. KVKK aydınlatma metnini okuyup onaylayabilirsiniz.</span></div>
+      <button type="button" class="btn">Reddet</button><button type="button" class="btn btn-pri">Onayla</button>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+      <div class="col" style="flex:2 1 560px;min-width:0;gap:20px">
+        <div class="card" style="overflow:hidden">
+          <div class="row" style="padding:16px 20px"><h2 style="font-size:18px" class="grow">Müşavirinin istedikleri</h2></div>
+          <div class="row wrap" style="gap:14px;padding:16px 20px;border-top:1px solid var(--line)"><span class="crown"><i></i><i></i><i></i></span><div class="col grow" style="min-width:220px"><b>Banka ekstresi · Eylül</b><span class="t-sm" style="color:var(--danger)">2 gün gecikti · Ayşe Demir</span></div><button type="button" class="btn btn-pri">Dosya seç</button></div>
+          <div class="row wrap" style="gap:14px;padding:16px 20px;border-top:1px solid var(--line)"><span class="crown"><i></i><i></i><i></i></span><div class="col grow" style="min-width:220px"><b>14 Ekim'deki 18.500 ₺ ödemenin belgesi</b><span class="t-sm t-2">Ege Gayrimenkul'e ödeme · 5 gün kaldı</span></div><button type="button" class="btn">Bende yok</button><button type="button" class="btn btn-pri">Dosya seç</button></div>
+        </div>
+        <div class="col" style="align-items:center;gap:10px;padding:36px;border:2px dashed var(--line-strong);border-radius:16px;background:var(--surface);text-align:center">
+          <span class="loader" style="height:30px;gap:3px"><i style="width:9px;height:21px;animation:none"></i><i style="width:9px;height:30px;animation:none"></i><i style="width:9px;height:21px;animation:none"></i></span>
+          <b style="font-size:17px">Fiş, fatura ya da ekstreyi buraya bırak</b>
+          <span class="t-sm t-2">JPG, PNG, PDF, XML (UBL), ZIP · telefonla çekmek için uygulamayı kullan</span>
+          <button type="button" class="btn" style="margin-top:6px">Bilgisayardan seç</button>
+        </div>
+      </div>
+      <div class="card" style="flex:1 1 320px;min-width:0;overflow:hidden">
+        <div class="row" style="padding:16px 20px"><h2 style="font-size:18px" class="grow">Son gönderdiklerin</h2><a href="#" class="t-sm t-b" style="color:var(--brand-text)">Tümü</a></div>
+        <sc-for list="{{son}}" as="s" hint-placeholder-count="6">
+          <div class="row" style="gap:12px;padding:12px 20px;border-top:1px solid var(--line)"><span class="{{s.c}}"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">{{s.k}}</b><span class="t-xs" style="color:{{s.dc}}">{{s.d}}</span></div><span class="num t-sm">{{s.t}}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const S = (k,d,t,c,dc) => ({k,d,t,c,dc: dc||'var(--text-3)'});
+    const son = [S('Yıldız Market · fiş','Müşavir onayında','1.533,60','crown s1'),S('Kalem Kırtasiye · e-Arşiv','Onaylandı','4.212,00','crown s2'),S('Opet · fiş','Okunamadı · tekrar yükle','2.140,00','crown err','var(--danger)'),S('Kira kontratı.pdf','İstek tamamlandı','—','crown s2'),S('Temiz Ofis · e-Arşiv','Luca\'ya aktarıldı','2.880,00','crown s3'),S('Z raporu Z-0090','Luca\'ya aktarıldı','11.204,00','crown s3')];
+    return { tema: this.props.tema ?? 'm3-light', son };
+  }
+}
+</script>
+</body>
+</html>

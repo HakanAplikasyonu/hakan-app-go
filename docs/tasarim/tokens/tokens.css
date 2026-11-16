@@ -1,0 +1,44 @@
+/*
+ * HAKAN tasarım token'ları · v1 (onaylı tuval: docs/tasarim/README.md)
+ * Web (Next.js, Tailwind v4 + shadcn) ve Tauri ajanı bu dosyayı aynen kullanır.
+ * Tema seçimi: <html data-theme="m3-light|m3-dark|n3-light|n3-dark">.
+ * Varsayılan M3; "sistemi izle" seçiliyse prefers-color-scheme ile m3-light/m3-dark.
+ * Renkler logo PDF'inden piksel ölçümüyle alındı (tasarim-referans/logo-ornekleri.pdf).
+ */
+:root,[data-theme="m3-light"]{
+  --bg:#F3F3F5;--surface:#FFFFFF;--surface-2:#F8F8FA;--surface-3:#EDEDF1;--line:#E3E3E9;--line-strong:#CACAD3;
+  --text:#0A0A0A;--text-2:#4A4A55;--text-3:#6B6B76;
+  --brand:#2448FF;--on-brand:#FFFFFF;--brand-text:#2448FF;--brand-ink:#102290;--brand-soft:#CFD8FF;--brand-tint:#EEF1FF;
+  --c-light:#CFD8FF;--c-mid:#2448FF;--c-dark:#102290;
+  --ok:#0E7A4E;--ok-tint:#E3F4EC;--warn:#9A5800;--warn-tint:#FFF1DC;--danger:#C0261C;--danger-tint:#FDE7E5;--info:#2448FF;--info-tint:#EEF1FF;
+  --focus:#2448FF;
+  --shadow:0 1px 2px rgba(10,10,10,.05),0 4px 16px rgba(10,10,10,.06);--shadow-lg:0 12px 40px rgba(10,10,10,.14);
+  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;--radius-xl:22px;
+  --font-display:'Inter Tight','Inter',system-ui,sans-serif;--font-sans:'Inter',system-ui,sans-serif;--font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --dur-fast:120ms;--dur-base:200ms;--dur-slow:320ms;--ease-out:cubic-bezier(.2,.7,.2,1);
+}
+[data-theme="m3-dark"]{
+  --bg:#0A0A0A;--surface:#131316;--surface-2:#1A1A1E;--surface-3:#232329;--line:#26262C;--line-strong:#3A3A43;
+  --text:#F3F3F5;--text-2:#B4B4BE;--text-3:#8C8C97;
+  --brand:#2448FF;--on-brand:#FFFFFF;--brand-text:#93A5FF;--brand-ink:#CFD8FF;--brand-soft:#1E2C8F;--brand-tint:#151B45;
+  --c-light:#CFD8FF;--c-mid:#2448FF;--c-dark:#102290;
+  --ok:#4FD39A;--ok-tint:#0F2A1F;--warn:#FFB54D;--warn-tint:#2E2210;--danger:#FF7A70;--danger-tint:#331614;--info:#93A5FF;--info-tint:#151B45;
+  --focus:#93A5FF;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow-lg:0 12px 40px rgba(0,0,0,.6);
+}
+[data-theme="n3-light"]{
+  --bg:#F3F3F5;--surface:#FFFFFF;--surface-2:#F8F8FA;--surface-3:#EDEDF1;--line:#E3E3E9;--line-strong:#CACAD3;
+  --text:#0A0A0A;--text-2:#4A4A55;--text-3:#6B6B76;
+  --brand:#01FF11;--on-brand:#0A0A0A;--brand-text:#067A12;--brand-ink:#0A0A0A;--brand-soft:#D4D3D8;--brand-tint:#E6FFE8;
+  --c-light:#D4D3D8;--c-mid:#01FF11;--c-dark:#0A0A0A;
+  --ok:#067A12;--ok-tint:#E6FFE8;--warn:#9A5800;--warn-tint:#FFF1DC;--danger:#C0261C;--danger-tint:#FDE7E5;--info:#0A0A0A;--info-tint:#EDEDF1;
+  --focus:#0A0A0A;
+}
+[data-theme="n3-dark"]{
+  --bg:#0A0A0A;--surface:#131316;--surface-2:#1A1A1E;--surface-3:#232329;--line:#26262C;--line-strong:#3A3A43;
+  --text:#F3F3F5;--text-2:#B4B4BE;--text-3:#8C8C97;
+  --brand:#01FF11;--on-brand:#0A0A0A;--brand-text:#01FF11;--brand-ink:#F3F3F5;--brand-soft:#2A2A30;--brand-tint:#0D2410;
+  --c-light:#D4D3D8;--c-mid:#01FF11;--c-dark:#F3F3F5;
+  --ok:#01FF11;--ok-tint:#0D2410;--warn:#FFB54D;--warn-tint:#2E2210;--danger:#FF7A70;--danger-tint:#331614;--info:#F3F3F5;--info-tint:#232329;
+  --focus:#01FF11;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow-lg:0 12px 40px rgba(0,0,0,.6);
+}
+@media (prefers-reduced-motion:reduce){:root{--dur-fast:0ms;--dur-base:0ms;--dur-slow:0ms}}

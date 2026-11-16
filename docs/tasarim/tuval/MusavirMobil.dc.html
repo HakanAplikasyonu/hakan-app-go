@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mali müşavir mobil uygulaması</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit;text-decoration:none}
+.hd{padding:56px 20px 14px;display:flex;align-items:center;gap:10px}
+.bd{flex:1;overflow:hidden;padding:4px 16px 16px;display:flex;flex-direction:column;gap:12px}
+.sw{position:absolute;inset:0;border-radius:22px;display:flex;align-items:center;padding:0 28px;font-weight:700;color:#fff}
+.tabs5 .tab{min-width:0;flex:1}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:2270px;height:980px;padding:40px;display:flex;gap:60px;align-items:flex-start;background:var(--bg)">
+
+  <div class="col" style="gap:10px"><span class="t-cap">1 · Pano</span>
+  <div class="phone">
+    <div class="hd"><div class="col grow"><span class="t-sm t-3">Günaydın</span><b style="font:700 24px 'Inter Tight'">Ayşe Demir</b></div><span class="av av-sq" style="background:var(--text);color:var(--bg)">DM</span></div>
+    <div class="bd">
+      <div class="card chamfer" style="padding:18px;display:flex;align-items:flex-end;gap:14px">
+        <div class="col grow" style="gap:4px"><span class="t-cap">2026-10 · senin 14 mükellefin</span><span class="kpi" style="font-size:34px">9<span class="t-3" style="font-size:18px">/14</span></span><span class="t-xs t-2">beyana hazır · 12 gün kaldı</span></div>
+        <span class="crown s2" style="height:44px;gap:4px"><i style="width:13px;height:30px"></i><i style="width:13px;height:44px"></i><i style="width:13px;height:30px"></i></span>
+      </div>
+      <a href="#" class="card" style="padding:16px;display:flex;align-items:center;gap:14px;background:var(--brand);border-color:var(--brand);color:var(--on-brand)"><div class="col grow"><b style="font-size:17px">Onay kuyruğu · 48</b><span style="font-size:13px;opacity:.85">Ortalama 6 sn / öneri · ~5 dk</span></div><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+        <div class="card" style="padding:12px"><span class="t-xs t-2">Belge görevi</span><div class="kpi" style="font-size:22px">5</div></div>
+        <div class="card" style="padding:12px"><span class="t-xs t-2">Engel</span><div class="kpi" style="font-size:22px;color:var(--danger)">3</div></div>
+        <div class="card" style="padding:12px"><span class="t-xs t-2">Bugün</span><div class="kpi" style="font-size:22px">23</div></div>
+      </div>
+      <div class="card" style="overflow:hidden">
+        <div class="t-sm t-b" style="padding:12px 14px">Bugün gelen yüklemeler</div>
+        <div class="row" style="padding:12px 14px;border-top:1px solid var(--line);gap:10px"><span class="crown s1"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Atlas Gıda · 12 fiş</b><span class="t-xs t-3">Mobil · 09:42</span></div></div>
+        <div class="row" style="padding:12px 14px;border-top:1px solid var(--line);gap:10px"><span class="crown s1"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Kuzey Lojistik · 8 e-Fatura</b><span class="t-xs t-3">Ofis-PC ajanı · 09:15</span></div></div>
+      </div>
+    </div>
+    <nav class="tabbar tabs5" aria-label="Alt menü"><a href="#" class="tab on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11l3-3 3 3v9M10 20V7l3-4 3 4v13M16 20v-9l3-3 3 3v9"></path></svg>Pano</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13l2.5-8h13L21 13v6H3z"></path></svg>Onay</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 20v-1.5a3.5 3.5 0 00-3.5-3.5h-5A3.5 3.5 0 004 18.5V20M10 11.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7"></path></svg>Mükellef</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"></path></svg>Görev</a><a href="#" class="tab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9"></path></svg>Bildirim</a></nav>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">2 · Onay kuyruğu · kaydırarak onay (oynat)</span>
+  <div class="phone">
+    <div class="hd"><h2 style="font-size:26px" class="grow">Onay</h2><span class="pill num">{{kalan}} kaldı</span></div>
+    <div style="padding:0 16px"><div class="bar"><i style="width:{{ilerle}}"></i></div></div>
+    <div class="bd" style="padding-top:18px;gap:16px">
+      <div style="position:relative;height:430px">
+        <div class="card" style="position:absolute;left:14px;right:14px;top:22px;bottom:-10px;border-radius:22px;opacity:.6"></div>
+        <div style="position:absolute;inset:0 0 0 0">
+          <div class="sw" style="background:var(--ok);justify-content:flex-start"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg>&nbsp;Onayla</div>
+          <div class="card" style="position:absolute;inset:0;border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow-lg);transform:translateX(56px) rotate(3deg)">
+            <div class="row"><span class="pill pill-brand">{{c.tur}}</span><span class="t-xs t-3" style="margin-left:auto">{{c.muk}}</span></div>
+            <div class="col" style="gap:4px"><b style="font:700 22px 'Inter Tight'">{{c.k}}</b><span class="t-sm t-2">{{c.satir}}</span></div>
+            <span class="kpi">{{c.t}}</span>
+            <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)">
+              <div class="row" style="gap:8px"><span class="code code-b" style="font-size:15px">{{c.kod}}</span><b class="t-sm">{{c.ad}}</b></div>
+              <div class="row t-xs t-2"><span class="{{c.cf}}"><i></i><i></i><i></i></span>{{c.neden}}</div>
+            </div>
+            <div style="flex:1"></div>
+            <div class="row t-xs t-3" style="justify-content:space-between"><span>← reddet</span><span>yukarı: düzelt</span><span>onayla →</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center;gap:18px">
+        <button type="button" onClick="{{gec}}" aria-label="Reddet" style="width:60px;height:60px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--danger);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        <button type="button" aria-label="Düzelt" style="width:52px;height:52px;margin-top:4px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--text);display:flex;align-items:center;justify-content:center"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button>
+        <button type="button" onClick="{{gec}}" aria-label="Onayla" style="width:60px;height:60px;border-radius:50%;border:0;background:var(--ok);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></button>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">3 · Mükellefler</span>
+  <div class="phone">
+    <div class="hd"><h2 style="font-size:26px" class="grow">Mükellefler</h2></div>
+    <div style="padding:0 16px 10px"><div class="search" style="height:42px"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 100-14 7 7 0 000 14M20 20l-4-4"></path></svg>Unvan, VKN, TCKN</div></div>
+    <div class="bd" style="padding:0;gap:0">
+      <sc-for list="{{muk}}" as="m" hint-placeholder-count="8">
+        <div class="row" style="gap:12px;padding:13px 20px;border-top:1px solid var(--line)"><span class="av av-sq">{{m.i}}</span><div class="col grow"><b class="t-sm">{{m.a}}</b><span class="t-xs t-3">{{m.s}}</span></div><span class="{{m.c}}"><i></i><i></i><i></i></span></div>
+      </sc-for>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">4 · Belge iste</span>
+  <div class="phone">
+    <div class="hd"><a href="#" class="btn btn-icon btn-ghost" aria-label="Kapat"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a><b class="grow">Belge iste</b><span class="t-sm t-3">Atlas Gıda</span></div>
+    <div class="bd" style="gap:18px">
+      <div class="col" style="gap:8px"><span class="label" style="margin:0">Ne lazım?</span>
+        <div class="row wrap" style="gap:8px"><span class="pill pill-brand" style="height:34px;padding:0 12px">Banka ekstresi</span><span class="pill" style="height:34px;padding:0 12px">Kira kontratı</span><span class="pill" style="height:34px;padding:0 12px">SGK bildirgesi</span><span class="pill" style="height:34px;padding:0 12px">Gider faturası</span><span class="pill" style="height:34px;padding:0 12px">Z raporu</span><span class="pill" style="height:34px;padding:0 12px">Vergi levhası</span></div>
+      </div>
+      <div><label class="label" for="bn">Not (mükellef görür)</label><input class="input" id="bn" value="Eylül ayı, tüm hesaplar" style="height:46px"></div>
+      <div class="col" style="gap:8px"><span class="label" style="margin:0">Son gün</span><div class="row" style="gap:8px"><span class="btn grow">3 gün</span><span class="btn btn-pri grow">7 gün</span><span class="btn grow">14 gün</span><span class="btn grow">Tarih</span></div></div>
+      <div class="card" style="padding:14px;display:flex;gap:10px;align-items:flex-start;background:var(--surface-2)"><svg class="ic ic-sm t-3" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9"></path></svg><span class="t-xs t-2">Okan Atlas'a bildirim gider. Son günden 1 gün önce hatırlatılır.</span></div>
+      <div style="flex:1"></div>
+      <button type="button" class="btn btn-lg btn-pri" style="height:52px">İsteği gönder</button>
+    </div>
+  </div></div>
+
+  <div class="col" style="gap:10px"><span class="t-cap">5 · Bildirimler (yeni ekran)</span>
+  <div class="phone">
+    <div class="hd"><h2 style="font-size:26px" class="grow">Bildirimler</h2></div>
+    <div style="padding:0 16px 10px"><div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px"><span class="btn btn-sm grow" style="border-color:transparent;box-shadow:var(--shadow)">Tümü</span><span class="btn btn-sm btn-ghost grow">Engel</span><span class="btn btn-sm btn-ghost grow">Yükleme</span></div></div>
+    <div class="bd" style="padding:0;gap:0">
+      <sc-for list="{{bild}}" as="b" hint-placeholder-count="6">
+        <div class="row" style="{{b.st}}"><span class="{{b.c}}"><i></i><i></i><i></i></span><div class="col grow" style="gap:2px"><b class="t-sm">{{b.t}}</b><span class="t-xs t-2">{{b.s}}</span></div><span class="t-xs t-3">{{b.z}}</span></div>
+      </sc-for>
+    </div>
+  </div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":2270,"height":980}}'>
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { i: 0 }; }
+  renderVals() {
+    const cards = [
+      {tur:'Fiş',muk:'Kuzey Lojistik',k:'Opet Akaryakıt',satir:'Motorin 142 lt · 34 KLJ 210',t:'6.212,40 ₺',kod:'770.01.005',ad:'Yakıt giderleri',cf:'conf c2',neden:'Plaka kayıtlı · 31× geçmiş'},
+      {tur:'e-Fatura',muk:'Marmara Tekstil',k:'Mavi Tasarım Ajansı',satir:'Katalog tasarım hizmeti',t:'14.160,00 ₺',kod:'760.01',ad:'Pazarlama giderleri',cf:'conf c2',neden:'Benzer ajans faturaları'},
+      {tur:'e-Arşiv',muk:'Atlas Gıda',k:'Kalem Kırtasiye',satir:'A4 fotokopi kağıdı 40 koli',t:'4.212,00 ₺',kod:'770.01.003',ad:'Kırtasiye giderleri',cf:'conf c3',neden:'Kural #1 eşleşti'}
+    ];
+    const i = this.state.i % cards.length;
+    const muk = [['AG','Atlas Gıda Ticaret A.Ş.','31 kuyrukta · 3 engel','crown err'],['DE','Defne Eczanesi','1 engel','crown err'],['KL','Kuzey Lojistik Ltd. Şti.','18 kuyrukta','crown s1'],['LK','Lale Kafe','Onaylandı','crown s2'],['MT','Marmara Tekstil A.Ş.','Çıktı hazır','crown s3'],['OT','Ova Tarım Kooperatifi','Beyan edildi','crown s3'],['SY','Selin Yılmaz','Veri bekleniyor','crown'],['YO','Yavuz Oto Servis','12 kuyrukta','crown s1']].map(x=>({i:x[0],a:x[1],s:x[2],c:x[3]}));
+    const B = (t,s,z,c,un) => ({t,s,z,c,st:'gap:12px;padding:14px 20px;border-top:1px solid var(--line);'+(un?'background:var(--brand-tint)':'')});
+    const bild = [B('Engelleyici: KDV toplamı tutmuyor','Kuzey Lojistik · KZY2026000031144','08:31','crown err',true),B('Atlas Gıda 12 fiş yükledi','Kuyruğa eklendi','09:42','crown s1',true),B('Belge yüklendi, inceleyin','Atlas Gıda · Kira kontratı','Dün','crown s1'),B('Mert-MacBook ajanı çevrimdışı','30 dakikadır sinyal yok','Dün','crown err'),B('Luca dosyası hazır','Marmara Tekstil · 2026-10','Dün','crown s3'),B('Selin Yılmaz isteği gecikti','Banka ekstresi · Eylül','2 gün','crown')];
+    return { tema: this.props.tema ?? 'm3-light', c: cards[i], kalan: String(48 - this.state.i), ilerle: Math.min(100, Math.round(this.state.i/48*100)+2)+'%', gec: () => this.setState({i: this.state.i+1}), muk, bild };
+  }
+}
+</script>
+</body>
+</html>

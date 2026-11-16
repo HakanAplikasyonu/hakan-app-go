@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Genel bakış</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}
+.tc{display:flex;align-items:flex-end;gap:10px;height:150px}
+.tc>div{display:flex;flex-direction:column;justify-content:flex-end;width:64px;height:100%;position:relative}
+.tc .shell{position:absolute;inset:0;background:var(--surface-3);clip-path:polygon(0 18px,50% 0,100% 18px,100% 100%,0 100%)}
+.tc .fill{position:relative;clip-path:polygon(0 18px,50% 0,100% 18px,100% 100%,0 100%)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="pano" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column">
+  <div class="topbar" style="flex-wrap:wrap">
+    <div class="search grow" style="max-width:420px"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 100-14 7 7 0 000 14M20 20l-4-4"></path></svg>Mükellef, fatura, VKN ara<span class="kbd" style="margin-left:auto">⌘K</span></div>
+    <button type="button" class="btn" style="gap:6px"><span class="t-3">Dönem</span><b class="mono">2026-10</b><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+    <div style="flex:1"></div>
+    <button type="button" class="btn btn-icon btn-ghost" aria-label="Bildirimler" style="position:relative"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9M10 20a2.2 2.2 0 004 0"></path></svg><span style="position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--brand)"></span></button>
+    <button type="button" class="btn btn-pri"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"></path></svg>UBL yükle</button>
+  </div>
+
+  <div style="padding:28px 32px;display:flex;flex-direction:column;gap:24px;max-width:1240px;width:100%">
+    <div class="row wrap" style="justify-content:space-between;gap:16px">
+      <div class="col" style="gap:6px"><span class="t-3 t-sm">Pazartesi, 16 Kasım</span><h1 style="font-size:30px">Günaydın Mert. Ekim beyanına 12 gün var.</h1></div>
+      <div class="row t-sm t-2" style="gap:6px"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v4l3 2M12 21a9 9 0 100-18 9 9 0 000 18"></path></svg>KDV son gün <b style="color:var(--text)">28 Kasım</b></div>
+    </div>
+
+    <section class="card chamfer" style="display:flex;flex-wrap:wrap;gap:32px;padding:28px;align-items:flex-end;border-color:var(--line-strong)">
+      <div class="col" style="gap:10px;flex:1 1 260px">
+        <span class="t-cap">Dönem tacı · 2026-10</span>
+        <div class="row" style="align-items:baseline;gap:8px"><span class="kpi" style="font-size:56px">24</span><span class="t-2" style="font-size:18px">/ 38 mükellef beyana hazır</span></div>
+        <p class="t-2 t-sm" style="max-width:360px">Belgelerin %92'si geldi, önerilerin %71'i onaylandı. Kalan 14 mükellefin 6'sında engelleyici uyarı var.</p>
+        <div class="row" style="gap:8px;margin-top:6px"><a href="OfisKuyruk.dc.html" class="btn btn-pri">Kuyruğa başla · 124</a><a href="OfisUyarilar.dc.html" class="btn">Engelleri gör</a></div>
+      </div>
+      <div class="row" style="gap:28px;align-items:flex-end">
+        <div class="col" style="align-items:center;gap:10px"><div class="tc"><div><span class="shell"></span><span class="fill" style="height:92%;background:var(--c-light)"></span></div></div><span class="t-xs t-2" style="text-align:center"><b class="num" style="color:var(--text);font-size:15px">%92</b><br>Mükellef verisi</span></div>
+        <div class="col" style="align-items:center;gap:10px"><div class="tc" style="height:190px"><div><span class="shell"></span><span class="fill" style="height:63%;background:var(--c-mid)"></span></div></div><span class="t-xs t-2" style="text-align:center"><b class="num" style="color:var(--text);font-size:15px">24/38</b><br>Beyana hazır</span></div>
+        <div class="col" style="align-items:center;gap:10px"><div class="tc"><div><span class="shell"></span><span class="fill" style="height:71%;background:var(--c-dark)"></span></div></div><span class="t-xs t-2" style="text-align:center"><b class="num" style="color:var(--text);font-size:15px">%71</b><br>Müşavir onayı</span></div>
+      </div>
+    </section>
+
+    <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+      <a href="OfisKuyruk.dc.html" class="card card-pad col" style="gap:8px;text-decoration:none"><span class="row t-sm t-2"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13l2.5-8h13L21 13v6H3zM3 13h5l1.5 2.5h5L16 13h5"></path></svg>İnceleme bekleyen öneri</span><span class="kpi">124</span><span class="t-xs" style="color:var(--warn)">9 düşük güven</span></a>
+      <a href="OfisUyarilar.dc.html" class="card card-pad col" style="gap:8px;text-decoration:none"><span class="row t-sm t-2"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg>Açık engelleyici uyarı</span><span class="kpi" style="color:var(--danger)">6</span><span class="t-xs t-3">21 uyarı · 40 bilgi</span></a>
+      <div class="card card-pad col" style="gap:8px"><span class="row t-sm t-2"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"></path></svg>Bekleyen belge görevi</span><span class="kpi">14</span><span class="t-xs" style="color:var(--danger)">3 gecikti</span></div>
+      <div class="card card-pad col" style="gap:8px"><span class="row t-sm t-2"><svg class="ic ic-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"></path></svg>Bugün gelen</span><span class="kpi">57</span><span class="t-xs t-3">41 fatura · 16 fiş</span></div>
+    </section>
+
+    <section style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+      <div class="card" style="flex:2 1 560px;min-width:0;overflow:hidden">
+        <div class="row" style="padding:16px 20px"><h3 style="font-size:16px">İşi geride olan mükellefler</h3><a href="OfisMukellefler.dc.html" class="t-sm t-b" style="margin-left:auto;color:var(--brand-text);text-decoration:none">Tümü</a></div>
+        <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead><tr><th>Mükellef</th><th>Durum</th><th>Hazırlık</th><th>Engel</th><th>Kuyruk</th><th>Atanan</th></tr></thead>
+          <tbody>
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+              <tr><td><div class="col"><b>{{r.ad}}</b><span class="t-xs t-3 mono">{{r.vkn}}</span></div></td>
+              <td><span class="{{r.pc}}"><span class="{{r.cc}}"><i></i><i></i><i></i></span>{{r.durum}}</span></td>
+              <td style="width:140px"><div class="bar"><i style="width:{{r.p}}"></i></div><span class="t-xs t-3 num">{{r.p}}</span></td>
+              <td><span class="num t-b" style="color:{{r.ec}}">{{r.engel}}</span></td><td class="num">{{r.kuyruk}}</td>
+              <td><span class="av" style="width:26px;height:26px;font-size:10px">{{r.at}}</span></td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+        </div>
+      </div>
+      <div class="col" style="gap:16px;flex:1 1 300px">
+        <div class="card card-pad col" style="gap:12px">
+          <div class="row"><h3 style="font-size:16px">KDV tahmini · 2026-10</h3></div>
+          <div class="row t-sm"><span class="t-2 grow">Ödenecek KDV</span><b class="num">₺ 486.210</b></div>
+          <div class="row t-sm"><span class="t-2 grow">Devreden KDV</span><b class="num">₺ 92.340</b></div>
+          <div class="divider"></div>
+          <div class="row t-xs t-3">31 mükellefin tahmini · onaylı fişlerden</div>
+        </div>
+        <div class="card card-pad col" style="gap:12px">
+          <h3 style="font-size:16px">Bugün olanlar</h3>
+          <sc-for list="{{feed}}" as="f" hint-placeholder-count="5">
+            <div class="row" style="align-items:flex-start;gap:10px"><span class="{{f.cc}}" style="margin-top:2px"><i></i><i></i><i></i></span><div class="col grow"><span class="t-sm">{{f.t}}</span><span class="t-xs t-3">{{f.s}}</span></div></div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const R = (ad,vkn,d,p,engel,kuyruk,at) => {
+      const m = {engel:['pill pill-danger','crown err','Engel var'], inc:['pill pill-brand','crown s1','İnceleniyor'], bek:['pill','crown','Veri bekleniyor']}[d];
+      return {ad,vkn,p,engel,kuyruk,at,pc:m[0],cc:m[1],durum:m[2],ec: engel==='0'?'var(--text-3)':'var(--danger)'};
+    };
+    const rows = [
+      R('Atlas Gıda Ticaret A.Ş.','9000000017','engel','58%','3','31','AD'),
+      R('Kuzey Lojistik Ltd. Şti.','4810293847','engel','64%','2','18','MD'),
+      R('Selin Yılmaz','TCKN ··· 4416','bek','22%','0','4','CK'),
+      R('Marmara Tekstil A.Ş.','6120047731','inc','81%','0','26','AD'),
+      R('Defne Eczanesi','TCKN ··· 9072','engel','70%','1','7','CK'),
+      R('Yavuz Oto Servis','9182736450','inc','76%','0','12','MD')
+    ];
+    const feed = [
+      {cc:'crown s1',t:'Atlas Gıda 12 fiş yükledi',s:'Mobil · 09:42'},
+      {cc:'crown s1',t:'Ofis-PC ajanı 34 e-Fatura gönderdi',s:'Masaüstü ajanı · 09:15'},
+      {cc:'crown s2',t:'Ayşe Demir 46 öneriyi onayladı',s:'İnceleme stüdyosu · 08:58'},
+      {cc:'crown err',t:'Kuzey Lojistik: TAX_TOTAL_MISMATCH',s:'Engelleyici · 08:31'},
+      {cc:'crown s3',t:'Marmara Tekstil Luca dosyası hazır',s:'Yevmiye · dün 18:20'}
+    ];
+    return { tema: this.props.tema ?? 'm3-light', rows, feed };
+  }
+}
+</script>
+</body>
+</html>

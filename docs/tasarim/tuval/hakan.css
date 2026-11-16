@@ -1,0 +1,117 @@
+/* HAKAN tasarım token'ları + ortak sınıflar (tuval için). Kaynak: docs/tasarim/tokens */
+:root,[data-theme="m3-light"]{
+  --bg:#F3F3F5;--surface:#FFFFFF;--surface-2:#F8F8FA;--surface-3:#EDEDF1;--line:#E3E3E9;--line-strong:#CACAD3;
+  --text:#0A0A0A;--text-2:#4A4A55;--text-3:#6B6B76;
+  --brand:#2448FF;--on-brand:#FFFFFF;--brand-text:#2448FF;--brand-ink:#102290;--brand-soft:#CFD8FF;--brand-tint:#EEF1FF;
+  --c-light:#CFD8FF;--c-mid:#2448FF;--c-dark:#102290;
+  --ok:#0E7A4E;--ok-tint:#E3F4EC;--warn:#9A5800;--warn-tint:#FFF1DC;--danger:#C0261C;--danger-tint:#FDE7E5;--info:#2448FF;--info-tint:#EEF1FF;
+  --focus:#2448FF;--shadow:0 1px 2px rgba(10,10,10,.05),0 4px 16px rgba(10,10,10,.06);--shadow-lg:0 12px 40px rgba(10,10,10,.14);
+}
+[data-theme="m3-dark"]{
+  --bg:#0A0A0A;--surface:#131316;--surface-2:#1A1A1E;--surface-3:#232329;--line:#26262C;--line-strong:#3A3A43;
+  --text:#F3F3F5;--text-2:#B4B4BE;--text-3:#8C8C97;
+  --brand:#2448FF;--on-brand:#FFFFFF;--brand-text:#93A5FF;--brand-ink:#CFD8FF;--brand-soft:#1E2C8F;--brand-tint:#151B45;
+  --c-light:#CFD8FF;--c-mid:#2448FF;--c-dark:#102290;
+  --ok:#4FD39A;--ok-tint:#0F2A1F;--warn:#FFB54D;--warn-tint:#2E2210;--danger:#FF7A70;--danger-tint:#331614;--info:#93A5FF;--info-tint:#151B45;
+  --focus:#93A5FF;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow-lg:0 12px 40px rgba(0,0,0,.6);
+}
+[data-theme="n3-light"]{
+  --bg:#F3F3F5;--surface:#FFFFFF;--surface-2:#F8F8FA;--surface-3:#EDEDF1;--line:#E3E3E9;--line-strong:#CACAD3;
+  --text:#0A0A0A;--text-2:#4A4A55;--text-3:#6B6B76;
+  --brand:#01FF11;--on-brand:#0A0A0A;--brand-text:#067A12;--brand-ink:#0A0A0A;--brand-soft:#D4D3D8;--brand-tint:#E6FFE8;
+  --c-light:#D4D3D8;--c-mid:#01FF11;--c-dark:#0A0A0A;
+  --ok:#067A12;--ok-tint:#E6FFE8;--warn:#9A5800;--warn-tint:#FFF1DC;--danger:#C0261C;--danger-tint:#FDE7E5;--info:#0A0A0A;--info-tint:#EDEDF1;
+  --focus:#0A0A0A;--shadow:0 1px 2px rgba(10,10,10,.05),0 4px 16px rgba(10,10,10,.06);--shadow-lg:0 12px 40px rgba(10,10,10,.14);
+}
+[data-theme="n3-dark"]{
+  --bg:#0A0A0A;--surface:#131316;--surface-2:#1A1A1E;--surface-3:#232329;--line:#26262C;--line-strong:#3A3A43;
+  --text:#F3F3F5;--text-2:#B4B4BE;--text-3:#8C8C97;
+  --brand:#01FF11;--on-brand:#0A0A0A;--brand-text:#01FF11;--brand-ink:#F3F3F5;--brand-soft:#2A2A30;--brand-tint:#0D2410;
+  --c-light:#D4D3D8;--c-mid:#01FF11;--c-dark:#F3F3F5;
+  --ok:#01FF11;--ok-tint:#0D2410;--warn:#FFB54D;--warn-tint:#2E2210;--danger:#FF7A70;--danger-tint:#331614;--info:#F3F3F5;--info-tint:#232329;
+  --focus:#01FF11;--shadow:0 1px 2px rgba(0,0,0,.4);--shadow-lg:0 12px 40px rgba(0,0,0,.6);
+}
+.hk{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;font-feature-settings:'cv11','ss01'}
+.hk *{box-sizing:border-box}
+.hk h1,.hk h2,.hk h3,.hk h4{font-family:'Inter Tight','Inter',sans-serif;margin:0;letter-spacing:-.02em;color:var(--text)}
+.hk p{margin:0}
+.mono,.num{font-family:'JetBrains Mono',ui-monospace,monospace;font-feature-settings:'tnum';letter-spacing:-.01em}
+.num{font-family:'Inter',sans-serif;font-variant-numeric:tabular-nums}
+.t-cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.t-xs{font-size:12px}.t-sm{font-size:13px}.t-2{color:var(--text-2)}.t-3{color:var(--text-3)}.t-b{font-weight:600}
+.row{display:flex;align-items:center;gap:8px}.col{display:flex;flex-direction:column}.grow{flex:1 1 auto;min-width:0}.wrap{flex-wrap:wrap}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.card-pad{padding:20px}
+.chamfer{clip-path:polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,0 100%)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);color:var(--text);font:600 13px/1 'Inter',sans-serif;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn-lg{height:44px;padding:0 18px;font-size:14px;border-radius:12px}
+.btn-sm{height:30px;padding:0 10px;font-size:12px;border-radius:8px}
+.btn-pri{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.btn-dark{background:var(--text);border-color:var(--text);color:var(--bg)}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn-ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn-danger{background:transparent;border-color:var(--line-strong);color:var(--danger)}
+.btn-icon{width:36px;padding:0}
+.kbd{font:500 11px/1 'JetBrains Mono',monospace;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:3px 5px;color:var(--text-2);background:var(--surface)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:999px;font:600 11.5px/1 'Inter',sans-serif;white-space:nowrap;background:var(--surface-3);color:var(--text-2)}
+.pill-ok{background:var(--ok-tint);color:var(--ok)}.pill-warn{background:var(--warn-tint);color:var(--warn)}.pill-danger{background:var(--danger-tint);color:var(--danger)}.pill-brand{background:var(--brand-tint);color:var(--brand-text)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block}
+.input{height:40px;border:1px solid var(--line-strong);border-radius:10px;background:var(--surface);padding:0 12px;font:400 14px 'Inter',sans-serif;color:var(--text);width:100%}
+.label{font-size:12.5px;font-weight:600;color:var(--text-2);margin-bottom:6px;display:block}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:12px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr.sel td{background:var(--brand-tint)}
+.code{font:600 12.5px/1 'JetBrains Mono',monospace;padding:4px 7px;border-radius:6px;background:var(--surface-3);color:var(--text)}
+.code-b{background:var(--brand-tint);color:var(--brand-text)}
+.ic{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ic-sm{width:16px;height:16px}.ic-lg{width:22px;height:22px}
+/* Kristal taç: 3 kristal, durum = dolan kristaller */
+.crown{display:inline-flex;align-items:flex-end;gap:2px;height:16px}
+.crown i{display:block;width:5px;background:var(--line-strong);clip-path:polygon(0 3px,50% 0,100% 3px,100% 100%,0 100%)}
+.crown i:nth-child(1),.crown i:nth-child(3){height:11px}.crown i:nth-child(2){height:16px}
+.crown.s1 i:nth-child(1){background:var(--c-light)}
+.crown.s2 i:nth-child(1){background:var(--c-light)}.crown.s2 i:nth-child(3){background:var(--c-dark)}
+.crown.s3 i:nth-child(1){background:var(--c-light)}.crown.s3 i:nth-child(3){background:var(--c-dark)}.crown.s3 i:nth-child(2){background:var(--c-mid)}
+.crown.err i{background:var(--danger)!important;opacity:.85}
+/* Güven ölçeği: 3 kademeli kristal */
+.conf{display:inline-flex;align-items:flex-end;gap:2px}
+.conf i{display:block;width:4px;background:var(--line-strong);clip-path:polygon(0 2px,50% 0,100% 2px,100% 100%,0 100%)}
+.conf i:nth-child(1){height:6px}.conf i:nth-child(2){height:9px}.conf i:nth-child(3){height:12px}
+.conf.c1 i:nth-child(1){background:var(--warn)}
+.conf.c2 i:nth-child(-n+2){background:var(--brand-text)}
+.conf.c3 i{background:var(--ok)}
+/* Kristal yükleme animasyonu */
+@keyframes hk-rise{0%,100%{transform:scaleY(.35);opacity:.35}45%{transform:scaleY(1);opacity:1}}
+.loader{display:inline-flex;align-items:flex-end;gap:4px;height:40px}
+.loader i{display:block;width:12px;transform-origin:bottom;clip-path:polygon(0 6px,50% 0,100% 6px,100% 100%,0 100%);animation:hk-rise 1.4s cubic-bezier(.2,.7,.2,1) infinite}
+.loader i:nth-child(1){height:28px;background:var(--c-light)}
+.loader i:nth-child(2){height:40px;background:var(--c-mid);animation-delay:.18s}
+.loader i:nth-child(3){height:28px;background:var(--c-dark);animation-delay:.36s}
+@keyframes hk-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.skel{border-radius:6px;background:linear-gradient(90deg,var(--surface-3) 0,var(--surface-2) 50%,var(--surface-3) 100%);background-size:400px 100%;animation:hk-shimmer 1.4s linear infinite}
+/* Uygulama kabuğu */
+.side{width:240px;flex:none;background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:2px}
+.nav{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;border-radius:9px;color:var(--text-2);font-weight:500;font-size:13.5px;text-decoration:none}
+.nav.on{background:var(--brand-tint);color:var(--brand-text);font-weight:600}
+.nav .cnt{margin-left:auto;font:600 11px/1 'JetBrains Mono',monospace;color:var(--text-3)}
+.nav.on .cnt{color:var(--brand-text)}
+.topbar{height:60px;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line);background:var(--surface)}
+.search{display:flex;align-items:center;gap:8px;height:36px;border:1px solid var(--line);border-radius:10px;padding:0 10px;color:var(--text-3);background:var(--surface-2);font-size:13px}
+.av{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 12px 'Inter',sans-serif;background:var(--brand-soft);color:var(--brand-ink);flex:none}
+.av-sq{border-radius:9px}
+.divider{height:1px;background:var(--line)}
+.kpi{font:700 30px/1 'Inter Tight',sans-serif;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.bar{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden}.bar>i{display:block;height:100%;background:var(--brand);border-radius:999px}
+/* Telefon çerçevesi */
+.phone{width:390px;height:844px;border-radius:44px;background:var(--bg);overflow:hidden;position:relative;display:flex;flex-direction:column;border:1px solid var(--line-strong)}
+.tabbar{display:flex;justify-content:space-around;align-items:flex-start;padding:10px 8px 28px;border-top:1px solid var(--line);background:var(--surface)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--text-3);min-width:56px;text-decoration:none}
+.tab.on{color:var(--brand-text)}
+.sheet{background:var(--surface);border-radius:22px 22px 0 0;box-shadow:var(--shadow-lg)}
+/* Taşma koruması: kök kutu-boyutu, grid/flex çocukları içerikten geniş olamaz */
+.hk{box-sizing:border-box;max-width:100%}
+.hk [style*="display:grid"]>*,.hk [style*="display: grid"]>*{min-width:0}
+.hk .card{min-width:0;max-width:100%}
+.hk .grow,.hk .col{min-width:0}
+.hk table{max-width:100%}

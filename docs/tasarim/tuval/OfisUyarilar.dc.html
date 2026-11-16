@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Ofis paneli · Uyarılar</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit}</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="display:flex;flex-wrap:wrap;min-height:1000px">
+<dc-import name="OfisNav" aktif="uyari" hint-size="240px,1000px"></dc-import>
+<main style="flex:999 1 560px;min-width:0;display:flex;flex-direction:column">
+  <div class="topbar" style="flex-wrap:wrap;height:auto;min-height:60px;padding:10px 24px">
+    <h1 style="font-size:20px">Uyarılar</h1>
+    <div class="row" style="gap:2px;padding:3px;background:var(--surface-3);border-radius:10px;margin-left:8px"><span class="btn btn-sm" style="border-color:transparent;box-shadow:var(--shadow)">Açık 67</span><span class="btn btn-sm btn-ghost">Görüldü 12</span><span class="btn btn-sm btn-ghost">Çözüldü</span></div>
+    <div style="flex:1"></div>
+    <button type="button" class="btn" style="gap:6px"><span class="t-3">Dönem</span><b class="mono">2026-10</b></button>
+    <button type="button" class="btn">Koda göre gruplu ▾</button>
+  </div>
+  <div style="padding:24px;display:flex;flex-direction:column;gap:20px;max-width:1240px;width:100%">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+      <div class="card card-pad row" style="gap:14px;border-color:var(--danger)"><span style="width:40px;height:40px;border-radius:10px;background:var(--danger-tint);color:var(--danger);display:flex;align-items:center;justify-content:center;flex:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9.5 17h-19zM12 10v4M12 17h.01"></path></svg></span><div class="col"><span class="kpi" style="font-size:26px">6</span><span class="t-sm t-2">Engelleyici · beyanı durdurur</span></div></div>
+      <div class="card card-pad row" style="gap:14px"><span style="width:40px;height:40px;border-radius:10px;background:var(--warn-tint);color:var(--warn);display:flex;align-items:center;justify-content:center;flex:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5M12 16h.01M12 21a9 9 0 100-18 9 9 0 000 18"></path></svg></span><div class="col"><span class="kpi" style="font-size:26px">21</span><span class="t-sm t-2">Uyarı · kontrol et</span></div></div>
+      <div class="card card-pad row" style="gap:14px"><span style="width:40px;height:40px;border-radius:10px;background:var(--surface-3);color:var(--text-2);display:flex;align-items:center;justify-content:center;flex:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11v5M12 8h.01M12 21a9 9 0 100-18 9 9 0 000 18"></path></svg></span><div class="col"><span class="kpi" style="font-size:26px">40</span><span class="t-sm t-2">Bilgi · gerekirse bak</span></div></div>
+    </div>
+
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+      <div class="card" style="overflow:hidden">
+        <div class="row wrap" style="gap:12px;padding:14px 18px;background:var(--surface-2);border-bottom:1px solid var(--line)">
+          <span class="{{g.pill}}"><span class="dot"></span>{{g.sev}}</span>
+          <b class="grow" style="min-width:200px">{{g.title}}</b>
+          <span class="mono t-xs t-3">{{g.code}}</span>
+          <span class="pill">{{g.n}}</span>
+          <button type="button" class="btn btn-sm">Tümünü gördüm</button>
+        </div>
+        <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="2">
+          <div class="row wrap" style="gap:12px;padding:12px 18px;border-top:1px solid var(--line)">
+            <span class="crown err"><i></i><i></i><i></i></span>
+            <div class="col grow" style="min-width:220px"><span class="t-sm"><b>{{r.m}}</b> · {{r.b}}</span><span class="t-xs t-3">{{r.d}}</span></div>
+            <span class="t-xs t-3">{{r.t}}</span>
+            <div class="row" style="gap:6px"><button type="button" class="btn btn-sm btn-ghost">Gördüm</button><button type="button" class="btn btn-sm">Faturayı aç</button><button type="button" class="btn btn-sm btn-pri">Çözüldü</button></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const groups = [
+      {sev:'Engelleyici',pill:'pill pill-danger',title:'KDV toplamı satırlarla tutmuyor',code:'TAX_TOTAL_MISMATCH',n:'4',rows:[
+        {m:'Kuzey Lojistik',b:'KZY2026000031144',d:'Fark 4.820,00 ₺ · tevkifat yansıtılmamış olabilir',t:'08:31'},
+        {m:'Atlas Gıda',b:'TKN2026000391827',d:'Fark 0,40 ₺ · yuvarlama',t:'dün'}]},
+      {sev:'Engelleyici',pill:'pill pill-danger',title:'Faturasız tahsilat',code:'BNK_UNINVOICED_COLLECTION',n:'2',rows:[
+        {m:'Defne Eczanesi',b:'Banka · 14.10 · 18.500,00 ₺',d:'Karşılığı olan satış faturası bulunamadı · mükelleften belge istenebilir',t:'2 gün'}]},
+      {sev:'Uyarı',pill:'pill pill-warn',title:'Muhtemel mükerrer fatura',code:'POSSIBLE_DUPLICATE',n:'7',rows:[
+        {m:'Atlas Gıda',b:'KLM2026000184213',d:'Aynı tutar ve karşı taraf · 3 gün arayla',t:'dün'},
+        {m:'Lale Kafe',b:'Fiş Z-0091',d:'Aynı ÖKC sicil ve Z no ikinci kez yüklendi',t:'dün'}]}
+    ];
+    return { tema: this.props.tema ?? 'm3-light', groups };
+  }
+}
+</script>
+</body>
+</html>

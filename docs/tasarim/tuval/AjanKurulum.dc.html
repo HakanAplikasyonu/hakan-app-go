@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Masaüstü ajanı · kurulum</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}
+.win{width:540px;height:600px;border-radius:12px;overflow:hidden;border:1px solid var(--line-strong);box-shadow:var(--shadow-lg);background:var(--surface);display:flex;flex-direction:column}
+.wt{height:38px;display:flex;align-items:center;gap:6px;padding:0 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.wt span{width:11px;height:11px;border-radius:50%}
+.wb{flex:1;padding:32px 36px;display:flex;flex-direction:column;gap:18px}
+.dots{display:flex;gap:6px}.dots i{display:block;width:22px;height:4px;border-radius:2px;background:var(--surface-3)}.dots i.on{background:var(--brand)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:1800px;height:760px;padding:40px;display:flex;flex-direction:column;gap:24px">
+  <div class="row" style="gap:16px"><span class="t-cap">Kurulum: 3 adım, 1 dakika</span><span class="t-sm t-2">Bitince pencere kapanır, ajan tepside çalışır.</span></div>
+  <div class="row" style="gap:40px;align-items:flex-start">
+    <div class="win">
+      <div class="wt"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div>
+      <div class="wb">
+        <div class="dots"><i class="on"></i><i></i><i></i></div>
+        <svg viewBox="0 0 181 198" width="44" height="48" aria-hidden="true"><polygon points="0,86 28,59 28,198 0,198" style="fill:var(--c-light)"></polygon><polygon points="28,59 56,86 56,198 28,198" style="fill:var(--c-mid)"></polygon><polygon points="63,36 91,0 91,198 63,198" style="fill:var(--c-mid)"></polygon><polygon points="91,0 119,36 119,198 91,198" style="fill:var(--c-dark)"></polygon><polygon points="125,86 153,59 153,198 125,198" style="fill:var(--c-dark)"></polygon><polygon points="153,59 181,86 181,198 153,198" style="fill:var(--c-light)"></polygon></svg>
+        <div class="col" style="gap:6px"><h1 style="font-size:26px">HAKAN hesabınla gir</h1><p class="t-2 t-sm">Ofis panelinde kullandığın e-posta ve parola.</p></div>
+        <div><label class="label" for="a1">E-posta</label><input class="input" id="a1" value="mert@demirsmmm.com.tr"></div>
+        <div><label class="label" for="a2">Parola</label><input class="input" id="a2" type="password" value="parola12345"></div>
+        <div style="flex:1"></div>
+        <div class="row"><a href="#" class="t-sm t-3" style="color:var(--text-3)">Sunucu adresi ▸</a><div style="flex:1"></div><button type="button" class="btn btn-lg btn-pri">Devam</button></div>
+      </div>
+    </div>
+    <div class="win">
+      <div class="wt"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div>
+      <div class="wb">
+        <div class="dots"><i class="on"></i><i class="on"></i><i></i></div>
+        <div class="col" style="gap:6px"><h1 style="font-size:26px">Bu bilgisayarı tanıt</h1><p class="t-2 t-sm">Panelde "Masaüstü ajanları" listesinde bu adla görünecek.</p></div>
+        <div class="col" style="gap:8px"><span class="label" style="margin:0">Ofis</span>
+          <div class="row" style="gap:12px;padding:12px;border:1.5px solid var(--brand);border-radius:12px;background:var(--brand-tint)"><span class="av av-sq" style="background:var(--text);color:var(--bg)">DM</span><b class="grow t-sm">Demir Mali Müşavirlik</b><svg class="ic" viewBox="0 0 24 24" style="color:var(--brand-text)" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5"></path></svg></div>
+        </div>
+        <div><label class="label" for="a3">Bu bilgisayarın adı</label><input class="input" id="a3" value="Ofis-PC"></div>
+        <div style="flex:1"></div>
+        <div class="row"><button type="button" class="btn btn-lg btn-ghost">Geri</button><div style="flex:1"></div><button type="button" class="btn btn-lg btn-pri">Kaydet</button></div>
+      </div>
+    </div>
+    <div class="win">
+      <div class="wt"><span style="background:#FF5F57"></span><span style="background:#FEBC2E"></span><span style="background:#28C840"></span></div>
+      <div class="wb">
+        <div class="dots"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+        <div class="col" style="gap:6px"><h1 style="font-size:26px">İlk klasörü bağla</h1><p class="t-2 t-sm">e-Fatura XML ya da ZIP'lerinin düştüğü klasör. Sonra istediğin kadar ekleyebilirsin.</p></div>
+        <div class="col" style="gap:8px"><span class="label" style="margin:0">Mükellef</span><div class="search" style="height:40px;background:var(--surface)"><span style="color:var(--text)">Atlas Gıda Ticaret A.Ş.</span><span class="mono t-xs" style="margin-left:auto">9000000017</span></div></div>
+        <div class="col" style="gap:8px"><span class="label" style="margin:0">Klasör</span><div class="row" style="gap:10px;padding:14px;border:1.5px dashed var(--line-strong);border-radius:12px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"></path></svg><span class="mono t-xs grow">D:\Mukellefler\Atlas\eFatura</span><span class="pill pill-ok">212 dosya bulundu</span></div></div>
+        <div class="row t-sm" style="gap:10px;padding:12px;border-radius:10px;background:var(--surface-2)"><span class="loader" style="height:18px;gap:2px"><i style="width:6px;height:12px"></i><i style="width:6px;height:18px"></i><i style="width:6px;height:12px"></i></span><span class="grow">İlk gönderim arka planda yapılacak</span></div>
+        <div style="flex:1"></div>
+        <div class="row"><a href="#" class="t-sm" style="color:var(--text-3)">Şimdilik atla</a><div style="flex:1"></div><button type="button" class="btn btn-lg btn-pri">Bitir ve tepsiye geç</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1800,"height":760}}'>
+class Component extends DCLogic { renderVals() { return { tema: this.props.tema ?? 'm3-light' }; } }
+</script>
+</body>
+</html>

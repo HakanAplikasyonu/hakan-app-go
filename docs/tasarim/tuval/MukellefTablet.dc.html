@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>Mükellef tablet yatay</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="./hakan.css">
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Inter+Tight:wght@600;700;800&amp;family=JetBrains+Mono:wght@500;600&amp;display=swap">
+<style>body{margin:0}a{color:inherit;text-decoration:none}
+.rail{width:84px;flex:none;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 0}
+.rail a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--text-3);padding:8px 0;width:68px;border-radius:12px}
+.rail a.on{background:var(--brand-tint);color:var(--brand-text)}
+</style>
+</helmet>
+<div class="hk" data-theme="{{tema}}" style="width:1194px;height:834px;border-radius:28px;overflow:hidden;display:flex;border:1px solid var(--line-strong)">
+  <nav class="rail" aria-label="Menü">
+    <svg viewBox="0 0 181 198" width="26" height="28" style="margin-bottom:16px" aria-hidden="true"><polygon points="0,86 28,59 28,198 0,198" style="fill:var(--c-light)"></polygon><polygon points="28,59 56,86 56,198 28,198" style="fill:var(--c-mid)"></polygon><polygon points="63,36 91,0 91,198 63,198" style="fill:var(--c-mid)"></polygon><polygon points="91,0 119,36 119,198 91,198" style="fill:var(--c-dark)"></polygon><polygon points="125,86 153,59 153,198 125,198" style="fill:var(--c-dark)"></polygon><polygon points="153,59 181,86 181,198 153,198" style="fill:var(--c-light)"></polygon></svg>
+    <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11l3-3 3 3v9M10 20V7l3-4 3 4v13M16 20v-9l3-3 3 3v9"></path></svg>Ana</a>
+    <a href="#" class="on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H8l-4 4z"></path></svg>İstekler</a>
+    <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2L6 21z"></path></svg>Geçmiş</a>
+    <a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0112 0c0 6 2.5 8 2.5 8h-17S6 15 6 9"></path></svg>Bildirim</a>
+    <div style="flex:1"></div>
+    <a href="#" style="width:60px;height:60px;border-radius:18px;background:var(--brand);color:var(--on-brand);justify-content:center" aria-label="Fiş çek"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v12H4zM12 17a4 4 0 100-8 4 4 0 000 8"></path></svg></a>
+  </nav>
+  <section style="width:400px;flex:none;border-right:1px solid var(--line);background:var(--surface);display:flex;flex-direction:column">
+    <div class="col" style="padding:32px 22px 14px;gap:4px"><span class="t-3 t-sm">Atlas Gıda</span><h1 style="font-size:26px">İstekler</h1></div>
+    <div class="row" style="padding:0 22px 12px;gap:6px"><span class="pill pill-brand" style="height:28px">Açık 2</span><span class="pill" style="height:28px">Tamamlanan 14</span></div>
+    <div class="row" style="gap:12px;padding:16px 22px;border-top:1px solid var(--line);background:var(--brand-tint);box-shadow:inset 3px 0 0 var(--brand)"><span class="crown"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Ödeme için belge · 18.500 ₺</b><span class="t-xs t-3">5 gün kaldı</span></div></div>
+    <div class="row" style="gap:12px;padding:16px 22px;border-top:1px solid var(--line)"><span class="crown"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm">Banka ekstresi · Eylül</b><span class="t-xs" style="color:var(--danger)">2 gün gecikti</span></div></div>
+    <div class="row" style="gap:12px;padding:16px 22px;border-top:1px solid var(--line)"><span class="crown s2"><i></i><i></i><i></i></span><div class="col grow"><b class="t-sm t-2">Kira kontratı</b><span class="t-xs t-3">Tamamlandı · 2 Kas</span></div></div>
+  </section>
+  <section style="flex:1;min-width:0;padding:36px;display:flex;flex-direction:column;gap:18px">
+    <span class="pill" style="align-self:flex-start">Ödeme için belge</span>
+    <h2 style="font-size:28px">14 Ekim'deki 18.500 ₺ ödemenin belgesi</h2>
+    <p class="t-2" style="font-size:16px;max-width:560px">Banka hesabınızdan Ege Gayrimenkul Ltd. Şti.'ye yapılan ödemenin faturası ya da makbuzu. Not: kira faturası olabilir.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+      <button type="button" class="card" style="height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:inherit;color:inherit;border-color:var(--brand)"><svg class="ic ic-lg" viewBox="0 0 24 24" style="color:var(--brand-text)" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v12H4zM12 17a4 4 0 100-8 4 4 0 000 8"></path></svg><b>Fotoğraf çek</b></button>
+      <button type="button" class="card" style="height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:inherit;color:inherit"><svg class="ic ic-lg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z"></path></svg><b>Dosyalardan seç</b></button>
+    </div>
+    <div style="flex:1"></div>
+    <div class="row" style="gap:10px"><button type="button" class="btn btn-lg btn-ghost">Bu belge bende yok</button><div style="flex:1"></div><button type="button" class="btn btn-lg btn-pri" style="opacity:.45" disabled>Gönder</button></div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tema":{"editor":"enum","options":["m3-light","m3-dark","n3-light","n3-dark"],"default":"m3-light"},"$preview":{"width":1194,"height":834}}'>
+class Component extends DCLogic { renderVals() { return { tema: this.props.tema ?? 'm3-light' }; } }
+</script>
+</body>
+</html>
