@@ -33,12 +33,18 @@ func (q *Queries) CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerIn
 }
 
 const countTaxpayerReceiptCaptures = `-- name: CountTaxpayerReceiptCaptures :one
-SELECT COUNT(*)::bigint FROM receipt_captures WHERE taxpayer_id = $1
+SELECT COUNT(*)::bigint FROM receipt_captures WHERE receipt_captures.taxpayer_id = $1
+  AND ($2::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = $2)
 `
 
+type CountTaxpayerReceiptCapturesParams struct {
+	TaxpayerID int64       `json:"taxpayer_id"`
+	Period     pgtype.Text `json:"period"`
+}
+
 // tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
-func (q *Queries) CountTaxpayerReceiptCaptures(ctx context.Context, taxpayerID int64) (int64, error) {
-	row := q.db.QueryRow(ctx, countTaxpayerReceiptCaptures, taxpayerID)
+func (q *Queries) CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTaxpayerReceiptCapturesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTaxpayerReceiptCaptures, arg.TaxpayerID, arg.Period)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -274,15 +280,17 @@ func (q *Queries) ListTaxpayerInvoicesAfter(ctx context.Context, arg ListTaxpaye
 const listTaxpayerReceiptCaptures = `-- name: ListTaxpayerReceiptCaptures :many
 SELECT uuid, kind, status, media_type, fields, error, created_at
 FROM receipt_captures
-WHERE taxpayer_id = $1
+WHERE receipt_captures.taxpayer_id = $1
+  AND ($2::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = $2)
 ORDER BY created_at DESC, id DESC
-LIMIT $3 OFFSET $2
+LIMIT $4 OFFSET $3
 `
 
 type ListTaxpayerReceiptCapturesParams struct {
-	TaxpayerID int64 `json:"taxpayer_id"`
-	Off        int32 `json:"off"`
-	Lim        int32 `json:"lim"`
+	TaxpayerID int64       `json:"taxpayer_id"`
+	Period     pgtype.Text `json:"period"`
+	Off        int32       `json:"off"`
+	Lim        int32       `json:"lim"`
 }
 
 type ListTaxpayerReceiptCapturesRow struct {
@@ -297,7 +305,12 @@ type ListTaxpayerReceiptCapturesRow struct {
 
 // tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı, ofis bağlamı yok
 func (q *Queries) ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpayerReceiptCapturesParams) ([]ListTaxpayerReceiptCapturesRow, error) {
-	rows, err := q.db.Query(ctx, listTaxpayerReceiptCaptures, arg.TaxpayerID, arg.Off, arg.Lim)
+	rows, err := q.db.Query(ctx, listTaxpayerReceiptCaptures,
+		arg.TaxpayerID,
+		arg.Period,
+		arg.Off,
+		arg.Lim,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -327,15 +340,17 @@ func (q *Queries) ListTaxpayerReceiptCaptures(ctx context.Context, arg ListTaxpa
 const listTaxpayerUploadJobs = `-- name: ListTaxpayerUploadJobs :many
 SELECT id, uuid, organization_id, engagement_id, taxpayer_id, actor_id, file_name, file_key, sha256, size_bytes, status, report, error, started_at, finished_at, created_at, updated_at FROM ubl_upload_jobs
 WHERE taxpayer_id = $1 AND actor_id = $2
+  AND ($3::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $3)
 ORDER BY created_at DESC, id DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListTaxpayerUploadJobsParams struct {
-	TaxpayerID int64 `json:"taxpayer_id"`
-	ActorID    int64 `json:"actor_id"`
-	Off        int32 `json:"off"`
-	Lim        int32 `json:"lim"`
+	TaxpayerID int64       `json:"taxpayer_id"`
+	ActorID    int64       `json:"actor_id"`
+	Period     pgtype.Text `json:"period"`
+	Off        int32       `json:"off"`
+	Lim        int32       `json:"lim"`
 }
 
 // tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
@@ -343,6 +358,7 @@ func (q *Queries) ListTaxpayerUploadJobs(ctx context.Context, arg ListTaxpayerUp
 	rows, err := q.db.Query(ctx, listTaxpayerUploadJobs,
 		arg.TaxpayerID,
 		arg.ActorID,
+		arg.Period,
 		arg.Off,
 		arg.Lim,
 	)

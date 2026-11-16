@@ -1,15 +1,41 @@
-// Hakan masaüstü arayüzü (#206). Ön yüz yalnızca Rust komutlarını çağırır;
-// sidecar'a doğrudan erişmez, oturum belirteci ön yüze hiç gelmez.
+// Hakan masaüstü arayüzü, arayüz v1 (#325; ilk sürüm #206). Ön yüz yalnızca
+// kabuk komutlarını çağırır; sidecar'a doğrudan erişmez, oturum belirteci ön
+// yüze hiç gelmez. Kabuk ve sidecar davranışı değişmedi; yalnızca arayüz yeni.
 //
 // Kural: hiçbir ekranda UUID, iç kod ya da ham JSON gösterilmez. Mükellefler
 // adlarıyla, hatalar Türkçe açıklamalarıyla görünür. Tanılama araçları
-// "Gelişmiş" sekmesindedir.
+// Ayarlar → Gelişmiş bölümündedir.
+import { degerlendir, yeniDurum } from "./bildirim.js";
+import { BosDurum, TacRozeti } from "./hakan-ui.js";
+import { temaSec, temaTercihi } from "./tema.js";
+
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
 const call = (method, params = {}) => invoke("sidecar_call", { method, params });
-const FEED_SIZE = 30;
+const HISTORY_SIZE = 200;
+const SCAN_SECONDS = 15; // sidecar/agent/runtime.go ScanInterval
+
+// --- Yerel depo (yalnızca bu bilgisayarda; hata verirse sessizce geçilir) ---
+
+const store = {
+  get(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v == null ? fallback : JSON.parse(v);
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* depo kapalı */
+    }
+  },
+};
 
 // --- Biçimlendirme ----------------------------------------------------------
 
@@ -32,7 +58,7 @@ const ERROR_TEXT = {
   NOT_FOUND: "Kayıt bulunamadı.",
 };
 
-const GENERIC_ERROR = "Beklenmeyen bir sorun oluştu. Sorun sürerse Gelişmiş bölümündeki bilgileri destek ekibine iletin.";
+const GENERIC_ERROR = "Beklenmeyen bir sorun oluştu. Sorun sürerse Ayarlar → Gelişmiş bölümündeki bilgileri destek ekibine iletin.";
 let lastTechnicalError = "";
 
 /** Hatayı kullanıcıya gösterilecek Türkçe metne çevirir. */
@@ -48,44 +74,52 @@ export function errText(e) {
   return GENERIC_ERROR;
 }
 
-const fmtTime = (iso) => {
-  if (!iso) return "";
+const validDate = (iso) => {
+  if (!iso) return null;
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime()) || d.getFullYear() < 2000) return "";
-  return d.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+  return Number.isNaN(d.getTime()) || d.getFullYear() < 2000 ? null : d;
 };
 
+const fmtTime = (iso) => validDate(iso)?.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" }) ?? "";
+
 function relTime(iso) {
-  if (!iso) return "";
-  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const d = validDate(iso);
+  if (!d) return "";
+  const s = (Date.now() - d.getTime()) / 1000;
   if (s < 60) return "az önce";
   if (s < 3600) return `${Math.floor(s / 60)} dk önce`;
   if (s < 86400) return `${Math.floor(s / 3600)} sa önce`;
+  if (s < 2 * 86400) return "dün";
   return fmtTime(iso);
+}
+
+/** Geçmiş tablosu için kısa zaman: bugün saat, dün, ya da tarih. */
+function shortTime(iso) {
+  const d = validDate(iso);
+  if (!d) return "";
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString("tr-TR", { timeStyle: "short" });
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "dün";
+  return d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
 }
 
 const folderName = (p) => (p || "").split(/[\\/]/).filter(Boolean).pop() || p;
 
-function show(el, text) {
-  el.textContent = text || "";
-  el.hidden = !text;
+function show(node, text, kind) {
+  node.textContent = text || "";
+  node.hidden = !text;
+  if (kind) node.dataset.kind = kind;
+  else delete node.dataset.kind;
 }
 
 function fill(dl, rows) {
   dl.replaceChildren();
   for (const [k, v] of rows) {
     if (v === undefined || v === null || v === "") continue;
-    const dt = document.createElement("dt");
-    dt.textContent = k;
-    const dd = document.createElement("dd");
-    dd.textContent = String(v);
-    dl.append(dt, dd);
+    dl.append(el("dt", {}, k), el("dd", {}, String(v)));
   }
-}
-
-function badge(el, state, text) {
-  el.dataset.state = state;
-  el.textContent = text;
 }
 
 function el(tag, props = {}, ...children) {
@@ -99,6 +133,23 @@ function el(tag, props = {}, ...children) {
   for (const c of children) if (c !== null && c !== undefined && c !== false) n.append(c);
   return n;
 }
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+function icon(d, cls = "ic") {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("class", cls);
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS(SVG_NS, "path");
+  p.setAttribute("d", d);
+  svg.append(p);
+  return svg;
+}
+const IC = {
+  folder: "M3 6h6l2 2h10v11H3z",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  check: "M4 12.5l5 5L20 6.5",
+};
 
 let confirmResolve = null;
 function confirmBox(text, yes = "Kaldır") {
@@ -118,26 +169,50 @@ $("confirm-no").addEventListener("click", () => {
 
 // --- Görünümler -------------------------------------------------------------
 
-const VIEWS = ["loading", "login", "office", "folders", "program", "settings", "advanced"];
+const SETUP_VIEWS = ["loading", "login", "office", "first"];
+const TABS = ["folders", "history", "problems", "program", "settings"];
 let currentTab = "folders";
 let currentView = "loading";
 
 function setView(name) {
   currentView = name;
-  for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
-  const inApp = ["folders", "program", "settings", "advanced"].includes(name);
-  $("tabs").hidden = !inApp;
+  const inApp = TABS.includes(name);
+  $("setup").hidden = inApp;
+  $("app").hidden = !inApp;
+  for (const v of SETUP_VIEWS) $(`view-${v}`).hidden = v !== name;
+  for (const v of TABS) $(`view-${v}`).hidden = v !== name;
   for (const b of $("tabs").querySelectorAll("[role=tab]")) {
-    b.setAttribute("aria-selected", String(b.dataset.view === name));
+    const on = b.dataset.view === name;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on || (!inApp && b.dataset.view === "folders") ? 0 : -1;
   }
+  if (name === "problems") startProblemTicker();
+  else stopProblemTicker();
+}
+
+function selectTab(v, focus = false) {
+  currentTab = v;
+  setView(v);
+  if (v === "settings") loadSettings();
+  if (v === "history") renderHistory();
+  if (focus) $("tabs").querySelector(`[data-view="${v}"]`)?.focus();
 }
 
 $("tabs").addEventListener("click", (e) => {
   const v = e.target.closest("[role=tab]")?.dataset.view;
-  if (!v) return;
-  currentTab = v;
-  setView(v);
-  if (v === "settings") loadSettings();
+  if (v) selectTab(v);
+});
+// Sekme listesi: ok tuşlarıyla gezinme (WAI-ARIA tabs).
+$("tabs").addEventListener("keydown", (e) => {
+  const i = TABS.indexOf(currentTab);
+  const next = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
+  if (next !== undefined) {
+    e.preventDefault();
+    selectTab(TABS[(i + next + TABS.length) % TABS.length], true);
+  } else if (e.key === "Home" || e.key === "End") {
+    e.preventDefault();
+    selectTab(e.key === "Home" ? TABS[0] : TABS.at(-1), true);
+  }
 });
 
 // --- Ajan durumu ------------------------------------------------------------
@@ -145,15 +220,22 @@ $("tabs").addEventListener("click", (e) => {
 let status = null;
 const engagementTitles = new Map(); // engagement → mükellef adı
 let engagements = [];
+let firstRunSkipped = store.get("hakan.kurulum.atlandi", false);
+let appVersion = "";
+
+function agentState(st) {
+  if (paused) return ["paused", "Duraklatıldı"];
+  if (st.heartbeat_error) return ["down", "Bağlantı sorunu"];
+  if (problemCount(st) > 0) return ["wait", "Sorun var"];
+  return ["ok", "Bağlı"];
+}
 
 async function refresh() {
   let st;
   try {
     st = await call("agent.status");
   } catch (e) {
-    if (currentView === "loading" || e?.code === "SIDECAR_DOWN") {
-      badge($("agent-badge"), "wait", "Yerel ajan başlatılıyor…");
-    }
+    if (currentView === "loading" || e?.code === "SIDECAR_DOWN") setAgent("wait", "Yerel ajan başlatılıyor…");
     return;
   }
   status = st;
@@ -163,48 +245,56 @@ async function refresh() {
   const running = st.signed_in && st.running;
   $("office-name").textContent = running ? st.organization?.name || "" : "";
   if (!st.signed_in) {
-    badge($("agent-badge"), "wait", "Oturum açılmadı");
+    setAgent("wait", "Oturum açılmadı");
     if (currentView !== "login") setView("login");
     return;
   }
   if (!running) {
-    badge($("agent-badge"), "wait", "Ofis seçilmedi");
+    setAgent("wait", "Ofis seçilmedi");
     if (currentView !== "office") {
       setView("office");
       loadOffices();
     }
     return;
   }
-  if (paused) badge($("agent-badge"), "wait", "Duraklatıldı");
-  else if (st.heartbeat_error) badge($("agent-badge"), "down", "Bağlantı sorunu");
-  else badge($("agent-badge"), "ok", "Çevrimiçi");
-  if (!["folders", "program", "settings", "advanced"].includes(currentView)) setView(currentTab);
+  if (!engagements.length) await loadEngagements();
 
-  $("sum-conn").textContent = st.heartbeat_error ? "Sunucuya ulaşılamıyor" : "Bağlı";
-  $("sum-beat").textContent = relTime(st.last_heartbeat) || "—";
-  $("sum-folders").textContent = String(st.watches.length);
-  $("sum-uploaded").textContent = String(st.uploaded_total ?? 0);
+  // Kurulumun 3. adımı: ilk klasör (yalnızca hiç klasör yokken ve atlanmadıysa).
+  if (!st.watches.length && !firstRunSkipped && !TABS.includes(currentView)) {
+    if (currentView !== "first") openFirst();
+    return;
+  }
+  if (!TABS.includes(currentView)) setView(currentTab);
+
+  const [state, label] = agentState(st);
+  setAgent(state, label);
+  $("agent-meta").textContent = [st.agent_name, appVersion].filter(Boolean).join(" · ");
   fill($("account-info"), [
     ["Ofis", st.organization?.name],
     ["Bu bilgisayar", st.agent_name],
     ["Sunucu", st.base_url],
+    ["Son eşitleme", relTime(st.last_heartbeat)],
   ]);
-  if (!engagements.length) await loadEngagements();
   renderWatches(st.watches);
+  renderProblems(st);
+  notify(st);
 }
 
-// --- Oturum -----------------------------------------------------------------
+function setAgent(state, text) {
+  $("agent-dot").dataset.state = state;
+  $("agent-badge").textContent = text;
+  $("agent-card").setAttribute("aria-label", `Ajan durumu: ${text}`);
+}
+
+// --- Kurulum 1 · Giriş --------------------------------------------------------
 
 $("api-check").addEventListener("click", async () => {
-  show($("login-msg"), "Deneniyor…");
-  $("login-msg").dataset.kind = "info";
+  show($("login-msg"), "Deneniyor…", "info");
   try {
     await call("api.health", { base_url: $("api-url").value.trim() });
-    show($("login-msg"), "Sunucuya bağlanıldı.");
-    $("login-msg").dataset.kind = "ok";
+    show($("login-msg"), "Sunucuya bağlanıldı.", "ok");
   } catch (e) {
     show($("login-msg"), errText(e));
-    $("login-msg").dataset.kind = "error";
   }
 });
 
@@ -214,7 +304,6 @@ $("login-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const email = $("email").value.trim();
   const password = $("password").value;
-  $("login-msg").dataset.kind = "error";
   if (!email || !password) return show($("login-msg"), "E-posta ve parolanızı girin.");
   if (!$("api-url").value.trim()) {
     $("server-box").open = true;
@@ -233,13 +322,14 @@ $("login-form").addEventListener("submit", async (ev) => {
     $("password").value = "";
     $("totp").value = "";
     $("totp-row").hidden = true;
+    firstRunSkipped = false;
+    store.set("hakan.kurulum.atlandi", false);
     renderOffices();
   } catch (e) {
     if (e?.code === "MFA_REQUIRED") {
       $("totp-row").hidden = false;
       $("totp").focus();
-      $("login-msg").dataset.kind = "info";
-      show($("login-msg"), "Hesabınızda iki adımlı doğrulama açık. Doğrulama kodunu girin.");
+      show($("login-msg"), "Hesabınızda iki adımlı doğrulama açık. Doğrulama kodunu girin.", "info");
     } else {
       show($("login-msg"), errText(e));
     }
@@ -248,6 +338,8 @@ $("login-form").addEventListener("submit", async (ev) => {
   }
   refresh();
 });
+
+// --- Kurulum 2 · Ofis ve bilgisayar adı ----------------------------------------
 
 async function loadOffices() {
   if (organizations.length) return renderOffices();
@@ -260,6 +352,14 @@ async function loadOffices() {
   renderOffices();
 }
 
+const initials = (name) =>
+  (name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toLocaleUpperCase("tr"))
+    .join("");
+
 function renderOffices() {
   const box = $("office-list");
   box.replaceChildren();
@@ -267,9 +367,11 @@ function renderOffices() {
     box.append(
       el(
         "label",
-        { class: "choice" },
-        el("input", { type: "radio", name: "office", value: o.slug, checked: i === 0 }),
-        el("span", {}, o.name),
+        { class: "office" },
+        el("input", { type: "radio", name: "office", value: o.slug, checked: i === 0, "aria-label": o.name }),
+        el("span", { class: "av", "aria-hidden": "true" }, initials(o.name)),
+        el("b", { class: "grow t-sm" }, o.name),
+        icon(IC.check, "ic check"),
       ),
     );
   });
@@ -298,7 +400,6 @@ async function signOut() {
   organizations = [];
   engagements = [];
   engagementTitles.clear();
-  $("uploads").replaceChildren();
   setView("login");
   refresh();
 }
@@ -320,6 +421,7 @@ async function loadEngagements() {
     show($("add-msg"), errText(e));
   }
   renderEngagements();
+  $("first-taxpayers").replaceChildren(...engagements.map((e) => el("option", { value: e.title })));
 }
 
 function renderEngagements() {
@@ -338,6 +440,57 @@ function renderEngagements() {
 $("taxpayer-search").addEventListener("input", renderEngagements);
 
 const taxpayerOf = (w) => w.taxpayer_title || engagementTitles.get(w.engagement_uuid) || "Mükellef";
+const engagementByTitle = (title) => engagements.find((e) => e.title.toLocaleLowerCase("tr") === title.trim().toLocaleLowerCase("tr"));
+
+// --- Kurulum 3 · İlk klasör ------------------------------------------------------
+
+let firstFolder = "";
+
+function openFirst() {
+  setView("first");
+  setFirstPicked("");
+  show($("first-msg"), "");
+}
+
+function setFirstPicked(path) {
+  firstFolder = path || "";
+  $("first-picked").textContent = firstFolder || "Klasör seç ya da pencereye sürükle";
+  $("first-picked").className = firstFolder ? "grow mono t-xs" : "grow t-sm t-2";
+  if (firstFolder) $("first-pick").dataset.picked = "";
+  else delete $("first-pick").dataset.picked;
+}
+
+$("first-pick").addEventListener("click", async () => {
+  try {
+    const p = await invoke("pick_folder");
+    if (p) setFirstPicked(p);
+  } catch (e) {
+    show($("first-msg"), errText(e));
+  }
+});
+
+$("first-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const eng = engagementByTitle($("first-taxpayer").value);
+  if (!eng) return show($("first-msg"), "Listeden bir mükellef seçin.");
+  if (!firstFolder) return show($("first-msg"), "İzlenecek klasörü seçin.");
+  try {
+    await call("watch.add", { path: firstFolder, engagement_uuid: eng.id, label: "", taxpayer_title: eng.title });
+    finishSetup();
+  } catch (e) {
+    show($("first-msg"), errText(e));
+  }
+});
+
+$("first-skip").addEventListener("click", finishSetup);
+
+function finishSetup() {
+  firstRunSkipped = true;
+  store.set("hakan.kurulum.atlandi", true);
+  currentTab = "folders";
+  setView("folders");
+  refresh();
+}
 
 // --- Klasörler --------------------------------------------------------------
 
@@ -345,8 +498,10 @@ let pickedFolder = "";
 
 function setPicked(path) {
   pickedFolder = path || "";
-  $("picked-folder").textContent = pickedFolder || "Henüz seçilmedi. Klasörü pencereye sürükleyebilirsiniz.";
-  $("picked-folder").className = pickedFolder ? "path" : "muted";
+  $("picked-folder").textContent = pickedFolder || "Klasör seç… ya da pencereye sürükle";
+  $("picked-folder").className = pickedFolder ? "grow mono t-xs" : "grow t-sm t-2";
+  if (pickedFolder) $("pick-folder").dataset.picked = "";
+  else delete $("pick-folder").dataset.picked;
 }
 
 function openAdd() {
@@ -395,110 +550,321 @@ $("add-form").addEventListener("submit", async (ev) => {
   refresh();
 });
 
+/** Klasör satırının durumu: [pill durumu, metin]. */
 function watchState(a) {
-  if (a.folder_error) return ["down", a.folder_error];
-  if (a.errors?.length) return ["warn", `${a.errors.length} dosyada sorun var`];
-  if (a.last_upload_at) return ["ok", `Son yükleme ${relTime(a.last_upload_at)}`];
-  return ["wait", "Yeni dosya bekleniyor"];
+  if (a.folder_error) return ["down", "Klasör bulunamadı"];
+  if (paused) return ["", "Duraklatıldı"];
+  if (a.errors?.length) return ["warn", `${a.errors.length} dosyada sorun`];
+  return ["ok", "İzleniyor"];
 }
 
-// Açık bırakılan hata listeleri yenilemede kapanmasın.
-const openErrorBoxes = new Set();
+async function removeWatch(w) {
+  if (!(await confirmBox(`“${w.label || folderName(w.path)}” klasörü izlemeden çıkarılsın mı? Klasördeki dosyalara dokunulmaz.`, "İzlemeden çıkar"))) return;
+  await call("watch.remove", { path: w.path }).catch(() => {});
+  refresh();
+}
 
 function renderWatches(watches) {
-  const ul = $("watches");
-  ul.replaceChildren();
+  $("cnt-folders").textContent = watches.length ? String(watches.length) : "";
+  const list = $("watches");
+  list.replaceChildren();
+  list.hidden = !watches.length;
+  $("watches-empty").hidden = !!watches.length;
   if (!watches.length) {
-    ul.append(el("li", { class: "empty" }, "Henüz izlenen klasör yok. “Klasör ekle” ile başlayın."));
+    const add = el("button", { type: "button", class: "btn btn-pri" }, "+ Klasör ekle");
+    add.addEventListener("click", openAdd);
+    $("watches-empty").replaceChildren(
+      el("div", { class: "card" }, BosDurum({ baslik: "Henüz izlenen klasör yok", aciklama: "e-Fatura XML ya da ZIP'lerinin düştüğü klasörü ekle; dosyalar seçtiğin mükellefe kendiliğinden gönderilir.", eylem: add })),
+    );
     return;
   }
   for (const w of watches) {
     const a = w.activity || { errors: [] };
     const [state, text] = watchState(a);
-    const remove = el("button", { type: "button", class: "ghost small-btn" }, "Kaldır");
-    remove.addEventListener("click", async () => {
-      if (!(await confirmBox(`“${w.label || folderName(w.path)}” klasörü izlemeden çıkarılsın mı? Klasördeki dosyalara dokunulmaz.`))) return;
-      await call("watch.remove", { path: w.path }).catch(() => {});
-      refresh();
-    });
-    const li = el(
-      "li",
-      { class: "watch", dataset: { state } },
+    const sync = a.last_upload_at ? `${relTime(a.last_upload_at)} · ${a.uploaded || 0}` : "—";
+    const menu = el(
+      "details",
+      { class: "menu" },
+      el("summary", { class: "btn btn-sm btn-icon btn-ghost", role: "button", "aria-label": `${taxpayerOf(w)}: seçenekler` }, icon(IC.more, "ic ic-sm")),
       el(
         "div",
-        { class: "watch-head" },
-        el(
-          "div",
-          { class: "watch-title" },
-          el("strong", {}, w.label || folderName(w.path)),
-          el("span", { class: "muted" }, taxpayerOf(w)),
-        ),
-        el("span", { class: "status", dataset: { state } }, text),
-        remove,
-      ),
-      el("div", { class: "path", title: w.path }, w.path),
-      el(
-        "div",
-        { class: "muted small" },
-        `${a.uploaded || 0} dosya yüklendi (bu oturumda)` + (a.last_file ? ` · Son dosya: ${a.last_file}` : ""),
+        { class: "menu-pop" },
+        a.errors?.length ? el("button", { type: "button", class: "btn btn-sm btn-ghost", onclick: () => selectTab("problems") }, "Sorunları göster") : null,
+        el("button", { type: "button", class: "btn btn-sm btn-ghost danger-text", onclick: () => removeWatch(w) }, "İzlemeden çıkar"),
       ),
     );
-    if (a.errors?.length) {
-      const list = el("ul", { class: "errors" });
-      for (const e of a.errors) {
-        list.append(
-          el(
-            "li",
-            {},
-            el("span", { class: "file" }, e.name),
-            el("span", {}, e.message),
-            el("span", { class: "muted" }, fmtTime(e.at)),
-          ),
-        );
-      }
-      const clear = el("button", { type: "button", class: "ghost small-btn" }, "Listeyi temizle");
-      clear.addEventListener("click", async () => {
-        await call("watch.clear_errors", { path: w.path }).catch(() => {});
-        refresh();
-      });
-      const box = el("details", { class: "error-box", open: openErrorBoxes.has(w.path) }, el("summary", {}, `Sorunlu dosyalar (${a.errors.length})`), list, clear);
-      box.addEventListener("toggle", () => (box.open ? openErrorBoxes.add(w.path) : openErrorBoxes.delete(w.path)));
-      li.append(box);
-    }
-    ul.append(li);
+    list.append(
+      el(
+        "div",
+        { class: "fl", role: "listitem", dataset: { state } },
+        el("span", { class: "fl-ic" }, icon(IC.folder)),
+        el(
+          "div",
+          { class: "col grow" },
+          el("span", { class: "fl-title" }, w.label ? `${taxpayerOf(w)} · ${w.label}` : taxpayerOf(w)),
+          el("span", { class: "fl-path", title: w.path }, w.path),
+        ),
+        el("span", { class: "fl-sync num", title: "Son gönderim · bu oturumda gönderilen" }, sync),
+        el("span", { class: "fl-state" }, el("span", { class: "pill", dataset: { state } }, text)),
+        menu,
+      ),
+    );
   }
 }
 
-// --- Son yüklemeler ---------------------------------------------------------
+// --- Geçmiş -----------------------------------------------------------------
+
+// Bu bilgisayarda tutulur (son 200 dosya); sidecar geçmiş tutmaz.
+let history = store.get("hakan.gecmis", []);
 
 const OUTCOME = {
-  uploaded: ["ok", "Yüklendi"],
-  rejected: ["down", "Yüklenmedi"],
-  failed: ["warn", "Gönderilemedi, yeniden denenecek"],
+  uploaded: { durum: "yuklendi", state: "ok", label: "Eklendi" },
+  duplicate: { durum: "yuklendi", state: "", label: "Zaten var" },
+  rejected: { durum: "sorun", state: "down", label: "Gönderilmedi" },
+  failed: { durum: "sorun", state: "down", label: "Yeniden denenecek" },
 };
 
-function addFeed(data) {
-  const [state, label] = OUTCOME[data.outcome] || ["wait", "İşlendi"];
-  const ul = $("uploads");
-  ul.querySelector(".empty")?.remove();
-  ul.prepend(
-    el(
-      "li",
-      { dataset: { state } },
-      el("span", { class: "muted" }, new Date().toLocaleTimeString("tr-TR", { timeStyle: "short" })),
-      el("span", { class: "file" }, data.name),
-      el("span", { class: "muted" }, engagementTitles.get(data.engagement_uuid) || ""),
-      el("span", { class: "status", dataset: { state } }, data.outcome === "uploaded" ? label : data.reason || label),
-    ),
-  );
-  while (ul.children.length > FEED_SIZE) ul.lastChild.remove();
+function addHistory(data) {
+  history.unshift({
+    at: new Date().toISOString(),
+    name: data.name,
+    taxpayer: engagementTitles.get(data.engagement_uuid) || "",
+    outcome: data.outcome,
+    reason: data.outcome === "uploaded" || data.outcome === "duplicate" ? "" : data.reason || "",
+  });
+  history = history.slice(0, HISTORY_SIZE);
+  store.set("hakan.gecmis", history);
+  renderHistory();
 }
-$("uploads").append(el("li", { class: "empty" }, "Bu oturumda henüz dosya yüklenmedi."));
+
+function renderHistory() {
+  const now = Date.now();
+  const today = new Date().toDateString();
+  const sent = history.filter((h) => h.outcome === "uploaded");
+  const todayCount = sent.filter((h) => new Date(h.at).toDateString() === today).length;
+  const weekCount = sent.filter((h) => now - new Date(h.at).getTime() < 7 * 86400000).length;
+  $("history-sub").textContent = `Bugün ${todayCount} dosya · son 7 gün ${weekCount}`;
+  $("cnt-history").textContent = "";
+
+  const q = $("history-search").value.trim().toLocaleLowerCase("tr");
+  const rows = history.filter((h) => !q || `${h.name} ${h.taxpayer}`.toLocaleLowerCase("tr").includes(q));
+  const body = $("uploads");
+  body.replaceChildren(
+    ...rows.map((h) => {
+      const o = OUTCOME[h.outcome] || { durum: "bekleniyor", state: "", label: "İşlendi" };
+      return el(
+        "tr",
+        {},
+        el("td", {}, TacRozeti({ durum: o.durum, metin: o.label })),
+        el("td", { class: "file", title: h.name }, h.name),
+        el("td", { class: "t-sm" }, h.taxpayer),
+        el("td", {}, el("span", { class: "pill", dataset: { state: o.state } }, h.reason || o.label)),
+        el("td", { class: "t-xs t-3 num" }, shortTime(h.at)),
+      );
+    }),
+  );
+  $("history-table").hidden = !rows.length;
+  $("history-empty").hidden = !!rows.length;
+  if (!rows.length) {
+    $("history-empty").replaceChildren(
+      BosDurum(
+        q
+          ? { baslik: "Eşleşen dosya yok", aciklama: "Aramayı değiştir ya da temizle." }
+          : { baslik: "Henüz gönderilen dosya yok", aciklama: "İzlenen klasörlere düşen e-Faturalar burada listelenir." },
+      ),
+    );
+  }
+}
+$("history-search").addEventListener("input", renderHistory);
+
+// --- Sorunlar ---------------------------------------------------------------
+
+// "Yok say" yalnızca bu listeden gizler (dosya ve klasör değişmez).
+let ignored = new Set(store.get("hakan.yoksay", []));
+const errKey = (w, e) => `${w.path}|${e.name}|${e.at}`;
+
+function collectProblems(st) {
+  const transient = [];
+  const permanent = [];
+  const folders = [];
+  for (const w of st?.watches || []) {
+    const a = w.activity || { errors: [] };
+    if (a.folder_error) folders.push({ w, message: a.folder_error });
+    for (const e of a.errors || []) {
+      if (ignored.has(errKey(w, e))) continue;
+      (e.retry ? transient : permanent).push({ w, e });
+    }
+  }
+  return { transient, permanent, folders };
+}
+
+function problemCount(st) {
+  const p = collectProblems(st);
+  return p.transient.length + p.permanent.length + p.folders.length;
+}
+
+function problemCard(durum, title, text, ...actions) {
+  return el(
+    "div",
+    { class: "card problem", role: "listitem" },
+    TacRozeti({ durum, metin: durum === "sorun" ? "Sorun var" : "Bilgi" }),
+    el("div", { class: "col grow gap-6" }, el("b", {}, title), text),
+    ...actions,
+  );
+}
+
+function nextScanFraction(iso) {
+  const d = validDate(iso);
+  if (!d) return 0;
+  const s = ((Date.now() - d.getTime()) / 1000) % SCAN_SECONDS;
+  return Math.max(0, Math.min(1, s / SCAN_SECONDS));
+}
+
+function renderProblems(st) {
+  const { transient, permanent, folders } = collectProblems(st);
+  const total = transient.length + permanent.length + folders.length;
+  $("cnt-problems").textContent = total ? String(total) : "";
+  const box = $("problems");
+  box.replaceChildren();
+  box.setAttribute("role", "list");
+
+  if (!total && !dupToday().length) {
+    box.append(el("div", { class: "card" }, BosDurum({ baslik: "Sorun yok, taç tamam", aciklama: "Gönderilemeyen dosya olursa burada görünür." })));
+    return;
+  }
+
+  // Geçici: ağ / sunucu (kendiliğinden yeniden denenir)
+  if (transient.length) {
+    const latest = transient.map((t) => t.e.at).sort().at(-1);
+    const left = Math.ceil(SCAN_SECONDS * (1 - nextScanFraction(latest)));
+    const bar = el("div", { class: "bar warn", role: "progressbar", "aria-label": "Sonraki deneme", "aria-valuemin": "0", "aria-valuemax": "100" }, el("i", { id: "retry-bar" }));
+    const reasons = [...new Set(transient.map((t) => t.e.message).filter(Boolean))];
+    box.append(
+      el("span", { class: "t-cap" }, "Geçici · kendiliğinden yeniden denenir"),
+      problemCard(
+        "sorun",
+        `${transient.length} dosya · ${reasons.length === 1 ? reasons[0].replace(/[.;].*$/, "").toLocaleLowerCase("tr") : "sunucuya ulaşılamadı"}`,
+        el(
+          "div",
+          { class: "col gap-6" },
+          el("span", { class: "t-sm t-2" }, transient.map((t) => t.e.name).join(", ")),
+          el("span", { class: "t-sm t-2", id: "retry-text" }, `Sonraki taramada otomatik yeniden denenecek (yaklaşık ${left} sn).`),
+          bar,
+        ),
+      ),
+    );
+    updateRetryBar(latest);
+  }
+
+  // Kalıcı: kullanıcı kararı gerekir
+  if (permanent.length || folders.length) {
+    box.append(el("span", { class: "t-cap" }, "Kalıcı · senin kararını bekler"));
+    for (const { w, message } of folders) {
+      box.append(
+        problemCard(
+          "sorun",
+          `${taxpayerOf(w)} · klasör bulunamadı`,
+          el("span", { class: "t-sm t-2" }, `${message.charAt(0).toUpperCase()}${message.slice(1)}. Klasör taşındıysa izlemeden çıkarıp yeniden ekle.`),
+          el("button", { type: "button", class: "btn btn-sm", onclick: () => removeWatch(w) }, "İzlemeden çıkar"),
+        ),
+      );
+    }
+    for (const { w, e } of permanent) {
+      box.append(
+        problemCard(
+          "sorun",
+          `${e.name} · ${taxpayerOf(w)}`,
+          el("span", { class: "t-sm t-2" }, `${e.message || "Dosya gönderilmedi."} ${fmtTime(e.at)}`.trim()),
+          el(
+            "button",
+            {
+              type: "button",
+              class: "btn btn-sm btn-ghost",
+              onclick: () => {
+                ignored.add(errKey(w, e));
+                store.set("hakan.yoksay", [...ignored].slice(-500));
+                renderProblems(status);
+                renderStatusOnly();
+              },
+            },
+            "Yok say",
+          ),
+        ),
+      );
+    }
+  }
+
+  // Bilgi: mükerrer (işlem gerekmez)
+  const dups = dupToday();
+  if (dups.length) {
+    box.append(
+      el("span", { class: "t-cap" }, "Bilgi"),
+      problemCard("yuklendi", `${dups.length} dosya · zaten var`, el("span", { class: "t-sm t-2" }, "Aynı dosya daha önce gönderilmiş (SHA-256). İşlem gerekmez.")),
+    );
+  }
+}
+
+function dupToday() {
+  const today = new Date().toDateString();
+  return history.filter((h) => h.outcome === "duplicate" && new Date(h.at).toDateString() === today);
+}
+
+function renderStatusOnly() {
+  if (!status) return;
+  const [s, l] = agentState(status);
+  setAgent(s, l);
+}
+
+let retryLatest = null;
+function updateRetryBar(latest = retryLatest) {
+  retryLatest = latest;
+  const bar = $("retry-bar");
+  if (!bar || !latest) return;
+  const f = nextScanFraction(latest);
+  bar.style.width = `${Math.round(f * 100)}%`; // CSSOM; CSP satır içi stil özniteliğini engeller, bunu değil
+  bar.parentElement.setAttribute("aria-valuenow", String(Math.round(f * 100)));
+  const t = $("retry-text");
+  if (t) t.textContent = `Sonraki taramada otomatik yeniden denenecek (yaklaşık ${Math.ceil(SCAN_SECONDS * (1 - f))} sn).`;
+}
+let ticker = null;
+function startProblemTicker() {
+  if (!ticker) ticker = setInterval(() => updateRetryBar(), 1000);
+}
+function stopProblemTicker() {
+  clearInterval(ticker);
+  ticker = null;
+}
+
+// --- Bildirimler (kurallar: bildirim.js) ---------------------------------------
+
+const notifyState = Object.assign(yeniDurum(), store.get("hakan.bildirim", {}));
+
+function notify(st) {
+  const { permanent } = collectProblems(st);
+  const out = degerlendir(notifyState, {
+    agSorunu: !!st.heartbeat_error || collectProblems(st).transient.length > 0,
+    kaliciHatalar: permanent.map(({ w, e }) => ({ anahtar: errKey(w, e) })),
+  });
+  store.set("hakan.bildirim", notifyState);
+  for (const n of out) systemNotification(n.baslik, n.govde);
+}
+
+async function systemNotification(title, body) {
+  if (!("Notification" in window)) return;
+  try {
+    if (Notification.permission === "default") await Notification.requestPermission();
+    if (Notification.permission === "granted") new Notification(title, { body });
+  } catch {
+    /* bildirim gösterilemezse sessizce geç */
+  }
+}
+
+// --- Olaylar -------------------------------------------------------------------
 
 listen("sidecar://event", (e) => {
   const { event, data } = e.payload;
   if (event === "ready") showReady(data);
-  if (event === "upload") addFeed(data);
+  if (event === "upload") addHistory(data);
   if (event === "auth.signed_out" || event === "agent.revoked") {
     engagements = [];
     organizations = [];
@@ -506,15 +872,17 @@ listen("sidecar://event", (e) => {
   if (["agent.heartbeat", "auth.signed_out", "agent.revoked", "upload"].includes(event)) refresh();
 });
 listen("sidecar://exit", () => {
-  badge($("agent-badge"), "wait", "Yerel ajan yeniden başlatılıyor…");
+  setAgent("wait", "Yerel ajan yeniden başlatılıyor…");
   adv.sidecar = "Kapandı, yeniden başlatılıyor";
   renderAdv();
 });
 
 // --- Muhasebe programı ------------------------------------------------------
 
+const srcKind = () => document.querySelector("input[name=src-kind]:checked")?.value || "logo_tiger";
+
 function srcConfig() {
-  const kind = $("src-kind").value;
+  const kind = srcKind();
   const cfg = {
     kind,
     host: $("src-host").value.trim(),
@@ -531,9 +899,11 @@ function srcConfig() {
   return cfg;
 }
 
-$("src-kind").addEventListener("change", () => {
-  $("logo-only").hidden = $("src-kind").value === "mikro";
-});
+for (const r of document.querySelectorAll("input[name=src-kind]")) {
+  r.addEventListener("change", () => {
+    for (const f of document.querySelectorAll(".logo-only")) f.hidden = srcKind() === "mikro";
+  });
+}
 
 function srcResult(...nodes) {
   const box = $("src-result");
@@ -549,21 +919,19 @@ const money = (v) => {
 
 $("src-form").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  srcResult(el("p", { class: "muted" }, "Bağlanılıyor…"));
+  srcResult(el("p", { class: "t-2" }, "Bağlanılıyor…"));
   try {
     const r = await call("source.test", { config: srcConfig() });
     const total = r.tables?.length || 0;
     const missing = r.missing || [];
     const nodes = [
-      el(
-        "p",
-        { class: r.ok ? "ok-text" : "warn-text" },
-        r.ok ? "Bağlantı başarılı. Gerekli tabloların hepsi okunabiliyor." : "Bağlantı kuruldu ancak bazı sorunlar var.",
-      ),
-      el("p", { class: "muted" }, `Beklenen ${total} tablonun ${total - missing.length} tanesi bulundu.`),
+      r.ok
+        ? el("div", { class: "ok-box" }, icon(IC.check), el("span", { class: "t-sm" }, "Bağlantı başarılı · gerekli tabloların hepsi okunabiliyor"))
+        : el("p", { class: "warn-text" }, "Bağlantı kuruldu ancak bazı sorunlar var."),
+      el("p", { class: "t-2" }, `Beklenen ${total} tablonun ${total - missing.length} tanesi bulundu.`),
     ];
     if (missing.length) {
-      nodes.push(el("p", {}, "Bulunamayan ya da okuma izni olmayan tablolar:"), el("ul", { class: "plain" }, ...missing.map((t) => el("li", {}, t))));
+      nodes.push(el("p", {}, "Bulunamayan ya da okuma izni olmayan tablolar:"), el("ul", { class: "plain mono t-xs" }, ...missing.map((t) => el("li", {}, t))));
     }
     if (r.invoice_query_error) nodes.push(el("p", { class: "warn-text" }, "Fatura sorgusu bu veritabanında çalışmadı. Program sürümü farklı olabilir; destek ekibine bildirin."));
     srcResult(...nodes);
@@ -577,7 +945,7 @@ $("src-preview").addEventListener("click", async () => {
   const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const day = (d) => d.toISOString().slice(0, 10);
-  srcResult(el("p", { class: "muted" }, "Okunuyor…"));
+  srcResult(el("p", { class: "t-2" }, "Okunuyor…"));
   try {
     const r = await call("source.preview", { config: srcConfig(), from: day(from), to: day(to) });
     const dir = r.by_direction || {};
@@ -595,7 +963,7 @@ $("src-preview").addEventListener("click", async () => {
         el(
           "tr",
           {},
-          el("td", {}, inv.doc_no || inv.internal_no || ""),
+          el("td", { class: "mono t-xs" }, inv.doc_no || inv.internal_no || ""),
           el("td", {}, inv.date ? new Date(inv.date).toLocaleDateString("tr-TR", { timeZone: "UTC" }) : ""),
           el("td", {}, (DIRECTION[inv.direction] || "") + (inv.cancelled ? " (iptal)" : "")),
           el("td", {}, inv.counterparty_title || ""),
@@ -603,7 +971,7 @@ $("src-preview").addEventListener("click", async () => {
         ),
       );
       nodes.push(el("table", { class: "grid" }, el("thead", {}, head), el("tbody", {}, ...body)));
-      if (r.total > rows.length) nodes.push(el("p", { class: "muted" }, `İlk ${rows.length} fatura gösteriliyor.`));
+      if (r.total > rows.length) nodes.push(el("p", { class: "t-2" }, `İlk ${rows.length} fatura gösteriliyor.`));
     }
     srcResult(...nodes);
   } catch (e) {
@@ -621,14 +989,19 @@ async function loadSettings() {
     $("set-autostart").checked = s.autostart;
     setPaused(s.paused);
   } catch {
-    /* kabuk ayarları okunamazsa kutular olduğu gibi kalır */
+    /* kabuk ayarları okunamazsa anahtarlar olduğu gibi kalır */
   }
+  syncThemeControls();
 }
 
 function setPaused(p) {
   paused = !!p;
   $("set-paused").checked = paused;
   $("paused-banner").hidden = !paused;
+  if (status) {
+    renderWatches(status.watches);
+    renderStatusOnly();
+  }
 }
 
 $("set-autostart").addEventListener("change", async (e) => {
@@ -654,6 +1027,20 @@ $("set-paused").addEventListener("change", (e) => changePaused(e.target.checked)
 $("paused-resume").addEventListener("click", () => changePaused(false));
 listen("shell://paused", (e) => setPaused(e.payload));
 
+// Görünüm: palet ve kip (tema.js; bu bilgisayarda saklanır).
+function syncThemeControls() {
+  const { palet, kip } = temaTercihi();
+  for (const r of document.querySelectorAll("input[name=palet]")) r.checked = r.value === palet;
+  for (const r of document.querySelectorAll("input[name=kip]")) r.checked = r.value === kip;
+}
+for (const r of document.querySelectorAll("input[name=palet], input[name=kip]")) {
+  r.addEventListener("change", () => {
+    const palet = document.querySelector("input[name=palet]:checked")?.value;
+    const kip = document.querySelector("input[name=kip]:checked")?.value;
+    temaSec({ palet, kip });
+  });
+}
+
 // --- Güncellemeler (#205) ---------------------------------------------------
 // Kabuk açılışta ve 6 saatte bir denetler; durum `updater://status`,
 // indirme ilerlemesi `updater://progress` olayıyla gelir.
@@ -667,7 +1054,7 @@ function updateText(u) {
     case "checking":
       return "Güncelleme denetleniyor…";
     case "available":
-      return `Yeni sürüm hazır: ${u.available} (kurulu: ${u.current}).${u.notes ? ` ${u.notes}` : ""}`;
+      return `Klasör izleme güncelleme sırasında kısa bir süre durur, kaçan dosya olmaz.${u.notes ? ` ${u.notes}` : ""}`;
     case "downloading":
       return `Sürüm ${u.available} indiriliyor…`;
     case "installing":
@@ -682,19 +1069,20 @@ function updateText(u) {
 }
 
 const updateBadge = {
-  disabled: ["wait", "Kapalı"],
-  idle: ["wait", "Denetlenmedi"],
-  checking: ["wait", "Denetleniyor…"],
+  disabled: ["", "Kapalı"],
+  idle: ["", "Denetlenmedi"],
+  checking: ["", "Denetleniyor…"],
   up_to_date: ["ok", "Güncel"],
-  available: ["wait", "Yeni sürüm var"],
-  downloading: ["wait", "İndiriliyor…"],
-  installing: ["wait", "Kuruluyor…"],
+  downloading: ["brand", "İndiriliyor…"],
+  installing: ["brand", "Kuruluyor…"],
   error: ["down", "Sorun var"],
 };
 
 function showUpdate(u) {
-  const [state, text] = updateBadge[u.state] || updateBadge.idle;
-  badge($("up-badge"), state, text);
+  const [state, text] = u.state === "available" ? ["brand", `${u.available} hazır`] : updateBadge[u.state] || updateBadge.idle;
+  const b = $("up-badge");
+  b.dataset.state = state;
+  b.textContent = text;
   $("up-text").textContent = updateText(u);
   $("up-channel").value = u.channel;
   $("up-channel").disabled = !u.enabled;
@@ -706,16 +1094,21 @@ function showUpdate(u) {
   $("up-progress-row").hidden = !busy;
   const banner = u.state === "available" || busy;
   $("update-banner").hidden = !banner;
+  $("cnt-settings").textContent = banner ? "•" : "";
+  $("cnt-settings").setAttribute("aria-label", banner ? "güncelleme hazır" : "");
   if (banner) $("update-banner-text").textContent = `Hakan ${u.available} sürümü hazır.`;
+  appVersion = u.current || appVersion;
   adv.app = u.current;
   renderAdv();
 }
 
 function showProgress({ downloaded, total }) {
   const bar = $("up-progress");
+  const fill = $("up-progress-bar");
   if (total) {
     bar.max = total;
     bar.value = downloaded;
+    fill.style.width = `${Math.floor((downloaded / total) * 100)}%`;
     $("up-progress-text").textContent = `${fmtBytes(downloaded)} / ${fmtBytes(total)} (%${Math.floor((downloaded / total) * 100)})`;
   } else {
     bar.removeAttribute("value");
@@ -787,7 +1180,7 @@ $("adv-restart").addEventListener("click", async () => {
   }
 });
 
-// Sürükle-bırak: .xml → yerel denetim (Gelişmiş); klasör → klasör ekleme.
+// Sürükle-bırak: .xml → yerel denetim (Ayarlar → Gelişmiş); klasör → klasör ekleme.
 listen("tauri://drag-drop", async (e) => {
   for (const path of e.payload.paths || []) {
     if (path.toLowerCase().endsWith(".xml")) {
@@ -805,11 +1198,14 @@ listen("tauri://drag-drop", async (e) => {
         fill($("ubl-out"), [["Sonuç", "Dosya e-fatura (UBL-TR) olarak okunamadı."]]);
         errText(err);
       }
-      currentTab = "advanced";
-      setView("advanced");
+      selectTab("settings");
+      $("advanced").open = true;
     } else if (!/\.[a-z0-9]{2,4}$/i.test(path) && status?.running) {
-      currentTab = "folders";
-      setView("folders");
+      if (currentView === "first") {
+        setFirstPicked(path);
+        continue;
+      }
+      selectTab("folders");
       openAdd();
       setPicked(path);
     }
@@ -819,9 +1215,10 @@ listen("tauri://drag-drop", async (e) => {
 // --- Başlangıç --------------------------------------------------------------
 
 window.__TAURI__.app
-  .getVersion()
+  ?.getVersion()
   .then((v) => {
     adv.app = v;
+    appVersion = v;
     renderAdv();
   })
   .catch(() => {});
@@ -830,5 +1227,6 @@ invoke("sidecar_status")
   .catch(() => {});
 invoke("update_status").then(showUpdate).catch(() => {});
 loadSettings();
+renderHistory();
 refresh();
 setInterval(refresh, 15000);

@@ -288,16 +288,21 @@ func (r *Postgres) SaveRefresh(ctx context.Context, userID int64, hash string, e
 	if meta.ImpersonatorUserID != nil {
 		impersonator = pgtype.Int8{Int64: *meta.ImpersonatorUserID, Valid: true}
 	}
+	session := meta.SessionUUID
+	if session == uuid.Nil {
+		session = uuid.New()
+	}
 	row, err := r.q.CreateRefreshToken(ctx, db.CreateRefreshTokenParams{
 		UserID: userID, TokenHash: hash,
 		ExpiresAt: pgtype.Timestamptz{Time: expiresAt.UTC(), Valid: true},
 		UserAgent: ua, IpAddress: ip,
 		ImpersonatorUserID: impersonator,
+		SessionUuid:        session,
 	})
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return row.Uuid, nil
+	return row.SessionUuid, nil
 }
 
 func (r *Postgres) GetRefreshSession(ctx context.Context, hash string) (model.RefreshSession, error) {
@@ -308,7 +313,7 @@ func (r *Postgres) GetRefreshSession(ctx context.Context, hash string) (model.Re
 		}
 		return model.RefreshSession{}, err
 	}
-	out := model.RefreshSession{UUID: row.Uuid, UserID: row.UserID}
+	out := model.RefreshSession{UUID: row.Uuid, UserID: row.UserID, SessionUUID: row.SessionUuid}
 	if row.ImpersonatorUserID.Valid {
 		id := row.ImpersonatorUserID.Int64
 		out.ImpersonatorUserID = &id
@@ -329,6 +334,29 @@ func (r *Postgres) RevokeRefresh(ctx context.Context, hash string) error {
 	return nil
 }
 
+// EndRefreshSession ends the session of a refresh token (sign-out): its
+// access tokens stop working too (#323).
+func (r *Postgres) EndRefreshSession(ctx context.Context, hash string) error {
+	n, err := r.q.EndRefreshSessionByHash(ctx, hash)
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// RefreshSessionEnded reports whether the session of an access token has
+// ended (signed out, revoked, password changed) or is unknown (#323).
+func (r *Postgres) RefreshSessionEnded(ctx context.Context, userID int64, session uuid.UUID) (bool, error) {
+	ended, err := r.q.RefreshSessionEnded(ctx, db.RefreshSessionEndedParams{SessionUuid: session, UserID: userID})
+	if err != nil {
+		return false, err
+	}
+	return !ended.Valid || ended.Bool, nil
+}
+
 func (r *Postgres) RevokeAllRefresh(ctx context.Context, userID int64) error {
 	return r.q.RevokeAllRefreshTokensForUser(ctx, userID)
 }
@@ -341,7 +369,7 @@ func (r *Postgres) ListActiveSessions(ctx context.Context, userID int64) ([]mode
 	out := make([]model.DeviceSession, 0, len(rows))
 	for _, row := range rows {
 		item := model.DeviceSession{
-			UUID:         row.Uuid,
+			UUID:         row.SessionUuid,
 			CreatedAt:    row.CreatedAt.Time,
 			ExpiresAt:    row.ExpiresAt.Time,
 			Impersonated: row.ImpersonatorUserID.Valid,
@@ -361,7 +389,7 @@ func (r *Postgres) ListActiveSessions(ctx context.Context, userID int64) ([]mode
 
 func (r *Postgres) RevokeSession(ctx context.Context, userID int64, sessionUUID uuid.UUID) error {
 	n, err := r.q.RevokeRefreshTokenByUUIDForUser(ctx, db.RevokeRefreshTokenByUUIDForUserParams{
-		Uuid: sessionUUID, UserID: userID,
+		SessionUuid: sessionUUID, UserID: userID,
 	})
 	if err != nil {
 		return err
@@ -374,7 +402,7 @@ func (r *Postgres) RevokeSession(ctx context.Context, userID int64, sessionUUID 
 
 func (r *Postgres) RevokeOtherSessions(ctx context.Context, userID int64, keep uuid.UUID) error {
 	return r.q.RevokeOtherRefreshTokensForUser(ctx, db.RevokeOtherRefreshTokensForUserParams{
-		UserID: userID, Uuid: keep,
+		UserID: userID, SessionUuid: keep,
 	})
 }
 

@@ -10,6 +10,7 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 -- name: ListUBLUploadJobs :many
 SELECT * FROM ubl_upload_jobs
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND (sqlc.narg(period)::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = sqlc.narg(period))
 ORDER BY created_at DESC, id DESC
 LIMIT @lim OFFSET @off;
 

@@ -147,7 +147,7 @@ func TestCaptureAgainstPostgres(t *testing.T) {
 	if _, err := svc.Capture(ctx, sc, user, "x.txt", []byte("hello"), ""); err == nil {
 		t.Fatal("text accepted as image")
 	}
-	_, total, err := svc.List(ctx, sc, "", 50, 0)
+	_, total, err := svc.List(ctx, sc, "", "", 50, 0)
 	must(err)
 	if total != 5 {
 		t.Fatalf("captures = %d", total)

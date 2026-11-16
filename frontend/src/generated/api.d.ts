@@ -2913,6 +2913,212 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/notifications": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Own notifications in this office (#333)
+         * @description The caller's in-app notifications of this office (X-Organization), newest first.
+         *     `unread=true` lists only unread ones; `period` (YYYY-MM) the month
+         *     they were created in. Every member may read their own; no other
+         *     user's notification is listed.
+         */
+        get: operations["getTenantNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** Unread count of own notifications in this office (#333) */
+        get: operations["getTenantNotificationsUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark all own notifications in this office read (#333) */
+        post: operations["markTenantNotificationsReadAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/notifications/{uuid}/read": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark one own notification in this office read (#333)
+         * @description Another user's or another office's notification is `404`.
+         */
+        post: operations["markTenantNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/notifications": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Own notifications in this company (#333)
+         * @description The caller's in-app notifications about this company (X-Taxpayer: requests, reminders), newest first.
+         *     `unread=true` lists only unread ones; `period` (YYYY-MM) the month
+         *     they were created in. Every member may read their own; no other
+         *     user's notification is listed.
+         */
+        get: operations["getTaxpayerNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** Unread count of own notifications in this company (#333) */
+        get: operations["getTaxpayerNotificationsUnreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark all own notifications in this company read (#333) */
+        post: operations["markTaxpayerNotificationsReadAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/notifications/{uuid}/read": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark one own notification in this company read (#333)
+         * @description Another user's or another company's notification is `404`.
+         */
+        post: operations["markTaxpayerNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/settings": {
         parameters: {
             query?: never;
@@ -9785,6 +9991,26 @@ export interface components {
             /** Format: email */
             email: string;
         };
+        ScopedInbox: {
+            items: components["schemas"]["Notification"][];
+            /** Format: int64 */
+            total: number;
+            /**
+             * Format: int64
+             * @description Unread ones under the same filters
+             */
+            unread: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EnvelopeScopedInbox: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ScopedInbox"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         NotificationPage: {
             items: components["schemas"]["Notification"][];
             /** Format: int64 */
@@ -12567,6 +12793,13 @@ export interface components {
         };
     };
     parameters: {
+        /**
+         * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+         *     A record's period is its own (invoice, expense, suggestion, task);
+         *     without one, the month it was created in (Europe/Istanbul). A
+         *     malformed value answers `400 INVALID_PERIOD`.
+         */
+        PeriodFilter: string;
         BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
@@ -17207,6 +17440,292 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTenantNotifications: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
+                unread?: boolean;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page with the unread count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeScopedInbox"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getTenantNotificationsUnreadCount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: int64 */
+                            count: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markTenantNotificationsReadAll: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were marked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: int64 */
+                            marked: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markTenantNotificationRead: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notification */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeNotification"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTaxpayerNotifications: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
+                unread?: boolean;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page with the unread count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeScopedInbox"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getTaxpayerNotificationsUnreadCount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: int64 */
+                            count: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markTaxpayerNotificationsReadAll: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were marked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: int64 */
+                            marked: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    markTaxpayerNotificationRead: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notification */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeNotification"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     getTenantSettings: {
         parameters: {
             query?: never;
@@ -18531,6 +19050,13 @@ export interface operations {
     listTaxpayerReceipts: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 limit?: number;
                 offset?: number;
             };
@@ -18555,6 +19081,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeTaxpayerReceiptPage"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             /** @description `NO_TAXPAYER_MEMBERSHIP` */
             403: {
@@ -18701,6 +19228,13 @@ export interface operations {
     listTaxpayerUploads: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 limit?: number;
                 offset?: number;
             };
@@ -18725,6 +19259,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeUBLUploadJobList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             /** @description `NO_TAXPAYER_MEMBERSHIP` */
             403: {
@@ -18900,6 +19435,13 @@ export interface operations {
     listOfficeSuggestions: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 /** @description Default pending; all = any status */
                 status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
                 kind?: string;
@@ -19030,6 +19572,13 @@ export interface operations {
     listEngagementSuggestions: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 /** @description Default pending; all = any status */
                 status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
                 kind?: string;
@@ -19795,6 +20344,13 @@ export interface operations {
     listReceiptCaptures: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 status?: "draft" | "duplicate" | "failed" | "approved" | "rejected";
                 limit?: number;
                 offset?: number;
@@ -19822,6 +20378,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeReceiptCapturePage"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
@@ -20850,6 +21407,13 @@ export interface operations {
     listTenantUBLUploads: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 limit?: number;
                 offset?: number;
             };
@@ -20876,6 +21440,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeUBLUploadJobList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
@@ -24040,6 +24605,13 @@ export interface operations {
     listTaxpayerDocumentTasks: {
         parameters: {
             query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
                 status?: "open" | "submitted" | "matched" | "cancelled" | "all";
                 limit?: components["parameters"]["Limit"];
                 offset?: components["parameters"]["Offset"];

@@ -213,6 +213,12 @@ func (h *Handler) ListMine(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// The panel's period selector (#333): the task's own period.
+	f.Period = r.URL.Query().Get("period")
+	if f.Period != "" && !ValidPeriod(f.Period) {
+		writeError(w, r, ErrBadPeriod)
+		return
+	}
 	items, total, err := h.svc.ListMine(r.Context(), taxpayerctx.Must(r.Context()).ID, f)
 	if err != nil {
 		writeError(w, r, err)

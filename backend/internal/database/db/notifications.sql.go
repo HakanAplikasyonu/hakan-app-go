@@ -84,6 +84,45 @@ func (q *Queries) CountPlatformNotifications(ctx context.Context, arg CountPlatf
 	return column_1, err
 }
 
+const countScopedInbox = `-- name: CountScopedInbox :one
+SELECT COUNT(*)::bigint AS total,
+       COUNT(*) FILTER (WHERE read_at IS NULL)::bigint AS unread
+FROM notifications
+WHERE user_id = $1
+  AND channel = 'inapp'
+  AND ($2::bigint IS NULL OR organization_id = $2)
+  AND ($3::text IS NULL OR payload ->> 'taxpayer_uuid' = $3)
+  AND ($4::bool IS NOT TRUE OR read_at IS NULL)
+  AND ($5::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $5)
+`
+
+type CountScopedInboxParams struct {
+	UserID         pgtype.Int8 `json:"user_id"`
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	TaxpayerUuid   pgtype.Text `json:"taxpayer_uuid"`
+	Unread         pgtype.Bool `json:"unread"`
+	Period         pgtype.Text `json:"period"`
+}
+
+type CountScopedInboxRow struct {
+	Total  int64 `json:"total"`
+	Unread int64 `json:"unread"`
+}
+
+// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+func (q *Queries) CountScopedInbox(ctx context.Context, arg CountScopedInboxParams) (CountScopedInboxRow, error) {
+	row := q.db.QueryRow(ctx, countScopedInbox,
+		arg.UserID,
+		arg.OrganizationID,
+		arg.TaxpayerUuid,
+		arg.Unread,
+		arg.Period,
+	)
+	var i CountScopedInboxRow
+	err := row.Scan(&i.Total, &i.Unread)
+	return i, err
+}
+
 const countUnreadInappForUser = `-- name: CountUnreadInappForUser :one
 SELECT COUNT(*)::bigint FROM notifications
 WHERE user_id = $1
@@ -666,6 +705,90 @@ func (q *Queries) ListPushSubscriptionsByUser(ctx context.Context, userID int64)
 	return items, nil
 }
 
+const listScopedInbox = `-- name: ListScopedInbox :many
+SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, sealed_content FROM notifications
+WHERE user_id = $1
+  AND channel = 'inapp'
+  AND ($2::bigint IS NULL OR organization_id = $2)
+  AND ($3::text IS NULL OR payload ->> 'taxpayer_uuid' = $3)
+  AND ($4::bool IS NOT TRUE OR read_at IS NULL)
+  AND ($5::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $5)
+ORDER BY created_at DESC, id DESC
+LIMIT $7 OFFSET $6
+`
+
+type ListScopedInboxParams struct {
+	UserID         pgtype.Int8 `json:"user_id"`
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	TaxpayerUuid   pgtype.Text `json:"taxpayer_uuid"`
+	Unread         pgtype.Bool `json:"unread"`
+	Period         pgtype.Text `json:"period"`
+	OffsetCount    int32       `json:"offset_count"`
+	LimitCount     int32       `json:"limit_count"`
+}
+
+// Scoped inbox (issue #333): the caller's in-app notifications for one office
+// (organization_id) or one company (payload taxpayer_uuid, the mükellef
+// panel), optionally unread only and in one month (period, YYYY-MM, office
+// time). Email rows are never listed (see ListNotificationsForUser).
+// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+func (q *Queries) ListScopedInbox(ctx context.Context, arg ListScopedInboxParams) ([]Notification, error) {
+	rows, err := q.db.Query(ctx, listScopedInbox,
+		arg.UserID,
+		arg.OrganizationID,
+		arg.TaxpayerUuid,
+		arg.Unread,
+		arg.Period,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Notification{}
+	for rows.Next() {
+		var i Notification
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.UserID,
+			&i.Channel,
+			&i.Status,
+			&i.Priority,
+			&i.Title,
+			&i.Body,
+			&i.Payload,
+			&i.ActionUrl,
+			&i.Recipient,
+			&i.TemplateCode,
+			&i.SourceEvent,
+			&i.ScheduledAt,
+			&i.SentAt,
+			&i.DeliveredAt,
+			&i.ReadAt,
+			&i.FailedAt,
+			&i.CancelledAt,
+			&i.AttemptCount,
+			&i.MaxAttempts,
+			&i.LastError,
+			&i.Provider,
+			&i.ProviderReference,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OrganizationID,
+			&i.SealedContent,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStuckProcessingNotificationIDs = `-- name: ListStuckProcessingNotificationIDs :many
 SELECT id FROM notifications
 WHERE status = 'processing'
@@ -889,6 +1012,91 @@ func (q *Queries) MarkNotificationSent(ctx context.Context, arg MarkNotification
 		arg.Provider,
 		arg.ProviderReference,
 		arg.ID,
+	)
+	var i Notification
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.UserID,
+		&i.Channel,
+		&i.Status,
+		&i.Priority,
+		&i.Title,
+		&i.Body,
+		&i.Payload,
+		&i.ActionUrl,
+		&i.Recipient,
+		&i.TemplateCode,
+		&i.SourceEvent,
+		&i.ScheduledAt,
+		&i.SentAt,
+		&i.DeliveredAt,
+		&i.ReadAt,
+		&i.FailedAt,
+		&i.CancelledAt,
+		&i.AttemptCount,
+		&i.MaxAttempts,
+		&i.LastError,
+		&i.Provider,
+		&i.ProviderReference,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OrganizationID,
+		&i.SealedContent,
+	)
+	return i, err
+}
+
+const markScopedInboxAllRead = `-- name: MarkScopedInboxAllRead :execrows
+UPDATE notifications
+SET status = 'read', read_at = NOW()
+WHERE user_id = $1
+  AND channel = 'inapp'
+  AND read_at IS NULL
+  AND ($2::bigint IS NULL OR organization_id = $2)
+  AND ($3::text IS NULL OR payload ->> 'taxpayer_uuid' = $3)
+`
+
+type MarkScopedInboxAllReadParams struct {
+	UserID         pgtype.Int8 `json:"user_id"`
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	TaxpayerUuid   pgtype.Text `json:"taxpayer_uuid"`
+}
+
+// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+func (q *Queries) MarkScopedInboxAllRead(ctx context.Context, arg MarkScopedInboxAllReadParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markScopedInboxAllRead, arg.UserID, arg.OrganizationID, arg.TaxpayerUuid)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markScopedInboxRead = `-- name: MarkScopedInboxRead :one
+UPDATE notifications
+SET status = 'read', read_at = COALESCE(read_at, NOW())
+WHERE uuid = $1
+  AND user_id = $2
+  AND channel = 'inapp'
+  AND ($3::bigint IS NULL OR organization_id = $3)
+  AND ($4::text IS NULL OR payload ->> 'taxpayer_uuid' = $4)
+RETURNING id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, sealed_content
+`
+
+type MarkScopedInboxReadParams struct {
+	Uuid           uuid.UUID   `json:"uuid"`
+	UserID         pgtype.Int8 `json:"user_id"`
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	TaxpayerUuid   pgtype.Text `json:"taxpayer_uuid"`
+}
+
+// tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle
+func (q *Queries) MarkScopedInboxRead(ctx context.Context, arg MarkScopedInboxReadParams) (Notification, error) {
+	row := q.db.QueryRow(ctx, markScopedInboxRead,
+		arg.Uuid,
+		arg.UserID,
+		arg.OrganizationID,
+		arg.TaxpayerUuid,
 	)
 	var i Notification
 	err := row.Scan(

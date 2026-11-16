@@ -123,6 +123,13 @@ func TestUserRowTablesPolicies(t *testing.T) {
 				if cmd != "ALL" || strings.Contains(qual, "IS NULL") || strings.Contains(check, "IS NULL") {
 					t.Errorf("%s.rls_user_write: %s %q %q (must not open office-less rows)", table, cmd, qual, check)
 				}
+			case "rls_user_own":
+				// notifications (000092, #333): the user's own row, in any scope,
+				// for reading and marking read; never another user's.
+				if table != "notifications" || cmd != "UPDATE" || !strings.Contains(qual, "user_id = app_current_user_id()") ||
+					!strings.Contains(check, "user_id = app_current_user_id()") {
+					t.Errorf("%s.rls_user_own: %s %q %q", table, cmd, qual, check)
+				}
 			case "rls_legacy", "rls_system":
 			default:
 				t.Errorf("%s: unexpected policy %s", table, name)

@@ -144,6 +144,7 @@ JOIN organizations o ON o.id = t.organization_id
 LEFT JOIN bank_transactions bt ON bt.taxpayer_id = t.taxpayer_id AND bt.id = t.bank_transaction_id
 WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id
   AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status))
+  AND (sqlc.narg(period)::text IS NULL OR t.period = sqlc.narg(period))
 ORDER BY t.due_at, t.id
 LIMIT @lim OFFSET @off;
 
@@ -153,7 +154,8 @@ SELECT count(*)
 FROM document_tasks t
 JOIN engagements e ON e.organization_id = t.organization_id AND e.id = t.engagement_id AND e.ended_at IS NULL
 WHERE t.taxpayer_id = @taxpayer_id AND e.taxpayer_id = @taxpayer_id
-  AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status));
+  AND (sqlc.narg(status)::text IS NULL OR t.status = sqlc.narg(status))
+  AND (sqlc.narg(period)::text IS NULL OR t.period = sqlc.narg(period));
 
 -- tenant-lint: cross-org mükellef kendi görevini okur; taxpayer_id ve aktif engagement ile sınırlı
 -- name: GetTaxpayerDocumentTask :one

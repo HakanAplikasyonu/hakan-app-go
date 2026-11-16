@@ -201,6 +201,9 @@ type RefreshSession struct {
 	UUID               uuid.UUID
 	UserID             int64
 	ImpersonatorUserID *int64
+	// SessionUUID is the session the token belongs to: stable over
+	// rotations, the access token's sid (#323).
+	SessionUUID uuid.UUID
 }
 
 // DeviceSession is a user-visible refresh session (token never included).
@@ -219,6 +222,9 @@ type SessionMeta struct {
 	UserAgent          string
 	IP                 string
 	ImpersonatorUserID *int64
+	// SessionUUID is the session a rotated refresh token continues; zero at
+	// sign-in (a new session starts) (#323).
+	SessionUUID uuid.UUID
 }
 
 // SessionSwitch tells clients which identity the issued tokens represent.
