@@ -19,7 +19,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -174,9 +176,12 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 func ts(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t, Valid: true} }
 
-// Module mounts the dashboard route.
+// Module mounts the dashboard and client routes. Engagement routes need
+// Engagements (the engagement resolver); without it they are not mounted.
 type Module struct {
-	H *Handler
+	H           *Handler
+	Clients     *ClientsHandler
+	Engagements engagementctx.Resolver
 }
 
 // Name implements module.Module.
@@ -189,4 +194,20 @@ func (m Module) Routes(r *module.Router) {
 		h = &Handler{}
 	}
 	r.Tenant("GET /v1/tenant/dashboard", rbac.PermTenantEngagementsRead, h.Get)
+
+	c := m.Clients
+	if c == nil {
+		c = &ClientsHandler{}
+	}
+	r.Tenant("GET /v1/tenant/clients", rbac.PermTenantEngagementsRead, c.List)
+	if m.Engagements == nil {
+		return
+	}
+	eng := []func(http.Handler) http.Handler{
+		middleware.RequireTenantPermission(rbac.PermTenantEngagementsRead),
+		middleware.RequireEngagement(m.Engagements),
+	}
+	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
+	r.Tenant("GET "+base+"/contacts", rbac.PermTenantEngagementsRead, c.Contacts, eng...)
+	r.Tenant("GET "+base+"/receipts/{receiptUuid}/image", rbac.PermTenantReceiptsRead, c.ReceiptImage, eng...)
 }

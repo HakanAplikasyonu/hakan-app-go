@@ -1,0 +1,173 @@
+import { Image } from 'expo-image';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
+
+import { Card, Chip, Notice, Row, Screen, Text } from '@/components/ui';
+import { errorMessage } from '@/core/api/envelope';
+import { useAuth, useOrganization } from '@/core/auth/auth-provider';
+import { useColors } from '@/core/theme';
+import {
+  receiptImageSource,
+  useContacts,
+  useOpenTasks,
+  usePeriod,
+  useRecentInvoices,
+  useRecentReceipts,
+} from '@/features/clients/api';
+import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
+import { periodLabel } from '@/features/warnings/format';
+
+/** Mükellef ayrıntısı (#238): iletişim, dönem durumu, son belgeler, açık görevler. */
+export default function ClientDetailScreen() {
+  const { engagement, title } = useLocalSearchParams<{ engagement: string; title?: string }>();
+  const { can } = useAuth();
+  const org = useOrganization();
+  const c = useColors();
+  const [current, previous] = useMemo(() => recentPeriods(), []);
+
+  const contacts = useContacts(engagement);
+  const cur = usePeriod(engagement, current, can('tenant.periods.read'));
+  const prev = usePeriod(engagement, previous, can('tenant.periods.read'));
+  const invoices = useRecentInvoices(engagement, can('tenant.invoices.read'));
+  const receipts = useRecentReceipts(engagement, can('tenant.receipts.read'));
+  const tasks = useOpenTasks(engagement, can('tenant.doc_tasks.read'));
+
+  const ct = contacts.data;
+  const phone = telHref(ct?.phone);
+  const emails = [ct?.email, ...(ct?.members.map((m) => m.email) ?? [])].filter((e, i, a): e is string => !!e && a.indexOf(e) === i);
+
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: ct?.title ?? title ?? 'Mükellef' }} />
+      {contacts.error ? <Notice>{errorMessage(contacts.error)}</Notice> : null}
+
+      <View style={{ gap: 4 }}>
+        <Text variant="title" numberOfLines={3}>
+          {ct?.title ?? title}
+        </Text>
+        {ct ? (
+          <Text tone="muted">
+            {ct.kind === 'legal' ? 'VKN' : 'TCKN'} {ct.tax_id}
+            {ct.tax_office ? ` · ${ct.tax_office}` : ''}
+          </Text>
+        ) : null}
+      </View>
+
+      <Card>
+        <Text variant="heading">İletişim</Text>
+        {contacts.isLoading ? <ActivityIndicator color={c.brand} /> : null}
+        {phone ? <ActionLink label={`Ara: ${ct?.phone}`} href={phone} /> : null}
+        {emails.map((e) => {
+          const href = mailHref(e);
+          return href ? <ActionLink key={e} label={`E-posta: ${e}`} href={href} /> : null;
+        })}
+        {ct && !phone && emails.length === 0 ? <Text tone="muted">Kayıtlı iletişim bilgisi yok.</Text> : null}
+        {ct?.members.length ? (
+          <Text variant="caption" tone="muted">
+            Hesaplar: {ct.members.map((m) => `${m.name} ${m.surname} (${m.role === 'owner' ? 'sahip' : 'çalışan'})`).join(', ')}
+          </Text>
+        ) : null}
+      </Card>
+
+      {can('tenant.periods.read') ? (
+        <Card>
+          <Text variant="heading">Dönem durumu</Text>
+          {[cur, prev].map((p, i) => {
+            const period = i === 0 ? current : previous;
+            const d = p.data;
+            return (
+              <View key={period} style={styles.periodRow}>
+                <Text style={{ flex: 1 }}>{periodLabel(period)}</Text>
+                {p.isLoading ? <ActivityIndicator color={c.brand} /> : null}
+                {d ? (
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    {d.locked ? <Chip label="Kilitli" /> : null}
+                    <Chip tone={d.ready ? 'success' : 'danger'} label={d.ready ? 'Hazır' : `${d.open_blockers} engelleyici`} />
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+        </Card>
+      ) : null}
+
+      {tasks.data ? (
+        <Section title={`Açık görevler (${tasks.data.total})`} empty={tasks.data.items.length === 0 ? 'Açık belge görevi yok.' : null}>
+          {tasks.data.items.map((t) => (
+            <Row
+              key={t.uuid}
+              title={t.note || (t.kind === 'undocumented_payment' ? 'Belgesiz ödeme' : 'Faturasız tahsilat')}
+              subtitle={`${periodLabel(t.period)} · son gün ${new Date(t.due_at).toLocaleDateString('tr-TR')}${t.overdue ? ' · gecikti' : ''}`}
+            />
+          ))}
+        </Section>
+      ) : null}
+
+      {receipts.data ? (
+        <Section title="Son fişler" empty={receipts.data.items.length === 0 ? 'Fiş yok.' : null}>
+          <View style={styles.thumbs}>
+            {receipts.data.items.map((r) => (
+              <View key={r.uuid} style={{ gap: 4, width: 96 }}>
+                {r.media_type.startsWith('image/') ? (
+                  <Image
+                    source={receiptImageSource(org, engagement, r.uuid)}
+                    style={[styles.thumb, { backgroundColor: c.border }]}
+                    contentFit="cover"
+                    transition={150}
+                    accessibilityLabel="Fiş görseli"
+                  />
+                ) : (
+                  <View style={[styles.thumb, { backgroundColor: c.border, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Text variant="caption">PDF</Text>
+                  </View>
+                )}
+                <Text variant="caption" tone="muted" numberOfLines={1}>
+                  {new Date(r.created_at).toLocaleDateString('tr-TR')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </Section>
+      ) : null}
+
+      {invoices.data ? (
+        <Section title="Son faturalar" empty={invoices.data.items.length === 0 ? 'Fatura yok.' : null}>
+          {invoices.data.items.map((inv) => (
+            <Row
+              key={inv.uuid}
+              title={inv.counterparty_name || inv.invoice_number}
+              subtitle={`${inv.direction === 'incoming' ? 'Gelen' : 'Giden'} · ${inv.issue_date} · ${money(inv.payable_amount, inv.currency)}`}
+              trailing={inv.open_warnings ? <Chip tone="warning" label={`${inv.open_warnings}`} /> : undefined}
+            />
+          ))}
+        </Section>
+      ) : null}
+    </Screen>
+  );
+}
+
+function Section({ title, empty, children }: { title: string; empty: string | null; children: React.ReactNode }) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Text variant="heading">{title}</Text>
+      {empty ? <Text tone="muted">{empty}</Text> : children}
+    </View>
+  );
+}
+
+function ActionLink({ label, href }: { label: string; href: string }) {
+  return (
+    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(href)} hitSlop={8}>
+      <Text tone="brand" style={{ fontWeight: '600' }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  periodRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 32 },
+  thumbs: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  thumb: { width: 96, height: 128, borderRadius: 10 },
+});

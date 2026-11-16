@@ -1573,14 +1573,16 @@ type SyncWindow struct {
 }
 
 type Taxpayer struct {
-	ID        int64              `json:"id"`
-	Uuid      uuid.UUID          `json:"uuid"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-	Kind      string             `json:"kind"`
-	TaxID     string             `json:"tax_id"`
-	Title     string             `json:"title"`
-	TaxOffice string             `json:"tax_office"`
+	ID           int64              `json:"id"`
+	Uuid         uuid.UUID          `json:"uuid"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	Kind         string             `json:"kind"`
+	TaxID        string             `json:"tax_id"`
+	Title        string             `json:"title"`
+	TaxOffice    string             `json:"tax_office"`
+	ContactPhone pgtype.Text        `json:"contact_phone"`
+	ContactEmail pgtype.Text        `json:"contact_email"`
 }
 
 type TaxpayerHistoryShare struct {

@@ -77,6 +77,8 @@ export default function HomeScreen() {
               </Card>
             ) : null}
 
+            <Button title="Mükellefler" variant="secondary" onPress={() => router.push('/clients')} />
+
             <Text variant="heading">Bugün gelen yüklemeler</Text>
             {d.uploads.recent.length === 0 ? (
               <Text tone="muted">Bugün henüz yükleme yok.</Text>
@@ -141,8 +143,13 @@ function Stat({
 }
 
 function UploadRow({ upload }: { upload: DashboardUpload }) {
+  const router = useRouter();
   return (
     <Row
+      onPress={() =>
+        router.push({ pathname: '/clients/[engagement]', params: { engagement: upload.engagement_uuid, title: upload.taxpayer_title } })
+      }
+      trailing={<Text tone="muted">›</Text>}
       title={upload.taxpayer_title}
       subtitle={`${uploadKindLabel[upload.kind as UploadKind] ?? upload.kind} · ${clock(upload.created_at)}`}
       accessibilityLabel={`${upload.taxpayer_title}, ${uploadKindLabel[upload.kind as UploadKind] ?? upload.kind}`}

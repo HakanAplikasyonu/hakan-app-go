@@ -4704,6 +4704,89 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/clients:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Dashboard]
+      operationId: listOfficeClients
+      summary: Office taxpayer list (müşavir mobil)
+      description: |
+        Requires `tenant.engagements.read`. Active engagements of the office
+        with the taxpayer identity and open warning / task counts, ordered by
+        title. Without `tenant.engagements.read_all` only engagements assigned
+        to the caller. `q` matches the title (contains, case-insensitive) or
+        the start of the tax id. Keyset pagination: pass `next_cursor` back as
+        `cursor` (issue #182); null on the last page.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
+        - { name: filter, in: query, required: false, schema: { type: string, enum: [all, warnings, tasks, mine], default: all } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        "200":
+          description: Taxpayers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeClientPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/contacts:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Dashboard]
+      operationId: getEngagementContacts
+      summary: Taxpayer contact details
+      description: |
+        Requires `tenant.engagements.read` and engagement access. The
+        taxpayer's identity, its contact phone / e-mail (may be null) and the
+        active mükellef accounts (owner first, at most 20).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEngagementContacts"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/image:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: receiptUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Dashboard]
+      operationId: getEngagementReceiptImage
+      summary: Receipt photo (preview)
+      description: |
+        Requires `tenant.receipts.read` and engagement access. The captured
+        photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
+        not an image.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Image
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/warnings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -11703,6 +11786,65 @@ components:
         status: { type: string, description: "Status of the receipt, the upload job or the document task" }
         task_uuid: { type: ["string", "null"], format: uuid, description: "Document task of a document upload" }
         created_at: { type: string, format: date-time }
+    OfficeClient:
+      type: object
+      required: [engagement_uuid, taxpayer_uuid, kind, tax_id, title, tax_office, open_warnings, open_blockers, open_tasks, assigned_to_me]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string }
+        title: { type: string }
+        tax_office: { type: string }
+        open_warnings: { type: integer, format: int64 }
+        open_blockers: { type: integer, format: int64 }
+        open_tasks: { type: integer, format: int64, description: "Document tasks open or submitted" }
+        assigned_to_me: { type: boolean }
+    OfficeClientPage:
+      type: object
+      required: [items, limit, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OfficeClient" }
+        limit: { type: integer, format: int32 }
+        next_cursor: { type: ["string", "null"], description: "Cursor of the next page (`?cursor=`); null on the last page." }
+    EnvelopeOfficeClientPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeClientPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EngagementContacts:
+      type: object
+      required: [taxpayer_uuid, kind, tax_id, title, tax_office, phone, email, members]
+      properties:
+        taxpayer_uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [legal, individual] }
+        tax_id: { type: string }
+        title: { type: string }
+        tax_office: { type: string }
+        phone: { type: ["string", "null"] }
+        email: { type: ["string", "null"] }
+        members:
+          type: array
+          items:
+            type: object
+            required: [uuid, name, surname, email, role]
+            properties:
+              uuid: { type: string, format: uuid }
+              name: { type: string }
+              surname: { type: string }
+              email: { type: string }
+              role: { type: string, enum: [owner, employee] }
+    EnvelopeEngagementContacts:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EngagementContacts" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeOfficeDashboard:
       type: object
       required: [success, data, meta]
