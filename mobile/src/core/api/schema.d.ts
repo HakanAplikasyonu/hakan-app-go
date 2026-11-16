@@ -3167,6 +3167,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/clients": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office taxpayer list (müşavir mobil)
+         * @description Requires `tenant.engagements.read`. Active engagements of the office
+         *     with the taxpayer identity and open warning / task counts, ordered by
+         *     title. Without `tenant.engagements.read_all` only engagements assigned
+         *     to the caller. `q` matches the title (contains, case-insensitive) or
+         *     the start of the tax id. Keyset pagination: pass `next_cursor` back as
+         *     `cursor` (issue #182); null on the last page.
+         */
+        get: operations["listOfficeClients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/contacts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer contact details
+         * @description Requires `tenant.engagements.read` and engagement access. The
+         *     taxpayer's identity, its contact phone / e-mail (may be null) and the
+         *     active mükellef accounts (owner first, at most 20).
+         */
+        get: operations["getEngagementContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/image": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                receiptUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Receipt photo (preview)
+         * @description Requires `tenant.receipts.read` and engagement access. The captured
+         *     photo of a receipt (JPEG, PNG, WebP or HEIC); 404 when the capture is
+         *     not an image.
+         */
+        get: operations["getEngagementReceiptImage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/warnings": {
         parameters: {
             query?: never;
@@ -8733,6 +8825,66 @@ export interface components {
             task_uuid: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        OfficeClient: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            tax_office: string;
+            /** Format: int64 */
+            open_warnings: number;
+            /** Format: int64 */
+            open_blockers: number;
+            /**
+             * Format: int64
+             * @description Document tasks open or submitted
+             */
+            open_tasks: number;
+            assigned_to_me: boolean;
+        };
+        OfficeClientPage: {
+            items: components["schemas"]["OfficeClient"][];
+            /** Format: int32 */
+            limit: number;
+            /** @description Cursor of the next page (`?cursor=`); null on the last page. */
+            next_cursor: string | null;
+        };
+        EnvelopeOfficeClientPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeClientPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EngagementContacts: {
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            /** @enum {string} */
+            kind: "legal" | "individual";
+            tax_id: string;
+            title: string;
+            tax_office: string;
+            phone: string | null;
+            email: string | null;
+            members: {
+                /** Format: uuid */
+                uuid: string;
+                name: string;
+                surname: string;
+                email: string;
+                /** @enum {string} */
+                role: "owner" | "employee";
+            }[];
+        };
+        EnvelopeEngagementContacts: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EngagementContacts"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeOfficeDashboard: {
             /** @enum {boolean} */
@@ -16986,6 +17138,107 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeClients: {
+        parameters: {
+            query?: {
+                q?: string;
+                filter?: "all" | "warnings" | "tasks" | "mine";
+                cursor?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Taxpayers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeClientPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementContacts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contacts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEngagementContacts"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementReceiptImage: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                receiptUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Image */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/*": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
