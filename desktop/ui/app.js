@@ -706,7 +706,7 @@ function problemCount(st) {
 function problemCard(durum, title, text, ...actions) {
   return el(
     "div",
-    { class: "card problem", role: "listitem" },
+    { class: "card problem" },
     TacRozeti({ durum, metin: durum === "sorun" ? "Sorun var" : "Bilgi" }),
     el("div", { class: "col grow gap-6" }, el("b", {}, title), text),
     ...actions,
@@ -726,7 +726,6 @@ function renderProblems(st) {
   $("cnt-problems").textContent = total ? String(total) : "";
   const box = $("problems");
   box.replaceChildren();
-  box.setAttribute("role", "list");
 
   // #332: sunucuya ulaşılamıyorsa önce bu söylenir; dosyalar bilgisayarda
   // bekler, bağlantı gelince gönderilir (veri güvende).
