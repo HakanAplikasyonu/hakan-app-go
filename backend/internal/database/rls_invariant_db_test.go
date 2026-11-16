@@ -15,13 +15,10 @@ import (
 // table gets its policies; the test fails while a listed table is already
 // protected or no longer exists.
 //
-// Both come from the boilerplate and keep user-level rows next to office
-// rows: they also need a user_id condition (issue #307, after #304). The
-// other office-less tables carry rls_apply_org_shared (shared_tables.txt).
-var rlsInvariantExceptions = map[string]string{
-	"notifications":   "user notifications (organization_id NULL) need a user_id condition as well (#307, after #304)",
-	"activity_events": "platform activity log with user / platform rows; needs a user_id condition as well (#307, after #304)",
-}
+// Empty since issue #307: the office-less tables carry rls_apply_org_shared
+// (shared_tables.txt) or, for notifications and activity_events, the user
+// row policies of migration 000088.
+var rlsInvariantExceptions = map[string]string{}
 
 // TestRLSInvariant (issue #302): after all migrations, every public table
 // with an organization_id or taxpayer_id column has row level security

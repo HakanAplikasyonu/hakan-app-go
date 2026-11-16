@@ -138,8 +138,7 @@ template), in transition or enforced. The runtime role is not affected (it is
 not the owner); a non-superuser owner sees and writes those tables only
 inside `rls.System` (`app.system`). A data migration touching any such table
 as a non-superuser owner must `SET LOCAL app.system = 'on'` first. The
-deliberate exceptions (notifications and activity_events, which also need a
-user_id condition) are listed
+exception list is empty since #307; a new exception goes, with its reason,
 with their reason in `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
 
 Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
@@ -165,6 +164,12 @@ and the NULL rows, writes only its own office's rows; a NULL row is written
 only through `rls.System` (or unscoped, while the table is in transition).
 List the table in `internal/database/shared_tables.txt`
 (`TestSharedTablesPolicies`).
+
+`notifications` and `activity_events` (migration 000088) add a user
+condition on the office-less rows: a scope reads its office's rows and only
+its own user's office-less rows (notifications: also user-less ones), and
+writes only its office's rows. Code that notifies an office from the
+mükellef panel writes inside `rls.ForOffice` (doctasks `notifyOffice`).
 
 How code joins a scope: `database.NewQueries(pool)` (and `database.Ambient`)
 run each statement on the transaction carried by the context, so a
