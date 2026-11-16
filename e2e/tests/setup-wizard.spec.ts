@@ -110,9 +110,12 @@ test("mükellef listesi: 200 satır, hatalı satırlar satır satır", async () 
   });
   await expect(owner.getByText(`${ROWS - 3} geçerli, 3 hatalı satır`)).toBeVisible();
   // Satır numaraları başlık 1. satır olacak şekilde: 199, 200, 201.
-  await expect(owner.getByText("Hatalı VKN Ltd.")).toBeVisible();
-  await expect(owner.getByText("E-postasız A.Ş.")).toBeVisible();
-  await expect(owner.getByText("Tekrar A.Ş.")).toBeVisible();
+  // Hatalı satırlar tabloda düzenlenebilir alan (#330): unvan alanın değeri.
+  await expect(owner.getByText("Hatalı VKN Ltd.").or(owner.locator('input[value="Hatalı VKN Ltd."]')).first()).toBeVisible();
+  // Hatalı satırlar tabloda düzenlenebilir alan (#330): unvan alanın değeri.
+  await expect(owner.getByText("E-postasız A.Ş.").or(owner.locator('input[value="E-postasız A.Ş."]')).first()).toBeVisible();
+  // Hatalı satırlar tabloda düzenlenebilir alan (#330): unvan alanın değeri.
+  await expect(owner.getByText("Tekrar A.Ş.").or(owner.locator('input[value="Tekrar A.Ş."]')).first()).toBeVisible();
   await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
 });
 

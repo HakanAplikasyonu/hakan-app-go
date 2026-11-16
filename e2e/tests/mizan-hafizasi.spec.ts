@@ -187,7 +187,10 @@ test("ilk ay: öneriler yüklemeyle gelir, müşavir 153'ü 150.01'e düzeltir",
     await expect(row).toHaveCount(1);
     // Kuyruk ve karar ekranı tek sayfa (#326): satırı seç, "Kodu düzelt".
     await row.click();
-    await office.getByRole("button", { name: "Kodu düzelt" }).click();
+    // Önceki kart çıkış animasyonunda kısa süre DOM'da kalır: tek düğme kalsın.
+    const correct = office.getByRole("button", { name: "Kodu düzelt" });
+    await expect(correct).toHaveCount(1);
+    await correct.click();
     const input = office.getByPlaceholder("Hesap kodu ya da adı…");
     await input.fill(CORRECTED);
     await input.press("Enter");
