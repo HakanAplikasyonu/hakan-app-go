@@ -190,3 +190,8 @@ DELETE FROM bank_balance_snapshots WHERE taxpayer_id = @taxpayer_id AND import_i
 
 -- name: GetCashBoxByUUID :one
 SELECT * FROM cash_boxes WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
+
+-- name: RenameCashBox :one
+UPDATE cash_boxes SET name = @name, updated_at = NOW()
+WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid
+RETURNING *;

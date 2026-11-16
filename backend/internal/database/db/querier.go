@@ -710,6 +710,7 @@ type Querier interface {
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
+	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
 	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
 	ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error)

@@ -7781,7 +7781,8 @@ paths:
         Requires `tenant.bank.write` and an active engagement. The account is
         found from the IBAN in the file (or the `:25:` account number); when
         the file names none, send `cash_box_uuid`. A file naming an account
-        the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`).
+        the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
+        add it first with `POST .../cash-boxes`.
         Movements go through the duplicate rules (same source key, running
         balance, lookalike) and are classified. A balance that does not add
         up raises `BNK_GAP`; a text PDF whose balance does not add up is
@@ -7831,6 +7832,117 @@ paths:
           description: |
             `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
             `STATEMENT_BALANCE_MISMATCH` (text PDF) or `SCANNED_PDF`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/cash-boxes:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: listTenantCashBoxes
+      summary: The taxpayer's bank accounts and cash registers
+      description: |
+        Requires `tenant.bank.read`. Accounts created here and those a bank
+        web service connection created (`web_service: true`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cash boxes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/CashBox" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Bank]
+      operationId: createTenantCashBox
+      summary: Add a bank account or cash register
+      description: |
+        Requires `tenant.bank.write` and an active engagement. Needed before a
+        statement file naming this account can be imported
+        (`UNKNOWN_BANK_ACCOUNT`, #144). `type` defaults to `bank_account`,
+        which needs an `iban` or a `bank_account_number`. The IBAN is
+        validated (mod 97) and the bank is read from it. An IBAN the taxpayer
+        already has returns `409 CASH_BOX_EXISTS`. Without `name` a name is
+        made from the currency and the IBAN's last four digits.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCashBoxRequest" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCashBox" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVALID_CASH_BOX` (type, iban, currency or name; the field is in `details`)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: cashBoxUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Bank]
+      operationId: renameTenantCashBox
+      summary: Rename a cash box
+      description: Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 255 }
+      responses:
+        "200":
+          description: Renamed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCashBox" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`INVALID_CASH_BOX` (empty or too long name)"
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -12638,6 +12750,39 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/TenantPermissionList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    CashBox:
+      type: object
+      required: [uuid, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, web_service]
+      properties:
+        uuid: { type: string, format: uuid }
+        type: { type: string, enum: [cash, bank_account, credit_card, valor] }
+        name: { type: string }
+        bank_id: { type: [string, "null"], description: "Bank read from the IBAN, e.g. ziraat" }
+        iban: { type: [string, "null"] }
+        currency: { type: string, pattern: '^[A-Z]{3}$' }
+        bank_account_number: { type: [string, "null"] }
+        bank_branch_code: { type: [string, "null"] }
+        web_service: { type: boolean, description: Created by a bank web service connection }
+
+    CreateCashBoxRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type: { type: string, enum: [cash, bank_account, credit_card, valor], default: bank_account }
+        name: { type: string, maxLength: 255 }
+        iban: { type: string, description: "Spaces are ignored; validated (mod 97)" }
+        currency: { type: string, default: TRY, description: "TL / TRL / YTL become TRY" }
+        bank_account_number: { type: string }
+        bank_branch_code: { type: string }
+
+    EnvelopeCashBox:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/CashBox" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     CreateTaxpayerRequestRequest:
