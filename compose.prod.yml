@@ -74,6 +74,10 @@ x-backend-environment: &backend-environment
   # APP_ENCRYPTION_KEY ile çalışır (KEK kimliği "app").
   SECRETS_KEYRING: ${SECRETS_KEYRING:-}
   SECRETS_ACTIVE_KEY_ID: ${SECRETS_ACTIVE_KEY_ID:-}
+  # KVKK veri sahibi talepleri (docs/kvkk.md §7): muhasebe saklama süresi (yıl) ve
+  # dışa aktarımın indirilebilir kalma süresi. Boş: 5 yıl, 168h.
+  PRIVACY_ACCOUNTING_RETENTION_YEARS: ${PRIVACY_ACCOUNTING_RETENTION_YEARS:-}
+  PRIVACY_EXPORT_TTL: ${PRIVACY_EXPORT_TTL:-}
   # Alan düzeyinde şifreleme KEK'i (ham banka/fatura verisi, backend/docs/alan-sifreleme.md).
   # APP_ENCRYPTION_KEY'den ayrıdır. Döndürme: KEYRING'e anahtar ekle, ACTIVE'i ayarla, field-crypt rotate.
   FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?FIELD_ENCRYPTION_KEY is required}

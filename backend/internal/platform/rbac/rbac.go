@@ -115,6 +115,10 @@ const (
 	PermTenantJournalsRead   = "tenant.journals.read"
 	PermTenantJournalsWrite  = "tenant.journals.write"
 	PermTenantJournalsExport = "tenant.journals.export"
+
+	// KVKK data subject requests (issue #193).
+	PermTenantPrivacyRequest = "tenant.privacy.request"
+	PermTenantPrivacyApprove = "tenant.privacy.approve"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

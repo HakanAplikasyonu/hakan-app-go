@@ -82,6 +82,7 @@ import (
 	periodsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/repository"
 	periodsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
 	petitionsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/petitions"
+	privacymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/privacy"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/qrlogin"
 	receiptsextract "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
@@ -415,6 +416,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			WithPlanLoader(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)).PlanLoader())
 		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage), rlsScope)
 	}
+	// KVKK veri sahibi talepleri (#193): dışa aktarma ve anonimleştirme, yönetici onaylı.
+	privacymodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		privacymodule.NewHandler(privacymodule.New(deps.DB, privacymodule.Config{
+			AccountingRetentionYears: cfg.Privacy.AccountingRetentionYears, ExportTTL: cfg.Privacy.ExportTTL,
+		}), activityRec))
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
 	}

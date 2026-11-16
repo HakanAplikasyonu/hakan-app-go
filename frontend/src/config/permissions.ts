@@ -68,6 +68,8 @@ export const Permission = {
   TenantJournalsRead: "tenant.journals.read",
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
+  TenantPrivacyRequest: "tenant.privacy.request",
+  TenantPrivacyApprove: "tenant.privacy.approve",
 } as const;
 
 export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
@@ -187,6 +189,10 @@ export const permissions = {
       read: Permission.TenantJournalsRead,
       write: Permission.TenantJournalsWrite,
       export: Permission.TenantJournalsExport,
+    },
+    privacy: {
+      request: Permission.TenantPrivacyRequest,
+      approve: Permission.TenantPrivacyApprove,
     },
   },
 } as const;
