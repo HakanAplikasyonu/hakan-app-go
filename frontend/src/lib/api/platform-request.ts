@@ -5,6 +5,8 @@ import { withStepUpRetry } from "@/features/step-up-engine/lib/step-up-intercept
 type PlatformRequestOptions = {
   query?: Record<string, string | number | undefined>;
   body?: unknown;
+  /** Skip the global error toast (the caller renders the error itself). */
+  silent?: boolean;
 };
 
 /** BFF fetch for platform endpoints not yet in generated OpenAPI paths. */
@@ -40,6 +42,6 @@ export async function platformRequest<T>(
     });
 
     const payload = await response.json().catch(() => undefined);
-    return unwrap<T>({ data: payload, response });
+    return unwrap<T>({ data: payload, response }, { silent: options?.silent });
   });
 }
