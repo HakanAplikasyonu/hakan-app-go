@@ -3,10 +3,11 @@
  * (frontend/src/components/hakan) ve Tauri (desktop/ui/hakan-ui.js) ile aynı
  * ad ve prop'lar. Ölçüler tuvalden: docs/tasarim/tuval/Kristal.dc.html.
  */
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AccessibilityInfo, Animated, Easing, Text as RNText, View, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { AccessibilityInfo, Animated, Easing, Pressable, Text as RNText, TextInput, View, type ViewStyle } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
+import { Ikon, type IkonAdi } from './ikon.tsx';
 import { guvenKademesi, type GuvenKademesi, type GuvenKaynagi } from './theme-pref.ts';
 import { useTheme } from './theme.ts';
 
@@ -229,6 +230,188 @@ export function BosDurum({ baslik, aciklama, eylem, style }: { baslik: string; a
       ) : null}
       {eylem}
     </View>
+  );
+}
+
+/*
+ * Ortak durumlar (#332, tuval: Durumlar.dc.html). Kural: hata = ne oldu +
+ * veri güvende mi + ne yapmalı; teknik kod yalnızca "Ayrıntı"da.
+ */
+
+function DurumIkonu({ ad, ton }: { ad: IkonAdi; ton: 'tehlike' | 'notr' }) {
+  const { colors: c } = useTheme();
+  return (
+    <View
+      importantForAccessibility="no-hide-descendants"
+      style={{
+        width: 64,
+        height: 64,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: ton === 'tehlike' ? c.dangerTint : c.surface3,
+      }}>
+      <Ikon ad={ad} boyut={28} renk={ton === 'tehlike' ? c.danger : c.text2} />
+    </View>
+  );
+}
+
+function DurumMetni({ baslik, aciklama }: { baslik: string; aciklama?: string }) {
+  const { colors: c } = useTheme();
+  return (
+    <>
+      <RNText accessibilityRole="header" style={{ fontFamily: 'InterTight_700Bold', fontSize: 20, lineHeight: 26, color: c.text, textAlign: 'center' }}>
+        {baslik}
+      </RNText>
+      {aciklama ? (
+        <RNText style={{ fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 22, color: c.text2, textAlign: 'center', maxWidth: 380 }}>
+          {aciklama}
+        </RNText>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Hata: ne oldu + veri güvende mi + yeniden dene. `verilerGuvende` yalnızca
+ * gerçekten biliniyorsa verilir ("Hiçbir şey kaybolmadı"). `kod` (ör.
+ * NETWORK_TIMEOUT) yalnızca "Ayrıntı"ya dokununca görünür.
+ */
+export function HataDurumu({
+  baslik = 'Sunucuya ulaşılamıyor',
+  aciklama = 'Bağlantı ya da sunucu yanıt vermedi. Birazdan yeniden dene.',
+  verilerGuvende,
+  kod,
+  eylem,
+  style,
+}: {
+  baslik?: string;
+  aciklama?: string;
+  verilerGuvende?: boolean;
+  kod?: string;
+  /** Yeniden dene düğmesi (uygulamanın Button'u). */
+  eylem?: ReactNode;
+  style?: ViewStyle;
+}) {
+  const { colors: c } = useTheme();
+  const [ayrinti, setAyrinti] = useState(false);
+  return (
+    <View accessibilityRole="alert" style={[{ alignItems: 'center', gap: 14, paddingVertical: 32, paddingHorizontal: 20 }, style]}>
+      <DurumIkonu ad="bulutYok" ton="tehlike" />
+      <DurumMetni baslik={baslik} aciklama={verilerGuvende ? `${aciklama} Hiçbir şey kaybolmadı.` : aciklama} />
+      {eylem}
+      {kod ? (
+        <RNText
+          accessibilityRole="button"
+          onPress={() => setAyrinti((v) => !v)}
+          style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: c.text2, textDecorationLine: ayrinti ? 'none' : 'underline', paddingVertical: 12 }}>
+          {ayrinti ? `Ayrıntı · ${kod}` : 'Ayrıntı'}
+        </RNText>
+      ) : null}
+    </View>
+  );
+}
+
+/** Yetki 403: bu ekran için yetkin yok + rolün + kimden istemeli. */
+export function YetkiYok({
+  rol,
+  aciklama = 'Erişim için ofis sahibi ya da yöneticinden yetki iste.',
+  eylem,
+  style,
+}: {
+  rol?: string;
+  aciklama?: string;
+  eylem?: ReactNode;
+  style?: ViewStyle;
+}) {
+  return (
+    <View style={[{ alignItems: 'center', gap: 14, paddingVertical: 32, paddingHorizontal: 20 }, style]}>
+      <DurumIkonu ad="kilit" ton="notr" />
+      <DurumMetni baslik="Bu ekran için yetkin yok" aciklama={rol ? `Rolün: ${rol}. ${aciklama}` : aciklama} />
+      {eylem}
+    </View>
+  );
+}
+
+/** "Dönem tamam" kutlaması: taçtaki üç kristal dolu; tek an, hareket yok. */
+export function DonemTamam({ baslik, aciklama, eylem, style }: { baslik: string; aciklama?: string; eylem?: ReactNode; style?: ViewStyle }) {
+  return (
+    <View accessibilityRole="summary" style={[{ alignItems: 'center', gap: 14, paddingVertical: 32, paddingHorizontal: 20 }, style]}>
+      <TacRozeti durum="aktarildi" boyut={72} />
+      <DurumMetni baslik={baslik} aciklama={aciklama} />
+      {eylem}
+    </View>
+  );
+}
+
+/**
+ * Doğrulama kodu girişi (#332, Giris.dc.html "Mobil · giriş + doğrulama
+ * kodu"): 6 kutu, tek gizli alan (yapıştırma ve SMS / Authenticator
+ * otomatik doldurma çalışır). Kutulara dokununca klavye açılır.
+ */
+export function KodGirisi({
+  value,
+  onChangeText,
+  uzunluk = 6,
+  onTamam,
+  testID,
+  etiket = 'Doğrulama kodu',
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  uzunluk?: number;
+  /** Son hane girilince (ör. otomatik gönder). */
+  onTamam?: (kod: string) => void;
+  testID?: string;
+  etiket?: string;
+}) {
+  const { colors: c } = useTheme();
+  const ref = useRef<ComponentRef<typeof TextInput>>(null);
+  const [odak, setOdak] = useState(false);
+  const haneler = value.slice(0, uzunluk).split('');
+  return (
+    <Pressable onPress={() => ref.current?.focus()} accessibilityRole="none" style={{ flexDirection: 'row', gap: 8, justifyContent: 'center' }}>
+      {Array.from({ length: uzunluk }, (_, i) => {
+        const aktif = odak && i === Math.min(haneler.length, uzunluk - 1);
+        return (
+          <View
+            key={i}
+            importantForAccessibility="no-hide-descendants"
+            style={{
+              width: 46,
+              height: 56,
+              borderRadius: 10,
+              borderWidth: aktif ? 2 : 1,
+              borderColor: aktif ? c.brand : c.lineStrong,
+              backgroundColor: c.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <RNText style={{ fontFamily: 'JetBrainsMono_500Medium', fontSize: 22, color: c.text }}>{haneler[i] ?? ''}</RNText>
+          </View>
+        );
+      })}
+      <TextInput
+        ref={ref}
+        testID={testID}
+        accessibilityLabel={etiket}
+        value={value}
+        onChangeText={(t) => {
+          const kod = t.replace(/\D/g, '').slice(0, uzunluk);
+          onChangeText(kod);
+          if (kod.length === uzunluk) onTamam?.(kod);
+        }}
+        onFocus={() => setOdak(true)}
+        onBlur={() => setOdak(false)}
+        keyboardType="number-pad"
+        autoComplete="one-time-code"
+        textContentType="oneTimeCode"
+        maxLength={uzunluk}
+        autoFocus
+        caretHidden
+        style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}
+      />
+    </Pressable>
   );
 }
 

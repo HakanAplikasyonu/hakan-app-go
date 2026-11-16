@@ -70,7 +70,7 @@ test("ofis kaydı: platform yöneticisi ofisi açar ve sahibi davet eder", async
   await owner.getByRole("button", { name: "Daveti kabul et" }).click();
   await owner.waitForURL((u) => u.pathname.startsWith(`/t/${slug}`));
   await owner.goto(`/t/${slug}`);
-  await expect(owner.getByText("Sahip olarak giriş yaptınız")).toBeVisible();
+  await expect(owner.getByText("İnceleme bekleyen öneri")).toBeVisible();
 });
 
 test("mükellef ekleme: onay e-postası, mükellefin kaydı ve onayı", async ({ browser }) => {

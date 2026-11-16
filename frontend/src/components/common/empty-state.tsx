@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { BosKristal } from "@/components/hakan/bos-durum";
 import { cn } from "@/lib/utils";
 
 type EmptyStateProps = {
@@ -9,6 +10,10 @@ type EmptyStateProps = {
   className?: string;
 };
 
+/**
+ * Boş durum (#332, Durumlar.dc.html): kesik çizgili kristaller + ne olduğu
+ * + neden + tek düğme.
+ */
 export function EmptyState({
   title,
   description,
@@ -18,15 +23,16 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "border-border flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-16 text-center",
+        "flex flex-col items-center justify-center gap-3.5 rounded-xl border border-dashed px-6 py-12 text-center",
         className,
       )}
     >
-      <h3 className="text-base font-medium">{title}</h3>
+      <BosKristal className="h-[72px]" />
+      <h3 className="font-display text-[19px] font-bold">{title}</h3>
       {description ? (
-        <p className="text-muted-foreground max-w-md text-sm">{description}</p>
+        <p className="text-text-2 max-w-md text-sm">{description}</p>
       ) : null}
-      {action ? <div className="mt-2">{action}</div> : null}
+      {action ? <div>{action}</div> : null}
     </div>
   );
 }

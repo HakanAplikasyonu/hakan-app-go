@@ -6,7 +6,7 @@
 // adlarıyla, hatalar Türkçe açıklamalarıyla görünür. Tanılama araçları
 // Ayarlar → Gelişmiş bölümündedir.
 import { degerlendir, yeniDurum } from "./bildirim.js";
-import { BosDurum, TacRozeti } from "./hakan-ui.js";
+import { BosDurum, HataDurumu, TacRozeti } from "./hakan-ui.js";
 import { temaSec, temaTercihi } from "./tema.js";
 
 const { invoke } = window.__TAURI__.core;
@@ -728,8 +728,26 @@ function renderProblems(st) {
   box.replaceChildren();
   box.setAttribute("role", "list");
 
+  // #332: sunucuya ulaşılamıyorsa önce bu söylenir; dosyalar bilgisayarda
+  // bekler, bağlantı gelince gönderilir (veri güvende).
+  if (st.heartbeat_error) {
+    const tekrar = el("button", { type: "button", class: "btn btn-sm", onclick: () => refresh() }, "Yeniden dene");
+    box.append(
+      el(
+        "div",
+        { class: "card" },
+        HataDurumu({
+          aciklama: "Dosyalar bu bilgisayarda bekliyor; bağlantı gelince kendiliğinden gönderilecek.",
+          verilerGuvende: true,
+          kod: String(st.heartbeat_error).slice(0, 120),
+          eylem: tekrar,
+        }),
+      ),
+    );
+  }
+
   if (!total && !dupToday().length) {
-    box.append(el("div", { class: "card" }, BosDurum({ baslik: "Sorun yok, taç tamam", aciklama: "Gönderilemeyen dosya olursa burada görünür." })));
+    if (!st.heartbeat_error) box.append(el("div", { class: "card" }, BosDurum({ baslik: "Sorun yok, taç tamam", aciklama: "Gönderilemeyen dosya olursa burada görünür." })));
     return;
   }
 

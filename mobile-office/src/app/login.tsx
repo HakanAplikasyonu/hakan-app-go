@@ -7,6 +7,7 @@ import { Button, Field, Notice, Screen, Text, type InputRef } from '@/components
 import { errorMessage, isApiError } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { brand } from '@/core/brand';
+import { KodGirisi } from '@hakan/mobile-core/hakan';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -20,12 +21,14 @@ export default function LoginScreen() {
 
   const canSubmit = email.trim().length > 3 && password.length > 0 && (!needsCode || code.trim().length >= 6);
 
-  async function submit() {
-    if (!canSubmit || busy) return;
+  async function submit(kod?: string) {
+    const totp = (kod ?? code).trim();
+    const ok = email.trim().length > 3 && password.length > 0 && (!needsCode || totp.length >= 6);
+    if (!ok || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await signIn({ email: email.trim(), password, totp_code: needsCode ? code.trim() : undefined });
+      await signIn({ email: email.trim(), password, totp_code: needsCode ? totp : undefined });
     } catch (e) {
       if (isApiError(e) && e.code === 'MFA_REQUIRED') setNeedsCode(true);
       setError(errorMessage(e));
@@ -68,24 +71,30 @@ export default function LoginScreen() {
           autoComplete="password"
           textContentType="password"
           returnKeyType={needsCode ? 'next' : 'go'}
-          onSubmitEditing={submit}
+          onSubmitEditing={() => void submit()}
         />
         {needsCode ? (
-          <Field
-            label="Doğrulama kodu"
-            value={code}
-            onChangeText={setCode}
-            keyboardType="number-pad"
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-            maxLength={32}
-            returnKeyType="go"
-            onSubmitEditing={submit}
-            autoFocus
-          />
+          // #332 (Giris.dc.html): 6 haneli doğrulama kodu; son hane girilince
+          // kendiliğinden gönderilir.
+          <View style={{ gap: 10 }}>
+            <Text variant="heading">Doğrulama kodu</Text>
+            <Text tone="muted">Authenticator uygulamandaki 6 haneli kod.</Text>
+            <KodGirisi value={code} onChangeText={setCode} onTamam={(kod) => void submit(kod)} testID="login-code" />
+          </View>
         ) : null}
 
-        <Button title="Giriş yap" onPress={submit} loading={busy} disabled={!canSubmit} />
+        <Button title={needsCode ? 'Doğrula' : 'Giriş yap'} onPress={() => void submit()} loading={busy} disabled={!canSubmit} />
+        {needsCode ? (
+          <Button
+            title="Başka bir yolla gir"
+            variant="ghost"
+            onPress={() => {
+              setNeedsCode(false);
+              setCode('');
+              setError(null);
+            }}
+          />
+        ) : null}
         <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
           Bu uygulama mali müşavirlik ofisi çalışanları içindir. Hesabınız yoksa ofis yöneticinizden davet isteyin.
         </Text>

@@ -52,7 +52,7 @@ test.afterAll(async () => {
 test("ofis girişi: genel bakış API'den yükleniyor", async () => {
   await uiLogin(office, DEMO.owner);
   await office.goto(officePath());
-  await expect(office.getByText("Sahip olarak giriş yaptınız")).toBeVisible();
+  await expect(office.getByText("İnceleme bekleyen öneri")).toBeVisible();
   await expect(office.getByText(DEMO.atlas.title).first()).toBeVisible();
   await expect(office.getByText(DEMO.selin.title).first()).toBeVisible();
   await expect(office.getByText("Demo verisi")).toHaveCount(0);

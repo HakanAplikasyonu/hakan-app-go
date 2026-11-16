@@ -36,6 +36,7 @@ import {
   type TenantRoleOption,
 } from "@/features/tenant/lib/roles";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import type {
   TenantMember,
   TenantRole,
@@ -290,12 +291,7 @@ export function TenantMembersPage() {
       title={t("tenant.members_title")}
       description={t("tenant.members_description")}
       permission={permissions.tenant.members.read}
-      forbiddenFallback={
-        <ErrorState
-          title={t("common.error_forbidden")}
-          description={t("errors.forbidden_body")}
-        />
-      }
+      forbiddenFallback={<TenantForbidden />}
       breadcrumbs={[
         {
           label: tenant.organization.name,

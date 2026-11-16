@@ -103,3 +103,35 @@ export function BosDurum({ baslik, aciklama, eylem } = {}) {
   if (eylem) d.append(eylem);
   return d;
 }
+
+const BULUT_YOK =
+  'M2 2l20 20M5.8 5.8A6 6 0 004 10.5 4.5 4.5 0 006.5 19H17m3.6-2.3A4 4 0 0018 9.1h-.5A7 7 0 009.3 4.2';
+
+/**
+ * Hata (#332, Durumlar.dc.html): ne oldu + veri güvende mi + ne yapmalı.
+ * verilerGuvende yalnızca gerçekten biliniyorsa verilir ("Hiçbir şey
+ * kaybolmadı"). kod (ör. NETWORK_TIMEOUT) yalnızca "Ayrıntı"ya basınca görünür.
+ */
+export function HataDurumu({ baslik = 'Sunucuya ulaşılamıyor', aciklama, verilerGuvende = false, kod, eylem } = {}) {
+  const d = el('div', 'bos-durum hata-durumu');
+  d.setAttribute('role', 'alert');
+  const ikon = el('span', 'durum-ikonu tehlike');
+  ikon.setAttribute('aria-hidden', 'true');
+  ikon.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="${BULUT_YOK}"/></svg>`;
+  d.append(ikon, el('h3', null, baslik));
+  const metin = [aciklama, verilerGuvende ? 'Hiçbir şey kaybolmadı.' : null].filter(Boolean).join(' ');
+  if (metin) d.append(el('p', null, metin));
+  if (eylem) d.append(eylem);
+  if (kod) {
+    const ayrinti = el('button', 'durum-ayrinti', 'Ayrıntı');
+    ayrinti.type = 'button';
+    ayrinti.setAttribute('aria-expanded', 'false');
+    ayrinti.addEventListener('click', () => {
+      const acik = ayrinti.getAttribute('aria-expanded') === 'true';
+      ayrinti.setAttribute('aria-expanded', String(!acik));
+      ayrinti.textContent = acik ? 'Ayrıntı' : `Ayrıntı · ${kod}`;
+    });
+    d.append(ayrinti);
+  }
+  return d;
+}

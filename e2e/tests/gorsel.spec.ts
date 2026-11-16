@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { DEMO, officePath, uiLogin } from "./lib";
 
@@ -54,7 +54,12 @@ async function settle(page: Page) {
   await page.waitForTimeout(300);
 }
 
-async function snap(page: Page, path: string, name: string) {
+async function snap(
+  page: Page,
+  path: string,
+  name: string,
+  hazir?: (page: Page) => Locator,
+) {
   for (const theme of THEMES) {
     for (const vp of VIEWPORTS) {
       await test.step(`${name} · ${theme} · ${vp.name}`, async () => {
@@ -62,19 +67,24 @@ async function snap(page: Page, path: string, name: string) {
         await applyTheme(page, theme);
         await page.goto(path);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        if (hazir) await expect(hazir(page)).toBeVisible({ timeout: 30_000 });
         await settle(page);
         // Yumuşak: bir fark sonraki çekimleri durdurmaz; CI bütün farkları
         // (ve -actual görüntülerini) tek koşuda toplar.
-        await expect.soft(page).toHaveScreenshot(`${name}-${theme}-${vp.name}.png`, {
-          animations: "disabled",
-          caret: "hide",
-          mask: [
-            page.locator("time"),
-            page.locator("[data-visual-mask]"),
-            ...DYNAMIC_TEXT.map((re) => page.getByText(re)),
-          ],
-          maxDiffPixelRatio: 0.01,
-        });
+        await expect
+          .soft(page)
+          .toHaveScreenshot(`${name}-${theme}-${vp.name}.png`, {
+            animations: "disabled",
+            caret: "hide",
+            mask: [
+              page.locator("time"),
+              page.locator("[data-visual-mask]"),
+              // Toast'lar zamanlamaya bağlı gelir / gider.
+              page.locator("[data-sonner-toast]"),
+              ...DYNAMIC_TEXT.map((re) => page.getByText(re)),
+            ],
+            maxDiffPixelRatio: 0.01,
+          });
       });
     }
   }
@@ -92,6 +102,45 @@ test.describe("@visual görsel regresyon", () => {
     await uiLogin(page, DEMO.owner);
     await snap(page, officePath(), "ofis-genel-bakis");
     await snap(page, officePath("/review"), "ofis-inceleme");
+  });
+
+  // #332 ortak durumlar: yetki 403 (stajyer, roller), hata ve boş durum
+  // (inceleme kuyruğu ucu taklit edilir: 500 / boş liste).
+  test("durumlar: yetki yok", async ({ page }) => {
+    await uiLogin(page, DEMO.intern);
+    await snap(page, officePath("/roles"), "durum-yetki-yok", (p) =>
+      p.getByRole("heading", { name: "Bu sayfa için yetkin yok" }),
+    );
+  });
+
+  test("durumlar: hata ve boş kuyruk", async ({ page }) => {
+    await uiLogin(page, DEMO.owner);
+    await page.route("**/api/v1/tenant/review/suggestions**", (route) =>
+      route.fulfill({
+        status: 500,
+        json: {
+          success: false,
+          error: { code: "INTERNAL_ERROR", message: "Sunucu hatası" },
+          meta: { request_id: "gorsel" },
+        },
+      }),
+    );
+    await snap(page, officePath("/review"), "durum-hata", (p) =>
+      p.getByRole("heading", { name: "Öneriler yüklenemedi" }),
+    );
+    await page.unroute("**/api/v1/tenant/review/suggestions**");
+    await page.route("**/api/v1/tenant/review/suggestions**", (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: { items: [], total: 0 },
+          meta: { request_id: "gorsel" },
+        },
+      }),
+    );
+    await snap(page, officePath("/review"), "durum-bos-kuyruk", (p) =>
+      p.getByText("Bekleyen öneri yok").first(),
+    );
   });
 
   test("mükellef: portal ana sayfa", async ({ page }) => {

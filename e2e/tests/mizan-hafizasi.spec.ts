@@ -108,7 +108,8 @@ async function uploadMonth(month: "2026-10" | "2026-11") {
 const queueRows = () => office.getByRole("listitem").filter({ hasText: taxpayer.title });
 
 // textContent'te boşluk yok ("…1. satır153%50…"): kodu rakam/nokta sınırıyla ara.
-const codeRe = (code: string) => new RegExp(`(?<![\\d.])${code.replace(".", "\\.")}(?![\\d.])`);
+// Önünde rakam ya da "rakam." olmasın ("Şti.191.01" geçer, "1.153" geçmez).
+const codeRe = (code: string) => new RegExp(`(?<!\\d)(?<!\\d\\.)${code.replace(".", "\\.")}(?![\\d.])`);
 const lineRow = (item: string, code: string) =>
   queueRows().filter({ hasText: item }).filter({ hasText: codeRe(code) });
 

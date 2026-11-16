@@ -16,15 +16,18 @@ tags: [smoke]
     id: "stat-tasks"
 - assertVisible:
     id: "stat-warnings"
+- takeScreenshot: musavir-pano
 - tapOn:
     id: "tab-notifications"
 - assertVisible: "Bildirimler"
 - assertVisible:
     id: "inbox-filter-blocker"
+- takeScreenshot: musavir-bildirimler
 - tapOn:
     id: "tab-clients"
 - assertVisible:
     id: "clients-search"
+- takeScreenshot: musavir-mukellefler
 - openLink: "hakanofis://warnings"
 - assertVisible: "Uyarılar"
 - back

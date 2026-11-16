@@ -8,3 +8,4 @@ export { MarkaLogosu } from "./marka-logosu";
 export { TacRozeti } from "./tac-rozeti";
 export type { TacBoyutu, TacDurumu } from "./tac-rozeti";
 export { GorunumAyari } from "./gorunum-ayari";
+export { DonemTamam, HataDurumu, YetkiYok, YuklemeDurumu } from "./durumlar";

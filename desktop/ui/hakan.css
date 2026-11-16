@@ -68,3 +68,8 @@
 .bos-kristal i:nth-child(2) { height: 80px; }
 .bos-durum h3 { margin: 0; font-size: 17px; }
 .bos-durum p { margin: 0; color: var(--text-2); max-width: 380px; }
+
+/* Hata durumu (#332): tehlike tonlu ikon kutusu + "Ayrıntı" içinde kod. */
+.durum-ikonu { display: flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 18px; background: var(--surface-3); color: var(--text-2); }
+.durum-ikonu.tehlike { background: var(--danger-tint); color: var(--danger); }
+.durum-ayrinti { border: 0; background: none; padding: 6px; color: var(--text-2); font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; }

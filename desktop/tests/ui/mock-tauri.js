@@ -39,6 +39,7 @@
         watches: this.watches,
         stats: { watched_folders: this.watches.length, uploaded: 3, failed: 1 },
         uploaded_total: 3,
+        heartbeat_error: this.heartbeatError || undefined,
       };
     },
     emit(name, payload) {

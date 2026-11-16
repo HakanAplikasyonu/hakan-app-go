@@ -58,5 +58,16 @@
   "theme_m3_light": "Kristal mavi · açık",
   "theme_m3_dark": "Kristal mavi · koyu",
   "theme_n3_light": "Yeşil · açık",
-  "theme_n3_dark": "Yeşil · koyu"
+  "theme_n3_dark": "Yeşil · koyu",
+  "state_error_title": "Sunucuya ulaşılamıyor",
+  "state_error_description": "Bağlantı ya da sunucu yanıt vermedi. Birazdan yeniden dene.",
+  "state_error_data_safe": "Hiçbir şey kaybolmadı.",
+  "state_retry": "Yeniden dene",
+  "state_details": "Ayrıntı",
+  "state_forbidden_title": "Bu sayfa için yetkin yok",
+  "state_forbidden_role": "Rolün: {{role}}.",
+  "state_forbidden_description": "Erişim için ofis sahibi ya da yöneticinden yetki iste.",
+  "state_back_home": "Genel bakışa dön",
+  "state_render_error_title": "Bu ekran açılamadı",
+  "state_render_error_description": "Ekran çizilirken bir hata oldu; kayıtlı verine dokunulmadı."
 }
