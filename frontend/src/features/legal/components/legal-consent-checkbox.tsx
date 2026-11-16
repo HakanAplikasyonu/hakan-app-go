@@ -51,7 +51,7 @@ export function LegalConsentCheckbox({
           onCheckedChange={(value) => consent.setChecked(value === true)}
           aria-describedby={consent.outdated ? `${id}-outdated` : undefined}
         />
-        <div className="space-y-1">
+        <div className="min-w-0 space-y-1">
           <Label htmlFor={id} className="leading-snug font-normal">
             {label}
           </Label>
@@ -60,7 +60,7 @@ export function LegalConsentCheckbox({
               type="button"
               variant="link"
               size="sm"
-              className="h-auto p-0 text-sm"
+              className="text-brand-text h-auto p-0 text-start text-sm whitespace-normal"
               onClick={() => setOpen(true)}
               disabled={!document && !query.isError}
             >
