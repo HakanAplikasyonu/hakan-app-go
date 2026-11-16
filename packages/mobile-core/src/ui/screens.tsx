@@ -7,7 +7,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { Button, Screen, Text } from './ui.tsx';
+import { HataDurumu } from './hakan.tsx';
+import { Button, Screen } from './ui.tsx';
 
 /**
  * Render errors anywhere below the root: reported when the app's reporter is
@@ -31,13 +32,14 @@ export function RootErrorScreen({
     <SafeAreaProvider>
       <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
         {mark}
-        <View style={{ gap: 6, alignItems: 'center' }}>
-          <Text variant="title">Bir şeyler ters gitti</Text>
-          <Text tone="muted" style={{ textAlign: 'center' }}>
-            Ekran açılırken beklenmeyen bir hata oluştu. Tekrar deneyebilirsiniz.
-          </Text>
-        </View>
-        <Button title="Tekrar dene" onPress={retry} />
+        {/* #332: ekran çizilirken düşen hata; kayıtlı veriye dokunulmaz. */}
+        <HataDurumu
+          baslik="Bu ekran açılamadı"
+          aciklama="Ekran açılırken beklenmeyen bir hata oluştu. Tekrar deneyebilirsin."
+          verilerGuvende
+          kod={error.name !== 'Error' ? error.name : undefined}
+          eylem={<Button title="Tekrar dene" onPress={retry} />}
+        />
       </Screen>
     </SafeAreaProvider>
   );
@@ -49,19 +51,22 @@ export function OfflineScreen({ mark, retry }: { mark: ReactNode; retry: () => P
   return (
     <Screen style={{ justifyContent: 'center', alignItems: 'center', gap: 16 }}>
       {mark}
-      <View style={{ gap: 6, alignItems: 'center' }}>
-        <Text variant="title">Bağlantı yok</Text>
-        <Text tone="muted" style={{ textAlign: 'center' }}>
-          Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin; oturumunuz açık kalır.
-        </Text>
-      </View>
-      <Button
-        title="Tekrar dene"
-        loading={busy}
-        onPress={() => {
-          setBusy(true);
-          retry().finally(() => setBusy(false));
-        }}
+      {/* #332: geçici hata; oturum ve telefonda bekleyenler saklı. */}
+      <HataDurumu
+        baslik="Sunucuya ulaşılamıyor"
+        aciklama="İnternet bağlantını kontrol edip tekrar dene; oturumun açık kalır."
+        verilerGuvende
+        kod="NETWORK_UNAVAILABLE"
+        eylem={
+          <Button
+            title="Tekrar dene"
+            loading={busy}
+            onPress={() => {
+              setBusy(true);
+              retry().finally(() => setBusy(false));
+            }}
+          />
+        }
       />
     </Screen>
   );

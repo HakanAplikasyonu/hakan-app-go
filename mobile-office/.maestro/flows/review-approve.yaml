@@ -22,6 +22,7 @@ tags: [smoke]
     timeout: 20000
 - assertVisible:
     id: "review-remaining"
+- takeScreenshot: musavir-onay
 - tapOn:
     id: "review-approve"
 - extendedWaitUntil:

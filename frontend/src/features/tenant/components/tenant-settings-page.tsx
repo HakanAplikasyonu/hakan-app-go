@@ -20,6 +20,7 @@ import {
   useTenantSettings,
 } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
@@ -131,12 +132,7 @@ export function TenantSettingsPage() {
       title={t("tenant.settings_title")}
       description={t("tenant.settings_description")}
       permission={permissions.tenant.settings.read}
-      forbiddenFallback={
-        <ErrorState
-          title={t("common.error_forbidden")}
-          description={t("errors.forbidden_body")}
-        />
-      }
+      forbiddenFallback={<TenantForbidden />}
       breadcrumbs={[
         {
           label: tenant.organization.name,

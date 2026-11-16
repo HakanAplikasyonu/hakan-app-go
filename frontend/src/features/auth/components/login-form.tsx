@@ -563,20 +563,6 @@ export function LoginForm() {
       description={t("auth.login.description")}
     >
       <div className="space-y-4">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          disabled={authPending}
-          onClick={() => {
-            setFormError(null);
-            setQrStep(true);
-          }}
-        >
-          <QrCode aria-hidden />
-          {t("auth.qr.sign_in")}
-        </Button>
-
         {showPasskey ? (
           <Button
             type="button"
@@ -670,6 +656,29 @@ export function LoginForm() {
           </Field>
         ) : null}
 
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-muted-foreground text-xs">
+            {t("auth.login.or")}
+          </span>
+          <Separator className="flex-1" />
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          className="w-full"
+          disabled={authPending}
+          onClick={() => {
+            setFormError(null);
+            setQrStep(true);
+          }}
+        >
+          <QrCode aria-hidden />
+          {t("auth.qr.sign_in")}
+        </Button>
+
         <Button
           type="button"
           variant="ghost"
@@ -680,6 +689,10 @@ export function LoginForm() {
           <Mail aria-hidden />
           {t("auth.email_code.sign_in")}
         </Button>
+
+        <p className="text-muted-foreground text-xs">
+          {t("auth.taxpayer_hint")}
+        </p>
 
         {showRegisterLink ? (
           <p className="text-muted-foreground text-center text-sm">

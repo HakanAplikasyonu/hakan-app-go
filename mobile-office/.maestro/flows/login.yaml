@@ -7,6 +7,8 @@ tags: [smoke]
 - launchApp:
     clearState: true
 - assertVisible: "Giriş yap"
+# Ekran görüntüleri (#332): CI'da maestro-<uygulama> artefaktının screenshots/ klasörü.
+- takeScreenshot: musavir-giris
 - tapOn:
     id: "login-email"
 - inputText: ${MAESTRO_EMAIL}

@@ -8,6 +8,7 @@ tags: [smoke]
     id: "tab-profile"
 - assertVisible:
     id: "app-version"
+- takeScreenshot: mukellef-profil
 - tapOn: "Çıkış yap"
 - extendedWaitUntil:
     visible: "Giriş yap"

@@ -9,4 +9,6 @@ export const StorageKeys = {
   session: 'hakan.session',
   taxpayer: 'hakan.taxpayer',
   pushToken: 'hakan.push-token',
+  /** Mükellef ilk açılışı (KVKK onayı) görüldü (#332). */
+  onboarding: 'hakan.ilk-acilis',
 } as const;

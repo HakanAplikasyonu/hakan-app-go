@@ -58,5 +58,16 @@
   "theme_m3_light": "Crystal blue · light",
   "theme_m3_dark": "Crystal blue · dark",
   "theme_n3_light": "Green · light",
-  "theme_n3_dark": "Green · dark"
+  "theme_n3_dark": "Green · dark",
+  "state_error_title": "Can't reach the server",
+  "state_error_description": "The connection or the server did not respond. Try again in a moment.",
+  "state_error_data_safe": "Nothing was lost.",
+  "state_retry": "Try again",
+  "state_details": "Details",
+  "state_forbidden_title": "You don't have access to this page",
+  "state_forbidden_role": "Your role: {{role}}.",
+  "state_forbidden_description": "Ask the office owner or an administrator for access.",
+  "state_back_home": "Back to overview",
+  "state_render_error_title": "This screen could not open",
+  "state_render_error_description": "Something failed while drawing the screen; your saved data was not touched."
 }

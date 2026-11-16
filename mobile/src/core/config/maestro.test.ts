@@ -68,7 +68,8 @@ test('the ids the flows tap exist in the app (#328)', () => {
     readdirSync(dir, { withFileTypes: true })
       .map((e) => (e.isDirectory() ? read(new URL(`${e.name}/`, dir)) : e.name.endsWith('.tsx') ? readFileSync(new URL(e.name, dir), 'utf8') : ''))
       .join('\n');
-  const src = read(appDir) + readFileSync(new URL('../../../../packages/mobile-core/src/ui/sekme-cubugu.tsx', import.meta.url), 'utf8');
+  // Ekranlar app/ altında; bazı parçalar features/ altında (ör. ilk açılış, #332).
+  const src = read(appDir) + read(new URL('../../features/', import.meta.url)) + readFileSync(new URL('../../../../packages/mobile-core/src/ui/sekme-cubugu.tsx', import.meta.url), 'utf8');
   // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").
   const has = (id: string) => {
     if (src.includes(`"${id}"`) || src.includes(`'${id}'`)) return true;

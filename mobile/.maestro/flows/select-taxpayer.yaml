@@ -12,7 +12,17 @@ tags: [smoke]
       - tapOn:
           text: "›"
           index: 0
+# İlk açılış (#332): üç kristal anlatımı ve KVKK onayı; bir kez görülür.
+- runFlow:
+    when:
+      visible: "Fişi çek, gerisini düşünme"
+    commands:
+      - takeScreenshot: mukellef-ilk-acilis
+      - tapOn:
+          id: "ilk-acilis-kvkk"
+      - tapOn: "Devam et"
 - extendedWaitUntil:
     visible: "Merhaba.*"
     timeout: 20000
+- takeScreenshot: mukellef-ana-sayfa
 - assertVisible: "Fiş / Z raporu çek"

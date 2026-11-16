@@ -6,7 +6,8 @@
 #   scripts/maestro-ci.sh <uygulama klasörü> <apk> <çıktı klasörü>
 #
 # MAESTRO_EMAIL / MAESTRO_PASSWORD ortamdan gelir (demo seed hesabı).
-# Çıktı: report.xml (JUnit), debug/ (Maestro komut günlüğü ve hata anı
+# Çıktı: report.xml (JUnit), screenshots/ (akışlardaki takeScreenshot
+# adımları: ekranların görüntüleri, #332), debug/ (Maestro komut günlüğü ve hata anı
 # ekran görüntüleri), recordings/ (ekran kaydı, 170 sn'lik parçalar),
 # logcat.txt. Çıkış kodu Maestro'nunkidir.
 set -uo pipefail
@@ -44,12 +45,17 @@ adb logcat -c || true
 ) &
 rec=$!
 
+# takeScreenshot adımları (#332) çalışma klasörüne yazar: akışlar
+# screenshots/ içinden koşar, görüntüler artefakta girer.
+mkdir -p "$out/screenshots"
+flows=$(cd "$app/.maestro" && pwd)
+out=$(cd "$out" && pwd)
 code=0
-"$maestro" test \
+(cd "$out/screenshots" && "$maestro" test \
   --format junit --output "$out/report.xml" \
   --debug-output "$out/debug" --flatten-debug-output \
   -e MAESTRO_EMAIL="${MAESTRO_EMAIL:?}" -e MAESTRO_PASSWORD="${MAESTRO_PASSWORD:?}" \
-  "$app/.maestro" || code=$?
+  "$flows") || code=$?
 
 kill "$rec" 2>/dev/null || true
 adb shell pkill -INT screenrecord 2>/dev/null || true

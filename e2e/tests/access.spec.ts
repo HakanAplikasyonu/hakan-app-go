@@ -25,7 +25,7 @@ test.describe("stajyer (Personel)", () => {
 
   test("roller sayfası kapalı, üye daveti ve ayar kaydı yok", async ({ page }) => {
     await page.goto(officePath("/roles"));
-    await expect(page.getByText("Bu işlem için yetkiniz yok")).toBeVisible();
+    await expect(page.getByText("Bu sayfa için yetkin yok")).toBeVisible();
 
     await page.goto(officePath("/members"));
     await expect(page.getByText(DEMO.owner)).toBeVisible();
@@ -38,7 +38,7 @@ test.describe("stajyer (Personel)", () => {
 
   test("platform paneli kapalı", async ({ page }) => {
     await page.goto("/platform");
-    await expect(page.getByText("Yetkisiz").first()).toBeVisible();
+    await expect(page.getByText("Bu sayfa için yetkin yok").first()).toBeVisible();
   });
 
   test("atanmadığı mükellef ekranlarda yok", async ({ page }) => {
@@ -84,6 +84,6 @@ test.describe("mükellef kullanıcısı", () => {
       await expect(page.getByText("Bu organizasyona erişiminiz yok")).toBeVisible();
     }
     await page.goto("/platform");
-    await expect(page.getByText("Yetkisiz").first()).toBeVisible();
+    await expect(page.getByText("Bu sayfa için yetkin yok").first()).toBeVisible();
   });
 });

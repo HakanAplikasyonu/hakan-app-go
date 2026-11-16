@@ -7,6 +7,8 @@ tags: [smoke]
 - launchApp:
     clearState: true
 - assertVisible: "Giriş yap"
+# Ekran görüntüleri (#332): CI'da maestro-<uygulama> artefaktının screenshots/ klasörü.
+- takeScreenshot: mukellef-giris
 - tapOn:
     id: "login-email"
 - inputText: ${MAESTRO_EMAIL}
@@ -17,5 +19,5 @@ tags: [smoke]
 - tapOn: "Giriş yap"
 - extendedWaitUntil:
     visible:
-      text: "Şirket seçin|Merhaba.*"
+      text: "Şirket seçin|Merhaba.*|Fişi çek, gerisini düşünme"
     timeout: 20000

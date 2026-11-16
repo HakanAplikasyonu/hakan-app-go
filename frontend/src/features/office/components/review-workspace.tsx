@@ -1258,6 +1258,21 @@ function ReviewWorkspaceInner() {
             </div>
             {query.isLoading ? (
               <Loading className="m-4" label={t("common.loading")} />
+            ) : query.isError && !isMobile ? (
+              // #332: geniş ekranda hatanın ayrıntısı sağ panelde; liste
+              // "Bekleyen öneri yok" diyerek yanıltmaz.
+              <p className="text-danger p-4 text-sm">
+                {t("office.review_api.load_error")}
+              </p>
+            ) : query.isError ? (
+              // Telefonda ayrıntı paneli yok: hata listede gösterilir.
+              <ErrorState
+                className="m-3 border-0 py-8"
+                title={t("office.review_api.load_error")}
+                description={query.error.message}
+                onRetry={() => void query.refetch()}
+                retryLabel={t("common.retry")}
+              />
             ) : queue.length === 0 ? (
               <p className="text-text-2 p-4 text-sm">
                 {t("office.review_empty")}

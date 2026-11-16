@@ -4,14 +4,8 @@ import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { KristalYukleyici, YetkiYok } from "@/components/hakan";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { routes } from "@/config/routes";
 import {
   defaultHomeForUser,
@@ -33,10 +27,11 @@ type RouteGuardProps = {
   mode: "guest" | "platform" | "cms" | "tenant";
 };
 
+/** Tam sayfa bekleme: 400 ms sonra kristal yükleyici (#332). */
 function PageLoader({ label }: { label: string }) {
   return (
-    <div className="text-muted-foreground flex min-h-svh items-center justify-center text-sm">
-      {label}
+    <div className="flex min-h-svh items-center justify-center">
+      <KristalYukleyici etiket={label} />
     </div>
   );
 }
@@ -45,20 +40,15 @@ function RoleMismatch({ expected, home }: { expected: string; home: string }) {
   const { t } = useLocale();
   return (
     <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{t("errors.forbidden_title")}</CardTitle>
-          <CardDescription>{t("errors.role_mismatch")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          <p className="text-muted-foreground text-sm">
-            {t("errors.area_requires", { area: expected })}
-          </p>
+      <YetkiYok
+        className="w-full max-w-md"
+        aciklama={`${t("errors.role_mismatch")} ${t("errors.area_requires", { area: expected })}`}
+        eylem={
           <Button asChild>
             <Link href={home}>{t("errors.continue")}</Link>
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     </div>
   );
 }

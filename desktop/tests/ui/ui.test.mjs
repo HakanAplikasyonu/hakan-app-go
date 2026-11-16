@@ -217,6 +217,27 @@ test("geçmiş ve sorunlar: geçici / kalıcı ayrımı, ham hata yok", async ()
   await page.close();
 });
 
+test("sunucuya ulaşılamıyor (#332): hata durumu, veri güvende, kod Ayrıntı'da", async () => {
+  const { page, errors } = await open();
+  await signIn(page);
+  await page.evaluate(() => {
+    window.__mock.heartbeatError = "NETWORK_TIMEOUT: dial tcp 10.0.0.1:443";
+  });
+  await page.getByRole("tab", { name: "Sorunlar" }).click();
+  await page.evaluate(() => window.__mock.emit("sidecar://event", { event: "agent.heartbeat", data: {} }));
+  const box = page.locator("#problems");
+  const alert = box.getByRole("alert");
+  await alert.getByRole("heading", { name: "Sunucuya ulaşılamıyor" }).waitFor();
+  await alert.getByText(/Hiçbir şey kaybolmadı\./).waitFor();
+  assert.equal(await box.getByText("Sorun yok, taç tamam").count(), 0, "hata varken \"sorun yok\" denmemeli");
+  await assertClean(page, "sunucu hatası");
+  await alert.getByRole("button", { name: "Ayrıntı" }).click();
+  await alert.getByText(/NETWORK_TIMEOUT/).waitFor();
+  await alert.getByRole("button", { name: "Yeniden dene" }).click();
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("tepsi menüsü sekme ister (#325): kurulumda yok sayılır, sonra sekme açılır", async () => {
   const { page, errors } = await open();
   const nav = (tab) => page.evaluate((t) => window.__mock.emit("shell://navigate", t), tab);

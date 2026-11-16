@@ -73,3 +73,9 @@
   --accent: var(--brand-accent, var(--accent));
   --radius: var(--brand-radius, var(--radius));
 }
+
+/* Giriş marka paneli (#332): zemin her temada siyah. N3'te koyu kristal
+   (#0A0A0A) zeminle aynı renk olur; panelde görünür bir koyu griye çekilir. */
+[data-theme^="n3"] .giris-panel {
+  --c-dark: #3a3a42;
+}
