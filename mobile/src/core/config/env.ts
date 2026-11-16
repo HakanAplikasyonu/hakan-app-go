@@ -3,10 +3,15 @@
  *
  *   EXPO_PUBLIC_API_URL=https://api.example.com   Go API origin, without /v1
  *   EXPO_PUBLIC_APP_ENV=development|preview|production
+ *   EXPO_PUBLIC_PRIVACY_URL=https://…           gizlilik metni (profil ekranı); boş: gizlenir
+ *   EXPO_PUBLIC_SUPPORT_URL=https://… | mailto:  destek (profil ekranı); boş: gizlenir
+ *   EXPO_PUBLIC_SENTRY_DSN=https://…@…/…         çökme raporu; boş: Sentry kapalı
  *
  * Unset API URL → http://localhost:8080 (Metro dev builds). app.config.js refuses a
  * production build without an https URL.
  */
+import { safeLink } from './safe-link';
+
 export type AppEnv = 'development' | 'preview' | 'production';
 
 const rawAppEnv = process.env.EXPO_PUBLIC_APP_ENV;
@@ -21,4 +26,7 @@ export const appEnv: AppEnv =
 export const env = {
   apiUrl: (process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:8080').replace(/\/$/, ''),
   requestTimeoutMs: 20000,
+  privacyUrl: safeLink(process.env.EXPO_PUBLIC_PRIVACY_URL),
+  supportUrl: safeLink(process.env.EXPO_PUBLIC_SUPPORT_URL, true),
+  sentryDsn: safeLink(process.env.EXPO_PUBLIC_SENTRY_DSN),
 } as const;

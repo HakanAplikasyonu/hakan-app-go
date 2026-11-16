@@ -4,6 +4,8 @@ import { api, request } from '../api/client';
 import { isApiError, type Schemas } from '../api/envelope';
 import { registerPushDevice, unregisterPushDevice } from '../push/push';
 import { secure, StorageKeys } from '../storage';
+import { setReportUser } from '../observability/sentry';
+import { launchFailure } from './launch';
 import { session, type Tokens } from './session';
 import { pickTaxpayer, type TaxpayerOption } from './taxpayers';
 
@@ -14,7 +16,9 @@ export type TaxpayerContext = Schemas['TaxpayerContext'];
  * booting → (no session) signedOut → login → selectTaxpayer → ready.
  * `selectTaxpayer` is also where a user without any company lands.
  */
-export type AuthStatus = 'booting' | 'signedOut' | 'selectTaxpayer' | 'ready';
+// `offline`: a stored session could not be checked at launch (no network,
+// timeout, server error). The session is kept; `retry` checks again (#202).
+export type AuthStatus = 'booting' | 'offline' | 'signedOut' | 'selectTaxpayer' | 'ready';
 
 type AuthState = {
   status: AuthStatus;
@@ -31,6 +35,8 @@ type AuthApi = AuthState & {
   switchTaxpayer: () => void;
   /** Re-reads memberships (after an invitation was accepted on the web). */
   reload: () => Promise<void>;
+  /** Checks the stored session again after an offline launch. */
+  retry: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -52,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const taxpayer = await api.get<TaxpayerContext>('/v1/taxpayer/context', { taxpayer: uuid });
         await secure.set(StorageKeys.taxpayer, uuid);
         setState({ status: 'ready', me, taxpayers, taxpayer });
+        setReportUser(me.user?.uuid ?? null);
         void registerPushDevice();
         return;
       } catch (e) {
@@ -61,6 +68,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setState({ status: 'selectTaxpayer', me, taxpayers, taxpayer: null });
   }, []);
+
+  // Launch check of a stored session: only a refused session (401) signs out;
+  // without a connection the session is kept and the app offers a retry.
+  const check = useCallback(async () => {
+    try {
+      await resolve(null);
+    } catch (e) {
+      if (launchFailure(e) === 'signedOut') {
+        await session.clear();
+        setState({ ...initial, status: 'signedOut' });
+        return;
+      }
+      if (mounted.current) setState({ ...initial, status: 'offline' });
+    }
+  }, [resolve]);
+
+  const retry = useCallback(async () => {
+    setState({ ...initial, status: 'booting' });
+    await check();
+  }, [check]);
 
   useEffect(() => {
     mounted.current = true;
@@ -73,19 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState({ ...initial, status: 'signedOut' });
         return;
       }
-      try {
-        await resolve(null);
-      } catch (e) {
-        // Offline at launch: keep the session, the user can retry by signing in again.
-        if (isApiError(e) && e.status === 401) await session.clear();
-        setState({ ...initial, status: 'signedOut' });
-      }
+      await check();
     })();
     return () => {
       mounted.current = false;
       off();
     };
-  }, [resolve]);
+  }, [check]);
 
   const signIn = useCallback<AuthApi['signIn']>(
     async (input) => {
@@ -112,12 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await secure.remove(StorageKeys.taxpayer);
     await session.clear();
+    setReportUser(null);
     setState({ ...initial, status: 'signedOut' });
   }, []);
 
   const value = useMemo<AuthApi>(
-    () => ({ ...state, signIn, selectTaxpayer, switchTaxpayer, reload, signOut }),
-    [state, signIn, selectTaxpayer, switchTaxpayer, reload, signOut],
+    () => ({ ...state, signIn, selectTaxpayer, switchTaxpayer, reload, retry, signOut }),
+    [state, signIn, selectTaxpayer, switchTaxpayer, reload, retry, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

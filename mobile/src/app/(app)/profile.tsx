@@ -1,0 +1,92 @@
+import { useState } from 'react';
+import { Linking, View } from 'react-native';
+
+import { Button, Card, Field, Notice, Screen, Text } from '@/components/ui';
+import { api } from '@/core/api/client';
+import { errorMessage } from '@/core/api/envelope';
+import { useAuth } from '@/core/auth/auth-provider';
+import { env } from '@/core/config/env';
+
+/**
+ * Profil ve hesap (#202): gizlilik ve destek bağlantıları (yapılandırmadan),
+ * çıkış ve uygulama içinden hesap silme (App Store 5.1.1(v)).
+ *
+ * Silme: /v1/auth/account/deactivate/request e-postaya kod gönderir, kod
+ * /v1/auth/account/deactivate ile onaylanır. Hesap kapanır, oturumlar düşer;
+ * muhasebe kayıtları müşavirde kalır (yasal saklama).
+ */
+export default function ProfileScreen() {
+  const { me, signOut } = useAuth();
+  const [step, setStep] = useState<'idle' | 'code'>('idle');
+  const [code, setCode] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(fn: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const requestCode = () =>
+    run(async () => {
+      await api.post('/v1/auth/account/deactivate/request', {});
+      setStep('code');
+    });
+
+  const confirmDelete = () =>
+    run(async () => {
+      await api.post('/v1/auth/account/deactivate', { code: code.trim() });
+      await signOut();
+    });
+
+  const open = (url: string) => {
+    Linking.openURL(url).catch(() => setError('Bağlantı açılamadı.'));
+  };
+
+  return (
+    <Screen style={{ maxWidth: 640, width: '100%', alignSelf: 'center' }}>
+      <Card>
+        <Text variant="heading">
+          {me?.user.name} {me?.user.surname}
+        </Text>
+        <Text tone="muted">{me?.user.email}</Text>
+      </Card>
+
+      {env.privacyUrl || env.supportUrl ? (
+        <Card>
+          {env.privacyUrl ? <Button title="Gizlilik ve KVKK aydınlatma metni" variant="ghost" onPress={() => open(env.privacyUrl)} /> : null}
+          {env.supportUrl ? <Button title="Destek" variant="ghost" onPress={() => open(env.supportUrl)} /> : null}
+        </Card>
+      ) : null}
+
+      <Button title="Çıkış yap" variant="secondary" onPress={signOut} />
+
+      <Card>
+        <Text variant="heading">Hesabı sil</Text>
+        <Text tone="muted">
+          Hesabınız kapatılır ve bütün cihazlarda oturumunuz sonlanır. Müşavirinize gönderdiğiniz belgeler ve muhasebe kayıtları yasal
+          saklama süresi boyunca müşavirinizde kalır.
+        </Text>
+        {error ? <Notice>{error}</Notice> : null}
+        {step === 'idle' ? (
+          <Button title="Hesabımı sil" variant="secondary" onPress={requestCode} loading={busy} />
+        ) : (
+          <View style={{ gap: 12 }}>
+            <Text>E-posta adresinize gönderilen 6 haneli kodu girin.</Text>
+            <Field label="Onay kodu" value={code} onChangeText={setCode} keyboardType="number-pad" textContentType="oneTimeCode" maxLength={32} />
+            <Button title="Hesabı kalıcı olarak kapat" onPress={confirmDelete} loading={busy} disabled={code.trim().length < 4} />
+            <Button title="Vazgeç" variant="ghost" onPress={() => setStep('idle')} disabled={busy} />
+          </View>
+        )}
+      </Card>
+    </Screen>
+  );
+}
