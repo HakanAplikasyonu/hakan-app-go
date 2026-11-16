@@ -114,6 +114,23 @@ func TestLegalTextsInScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("own office acceptance: %v", err)
 	}
+	// Taxpayer scope (mükellef panel): a history share consent names the
+	// receiving office; allowed for its own taxpayer only (migration 000080).
+	history := func(scope rls.Scope, user, org, tp int64) error {
+		return rls.WithScope(ctx, f.d.Pool, scope, func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, `
+				INSERT INTO legal_acceptances (document_id, user_id, organization_id, taxpayer_id, context, content_sha256)
+				VALUES ($1, $2, $3, $4, 'history_share', repeat('a', 64))`, pub, user, org, tp)
+			return err
+		})
+	}
+	tpScope := rls.Scope{UserID: f.ownerA, TaxpayerIDs: []int64{f.tpA}}
+	if err := history(tpScope, f.ownerA, f.orgB, f.tpA); err != nil {
+		t.Errorf("taxpayer A's history consent naming office B: %v", err)
+	}
+	if err := history(tpScope, f.ownerA, f.orgB, f.tpB); !isRLSError(err) {
+		t.Errorf("history consent for another taxpayer: %v, want a row level security violation", err)
+	}
 	for name, args := range map[string][]any{
 		"another office": {pub, f.ownerA, f.orgB},
 		"another user":   {pub, f.ownerB, f.orgA},

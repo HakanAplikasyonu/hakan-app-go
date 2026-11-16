@@ -48,10 +48,24 @@ func RequireTaxpayer(resolver taxpayerctx.Resolver) func(http.Handler) http.Hand
 				response.InternalErr(w, r, err, "")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(taxpayerctx.WithScope(r.Context(), scope)))
+			h := next
+			if ts := taxpayerScope; ts != nil {
+				// The rest of the request runs in one row level security
+				// transaction for this taxpayer and user (issue #166).
+				h = ts(next)
+			}
+			h.ServeHTTP(w, r.WithContext(taxpayerctx.WithScope(r.Context(), scope)))
 		})
 	}
 }
+
+// taxpayerScope wraps everything after RequireTaxpayer (issue #166):
+// rls.Middleware, set by the server. Nil leaves taxpayer routes unscoped.
+var taxpayerScope func(http.Handler) http.Handler
+
+// SetTaxpayerScope sets the per-request row level security scope for
+// taxpayer (mükellef panel) routes. Call once at startup.
+func SetTaxpayerScope(mw func(http.Handler) http.Handler) { taxpayerScope = mw }
 
 func writeNoTaxpayerMembership(w http.ResponseWriter, r *http.Request, err error) {
 	response.RecordFailure(w, err)

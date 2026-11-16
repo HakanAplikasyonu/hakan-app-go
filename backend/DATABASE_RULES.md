@@ -160,6 +160,15 @@ engagement's taxpayer (`rls.Narrow`). Writes are buffered and roll back on
 4xx/5xx; GET/HEAD stream. Inside the scope every RLS table, enforced or in
 transition, is filtered by the scope policies.
 
+**Taxpayer (mükellef panel) requests** run in a scope too: `RequireTaxpayer`
+opens it for the user and the member taxpayer, with no office. Office tables
+the panel reads (engagements, upload jobs, receipt captures, document tasks
+and uploads, onboarding requests) carry `rls_taxpayer_party` (migration
+000080): rows of the scope's own taxpayer, only when the scope has no
+office, so office scopes are unchanged. A new office table the panel reads
+needs `SELECT rls_apply_taxpayer_party('my_table');` and an entry in
+`taxpayerParty` (`rls_templates_db_test.go`).
+
 **Workers.** A job working for one office puts its own transactions under
 `rls.Job(orgID, taxpayerID...)` with `rls.Apply(ctx, tx, scope)` (worker
 role), skipped when `rls.InScope(ctx)` (already in a request scope). Jobs
