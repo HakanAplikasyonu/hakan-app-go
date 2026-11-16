@@ -64,10 +64,15 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
       {cell.locked ? <Lock className="size-3" aria-hidden /> : null}
       {t(`office.command.status_${status}`)}
       {cell.open_blockers || cell.open_change_requests ? (
-        <span
-          className="bg-status-blocking ring-card absolute -top-1 -right-1 size-2.5 rounded-full ring-2"
-          aria-label={parts.slice(1).join(", ")}
-        />
+        <>
+          {/* #310: aria-label on a role-less span is not read (axe
+              aria-prohibited-attr); the dot is decorative, the text is sr-only. */}
+          <span
+            className="bg-status-blocking ring-card absolute -top-1 -right-1 size-2.5 rounded-full ring-2"
+            aria-hidden
+          />
+          <span className="sr-only">{parts.slice(1).join(", ")}</span>
+        </>
       ) : null}
     </div>
   );

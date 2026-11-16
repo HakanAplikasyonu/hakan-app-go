@@ -133,6 +133,9 @@ export const routes = {
     /** One engagement; opens on its documents. */
     engagement: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}`,
+    /** Mizan hafızası: account plan, rule candidates, rules (#310). */
+    accountPlan: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/account-plan`,
     /** Desktop agents of the office (#285). */
     agents: (slug: string) => `/t/${encodeURIComponent(slug)}/agents`,
     /** Documents + history consents of one engagement (issue #8). */

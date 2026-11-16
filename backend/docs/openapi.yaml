@@ -15942,6 +15942,12 @@ components:
         status: { type: string }
         rationale: { type: string }
         rule_ref: { type: string }
+        open_new:
+          type: boolean
+          description: Counterparty (cari) suggestions only. true when the proposed code is not in the imported plan and must be opened in the accounting program (#310).
+        account_name:
+          type: string
+          description: Counterparty suggestions only. Plan account name (match) or the invoice's counterparty name (new account).
 
     EnvelopeAccountRule:
       type: object
