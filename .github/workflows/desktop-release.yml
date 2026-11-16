@@ -189,7 +189,7 @@ jobs:
           echo "$out" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "$out" | jq -e '.ok == true' >/dev/null
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: hakan-desktop-${{ matrix.target }}
           path: |
@@ -214,7 +214,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: desktop/.nvmrc
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v8
         with:
           pattern: hakan-desktop-*
           path: ${{ runner.temp }}/bundles
@@ -234,7 +234,7 @@ jobs:
             --channel "$CHANNEL" --tag "$TAG" --base-url "${BASE_URL:-}" \
             --notes "HAKAN masaüstü $VERSION" --out "$RUNNER_TEMP/latest.json"
           { echo '```json'; cat "$RUNNER_TEMP/latest.json"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: hakan-desktop-updater-${{ needs.build.outputs.channel }}
           path: ${{ runner.temp }}/latest.json

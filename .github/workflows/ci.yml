@@ -377,7 +377,7 @@ jobs:
           for f in e2e/.run/server.log e2e/.run/frontend.log; do
             echo "::group::$f"; tail -200 "$f" || true; echo "::endgroup::"
           done
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-report
