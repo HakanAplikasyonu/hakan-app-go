@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { historyStatusLabel, serverOnly } from './history.ts';
+import { historyStatusLabel, receiptsSummaryLine, serverOnly } from './history.ts';
 import { markUploaded, newItem, type ReceiptResult } from './queue.ts';
 
 const result = (uuid: string): ReceiptResult => ({ uuid, status: 'draft', kind: 'fuel_receipt', fields: {}, duplicate_of: null, error: null });
@@ -20,4 +20,13 @@ test('server history shows receipts that are not on this phone, newest first', (
 test('history status labels', () => {
   assert.equal(historyStatusLabel('approved'), 'Onaylandı');
   assert.equal(historyStatusLabel('something_new'), 'something_new');
+});
+
+test('home summary counts receipts sent from elsewhere (#283)', () => {
+  const none = { waiting: 0, blocked: 0, failed: 0, uploaded: 0 };
+  assert.equal(receiptsSummaryLine(none, 0), 'Henüz fiş çekmediniz');
+  assert.equal(receiptsSummaryLine(none, 3), '3 gönderildi');
+  assert.equal(receiptsSummaryLine({ ...none, uploaded: 1 }, 2), '3 gönderildi');
+  assert.equal(receiptsSummaryLine({ waiting: 1, blocked: 1, failed: 0, uploaded: 0 }, 0), '2 bekliyor');
+  assert.equal(receiptsSummaryLine({ waiting: 1, blocked: 0, failed: 1, uploaded: 2 }, 1), '3 gönderildi · 1 bekliyor · 1 hatalı');
 });
