@@ -200,10 +200,28 @@ type Assignment struct {
 	RuleID      int64
 	RuleRef     string
 	Matched     []string
+	// Tier of the rule that answered (Rule.Tier).
+	Tier int
 }
 
-// Pick returns the best matching rule of role: lowest priority first, then
-// the most specific, then engagement rules before platform defaults.
+// Tier orders the rule levels (docs: "mükellef > şablon > varsayılan",
+// #319): the engagement's own rules (written or promoted for this taxpayer)
+// always win over the office template copied into the engagement, which
+// wins over the platform defaults. Priority only orders rules of one tier.
+func (r Rule) Tier() int {
+	switch {
+	case r.ID == 0:
+		return 2
+	case r.Origin == OriginTemplate:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// Pick returns the best matching rule of role: the engagement's own rules
+// before the office template before platform defaults (Tier), then lowest
+// priority, then the most specific.
 func Pick(rules []Rule, role Role, x Context) (Assignment, bool) {
 	type cand struct {
 		r   Rule
@@ -223,13 +241,16 @@ func Pick(rules []Rule, role Role, x Context) (Assignment, bool) {
 	}
 	sort.SliceStable(cs, func(i, j int) bool {
 		a, b := cs[i].r, cs[j].r
+		if at, bt := a.Tier(), b.Tier(); at != bt {
+			return at < bt
+		}
 		if a.Priority != b.Priority {
 			return a.Priority < b.Priority
 		}
 		if ac, bc := a.Conditions.Count(), b.Conditions.Count(); ac != bc {
 			return ac > bc
 		}
-		return (a.ID != 0) && (b.ID == 0)
+		return false
 	})
 	best := cs[0]
 	label := best.r.Name
@@ -242,7 +263,7 @@ func Pick(rules []Rule, role Role, x Context) (Assignment, bool) {
 	}
 	return Assignment{
 		Role: role, AccountCode: best.r.AccountCode, Confidence: best.r.Confidence,
-		RuleID: best.r.ID, RuleRef: best.r.Ref, Matched: best.why,
+		RuleID: best.r.ID, RuleRef: best.r.Ref, Matched: best.why, Tier: best.r.Tier(),
 		Rationale: fmt.Sprintf("Kural %q (%s) → %s; koşullar: %s", label, best.r.Ref, best.r.AccountCode, why),
 	}, true
 }

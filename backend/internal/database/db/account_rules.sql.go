@@ -79,6 +79,26 @@ func (q *Queries) AccountRuleCandidates(ctx context.Context, arg AccountRuleCand
 	return items, nil
 }
 
+const activeAccountPlanTarget = `-- name: ActiveAccountPlanTarget :one
+SELECT COALESCE((SELECT target FROM account_plan_imports
+                 WHERE organization_id = $1 AND engagement_id = $2
+                 ORDER BY id DESC LIMIT 1), 'luca')::text AS target
+`
+
+type ActiveAccountPlanTargetParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+}
+
+// Mükellefin hedef muhasebe programı (#319): en son içe aktarılan planın
+// hedefi; plan yoksa 'luca'.
+func (q *Queries) ActiveAccountPlanTarget(ctx context.Context, arg ActiveAccountPlanTargetParams) (string, error) {
+	row := q.db.QueryRow(ctx, activeAccountPlanTarget, arg.OrganizationID, arg.EngagementID)
+	var target string
+	err := row.Scan(&target)
+	return target, err
+}
+
 const copyOfficeAccountRules = `-- name: CopyOfficeAccountRules :one
 SELECT copy_office_account_rules($1::bigint, $2::bigint)::int AS copied
 `
@@ -186,6 +206,48 @@ func (q *Queries) DeleteAccountAssignment(ctx context.Context, arg DeleteAccount
 	return result.RowsAffected(), nil
 }
 
+const deleteCounterpartyAccountBySuggestion = `-- name: DeleteCounterpartyAccountBySuggestion :execrows
+DELETE FROM counterparty_accounts
+WHERE organization_id = $1 AND engagement_id = $2 AND suggestion_id = $3
+`
+
+type DeleteCounterpartyAccountBySuggestionParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	SuggestionID   pgtype.Int8 `json:"suggestion_id"`
+}
+
+// Kararı geri alınan eşleme unutulur.
+func (q *Queries) DeleteCounterpartyAccountBySuggestion(ctx context.Context, arg DeleteCounterpartyAccountBySuggestionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteCounterpartyAccountBySuggestion, arg.OrganizationID, arg.EngagementID, arg.SuggestionID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const engagementHasAccountMemory = `-- name: EngagementHasAccountMemory :one
+SELECT (EXISTS (SELECT 1 FROM account_plan_imports p
+                WHERE p.organization_id = $1 AND p.engagement_id = $2)
+     OR EXISTS (SELECT 1 FROM account_rules r
+                WHERE r.organization_id = $1 AND r.engagement_id = $2
+                  AND r.status = 'active'))::boolean AS has_memory
+`
+
+type EngagementHasAccountMemoryParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+}
+
+// Yükleme sonrası otomatik öneri (#319) yalnızca hesap planı ya da etkin
+// kuralı olan mükellefte çalışır.
+func (q *Queries) EngagementHasAccountMemory(ctx context.Context, arg EngagementHasAccountMemoryParams) (bool, error) {
+	row := q.db.QueryRow(ctx, engagementHasAccountMemory, arg.OrganizationID, arg.EngagementID)
+	var has_memory bool
+	err := row.Scan(&has_memory)
+	return has_memory, err
+}
+
 const getAccountRuleByID = `-- name: GetAccountRuleByID :one
 SELECT id, uuid, organization_id, engagement_id, rule_key, version, status, role, priority, name, conditions, account_code, confidence, origin, copied_from, created_by, created_at, retired_at FROM account_rules WHERE organization_id = $1 AND id = $2
 `
@@ -258,6 +320,37 @@ func (q *Queries) GetActiveAccountRuleForUpdate(ctx context.Context, arg GetActi
 		&i.CreatedAt,
 		&i.RetiredAt,
 	)
+	return i, err
+}
+
+const getCounterpartyAccount = `-- name: GetCounterpartyAccount :one
+SELECT account_code, account_name FROM counterparty_accounts
+WHERE organization_id = $1 AND engagement_id = $2
+  AND counterparty_tax_id = $3 AND main_code = $4
+`
+
+type GetCounterpartyAccountParams struct {
+	OrganizationID    int64  `json:"organization_id"`
+	EngagementID      int64  `json:"engagement_id"`
+	CounterpartyTaxID string `json:"counterparty_tax_id"`
+	MainCode          string `json:"main_code"`
+}
+
+type GetCounterpartyAccountRow struct {
+	AccountCode string `json:"account_code"`
+	AccountName string `json:"account_name"`
+}
+
+// Cari hafızası (#319): karşı tarafın VKN'si ile hatırlanan cari hesap.
+func (q *Queries) GetCounterpartyAccount(ctx context.Context, arg GetCounterpartyAccountParams) (GetCounterpartyAccountRow, error) {
+	row := q.db.QueryRow(ctx, getCounterpartyAccount,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.CounterpartyTaxID,
+		arg.MainCode,
+	)
+	var i GetCounterpartyAccountRow
+	err := row.Scan(&i.AccountCode, &i.AccountName)
 	return i, err
 }
 
@@ -644,4 +737,41 @@ func (q *Queries) UpsertAccountAssignment(ctx context.Context, arg UpsertAccount
 	var previous_code string
 	err := row.Scan(&previous_code)
 	return previous_code, err
+}
+
+const upsertCounterpartyAccount = `-- name: UpsertCounterpartyAccount :exec
+INSERT INTO counterparty_accounts (organization_id, engagement_id, taxpayer_id, counterparty_tax_id, main_code,
+                                   account_code, account_name, suggestion_id, decided_by)
+VALUES ($1, $2, $3, $4, $5,
+        $6, $7, $8, $9)
+ON CONFLICT (engagement_id, counterparty_tax_id, main_code)
+DO UPDATE SET account_code = EXCLUDED.account_code, account_name = EXCLUDED.account_name,
+              suggestion_id = EXCLUDED.suggestion_id, decided_by = EXCLUDED.decided_by
+`
+
+type UpsertCounterpartyAccountParams struct {
+	OrganizationID    int64       `json:"organization_id"`
+	EngagementID      int64       `json:"engagement_id"`
+	TaxpayerID        int64       `json:"taxpayer_id"`
+	CounterpartyTaxID string      `json:"counterparty_tax_id"`
+	MainCode          string      `json:"main_code"`
+	AccountCode       string      `json:"account_code"`
+	AccountName       string      `json:"account_name"`
+	SuggestionID      pgtype.Int8 `json:"suggestion_id"`
+	DecidedBy         pgtype.Int8 `json:"decided_by"`
+}
+
+func (q *Queries) UpsertCounterpartyAccount(ctx context.Context, arg UpsertCounterpartyAccountParams) error {
+	_, err := q.db.Exec(ctx, upsertCounterpartyAccount,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.CounterpartyTaxID,
+		arg.MainCode,
+		arg.AccountCode,
+		arg.AccountName,
+		arg.SuggestionID,
+		arg.DecidedBy,
+	)
+	return err
 }

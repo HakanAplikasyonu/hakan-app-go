@@ -3,6 +3,10 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
@@ -76,10 +80,15 @@ func TestGateBlocksMissingCodePerSetting(t *testing.T) {
 	}
 	setOffice(t, d, org, "NULL", "true")
 
-	// Group account is reported but does not block; fixing the code resolves.
+	// A group account (has sub-accounts) blocks too (#319): Luca does not
+	// take postings on it. Fixing the code resolves the warning.
 	v, err = gate.Evaluate(ctx, subj, ent, "luca", []string{"120", "600.01"})
-	if err != nil || v.Blocked || len(v.NonLeaf) != 1 {
+	if err != nil || !v.Blocked || len(v.NonLeaf) != 1 {
 		t.Fatalf("non-leaf: %+v %v", v, err)
+	}
+	v, err = gate.Evaluate(ctx, subj, ent, "luca", []string{"120.01", "600.01"})
+	if err != nil || v.Blocked {
+		t.Fatalf("fixed: %+v %v", v, err)
 	}
 	var autoResolved int
 	if err := d.Pool.QueryRow(ctx, `SELECT COUNT(*) FROM data_warnings WHERE engagement_id = $1 AND status = 'auto_resolved'`, eng).Scan(&autoResolved); err != nil || autoResolved == 0 {
@@ -134,3 +143,57 @@ func openWarnings(t *testing.T, d *testdb.DB, eng int64) int {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// TestExportGateNormalizesAndRejectsGroupAccounts is the #319 export check:
+// "120 01" is the plan's "120.01" (the line is rewritten to it), a group
+// account and a missing code block per line, and a warning lowered to
+// "warning" or an export setting that does not block only warns.
+func TestExportGateNormalizesAndRejectsGroupAccounts(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	org := d.Organization(t)
+	tp := d.Taxpayer(t, "legal", "1234567892")
+	eng := d.Engagement(t, org, tp)
+	q := db.New(d.Pool)
+	svc := usecase.New(New(d.Pool, q))
+	cfg := warningsrepo.NewConfig(q)
+	check := usecase.NewGate(svc, engine.New(warningsrepo.NewWarnings(q), cfg), cfg).ExportGate()
+	scope := engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
+	date := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+	entries := func() []accountingexport.Entry {
+		return []accountingexport.Entry{{No: "1", Date: date, Lines: []accountingexport.Line{
+			{Account: "120 01"}, {Account: "120"}, {Account: "770.01"}, {Account: "600.01"},
+		}}}
+	}
+
+	// No plan: nothing checked.
+	if is, err := check(ctx, scope, "luca", entries(), true); err != nil || len(is) != 0 {
+		t.Fatalf("no plan: %v %v", is, err)
+	}
+	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", []byte(planCSV)); err != nil {
+		t.Fatal(err)
+	}
+	es := entries()
+	is, err := check(ctx, scope, "luca", es, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(is) != 2 || is[0].Line != 2 || is[0].Params["reason"] != "group_account" || is[1].Line != 3 ||
+		is[0].Severity != accountingexport.SeverityBlocker || is[1].Severity != accountingexport.SeverityBlocker {
+		t.Fatalf("issues = %+v", is)
+	}
+	if es[0].Lines[0].Account != "120.01" {
+		t.Fatalf("normalized line = %q, want 120.01", es[0].Lines[0].Account)
+	}
+	if n := openWarnings(t, d, eng); n != 1 {
+		t.Fatalf("open warnings = %d", n)
+	}
+	// Export setting off: the same lines only warn.
+	if is, _ := check(ctx, scope, "luca", entries(), false); len(is) != 2 || is[0].Severity != accountingexport.SeverityWarning {
+		t.Fatalf("non-blocking setting: %+v", is)
+	}
+	// Another target program with no plan: nothing checked.
+	if is, _ := check(ctx, scope, "zirve", entries(), true); len(is) != 0 {
+		t.Fatalf("zirve without a plan: %+v", is)
+	}
+}

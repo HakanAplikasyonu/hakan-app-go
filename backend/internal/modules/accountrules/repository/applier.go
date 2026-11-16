@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
@@ -80,6 +81,9 @@ func (Applier) Apply(ctx context.Context, tx reviewusecase.Tx, sug reviewusecase
 	if err := syncDraftLines(ctx, q, sug, tt, tid, field, v.AccountCode); err != nil {
 		return nil, err
 	}
+	if err := rememberCounterparty(ctx, q, sug, tt, field, v.AccountCode, value); err != nil {
+		return nil, err
+	}
 	if prev == "" {
 		return json.RawMessage("null"), nil
 	}
@@ -96,6 +100,13 @@ func (Applier) Revert(ctx context.Context, tx reviewusecase.Tx, sug reviewusecas
 	if err != nil {
 		return err
 	}
+	if tt == usecase.TargetCustomer && field == usecase.FieldAccount && sug.ID > 0 {
+		if _, err := q.DeleteCounterpartyAccountBySuggestion(ctx, db.DeleteCounterpartyAccountBySuggestionParams{
+			OrganizationID: sug.OrganizationID, EngagementID: sug.EngagementID, SuggestionID: pgtype.Int8{Int64: sug.ID, Valid: true},
+		}); err != nil {
+			return fmt.Errorf("forget counterparty account: %w", err)
+		}
+	}
 	var v codeValue
 	if len(previous) == 0 || string(previous) == "null" || json.Unmarshal(previous, &v) != nil || v.AccountCode == "" {
 		_, err := q.DeleteAccountAssignment(ctx, db.DeleteAccountAssignmentParams{
@@ -111,6 +122,44 @@ func (Applier) Revert(ctx context.Context, tx reviewusecase.Tx, sug reviewusecas
 		return err
 	}
 	return syncDraftLines(ctx, q, sug, tt, tid, field, v.AccountCode)
+}
+
+var taxIDRe = regexp.MustCompile(`^[0-9]{10,11}$`)
+
+// rememberCounterparty stores the decided cari of a counterparty under its
+// VKN / TCKN (#319, counterparty_accounts): the next invoice of the same
+// counterparty finds its cari by tax id first, before the name match.
+func rememberCounterparty(ctx context.Context, q *db.Queries, sug reviewusecase.Suggestion, targetType, field, code string, value json.RawMessage) error {
+	if targetType != usecase.TargetCustomer || field != usecase.FieldAccount || len(code) < 3 {
+		return nil
+	}
+	in := sug.Input.Provenance.Inputs
+	taxID, _ := in["counterparty_tax_id"].(string)
+	if taxID == "" {
+		taxID, _ = in["counterparty_key"].(string)
+	}
+	if !taxIDRe.MatchString(taxID) {
+		return nil
+	}
+	var named struct {
+		AccountName string `json:"account_name"`
+	}
+	_ = json.Unmarshal(value, &named)
+	if named.AccountName == "" {
+		_ = json.Unmarshal(sug.Input.Value, &named)
+	}
+	if named.AccountName == "" {
+		named.AccountName, _ = in["counterparty_name"].(string)
+	}
+	err := q.UpsertCounterpartyAccount(ctx, db.UpsertCounterpartyAccountParams{
+		OrganizationID: sug.OrganizationID, EngagementID: sug.EngagementID, TaxpayerID: sug.TaxpayerID,
+		CounterpartyTaxID: taxID, MainCode: code[:3], AccountCode: code, AccountName: named.AccountName,
+		SuggestionID: pgtype.Int8{Int64: sug.ID, Valid: sug.ID > 0}, DecidedBy: optInt8(derefID(sug.DecidedBy)),
+	})
+	if err != nil {
+		return fmt.Errorf("remember counterparty account: %w", err)
+	}
+	return nil
 }
 
 // DraftLineSourceKind is the journal_draft_lines.source_kind of a line

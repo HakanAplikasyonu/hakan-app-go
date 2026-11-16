@@ -1,6 +1,13 @@
 "use client";
 
-import { BrainCircuit, FileUp, Loader2, Undo2, Wand2 } from "lucide-react";
+import {
+  BrainCircuit,
+  Download,
+  FileUp,
+  Loader2,
+  Undo2,
+  Wand2,
+} from "lucide-react";
 import { Suspense, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
@@ -20,6 +27,7 @@ import {
   useAccountMemoryActions,
   useAccountPlanImports,
   useEngagementRules,
+  useMissingPlanAccounts,
   useRuleCandidates,
 } from "../hooks/use-account-memory";
 import {
@@ -142,6 +150,75 @@ function PlanPanel({ engagement }: { engagement: string }) {
           </p>
         ) : null}
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * Luca'da açılacak hesaplar (#319): uygulanmış ama planda olmayan kodlar
+ * (çoğu "açılmalı" cari). Luca çıktısı bunlar açılıp mizan yeniden
+ * yüklenene kadar durur; şablon Luca'ya aktarılacak Excel'dir.
+ */
+function MissingPanel({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const missing = useMissingPlanAccounts(slug, engagement);
+  const { downloadTemplate } = useAccountMemoryActions(slug, engagement);
+  const items = missing.data?.items ?? [];
+  return (
+    <Panel
+      title={t("office.memory.missing_title")}
+      description={t("office.memory.missing_description")}
+    >
+      {missing.isLoading ? (
+        <Skeleton className="m-4 h-16" />
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground p-4 text-sm">
+          {t("office.memory.missing_empty")}
+        </p>
+      ) : (
+        <div className="space-y-3 p-4">
+          <TableBox>
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left">{t("office.memory.col_code")}</th>
+                  <th className="text-left">
+                    {t("office.memory.col_account_name")}
+                  </th>
+                  <th className="text-left">{t("office.memory.col_uses")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((a) => (
+                  <tr key={a.code}>
+                    <td className="font-mono">{a.code}</td>
+                    <td>{a.name || "—"}</td>
+                    <td className="tabular-nums">{a.uses}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableBox>
+          <Button
+            size="sm"
+            disabled={downloadTemplate.isPending}
+            onClick={() => downloadTemplate.mutate(items)}
+          >
+            {downloadTemplate.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Download className="size-4" />
+            )}
+            {t("office.memory.missing_download")}
+          </Button>
+          {downloadTemplate.error ? (
+            <p className="text-status-blocking text-sm">
+              {errorText(t, downloadTemplate.error)}
+            </p>
+          ) : null}
+        </div>
+      )}
     </Panel>
   );
 }
@@ -462,6 +539,7 @@ function AccountMemoryInner() {
         onSelect={select}
       />
       <PlanPanel engagement={engagement} />
+      <MissingPanel engagement={engagement} />
       <CandidatesPanel engagement={engagement} />
       <RulesPanel engagement={engagement} />
       <AutoCodedPanel engagement={engagement} />

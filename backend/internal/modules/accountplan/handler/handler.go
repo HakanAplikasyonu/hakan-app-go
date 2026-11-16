@@ -109,6 +109,21 @@ func (h *Handler) Check(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, res)
 }
 
+type missingResponse struct {
+	Items []usecase.MissingAccount `json:"items"`
+}
+
+// Missing: GET .../account-plan/missing?target= — applied codes the active
+// plan lacks (#319), for the missing-account template.
+func (h *Handler) Missing(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.Missing(r.Context(), subject(r), r.URL.Query().Get("target"))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, missingResponse{Items: items})
+}
+
 type templateRequest struct {
 	Accounts []usecase.TemplateAccount `json:"accounts"`
 }

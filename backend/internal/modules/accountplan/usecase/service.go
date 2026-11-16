@@ -96,6 +96,17 @@ type Store interface {
 	Find(ctx context.Context, s Subject, target string, codes []string) ([]Found, error)
 	// Codes returns every code of the active plan (nil when none loaded).
 	Codes(ctx context.Context, s Subject, target string) ([]string, error)
+	// MissingAssigned lists account codes applied to the engagement that the
+	// active plan of target does not have (#319).
+	MissingAssigned(ctx context.Context, s Subject, target string) ([]MissingAccount, error)
+}
+
+// MissingAccount is an applied account code to open in the target program.
+type MissingAccount struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+	// Uses: how many applied codes (lines, cari) point at it.
+	Uses int64 `json:"uses"`
 }
 
 // Service runs imports and checks.
@@ -234,6 +245,28 @@ func (s *Service) Check(ctx context.Context, sub Subject, tgt string, codes []st
 	sort.Strings(res.Missing)
 	sort.Strings(res.NonLeaf)
 	return res, nil
+}
+
+// Missing lists the account codes the office applied for the engagement
+// (accepted / auto-applied suggestions, e.g. a cari "açılmalı") that the
+// active plan does not have yet (#319). They block the export until they are
+// opened in the program and the plan is imported again; the list feeds the
+// missing-account template. With no plan loaded the list is empty.
+func (s *Service) Missing(ctx context.Context, sub Subject, tgt string) ([]MissingAccount, error) {
+	tgt, err := target(tgt)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := s.store.Active(ctx, sub, tgt); errors.Is(err, ErrNotFound) {
+		return []MissingAccount{}, nil
+	} else if err != nil {
+		return nil, err
+	}
+	out, err := s.store.MissingAssigned(ctx, sub, tgt)
+	if out == nil {
+		out = []MissingAccount{}
+	}
+	return out, err
 }
 
 // CodeSet returns the active plan of target as a set, nil when the

@@ -53,12 +53,19 @@ type ObjectStore interface {
 // Nil plan means none loaded.
 type PlanLoader func(ctx context.Context, scope engagementctx.Scope, driver string) (accountingexport.AccountPlan, error)
 
+// PlanGate checks the accounts of the entries going to driver against the
+// engagement's target plan (#30, #319) and returns ACCOUNT_NOT_IN_TARGET_PLAN
+// issues (blockers when block). It may rewrite a line's account to the
+// plan's normalized form. No plan loaded: no issues.
+type PlanGate func(ctx context.Context, scope engagementctx.Scope, driver string, entries []accountingexport.Entry, block bool) ([]accountingexport.Issue, error)
+
 // Service manages drafts and exports.
 type Service struct {
 	db    DB
 	q     *db.Queries
 	store ObjectStore
 	plan  PlanLoader
+	gate  PlanGate
 	now   func() time.Time
 }
 
@@ -72,6 +79,11 @@ func New(pool DB, store ObjectStore) *Service {
 
 // WithPlanLoader sets how the target account plan is found.
 func (s *Service) WithPlanLoader(fn PlanLoader) *Service { s.plan = fn; return s }
+
+// WithPlanGate sets the pre-export account check (#319). It replaces the
+// plan loader's exact-code check: codes are normalized, group accounts are
+// rejected and the result is recorded as a warning.
+func (s *Service) WithPlanGate(fn PlanGate) *Service { s.gate = fn; return s }
 
 // LineInput is one line of a new draft.
 type LineInput struct {
@@ -260,12 +272,19 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 	if err != nil {
 		return BatchView{}, err
 	}
-	if s.plan != nil {
+	var gateIssues []accountingexport.Issue
+	switch {
+	case s.gate != nil:
+		entries, _ := accountingexport.SelectEntries(batch)
+		if gateIssues, err = s.gate(ctx, scope, in.Driver, entries, batch.Settings.BlockOnUnknownAccount); err != nil {
+			return BatchView{}, err
+		}
+	case s.plan != nil:
 		if batch.TargetPlan, err = s.plan(ctx, scope, in.Driver); err != nil {
 			return BatchView{}, err
 		}
 	}
-	issues := drv.Validate(ctx, batch)
+	issues := append(gateIssues, drv.Validate(ctx, batch)...)
 	if accountingexport.HasBlocker(issues) {
 		return BatchView{}, &BlockedError{Issues: issues}
 	}
@@ -295,7 +314,7 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 		byUUID[r.Uuid.String()] = r.ID
 	}
 	info := drv.Info()
-	view := BatchView{Driver: info.Name, TemplateVersion: info.TemplateVer, TemplateVerified: info.Verified, Files: files, Issues: nonNilIssues(res.Issues), Entries: len(res.EntryIDs)}
+	view := BatchView{Driver: info.Name, TemplateVersion: info.TemplateVer, TemplateVerified: info.Verified, Files: files, Issues: nonNilIssues(append(gateIssues, res.Issues...)), Entries: len(res.EntryIDs)}
 	filesJSON, _ := json.Marshal(files)
 	issuesJSON, _ := json.Marshal(view.Issues)
 

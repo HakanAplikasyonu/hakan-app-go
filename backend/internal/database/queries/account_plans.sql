@@ -48,3 +48,22 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 -- Çıktı (journals, #26) için etkin planın bütün kodları.
 SELECT code FROM account_plan_accounts
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND target = @target;
+
+-- name: ListAssignedCodesMissingFromPlan :many
+-- "Açılmalı" hesaplar (#319): mükellefe uygulanmış ama etkin planda
+-- olmayan hesap kodları; ad, cari hafızasından ya da önerinin önerdiği
+-- addan. Eksik hesap şablonunu (Luca) besler.
+SELECT a.account_code::text AS code,
+       COALESCE(MAX(NULLIF(c.account_name, '')), MAX(s.proposed_value->>'account_name'), '')::text AS name,
+       COUNT(*)::bigint AS uses
+FROM account_assignments a
+LEFT JOIN counterparty_accounts c
+       ON c.organization_id = a.organization_id AND c.engagement_id = a.engagement_id AND c.account_code = a.account_code
+LEFT JOIN suggestions s ON s.organization_id = a.organization_id AND s.id = a.suggestion_id
+WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+  AND NOT EXISTS (SELECT 1 FROM account_plan_accounts p
+                  WHERE p.organization_id = a.organization_id AND p.engagement_id = a.engagement_id
+                    AND p.target = @target AND p.code = a.account_code)
+GROUP BY a.account_code
+ORDER BY a.account_code
+LIMIT 5000;

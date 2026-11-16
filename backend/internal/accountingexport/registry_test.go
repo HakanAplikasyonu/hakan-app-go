@@ -143,6 +143,12 @@ func TestSelectEntriesDoubleBooking(t *testing.T) {
 	if got, _ := SelectEntries(b); len(got) != 2 {
 		t.Fatal("accountant chose to include invoice entries")
 	}
+	// #319: lines booked per invoice item are invoice entries too.
+	item := entry("3", Line{Account: "153", Debit: d("10"), Source: SourceRef{Kind: "invoice_item", ID: "42"}}, cr("320", "10"))
+	b = Batch{Entries: []Entry{item, bank}, Settings: Settings{InvoicesReachLucaDirectly: true}}
+	if got, _ := SelectEntries(b); len(got) != 1 || got[0].No != "2" {
+		t.Fatalf("invoice_item entry must be excluded: %v", got)
+	}
 }
 
 // docs/02 §5 test 2: 120 fiş → 50 / 50 / 20.

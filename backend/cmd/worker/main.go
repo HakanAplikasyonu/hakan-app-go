@@ -17,6 +17,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
+	accountrulesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules"
+	accountrulesrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/repository"
+	accountrulesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/usecase"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
@@ -29,6 +32,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
+	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
+	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -215,11 +220,21 @@ func main() {
 	}
 	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{HTTP: egressHTTP}, log)
 
+	// Yükleme sonrası hesap kodu önerileri (#319): UBL işi bitince ayrı bir
+	// kuyruk işi; kurala uyan kalemler inceleme kuyruğuna düşmeden uygulanır.
+	reviewSvc := reviewusecase.New(reviewrepository.New(pool, queries)).
+		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{})
+	autoSuggest := accountrulesmodule.RunAutoSuggest(pool,
+		accountrulesusecase.New(accountrulesrepository.New(pool, queries), reviewSvc), log)
+	ublUpload := invoiceupload.New(pool, store, nil, log).
+		WithAfterProcess(accountrulesmodule.AfterUpload(queueClient, autoSuggest, log))
+
 	worker := queue.NewWorker(cfg, log, notifSvc.Deliver).
 		WithExport(exportSvc.ProcessExport).
 		WithImport(importSvc.ProcessImport).
 		WithBulk(bulkSvc.ProcessBulk).
-		WithUBLUpload(invoiceupload.New(pool, store, nil, log).Process).
+		WithUBLUpload(ublUpload.Process).
+		WithAccountSuggest(autoSuggest).
 		// The two sweeps scan every office: deliberate row level security
 		// bypass (issue #166).
 		WithDocTaskReminders(systemCount(pool, "doctasks: reminders across offices", doctasksmodule.New(pool, store, notifSvc,

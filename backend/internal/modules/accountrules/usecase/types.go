@@ -112,7 +112,15 @@ type Store interface {
 	CopyTemplate(ctx context.Context, org, eng int64) (int, error)
 	Invoice(ctx context.Context, taxpayerID int64, id uuid.UUID) (Invoice, error)
 	History(ctx context.Context, s Subject, field, direction, taxNumber, identityNumber string, excludeInvoiceID int64) ([]HistoryRow, error)
+	// PlanUnder lists the accounts under mainCode in the engagement's active
+	// plan of its target program (the latest imported plan's target, #319).
 	PlanUnder(ctx context.Context, s Subject, mainCode string) ([]engine.PlanAccount, error)
+	// CounterpartyAccount is the cari remembered for a counterparty VKN /
+	// TCKN under mainCode (#319); ok false when none.
+	CounterpartyAccount(ctx context.Context, s Subject, taxID, mainCode string) (code, name string, ok bool, err error)
 	Assigned(ctx context.Context, s Subject, targetType string, ids []int64) (map[int64]map[string]string, error)
 	Candidates(ctx context.Context, s Subject, minCount int64) ([]Candidate, error)
+	// HasMemory reports whether the engagement has an imported plan or an
+	// active rule (#319: automatic suggestions run only then).
+	HasMemory(ctx context.Context, s Subject) (bool, error)
 }

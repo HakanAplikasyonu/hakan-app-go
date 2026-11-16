@@ -64,6 +64,8 @@ fatura / banka / fiş ──► hesap kodu kuralları (T1) ──► JournalDraf
 Kurallar:
 - Fiş dengesi (Σ borç = Σ alacak) **sürücüye gelmeden** doğrulanır. Dengesiz fiş çıktıya giremez (blocker).
 - Hesap kodu, ofisin yüklediği **Luca hesap planında** yoksa uyarı `ACCOUNT_NOT_IN_TARGET_PLAN` üretilir. Böylece Luca'daki "hesap kodu bulunamadı" hatası çıktı öncesinde yakalanır.
+  - Denetim kodu önce normalize eder (`320 01 002` → `320.01.002`) ve satıra planın yazımını koyar; alt hesabı olan **ana hesap** da aynı uyarıyla reddedilir (`reason: group_account`), çünkü Luca ana hesaba fiş almaz (#319).
+  - Sonuç dönemin uyarısı olarak kaydedilir (`control:target_plan`); kod düzelince uyarı kendiliğinden kapanır. Engelleme için hem çıktı ayarı (`block_on_unknown_account`) hem uyarı kodunun ayarı (etkin, `blocker`) gerekir.
 - Her satır kaynak belgesini (ETTN vb.) taşır. Çift kayıt kontrolü buna dayanır (`00` E9).
 
 ## 3. Sürücü modeli

@@ -21,10 +21,12 @@ func (e Entry) Balanced() bool {
 	return d.Equal(c)
 }
 
-// IsInvoiceEntry reports whether any line comes from an invoice.
+// IsInvoiceEntry reports whether any line comes from an invoice: the
+// invoice itself or one of its items (journal lines booked per item carry
+// source kind "invoice_item", #239 / #319).
 func (e Entry) IsInvoiceEntry() bool {
 	for _, l := range e.Lines {
-		if l.Source.Kind == "invoice" {
+		if l.Source.Kind == "invoice" || l.Source.Kind == "invoice_item" {
 			return true
 		}
 	}

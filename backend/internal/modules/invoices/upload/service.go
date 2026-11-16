@@ -94,7 +94,15 @@ type Service struct {
 	log       *slog.Logger
 	ownTaxID  func(ctx context.Context, taxpayerID int64) (string, error)
 	guard     repository.PeriodGuard // nil: no period locks (tests)
+	after     AfterProcess           // nil: nothing runs after a job
 }
+
+// AfterProcess runs once a job has finished, with the invoices it added
+// (not duplicates, not held ones). #319: account code suggestions.
+type AfterProcess func(ctx context.Context, job db.UblUploadJob, added []uuid.UUID)
+
+// WithAfterProcess sets what runs after a job (#319).
+func (s *Service) WithAfterProcess(fn AfterProcess) *Service { s.after = fn; return s }
 
 // New builds the service. enq may be nil.
 func New(pool DB, store ObjectStore, enq Enqueuer, log *slog.Logger) *Service {
@@ -273,6 +281,17 @@ func (s *Service) Process(ctx context.Context, jobID int64) error {
 	raw, _ := json.Marshal(rep)
 	if err := s.q.FinishUBLUploadJob(ctx, db.FinishUBLUploadJobParams{ID: job.ID, Status: status, Report: raw, Error: msg}); err != nil {
 		return err
+	}
+	if s.after != nil {
+		var added []uuid.UUID
+		for _, it := range rep.Items {
+			if it.Status == ItemAdded && it.InvoiceUUID != uuid.Nil {
+				added = append(added, it.InvoiceUUID)
+			}
+		}
+		if len(added) > 0 {
+			s.after(ctx, job, added)
+		}
 	}
 	return perr
 }

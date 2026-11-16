@@ -89,3 +89,68 @@ func TestProposeCounterpartyIgnoresPunctuation(t *testing.T) {
 		t.Errorf("Deniz Ambalaj Sanayi matched %+v", p)
 	}
 }
+
+func TestPickEngagementRuleBeatsTemplate(t *testing.T) {
+	t.Parallel()
+	x := Context{Direction: "incoming", CounterpartyTaxID: "2981056178", ItemName: "Koli"}
+	rules := append([]Rule{
+		// Office template copied into the engagement, a low priority number.
+		{ID: 1, Role: RoleLine, Priority: 10, Origin: OriginTemplate, Conditions: Conditions{Direction: "incoming"}, AccountCode: "770"},
+		// Promoted from the accountant's decisions, default priority 100.
+		{ID: 2, Role: RoleLine, Priority: 100, Origin: OriginCandidate, Conditions: Conditions{CounterpartyTaxID: "2981056178"}, AccountCode: "150.01"},
+	}, Defaults...)
+	if a, _ := Pick(rules, RoleLine, x); a.AccountCode != "150.01" || a.RuleID != 2 {
+		t.Fatalf("engagement rule must win over the template: %+v", a)
+	}
+	// Without an engagement rule the template still beats the defaults.
+	if a, _ := Pick(append([]Rule{rules[0]}, Defaults...), RoleLine, x); a.AccountCode != "770" {
+		t.Fatalf("template over default: %+v", a)
+	}
+}
+
+func TestNameKeyAbbreviations(t *testing.T) {
+	t.Parallel()
+	same := [][2]string{
+		{"KORKMAZ GIDA SAN. VE TİC. A.Ş.", "Korkmaz Gıda Sanayi ve Ticaret Anonim Şirketi"},
+		{"DENİZ AMBALAJ LTD. ŞTİ.", "Deniz Ambalaj Limited Şirketi"},
+		{"Deniz Ambalaj Ltd.Şti.", "DENIZ AMBALAJ LTD STI"},
+		{"Yeni Lojistik Taşımacılık A.S.", "YENİ LOJİSTİK TAŞIMACILIK AŞ"},
+		{"Atlas İnş. Paz. Tic. Ltd. Şti.", "ATLAS İNŞAAT PAZARLAMA TİCARET LİMİTED ŞİRKETİ"},
+	}
+	for _, p := range same {
+		if NameKey(p[0]) != NameKey(p[1]) {
+			t.Errorf("%q / %q: %q != %q", p[0], p[1], NameKey(p[0]), NameKey(p[1]))
+		}
+	}
+	if NameKey("Deniz Ambalaj Ltd. Şti.") == NameKey("Deniz Kağıt Ltd. Şti.") {
+		t.Error("different words must not match")
+	}
+}
+
+func TestVATSubAccount(t *testing.T) {
+	t.Parallel()
+	plan := []PlanAccount{
+		{Code: "191", Name: "İNDİRİLECEK KDV"},
+		{Code: "191.01", Name: "İNDİRİLECEK KDV %20", IsLeaf: true},
+		{Code: "191.02", Name: "İndirilecek KDV % 10", IsLeaf: true},
+		{Code: "191.03", Name: "KDV 1%", IsLeaf: true},
+		{Code: "191.09", Name: "Diğer KDV", IsLeaf: true},
+	}
+	for rate, want := range map[int64]string{20: "191.01", 10: "191.02", 1: "191.03"} {
+		a, ok := VATSubAccount("191", decimal.NewFromInt(rate), plan)
+		if !ok || a.Code != want {
+			t.Errorf("rate %d: %+v %v", rate, a, ok)
+		}
+	}
+	if _, ok := VATSubAccount("191", decimal.NewFromInt(8), plan); ok {
+		t.Error("no sub-account for 8%: stay on the main account")
+	}
+	// Two leaves with the same rate: ambiguous, stay on the main account.
+	dup := append(plan, PlanAccount{Code: "191.04", Name: "KDV %20 (ithalat)", IsLeaf: true})
+	if _, ok := VATSubAccount("191", decimal.NewFromInt(20), dup); ok {
+		t.Error("ambiguous rate must not map")
+	}
+	if r, ok := RateInName("Hesaplanan KDV yüzde 10"); !ok || !r.Equal(decimal.NewFromInt(10)) {
+		t.Errorf("yüzde: %v %v", r, ok)
+	}
+}
