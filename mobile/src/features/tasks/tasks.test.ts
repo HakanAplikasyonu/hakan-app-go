@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { markFailed, markTaskUploaded, markUploaded, newItem, receiptItems, taskItems } from '../receipts/queue.ts';
-import { localTasks, mergeTasks, moneyText, serverTasks, taskStatusLabel, transactionLine, type ServerTask } from './tasks.ts';
+import { isBankTask, localTasks, mergeTasks, moneyText, serverTasks, taskStatusLabel, taskTitle, transactionLine, type ServerTask } from './tasks.ts';
 
 const item = (id: string) => newItem({ id, taxpayer: 't', kind: 'expense_receipt', fileUri: 'f', mimeType: 'image/jpeg', now: 1 });
 
@@ -29,6 +29,7 @@ const task = (uuid: string, over: Partial<ServerTask> = {}): ServerTask => ({
   kind: 'undocumented_payment',
   period: '2026-10',
   status: 'open',
+  title: '',
   note: '',
   due_at: '2026-11-20T21:00:00Z',
   overdue: false,
@@ -85,4 +86,29 @@ test('task photos are not local tasks or receipts, and are listed on their task'
   assert.equal(done.status, 'uploaded');
   assert.deepEqual(done.taskUpload, { uploadUuid: 'u1', matched: true });
   assert.equal(done.result, null);
+});
+
+test('office-opened request (#279): title from the request, no bank line', () => {
+  const req = task('r', {
+    code: 'DOC_REQUEST',
+    kind: 'document_request',
+    title: 'Ekim kira sözleşmesi',
+    note: 'İmzalı sayfası eksik',
+    bank_transaction: { ...task('r').bank_transaction, amount: '0', counterparty_name: null, description: 'Ekim kira sözleşmesi' },
+  });
+  assert.equal(isBankTask(req), false);
+  const [s] = serverTasks([req]);
+  assert.equal(s.title, 'Ekim kira sözleşmesi');
+  assert.equal(s.detail, 'İmzalı sayfası eksik');
+  const [sub] = serverTasks([{ ...req, status: 'submitted' }]);
+  assert.equal(sub.detail, 'Gönderildi, müşavir kontrol ediyor');
+});
+
+test('task titles: bank kinds by name, unknown kinds get a generic title', () => {
+  assert.equal(taskTitle({ kind: 'undocumented_payment', title: 'yok sayılır' }), 'Ödeme için belge');
+  assert.equal(taskTitle({ kind: 'uninvoiced_collection', title: '' }), 'Tahsilat için fatura');
+  assert.equal(taskTitle({ kind: 'document_request', title: '  ' }), 'Eksik belge');
+  assert.equal(taskTitle({ kind: 'something_new', title: '' }), 'Eksik belge');
+  assert.equal(taskTitle({ kind: 'something_new', title: 'Vekaletname' }), 'Vekaletname');
+  assert.equal(isBankTask({ kind: 'toString' }), false);
 });
