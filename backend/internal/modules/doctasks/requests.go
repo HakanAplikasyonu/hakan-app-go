@@ -257,7 +257,9 @@ func (s *Service) notifyOffice(ctx context.Context, organizationID, engagementID
 	if len(users) == 0 {
 		return
 	}
-	link := strings.TrimRight(s.cfg.FrontendURL, "/") + "/t/" + names.OrganizationSlug + "/engagements/" + engagementUUID
+	// The office panel's engagement page; `task` lets the müşavir mobil app
+	// open the task itself (issue #241, hakanofis links).
+	link := strings.TrimRight(s.cfg.FrontendURL, "/") + "/t/" + names.OrganizationSlug + "/engagements/" + engagementUUID + "?task=" + t.UUID.String()
 	for _, uid := range users {
 		s.enqueue(ctx, TemplateSubmitted, organizationID, uid, link, map[string]string{
 			"org_name": names.OrganizationName, "taxpayer_name": names.TaxpayerTitle, "title": taskTitle(t), "link": link,

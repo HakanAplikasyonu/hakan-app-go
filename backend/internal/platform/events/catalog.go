@@ -145,6 +145,7 @@ const (
 	DocTasksReminder       = "doc_tasks.reminder"
 	DocTasksRequested      = "doc_tasks.requested"
 	DocTasksSubmitted      = "doc_tasks.submitted"
+	WarningsBlocker        = "warnings.blocker"
 	AgentsOffline          = "agents.offline"
 	NotificationsTest      = "notifications.test"
 	NotificationsQueued    = "notifications.queued"
@@ -324,6 +325,7 @@ func catalogConstants() []string {
 		DocTasksReminder,
 		DocTasksRequested,
 		DocTasksSubmitted,
+		WarningsBlocker,
 		AgentsOffline,
 		NotificationsTest,
 		NotificationsQueued,

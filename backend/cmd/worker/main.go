@@ -28,6 +28,7 @@ import (
 	notifmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -223,6 +224,9 @@ func main() {
 		// bypass (issue #166).
 		WithDocTaskReminders(systemCount(pool, "doctasks: reminders across offices", doctasksmodule.New(pool, store, notifSvc,
 			doctasksmodule.Config{FrontendURL: cfg.Auth.FrontendURL}, log).SendRemindersCount)).
+		WithBlockerAlerts(systemCount(pool, "officedash: blocker alerts across offices", (&officedash.Alerts{
+			Q: database.NewQueries(pool), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
+		}).SendBlockerAlerts)).
 		WithAgentsOfflineSweep(systemCount(pool, "agents: offline sweep across offices",
 			agentsusecase.New(database.NewQueries(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount)).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
@@ -255,6 +259,10 @@ func main() {
 		}
 		if err := queue.RegisterDocTaskRemindersSchedule(scheduler); err != nil {
 			log.Error("doc_task_reminders_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterBlockerAlertsSchedule(scheduler); err != nil {
+			log.Error("blocker_alerts_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {

@@ -295,6 +295,7 @@ type Querier interface {
 	// Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
 	GetDocumentTaskUUID(ctx context.Context, arg GetDocumentTaskUUIDParams) (uuid.UUID, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
+	GetEngagementAlertNames(ctx context.Context, arg GetEngagementAlertNamesParams) (GetEngagementAlertNamesRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
 	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
@@ -472,6 +473,7 @@ type Querier interface {
 	InsertSuggestionDecision(ctx context.Context, arg InsertSuggestionDecisionParams) error
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
+	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
@@ -550,6 +552,8 @@ type Querier interface {
 	ListDueDocumentTaskReminders(ctx context.Context, arg ListDueDocumentTaskRemindersParams) ([]ListDueDocumentTaskRemindersRow, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
+	// Atanan ofis üyeleri (hâlâ üye olanlar); atanan yoksa ofis sahipleri.
+	ListEngagementAlertRecipients(ctx context.Context, arg ListEngagementAlertRecipientsParams) ([]int64, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
@@ -714,6 +718,9 @@ type Querier interface {
 	// tenant-lint: org-wide ofis inceleme kuyruğu; read_all yoksa engagement_assignments ile süzülür
 	ListTenantSuggestions(ctx context.Context, arg ListTenantSuggestionsParams) ([]ListTenantSuggestionsRow, error)
 	ListUBLUploadJobs(ctx context.Context, arg ListUBLUploadJobsParams) ([]UblUploadJob, error)
+	// Kritik uyarı bildirimi (issue #241). Zamanlanmış iş bütün ofisleri tarar.
+	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin bildirilmemiş açık engelleyicilerini tarar
+	ListUnalertedBlockerWarnings(ctx context.Context, arg ListUnalertedBlockerWarningsParams) ([]ListUnalertedBlockerWarningsRow, error)
 	ListUserLegalAcceptances(ctx context.Context, userID int64) ([]ListUserLegalAcceptancesRow, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
