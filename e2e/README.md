@@ -61,7 +61,25 @@ Banka hesabı ile ekstre yükleme (#144) ve dönem kilidi için ofis panelinde e
 
 Zorunluluk (#194):
 - Ortam kurulumu ve **erişilebilirlik adımı** (`--grep @a11y`) `ci` kapısını kırar.
-- Akış testleri (`--grep-invert @a11y`) henüz zorunlu değildir: düşerse iş uyarı yazar ve geçer.
+- **Görsel regresyon** (`--grep @visual`, #332) erişilebilirlikten hemen sonra, temiz demo verisinde koşar. Temel görüntüler CI'da doğrulanana kadar zorunlu değildir: fark varsa iş uyarı yazar ve geçer.
+- Akış testleri (`--grep-invert "@a11y|@docs|@visual"`) henüz zorunlu değildir: düşerse iş uyarı yazar ve geçer.
+
+## Görsel regresyon (#332)
+
+`tests/gorsel.spec.ts`, ana ekranları dört temada ve üç kırılımda çeker:
+- temalar: `m3-light`, `m3-dark`, `n3-light`, `n3-dark`;
+- kırılımlar: masaüstü 1440, tablet 1024, telefon 390.
+
+Görüntüler `tests/gorsel.spec.ts-snapshots/` altındaki temel görüntülerle karşılaştırılır. Piksel farkının en fazla %1 olmasına izin verilir.
+
+- **Yeni ekran eklemek:** `snap(page, yol, ad)` çağrısı ekleyin. Ekran tarih, saat ya da sayaç gibi oynak içerik gösteriyorsa o öğeye `data-visual-mask` verin; `time` öğeleri zaten maskelenir.
+- **Tasarım bilerek değiştiyse:** temiz ortamda (`make e2e-up`) temel görüntüleri yenileyin ve farkı PR'da gösterin:
+
+  ```bash
+  cd e2e && npx playwright test --grep @visual --update-snapshots
+  ```
+
+- **CI'da fark çıkarsa:** `e2e-report` artefaktındaki `test-results/` klasöründe her ekran için `-expected`, `-actual` ve `-diff` görüntüleri bulunur.
 
 `e2e-report` artefaktında şunlar bulunur:
 - HTML rapor,
