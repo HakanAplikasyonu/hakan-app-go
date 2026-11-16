@@ -25,6 +25,8 @@ export type ReviewListFilter = {
   engagement?: string;
   status?: ReviewSuggestionStatus | "all";
   kind?: string;
+  /** Global dönem seçici (#326): YYYY-MM; boş = bütün dönemler. */
+  period?: string;
   limit: number;
   offset: number;
 };
@@ -76,6 +78,7 @@ export const reviewService = {
       query: {
         status: filter.status,
         kind: filter.kind,
+        period: filter.period,
         limit: filter.limit,
         offset: filter.offset,
       },

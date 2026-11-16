@@ -3,7 +3,14 @@
 > Günlük iş akışı: dosya yükleme, faturalar, inceleme kuyruğu, uyarılar ve yevmiye.
 
 Ofis paneline girince **genel bakış** açılır. Ekranlar arasında kenar
-çubuğundan ya da **Ctrl+K** komut paletinden gezinin.
+menüden ya da **Ctrl+K** komut paletinden gezinin. Kenar menü geniş ekranda
+tam, tablette ikon rayı olarak görünür; telefonda alttaki sekmeler (Pano,
+Kuyruk, Mükellef, Uyarı, Daha) kullanılır.
+
+Üst çubuktaki **Dönem** seçicisi bütün listeleri (inceleme kuyruğu, faturalar,
+uyarılar, yevmiye) aynı döneme süzer. "Tüm dönemler" süzmez; genel bakış o
+durumda beyan dönemini (önceki ay) gösterir. Seçim bu tarayıcıda ofis başına
+saklanır.
 
 ![Komut paleti](../../frontend/public/yardim/img/ofis-komut-paleti.jpg)
 
@@ -41,23 +48,27 @@ kayıtlarını listeler. Satıra tıklayınca fatura görüntüsü, satırlar, v
 ## İnceleme
 
 **İnceleme kuyruğu**, güveni eşiğin altında kalan hesap kodu önerilerini en
-düşük güvenden başlayarak listeler. Her öneride kaynak satır, öneren (kural,
-model ya da belge) ve aynı karşı tarafla geçmiş kararlar görünür.
+düşük güvenden başlayarak listeler. Kuyruk ve karar ekranı tek sayfadadır:
+solda öneriler, sağda seçili önerinin kaynak satırı, "Neden bu kod?" (öneren
+ve güven) ve aynı karşı tarafla geçmiş kararlar. Telefonda öneriye dokununca
+ayrıntı açılır.
 
-**İnceleme stüdyosu** aynı kuyruğu klavyeyle hızlı karara bağlamak içindir:
-
-![İnceleme stüdyosu](../../frontend/public/yardim/img/ofis-inceleme-studyosu.jpg)
+![İnceleme kuyruğu](../../frontend/public/yardim/img/ofis-inceleme-kuyrugu.jpg)
 
 | Tuş | İşlem |
 |---|---|
-| J / K | sonraki / önceki öneri |
+| J / ↓ · ↑ | sonraki / önceki öneri |
 | A | önerilen kodu onayla |
+| E | kodu düzelt (hesap planında ara ya da kodu tam yazın, ör. 770.01.012) |
+| K | onayla ve bu karşı taraf için kural yap (hep bu koda işlenir) |
 | R | reddet |
-| E | kodu değiştir (hesap planında ara ya da kodu tam yazın, ör. 770.01.012) |
 | Z | son onayı ya da düzeltmeyi geri al |
 
-"Güveni en az %…" ile eşiğin üstündeki önerileri topluca onaylayabilirsiniz.
-Reddedilen öneri geri alınamaz.
+Kodu düzeltirken "Bu karşı taraf için kural yap" kutusunu işaretlerseniz
+düzeltilen kod kural olur. Üstteki şeritte "%… üstü N öneriyi toplu onayla"
+ile güveni seçtiğiniz değerin üstündeki önerileri topluca onaylayabilirsiniz.
+"Düşük güven" ve "Orta güven" düğmeleri kuyruğu süzer. Reddedilen öneri geri
+alınamaz.
 
 ## Uyarılar
 
@@ -67,7 +78,7 @@ sayılmaz.
 
 ![Uyarılar](../../frontend/public/yardim/img/ofis-uyarilar.jpg)
 
-- Mükellefe, koda ve döneme göre süzün.
+- Mükellefe ve koda göre süzün; dönem üst çubuktaki seçiciden gelir.
 - **Faturayı aç** ile ilgili kayda gidin, sorunu düzeltin.
 - Uyarıyı incelediyseniz **Gördüm**, sorunu giderdiyseniz **Çözüldü**
   ile işaretleyin. Düzelen kayıtlarda uyarı bir sonraki kontrolde

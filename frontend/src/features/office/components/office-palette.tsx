@@ -87,10 +87,10 @@ export function OfficePalette() {
         <CommandGroup heading={t("office.palette.actions")}>
           <CommandItem
             value="studio inceleme stüdyosu review"
-            onSelect={() => go(routes.tenant.reviewStudio(slug))}
+            onSelect={() => go(routes.tenant.review(slug))}
           >
             <Sparkles />
-            {t("office.studio.title")}
+            {t("office.review_title")}
             {pending.data !== undefined ? (
               <CommandShortcut>
                 {t("office.palette.pending", { count: pending.data })}

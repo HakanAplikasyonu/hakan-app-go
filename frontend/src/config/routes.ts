@@ -125,8 +125,6 @@ export const routes = {
     warnings: (slug: string) => `/t/${encodeURIComponent(slug)}/warnings`,
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
-    reviewStudio: (slug: string) =>
-      `/t/${encodeURIComponent(slug)}/review/studio`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */
     journals: (slug: string) => `/t/${encodeURIComponent(slug)}/journals`,

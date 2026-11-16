@@ -66,7 +66,6 @@ test.describe("@a11y ofis paneli", () => {
       "/taxpayer-requests",
       `/invoices?taxpayer=${atlas}`,
       "/review",
-      "/review/studio",
       "/warnings",
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,

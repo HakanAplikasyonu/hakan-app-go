@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { AppLayout } from "@/components/layout";
-import { shellNav } from "@/config/nav";
 import { OfficePalette } from "@/features/office/components/office-palette";
-import { OrganizationSwitcher } from "@/features/tenant/components/organization-switcher";
+import { OfficeShell } from "@/features/office/shell";
 import { TenantProvider } from "@/features/tenant/providers/tenant-provider";
 
-/** `/t/{slug}` shell: org gate + per-org permissions + tenant sidebar. */
+/**
+ * `/t/{slug}` shell: org gate + per-org permissions + the office shell
+ * (#326: kenar menü / ikon rayı / alt sekme, üst çubukta dönem seçici).
+ */
 export function TenantShell({
   slug,
   children,
@@ -16,16 +17,9 @@ export function TenantShell({
   slug: string;
   children: ReactNode;
 }) {
-  const nav = useMemo(() => shellNav({ variant: "tenant", slug }), [slug]);
   return (
     <TenantProvider slug={slug}>
-      <AppLayout
-        variant="tenant"
-        nav={nav}
-        sidebarHeader={<OrganizationSwitcher />}
-      >
-        {children}
-      </AppLayout>
+      <OfficeShell slug={slug}>{children}</OfficeShell>
       <OfficePalette />
     </TenantProvider>
   );

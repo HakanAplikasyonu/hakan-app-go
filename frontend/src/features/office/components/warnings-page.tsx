@@ -35,6 +35,7 @@ import {
   WarningStatusLabel,
 } from "./office-ui";
 import { ApiWarningActions } from "./warning-actions";
+import { useOfficePeriod } from "../period";
 
 const PAGE_SIZE = 25;
 const ALL = "all";
@@ -155,8 +156,11 @@ export function WarningsPage() {
   );
   const [status, setStatus] = useState<typeof ALL | ApiWarningStatus>("open");
   const [code, setCode] = useState(ALL);
-  const [period, setPeriod] = useState("");
-  const [offset, setOffset] = useState(0);
+  // Dönem üst çubuktaki global seçiciden (#326); dönem değişince ilk sayfa.
+  const { period } = useOfficePeriod();
+  const [page, setPage] = useState({ period, offset: 0 });
+  const offset = page.period === period ? page.offset : 0;
+  const setOffset = (next: number) => setPage({ period, offset: next });
 
   const query: WarningListQuery = {
     limit: PAGE_SIZE,
@@ -164,7 +168,7 @@ export function WarningsPage() {
     severity: severity === ALL ? undefined : severity,
     status: status === ALL ? undefined : status,
     code: code === ALL ? undefined : code,
-    period: /^\d{4}-(0[1-9]|1[0-2])$/.test(period) ? period : undefined,
+    period,
   };
   const list = useWarnings(
     slug,
@@ -247,27 +251,6 @@ export function WarningsPage() {
             ]}
           />
         ) : null}
-        <label className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">
-            {t("office.warnings_api.filter_period")}
-          </span>
-          <input
-            type="month"
-            className="bg-background h-8 rounded-md border px-2 text-sm"
-            value={period}
-            onChange={(e) => filter(setPeriod)(e.target.value)}
-          />
-        </label>
-        {period ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => filter(setPeriod)("")}
-          >
-            {t("office.warnings_api.clear_period")}
-          </Button>
-        ) : null}
       </div>
       <Panel>
         {list.isLoading ? (
@@ -323,7 +306,7 @@ export function WarningsPage() {
                 size="sm"
                 variant="outline"
                 disabled={offset === 0 || list.isFetching}
-                onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
+                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
               >
                 {t("office.warnings_api.prev")}
               </Button>
@@ -332,7 +315,7 @@ export function WarningsPage() {
                 size="sm"
                 variant="outline"
                 disabled={offset + PAGE_SIZE >= total || list.isFetching}
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
+                onClick={() => setOffset(offset + PAGE_SIZE)}
               >
                 {t("office.warnings_api.next")}
               </Button>

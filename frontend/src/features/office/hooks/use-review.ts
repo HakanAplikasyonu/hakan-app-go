@@ -23,12 +23,13 @@ import {
 /** Auto-accept threshold the server falls back to (`review.DefaultPolicy`). */
 const DEFAULT_THRESHOLD = 0.95;
 
-export function useReviewSuggestions(filter: ReviewListFilter) {
+export function useReviewSuggestions(filter: ReviewListFilter, enabled = true) {
   const { slug } = useTenant();
   return useQuery({
     queryKey: reviewKeys.list(slug, filter),
     queryFn: () => reviewService.list(slug, filter),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

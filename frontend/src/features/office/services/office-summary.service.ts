@@ -16,6 +16,14 @@ export const officeSummaryKeys = {
     ] as const,
   openBlockers: (slug: string) =>
     ["tenant", slug.toLowerCase(), "office-summary", "open-blockers"] as const,
+  reviewTotals: (slug: string, period: string) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "office-summary",
+      "review-totals",
+      period,
+    ] as const,
   vatForecast: (slug: string, period?: string) =>
     [
       "tenant",
@@ -42,6 +50,15 @@ export const officeSummaryService = {
       },
     );
     return page.total;
+  },
+  async reviewTotals(slug: string, period: string) {
+    const count = (status: "all" | "pending") =>
+      tenantRequest<Page>(slug, "GET", "/v1/tenant/review/suggestions", {
+        query: { status, period, limit: 1 },
+        silent: true,
+      }).then((p) => p.total);
+    const [all, pending] = await Promise.all([count("all"), count("pending")]);
+    return { all, pending };
   },
   async openBlockers(slug: string) {
     const page = await tenantRequest<Page>(slug, "GET", "/v1/tenant/warnings", {

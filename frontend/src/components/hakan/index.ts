@@ -1,5 +1,6 @@
 // HAKAN'a özgü ortak bileşenler (arayüz v1, #324). docs/tasarim/bilesenler.md
 export { BosDurum, BosKristal } from "./bos-durum";
+export { DonemTaci } from "./donem-taci";
 export { GuvenOlcegi, guvenKademesi } from "./guven-olcegi";
 export type { GuvenKademesi, GuvenKaynagi } from "./guven-olcegi";
 export { KristalYukleyici } from "./kristal-yukleyici";

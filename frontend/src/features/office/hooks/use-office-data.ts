@@ -12,6 +12,7 @@ import {
   officeSummaryKeys,
   officeSummaryService,
 } from "../services/office-summary.service";
+import { dashboardKeys, dashboardService } from "../services/dashboard.service";
 import { periodKeys, periodService } from "../services/periods.service";
 
 /** Period matrix for the office (all pages). */
@@ -76,5 +77,45 @@ export function useToggleAssignment(engagement: string) {
       qc.invalidateQueries({
         queryKey: engagementKeys.assignments(slug, engagement),
       }),
+  });
+}
+
+/**
+ * Ofis panosu sayaçları: kenar menüdeki sayaçlar ve genel bakış KPI'ları aynı
+ * sorguyu paylaşır. Dakikada bir tazelenir.
+ */
+export function useOfficeDashboard(enabled = true) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: dashboardKeys.office(slug),
+    queryFn: () => dashboardService.office(slug),
+    enabled,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+}
+
+/** Tek dönemin matrisi (genel bakışın dönem tacı, #326). */
+export function usePeriodMatrixAt(period: string) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: periodKeys.matrixAll(slug, { until: period, periods: 1 }),
+    queryFn: () => periodService.matrixAll(slug, { until: period, periods: 1 }),
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Dönemin öneri sayıları: toplam ve bekleyen (onay oranı = karara bağlanan /
+ * toplam). Liste uçlarından `total` okunur.
+ */
+export function useReviewPeriodTotals(period: string, enabled = true) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: officeSummaryKeys.reviewTotals(slug, period),
+    queryFn: () => officeSummaryService.reviewTotals(slug, period),
+    enabled,
+    staleTime: 60_000,
   });
 }
