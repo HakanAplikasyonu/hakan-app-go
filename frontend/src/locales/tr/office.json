@@ -629,5 +629,13 @@
   "warnings_card_info": "Bilgi · gerekirse bak",
   "warnings_empty_open": "Bu dönemde açık uyarı yok.",
   "warnings_empty_acknowledged": "Görüldü olarak işaretlenmiş uyarı yok.",
-  "warnings_empty_resolved": "Çözülmüş uyarı yok."
+  "warnings_empty_resolved": "Çözülmüş uyarı yok.",
+  "drawer.loading": "Fatura yükleniyor",
+  "drawer.preview": "Önizleme",
+  "drawer.preview_of": "{{number}} faturasını çekmecede aç",
+  "drawer.open_invoice": "Faturayı görüntüle",
+  "drawer.fix_request": "Mükelleften düzeltme iste",
+  "drawer.fix_request_title": "{{number}} numaralı faturanın düzeltilmiş hâli",
+  "drawer.fix_request_sent": "Düzeltme istendi",
+  "drawer.fix_request_error": "İstek gönderilemedi"
 }

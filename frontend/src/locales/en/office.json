@@ -629,5 +629,13 @@
   "warnings_card_info": "Info · look if needed",
   "warnings_empty_open": "No open warnings in this period.",
   "warnings_empty_acknowledged": "No warnings marked as seen.",
-  "warnings_empty_resolved": "No resolved warnings."
+  "warnings_empty_resolved": "No resolved warnings.",
+  "drawer.loading": "Loading invoice",
+  "drawer.preview": "Preview",
+  "drawer.preview_of": "Open invoice {{number}} in the drawer",
+  "drawer.open_invoice": "View invoice",
+  "drawer.fix_request": "Ask the taxpayer for a correction",
+  "drawer.fix_request_title": "Corrected version of invoice {{number}}",
+  "drawer.fix_request_sent": "Correction requested",
+  "drawer.fix_request_error": "The request could not be sent"
 }

@@ -57,3 +57,23 @@ export const engagementDocumentService = {
     );
   },
 };
+
+/** Ofisin elle açtığı belge isteği (`POST …/document-tasks`, #240). */
+export type DocumentRequestInput = {
+  title: string;
+  note?: string;
+  due_days?: number;
+};
+
+export function createDocumentRequest(
+  slug: string,
+  engagement: string,
+  body: DocumentRequestInput,
+) {
+  return tenantRequest<{ uuid: string }>(
+    slug,
+    "POST",
+    `/v1/tenant/engagements/${encodeURIComponent(engagement)}/document-tasks`,
+    { body, silent: true },
+  );
+}
