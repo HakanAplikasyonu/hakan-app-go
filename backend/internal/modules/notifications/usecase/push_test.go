@@ -66,6 +66,9 @@ func (m *pushTestQuerier) MarkNotificationProcessing(context.Context, int64) (db
 func (m *pushTestQuerier) ListStuckProcessingNotificationIDs(context.Context, int32) ([]int64, error) {
 	return nil, nil
 }
+func (m *pushTestQuerier) ListOrphanedQueuedNotificationIDs(context.Context, int32) ([]int64, error) {
+	return nil, nil
+}
 func (m *pushTestQuerier) MarkNotificationSent(context.Context, db.MarkNotificationSentParams) (db.Notification, error) {
 	return db.Notification{}, nil
 }

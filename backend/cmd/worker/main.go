@@ -315,6 +315,12 @@ func main() {
 	} else if n > 0 {
 		log.Info("notification_reclaim_completed", "count", n)
 	}
+	// Queued rows no task ever claimed, incl. those lost before #309.
+	if n, err := notifSvc.ReclaimQueued(ctx, queueClient, notifusecase.DefaultOrphanedQueuedMinutes); err != nil {
+		log.Error("notification_requeue_failed", "error", err)
+	} else if n > 0 {
+		log.Info("notification_requeue_completed", "count", n)
+	}
 
 	errCh := make(chan error, 1)
 	go func() {

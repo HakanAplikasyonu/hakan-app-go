@@ -448,6 +448,38 @@ func (q *Queries) ListNotificationsForUser(ctx context.Context, arg ListNotifica
 	return items, nil
 }
 
+const listOrphanedQueuedNotificationIDs = `-- name: ListOrphanedQueuedNotificationIDs :many
+SELECT id FROM notifications
+WHERE status = 'queued'
+  AND attempt_count = 0
+  AND (scheduled_at IS NULL OR scheduled_at <= NOW())
+  AND created_at < NOW() - make_interval(mins => $1::int)
+ORDER BY id
+LIMIT 500
+`
+
+// Queued rows whose deliver task never ran a claim: lost before #309
+// (Deliver returned nil on the commit race) or dropped from the queue.
+func (q *Queries) ListOrphanedQueuedNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listOrphanedQueuedNotificationIDs, staleMinutes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlatformNotifications = `-- name: ListPlatformNotifications :many
 SELECT id, uuid, user_id, channel, status, priority, title, body, payload, action_url, recipient, template_code, source_event, scheduled_at, sent_at, delivered_at, read_at, failed_at, cancelled_at, attempt_count, max_attempts, last_error, provider, provider_reference, created_at, updated_at, organization_id, sealed_content FROM notifications
 WHERE ($1::text IS NULL OR status = $1)
