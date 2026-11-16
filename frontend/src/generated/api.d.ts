@@ -915,6 +915,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/platform/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Billing plans (D9)
+         * @description Requires `platform.organizations.read`.
+         */
+        get: operations["listBillingPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/billing/plans/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create or update a plan
+         * @description Requires `platform.organizations.write`. Office base fee covering
+         *     `included_taxpayers`, a fee per active taxpayer above it, KDV rate.
+         *     Statements already final keep their plan snapshot.
+         */
+        put: operations["saveBillingPlan"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/organizations/{uuid}/billing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        /**
+         * An office's plan, mode, this month's usage and statements
+         * @description Requires `platform.organizations.read`.
+         */
+        get: operations["getOrganizationBilling"];
+        /**
+         * Set an office's plan and read-only mode
+         * @description Requires `platform.organizations.write`. `read_only: true` is the
+         *     AccessPolicy of G7: the office keeps reading, every write under
+         *     `/v1/tenant/*` answers `403 ORGANIZATION_READ_ONLY` with the reason.
+         */
+        put: operations["setOrganizationBilling"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/organizations/{uuid}/billing/statements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute the statement draft of a month
+         * @description Requires `platform.organizations.write`. Counts the month's active
+         *     taxpayers (an engagement of the office active on any day of the
+         *     month, Türkiye time, each taxpayer once) and prices them with the
+         *     office's plan. Recomputing replaces a draft; a final or void
+         *     statement answers `409 BILLING_STATEMENT_FINAL`. No collection (D14).
+         */
+        post: operations["generateBillingStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/organizations/{uuid}/billing/statements/{period}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finalize or void a draft
+         * @description Requires `platform.organizations.write`. `draft` → `final` | `void`.
+         */
+        post: operations["setBillingStatementStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/billing": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's plan, mode, this month so far and statements
+         * @description Requires `tenant.settings.read`. `estimate` prices the month so far.
+         */
+        get: operations["getTenantBilling"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/platform/organizations/{uuid}/access": {
         parameters: {
             query?: never;
@@ -6340,6 +6490,104 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BillingPlan: {
+            readonly code?: string;
+            name: string;
+            /** @default TRY */
+            currency: string;
+            /** @description Office base fee per month */
+            base_fee: string;
+            /** @description Per active taxpayer above included_taxpayers */
+            per_taxpayer_fee: string;
+            included_taxpayers: number;
+            /** @example 20 */
+            vat_rate: string;
+            active: boolean;
+        };
+        BillingAccount: {
+            plan: components["schemas"]["BillingPlan"];
+            read_only: boolean;
+            read_only_reason?: string;
+        };
+        BillingTaxpayer: {
+            /** Format: uuid */
+            uuid: string;
+            title: string;
+            tax_id: string;
+        };
+        BillingAmounts: {
+            active_taxpayers: number;
+            billable_taxpayers: number;
+            base_fee: string;
+            taxpayer_fee_total: string;
+            subtotal: string;
+            vat_rate: string;
+            vat_amount: string;
+            total: string;
+            lines: {
+                /** @enum {string} */
+                code: "base" | "taxpayer";
+                description: string;
+                quantity: number;
+                unit_price: string;
+                amount: string;
+            }[];
+        };
+        BillingStatement: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "final" | "void";
+            plan_code: string;
+            currency: string;
+            amounts: components["schemas"]["BillingAmounts"];
+            taxpayers: components["schemas"]["BillingTaxpayer"][];
+            /** Format: date-time */
+            generated_at: string;
+        };
+        BillingOverview: {
+            account: components["schemas"]["BillingAccount"];
+            current: {
+                period: string;
+                active_taxpayers: number;
+                taxpayers: components["schemas"]["BillingTaxpayer"][];
+            };
+            estimate: components["schemas"]["BillingAmounts"];
+            statements: components["schemas"]["BillingStatement"][];
+        };
+        EnvelopeBillingPlan: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BillingPlan"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBillingAccount: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BillingAccount"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBillingStatement: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BillingStatement"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBillingOverview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BillingOverview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBillingPlanList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BillingPlan"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         BankCredentialField: {
             key: string;
             label: string;
@@ -11801,6 +12049,251 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listBillingPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingPlanList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveBillingPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillingPlan"];
+            };
+        };
+        responses: {
+            /** @description Plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            /** @description `INVALID_BILLING_INPUT` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getOrganizationBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingOverview"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setOrganizationBilling: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example standart */
+                    plan_code?: string;
+                    read_only?: boolean;
+                    read_only_reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingAccount"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVALID_BILLING_INPUT` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    generateBillingStatement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingStatement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setBillingStatementStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Resource UUID */
+                uuid: components["parameters"]["ResourceUUID"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "final" | "void";
+                };
+            };
+        };
+        responses: {
+            /** @description Statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingStatement"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVALID_BILLING_INPUT` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBilling: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBillingOverview"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
         };
     };
     postPlatformOrganizationAccess: {

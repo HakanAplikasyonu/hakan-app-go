@@ -245,6 +245,9 @@ type Querier interface {
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
 	GetBankTransaction(ctx context.Context, arg GetBankTransactionParams) (BankTransaction, error)
+	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
+	GetBillingPlanByCode(ctx context.Context, code string) (BillingPlan, error)
+	GetBillingStatement(ctx context.Context, arg GetBillingStatementParams) (BillingStatement, error)
 	GetBulkJobByID(ctx context.Context, id int64) (BulkJob, error)
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
@@ -288,6 +291,7 @@ type Querier interface {
 	// member, so the lookup cannot be organization-scoped.
 	// tenant-lint: cross-org onay bağlantısı, yalnızca token özetiyle tek satır
 	GetOnboardingRequestByTokenHash(ctx context.Context, tokenHash string) (GetOnboardingRequestByTokenHashRow, error)
+	GetOrganizationBilling(ctx context.Context, organizationID int64) (OrganizationBilling, error)
 	GetOrganizationByID(ctx context.Context, id int64) (Organization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error)
 	GetOrganizationByUUID(ctx context.Context, argUuid uuid.UUID) (Organization, error)
@@ -428,6 +432,9 @@ type Querier interface {
 	ListActivePublicLinks(ctx context.Context) ([]StorageLink, error)
 	ListActivePushDevicesByUser(ctx context.Context, userID int64) ([]PushDevice, error)
 	ListActiveRefreshTokensByUserID(ctx context.Context, userID int64) ([]RefreshToken, error)
+	// Aktif mükellef (D9): ayın herhangi bir gününde ofisle aktif bir
+	// engagement'ı olan mükellef. Aynı mükellef ay içinde ayrılıp dönse de 1 sayılır.
+	ListActiveTaxpayersInPeriod(ctx context.Context, arg ListActiveTaxpayersInPeriodParams) ([]ListActiveTaxpayersInPeriodRow, error)
 	ListActivityEvents(ctx context.Context, arg ListActivityEventsParams) ([]ActivityEvent, error)
 	ListAllBulkJobs(ctx context.Context, arg ListAllBulkJobsParams) ([]BulkJob, error)
 	ListAllExcelImportRows(ctx context.Context, arg ListAllExcelImportRowsParams) ([]ExcelImportRow, error)
@@ -450,6 +457,10 @@ type Querier interface {
 	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
 	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
 	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
+	// Faturalama (issue #52). Planlar platform düzeyinde; ofis satırları
+	// organization_id ile.
+	ListBillingPlans(ctx context.Context) ([]BillingPlan, error)
+	ListBillingStatements(ctx context.Context, organizationID int64) ([]BillingStatement, error)
 	ListBulkChangesForJob(ctx context.Context, jobID int64) ([]BulkChange, error)
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
 	ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error)
@@ -664,6 +675,7 @@ type Querier interface {
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
 	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
+	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
@@ -716,6 +728,7 @@ type Querier interface {
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
+	SetBillingStatementStatus(ctx context.Context, arg SetBillingStatementStatusParams) (BillingStatement, error)
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
@@ -795,6 +808,8 @@ type Querier interface {
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
+	UpsertBillingPlan(ctx context.Context, arg UpsertBillingPlanParams) (BillingPlan, error)
+	UpsertBillingStatement(ctx context.Context, arg UpsertBillingStatementParams) (BillingStatement, error)
 	UpsertCustomerSourceLink(ctx context.Context, arg UpsertCustomerSourceLinkParams) error
 	// Masaüstü yerel ajanı (issue #51).
 	// Aynı makine yeniden kayıt olursa satır güncellenir; geri alınmış ajan
@@ -814,6 +829,7 @@ type Querier interface {
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.
 	UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataWarningParams) (DataWarning, error)
+	UpsertOrganizationBilling(ctx context.Context, arg UpsertOrganizationBillingParams) (OrganizationBilling, error)
 	// Mobile push devices (Expo) and their pending push tickets.
 	// A token moves to the calling user when the device switches accounts and is
 	// re-enabled on every registration.

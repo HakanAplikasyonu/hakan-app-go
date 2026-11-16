@@ -41,6 +41,7 @@ import (
 	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	bankws "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/billing"
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
@@ -356,6 +357,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		engagementHandler = engagementsmodule.NewHandler(engSvc)
 	}
 	tenantmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, tenantHandler)
+	// Faturalama (issue #52): plan, aktif mükellef sayımı, taslak, salt okunur kip.
+	billingSvc := billing.NewService(deps.DB)
+	middleware.SetOrganizationPolicy(billingSvc)
+	billing.RegisterRoutes(mux, tokens, loader, tenantResolver, billing.NewHandler(billingSvc))
 	engagementsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, engagementHandler)
 	// Taxpayers (issue #3): platform catalog always; the office-side profile
 	// of an engagement only with tenancy.

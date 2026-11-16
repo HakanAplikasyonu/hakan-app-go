@@ -39,6 +39,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Billing
+    description: Ofis faturalama (D9, D14)
   - name: Sources
     description: Ön muhasebe programı bağlantıları (Paraşüt …)
   - name: Health
@@ -1668,6 +1670,209 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/platform/billing/plans:
+    get:
+      tags: [Billing]
+      operationId: listBillingPlans
+      summary: Billing plans (D9)
+      description: Requires `platform.organizations.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingPlanList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/platform/billing/plans/{code}:
+    parameters:
+      - { name: code, in: path, required: true, schema: { type: string, example: standart } }
+    put:
+      tags: [Billing]
+      operationId: saveBillingPlan
+      summary: Create or update a plan
+      description: |
+        Requires `platform.organizations.write`. Office base fee covering
+        `included_taxpayers`, a fee per active taxpayer above it, KDV rate.
+        Statements already final keep their plan snapshot.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BillingPlan" }
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingPlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422":
+          description: "`INVALID_BILLING_INPUT`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/platform/organizations/{uuid}/billing:
+    parameters:
+      - $ref: "#/components/parameters/ResourceUUID"
+    get:
+      tags: [Billing]
+      operationId: getOrganizationBilling
+      summary: An office's plan, mode, this month's usage and statements
+      description: Requires `platform.organizations.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingOverview" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Billing]
+      operationId: setOrganizationBilling
+      summary: Set an office's plan and read-only mode
+      description: |
+        Requires `platform.organizations.write`. `read_only: true` is the
+        AccessPolicy of G7: the office keeps reading, every write under
+        `/v1/tenant/*` answers `403 ORGANIZATION_READ_ONLY` with the reason.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan_code: { type: string, example: standart }
+                read_only: { type: boolean }
+                read_only_reason: { type: string }
+      responses:
+        "200":
+          description: Account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingAccount" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`INVALID_BILLING_INPUT`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/platform/organizations/{uuid}/billing/statements:
+    parameters:
+      - $ref: "#/components/parameters/ResourceUUID"
+    post:
+      tags: [Billing]
+      operationId: generateBillingStatement
+      summary: Compute the statement draft of a month
+      description: |
+        Requires `platform.organizations.write`. Counts the month's active
+        taxpayers (an engagement of the office active on any day of the
+        month, Türkiye time, each taxpayer once) and prices them with the
+        office's plan. Recomputing replaces a draft; a final or void
+        statement answers `409 BILLING_STATEMENT_FINAL`. No collection (D14).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              properties:
+                period: { type: string, example: "2026-10" }
+      responses:
+        "200":
+          description: Statement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingStatement" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/platform/organizations/{uuid}/billing/statements/{period}/status:
+    parameters:
+      - $ref: "#/components/parameters/ResourceUUID"
+      - { name: period, in: path, required: true, schema: { type: string, example: "2026-10" } }
+    post:
+      tags: [Billing]
+      operationId: setBillingStatementStatus
+      summary: Finalize or void a draft
+      description: Requires `platform.organizations.write`. `draft` → `final` | `void`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [final, void] }
+      responses:
+        "200":
+          description: Statement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingStatement" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`INVALID_BILLING_INPUT`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/billing:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Billing]
+      operationId: getTenantBilling
+      summary: The office's plan, mode, this month so far and statements
+      description: Requires `tenant.settings.read`. `estimate` prices the month so far.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Overview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBillingOverview" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/platform/organizations/{uuid}/access:
     post:
@@ -8744,6 +8949,120 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    BillingPlan:
+      type: object
+      required: [name, base_fee, per_taxpayer_fee, included_taxpayers, vat_rate, active]
+      properties:
+        code: { type: string, readOnly: true }
+        name: { type: string }
+        currency: { type: string, default: TRY }
+        base_fee: { type: string, description: "Office base fee per month" }
+        per_taxpayer_fee: { type: string, description: "Per active taxpayer above included_taxpayers" }
+        included_taxpayers: { type: integer }
+        vat_rate: { type: string, example: "20" }
+        active: { type: boolean }
+    BillingAccount:
+      type: object
+      required: [plan, read_only]
+      properties:
+        plan: { $ref: "#/components/schemas/BillingPlan" }
+        read_only: { type: boolean }
+        read_only_reason: { type: string }
+    BillingTaxpayer:
+      type: object
+      required: [uuid, title, tax_id]
+      properties:
+        uuid: { type: string, format: uuid }
+        title: { type: string }
+        tax_id: { type: string }
+    BillingAmounts:
+      type: object
+      required: [active_taxpayers, billable_taxpayers, base_fee, taxpayer_fee_total, subtotal, vat_rate, vat_amount, total, lines]
+      properties:
+        active_taxpayers: { type: integer }
+        billable_taxpayers: { type: integer }
+        base_fee: { type: string }
+        taxpayer_fee_total: { type: string }
+        subtotal: { type: string }
+        vat_rate: { type: string }
+        vat_amount: { type: string }
+        total: { type: string }
+        lines:
+          type: array
+          items:
+            type: object
+            required: [code, description, quantity, unit_price, amount]
+            properties:
+              code: { type: string, enum: [base, taxpayer] }
+              description: { type: string }
+              quantity: { type: integer }
+              unit_price: { type: string }
+              amount: { type: string }
+    BillingStatement:
+      type: object
+      required: [uuid, period, status, plan_code, currency, amounts, taxpayers, generated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        status: { type: string, enum: [draft, final, void] }
+        plan_code: { type: string }
+        currency: { type: string }
+        amounts: { $ref: "#/components/schemas/BillingAmounts" }
+        taxpayers: { type: array, items: { $ref: "#/components/schemas/BillingTaxpayer" } }
+        generated_at: { type: string, format: date-time }
+    BillingOverview:
+      type: object
+      required: [account, current, estimate, statements]
+      properties:
+        account: { $ref: "#/components/schemas/BillingAccount" }
+        current:
+          type: object
+          required: [period, active_taxpayers, taxpayers]
+          properties:
+            period: { type: string }
+            active_taxpayers: { type: integer }
+            taxpayers: { type: array, items: { $ref: "#/components/schemas/BillingTaxpayer" } }
+        estimate: { $ref: "#/components/schemas/BillingAmounts" }
+        statements: { type: array, items: { $ref: "#/components/schemas/BillingStatement" } }
+    EnvelopeBillingPlan:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BillingPlan" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBillingAccount:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BillingAccount" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBillingStatement:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BillingStatement" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBillingOverview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BillingOverview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeBillingPlanList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: 
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/BillingPlan" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     BankCredentialField:
       type: object
       required: [key, label, secret]
