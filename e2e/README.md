@@ -7,6 +7,7 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 | `tests/smoke.spec.ts` | Doğrulama raporundaki duman akışı (`docs/dogrulama-raporu.md` §2.2): ofis girişi, realtime ve KVKK uçları, mükellef ekleme ve onay, UBL yükle, öneri ve onay, banka eşleme ve uyarılar, dönem kilidi, yevmiye, Luca / Zirve indirme, mükellef paneli, tenant izolasyonu | Demo ofisi, Atlas Gıda |
 | `tests/office-onboarding.spec.ts` | Ofis ana akışı baştan sona | Her koşuda yeni ofis, sahip ve VKN |
 | `tests/taxpayer-invite.spec.ts` | Mükellef paneli daveti: davet e-postası → kayıt → kabul; yalnızca kendi şirketini görür | Demo ofisi, Selin Yılmaz'a yeni çalışan |
+| `tests/a11y.spec.ts` | Erişilebilirlik (#194): misafir, ofis ve mükellef ana sayfalarında axe-core (WCAG 2.1 A/AA); kritik ve ciddi ihlal testi kırar. Komut paleti klavyeyle (Ctrl+K / Esc) | Yalnızca okur |
 | `tests/access.spec.ts` | Rol bazlı erişim reddi: giriş yapmamış kullanıcı, stajyer (roller, davet, ayar, platform, atanmadığı mükellef; arayüz ve API), mükellef kullanıcısının ofis paneli | Yalnızca okur |
 
 `office-onboarding.spec.ts` ofis ana akışının adımları:
@@ -57,7 +58,9 @@ Banka hesabı ile ekstre yükleme (#144) ve dönem kilidi için ofis panelinde e
 
 `.github/workflows/ci.yml` içindeki `e2e` işi şu durumlarda koşar: backend ya da frontend değiştiğinde, `e2e/**`, `scripts/e2e-*`, `compose.local.yml` ya da `.env.example` değiştiğinde ve main'de.
 
-İlk aşamada **zorunlu değil**: `ci` kapısında yok ve `continue-on-error` ile iş düşse de iş akışı kırmızıya dönmez.
+Zorunluluk (#194):
+- Ortam kurulumu ve **erişilebilirlik adımı** (`--grep @a11y`) `ci` kapısını kırar.
+- Akış testleri (`--grep-invert @a11y`) henüz zorunlu değildir: düşerse iş uyarı yazar ve geçer.
 
 `e2e-report` artefaktında şunlar bulunur:
 - HTML rapor,

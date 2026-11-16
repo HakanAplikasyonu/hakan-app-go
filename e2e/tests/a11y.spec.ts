@@ -40,7 +40,7 @@ async function scan(page: Page, name: string) {
   expect(blocking, `${name}\n${report}`).toEqual([]);
 }
 
-test.describe("misafir sayfaları", () => {
+test.describe("@a11y misafir sayfaları", () => {
   for (const path of ["/login", "/platform/register", "/forgot-password"]) {
     test(path, async ({ page }) => {
       await page.goto(path);
@@ -49,7 +49,7 @@ test.describe("misafir sayfaları", () => {
   }
 });
 
-test.describe("ofis paneli", () => {
+test.describe("@a11y ofis paneli", () => {
   let atlas = "";
   test.beforeAll(async () => {
     const api = await Api.login(DEMO.owner);
@@ -96,7 +96,7 @@ test.describe("ofis paneli", () => {
   });
 });
 
-test.describe("mükellef paneli", () => {
+test.describe("@a11y mükellef paneli", () => {
   test("ana ekranlar", async ({ page }) => {
     await uiLogin(page, DEMO.taxpayerUser);
     await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
