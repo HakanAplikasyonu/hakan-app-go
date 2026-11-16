@@ -52,7 +52,8 @@ export function toPanelInvoice(
       id: String(it.line_no),
       name: it.name,
       quantity: it.quantity,
-      unit: it.unit_code ?? "",
+      // Birim Türkçe adıyla (#378): API `unit_name` verir ("C62" → "adet").
+      unit: it.unit_name || it.unit_code || "",
       unitPrice: it.unit_price,
       lineTotal: it.tax_exclusive_amount,
       vatPercent: it.tax_rate,

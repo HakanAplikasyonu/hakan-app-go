@@ -1,5 +1,6 @@
 "use client";
 
+import { quantity } from "@/lib/utils/format";
 import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -24,7 +25,6 @@ import {
   useDecisionErrorText,
   useSuggestInvoiceAccounts,
 } from "../hooks/use-review";
-import { formatAmount } from "../lib/decimal";
 import { toPanelInvoice } from "../lib/from-api";
 import { AmountWaterfall } from "./amount-waterfall";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
@@ -254,7 +254,7 @@ function InvoiceDetailInner({ id }: { id: string }) {
                     <td>{l.name}</td>
                     <td className="text-right whitespace-nowrap">
                       <Figure>
-                        {formatAmount(l.quantity)} {l.unit}
+                        {quantity(l.quantity)} {l.unit}
                       </Figure>
                     </td>
                     <td className="text-right">

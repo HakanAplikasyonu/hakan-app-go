@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -73,7 +74,7 @@ func toDTO(s usecase.Suggestion) SuggestionDTO {
 	d := SuggestionDTO{
 		UUID: s.UUID, Kind: s.Input.Kind, TargetType: s.Input.TargetType, TargetID: s.Input.TargetID,
 		TargetField: s.Input.TargetField, ProposedValue: s.Input.Value, Confidence: s.Input.Confidence.StringFixed(4),
-		Rationale: s.Input.Rationale, Provenance: s.Input.Provenance, Status: string(s.Status),
+		Rationale: engine.HumanizeRationale(s.Input.Rationale), Provenance: s.Input.Provenance, Status: string(s.Status),
 		AppliedValue: nullJSON(s.AppliedValue), PreviousValue: nullJSON(s.PreviousValue),
 		RuleCandidate: s.RuleCandidate, DecidedAt: s.DecidedAt, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
 	}

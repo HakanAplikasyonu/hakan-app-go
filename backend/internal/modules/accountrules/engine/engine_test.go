@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/shopspring/decimal"
@@ -152,5 +153,39 @@ func TestVATSubAccount(t *testing.T) {
 	}
 	if r, ok := RateInName("Hesaplanan KDV yüzde 10"); !ok || !r.Equal(decimal.NewFromInt(10)) {
 		t.Errorf("yüzde: %v %v", r, ok)
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	r := Rule{Name: "Ticari mal alımı", AccountCode: "153", Ref: "global:line_goods"}
+	if got, want := Describe(r, []string{"direction=incoming"}), "Sistem kuralı: Ticari mal alımı → 153 · gelen faturalarda"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	r = Rule{ID: 7, Origin: OriginTemplate, Name: "Kumaş", AccountCode: "153.01"}
+	got := Describe(r, []string{"item_name~kumaş", "tax_rate=20", "line_type=goods"})
+	if want := "Ofis kuralı: Kumaş → 153.01 · satırda “kumaş” geçiyorsa, KDV %20, mal satırlarında"; got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+	if got := Describe(Rule{ID: 3, AccountCode: "770"}, nil); got != "Mükellef kuralı: Adsız kural → 770" {
+		t.Fatalf("got %q", got)
+	}
+	for _, s := range []string{Describe(r, []string{"direction=outgoing"})} {
+		if strings.Contains(s, "global:") || strings.Contains(s, "=") {
+			t.Fatalf("technical text leaked: %q", s)
+		}
+	}
+}
+
+func TestHumanizeRationale(t *testing.T) {
+	in := `Kural "Ticari mal alımı" (global:line_goods) → 153; koşullar: direction=incoming; hesap planında %20 oranlı alt hesap: 191.01 İndirilecek KDV`
+	want := "Sistem kuralı: Ticari mal alımı → 153 · gelen faturalarda; hesap planında %20 oranlı alt hesap: 191.01 İndirilecek KDV"
+	if got := HumanizeRationale(in); got != want {
+		t.Fatalf("got %q", got)
+	}
+	if got := HumanizeRationale(`Kural "account_rule:4@v1" (account_rule:4@v1) → 770; koşullar: always`); got != "Kural: Adsız kural → 770" {
+		t.Fatalf("got %q", got)
+	}
+	if s := "Bu karşı tarafın önceki 3 satırı 770 hesabına işlendi"; HumanizeRationale(s) != s {
+		t.Fatal("non-rule text changed")
 	}
 }

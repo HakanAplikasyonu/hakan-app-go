@@ -253,17 +253,105 @@ func Pick(rules []Rule, role Role, x Context) (Assignment, bool) {
 		return false
 	})
 	best := cs[0]
-	label := best.r.Name
-	if label == "" {
-		label = best.r.Ref
-	}
-	why := "always"
-	if len(best.why) > 0 {
-		why = strings.Join(best.why, ", ")
-	}
 	return Assignment{
 		Role: role, AccountCode: best.r.AccountCode, Confidence: best.r.Confidence,
 		RuleID: best.r.ID, RuleRef: best.r.Ref, Matched: best.why, Tier: best.r.Tier(),
-		Rationale: fmt.Sprintf("Kural %q (%s) → %s; koşullar: %s", label, best.r.Ref, best.r.AccountCode, why),
+		Rationale: Describe(best.r, best.why),
 	}, true
+}
+
+// Describe is the rule's answer in the user's language (#378): scope, name,
+// account code and the matched conditions, e.g. "Sistem kuralı: Ticari mal
+// alımı → 153 · gelen faturalarda". Rule keys ("global:line_goods") and
+// "key=value" pairs stay in provenance (RuleRef, Matched), not here.
+func Describe(r Rule, matched []string) string {
+	scope := [...]string{"Mükellef kuralı", "Ofis kuralı", "Sistem kuralı"}[r.Tier()]
+	name := r.Name
+	if name == "" {
+		name = "Adsız kural"
+	}
+	out := fmt.Sprintf("%s: %s → %s", scope, name, r.AccountCode)
+	var parts []string
+	for _, m := range matched {
+		if p := conditionText(m); p != "" {
+			parts = append(parts, p)
+		}
+	}
+	if len(parts) > 0 {
+		out += " · " + strings.Join(parts, ", ")
+	}
+	return out
+}
+
+var lineTypeText = map[string]string{
+	"goods": "mal satırlarında", "service": "hizmet satırlarında",
+	"fixed_asset_candidate": "demirbaş adayı satırlarda", "discount": "iskonto satırlarında",
+	"expense": "gider satırlarında", "unknown": "türü belirsiz satırlarda",
+}
+
+// conditionText turns one Match reason ("direction=incoming",
+// "item_name~kumaş") into Turkish.
+func conditionText(m string) string {
+	key, val := m, ""
+	if i := strings.IndexAny(m, "=~"); i > 0 {
+		key, val = m[:i], m[i+1:]
+	}
+	switch key {
+	case "direction":
+		switch val {
+		case "incoming":
+			return "gelen faturalarda"
+		case "outgoing":
+			return "giden faturalarda"
+		}
+	case "invoice_type":
+		return val + " tipindeki faturalarda"
+	case "counterparty_tax_id":
+		return "VKN/TCKN " + val
+	case "counterparty_name":
+		return "karşı taraf adında “" + val + "” geçiyorsa"
+	case "item_name":
+		return "satırda “" + val + "” geçiyorsa"
+	case "line_type":
+		if t, ok := lineTypeText[val]; ok {
+			return t
+		}
+	case "tax_rate":
+		return "KDV %" + val
+	}
+	return ""
+}
+
+// legacyRationale is the pre-#378 rule text: `Kural "Ad" (global:line_goods)
+// → 153; koşullar: direction=incoming` and an optional "; …" tail.
+var legacyRationale = regexp.MustCompile(`^Kural "(.*?)" \(([^)]*)\) → (\S+); koşullar: ([^;]*)(.*)$`)
+
+// HumanizeRationale rewrites a rule rationale stored before #378 into the
+// user's language at read time; any other text is returned unchanged.
+func HumanizeRationale(s string) string {
+	m := legacyRationale.FindStringSubmatch(s)
+	if m == nil {
+		return s
+	}
+	label, ref, code, why, tail := m[1], m[2], m[3], strings.TrimSpace(m[4]), m[5]
+	scope := "Kural"
+	if strings.HasPrefix(ref, "global:") {
+		scope = "Sistem kuralı"
+	}
+	if label == "" || label == ref {
+		label = "Adsız kural"
+	}
+	out := fmt.Sprintf("%s: %s → %s", scope, label, code)
+	var parts []string
+	if why != "always" && why != "" {
+		for _, w := range strings.Split(why, ", ") {
+			if p := conditionText(w); p != "" {
+				parts = append(parts, p)
+			}
+		}
+	}
+	if len(parts) > 0 {
+		out += " · " + strings.Join(parts, ", ")
+	}
+	return out + tail
 }

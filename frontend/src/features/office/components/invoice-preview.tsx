@@ -1,5 +1,6 @@
 "use client";
 
+import { quantity } from "@/lib/utils/format";
 import { useMemo } from "react";
 
 import { useLocale } from "@/providers/locale-provider";
@@ -46,7 +47,7 @@ function renderFallback(inv: Invoice, labels: Record<string, string>): string {
   const rows = inv.lines
     .map(
       (l) =>
-        `<tr><td>${esc(l.name)}</td><td class="n">${esc(l.quantity)} ${esc(l.unit)}</td><td class="n">${formatAmount(l.unitPrice)}</td><td class="n">%${esc(l.vatPercent)}</td><td class="n">${formatAmount(l.lineTotal)}</td></tr>`,
+        `<tr><td>${esc(l.name)}</td><td class="n">${esc(quantity(l.quantity))} ${esc(l.unit)}</td><td class="n">${formatAmount(l.unitPrice)}</td><td class="n">%${esc(l.vatPercent)}</td><td class="n">${formatAmount(l.lineTotal)}</td></tr>`,
     )
     .join("");
   const taxes = inv.taxes

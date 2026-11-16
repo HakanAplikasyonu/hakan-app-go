@@ -49,6 +49,22 @@ export function money(
   }).format(value);
 }
 
+/**
+ * Miktar (#378): tr-TR, gereksiz ondalık yok ("1.000000" → "1",
+ * "2.500000" → "2,5", "1250" → "1.250"). Sayı değilse olduğu gibi döner.
+ */
+export function quantity(
+  value: string | number | null | undefined,
+  locale: AppLocale = i18nConfig.defaultLocale,
+) {
+  if (value === null || value === undefined || value === "") return "";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return new Intl.NumberFormat(locale === "tr" ? "tr-TR" : "en-US", {
+    maximumFractionDigits: 6,
+  }).format(n);
+}
+
 export function date(
   value: Date | string,
   pattern = "dd.MM.yyyy",

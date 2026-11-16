@@ -11,6 +11,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ublunit"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -45,10 +46,12 @@ type ReviewInvoice struct {
 
 // ReviewItem is the invoice line the suggestion targets.
 type ReviewItem struct {
-	LineNo     int32   `json:"line_no"`
-	Name       string  `json:"name"`
-	Quantity   string  `json:"quantity"`
-	UnitCode   *string `json:"unit_code"`
+	LineNo   int32   `json:"line_no"`
+	Name     string  `json:"name"`
+	Quantity string  `json:"quantity"`
+	UnitCode *string `json:"unit_code"`
+	// UnitName is the Turkish name of UnitCode (#378).
+	UnitName   *string `json:"unit_name"`
 	LineAmount string  `json:"line_amount"`
 	TaxRate    string  `json:"tax_rate"`
 }
@@ -95,6 +98,8 @@ func (h *ReviewHandler) Context(w http.ResponseWriter, r *http.Request) {
 		if row.UnitCode.Valid {
 			u := row.UnitCode.String
 			it.UnitCode = &u
+			n := ublunit.Name(u)
+			it.UnitName = &n
 		}
 		out.Item = it
 	}

@@ -2,6 +2,7 @@ export { cn } from "./cn";
 export {
   currency,
   money,
+  quantity,
   date,
   datetime,
   relativeDatetime,

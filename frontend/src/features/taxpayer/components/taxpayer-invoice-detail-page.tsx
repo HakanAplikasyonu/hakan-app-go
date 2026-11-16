@@ -1,5 +1,6 @@
 "use client";
 
+import { quantity } from "@/lib/utils/format";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 
@@ -149,7 +150,8 @@ export function TaxpayerInvoiceDetailPage({
                   <td className="py-2 pr-3">{it.line_no}</td>
                   <td className="py-2 pr-3">{it.name}</td>
                   <td className="figure py-2 pr-3 text-right">
-                    {it.quantity} {it.unit_code}
+                    {quantity(it.quantity, locale === "en" ? "en" : "tr")}{" "}
+                    {it.unit_name || it.unit_code}
                   </td>
                   <td className="figure py-2 pr-3 text-right">
                     %{it.tax_rate}
