@@ -37,6 +37,7 @@ type Registry struct {
 	integrator   *prometheus.CounterVec
 	integratorD  *prometheus.HistogramVec
 	storageFail  *prometheus.CounterVec
+	sideEffect   *prometheus.CounterVec
 }
 
 // NewRegistry builds a registry with the runtime and app collectors.
@@ -64,10 +65,14 @@ func NewRegistry() *Registry {
 		Name: "storage_write_failures_total",
 		Help: "Object store writes refused by the store (no_space: no writable volume / disk full; server: 5xx), issue #247.",
 	}, []string{"reason"})
+	r.sideEffect = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "side_effect_failures_total",
+		Help: "Side-effect writes (notification, activity, review submission ...) that failed and were rolled back to their savepoint while the request went on, issue #311.",
+	}, []string{"name"})
 	r.reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		r.httpRequests, r.httpDuration, r.integrator, r.integratorD, r.storageFail,
+		r.httpRequests, r.httpDuration, r.integrator, r.integratorD, r.storageFail, r.sideEffect,
 	)
 	return r
 }
@@ -182,6 +187,18 @@ func (r *Registry) ObserveIntegrator(provider, operation, outcome string, d time
 // ObserveStorageWriteFailure counts an object store write the store refused.
 func (r *Registry) ObserveStorageWriteFailure(reason string) {
 	r.storageFail.WithLabelValues(reason).Inc()
+}
+
+// ObserveSideEffectFailure counts a side-effect write that failed and was
+// rolled back to its savepoint (database.BestEffort). name is a fixed,
+// low-cardinality label such as "notification".
+func (r *Registry) ObserveSideEffectFailure(name string) {
+	r.sideEffect.WithLabelValues(name).Inc()
+}
+
+// SideEffectFailures is the counter for name (tests and dashboards).
+func (r *Registry) SideEffectFailures(name string) prometheus.Counter {
+	return r.sideEffect.WithLabelValues(name)
 }
 
 // StorageWriteFailures is the counter for reason (tests and dashboards).

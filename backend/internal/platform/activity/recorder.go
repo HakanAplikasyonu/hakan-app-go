@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
@@ -53,19 +54,22 @@ func (r *Recorder) Record(ctx context.Context, actorID *int64, action, resource 
 			ua = pgtype.Text{String: rreq.UserAgent(), Valid: true}
 		}
 	}
-	_, err = r.q.InsertActivityEvent(ctx, db.InsertActivityEventParams{
-		OrganizationID: orgctx.Param(ctx),
-		ActorUserID:    pgtypeInt8(actorID),
-		Action:         action,
-		Resource:       resource,
-		ResourceUuid:   ru,
-		Payload:        body,
-		IpAddress:      ip,
-		UserAgent:      ua,
+	// The activity row is a side effect: in a savepoint of the request's
+	// transaction, so a failed insert never aborts the request (#311).
+	// database.BestEffort logs and counts the failure.
+	_ = database.BestEffort(ctx, "activity", func(ctx context.Context) error {
+		_, err := r.q.InsertActivityEvent(ctx, db.InsertActivityEventParams{
+			OrganizationID: orgctx.Param(ctx),
+			ActorUserID:    pgtypeInt8(actorID),
+			Action:         action,
+			Resource:       resource,
+			ResourceUuid:   ru,
+			Payload:        body,
+			IpAddress:      ip,
+			UserAgent:      ua,
+		})
+		return err
 	})
-	if err != nil {
-		r.log.Warn("activity_record_failed", "action", action, "error", err)
-	}
 }
 
 func pgtypeInt8(id *int64) pgtype.Int8 {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/actionlink"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
@@ -110,7 +111,26 @@ func (s *Service) WithSecretBox(box *crypto.SecretBox) *Service {
 }
 
 // Enqueue creates queued notification rows and schedules delivery.
+//
+// A notification is a side effect of the caller's work: its reads and
+// writes run in a savepoint of the caller's transaction
+// (database.BestEffort, issue #311), so a refused or failed row is rolled
+// back alone and never aborts the request that sent it. The error is still
+// returned for callers that report it.
 func (s *Service) Enqueue(ctx context.Context, in model.EnqueueInput) ([]model.Notification, error) {
+	var out []model.Notification
+	err := database.BestEffort(ctx, "notification", func(ctx context.Context) error {
+		var err error
+		out, err = s.enqueue(ctx, in)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (s *Service) enqueue(ctx context.Context, in model.EnqueueInput) ([]model.Notification, error) {
 	if len(in.Channels) == 0 {
 		return nil, fmt.Errorf("%w: channels required", ErrInvalidRequest)
 	}
