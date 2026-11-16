@@ -10,6 +10,13 @@ export type ApiWarningRule = components["schemas"]["WarningRule"];
 export type ApiWarningDecision =
   components["schemas"]["EnvelopeWarningDecision"]["data"];
 
+export type ApiWarningGroup = components["schemas"]["WarningGroup"];
+export type WarningGroupQuery = {
+  period?: string;
+  severity?: ApiWarningSeverity;
+  status?: ApiWarningStatus | "all";
+};
+
 export type WarningListFilters = {
   period?: string;
   code?: string;
@@ -33,6 +40,13 @@ export const warningKeys = {
       ...warningKeys.all(slug),
       "engagement",
       engagement.toLowerCase(),
+      query,
+    ] as const,
+  groups: (slug: string, query: WarningGroupQuery, engagement?: string) =>
+    [
+      ...warningKeys.all(slug),
+      "groups",
+      engagement?.toLowerCase() ?? "office",
       query,
     ] as const,
   rules: (slug: string) =>
@@ -80,5 +94,28 @@ export const warningService = {
       `/v1/tenant/engagements/${encodeURIComponent(engagement)}/warnings/${encodeURIComponent(warning)}/${action}`,
       { silent: true },
     );
+  },
+  /** Koda göre özet (arayüz 6/9, #329): ofis geneli ya da tek engagement. */
+  groups(slug: string, query: WarningGroupQuery, engagement?: string) {
+    const base = engagement
+      ? `/v1/tenant/engagements/${encodeURIComponent(engagement)}/warnings/groups`
+      : "/v1/tenant/warnings/groups";
+    return tenantRequest<{ items: ApiWarningGroup[] }>(slug, "GET", base, {
+      query,
+    });
+  },
+  /** "Tümünü gördüm": bir koddaki bütün açık uyarıları görüldü yapar. */
+  acknowledgeBulk(
+    slug: string,
+    body: { code: string; period?: string },
+    engagement?: string,
+  ) {
+    const base = engagement
+      ? `/v1/tenant/engagements/${encodeURIComponent(engagement)}/warnings/acknowledge-bulk`
+      : "/v1/tenant/warnings/acknowledge-bulk";
+    return tenantRequest<{ acknowledged: number }>(slug, "POST", base, {
+      body,
+      silent: true,
+    });
   },
 };
