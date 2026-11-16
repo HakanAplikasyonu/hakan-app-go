@@ -2,12 +2,40 @@ package queue
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/hibiken/asynq"
 )
+
+// ErrRetrySoon marks a task error that clears by itself within seconds, such
+// as a row whose writing transaction has not committed yet (#304). Such tasks
+// are retried after 1, 2, 4 … (at most 30) seconds instead of asynq's
+// default back-off, which waits tens of seconds even on the first retry.
+var ErrRetrySoon = errors.New("queue: retry soon")
+
+// retrying: a retry-soon error with attempts left is expected (#304), not a
+// failure to report; the last attempt is reported like any other error.
+func retrying(ctx context.Context, err error) bool {
+	if !errors.Is(err, ErrRetrySoon) {
+		return false
+	}
+	n, okN := asynq.GetRetryCount(ctx)
+	maxRetry, okMax := asynq.GetMaxRetry(ctx)
+	return okN && okMax && n < maxRetry
+}
+
+// RetryDelay is the worker's retry back-off (see ErrRetrySoon).
+func RetryDelay(n int, err error, task *asynq.Task) time.Duration {
+	if errors.Is(err, ErrRetrySoon) {
+		d := time.Second << min(n, 5)
+		return min(d, 30*time.Second)
+	}
+	return asynq.DefaultRetryDelayFunc(n, err, task)
+}
 
 // DeliverNotificationFunc delivers a queued notification by id.
 type DeliverNotificationFunc func(ctx context.Context, notificationID int64) error
@@ -61,8 +89,13 @@ func NewWorker(cfg config.Config, log *slog.Logger, deliver DeliverNotificationF
 		Concurrency: concurrency,
 		// WORKER_POOL selects the queues (issue #45): a dedicated
 		// fixed-egress pool, the general pool, or all of them.
-		Queues: PoolQueues(cfg.Queue.WorkerPool),
+		Queues:         PoolQueues(cfg.Queue.WorkerPool),
+		RetryDelayFunc: RetryDelay,
 		ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
+			if retrying(ctx, err) {
+				log.Warn("queue_task_retry_soon", "type", task.Type(), "error", err)
+				return
+			}
 			log.Error("queue_task_failed", "type", task.Type(), "error", err)
 			reportTaskFailure(ctx, task, err)
 		}),
