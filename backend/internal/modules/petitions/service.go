@@ -7,13 +7,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // ErrNotFound: unknown petition in this engagement.
@@ -83,7 +85,7 @@ func (s *Service) Create(ctx context.Context, e engagementctx.Scope, userID int6
 		rj, _ := json.Marshal(r)
 		row, err := q.CreatePetition(ctx, db.CreatePetitionParams{
 			OrganizationID: e.OrganizationID, EngagementID: e.ID, TemplateKey: r.TemplateKey,
-			TemplateVersion: int32(r.TemplateVersion), Fields: fj, Rendered: rj, Draft: r.Draft,
+			TemplateVersion: intconv.Int32(r.TemplateVersion), Fields: fj, Rendered: rj, Draft: r.Draft,
 			CreatedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
 		})
 		if err != nil {

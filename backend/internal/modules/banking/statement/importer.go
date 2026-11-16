@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // Producer is the data_warning producer name of this channel (05 §1:
@@ -289,7 +290,7 @@ func (im *Importer) importBlock(ctx context.Context, tx pgx.Tx, req Request, imp
 		params := db.UpsertBankDailySummaryParams{
 			TaxpayerID: req.TaxpayerID, CashBoxID: box.ID, Date: pgtype.Date{Time: st.Closing.Date, Valid: true},
 			ClosingBalance: numeric(st.Closing.Amount), TotalCredit: numeric(credit), TotalDebit: numeric(debit),
-			TransactionCount: pgtype.Int4{Int32: int32(len(st.Lines)), Valid: true}, Source: banking.CaptureMT940,
+			TransactionCount: pgtype.Int4{Int32: intconv.Int32(len(st.Lines)), Valid: true}, Source: banking.CaptureMT940,
 		}
 		if st.Opening != nil {
 			params.OpeningBalance = numeric(st.Opening.Amount)

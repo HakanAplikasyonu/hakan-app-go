@@ -241,6 +241,61 @@ jobs:
       - name: OpenAPI lint
         run: npx --yes @redocly/cli@1 lint docs/openapi.yaml
 
+  # Security scans (#192, docs/guvenlik-taramalari.md). Every push: gitleaks
+  # over the pushed history. Go changes: govulncheck (reachable vulnerabilities)
+  # and gosec (HIGH severity, backend/.golangci.gosec.yml). Dependency
+  # manifests: pnpm/npm audit at high+. A finding fails the job; justified
+  # false positives are silenced in place (see the doc), never by skipping.
+  security:
+    needs: changes
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: gitleaks (secrets in git history)
+        run: |
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          "$(go env GOPATH)/bin/gitleaks" git --redact --no-banner --exit-code 1 .
+      - name: govulncheck (backend)
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: backend
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: govulncheck (desktop sidecar)
+        if: needs.changes.outputs.desktop == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: desktop/sidecar
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: gosec (HIGH)
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.full == 'true'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          working-directory: backend
+          args: --config .golangci.gosec.yml
+      - uses: pnpm/action-setup@v6
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.full == 'true'
+        with:
+          version: 11.22.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+      - name: pnpm audit (frontend, high+)
+        if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.full == 'true'
+        working-directory: frontend
+        run: pnpm audit --audit-level high
+      - name: npm audit (mobile, desktop, e2e; high+)
+        run: |
+          set -euo pipefail
+          for d in mobile desktop e2e; do
+            echo "::group::npm audit $d"
+            (cd "$d" && npm audit --audit-level=high)
+            echo "::endgroup::"
+          done
+
   # Runs on a frontend change OR a contract change (backend/** sets contracts),
   # so a backend API edit re-verifies the committed frontend client.
   frontend:
@@ -823,7 +878,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, mobile, desktop, image-build, prod-smoke, backup-drill, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, security, mobile, desktop, image-build, prod-smoke, backup-drill, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

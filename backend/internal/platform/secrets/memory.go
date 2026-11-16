@@ -6,6 +6,8 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // MemoryStore is an in-process Store for tests.
@@ -77,7 +79,7 @@ func (m *MemoryStore) ListNotOnKEK(_ context.Context, active string, limit int32
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return m.seq[out[i].ID] < m.seq[out[j].ID] })
-	if int32(len(out)) > limit {
+	if intconv.Int32(len(out)) > limit {
 		out = out[:limit]
 	}
 	return out, nil

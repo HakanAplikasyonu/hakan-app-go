@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // RefPrefix marks a reference produced by this vault. A different backend
@@ -200,7 +202,7 @@ func (v *EnvelopeVault) Rotate(ctx context.Context, batch int32) (RotationReport
 	rep := RotationReport{ActiveKEK: v.kr.ActiveID()}
 	skip := map[uuid.UUID]bool{}
 	for {
-		list, err := v.store.ListNotOnKEK(ctx, v.kr.ActiveID(), batch+int32(len(skip)))
+		list, err := v.store.ListNotOnKEK(ctx, v.kr.ActiveID(), batch+intconv.Int32(len(skip)))
 		if err != nil {
 			return rep, err
 		}

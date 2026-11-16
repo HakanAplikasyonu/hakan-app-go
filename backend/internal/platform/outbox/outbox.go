@@ -13,13 +13,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 const (
@@ -282,7 +284,7 @@ type PublisherOption func(*Publisher)
 func WithMaxAttempts(n int) PublisherOption {
 	return func(p *Publisher) {
 		if n > 0 {
-			p.maxAttempts = int32(n)
+			p.maxAttempts = intconv.Int32(n)
 		}
 	}
 }
@@ -291,7 +293,7 @@ func WithMaxAttempts(n int) PublisherOption {
 func WithBatchSize(n int) PublisherOption {
 	return func(p *Publisher) {
 		if n > 0 {
-			p.batchSize = int32(n)
+			p.batchSize = intconv.Int32(n)
 		}
 	}
 }

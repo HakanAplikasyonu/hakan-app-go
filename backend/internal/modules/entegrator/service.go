@@ -314,7 +314,7 @@ func (s *Service) lock(ctx context.Context, connID int64) (func(), error) {
 		return nil, err
 	}
 	var ok bool
-	if err := pc.QueryRow(ctx, "SELECT pg_try_advisory_lock($1::int, $2::int)", lockKey, int32(connID)).Scan(&ok); err != nil {
+	if err := pc.QueryRow(ctx, "SELECT pg_try_advisory_lock($1::int, $2::int)", lockKey, int32(connID)).Scan(&ok); err != nil { //nolint:gosec // lock key half: an id wraps mod 2^32, a collision only serialises two syncs
 		pc.Release()
 		return nil, err
 	}
@@ -323,7 +323,7 @@ func (s *Service) lock(ctx context.Context, connID int64) (func(), error) {
 		return nil, ErrBusy
 	}
 	return func() {
-		_, _ = pc.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, $2::int)", lockKey, int32(connID))
+		_, _ = pc.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1::int, $2::int)", lockKey, int32(connID)) //nolint:gosec // same key as the lock above
 		pc.Release()
 	}, nil
 }

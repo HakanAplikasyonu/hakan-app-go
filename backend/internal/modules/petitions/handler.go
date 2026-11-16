@@ -3,8 +3,10 @@ package petitions
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
-	"strconv"
+
+	"github.com/google/uuid"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
@@ -12,8 +14,8 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
-	"github.com/google/uuid"
 )
 
 // Handler serves the petition routes.
@@ -86,12 +88,8 @@ type petitionList struct {
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	limit, offset := int32(50), int32(0)
-	if v, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && v > 0 && v <= 100 {
-		limit = int32(v)
-	}
-	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v >= 0 {
-		offset = int32(v)
-	}
+	limit = intconv.ParseInt32(r.URL.Query().Get("limit"), limit, 1, 100)
+	offset = intconv.ParseInt32(r.URL.Query().Get("offset"), offset, 0, math.MaxInt32)
 	items, err := h.svc.List(r.Context(), engagementctx.Must(r.Context()), limit, offset)
 	if err != nil {
 		writeError(w, r, err)

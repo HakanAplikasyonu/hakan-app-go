@@ -1,0 +1,46 @@
+# Dependabot (#192, docs/guvenlik-taramalari.md): weekly version updates,
+# minor/patch grouped per ecosystem to keep the PR count low. Security
+# updates are opened as they are published (repository setting).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directories: ["/backend", "/desktop/sidecar"]
+    schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch: { update-types: [minor, patch] }
+    commit-message: { prefix: "chore(deps)" }
+
+  - package-ecosystem: npm
+    directories: ["/frontend", "/mobile", "/desktop", "/e2e"]
+    schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-patch: { update-types: [minor, patch] }
+    ignore:
+      # Expo SDK packages move together with `npx expo install --fix`.
+      - dependency-name: "expo*"
+        update-types: [version-update:semver-major]
+      - dependency-name: "react-native"
+        update-types: [version-update:semver-major, version-update:semver-minor]
+    commit-message: { prefix: "chore(deps)" }
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    groups:
+      actions: { patterns: ["*"] }
+    commit-message: { prefix: "chore(ci)" }
+
+  - package-ecosystem: docker
+    directories: ["/backend", "/frontend", "/deploy/backup"]
+    schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    commit-message: { prefix: "chore(deps)" }
+
+  - package-ecosystem: cargo
+    directory: "/desktop/src-tauri"
+    schedule: { interval: weekly, day: monday, time: "05:00", timezone: Europe/Istanbul }
+    open-pull-requests-limit: 3
+    groups:
+      cargo-minor-patch: { update-types: [minor, patch] }
+    commit-message: { prefix: "chore(deps)" }

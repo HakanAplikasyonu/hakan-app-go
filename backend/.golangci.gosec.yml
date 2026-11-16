@@ -1,0 +1,30 @@
+# gosec security scan (#192, docs/guvenlik-taramalari.md). Separate from the
+# default golangci-lint run so its linter set stays unchanged. Only HIGH
+# severity findings (medium+ confidence) fail CI. A justified false positive
+# is silenced in place with `//nolint:gosec // <reason>`; the reason is
+# required (nolintlint).
+version: "2"
+run:
+  # Test code is not shipped; production code only.
+  tests: false
+linters:
+  default: none
+  enable:
+    - gosec
+    - nolintlint
+  settings:
+    gosec:
+      severity: high
+      confidence: medium
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      # Other directives target the main golangci-lint run.
+      allow-unused: true
+  exclusions:
+    generated: strict
+    paths:
+      - internal/database/db
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

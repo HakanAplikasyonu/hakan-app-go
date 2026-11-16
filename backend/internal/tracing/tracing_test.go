@@ -61,7 +61,7 @@ func TestHTTPSpansCarryNoPersonalData(t *testing.T) {
 		t.Fatalf("status = %v", s.Status())
 	}
 	for _, a := range s.Attributes() {
-		v := a.Value.Emit()
+		v := a.Value.String()
 		if strings.Contains(v, "ayse") || strings.Contains(v, "1234567890") || strings.Contains(v, "secret") || strings.Contains(v, "/x") {
 			t.Fatalf("attribute %s=%s leaks request data", a.Key, v)
 		}

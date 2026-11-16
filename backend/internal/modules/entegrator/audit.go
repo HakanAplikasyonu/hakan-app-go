@@ -43,7 +43,7 @@ func maskTaxID(s string) string {
 
 func (a auditDoer) Do(r *http.Request) (*http.Response, error) {
 	start := time.Now()
-	resp, err := a.next.Do(r)
+	resp, err := a.next.Do(r) //nolint:gosec // URL: provider endpoint or the vault-stored Credentials.Endpoint override (operator-set, no API writes it today; validate it if one is added, docs/guvenlik-taramalari.md)
 	attrs := []any{
 		"connection", a.conn, "source_system", a.system, "vkn", maskTaxID(a.vkn), "method", r.Method,
 		"host", r.URL.Host, "path", r.URL.Path,

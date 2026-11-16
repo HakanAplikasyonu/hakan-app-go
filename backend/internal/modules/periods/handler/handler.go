@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/apiquery"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -115,12 +116,8 @@ func (h *Handler) ListLockEvents(w http.ResponseWriter, r *http.Request) {
 func page(r *http.Request) (int32, int32) {
 	q := r.URL.Query()
 	limit, offset := apiquery.DefaultLimit, int32(0)
-	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 && v <= int(apiquery.MaxLimit) {
-		limit = int32(v)
-	}
-	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v >= 0 && v <= 1_000_000 {
-		offset = int32(v)
-	}
+	limit = intconv.ParseInt32(q.Get("limit"), limit, 1, apiquery.MaxLimit)
+	offset = intconv.ParseInt32(q.Get("offset"), offset, 0, 1_000_000)
 	return limit, offset
 }
 

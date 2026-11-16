@@ -104,7 +104,7 @@ func (r *Registry) Serve(ctx context.Context, addr, token string, log *slog.Logg
 	if err != nil {
 		return err
 	}
-	go func() {
+	go func() { //nolint:gosec // shutdown runs after ctx is done, so it needs its own deadline context
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()

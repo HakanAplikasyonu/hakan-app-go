@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/argon2"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 const (
@@ -84,6 +86,6 @@ func Verify(encoded, value string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("password: decode hash: %w", err)
 	}
-	actual := argon2.IDKey([]byte(value), salt, iter, mem, par, uint32(len(expected)))
+	actual := argon2.IDKey([]byte(value), salt, iter, mem, par, intconv.Uint32(int64(len(expected))))
 	return subtle.ConstantTimeCompare(actual, expected) == 1, nil
 }
