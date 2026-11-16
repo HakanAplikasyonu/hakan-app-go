@@ -125,3 +125,55 @@ func TestWriteFileForcesDownloadForActiveContent(t *testing.T) {
 		}
 	}
 }
+
+// namedPart builds a multipart body with one "file" part of the given name,
+// declared Content-Type and content.
+func namedPart(t *testing.T, name, ctype string, content []byte) (*bytes.Buffer, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	hdr := make(map[string][]string)
+	hdr["Content-Disposition"] = []string{`form-data; name="file"; filename="` + name + `"`}
+	hdr["Content-Type"] = []string{ctype}
+	fw, err := mw.CreatePart(hdr)
+	if err != nil {
+		t.Fatalf("create part: %v", err)
+	}
+	if _, err := fw.Write(content); err != nil {
+		t.Fatalf("write part: %v", err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+	return &buf, mw.FormDataContentType()
+}
+
+func TestUploadRejectsBlockedAndMismatchedTypes(t *testing.T) {
+	// #180: the bytes decide. Each case is refused before svc is reached.
+	cases := []struct {
+		name, file, ctype string
+		content           []byte
+	}{
+		{"windows executable", "fatura.pdf", "application/pdf", []byte("MZ\x90\x00\x03\x00\x00\x00")},
+		{"exe extension", "setup.exe", "application/octet-stream", []byte("hello")},
+		{"html as image", "logo.png", "image/png", []byte("<html><script>alert(1)</script></html>")},
+		{"text claiming pdf", "beyan.pdf", "application/pdf", []byte("just some text")},
+		{"shell script", "run.txt", "text/plain", []byte("#!/bin/sh\nrm -rf /\n")},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := New(nil, 1<<20)
+			body, ctype := namedPart(t, tc.file, tc.ctype, tc.content)
+			req := httptest.NewRequest(http.MethodPost, "/v1/platform/storage/uploads", body)
+			req.Header.Set("Content-Type", ctype)
+			rec := httptest.NewRecorder()
+			h.Upload(rec, req)
+			if rec.Code != http.StatusUnsupportedMediaType {
+				t.Fatalf("status = %d, want 415; body: %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), "UNSUPPORTED_FILE_TYPE") {
+				t.Fatalf("body missing UNSUPPORTED_FILE_TYPE: %s", rec.Body.String())
+			}
+		})
+	}
+}

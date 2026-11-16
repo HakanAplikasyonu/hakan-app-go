@@ -43,6 +43,64 @@ type Config struct {
 	KolayBi    KolayBiConfig
 	Bank       BankConfig
 	Privacy    PrivacyConfig
+	RateLimit  RateLimitConfig
+}
+
+// RateRule is a fixed window: at most Limit requests per Window.
+type RateRule struct {
+	Limit  int
+	Window time.Duration
+}
+
+// RateLimitConfig: abuse protection on login, password reset, invitations and
+// uploads (issue #180).
+type RateLimitConfig struct {
+	// Store: auto (Redis when configured, else in-process memory), redis,
+	// memory or off (RATE_LIMIT_STORE).
+	Store string
+	// Rules by action: login, register, forgot, reset, upload_user,
+	// upload_ip (RATE_LIMIT_<ACTION>_LIMIT / _WINDOW).
+	Rules map[string]RateRule
+	// Login backoff: from Threshold failed logins per account
+	// (IPThreshold per IP) within Window, each failure locks for
+	// Base·2^n up to Max (LOGIN_BACKOFF_*).
+	BackoffThreshold   int
+	BackoffIPThreshold int
+	BackoffBase        time.Duration
+	BackoffMax         time.Duration
+	BackoffWindow      time.Duration
+}
+
+func loadRateLimitConfig() RateLimitConfig {
+	defaults := []struct {
+		action string
+		limit  int
+		window time.Duration
+	}{
+		{"login", 10, 15 * time.Minute},
+		{"register", 5, 15 * time.Minute},
+		{"forgot", 5, 15 * time.Minute},
+		{"reset", 10, 15 * time.Minute},
+		{"upload_user", 300, 10 * time.Minute},
+		{"upload_ip", 600, 10 * time.Minute},
+	}
+	rules := make(map[string]RateRule, len(defaults))
+	for _, d := range defaults {
+		env := "RATE_LIMIT_" + strings.ToUpper(d.action)
+		rules[d.action] = RateRule{
+			Limit:  getInt(env+"_LIMIT", d.limit),
+			Window: getDuration(env+"_WINDOW", d.window),
+		}
+	}
+	return RateLimitConfig{
+		Store:              strings.ToLower(strings.TrimSpace(getEnv("RATE_LIMIT_STORE", "auto"))),
+		Rules:              rules,
+		BackoffThreshold:   getInt("LOGIN_BACKOFF_THRESHOLD", 5),
+		BackoffIPThreshold: getInt("LOGIN_BACKOFF_IP_THRESHOLD", 20),
+		BackoffBase:        getDuration("LOGIN_BACKOFF_BASE", 30*time.Second),
+		BackoffMax:         getDuration("LOGIN_BACKOFF_MAX", 15*time.Minute),
+		BackoffWindow:      getDuration("LOGIN_BACKOFF_WINDOW", time.Hour),
+	}
 }
 
 // PrivacyConfig: KVKK data subject requests (issue #193, docs/kvkk.md §7).
@@ -403,6 +461,7 @@ func Load() (Config, error) {
 			Name: getEnv("APP_NAME", "api"),
 			Env:  getEnv("APP_ENV", "development"),
 		},
+		RateLimit: loadRateLimitConfig(),
 		Privacy: PrivacyConfig{
 			AccountingRetentionYears: getInt("PRIVACY_ACCOUNTING_RETENTION_YEARS", 5),
 			ExportTTL:                getDuration("PRIVACY_EXPORT_TTL", 7*24*time.Hour),
@@ -587,6 +646,11 @@ func (c Config) validate() error {
 	}
 	if c.App.Name == "" {
 		return fmt.Errorf("config: APP_NAME is required")
+	}
+	switch c.RateLimit.Store {
+	case "", "auto", "redis", "memory", "off":
+	default:
+		return fmt.Errorf("config: RATE_LIMIT_STORE must be auto, redis, memory or off")
 	}
 	if c.HTTP.Addr == "" {
 		return fmt.Errorf("config: APP_HTTP_ADDR is required")

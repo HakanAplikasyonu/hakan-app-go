@@ -108,3 +108,35 @@ func TestValidatePlanCacheMode(t *testing.T) {
 		t.Fatal("unknown plan cache mode accepted")
 	}
 }
+
+func TestRateLimitConfig(t *testing.T) {
+	t.Setenv("RATE_LIMIT_STORE", " Memory ")
+	t.Setenv("RATE_LIMIT_LOGIN_LIMIT", "3")
+	t.Setenv("RATE_LIMIT_UPLOAD_IP_WINDOW", "2m")
+	t.Setenv("LOGIN_BACKOFF_BASE", "5s")
+	rl := loadRateLimitConfig()
+	if rl.Store != "memory" {
+		t.Fatalf("store = %q", rl.Store)
+	}
+	if got := rl.Rules["login"]; got.Limit != 3 || got.Window != 15*time.Minute {
+		t.Fatalf("login rule = %+v", got)
+	}
+	if got := rl.Rules["upload_ip"]; got.Limit != 600 || got.Window != 2*time.Minute {
+		t.Fatalf("upload_ip rule = %+v", got)
+	}
+	if rl.BackoffBase != 5*time.Second || rl.BackoffThreshold != 5 || rl.BackoffMax != 15*time.Minute {
+		t.Fatalf("backoff = %+v", rl)
+	}
+
+	c := validProdConfig()
+	for _, s := range []string{"", "auto", "redis", "memory", "off"} {
+		c.RateLimit.Store = s
+		if err := c.validate(); err != nil {
+			t.Errorf("store %q rejected: %v", s, err)
+		}
+	}
+	c.RateLimit.Store = "postgres"
+	if err := c.validate(); err == nil {
+		t.Error("unknown store accepted")
+	}
+}
