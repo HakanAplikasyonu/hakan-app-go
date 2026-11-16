@@ -9,12 +9,14 @@ import { useColors } from '@/core/theme';
 import { kindLabels, statusLabel } from '@/features/receipts/fields';
 import { historyStatusLabel, serverOnly } from '@/features/receipts/history';
 import { useReceipts } from '@/features/receipts/provider';
+import { receiptItems } from '@/features/receipts/queue';
 import { QueueBanner } from '@/features/receipts/queue-banner';
 import { shotAt, statusTone } from '@/features/receipts/status';
 import { useReceiptHistory } from '@/features/receipts/use-history';
 
 export default function ReceiptsScreen() {
-  const { items, syncing, syncNow } = useReceipts();
+  const { items: queue, syncing, syncNow } = useReceipts();
+  const items = receiptItems(queue);
   const { history, loading, refresh } = useReceiptHistory();
   const { taxpayer } = useAuth();
   const earlier = serverOnly(history, items, taxpayer?.taxpayer.uuid ?? '');
