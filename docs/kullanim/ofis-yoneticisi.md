@@ -11,13 +11,23 @@ Günlük işler (UBL yükleme, inceleme, uyarılar) için
 1. Size gelen davet e-postasındaki bağlantıyla hesabınızı açın ya da
    `/login` sayfasından e-posta ve parolanızla girin. Hesabınızda iki adımlı
    doğrulama açıksa doğrulama uygulamanızdaki kodu da girin.
-2. Giriş sonrası ofis panelinin **genel bakış** sayfası açılır. Üstte hangi
-   rolle girdiğiniz ve çalışılan dönem yazar.
+2. Giriş sonrası ofis panelinin **genel bakış** sayfası açılır. Üstte beyan
+   dönemine kalan gün ve KDV son günü, altında dönem tacı (beyana hazır
+   mükellef sayısı, istenen belgeler ve müşavir onayı) yazar.
 3. Genel bakış, işi geride olan mükellefleri (açık engelleyici uyarısı ya da
    değişiklik talebi olanlar önce) ve ödenecek KDV tahmini en yüksek
    mükellefleri gösterir.
 
 ![Ofis paneli genel bakış](../../frontend/public/yardim/img/ofis-genel-bakis.jpg)
+
+Ofis yeni açıldıysa genel bakışın üstünde **Ofis kurulumunu tamamlayın**
+kartı görünür. **Kuruluma devam et** altı adımlık sihirbazı açar: ofis
+bilgileri, ekip, mükellef listesi, muhasebe programı, fatura kaynakları ve
+mükellef davetleri. Soldaki listeden istediğiniz adıma geçebilir, **Geri** ile
+dönebilir ya da **Bu adımı atla** ile ilerleyebilirsiniz. Mükellef listesinde
+hatalı satırların VKN ve unvanını tabloda düzeltip **Düzeltmeleri uygula** ile
+listeyi yeniden kontrol ettirirsiniz. Yarıda bırakılan kurulum genel bakıştaki
+karttan sürer.
 
 Her ekrana kenar çubuğundan ya da **Ctrl+K** (macOS'ta ⌘K) komut paletinden
 gidebilirsiniz: mükellef adı ya da ekran adı yazın.
