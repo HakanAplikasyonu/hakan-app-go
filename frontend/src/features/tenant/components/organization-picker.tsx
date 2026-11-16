@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { ChevronRight } from "lucide-react";
 
@@ -19,18 +19,29 @@ import { date } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
+/**
+ * `?to=agents` (#285): a page inside the chosen organization, for links that
+ * cannot know the office's slug (usage guides). Only plain lowercase path
+ * segments are kept, so the target always stays under `/t/{slug}/`.
+ */
+export function pickerTarget(to: string | null): string {
+  return to && /^[a-z][a-z-]*(\/[a-z][a-z-]*)*$/.test(to) ? `/${to}` : "";
+}
+
 /** `/t` — lists the caller's organizations (several memberships). */
 export function OrganizationPicker() {
   const { t, locale } = useLocale();
   const router = useRouter();
   const { user } = useAuth();
   const orgs = user?.organizations ?? [];
+  const suffix = pickerTarget(useSearchParams().get("to"));
+  const target = (slug: string) => `${routes.tenant.home(slug)}${suffix}`;
 
   // A single membership needs no choice.
   const only = orgs.length === 1 ? orgs[0] : undefined;
   useEffect(() => {
-    if (only) router.replace(routes.tenant.home(only.slug));
-  }, [only, router]);
+    if (only) router.replace(`${routes.tenant.home(only.slug)}${suffix}`);
+  }, [only, router, suffix]);
 
   if (only) return null;
 
@@ -57,7 +68,7 @@ export function OrganizationPicker() {
                 return (
                   <li key={org.uuid}>
                     <Link
-                      href={routes.tenant.home(org.slug)}
+                      href={target(org.slug)}
                       className="hover:bg-muted/60 flex items-center gap-3 px-4 py-3 text-sm"
                     >
                       <div className="min-w-0 flex-1">

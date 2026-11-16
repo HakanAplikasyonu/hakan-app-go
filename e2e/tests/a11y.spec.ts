@@ -70,6 +70,7 @@ test.describe("@a11y ofis paneli", () => {
       "/warnings",
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,
+      "/agents",
       "/members",
       "/roles",
       "/settings",
@@ -93,6 +94,44 @@ test.describe("@a11y ofis paneli", () => {
     await scan(page, "komut paleti");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+  });
+
+  // #285: çevrimdışı rozeti ve genel bakış kartı yalnızca çevrimdışı ajan
+  // varken görünür; sunucu bunu 30 dk sessizlikten sonra yapar, liste taklit edilir.
+  test("çevrimdışı masaüstü ajanı: genel bakış kartı ve ajan listesi", async ({ page }) => {
+    const at = new Date(Date.now() - 3_600_000).toISOString();
+    await page.route("**/api/v1/tenant/agents", (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          data: {
+            items: [
+              {
+                uuid: "00000000-0000-4000-8000-000000000285",
+                machine_id: "a11y-agent-0001",
+                name: "A11y-PC",
+                platform: "windows",
+                version: "0.1.0",
+                status: "offline",
+                last_seen_at: at,
+                offline_since: at,
+                heartbeat: {},
+                created_at: at,
+                last_error: { code: "AGENT_OFFLINE", at },
+                heartbeat_seconds: 300,
+              },
+            ],
+          },
+          meta: { request_id: "a11y" },
+        },
+      }),
+    );
+    await uiLogin(page, DEMO.owner);
+    for (const p of ["", "/agents"]) {
+      await page.goto(officePath(p));
+      await expect(page.getByText("A11y-PC").first()).toBeVisible();
+      await scan(page, `${officePath(p)} (çevrimdışı ajan)`);
+    }
   });
 });
 

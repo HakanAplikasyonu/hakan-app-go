@@ -67,6 +67,22 @@ Her klasörün kartında mükellefin adı, son yükleme zamanı ve durum görün
 Bir klasörü izlemeden çıkarmak için kartındaki **Kaldır**'a basın.
 Klasördeki dosyalara dokunulmaz.
 
+## Ofis panelinden izleme
+
+Ofisteki bütün ajanlar ofis panelinde **Masaüstü ajanları** sayfasında
+listelenir: [ajanları aç](/t?to=agents). Sayfa her ajanın adını,
+platformunu, sürümünü, **Çevrimiçi / Çevrimdışı** durumunu, son görülme
+zamanını ve son hatasını gösterir.
+
+![Masaüstü ajanları sayfası](../../frontend/public/yardim/img/ofis-masaustu-ajanlari.jpg)
+
+- 30 dakika heartbeat göndermeyen ajan **Çevrimdışı** olur. Genel bakışta
+  "masaüstü ajanı çevrimdışı" kartı çıkar ve ajanı kaydeden kullanıcıya
+  bildirim gider.
+- Artık kullanılmayan bir bilgisayarın ajanını **Kaldır** ile ofisten
+  çıkarabilirsiniz (yazma izni gerekir). Kaldırılan ajan bir sonraki
+  heartbeat'te reddedilir ve yükleme yapamaz.
+
 ## Arka planda çalışma
 
 - Pencereyi kapatmak uygulamayı kapatmaz: pencere gizlenir, klasör izleme
@@ -109,7 +125,7 @@ kullanıcısıyla bağlanır. Yalnızca önceden tanımlı sorgular çalışır.
 |---|---|
 | Rozet **Oturum açılmadı** | Oturum açın. Oturum sunucuda kapatıldıysa (ör. parola değişti) yeniden açın. |
 | Rozet **Ofis seçilmedi** | Ofisi seçip **Devam et**'e basın. |
-| Rozet **Bağlantı sorunu** | İnternet bağlantısını ve sunucu adresini denetleyin. Ajan 30 dakika sessiz kalırsa ofis panelinde çevrimdışı görünür ve kaydeden kullanıcıya bildirim gider. |
+| Rozet **Bağlantı sorunu** | İnternet bağlantısını ve sunucu adresini denetleyin. Ajan 30 dakika sessiz kalırsa ofis panelindeki [Masaüstü ajanları](/t?to=agents) sayfasında çevrimdışı görünür ve kaydeden kullanıcıya bildirim gider. |
 | Rozet **Yerel ajan yeniden başlatılıyor…** | Ajan kendini kısa aralıklarla (1, 2, 4… en çok 16 sn) yeniden başlatır. Düzelmezse **Gelişmiş → Yerel ajanı yeniden başlat**. |
 | Dosya yüklenmiyor | Klasörün **Sorunlu dosyalar** listesine bakın. Uzantı `.xml` ya da `.zip` mi? Dosya hâlâ yazılıyor olabilir: iki tarama bekleyin. İzleme duraklatılmış olabilir: **İzlemeyi sürdür**. |
 | "Gönderilemedi, yeniden denenecek" | Ağ ya da sunucu sorunu. Ajan bir sonraki taramada yeniden dener. |
@@ -131,4 +147,5 @@ Günlük dönerek tutulur (5 dosya × 2 MB). E-posta, VKN/TCKN, IBAN, telefon ve
 belirteçler yazılmadan önce maskelenir.
 
 Ajanı başka bir bilgisayara taşırken eski bilgisayarda **Oturumu kapat**'a
-basın.
+basın ya da ofis panelindeki [Masaüstü ajanları](/t?to=agents) sayfasından
+eski kaydı kaldırın.
