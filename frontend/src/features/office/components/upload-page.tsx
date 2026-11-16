@@ -112,13 +112,12 @@ function JobReport({
                   </span>
                   {f.error ? (
                     <span className="text-muted-foreground mt-0.5 block text-[11px]">
-                      {f.error_code ? `${f.error_code}: ` : ""}
-                      {f.error}
+                      {uploadErrorText(t, f.error_code, f.error)}
                     </span>
                   ) : null}
                 </td>
                 <td>
-                  {f.invoice_uuid ? (
+                  {f.invoice_uuid && f.invoice_uuid !== NIL_UUID ? (
                     <Link
                       className="hover:underline"
                       href={routes.tenant.invoice(
@@ -132,7 +131,7 @@ function JobReport({
                   ) : (
                     "—"
                   )}
-                  {f.ettn ? (
+                  {f.ettn && f.ettn !== NIL_UUID ? (
                     <Figure className="text-muted-foreground block text-[11px]">
                       {f.ettn}
                     </Figure>
@@ -361,4 +360,29 @@ export function UploadPage() {
       <UploadInner />
     </Suspense>
   );
+}
+
+/**
+ * The server sends the zero UUID for a file that produced no invoice (or has
+ * no ETTN); it is neither shown nor linked (#161).
+ */
+const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Turkish text for a per-file upload error (#161). Reuses the taxpayer
+ * panel's `upload_error_*` copy; an unknown code falls back to the server
+ * text with its code.
+ */
+function uploadErrorText(
+  t: (key: string) => string,
+  code: string | null | undefined,
+  message: string | null | undefined,
+) {
+  if (code) {
+    const key = `taxpayer.upload_error_${code}`;
+    const msg = t(key);
+    if (msg !== key) return msg;
+    return message ? `${code}: ${message}` : code;
+  }
+  return message ?? "";
 }

@@ -57,9 +57,23 @@ const statusClass: Record<JournalDraft["status"], string> = {
   exported: "bg-brand/12 text-brand",
 };
 
-function errorText(err: unknown, fallback: string) {
-  if (isApiError(err)) return err.message || fallback;
+type Translate = (key: string) => string;
+
+/** API error in Turkish when the code is known, else the server message (#161). */
+function errorText(t: Translate, err: unknown, fallback: string) {
+  if (isApiError(err)) {
+    const key = `office.journals.error_${err.code}`;
+    const msg = err.code ? t(key) : key;
+    return msg !== key ? msg : err.message || fallback;
+  }
   return err instanceof Error ? err.message : fallback;
+}
+
+/** Program label for an export driver id; the id itself when unknown. */
+function driverLabel(t: Translate, name: string) {
+  const key = `office.journals.driver_${name}`;
+  const msg = t(key);
+  return msg === key ? name : msg;
 }
 
 function NewDraft({ engagement }: { engagement: string }) {
@@ -217,7 +231,7 @@ function NewDraft({ engagement }: { engagement: string }) {
         </div>
         {create.isError ? (
           <p className="text-status-blocking text-sm">
-            {errorText(create.error, t("office.api.load_error"))}
+            {errorText(t, create.error, t("office.api.load_error"))}
           </p>
         ) : null}
         <p className="text-muted-foreground text-xs">
@@ -260,7 +274,10 @@ function ExportPanel({
             label={t("office.journals.driver")}
             value={driver}
             onChange={setDriver}
-            options={items.map((d) => ({ value: d.name, label: d.name }))}
+            options={items.map((d) => ({
+              value: d.name,
+              label: driverLabel(t, d.name),
+            }))}
           />
           {chosen && !chosen.verified ? (
             <span className="bg-status-warning/12 text-status-warning rounded-md px-2 py-0.5 text-xs">
@@ -303,7 +320,7 @@ function ExportPanel({
           </div>
         ) : run.isError ? (
           <p className="text-status-blocking text-sm">
-            {errorText(run.error, t("office.api.load_error"))}
+            {errorText(t, run.error, t("office.api.load_error"))}
           </p>
         ) : null}
         {run.data ? (
@@ -411,7 +428,7 @@ function JournalsInner() {
       <Panel title={t("office.journals.drafts_title")}>
         {actionError ? (
           <p className="text-status-blocking px-4 pt-3 text-sm">
-            {errorText(actionError, t("office.api.load_error"))}
+            {errorText(t, actionError, t("office.api.load_error"))}
           </p>
         ) : null}
         {drafts.isLoading ? (
