@@ -3134,6 +3134,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/dashboard": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office home dashboard
+         * @description Requires `tenant.engagements.read`. Counts of the review queue
+         *     (pending suggestions), document tasks (open, submitted, overdue),
+         *     open data warnings by severity and today's uploads (receipts, UBL
+         *     uploads, document task uploads since midnight Europe/Istanbul), plus
+         *     the latest uploads of the day (at most 10). Active engagements only;
+         *     without `tenant.engagements.read_all` only engagements assigned to the
+         *     caller. A section the caller may not read (`tenant.review.read`,
+         *     `tenant.doc_tasks.read`, `tenant.warnings.read`) is `null`.
+         */
+        get: operations["getOfficeDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/warnings": {
         parameters: {
             query?: never;
@@ -8632,6 +8665,80 @@ export interface components {
             role: string;
             /** @description `tenant.*` permission slugs granted in this organization only */
             permissions: string[];
+        };
+        OfficeDashboard: {
+            /** Format: date-time */
+            generated_at: string;
+            /**
+             * Format: date-time
+             * @description Start of today (Europe/Istanbul)
+             */
+            since: string;
+            review: {
+                /** Format: int64 */
+                pending: number;
+            } | null;
+            doc_tasks: {
+                /** Format: int64 */
+                open: number;
+                /** Format: int64 */
+                submitted: number;
+                /**
+                 * Format: int64
+                 * @description Open tasks past due_at
+                 */
+                overdue: number;
+            } | null;
+            warnings: {
+                /** Format: int64 */
+                open: number;
+                /** Format: int64 */
+                blocker: number;
+                /** Format: int64 */
+                warning: number;
+                /** Format: int64 */
+                info: number;
+            } | null;
+            uploads: {
+                /** Format: int64 */
+                total: number;
+                /** Format: int64 */
+                receipts: number;
+                /** Format: int64 */
+                invoices: number;
+                /** Format: int64 */
+                documents: number;
+                recent: components["schemas"]["OfficeDashboardUpload"][];
+            };
+        };
+        OfficeDashboardUpload: {
+            /** @enum {string} */
+            kind: "receipt" | "invoice" | "document";
+            /**
+             * Format: uuid
+             * @description Receipt capture, UBL upload job or document task upload
+             */
+            uuid: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            taxpayer_title: string;
+            /** @description Status of the receipt, the upload job or the document task */
+            status: string;
+            /**
+             * Format: uuid
+             * @description Document task of a document upload
+             */
+            task_uuid: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeOfficeDashboard: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeDashboard"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeTenantContext: {
             /** @enum {boolean} */
@@ -16849,6 +16956,36 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getOfficeDashboard: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeDashboard"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };
