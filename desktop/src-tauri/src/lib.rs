@@ -7,8 +7,9 @@ pub mod bridge;
 pub mod logmask;
 mod secrets;
 pub mod supervisor;
+pub mod updater;
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
@@ -86,7 +87,14 @@ impl Default for SidecarState {
     }
 }
 
-struct UpdaterEnabled(bool);
+/// Güncelleyici durumu (#205). `cfg` derleme zamanında belirlenir; hatalıysa
+/// güncelleyici kapalıdır ve ön yüz nedeni gösterir.
+struct UpdaterState {
+    cfg: Result<updater::Config, updater::Disabled>,
+    status: Mutex<updater::Status>,
+    /// İndirme / kurulum sürüyor mu? Aynı anda ikinci kurulum başlamaz.
+    installing: AtomicBool,
+}
 
 fn start_sidecar(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<SidecarState>();
@@ -424,82 +432,177 @@ fn set_watch_paused(app: AppHandle, paused: bool) -> Result<bool, String> {
     Ok(is_paused(&app))
 }
 
-#[derive(serde::Serialize)]
-struct UpdateInfo {
-    enabled: bool,
-    current: String,
-    available: Option<String>,
-    notes: Option<String>,
+fn update_settings_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
+    app.path().app_config_dir().ok()
 }
 
-#[tauri::command]
-async fn update_check(
-    app: AppHandle,
-    enabled: State<'_, UpdaterEnabled>,
-) -> Result<UpdateInfo, String> {
-    let current = app.package_info().version.to_string();
-    if !enabled.0 {
-        return Ok(UpdateInfo {
-            enabled: false,
-            current,
-            available: None,
-            notes: None,
-        });
-    }
-    use tauri_plugin_updater::UpdaterExt;
-    let update = app
-        .updater()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await
-        .map_err(|e| e.to_string())?;
-    Ok(UpdateInfo {
-        enabled: true,
-        current,
-        available: update.as_ref().map(|u| u.version.clone()),
-        notes: update.and_then(|u| u.body),
-    })
-}
-
-#[tauri::command]
-async fn update_install(app: AppHandle, enabled: State<'_, UpdaterEnabled>) -> Result<(), String> {
-    if !enabled.0 {
-        return Err("güncelleyici bu derlemede kapalı".into());
-    }
-    use tauri_plugin_updater::UpdaterExt;
-    let Some(update) = app
-        .updater()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await
-        .map_err(|e| e.to_string())?
-    else {
-        return Ok(());
+/// Durumu değiştirir ve ön yüze `updater://status` olarak bildirir.
+fn set_update_status(app: &AppHandle, f: impl FnOnce(&mut updater::Status)) -> updater::Status {
+    let state = app.state::<UpdaterState>();
+    let snapshot = {
+        let mut st = state.status.lock().unwrap();
+        f(&mut st);
+        st.clone()
     };
-    update
-        .download_and_install(|_, _| {}, || {})
-        .await
-        .map_err(|e| e.to_string())?;
-    app.restart();
+    let _ = app.emit("updater://status", &snapshot);
+    snapshot
 }
 
-/// Güncelleyici yalnızca yapılandırmada açık anahtar ve uç tanımlıysa
-/// açılır (sürüm derlemesi `tauri.release.conf.json` ile verir). Yerel ve CI
-/// derlemeleri anahtarsız çalışır.
-fn updater_configured(app: &tauri::App) -> bool {
-    app.config()
-        .plugins
-        .0
-        .get("updater")
-        .map(|u| {
-            let key = u.get("pubkey").and_then(Value::as_str).unwrap_or("");
-            let has_endpoint = u
-                .get("endpoints")
-                .and_then(Value::as_array)
-                .is_some_and(|e| !e.is_empty());
-            !key.trim().is_empty() && has_endpoint
-        })
-        .unwrap_or(false)
+/// Seçili kanalın manifestini denetler. Kapalıysa ağa çıkmaz.
+async fn run_update_check(app: &AppHandle) -> updater::Status {
+    let state = app.state::<UpdaterState>();
+    let Ok(cfg) = state.cfg.clone() else {
+        return state.status.lock().unwrap().clone();
+    };
+    if state.installing.load(Ordering::SeqCst) {
+        return state.status.lock().unwrap().clone();
+    }
+    let channel = state.status.lock().unwrap().channel;
+    set_update_status(app, |s| {
+        s.state = "checking";
+        s.error = None;
+    });
+    let result = match updater::updater_for(app, &cfg, channel, None) {
+        Ok(u) => u.check().await.map_err(|e| e.to_string()),
+        Err(e) => Err(e),
+    };
+    let now = chrono_now();
+    match result {
+        Ok(Some(u)) => {
+            log::info!("güncelleme var: {} ({})", u.version, channel.as_str());
+            set_update_status(app, |s| {
+                s.state = "available";
+                s.available = Some(u.version.clone());
+                s.notes = u.body.clone();
+                s.checked_at = Some(now);
+            })
+        }
+        Ok(None) => set_update_status(app, |s| {
+            s.state = "up_to_date";
+            s.available = None;
+            s.notes = None;
+            s.checked_at = Some(now);
+        }),
+        Err(e) => {
+            log::warn!("güncelleme denetlenemedi: {e}");
+            set_update_status(app, |s| {
+                s.state = "error";
+                s.error = Some(updater::user_error(&e));
+            })
+        }
+    }
+}
+
+/// Açılıştan kısa süre sonra ve 6 saatte bir denetler (#205).
+fn spawn_update_loop(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(updater::FIRST_CHECK_DELAY).await;
+        loop {
+            run_update_check(&app).await;
+            tokio::time::sleep(updater::CHECK_INTERVAL).await;
+        }
+    });
+}
+
+/// Güncel durum (ağa çıkmaz).
+#[tauri::command]
+fn update_status(state: State<'_, UpdaterState>) -> updater::Status {
+    state.status.lock().unwrap().clone()
+}
+
+/// Şimdi denetle.
+#[tauri::command]
+async fn update_check(app: AppHandle) -> Result<updater::Status, String> {
+    Ok(run_update_check(&app).await)
+}
+
+/// Kanalı (stable / beta) değiştirir, kaydeder ve yeniden denetler.
+#[tauri::command]
+async fn update_set_channel(app: AppHandle, channel: String) -> Result<updater::Status, String> {
+    let ch = updater::Channel::parse(&channel).ok_or("Bilinmeyen güncelleme kanalı.")?;
+    if let Some(dir) = update_settings_dir(&app) {
+        if let Err(e) = updater::save_channel(&dir, ch) {
+            log::error!("güncelleme kanalı kaydedilemedi: {e}");
+            return Err("Kanal seçimi kaydedilemedi.".into());
+        }
+    }
+    set_update_status(&app, |s| {
+        s.channel = ch;
+        s.available = None;
+        s.notes = None;
+    });
+    Ok(run_update_check(&app).await)
+}
+
+/// Güncellemeyi indirir (ilerleme `updater://progress`), kurar ve uygulamayı
+/// yeniden başlatır. Güncelleme yoksa hiçbir şey yapmaz.
+#[tauri::command]
+async fn update_install(app: AppHandle) -> Result<(), String> {
+    let state = app.state::<UpdaterState>();
+    let Ok(cfg) = state.cfg.clone() else {
+        return Err("Bu derlemede otomatik güncelleme kapalı.".into());
+    };
+    if state.installing.swap(true, Ordering::SeqCst) {
+        return Err("Güncelleme zaten indiriliyor.".into());
+    }
+    let channel = state.status.lock().unwrap().channel;
+    let result = install_update(&app, &cfg, channel).await;
+    state.installing.store(false, Ordering::SeqCst);
+    match result {
+        Ok(true) => {
+            log::info!("güncelleme kuruldu, yeniden başlatılıyor");
+            stop_sidecar(&app, Mode::ShuttingDown);
+            app.restart();
+        }
+        Ok(false) => {
+            set_update_status(&app, |s| {
+                s.state = "up_to_date";
+                s.available = None;
+            });
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("güncelleme kurulamadı: {e}");
+            let msg = updater::user_error(&e);
+            set_update_status(&app, |s| {
+                s.state = "error";
+                s.error = Some(msg.clone());
+            });
+            Err(msg)
+        }
+    }
+}
+
+async fn install_update(
+    app: &AppHandle,
+    cfg: &updater::Config,
+    channel: updater::Channel,
+) -> Result<bool, String> {
+    let u = updater::updater_for(app, cfg, channel, None)?;
+    let Some(update) = u.check().await.map_err(|e| e.to_string())? else {
+        return Ok(false);
+    };
+    set_update_status(app, |s| {
+        s.state = "downloading";
+        s.available = Some(update.version.clone());
+        s.error = None;
+    });
+    let mut progress = updater::Progress::default();
+    let progress_app = app.clone();
+    let done_app = app.clone();
+    update
+        .download_and_install(
+            move |chunk, total| {
+                progress.add(chunk, total);
+                let _ = progress_app.emit("updater://progress", progress);
+            },
+            move || {
+                set_update_status(&done_app, |s| s.state = "installing");
+            },
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(true)
 }
 
 /// `--self-test`: uygulama açılır, sidecar'a ping atar, sonucu stdout'a tek
@@ -591,18 +694,40 @@ pub fn run() {
         ))
         .manage(SidecarState::default())
         .setup(move |app| {
-            let updater = updater_configured(app);
-            if updater {
-                app.handle()
-                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+            // Güncelleyici (#205): anahtar ve adres derleme zamanında gelir.
+            let cfg = updater::Config::from_build();
+            let version = app.package_info().version.to_string();
+            let channel = app
+                .path()
+                .app_config_dir()
+                .map(|d| updater::load_channel(&d, &version))
+                .unwrap_or_else(|_| updater::Channel::default_for(&version));
+            if let Err(d) = &cfg {
+                log::info!("güncelleyici kapalı: {d:?}");
             }
-            app.manage(UpdaterEnabled(updater));
+            let status = updater::Status::initial(version, channel, &cfg);
+            let enabled = cfg.is_ok();
+            if let Ok(c) = &cfg {
+                app.handle().plugin(
+                    tauri_plugin_updater::Builder::new()
+                        .pubkey(c.pubkey.clone())
+                        .build(),
+                )?;
+            }
+            app.manage(UpdaterState {
+                cfg,
+                status: Mutex::new(status),
+                installing: AtomicBool::new(false),
+            });
             if let Err(e) = start_sidecar(app.handle()) {
                 log::error!("sidecar başlatılamadı: {e}");
             }
             if self_test_mode {
                 self_test(app.handle().clone());
                 return Ok(());
+            }
+            if enabled {
+                spawn_update_loop(app.handle().clone());
             }
             // Tepsi yoksa (ör. masaüstü ortamı desteklemiyor) pencere kapanınca
             // uygulama görünmez kalmasın diye gizleme yerine çıkış yapılır.
@@ -642,7 +767,9 @@ pub fn run() {
             shell_settings,
             set_autostart_enabled,
             set_watch_paused,
+            update_status,
             update_check,
+            update_set_channel,
             update_install,
             secrets::secret_set,
             secrets::secret_get,

@@ -2,14 +2,5 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "createUpdaterArtifacts": true
-  },
-  "plugins": {
-    "updater": {
-      "pubkey": "",
-      "endpoints": [
-        "https://github.com/HakanAplikasyonu/hakan-app-go/releases/latest/download/latest.json"
-      ],
-      "windows": { "installMode": "passive" }
-    }
   }
 }

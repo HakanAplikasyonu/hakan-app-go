@@ -30,6 +30,11 @@ tokio = { version = "1", features = ["sync", "time", "macros"] }
 log = "0.4"
 
 [dev-dependencies]
+# Güncelleyici uçtan uca testi (#205): sahte Tauri uygulaması, geçici
+# minisign anahtar çifti.
+tauri = { version = "2", features = ["tray-icon", "test"] }
+minisign = "0.7"
+base64 = "0.22"
 tokio = { version = "1", features = ["process", "io-util", "rt-multi-thread", "macros", "time", "sync"] }
 
 [profile.release]

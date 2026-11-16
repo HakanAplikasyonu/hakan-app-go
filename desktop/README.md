@@ -72,6 +72,25 @@ desktop/
   - Dönerek tutulur: 5 dosya × 2 MB.
   - Satırlar yazılmadan önce maskelenir (`src/logmask.rs`): e-posta, VKN/TCKN, IBAN, telefon, JWT, `Bearer` ve belirteç/şifre alanları.
 
+## Otomatik güncelleme (#205)
+
+- **Yapılandırma derleme zamanında:** `TAURI_UPDATER_PUBKEY` (imza açık anahtarı) ve `TAURI_UPDATER_BASE_URL` (manifest kökü) `cargo`/`tauri build` sırasında ortamdan okunur (`src/updater.rs`, `option_env!`).
+  - Biri yoksa güncelleyici bu derlemede **kapalıdır**; arayüzdeki "Güncellemeler" kartı nedenini yazar. Yerel ve CI derlemeleri böyledir.
+  - Sürüm derlemesinde adres `https` olmalıdır; değilse güncelleyici kapalı kalır.
+- **Manifest adresi:** `<TAURI_UPDATER_BASE_URL>/<kanal>/latest.json` (`scripts/updater-manifest.mjs` ile aynı).
+- **Kanal:** Kararlı (`stable`) ya da Beta (`beta`); arayüzden seçilir, `<uygulama yapılandırma klasörü>/updater.json`'a yazılır. Seçim yoksa `-beta.N` sürümler beta, diğerleri kararlı kanaldadır.
+- **Denetim:** açılıştan 15 sn sonra ve 6 saatte bir. Yeni sürüm varsa pencerenin üstünde bant ve kartta "Güncelle ve yeniden başlat" görünür; indirme ilerleme çubuğuyla izlenir, kurulumdan sonra uygulama yeniden başlar. Kullanıcı onayı olmadan kurulmaz.
+- Komutlar: `update_status`, `update_check`, `update_set_channel`, `update_install`; olaylar: `updater://status`, `updater://progress`.
+- **Uçtan uca test** (`tests/updater_e2e.rs`): her çalıştırmada geçici minisign anahtar çifti üretilir, yerel HTTP sunucusu test manifestini ve paketi verir. 0.1.0 → 0.2.0 geçişinde paket indirilir, imzası doğrulanır ve kurulu ikilinin yerine konur; yanlış anahtarla imzalı paket reddedilir, kurulu dosya değişmez; kanal seçimi doğru manifeste gider.
+
+Yerelde güncelleyiciyi açık derlemek (geçici anahtarla):
+
+```bash
+npx tauri signer generate --ci -w /tmp/hakan-test.key -p ""
+TAURI_UPDATER_PUBKEY="$(cat /tmp/hakan-test.key.pub)" \
+TAURI_UPDATER_BASE_URL=http://127.0.0.1:8080 npm run dev
+```
+
 ## Protokol
 
 Her satır bir JSON nesnesi:
@@ -119,7 +138,9 @@ Duman testi: `hakan-desktop --self-test` uygulamayı açar, sidecar'a
   `WINDOWS_CERTIFICATE_PASSWORD`; parmak izi derlemede yapılandırmaya verilir.
 - Güncelleyici: `TAURI_SIGNING_PRIVATE_KEY` (+ parola) sırrı ve
   `TAURI_UPDATER_PUBKEY` değişkeni varsa `tauri.release.conf.json` ile
-  güncelleme paketleri üretilir. Anahtar yoksa güncelleyici derlemede kapalıdır.
+  güncelleme paketleri üretilir. Uygulamanın güncellemeyi denetlemesi için
+  ayrıca `TAURI_UPDATER_BASE_URL` değişkeni gerekir; ikisi derleme adımına env
+  olarak verilir. Biri yoksa güncelleyici derlemede kapalıdır.
 
 Sırlar yoksa iş düşmez; imzasız paket üretir ve özetine yazar. Anahtarlar koda
 ya da depoya girmez.
