@@ -3581,7 +3581,48 @@ export interface paths {
          */
         get: operations["listTaxpayerReceipts"];
         put?: never;
-        post?: never;
+        /**
+         * Fiş fotoğrafı yükle (mobil uygulama)
+         * @description Mükellef kapsamlı fiş yükleme (issue #199). Fotoğraf şirketin **etkin
+         *     ofisi** için okunur; ofis tarafındaki `captureReceipt` ile aynı akıştır
+         *     (taslak, mükerrer denetimi, düşük güvenli alanlar inceleme kuyruğuna).
+         *     `Idempotency-Key` aynı şirket için tekrar gelirse yeni kayıt açılmaz,
+         *     ilk kayıt `200` ile döner (bağlantısı kopan mobil yükleme güvenle
+         *     yeniden denenir). Etkin ofis yoksa `409 NO_ACTIVE_ENGAGEMENT`.
+         */
+        post: operations["captureTaxpayerReceipt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/receipts/{uuid}/corrections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fiş alanları için düzeltme öner
+         * @description Mükellefin önerdiği değerler (issue #199) ofisin inceleme kuyruğuna
+         *     `receipt_field` önerisi olarak gider (köken: girdi). Taslağa bu uçta
+         *     yazılmaz; müşavir kuyrukta kabul eder ya da reddeder. Aynı alandaki
+         *     bekleyen öneri (düşük güvenli OCR) yerini mükellef önerisine bırakır.
+         *     Taslağı olmayan fiş (failed, duplicate) için `409`.
+         */
+        post: operations["correctTaxpayerReceipt"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8156,6 +8197,16 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["ReceiptCapture"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReceiptCorrectionResult: {
+            /** @description Fields sent to the office's review queue. */
+            submitted: string[];
+        };
+        EnvelopeReceiptCorrectionResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ReceiptCorrectionResult"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeReceiptCapturePage: {
@@ -17272,6 +17323,136 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+        };
+    };
+    captureTaxpayerReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+                /** @description İstemcinin fotoğraf kimliği (en çok 128 karakter). */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    image: string;
+                    /** @enum {string} */
+                    kind?: "expense_receipt" | "fuel_receipt" | "z_report";
+                };
+            };
+        };
+        responses: {
+            /** @description Aynı Idempotency-Key ile daha önce yüklenen kayıt */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReceiptCapture"];
+                };
+            };
+            /** @description Yüklendi */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReceiptCapture"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECEIPTS_UNAVAILABLE` ya da `AI_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    correctTaxpayerReceipt: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    corrections: {
+                        /** @enum {string} */
+                        field: "date" | "vendor_tax_number" | "vendor_name" | "receipt_number" | "total_amount" | "tax_amount" | "tax_rate" | "vehicle_plate" | "z_report_number" | "okc_serial_number" | "payment_method";
+                        value: string;
+                        note?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Öneriler inceleme kuyruğuna gönderildi */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReceiptCorrectionResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECEIPTS_UNAVAILABLE` ya da `REVIEW_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     listTaxpayerUploads: {

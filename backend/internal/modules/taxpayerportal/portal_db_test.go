@@ -26,6 +26,7 @@ import (
 type env struct {
 	d     *testdb.DB
 	mux   *http.ServeMux
+	h     *Handler
 	userA int64
 	tpA   uuid.UUID
 	tpB   uuid.UUID
@@ -108,6 +109,7 @@ func setup(t *testing.T) env {
 	members := taxpayers.NewMembers(taxpayers.NewMemberPostgres(d.Pool), nil, taxpayers.InvitationConfig{}, nil)
 	ups := upload.New(d.Pool, storage.NewMemory(), nil, nil)
 	h := NewHandler(db.New(d.Pool), ups)
+	e.h = h
 	e.mux = http.NewServeMux()
 	fakeAuth := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -120,14 +122,27 @@ func setup(t *testing.T) env {
 
 func (e env) do(t *testing.T, method, path string, tp uuid.UUID, body *bytes.Buffer, contentType string) *httptest.ResponseRecorder {
 	t.Helper()
-	if body == nil {
-		body = &bytes.Buffer{}
+	req := httptest.NewRequest(method, path, nil)
+	if body != nil {
+		req = httptest.NewRequest(method, path, body)
 	}
-	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("X-Taxpayer", tp.String())
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
+	return e.serve(req)
+}
+
+// req builds a request for taxpayer A.
+func (e env) req(t *testing.T, method, path string, body *bytes.Buffer, contentType string) *http.Request {
+	t.Helper()
+	req := httptest.NewRequest(method, path, body)
+	req.Header.Set("X-Taxpayer", e.tpA.String())
+	req.Header.Set("Content-Type", contentType)
+	return req
+}
+
+func (e env) serve(req *http.Request) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
 	e.mux.ServeHTTP(rec, req)
 	return rec

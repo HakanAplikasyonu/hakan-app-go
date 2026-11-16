@@ -1,10 +1,11 @@
 /**
- * Mükellef tarafı fiş ve görev uçları.
+ * Mükellef tarafı fiş uçları (#199).
  *
- * Henüz backend'de yok (#38 PR'ı "Karar gerekiyor"): ofis tarafındaki
- * `POST /v1/tenant/engagements/{uuid}/receipts` sözleşmesinin mükellef kapsamlı
- * (`X-Taxpayer`) karşılığı olarak önerildi. Uç nokta yokken 404 döner ve fiş
- * kuyrukta `blocked` olarak bekler.
+ * `POST /v1/taxpayer/receipts` (multipart `image`, `kind`; `Idempotency-Key`)
+ * fotoğrafı şirketin etkin ofisi için okur; aynı anahtarla tekrar gelen istek
+ * ilk kaydı 200 ile döner. `POST …/{uuid}/corrections` önerileri ofisin
+ * inceleme kuyruğuna gönderir. `GET /v1/taxpayer/receipts` sunucudaki geçmiştir
+ * (telefon değişince de görünür).
  */
 import { Platform } from 'react-native';
 
@@ -65,6 +66,25 @@ export function sendCorrections(item: QueueItem, corrections: Correction[]) {
     taxpayer: item.taxpayer,
     body: { corrections },
   });
+}
+
+/** A receipt in the server-side history (`GET /v1/taxpayer/receipts`). */
+export type ServerReceipt = {
+  uuid: string;
+  kind?: string;
+  status: string;
+  media_type: string;
+  vendor_name?: string;
+  date?: string;
+  total_amount?: string;
+  error?: string;
+  created_at: string;
+};
+
+/** The company's receipts on the server, newest first. */
+export async function fetchReceiptHistory(taxpayer: string, limit = 50): Promise<ServerReceipt[]> {
+  const data = await api.get<{ items: ServerReceipt[] }>(`${RECEIPTS_PATH}?limit=${limit}`, { taxpayer });
+  return data?.items ?? [];
 }
 
 /** Görevler; uç nokta yoksa null (ekran "henüz yok" der). */

@@ -1297,6 +1297,7 @@ type ReceiptCapture struct {
 	Error          pgtype.Text        `json:"error"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ClientKey      pgtype.Text        `json:"client_key"`
 }
 
 type RefreshToken struct {

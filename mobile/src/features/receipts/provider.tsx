@@ -9,6 +9,8 @@ import { sendCorrections, uploadReceipt } from './api';
 import {
   addCorrection,
   classify,
+  correctionOutcome,
+  markCorrections,
   correctionsDue,
   due,
   markFailed,
@@ -88,16 +90,17 @@ export function ReceiptsProvider({ children }: { children: ReactNode }) {
           } catch (e) {
             const status = isApiError(e) ? e.status : 0;
             const current = ref.current.find((i) => i.id === item.id) ?? item;
-            replace(markFailed(current, classify(status), errorMessage(e), Date.now()));
+            replace(markFailed(current, classify(status, isApiError(e) ? e.code : undefined), errorMessage(e), Date.now()));
             if (status === 0) break; // offline: stop, the next network event retries
           }
         }
         for (const item of correctionsDue(ref.current, taxpayerUuid)) {
           try {
             await sendCorrections(item, item.corrections);
-            replace({ ...item, correctionsSent: true });
-          } catch {
-            // kept; sent with a later sync
+            replace(markCorrections(item));
+          } catch (e) {
+            // Network / server: kept for a later sync. Refused (4xx): shown, not retried.
+            if (correctionOutcome(isApiError(e) ? e.status : 0) === 'drop') replace(markCorrections(item, errorMessage(e)));
           }
         }
       } finally {
