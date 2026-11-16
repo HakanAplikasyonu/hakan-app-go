@@ -4,7 +4,8 @@ name: signout
 tags: [smoke]
 ---
 - launchApp
-- tapOn: "Profil ve hesap"
+- tapOn:
+    id: "tab-profile"
 - assertVisible:
     id: "app-version"
 - tapOn: "Çıkış yap"

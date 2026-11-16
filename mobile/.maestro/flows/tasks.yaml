@@ -1,13 +1,25 @@
-# Görevler: liste açılır (boşsa "Yapılacak iş yok"). Bir de deep link:
-# hakan://tasks aynı ekranı açar (#201).
+# İstekler, Geçmiş ve Bildirimler (arayüz v1, #328): alt sekmeler açılır;
+# hakan://tasks derin bağlantısı İstekler sekmesini açar (#201).
 appId: app.hakan.mukellef
 name: tasks
 tags: [smoke]
 ---
 - launchApp
-- tapOn: "Tüm görevler"
-- assertVisible: "Görevler"
+- tapOn:
+    id: "tab-tasks"
+- assertVisible: "İstekler"
+- assertVisible:
+    id: "tasks-tab-tamam"
+- tapOn:
+    id: "tab-history"
+- assertVisible: "Geçmiş"
+- tapOn:
+    id: "history-tab-fatura"
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "open-notifications"
+- assertVisible: "Bildirimler"
 - back
 - openLink: "hakan://tasks"
-- assertVisible: "Görevler"
-- back
+- assertVisible: "İstekler"

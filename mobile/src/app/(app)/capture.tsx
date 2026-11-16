@@ -1,27 +1,40 @@
+import { Ikon } from '@hakan/mobile-core/ui/ikon';
+import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
+import { metin } from '@hakan/mobile-core/ui/parcalar';
+import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Notice, Screen, Text } from '@/components/ui';
-import { useColors } from '@/core/theme';
 import { kindLabels } from '@/features/receipts/fields';
 import { useReceipts, type CapturedPhoto } from '@/features/receipts/provider';
 import type { ReceiptKind } from '@/features/receipts/queue';
 
 const KINDS: ReceiptKind[] = ['expense_receipt', 'fuel_receipt', 'z_report'];
+const KISA: Record<ReceiptKind, string> = { expense_receipt: 'Gider fişi', fuel_receipt: 'Akaryakıt', z_report: 'Z raporu' };
 const isKind = (v: unknown): v is ReceiptKind => typeof v === 'string' && (KINDS as string[]).includes(v);
 
-/** Fiş / Z raporu çekme: kamera (kırpma ile), arka arkaya çoklu çekim veya galeriden çoklu seçim. */
+/** Kamera ekranı her temada koyu (tasarım: MukellefMobil · 2). */
+const KOYU = '#0A0A0A';
+const BEYAZ = '#FFFFFF';
+
+/**
+ * Fiş çek (MukellefMobil · 2): fiş türü seçici, kenar kılavuzları, büyük
+ * deklanşör, galeri ve seri çekim sayacı. Çekim sistem kamerasıyla yapılır
+ * (kırpma ile); arka arkaya çekilen fotoğraflar seri olarak birikir.
+ */
 export default function CaptureScreen() {
   const params = useLocalSearchParams<{ kind?: string }>();
   const { enqueue, online } = useReceipts();
-  const c = useColors();
+  const { colors: c } = useTheme();
   const [kind, setKind] = useState<ReceiptKind>(isKind(params.kind) ? params.kind : 'expense_receipt');
   const [photos, setPhotos] = useState<CapturedPhoto[]>([]);
   const [denied, setDenied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const last = photos[photos.length - 1];
 
   async function shoot() {
     const perm = await ImagePicker.requestCameraPermissionsAsync();
@@ -54,73 +67,148 @@ export default function CaptureScreen() {
   }
 
   return (
-    <Screen style={{ maxWidth: 640, width: '100%', alignSelf: 'center' }}>
-      <View style={styles.segment} accessibilityRole="radiogroup">
-        {KINDS.map((k) => {
-          const active = k === kind;
-          return (
-            <Pressable
-              key={k}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
-              onPress={() => setKind(k)}
-              style={[styles.segmentItem, { borderColor: active ? c.brand : c.border, backgroundColor: active ? c.surface : 'transparent' }]}>
-              <Text style={{ fontWeight: active ? '700' : '500', color: active ? c.brand : c.text, textAlign: 'center' }}>{kindLabels[k]}</Text>
-            </Pressable>
-          );
-        })}
+    <SafeAreaView style={{ flex: 1, backgroundColor: KOYU }} edges={['top', 'left', 'right', 'bottom']}>
+      <View style={styles.hd}>
+        <Pressable testID="capture-close" accessibilityRole="button" accessibilityLabel="Kapat" onPress={() => router.back()} style={styles.close}>
+          <Ikon ad="kapat" renk={BEYAZ} />
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <View style={styles.kinds} accessibilityRole="radiogroup">
+          {KINDS.map((k) => {
+            const on = k === kind;
+            return (
+              <Pressable
+                key={k}
+                testID={`capture-kind-${k}`}
+                accessibilityRole="radio"
+                accessibilityLabel={kindLabels[k]}
+                accessibilityState={{ selected: on }}
+                onPress={() => setKind(k)}
+                hitSlop={{ top: 6, bottom: 6 }}
+                style={[styles.kind, on ? { backgroundColor: BEYAZ } : null]}>
+                <Text style={[styles.kindText, { color: on ? KOYU : BEYAZ }]}>{KISA[k]}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
-      <Text tone="muted">
-        {kind === 'z_report'
-          ? 'Gün sonu Z raporunun tamamı kadrajda olsun.'
-          : 'Fişi düz bir zemine koyun; toplam, tarih ve VKN okunur olsun. Çektikten sonra kenarları kırpabilirsiniz.'}
-      </Text>
+      <View style={styles.view}>
+        {last ? (
+          <Image source={{ uri: last.uri }} style={StyleSheet.absoluteFill} contentFit="contain" accessibilityLabel={`Son çekilen fotoğraf, toplam ${photos.length}`} />
+        ) : (
+          <View style={styles.guide}>
+            <Ikon ad="fisCek" boyut={28} renk="rgba(255,255,255,0.6)" />
+            <Text style={[metin.sm, { color: 'rgba(255,255,255,0.75)', textAlign: 'center' }]}>
+              {kind === 'z_report'
+                ? 'Gün sonu Z raporunun tamamı kadrajda olsun.'
+                : 'Fişi düz bir zemine koyun; toplam, tarih ve VKN okunur olsun. Çektikten sonra kenarları kırpabilirsiniz.'}
+            </Text>
+          </View>
+        )}
+        {(['tl', 'tr', 'bl', 'br'] as const).map((k) => (
+          <View key={k} pointerEvents="none" style={[styles.corner, cornerStyle[k], { borderColor: c.crystal.mid }]} />
+        ))}
+        {photos.length ? (
+          <View style={[styles.badge, { backgroundColor: c.brand }]}>
+            <Text style={[metin.xs, { color: c.onBrand, fontFamily: 'Inter_600SemiBold' }]}>
+              {photos.length} fotoğraf · {online ? 'gönder deyince gider' : 'bağlantı gelince gider'}
+            </Text>
+          </View>
+        ) : null}
+      </View>
 
       {denied ? (
-        <Notice>
-          Kamera izni verilmedi. Ayarlardan izin verebilir ya da galeriden seçebilirsiniz.{' '}
-          <Text tone="brand" onPress={() => Linking.openSettings()}>
-            Ayarları aç
+        <Text style={[metin.xs, { color: BEYAZ, textAlign: 'center', paddingHorizontal: 24 }]}>
+          Kamera izni verilmedi. Galeriden seçebilir ya da{' '}
+          <Text style={{ textDecorationLine: 'underline' }} onPress={() => Linking.openSettings()}>
+            ayarlardan izin verebilirsiniz
           </Text>
-        </Notice>
-      ) : null}
-
-      <Button title={photos.length ? 'Bir tane daha çek' : 'Kamerayla çek'} onPress={shoot} />
-      <Button title="Galeriden seç" variant="secondary" onPress={pick} />
-
-      {photos.length ? (
-        <View style={styles.grid}>
-          {photos.map((p, i) => (
-            <View key={`${p.uri}-${i}`} style={[styles.thumb, { borderColor: c.border }]}>
-              <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`${i + 1}. fotoğrafı çıkar`}
-                onPress={() => setPhotos((list) => list.filter((_, j) => j !== i))}
-                style={[styles.remove, { backgroundColor: c.primary }]}>
-                <Text style={{ color: c.primaryText, fontWeight: '700' }}>×</Text>
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={{ flex: 1 }} />
-      {photos.length ? (
-        <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-          {online ? 'Fotoğraflar hemen gönderilir.' : 'Bağlantı yok: fotoğraflar telefonda saklanır, bağlantı gelince gönderilir.'}
+          .
         </Text>
       ) : null}
-      <Button title={photos.length ? `Gönder (${photos.length})` : 'Gönder'} onPress={send} loading={saving} disabled={!photos.length} />
-    </Screen>
+
+      {photos.length > 1 ? (
+        <ScrollView horizontal contentContainerStyle={{ gap: 6, paddingHorizontal: 24, paddingTop: 10 }} showsHorizontalScrollIndicator={false}>
+          {photos.map((p, i) => (
+            <Pressable
+              key={`${p.uri}-${i}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${i + 1}. fotoğrafı çıkar`}
+              onPress={() => setPhotos((list) => list.filter((_, j) => j !== i))}
+              style={styles.mini}>
+              <Image source={{ uri: p.uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              <View style={styles.miniX}>
+                <Ikon ad="kapat" boyut={16} renk={BEYAZ} />
+              </View>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+
+      <View style={styles.bar}>
+        <Pressable testID="capture-gallery" accessibilityRole="button" accessibilityLabel="Galeriden seç" onPress={pick} style={styles.side}>
+          <View style={styles.gallery}>{last ? <Image source={{ uri: last.uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : <Ikon ad="klasor" renk={BEYAZ} />}</View>
+          <Text style={styles.sideText}>Galeri</Text>
+        </Pressable>
+        <Pressable
+          testID="capture-shutter"
+          accessibilityRole="button"
+          accessibilityLabel={photos.length ? 'Bir tane daha çek' : 'Kamerayla çek'}
+          onPress={shoot}
+          style={({ pressed }) => [styles.shutter, { opacity: pressed ? 0.85 : 1 }]}
+        />
+        {photos.length ? (
+          <Pressable
+            testID="capture-send"
+            accessibilityRole="button"
+            accessibilityLabel={`${photos.length} fotoğrafı gönder`}
+            accessibilityState={{ busy: saving, disabled: saving }}
+            disabled={saving}
+            onPress={send}
+            style={styles.side}>
+            <View style={[styles.send, { backgroundColor: c.brand }]}>
+              <Ikon ad="onayla" renk={c.onBrand} />
+            </View>
+            <Text style={styles.sideText}>Gönder ({photos.length})</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.side} accessible accessibilityLabel="Seri çekim: çektikçe fotoğraflar birikir">
+            <View style={[styles.serial, { backgroundColor: c.brand }]}>
+              <Text style={[metin.xs, { color: c.onBrand, fontFamily: 'Inter_700Bold' }]}>0</Text>
+            </View>
+            <Text style={styles.sideText}>Seri</Text>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
+const cornerStyle = StyleSheet.create({
+  tl: { left: 0, top: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 10 },
+  tr: { right: 0, top: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 10 },
+  bl: { left: 0, bottom: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 10 },
+  br: { right: 0, bottom: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 10 },
+});
+
 const styles = StyleSheet.create({
-  segment: { flexDirection: 'row', gap: 8 },
-  segmentItem: { flex: 1, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  thumb: { width: 96, height: 128, borderRadius: 12, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
-  remove: { position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  hd: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 8 },
+  close: { width: DOKUNMA, height: DOKUNMA, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  kinds: { flexDirection: 'row', gap: 2, padding: 3, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.12)' },
+  kind: { minHeight: 32, paddingHorizontal: 10, borderRadius: 8, justifyContent: 'center' },
+  kindText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  view: { flex: 1, margin: 28, marginTop: 18, borderRadius: 12, backgroundColor: '#1D1D20', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  guide: { alignItems: 'center', gap: 12, paddingHorizontal: 40 },
+  corner: { position: 'absolute', width: 34, height: 34, margin: 2 },
+  badge: { position: 'absolute', bottom: 14, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+  mini: { width: 40, height: 52, borderRadius: 6, overflow: 'hidden' },
+  miniX: { position: 'absolute', top: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderBottomLeftRadius: 6 },
+  bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 40, paddingTop: 20, paddingBottom: 20 },
+  side: { alignItems: 'center', gap: 4, minWidth: 64, minHeight: DOKUNMA },
+  sideText: { color: BEYAZ, fontFamily: 'Inter_500Medium', fontSize: 11 },
+  gallery: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#333', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  shutter: { width: 76, height: 76, borderRadius: 38, backgroundColor: BEYAZ, borderWidth: 4, borderColor: BEYAZ, boxShadow: `inset 0 0 0 4px ${KOYU}` },
+  send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  serial: { minWidth: 28, height: 22, borderRadius: 11, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', marginVertical: 11 },
 });

@@ -16,13 +16,11 @@ export default function AppLayout() {
           headerShadowVisible: false,
           headerBackButtonDisplayMode: 'minimal',
         }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="capture" options={{ headerShown: true, title: 'Fiş çek', presentation: 'modal' }} />
-        <Stack.Screen name="receipts/index" options={{ headerShown: true, title: 'Fişlerim' }} />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="capture" options={{ presentation: 'fullScreenModal' }} />
         <Stack.Screen name="receipts/[id]" options={{ headerShown: true, title: 'Fiş' }} />
-        <Stack.Screen name="tasks" options={{ headerShown: true, title: 'Görevler' }} />
-        <Stack.Screen name="task/[uuid]" options={{ headerShown: true, title: 'Görev' }} />
-        <Stack.Screen name="profile" options={{ headerShown: true, title: 'Profil ve hesap' }} />
+        <Stack.Screen name="task/[uuid]" options={{ headerShown: true, title: 'İstek' }} />
+        <Stack.Screen name="notifications" options={{ headerShown: true, title: 'Bildirimler' }} />
       </Stack>
     </ReceiptsProvider>
   );
