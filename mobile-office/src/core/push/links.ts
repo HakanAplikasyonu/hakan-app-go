@@ -107,12 +107,8 @@ export function resolveLink(input: string | null | undefined): LinkTarget | null
   return app(p.parts, p.query);
 }
 
-/** Push verisindeki `url` (data.url). */
-export function notificationUrl(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return null;
-  const url = (data as { url?: unknown }).url;
-  return typeof url === 'string' && url ? url : null;
-}
+/** Push verisindeki `url` (data.url); ortak pakette (@hakan/mobile-core, #295). */
+export { notificationUrl } from '@hakan/mobile-core/push/data';
 
 /** expo-router yolu: `/tasks/[uuid]` + params → `/tasks/x?engagement=y`. */
 export function hrefOf(t: Pick<LinkTarget, 'route' | 'params'>): string {

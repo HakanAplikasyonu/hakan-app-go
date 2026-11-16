@@ -10,7 +10,8 @@
     "allowImportingTsExtensions": true,
     "types": [
       "node"
-    ]
+    ],
+    "preserveSymlinks": true
   },
   "include": [
     "**/*.ts",
