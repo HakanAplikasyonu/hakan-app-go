@@ -16,6 +16,11 @@
       <span id="agent-badge" class="badge" data-state="wait">Oturum yok</span>
     </header>
 
+    <div id="update-banner" class="banner" role="status" hidden>
+      <span id="update-banner-text"></span>
+      <button id="update-banner-install" type="button">Güncelle ve yeniden başlat</button>
+    </div>
+
     <main>
       <section class="card" aria-labelledby="login-title">
         <h2 id="login-title">Ofis oturumu</h2>
@@ -125,6 +130,29 @@
         <pre id="src-out" class="out" aria-live="polite"></pre>
       </section>
 
+      <section class="card" aria-labelledby="up-title">
+        <div class="card-head">
+          <h2 id="up-title">Güncellemeler</h2>
+          <span id="up-badge" class="badge" data-state="wait">Denetlenmedi</span>
+        </div>
+        <p id="up-text" class="muted" aria-live="polite"></p>
+        <div class="row">
+          <label>
+            <span>Kanal</span>
+            <select id="up-channel">
+              <option value="stable">Kararlı</option>
+              <option value="beta">Beta (erken erişim)</option>
+            </select>
+          </label>
+          <button id="up-check" type="button" class="ghost">Şimdi denetle</button>
+          <button id="up-install" type="button" hidden>Güncelle ve yeniden başlat</button>
+        </div>
+        <div id="up-progress-row" class="stack" hidden>
+          <progress id="up-progress" max="100"></progress>
+          <span id="up-progress-text" class="muted"></span>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="sc-title">
         <div class="card-head">
           <h2 id="sc-title">Yerel ajan (Go sidecar)</h2>
@@ -134,7 +162,6 @@
         <div class="row">
           <button id="sc-ping" type="button" class="ghost">Ping</button>
           <button id="sc-restart" type="button" class="ghost">Yeniden başlat</button>
-          <button id="up-check" type="button" class="ghost">Güncelleme denetle</button>
         </div>
         <p id="sc-out" class="muted" aria-live="polite"></p>
         <h3>UBL dosyası denetimi</h3>

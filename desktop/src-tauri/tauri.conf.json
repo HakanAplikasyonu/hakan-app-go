@@ -49,5 +49,11 @@
     },
     "createUpdaterArtifacts": false
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [],
+      "windows": { "installMode": "passive" }
+    }
+  }
 }

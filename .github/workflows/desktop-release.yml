@@ -110,7 +110,7 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
-          UPDATER_ENDPOINT: ${{ steps.channel.outputs.endpoint }}
+          UPDATER_BASE_URL: ${{ vars.TAURI_UPDATER_BASE_URL }}
         run: |
           set -euo pipefail
           overlay='{}'
@@ -131,8 +131,14 @@ jobs:
           release=false
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && [ -n "$UPDATER_PUBKEY" ]; then
             release=true
-            overlay=$(jq -cn --argjson o "$overlay" --arg k "$UPDATER_PUBKEY" --arg e "$UPDATER_ENDPOINT" \
-              '$o * {plugins:{updater:{pubkey:$k, endpoints:[$e]}}}')
+            # Uygulama anahtarı ve adresi derleme zamanında env'den okur
+            # (#205, src/updater.rs); config'deki anahtar paket imzası içindir.
+            overlay=$(jq -cn --argjson o "$overlay" --arg k "$UPDATER_PUBKEY" \
+              '$o * {plugins:{updater:{pubkey:$k}}}')
+          fi
+          app_updater=false
+          if [ -n "$UPDATER_PUBKEY" ] && [ -n "$UPDATER_BASE_URL" ]; then
+            app_updater=true
           fi
           echo "overlay=$overlay" >> "$GITHUB_OUTPUT"
           echo "release=$release" >> "$GITHUB_OUTPUT"
@@ -140,6 +146,7 @@ jobs:
             echo "### ${{ matrix.target }}"
             echo "- imzalı: $signed"
             echo "- güncelleyici paketi: $release"
+            echo "- uygulamada otomatik güncelleme: $app_updater (TAURI_UPDATER_PUBKEY + TAURI_UPDATER_BASE_URL)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Tauri build
@@ -152,6 +159,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Derleme zamanı (#205): ikisi de yoksa uygulamada güncelleme kapalı.
+          TAURI_UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          TAURI_UPDATER_BASE_URL: ${{ vars.TAURI_UPDATER_BASE_URL }}
           OVERLAY: ${{ steps.sign.outputs.overlay }}
           RELEASE: ${{ steps.sign.outputs.release }}
         run: |

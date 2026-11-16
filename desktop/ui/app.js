@@ -287,17 +287,93 @@ $("sc-restart").addEventListener("click", async () => {
   }
 });
 
-$("up-check").addEventListener("click", async () => {
-  $("sc-out").textContent = "Denetleniyor…";
-  try {
-    const u = await invoke("update_check");
-    if (!u.enabled) $("sc-out").textContent = `Sürüm ${u.current}. Bu derlemede güncelleyici kapalı.`;
-    else if (u.available) $("sc-out").textContent = `Yeni sürüm: ${u.available}`;
-    else $("sc-out").textContent = `Sürüm ${u.current} güncel.`;
-  } catch (e) {
-    $("sc-out").textContent = errText(e);
+// --- Güncellemeler (#205) ---------------------------------------------------
+// Kabuk açılışta ve 6 saatte bir denetler; durum `updater://status`,
+// indirme ilerlemesi `updater://progress` olayıyla gelir.
+
+const fmtBytes = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+function updateText(u) {
+  if (!u.enabled) return u.disabled_reason || "Bu derlemede otomatik güncelleme kapalı.";
+  const checked = u.checked_at ? ` Son denetim: ${fmtTime(u.checked_at)}.` : "";
+  switch (u.state) {
+    case "checking":
+      return "Güncelleme denetleniyor…";
+    case "available":
+      return `Yeni sürüm hazır: ${u.available} (kurulu: ${u.current}).${u.notes ? ` ${u.notes}` : ""}`;
+    case "downloading":
+      return `Sürüm ${u.available} indiriliyor…`;
+    case "installing":
+      return "Güncelleme kuruluyor, uygulama yeniden başlatılacak…";
+    case "up_to_date":
+      return `Sürüm ${u.current} güncel.${checked}`;
+    case "error":
+      return `${u.error || "Güncelleme denetlenemedi."}${checked}`;
+    default:
+      return `Sürüm ${u.current}. Güncellemeler otomatik denetlenir.`;
   }
-});
+}
+
+const updateBadge = {
+  disabled: ["wait", "Kapalı"],
+  idle: ["wait", "Denetlenmedi"],
+  checking: ["wait", "Denetleniyor…"],
+  up_to_date: ["ok", "Güncel"],
+  available: ["wait", "Yeni sürüm var"],
+  downloading: ["wait", "İndiriliyor…"],
+  installing: ["wait", "Kuruluyor…"],
+  error: ["down", "Sorun var"],
+};
+
+function showUpdate(u) {
+  const [state, text] = updateBadge[u.state] || updateBadge.idle;
+  badge($("up-badge"), state, text);
+  $("up-text").textContent = updateText(u);
+  $("up-channel").value = u.channel;
+  $("up-channel").disabled = !u.enabled;
+  $("up-check").disabled = !u.enabled || ["checking", "downloading", "installing"].includes(u.state);
+  const busy = u.state === "downloading" || u.state === "installing";
+  $("up-install").hidden = u.state !== "available" && !busy;
+  $("up-install").disabled = busy;
+  $("update-banner-install").disabled = busy;
+  $("up-progress-row").hidden = !busy;
+  const banner = u.state === "available" || busy;
+  $("update-banner").hidden = !banner;
+  if (banner) $("update-banner-text").textContent = `Hakan ${u.available} sürümü hazır.`;
+}
+
+function showProgress({ downloaded, total }) {
+  const bar = $("up-progress");
+  if (total) {
+    bar.max = total;
+    bar.value = downloaded;
+    $("up-progress-text").textContent = `${fmtBytes(downloaded)} / ${fmtBytes(total)} (%${Math.floor((downloaded / total) * 100)})`;
+  } else {
+    bar.removeAttribute("value");
+    $("up-progress-text").textContent = `${fmtBytes(downloaded)} indirildi`;
+  }
+}
+
+async function installUpdate() {
+  $("up-progress-row").hidden = false;
+  try {
+    await invoke("update_install"); // başarıda uygulama yeniden başlar
+  } catch (e) {
+    $("up-text").textContent = typeof e === "string" ? e : "Güncelleme kurulamadı.";
+  }
+}
+
+$("up-check").addEventListener("click", () => invoke("update_check").then(showUpdate).catch(() => {}));
+$("up-channel").addEventListener("change", () =>
+  invoke("update_set_channel", { channel: $("up-channel").value })
+    .then(showUpdate)
+    .catch((e) => ($("up-text").textContent = typeof e === "string" ? e : "Kanal değiştirilemedi.")),
+);
+$("up-install").addEventListener("click", installUpdate);
+$("update-banner-install").addEventListener("click", installUpdate);
+listen("updater://status", (e) => showUpdate(e.payload));
+listen("updater://progress", (e) => showProgress(e.payload));
+invoke("update_status").then(showUpdate).catch(() => {});
 
 // Sürükle-bırak: .xml → yerel denetim; klasör → izlemeye ekle.
 listen("tauri://drag-drop", async (e) => {
