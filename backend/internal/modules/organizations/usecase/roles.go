@@ -61,6 +61,9 @@ type RoleInput struct {
 	Name        *string
 	Description *string
 	Permissions *[]string
+	// Grantor is the caller. It may only put into the role permissions it
+	// holds itself (issue #167).
+	Grantor Grantor
 }
 
 var roleKeyRe = regexp.MustCompile(`^[a-z][a-z0-9_]{1,31}$`)
@@ -138,6 +141,9 @@ func (s *Service) CreateRole(ctx context.Context, orgID int64, in RoleInput) (Te
 	if err != nil {
 		return TenantRole{}, err
 	}
+	if err := CheckGrant(in.Grantor, perms); err != nil {
+		return TenantRole{}, err
+	}
 	err = s.repo.WithTx(ctx, func(ctx context.Context, q *db.Queries, _ pgx.Tx) error {
 		role, err := rr.CreateOrganizationRole(ctx, q, db.CreateOrganizationRoleParams{
 			Name: name, RoleKey: key, Description: pgtype.Text{String: desc, Valid: true},
@@ -196,6 +202,15 @@ func (s *Service) UpdateRole(ctx context.Context, orgID int64, in RoleInput) (Te
 			return mapRepoNotFound(err, ErrRoleNotFound)
 		}
 		if in.Permissions != nil {
+			// Only what is added is checked: a caller may still rename a role
+			// or take permissions away from it.
+			prev, err := s.repo.ListTenantRolePermissionSlugsByRoleID(ctx, role.ID)
+			if err != nil {
+				return err
+			}
+			if err := CheckGrant(in.Grantor, added(prev, perms)); err != nil {
+				return err
+			}
 			return rr.ReplaceRolePermissions(ctx, q, orgID, role.ID, perms)
 		}
 		return nil

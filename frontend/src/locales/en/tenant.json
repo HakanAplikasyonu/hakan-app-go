@@ -82,6 +82,7 @@
   "roles_description_label": "Description",
   "roles_permissions": "Permissions",
   "roles_owner_locked": "The owner role always holds every permission; its permissions cannot be changed.",
+  "roles_grant_hint": "You can only add permissions you hold. Permissions the role already has may stay or be removed.",
   "roles_validation_key": "Enter a valid key (e.g. senior_staff).",
   "roles_validation_name": "Name is required.",
   "settings_title": "Organization settings",

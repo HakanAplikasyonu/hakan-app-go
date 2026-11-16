@@ -255,7 +255,7 @@ func TestAdminCannotReplaceOwnerInvitation(t *testing.T) {
 func TestChangeMemberRoleRejectsEmptyRole(t *testing.T) {
 	t.Parallel()
 	x := newInvFixture(t)
-	_, err := x.svc.ChangeMemberRole(context.Background(), x.org.Uuid, x.owner.Uuid, " ", "owner")
+	_, err := x.svc.ChangeMemberRole(context.Background(), x.org.Uuid, x.owner.Uuid, " ", OwnerGrantor)
 	if !errors.Is(err, ErrInvalidRequest) {
 		t.Fatalf("err = %v, want ErrInvalidRequest", err)
 	}

@@ -30,6 +30,7 @@ const (
 	CodeOrganizationAccessExpired = "ORGANIZATION_ACCESS_EXPIRED"
 	CodeLastOrganizationOwner     = "LAST_ORGANIZATION_OWNER"
 	CodeOwnerRoleRequired         = "OWNER_ROLE_REQUIRED"
+	CodePermissionEscalation      = "PERMISSION_ESCALATION"
 	CodeAlreadyMember             = "ALREADY_MEMBER"
 	CodeInvitationNotFound        = "INVITATION_NOT_FOUND"
 	CodeInvitationUnavailable     = "INVITATION_UNAVAILABLE"

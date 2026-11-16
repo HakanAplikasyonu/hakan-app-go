@@ -171,6 +171,14 @@ func (s *Service) CreateInvitation(ctx context.Context, in orgmodel.CreateInvita
 				return ErrOwnerRoleRequired
 			}
 		}
+		// The invitee gets the role's permissions (issue #167).
+		perms, err := s.repo.ListTenantRolePermissionSlugsByRoleID(ctx, role.ID)
+		if err != nil {
+			return err
+		}
+		if err := CheckGrant(Grantor{Role: in.InviterRoleKey, Permissions: in.InviterPermissions}, perms); err != nil {
+			return err
+		}
 		if err := s.inv.repo.RevokePendingInvitationsForEmail(ctx, q, in.OrgID, email); err != nil {
 			return err
 		}

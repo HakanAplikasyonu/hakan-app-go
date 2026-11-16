@@ -28,7 +28,7 @@ type OrganizationService interface {
 	PatchOrganization(ctx context.Context, id uuid.UUID, in orgmodel.PatchOrganizationInput) (orgmodel.Organization, error)
 	ListMembers(ctx context.Context, orgUUID uuid.UUID, f orgmodel.MemberListFilter) ([]orgmodel.Member, int64, error)
 	GetMember(ctx context.Context, orgID int64, userUUID uuid.UUID) (orgmodel.Member, error)
-	ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.UUID, roleKey, actorRole string) (orgmodel.Member, error)
+	ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.UUID, roleKey string, actor orgusecase.Grantor) (orgmodel.Member, error)
 	RemoveMember(ctx context.Context, orgUUID, userUUID uuid.UUID, actorRole string) error
 	ListInvitations(ctx context.Context, orgID int64, limit, offset int32) ([]orgmodel.Invitation, int64, error)
 	CreateInvitation(ctx context.Context, in orgmodel.CreateInvitationInput) (orgmodel.Invitation, error)
@@ -110,7 +110,7 @@ func (h *Handler) changeMemberRole(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	member, err := h.svc.ChangeMemberRole(r.Context(), s.UUID, userUUID, in.RoleKey, s.MemberRole)
+	member, err := h.svc.ChangeMemberRole(r.Context(), s.UUID, userUUID, in.RoleKey, grantor(s))
 	if err != nil {
 		writeError(w, r, err)
 		return
@@ -199,12 +199,13 @@ func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	inv, err := h.svc.CreateInvitation(r.Context(), orgmodel.CreateInvitationInput{
-		OrgID:          s.ID,
-		OrgName:        s.Name,
-		InviterUserID:  p.UserInternal,
-		InviterRoleKey: s.MemberRole,
-		Email:          in.Email,
-		RoleKey:        in.RoleKey,
+		OrgID:              s.ID,
+		OrgName:            s.Name,
+		InviterUserID:      p.UserInternal,
+		InviterRoleKey:     s.MemberRole,
+		InviterPermissions: s.Permissions,
+		Email:              in.Email,
+		RoleKey:            in.RoleKey,
 	})
 	if err != nil {
 		writeError(w, r, err)
@@ -419,6 +420,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusForbidden, response.CodeInvitationEmailMismatch, "Invitation was sent to another email address")
 	case errors.Is(err, orgusecase.ErrAlreadyMember):
 		response.Conflict(w, r, response.CodeAlreadyMember, "Already a member of this organization")
+	case errors.Is(err, orgusecase.ErrPermissionEscalation):
+		response.Error(w, r, http.StatusForbidden, response.CodePermissionEscalation, "You can only grant permissions you hold yourself")
 	case errors.Is(err, orgusecase.ErrOwnerRoleRequired):
 		response.Error(w, r, http.StatusForbidden, response.CodeOwnerRoleRequired, "Only an owner can grant, change or remove the owner role")
 	case errors.Is(err, orgusecase.ErrLastOrganizationOwner):
@@ -439,4 +442,9 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	default:
 		response.InternalErr(w, r, err, "Unexpected server error")
 	}
+}
+
+// grantor is the caller as the one handing out permissions (issue #167).
+func grantor(s orgctx.Scope) orgusecase.Grantor {
+	return orgusecase.Grantor{Role: s.MemberRole, Permissions: s.Permissions}
 }

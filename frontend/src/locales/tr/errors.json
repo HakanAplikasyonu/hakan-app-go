@@ -28,6 +28,7 @@
   "codes.ORGANIZATION_ACCESS_EXPIRED": "Bu organizasyonun erişim süresi sona erdi.",
   "codes.ORGANIZATION_REQUIRED": "Önce bir organizasyon seçin.",
   "codes.OWNER_ROLE_REQUIRED": "Bunu yalnızca organizasyon sahibi yapabilir.",
+  "codes.PERMISSION_ESCALATION": "Yalnızca sizde olan izinleri devredebilirsiniz.",
   "codes.ALREADY_MEMBER": "Bu kişi zaten organizasyonun üyesi.",
   "codes.INVITATION_NOT_FOUND": "Bu davet bağlantısı geçerli değil.",
   "codes.INVITATION_UNAVAILABLE": "Bu davet kullanılmış, iptal edilmiş ya da süresi dolmuş.",

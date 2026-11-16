@@ -264,11 +264,13 @@ func (s *Service) AddMember(ctx context.Context, orgUUID, userUUID uuid.UUID, ro
 	return s.GetMember(ctx, org.ID, user.Uuid)
 }
 
-// ChangeMemberRole sets a member's tenant role. actorRole is the caller's role
-// in the organization; the owner-escalation rule (CheckRoleChange) is checked
-// again inside the locked transaction so a concurrent change cannot slip past
-// a handler-level pre-check. Platform callers pass orgctx.RoleOwner.
-func (s *Service) ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.UUID, roleKey, actorRole string) (orgmodel.Member, error) {
+// ChangeMemberRole sets a member's tenant role. actor is the caller: its role
+// and permissions; it may only give a role whose permissions it holds (#167).
+// The owner-escalation rule (CheckRoleChange) is checked again inside the
+// locked transaction so a concurrent change cannot slip past a handler-level
+// pre-check. Platform callers pass OwnerGrantor.
+func (s *Service) ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.UUID, roleKey string, actor Grantor) (orgmodel.Member, error) {
+	actorRole := actor.Role
 	// normalizeRole defaults to member, which is right for adding someone but
 	// would silently demote here.
 	if strings.TrimSpace(roleKey) == "" {
@@ -292,6 +294,14 @@ func (s *Service) ChangeMemberRole(ctx context.Context, orgUUID, userUUID uuid.U
 			return mapRepoNotFound(err, ErrRoleNotFound)
 		}
 		if err := CheckRoleChange(actorRole, current.RoleKey, role.Slug); err != nil {
+			return err
+		}
+		// Giving someone a role hands out its permissions (issue #167).
+		perms, err := s.repo.ListTenantRolePermissionSlugsByRoleID(ctx, role.ID)
+		if err != nil {
+			return err
+		}
+		if err := CheckGrant(actor, perms); err != nil {
 			return err
 		}
 		if current.RoleKey == orgctx.RoleOwner && role.Slug != orgctx.RoleOwner {

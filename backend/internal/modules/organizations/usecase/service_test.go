@@ -105,7 +105,7 @@ func TestLastOwnerGuard(t *testing.T) {
 	f.addMembership(org.ID, 10, "owner")
 	svc := New(f, nil)
 
-	if _, err := svc.ChangeMemberRole(context.Background(), org.Uuid, userUUID, "member", "owner"); !errors.Is(err, ErrLastOrganizationOwner) {
+	if _, err := svc.ChangeMemberRole(context.Background(), org.Uuid, userUUID, "member", OwnerGrantor); !errors.Is(err, ErrLastOrganizationOwner) {
 		t.Fatalf("change last owner err = %v", err)
 	}
 	if err := svc.RemoveMember(context.Background(), org.Uuid, userUUID, "owner"); !errors.Is(err, ErrLastOrganizationOwner) {
@@ -113,7 +113,7 @@ func TestLastOwnerGuard(t *testing.T) {
 	}
 	// The owner-escalation rule is enforced inside the usecase too, not only
 	// by the tenant handler's pre-check.
-	if _, err := svc.ChangeMemberRole(context.Background(), org.Uuid, userUUID, "member", "admin"); !errors.Is(err, ErrOwnerRoleRequired) {
+	if _, err := svc.ChangeMemberRole(context.Background(), org.Uuid, userUUID, "member", Grantor{Role: "admin"}); !errors.Is(err, ErrOwnerRoleRequired) {
 		t.Fatalf("admin demote owner err = %v", err)
 	}
 	if err := svc.RemoveMember(context.Background(), org.Uuid, userUUID, "admin"); !errors.Is(err, ErrOwnerRoleRequired) {
