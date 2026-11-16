@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/engine"
@@ -76,6 +77,9 @@ func (Applier) Apply(ctx context.Context, tx reviewusecase.Tx, sug reviewusecase
 	if err != nil {
 		return nil, fmt.Errorf("assign account: %w", err)
 	}
+	if err := syncDraftLines(ctx, q, sug, tt, tid, field, v.AccountCode); err != nil {
+		return nil, err
+	}
 	if prev == "" {
 		return json.RawMessage("null"), nil
 	}
@@ -103,7 +107,33 @@ func (Applier) Revert(ctx context.Context, tx reviewusecase.Tx, sug reviewusecas
 		OrganizationID: sug.OrganizationID, EngagementID: sug.EngagementID, TaxpayerID: sug.TaxpayerID,
 		TargetType: tt, TargetID: tid, Field: field, AccountCode: v.AccountCode,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return syncDraftLines(ctx, q, sug, tt, tid, field, v.AccountCode)
+}
+
+// DraftLineSourceKind is the journal_draft_lines.source_kind of a line
+// booked from an invoice item; its source_id is the item id (issue #239).
+const DraftLineSourceKind = usecase.TargetItem
+
+// syncDraftLines writes the decided account code to the not yet approved
+// journal draft lines booked from the same invoice item, so an accepted
+// suggestion shows in the draft (issue #239). Approved drafts are never
+// changed; VAT account suggestions are not mapped to lines.
+func syncDraftLines(ctx context.Context, q *db.Queries, sug reviewusecase.Suggestion, targetType string, targetID int64, field, code string) error {
+	if targetType != usecase.TargetItem || field != usecase.FieldAccount || code == "" {
+		return nil
+	}
+	_, err := q.UpdateDraftJournalLinesAccount(ctx, db.UpdateDraftJournalLinesAccountParams{
+		OrganizationID: sug.OrganizationID, EngagementID: sug.EngagementID,
+		SourceKind: pgtype.Text{String: DraftLineSourceKind, Valid: true}, SourceID: pgtype.Text{String: strconv.FormatInt(targetID, 10), Valid: true},
+		AccountCode: code,
+	})
+	if err != nil {
+		return fmt.Errorf("sync journal draft lines: %w", err)
+	}
+	return nil
 }
 
 func derefID(p *int64) int64 {

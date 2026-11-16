@@ -47,6 +47,7 @@ export default function HomeScreen() {
                 label="İnceleme kuyruğu"
                 value={d.review ? countLabel(d.review.pending) : '—'}
                 hint={d.review ? 'onay bekleyen öneri' : 'yetkiniz yok'}
+                onPress={d.review ? () => router.push('/review') : undefined}
               />
               <Stat
                 testID="stat-tasks"

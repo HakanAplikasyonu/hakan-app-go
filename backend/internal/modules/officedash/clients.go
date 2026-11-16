@@ -108,12 +108,12 @@ func (h *ClientsHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := int32(ClientsDefaultLimit)
 	if v := q.Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
+		n, err := strconv.ParseInt(v, 10, 32)
 		if err != nil || n < 1 || n > ClientsMaxLimit {
 			response.BadRequest(w, r, response.CodeValidationError, fmt.Sprintf("limit must be 1..%d", ClientsMaxLimit))
 			return
 		}
-		limit = int32(n) // #nosec G115 -- bounded above
+		limit = int32(n)
 	}
 	p := db.ListOfficeClientsParams{
 		OrganizationID: s.ID, UserID: user, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), Lim: limit,

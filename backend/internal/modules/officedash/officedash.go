@@ -181,6 +181,7 @@ func ts(t time.Time) pgtype.Timestamptz { return pgtype.Timestamptz{Time: t, Val
 type Module struct {
 	H           *Handler
 	Clients     *ClientsHandler
+	Review      *ReviewHandler
 	Engagements engagementctx.Resolver
 }
 
@@ -210,4 +211,10 @@ func (m Module) Routes(r *module.Router) {
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
 	r.Tenant("GET "+base+"/contacts", rbac.PermTenantEngagementsRead, c.Contacts, eng...)
 	r.Tenant("GET "+base+"/receipts/{receiptUuid}/image", rbac.PermTenantReceiptsRead, c.ReceiptImage, eng...)
+
+	rv := m.Review
+	if rv == nil {
+		rv = &ReviewHandler{}
+	}
+	r.Tenant("GET "+base+"/suggestions/{suggestionUuid}/context", rbac.PermTenantReviewRead, rv.Context, eng...)
 }
