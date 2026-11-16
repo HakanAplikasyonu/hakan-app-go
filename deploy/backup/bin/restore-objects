@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# restore-objects --identity KEY_FILE [--bucket NAME] ARCHIVE.tar.age
+#
+# Decrypts a backup-objects archive and copies every object into the bucket
+# (default S3_BUCKET; created when missing). Existing objects with the same
+# key are overwritten, others are left alone. Checks the object count against
+# the archive's manifest.
+source /usr/local/bin/backup-lib.sh
+
+identity= bucket=${S3_BUCKET:-} archive=
+while (($#)); do
+  case $1 in
+    --identity) identity=${2:?}; shift 2 ;;
+    --bucket) bucket=${2:?}; shift 2 ;;
+    -*) die "unknown flag $1" ;;
+    *) archive=$1; shift ;;
+  esac
+done
+[[ -f ${identity:-} ]] || die "--identity KEY_FILE is required"
+[[ -f ${archive:-} ]] || die "archive file required"
+[[ -n $bucket ]] || die "--bucket or S3_BUCKET is required"
+
+objects_remote
+dst=$OBJECTS_REMOTE$bucket
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+age -d -i "$identity" "$archive" | tar -C "$work" -xf -
+count=$(find "$work/bucket" -type f | wc -l)
+rclone mkdir "$dst"
+log "restore: $count objects into bucket $bucket"
+rclone copy --checksum --quiet "$work/bucket" "$dst"
+
+manifest=${archive%.tar.age}.manifest.json
+if [[ -f $manifest ]]; then
+  want=$(jq -r .objects "$manifest")
+  [[ $count == "$want" ]] || die "restore: archive has $count objects, manifest says $want"
+fi
+got=$(rclone lsf -R --files-only "$dst" | wc -l)
+((got >= count)) || die "restore: bucket has $got objects after copying $count"
+log "restore: objects ok ($count)"

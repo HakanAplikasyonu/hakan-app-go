@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# restore-db --identity KEY_FILE [--clean] DUMP.age
+#
+# Decrypts a backup-db dump with the offline age identity and restores it into
+# the database named by the PG* env (PGDATABASE). The roles the schema refers
+# to (RLS roles) are restored first from the matching .roles.sql.age. Refuses
+# a database that already has tables unless --clean (drops what the dump
+# recreates). Then compares the result with the dump's manifest (verify-db).
+source /usr/local/bin/backup-lib.sh
+
+identity= clean=0 dump=
+while (($#)); do
+  case $1 in
+    --identity) identity=${2:?}; shift 2 ;;
+    --clean) clean=1; shift ;;
+    -*) die "unknown flag $1" ;;
+    *) dump=$1; shift ;;
+  esac
+done
+[[ -f ${identity:-} ]] || die "--identity KEY_FILE is required (the offline age private key)"
+[[ -f ${dump:-} ]] || die "dump file required"
+: "${PGDATABASE:?PGDATABASE (target database) is required}"
+
+base=${dump%.dump.age}
+tables=$(psql -XtAq -c "SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')")
+if ((tables > 0 && !clean)); then
+  die "database $PGDATABASE already has $tables tables; use an empty database or --clean"
+fi
+
+if [[ -f $base.roles.sql.age ]]; then
+  log "restore: roles"
+  # Existing roles ("already exists") are fine; the rest must apply.
+  age -d -i "$identity" "$base.roles.sql.age" | psql -Xq -d postgres -v ON_ERROR_STOP=0 2>&1 | grep -v 'already exists' >&2 || true
+fi
+
+log "restore: $(basename "$dump") into $PGDATABASE"
+args=(--exit-on-error --single-transaction -d "$PGDATABASE")
+((clean)) && args+=(--clean --if-exists)
+age -d -i "$identity" "$dump" | pg_restore "${args[@]}"
+
+if [[ -f $base.manifest.json ]]; then
+  verify-db "$base.manifest.json"
+else
+  log "restore: no manifest next to the dump, skipped verification"
+fi

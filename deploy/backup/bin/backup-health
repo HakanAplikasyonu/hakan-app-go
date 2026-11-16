@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Healthy when encryption is configured and the last successful run is recent
+# (BACKUP_MAX_AGE_HOURS, default 26 for a daily schedule). Before the first
+# run, the container is healthy for one max-age window after start.
+source /usr/local/bin/backup-lib.sh
+recipients_ok || { echo "BACKUP_AGE_RECIPIENTS not set"; exit 1; }
+max=$((${BACKUP_MAX_AGE_HOURS:-26} * 3600))
+now=$(date -u +%s)
+if [[ -f $BACKUP_DIR/.last-success ]]; then
+  last=$(cat "$BACKUP_DIR/.last-success")
+else
+  last=$(cat /tmp/.started 2>/dev/null || echo "$now")
+fi
+((now - last <= max)) || { echo "no successful backup for $(((now - last) / 3600))h"; exit 1; }

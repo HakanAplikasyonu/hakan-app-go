@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# backup-run — one full backup: database, object store (unless
+# BACKUP_OBJECTS=false), local retention, then the optional off-site copy.
+# Run by the scheduler; also safe to run by hand:
+#   docker compose exec backup backup-run
+source /usr/local/bin/backup-lib.sh
+
+ts=$(stamp)
+backup-db "$ts"
+if [[ ${BACKUP_OBJECTS:-true} == true ]]; then
+  backup-objects "$ts"
+fi
+
+days=${BACKUP_RETENTION_DAYS:-14}
+[[ $days =~ ^[1-9][0-9]*$ ]] || die "BACKUP_RETENTION_DAYS must be a positive number of days"
+removed=$(find "$BACKUP_DIR/db" "$BACKUP_DIR/objects" -type f -mtime +"$((days - 1))" -print -delete 2>/dev/null | wc -l)
+log "retention: kept ${days} days locally, removed $removed files"
+
+offsite_remote
+remote=$OFFSITE_REMOTE
+if [[ -n $remote ]]; then
+  log "offsite: copying to ${remote%%/*}"
+  rclone copy --quiet --include "*-$ts.*" "$BACKUP_DIR" "$remote"
+  rclone delete --quiet --min-age "${BACKUP_OFFSITE_RETENTION_DAYS:-$days}d" "$remote"
+fi
+
+date -u +%s >"$BACKUP_DIR/.last-success"
+log "run $ts: ok"

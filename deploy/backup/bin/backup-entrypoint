@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Scheduler: runs backup-run on BACKUP_SCHEDULE (cron, default 02:17 every
+# day in TZ). Any other command runs as given (backup-run, restore-db, …).
+set -euo pipefail
+if (($#)); then exec "$@"; fi
+source /usr/local/bin/backup-lib.sh
+
+date -u +%s >/tmp/.started
+if ! recipients_ok; then
+  # Do not crash-loop the deploy: stay up, unhealthy, and say why.
+  log "ERROR: BACKUP_AGE_RECIPIENTS is not set; no backups will run (docs/yedekleme.md)"
+  while :; do sleep 3600; done
+fi
+schedule=${BACKUP_SCHEDULE:-17 2 * * *}
+mkdir -p /etc/crontabs
+# crond starts jobs with an empty environment: hand the current one over.
+(umask 077; export -p | grep -v -E ' (HOME|PWD|SHLVL|_)=' >/etc/backup.env)
+printf '%s . /etc/backup.env; /usr/local/bin/backup-run >/proc/1/fd/2 2>&1\n' "$schedule" >/etc/crontabs/root
+log "scheduler: '$schedule' ($TZ), retention ${BACKUP_RETENTION_DAYS:-14} days"
+exec crond -f -l 8

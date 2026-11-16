@@ -1,0 +1,76 @@
+# Restore drill (#178): scripts/backup-drill.sh drives this stack. Two
+# independent Postgres clusters (source and an empty restore target, like a
+# fresh server after a disaster), a SeaweedFS object store, the migrations and
+# the backup image. Throwaway credentials, never used outside the drill.
+name: hakan-backup-drill
+
+x-pg-env: &pg-env
+  POSTGRES_USER: app
+  POSTGRES_PASSWORD: drill-only-password
+  POSTGRES_DB: app
+
+x-backup-env: &backup-env
+  PGHOST: postgres
+  PGUSER: app
+  PGPASSWORD: drill-only-password
+  PGDATABASE: app
+  S3_ENDPOINT: http://seaweedfs:8333
+  S3_ACCESS_KEY: drillaccess
+  S3_SECRET_KEY: drillsecretdrillsecret
+  S3_BUCKET: app
+  BACKUP_AGE_RECIPIENTS: ${DRILL_AGE_RECIPIENT:-}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment: *pg-env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      retries: 30
+
+  postgres-restore:
+    image: postgres:18-alpine
+    environment: *pg-env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 2s
+      retries: 30
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        printf '{"identities":[{"name":"app","credentials":[{"accessKey":"drillaccess","secretKey":"drillsecretdrillsecret"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' > /tmp/s3.json
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=64 -volume.max=0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8333/status"]
+      interval: 2s
+      retries: 60
+
+  migrate:
+    image: migrate/migrate:v4.19.1
+    command: ["-path", "/migrations", "-database", "postgres://app:drill-only-password@postgres:5432/app?sslmode=disable", "up"]
+    volumes:
+      - ../../backend/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  backup:
+    image: ${DRILL_BACKUP_IMAGE:-local/hakan-backup:main}
+    pull_policy: never
+    environment: *backup-env
+    volumes:
+      - ${DRILL_DIR:?DRILL_DIR is required}:/drill
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-restore:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
