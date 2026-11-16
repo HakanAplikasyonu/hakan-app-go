@@ -408,6 +408,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			// Every tenant route: RequireOrganization opens the scope,
 			// RequireEngagement narrows it (issue #166).
 			middleware.SetTenantScope(rlsScope)
+			middleware.SetTaxpayerScope(rlsScope)
 		}
 	}
 	// Yevmiye taslağı ve Luca / Zirve / Excel çıktısı (#143, #26). Hedef hesap

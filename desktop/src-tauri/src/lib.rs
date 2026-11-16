@@ -4,17 +4,24 @@
 //! (`desktop/sidecar`).
 
 pub mod bridge;
+pub mod logmask;
 mod secrets;
+pub mod supervisor;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 use bridge::{Bridge, LineBuffer, RpcError};
+use supervisor::{Backoff, Mode};
 
 /// Sidecar'ın ikili adı (`bundle.externalBin` ile aynı).
 const SIDECAR: &str = "hakan-sidecar";
@@ -45,12 +52,38 @@ const REFRESH_KEY: &str = "refresh_token";
 
 const CALL_TIMEOUT: Duration = Duration::from_secs(30);
 
-#[derive(Default)]
+/// Oturum açılışında başlatılan uygulama bu argümanla açılır: pencere
+/// gösterilmez, yalnızca tepside çalışır (#204).
+const BACKGROUND_ARG: &str = "--background";
+
+/// Ana pencerenin etiketi (tauri.conf.json).
+const MAIN_WINDOW: &str = "main";
+
 struct SidecarState {
     bridge: RwLock<Option<Arc<Bridge>>>,
     child: Arc<Mutex<Option<CommandChild>>>,
     /// Son `ready` olayının verisi (sürüm, pid…).
     ready: Mutex<Option<Value>>,
+    /// Her başlatmada artar; geç gelen eski kapanma olayları yok sayılır.
+    generation: AtomicU64,
+    /// Kabuğun istediği durum: çalışsın / duraklatıldı / kapanıyor (#204).
+    mode: Mutex<Mode>,
+    backoff: Mutex<Backoff>,
+    started_at: Mutex<Instant>,
+}
+
+impl Default for SidecarState {
+    fn default() -> Self {
+        Self {
+            bridge: RwLock::default(),
+            child: Arc::default(),
+            ready: Mutex::default(),
+            generation: AtomicU64::new(0),
+            mode: Mutex::new(Mode::Running),
+            backoff: Mutex::default(),
+            started_at: Mutex::new(Instant::now()),
+        }
+    }
 }
 
 struct UpdaterEnabled(bool);
@@ -61,6 +94,8 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         let _ = old.kill();
     }
     *state.ready.lock().unwrap() = None;
+    let generation = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
+    *state.started_at.lock().unwrap() = Instant::now();
 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let (mut rx, child) = app
@@ -110,6 +145,7 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                     log::warn!("sidecar kapandı: code={:?} signal={:?}", p.code, p.signal);
                     bridge.on_exit();
                     let _ = app.emit("sidecar://exit", p.code);
+                    schedule_restart(&app, generation);
                     break;
                 }
                 _ => {}
@@ -117,6 +153,161 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+/// Kapanan sidecar'ı geri çekilmeli olarak yeniden başlatır (#204). Kabuk
+/// duraklatıldıysa ya da kapanıyorsa ya da bu süreç artık güncel değilse
+/// hiçbir şey yapmaz.
+fn schedule_restart(app: &AppHandle, generation: u64) {
+    let state = app.state::<SidecarState>();
+    let mode = *state.mode.lock().unwrap();
+    if !supervisor::should_restart(mode, generation, state.generation.load(Ordering::SeqCst)) {
+        return;
+    }
+    let ran = state.started_at.lock().unwrap().elapsed();
+    let delay = state.backoff.lock().unwrap().on_exit(ran);
+    log::warn!("sidecar {} sn sonra yeniden başlatılacak", delay.as_secs());
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(delay).await;
+        let state = app.state::<SidecarState>();
+        // Beklerken duraklatıldı, kapanıyor ya da elle başlatıldıysa vazgeç.
+        let mode = *state.mode.lock().unwrap();
+        if !supervisor::should_restart(mode, generation, state.generation.load(Ordering::SeqCst)) {
+            return;
+        }
+        if let Err(e) = start_sidecar(&app) {
+            log::error!("sidecar yeniden başlatılamadı: {e}");
+            schedule_restart(&app, state.generation.load(Ordering::SeqCst));
+        }
+    });
+}
+
+/// Sidecar'ı durdurur ve yeniden başlatılmamasını sağlar.
+fn stop_sidecar(app: &AppHandle, mode: Mode) {
+    let state = app.state::<SidecarState>();
+    *state.mode.lock().unwrap() = mode;
+    let child = state.child.lock().unwrap().take();
+    if let Some(child) = child {
+        let _ = child.kill();
+    }
+}
+
+/// İzlemeyi duraklatır ya da sürdürür (tepsi menüsü). Duraklatmak sidecar'ı
+/// durdurur: klasör izleme, kuyruk ve sunucu bağlantısı birlikte durur.
+fn set_paused(app: &AppHandle, paused: bool) -> Result<(), String> {
+    if paused {
+        stop_sidecar(app, Mode::Paused);
+        let _ = app.emit("shell://paused", true);
+        return Ok(());
+    }
+    let state = app.state::<SidecarState>();
+    *state.mode.lock().unwrap() = Mode::Running;
+    state.backoff.lock().unwrap().reset();
+    let _ = app.emit("shell://paused", false);
+    start_sidecar(app)
+}
+
+fn is_paused(app: &AppHandle) -> bool {
+    *app.state::<SidecarState>().mode.lock().unwrap() == Mode::Paused
+}
+
+/// Ana pencereyi gösterir ve öne getirir.
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window(MAIN_WINDOW) {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+/// Uygulamadan gerçekten çıkar: sidecar durur, yeniden başlatılmaz.
+fn quit(app: &AppHandle) {
+    stop_sidecar(app, Mode::ShuttingDown);
+    app.exit(0);
+}
+
+/// Tepsi simgesi ve menüsü: Aç, İzlemeyi duraklat/sürdür, Oturum açılışında
+/// başlat, Çıkış (#204).
+fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+    let open = MenuItem::with_id(app, "open", "Aç", true, None::<&str>)?;
+    let pause = MenuItem::with_id(app, "pause", "İzlemeyi duraklat", true, None::<&str>)?;
+    let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
+    let autostart = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "Oturum açılışında başlat",
+        true,
+        autostart_on,
+        None::<&str>,
+    )?;
+    let quit_item = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &open,
+            &pause,
+            &PredefinedMenuItem::separator(app)?,
+            &autostart,
+            &PredefinedMenuItem::separator(app)?,
+            &quit_item,
+        ],
+    )?;
+
+    let pause_item = pause.clone();
+    let autostart_item = autostart.clone();
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("Hakan")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(move |app, event| match event.id().as_ref() {
+            "open" => show_main(app),
+            "pause" => {
+                let paused = !is_paused(app);
+                if let Err(e) = set_paused(app, paused) {
+                    log::error!("izleme durumu değiştirilemedi: {e}");
+                }
+                let _ = pause_item.set_text(if is_paused(app) {
+                    "İzlemeyi sürdür"
+                } else {
+                    "İzlemeyi duraklat"
+                });
+            }
+            "autostart" => {
+                let want = !app.autolaunch().is_enabled().unwrap_or(false);
+                if let Err(e) = set_autostart(app, want) {
+                    log::error!("otomatik başlatma ayarlanamadı: {e}");
+                }
+                let _ = autostart_item.set_checked(app.autolaunch().is_enabled().unwrap_or(false));
+            }
+            "quit" => quit(app),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
+
+fn set_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let launcher = app.autolaunch();
+    let res = if enabled {
+        launcher.enable()
+    } else {
+        launcher.disable()
+    };
+    res.map_err(|e| e.to_string())
 }
 
 /// Oturum olayları kabukta kalır: yenileme belirteci ön yüze hiç gitmez.
@@ -203,7 +394,34 @@ fn sidecar_status(state: State<'_, SidecarState>) -> SidecarStatus {
 
 #[tauri::command]
 fn sidecar_restart(app: AppHandle) -> Result<(), String> {
-    start_sidecar(&app)
+    set_paused(&app, false)
+}
+
+#[derive(serde::Serialize)]
+struct ShellSettings {
+    autostart: bool,
+    paused: bool,
+}
+
+/// Arka plan ayarları (#204): otomatik başlatma ve izleme durumu.
+#[tauri::command]
+fn shell_settings(app: AppHandle) -> ShellSettings {
+    ShellSettings {
+        autostart: app.autolaunch().is_enabled().unwrap_or(false),
+        paused: is_paused(&app),
+    }
+}
+
+#[tauri::command]
+fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<bool, String> {
+    set_autostart(&app, enabled)?;
+    app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_watch_paused(app: AppHandle, paused: bool) -> Result<bool, String> {
+    set_paused(&app, paused)?;
+    Ok(is_paused(&app))
 }
 
 #[derive(serde::Serialize)]
@@ -321,13 +539,58 @@ fn self_test(app: AppHandle) {
     });
 }
 
+/// Kalıcı günlük (#204): uygulamanın günlük klasörüne, dönerek (5 × 2 MB)
+/// ve maskelenerek (`logmask`) yazılır; geliştirmede stdout'a da gider.
+fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+    tauri_plugin_log::Builder::new()
+        .targets([
+            Target::new(TargetKind::LogDir {
+                file_name: Some("hakan".into()),
+            }),
+            Target::new(TargetKind::Stdout),
+        ])
+        .level(log::LevelFilter::Info)
+        .max_file_size(2 * 1024 * 1024)
+        .rotation_strategy(RotationStrategy::KeepSome(5))
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "{} {} {} {}",
+                chrono_now(),
+                record.level(),
+                record.target(),
+                logmask::mask(&message.to_string())
+            ))
+        })
+        .build()
+}
+
+/// Günlük satırı için UTC zaman damgası (RFC 3339).
+fn chrono_now() -> String {
+    time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_default()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let background = std::env::args().any(|a| a == BACKGROUND_ARG);
+    let self_test_mode = std::env::args().any(|a| a == "--self-test");
+
+    let app = tauri::Builder::default()
+        // Tek örnek: ikinci açılış yeni süreç başlatmaz, açık pencereyi öne getirir.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main(app);
+        }))
+        .plugin(log_plugin())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec![BACKGROUND_ARG]),
+        ))
         .manage(SidecarState::default())
-        .setup(|app| {
+        .setup(move |app| {
             let updater = updater_configured(app);
             if updater {
                 app.handle()
@@ -337,15 +600,38 @@ pub fn run() {
             if let Err(e) = start_sidecar(app.handle()) {
                 log::error!("sidecar başlatılamadı: {e}");
             }
-            if std::env::args().any(|a| a == "--self-test") {
+            if self_test_mode {
                 self_test(app.handle().clone());
+                return Ok(());
+            }
+            // Tepsi yoksa (ör. masaüstü ortamı desteklemiyor) pencere kapanınca
+            // uygulama görünmez kalmasın diye gizleme yerine çıkış yapılır.
+            let tray_ok = match build_tray(app.handle()) {
+                Ok(()) => true,
+                Err(e) => {
+                    log::error!("tepsi simgesi kurulamadı: {e}");
+                    false
+                }
+            };
+            app.manage(TrayReady(tray_ok));
+            if background {
+                if let Some(w) = app.get_webview_window(MAIN_WINDOW) {
+                    let _ = w.hide();
+                }
             }
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                if let Some(child) = window.state::<SidecarState>().child.lock().unwrap().take() {
-                    let _ = child.kill();
+            // Pencere kapanınca uygulama tepside kalır; sidecar ve klasör
+            // izleme sürer (#204). Çıkış tepsi menüsünden.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                let tray = window
+                    .try_state::<TrayReady>()
+                    .map(|t| t.0)
+                    .unwrap_or(false);
+                if tray {
+                    api.prevent_close();
+                    let _ = window.hide();
                 }
             }
         })
@@ -353,6 +639,9 @@ pub fn run() {
             sidecar_call,
             sidecar_status,
             sidecar_restart,
+            shell_settings,
+            set_autostart_enabled,
+            set_watch_paused,
             update_check,
             update_install,
             secrets::secret_set,
@@ -360,6 +649,16 @@ pub fn run() {
             secrets::secret_exists,
             secrets::secret_delete,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("HAKAN masaüstü başlatılamadı");
+
+    app.run(|app, event| {
+        if let RunEvent::Exit = event {
+            // Hangi yoldan çıkılırsa çıkılsın sidecar arkada kalmaz.
+            stop_sidecar(app, Mode::ShuttingDown);
+        }
+    });
 }
+
+/// Tepsi simgesi kuruldu mu? Kurulamadıysa pencere kapanınca çıkılır.
+struct TrayReady(bool);
