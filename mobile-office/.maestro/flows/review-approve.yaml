@@ -1,4 +1,5 @@
-# İnceleme onayı: kuyruktaki ilk öneri açılır ve onaylanır. Kuyruk boşsa
+# Kaydırarak onay (arayüz v1, #327): kuyruktaki ilk kart alt "Onayla"
+# düğmesiyle onaylanır (kaydırma hareketinin erişilebilir eşi). Kuyruk boşsa
 # yalnızca boş durum denetlenir (demo verisinde bekleyen öneri olmalı).
 appId: app.hakan.office
 name: review-approve
@@ -6,20 +7,24 @@ tags: [smoke]
 ---
 - launchApp
 - openLink: "hakanofis://review"
-- assertVisible: "İnceleme kuyruğu"
+- extendedWaitUntil:
+    visible: "Onay"
+    timeout: 15000
 - runFlow:
     when:
       visible:
-        id: "suggestion-row"
+        id: "suggestion-card"
     commands:
+      - assertVisible:
+          id: "review-remaining"
       - tapOn:
-          id: "suggestion-row"
-          index: 0
-      - extendedWaitUntil:
-          visible: "Onayla"
-          timeout: 15000
-      - tapOn: "Onayla"
+          id: "review-approve"
       - extendedWaitUntil:
           visible: ".*onaylandı.*"
           timeout: 15000
-- back
+- runFlow:
+    when:
+      notVisible:
+        id: "suggestion-card"
+    commands:
+      - assertVisible: "Kuyruk boş"

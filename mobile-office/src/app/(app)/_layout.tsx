@@ -16,6 +16,7 @@ export default function AppLayout() {
       }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="clients/[engagement]" options={{ headerShown: true, title: 'Mükellef' }} />
+      <Stack.Screen name="tasks/index" options={{ headerShown: true, title: 'Belge görevleri' }} />
       <Stack.Screen name="tasks/new" options={{ presentation: 'modal' }} />
       <Stack.Screen name="tasks/[uuid]" options={{ headerShown: true, title: 'Görev' }} />
       <Stack.Screen name="review/[uuid]" options={{ headerShown: true, title: 'Öneri' }} />

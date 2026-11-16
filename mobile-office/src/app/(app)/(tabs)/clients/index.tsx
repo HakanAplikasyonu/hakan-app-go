@@ -1,18 +1,23 @@
+import { BosDurum, KristalYukleyici, TacRozeti, tacEtiketleri } from '@hakan/mobile-core/hakan';
+import { Ikon } from '@hakan/mobile-core/ui/ikon';
+import { DOKUNMA } from '@hakan/mobile-core/ui/layout';
+import { EkranBasligi, metin } from '@hakan/mobile-core/ui/parcalar';
+import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Notice, Text } from '@/components/ui';
+import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
-import { useColors } from '@/core/theme';
 import { useClients, type OfficeClient } from '@/features/clients/api';
-import { clientSubtitle, filterLabels, normalizeSearch, type ClientFilter } from '@/features/clients/format';
+import { clientCrown, clientSubtitle, filterLabels, initials, normalizeSearch, type ClientFilter } from '@/features/clients/format';
 
-const ROW_HEIGHT = 68;
+const ROW_HEIGHT = 64;
 
-/** Mükellef listesi (#238): arama, süzgeç, imleçli sonsuz kaydırma. */
+/** Mükellefler (MusavirMobil · 3): arama, süzgeç, satırda taç durumu; imleçli sonsuz kaydırma (#238). */
 export default function ClientsScreen() {
-  const c = useColors();
+  const { colors: c } = useTheme();
   const router = useRouter();
   const [text, setText] = useState('');
   const [search, setSearch] = useState<string | undefined>();
@@ -27,33 +32,39 @@ export default function ClientsScreen() {
   const items = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: c.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 12, gap: 10 }}>
-        <TextInput
-          testID="clients-search"
-          value={text}
-          onChangeText={setText}
-          placeholder="Unvan ya da VKN/TCKN ara"
-          placeholderTextColor={c.muted}
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          accessibilityLabel="Mükellef ara"
-          style={[styles.search, { color: c.text, backgroundColor: c.surface, borderColor: c.border }]}
-        />
-        <View style={styles.filters} accessibilityRole="tablist">
-          {filterLabels.map((f) => (
-            <Pressable
-              key={f.key}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: filter === f.key }}
-              onPress={() => setFilter(f.key)}
-              style={[styles.filter, { borderColor: filter === f.key ? c.brand : c.border, backgroundColor: c.surface }]}>
-              <Text variant="caption" tone={filter === f.key ? 'brand' : 'muted'} style={{ fontWeight: '600' }}>
-                {f.label}
-              </Text>
-            </Pressable>
-          ))}
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['top', 'left', 'right']}>
+      <EkranBasligi baslik="Mükellefler" />
+      <View style={{ paddingHorizontal: 16, gap: 10, paddingBottom: 10 }}>
+        <View style={[styles.search, { backgroundColor: c.surface, borderColor: c.line }]}>
+          <Ikon ad="ara" boyut={16} renk={c.text3} />
+          <TextInput
+            testID="clients-search"
+            value={text}
+            onChangeText={setText}
+            placeholder="Unvan, VKN, TCKN"
+            placeholderTextColor={c.text3}
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            accessibilityLabel="Mükellef ara"
+            style={[metin.govde, { flex: 1, color: c.text, minHeight: DOKUNMA }]}
+          />
         </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }} accessibilityRole="tablist">
+          {filterLabels.map((f) => {
+            const on = filter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                hitSlop={{ top: 6, bottom: 6 }}
+                onPress={() => setFilter(f.key)}
+                style={[styles.chip, { backgroundColor: on ? c.brandTint : c.surface3 }]}>
+                <Text style={[metin.xs, { fontFamily: 'Inter_600SemiBold', color: on ? c.brandText : c.text2 }]}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
       {q.error ? (
         <View style={{ padding: 16 }}>
@@ -63,54 +74,62 @@ export default function ClientsScreen() {
       <FlatList
         data={items}
         keyExtractor={(x) => x.engagement_uuid}
-        contentContainerStyle={{ padding: 16 }}
         getItemLayout={(_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index })}
         initialNumToRender={15}
         maxToRenderPerBatch={20}
         windowSize={11}
         removeClippedSubviews
         keyboardDismissMode="on-drag"
-        refreshControl={<RefreshControl refreshing={q.isRefetching && !q.isFetchingNextPage} onRefresh={() => void q.refetch()} tintColor={c.brand} />}
+        refreshControl={<RefreshControl refreshing={q.isRefetching && !q.isFetchingNextPage} onRefresh={() => void q.refetch()} tintColor={c.brandText} />}
         onEndReached={() => q.hasNextPage && !q.isFetchingNextPage && q.fetchNextPage()}
         onEndReachedThreshold={0.5}
-        ListEmptyComponent={q.isLoading ? <ActivityIndicator color={c.brand} /> : <Text tone="muted">Mükellef bulunamadı.</Text>}
-        ListFooterComponent={q.isFetchingNextPage ? <ActivityIndicator color={c.brand} /> : undefined}
+        ListEmptyComponent={
+          q.isLoading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <KristalYukleyici etiket="Mükellefler yükleniyor" />
+            </View>
+          ) : (
+            <BosDurum baslik="Mükellef bulunamadı" aciklama={search ? 'Aramayı değiştirip yeniden deneyin.' : 'Size atanmış mükellef yok.'} />
+          )
+        }
+        ListFooterComponent={q.isFetchingNextPage ? <KristalYukleyici boyut={24} etiket="Devamı yükleniyor" /> : undefined}
         renderItem={({ item }) => (
           <ClientRow item={item} onPress={() => router.push({ pathname: '/clients/[engagement]', params: { engagement: item.engagement_uuid, title: item.title } })} />
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 function ClientRow({ item, onPress }: { item: OfficeClient; onPress: () => void }) {
-  const c = useColors();
-  const dot = item.open_blockers ? c.danger : item.open_warnings ? c.warning : item.open_tasks ? c.brand : null;
+  const { colors: c } = useTheme();
+  const tac = clientCrown(item);
   return (
     <Pressable
       testID="client-row"
       accessibilityRole="button"
-      accessibilityLabel={`${item.title}, ${clientSubtitle(item)}`}
+      accessibilityLabel={`${item.title}, ${clientSubtitle(item)}, ${tacEtiketleri[tac]}`}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}>
+      style={({ pressed }) => [styles.row, { borderTopColor: c.line, backgroundColor: pressed ? c.surface2 : 'transparent' }]}>
+      <View style={[styles.av, { backgroundColor: c.surface3 }]}>
+        <Text style={[metin.xs, { fontFamily: 'Inter_700Bold', color: c.text2 }]}>{initials(item.title)}</Text>
+      </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: '600' }} numberOfLines={1}>
+        <Text style={[metin.sm, { fontFamily: 'Inter_600SemiBold', color: c.text }]} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text variant="caption" tone="muted" numberOfLines={1}>
+        <Text style={[metin.xs, { color: item.open_blockers ? c.danger : c.text3 }]} numberOfLines={1}>
           {clientSubtitle(item)}
         </Text>
       </View>
-      {dot ? <View style={[styles.dot, { backgroundColor: dot }]} /> : null}
-      <Text tone="muted">›</Text>
+      <TacRozeti durum={tac} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  search: { minHeight: 44, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, fontSize: 16 },
-  filters: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  filter: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  row: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  dot: { width: 10, height: 10, borderRadius: 5 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
+  chip: { minHeight: 32, borderRadius: 999, paddingHorizontal: 12, justifyContent: 'center' },
+  row: { height: ROW_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, borderTopWidth: StyleSheet.hairlineWidth },
+  av: { width: 36, height: 36, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
 });

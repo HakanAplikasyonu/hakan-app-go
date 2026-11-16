@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { actions, dayLabel, dueDateFromDays, taskTitle, validateRequest } from './format.ts';
+import { actions, dayLabel, daysUntilDate, dueDateFromDays, taskTitle, validateRequest } from './format.ts';
 
 test('taskTitle', () => {
   assert.equal(taskTitle({ kind: 'document_request', title: 'Kira kontratı' }), 'Kira kontratı');
@@ -27,4 +27,14 @@ test('actions by status', () => {
   assert.deepEqual(actions('open'), { complete: true, rerequest: false, cancel: true });
   assert.deepEqual(actions('submitted'), { complete: true, rerequest: true, cancel: true });
   assert.deepEqual(actions('matched'), { complete: false, rerequest: false, cancel: false });
+});
+
+test('custom due date', () => {
+  const now = new Date('2026-11-16T10:00:00Z');
+  assert.equal(daysUntilDate('23.11.2026', now), 7);
+  assert.equal(daysUntilDate('2026-11-17', now), 1);
+  assert.equal(daysUntilDate('16.11.2026', now), null); // bugün olmaz
+  assert.equal(daysUntilDate('31.02.2027', now), null);
+  assert.equal(daysUntilDate('01.06.2027', now), null); // 90 günden uzak
+  assert.equal(daysUntilDate('yarın', now), null);
 });

@@ -12,5 +12,6 @@ tags: [smoke]
           text: "›"
           index: 0
 - extendedWaitUntil:
-    visible: "İnceleme kuyruğu"
+    visible:
+      id: "stat-uploads"
     timeout: 20000

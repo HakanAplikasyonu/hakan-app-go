@@ -64,3 +64,14 @@ export function initials(title: string): string {
     .filter((w) => w && !skip.has(w.toLocaleLowerCase('tr')));
   return words.slice(0, 2).map((w) => w[0].toLocaleUpperCase('tr')).join('') || '?';
 }
+
+/**
+ * Satırdaki taç (MusavirMobil · 3). Liste ucu dönem durumunu taşımadığı için
+ * yaklaşık: engelleyici varsa "sorun", açık belge görevi varsa "bekleniyor",
+ * aksi halde "yuklendi" (veri geldi, müşavirde). Dönem tacı ayrıntı ekranında.
+ */
+export function clientCrown(c: { open_blockers: number; open_tasks: number }): 'sorun' | 'bekleniyor' | 'yuklendi' {
+  if (c.open_blockers) return 'sorun';
+  if (c.open_tasks) return 'bekleniyor';
+  return 'yuklendi';
+}

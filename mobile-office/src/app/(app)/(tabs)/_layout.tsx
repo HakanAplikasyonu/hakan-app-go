@@ -22,7 +22,7 @@ export default function TabsLayout() {
     { name: 'index', label: 'Pano', ikon: 'pano' },
     { name: 'review/index', label: 'Onay', ikon: 'kuyruk', rozet: rozet(d?.review?.pending), testID: 'tab-review' },
     { name: 'clients/index', label: 'Mükellef', ikon: 'mukellef', testID: 'tab-clients' },
-    { name: 'tasks/index', label: 'Görev', ikon: 'gorev', testID: 'tab-tasks' },
+    { name: 'gorevler', label: 'Görev', ikon: 'gorev', testID: 'tab-tasks' },
     { name: 'notifications', label: 'Bildirim', ikon: 'bildirim', rozet: rozet(unreadCount(inbox.items)), testID: 'tab-notifications' },
   ];
   return (
@@ -32,7 +32,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="review/index" />
       <Tabs.Screen name="clients/index" />
-      <Tabs.Screen name="tasks/index" />
+      <Tabs.Screen name="gorevler" />
       <Tabs.Screen name="notifications" />
     </Tabs>
   );

@@ -17,5 +17,5 @@ tags: [smoke]
 - tapOn: "Giriş yap"
 - extendedWaitUntil:
     visible:
-      text: "Ofis seçin|İnceleme kuyruğu"
+      text: "Ofis seçin|Bugün gelen yüklemeler"
     timeout: 20000

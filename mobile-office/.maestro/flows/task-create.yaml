@@ -5,7 +5,8 @@ name: task-create
 tags: [smoke]
 ---
 - launchApp
-- tapOn: "Mükellefler"
+- tapOn:
+    id: "tab-clients"
 - extendedWaitUntil:
     visible:
       id: "client-row"
@@ -21,8 +22,10 @@ tags: [smoke]
     id: "request-title"
 - inputText: "Maestro duman testi"
 - hideKeyboard
-- tapOn: "7 gün"
-- tapOn: "Talebi gönder"
+- tapOn:
+    id: "due-7"
+- tapOn:
+    id: "request-submit"
 - extendedWaitUntil:
     visible: "Bekleniyor"
     timeout: 15000

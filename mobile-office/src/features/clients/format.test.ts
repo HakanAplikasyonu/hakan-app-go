@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { clientSubtitle, mailHref, money, normalizeSearch, recentPeriods, telHref, initials } from './format.ts';
+import { clientSubtitle, mailHref, money, normalizeSearch, recentPeriods, telHref, initials, clientCrown } from './format.ts';
 
 test('normalizeSearch', () => {
   assert.equal(normalizeSearch(' a '), undefined);
@@ -39,4 +39,10 @@ test('initials skip company suffixes', () => {
   assert.equal(initials('Kuzey Lojistik Ltd. Şti.'), 'KL');
   assert.equal(initials('ışık'), 'I');
   assert.equal(initials(''), '?');
+});
+
+test('client crown', () => {
+  assert.equal(clientCrown({ open_blockers: 2, open_tasks: 1 }), 'sorun');
+  assert.equal(clientCrown({ open_blockers: 0, open_tasks: 1 }), 'bekleniyor');
+  assert.equal(clientCrown({ open_blockers: 0, open_tasks: 0 }), 'yuklendi');
 });

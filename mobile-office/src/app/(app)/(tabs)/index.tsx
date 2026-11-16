@@ -138,7 +138,7 @@ export default function HomeScreen() {
                   label="Belge görevi"
                   value={d.doc_tasks ? d.doc_tasks.open + d.doc_tasks.submitted : null}
                   hint={d.doc_tasks?.overdue ? `${d.doc_tasks.overdue} gecikmiş` : undefined}
-                  onPress={d.doc_tasks ? () => router.push('/tasks') : undefined}
+                  onPress={d.doc_tasks ? () => router.push('/gorevler') : undefined}
                 />
                 <Stat
                   testID="stat-warnings"
