@@ -260,13 +260,23 @@ func (s *Service) notifyOffice(ctx context.Context, organizationID, engagementID
 	// The office panel's engagement page; `task` lets the müşavir mobil app
 	// open the task itself (issue #241, hakanofis links).
 	link := strings.TrimRight(s.cfg.FrontendURL, "/") + "/t/" + names.OrganizationSlug + "/engagements/" + engagementUUID + "?task=" + t.UUID.String()
-	for _, uid := range users {
-		s.enqueue(ctx, TemplateSubmitted, organizationID, uid, link, map[string]string{
-			"org_name": names.OrganizationName, "taxpayer_name": names.TaxpayerTitle, "title": taskTitle(t), "link": link,
-		}, map[string]any{
-			"kind": "doc_task_submitted", "task_uuid": t.UUID.String(), "engagement_uuid": engagementUUID,
-			"organization_slug": names.OrganizationSlug, "taxpayer_uuid": names.TaxpayerUuid.String(), "status": t.Status,
-		})
+	// The notifications are the office's rows (organization_id = the office):
+	// in the mükellef's scope (no office) the notifications policy refuses
+	// them (migration 000088, #307) and the failed insert aborted the
+	// upload's transaction. Write them as the office, like #281.
+	err = rls.ForOffice(ctx, organizationID, taxpayerID, func(ctx context.Context) error {
+		for _, uid := range users {
+			s.enqueue(ctx, TemplateSubmitted, organizationID, uid, link, map[string]string{
+				"org_name": names.OrganizationName, "taxpayer_name": names.TaxpayerTitle, "title": taskTitle(t), "link": link,
+			}, map[string]any{
+				"kind": "doc_task_submitted", "task_uuid": t.UUID.String(), "engagement_uuid": engagementUUID,
+				"organization_slug": names.OrganizationSlug, "taxpayer_uuid": names.TaxpayerUuid.String(), "status": t.Status,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		s.log.Warn("doctasks_office_notify_failed", "error", err, "engagement_id", engagementID)
 	}
 }
 

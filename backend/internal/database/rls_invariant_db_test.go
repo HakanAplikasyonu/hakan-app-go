@@ -15,21 +15,10 @@ import (
 // table gets its policies; the test fails while a listed table is already
 // protected or no longer exists.
 //
-// All of these come from the boilerplate and keep rows without an office
-// (organization_id NULL): an office-only policy would hide those rows in
-// every scoped transaction and break the lookups that read them there (the
-// system roles in every permission check, a user's own notifications). A
-// policy that also handles the NULL rows is a design decision of its own
-// (issue #302, "Karar gerekiyor").
-var rlsInvariantExceptions = map[string]string{
-	"roles":                  "system roles have organization_id NULL and are read by every tenant permission check",
-	"notifications":          "user notifications (organization_id NULL) are written inside office and taxpayer scopes",
-	"activity_events":        "platform activity log; office rows sit next to user / platform rows with organization_id NULL",
-	"bulk_jobs":              "IO engine jobs (boilerplate) started by platform users without an office",
-	"import_jobs":            "IO engine jobs (boilerplate) started by platform users without an office",
-	"export_jobs":            "IO engine jobs (boilerplate) started by platform users without an office",
-	"excel_import_templates": "system templates have organization_id and taxpayer_id NULL and are offered to every office",
-}
+// Empty since issue #307: the office-less tables carry rls_apply_org_shared
+// (shared_tables.txt) or, for notifications and activity_events, the user
+// row policies of migration 000088.
+var rlsInvariantExceptions = map[string]string{}
 
 // TestRLSInvariant (issue #302): after all migrations, every public table
 // with an organization_id or taxpayer_id column has row level security
