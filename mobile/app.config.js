@@ -12,11 +12,36 @@ function assertStoreConfig() {
   }
 }
 
+// Universal links (iOS) and verified app links (Android) for the web panel's
+// mükellef paths (/m/...), #201. EXPO_PUBLIC_APP_LINK_DOMAIN is the panel's
+// host (e.g. app.example.com); empty: only the hakan:// scheme works. The
+// domain must also serve apple-app-site-association and assetlinks.json
+// (docs: mobile/README.md, "Bildirim ve bağlantılar").
+function appLinks(config) {
+  const domain = process.env.EXPO_PUBLIC_APP_LINK_DOMAIN?.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!domain) return {};
+  return {
+    ios: { ...config.ios, associatedDomains: [`applinks:${domain}`] },
+    android: {
+      ...config.android,
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [{ scheme: 'https', host: domain, pathPrefix: '/m/' }],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
+    },
+  };
+}
+
 module.exports = ({ config }) => {
   assertStoreConfig();
   const projectId = config.extra?.eas?.projectId ?? process.env.EAS_PROJECT_ID?.trim();
   return {
     ...config,
+    ...appLinks(config),
     runtimeVersion: { policy: 'fingerprint' },
     extra: {
       ...config.extra,

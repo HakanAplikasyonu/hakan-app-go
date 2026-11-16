@@ -259,3 +259,28 @@ func TestValidatePushDevice(t *testing.T) {
 		}
 	}
 }
+
+// Absolute links (doc task reminders keep one for e-mail) reach the mobile
+// app as their path (#201); other schemes and hostless values are dropped.
+func TestPushPath(t *testing.T) {
+	cases := map[string]string{
+		"/m/abc/tasks":                          "/m/abc/tasks",
+		"https://app.example.com/m/abc/tasks":   "/m/abc/tasks",
+		"https://app.example.com/m/a%20b?x=1#f": "/m/a%20b?x=1",
+		"//evil.example/m/x":                    "",
+		"javascript:alert(1)":                   "",
+		"hakan://tasks":                         "",
+		"https://app.example.com":               "",
+		"":                                      "",
+	}
+	for in, want := range cases {
+		if got := pushPath(pgtype.Text{String: in, Valid: in != ""}); got != want {
+			t.Errorf("pushPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+	row := exportRow(t)
+	row.ActionUrl = pgtype.Text{String: "https://app.example.com/m/0b6a/tasks", Valid: true}
+	if msg := BuildPushMessage(row, "tr", db.PushDevice{}); msg.Data["url"] != "/m/0b6a/tasks" {
+		t.Fatalf("data=%v", msg.Data)
+	}
+}

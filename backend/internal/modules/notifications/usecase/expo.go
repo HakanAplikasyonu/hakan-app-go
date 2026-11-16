@@ -8,16 +8,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/pushtext"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // Expo Push Service endpoints and limits.
@@ -263,10 +265,31 @@ func BuildPushMessage(row db.Notification, userLocale string, dev db.PushDevice)
 	if kind != "" {
 		data["kind"] = kind
 	}
-	if row.ActionUrl.Valid && strings.HasPrefix(row.ActionUrl.String, "/") {
-		data["url"] = row.ActionUrl.String
+	if p := pushPath(row.ActionUrl); p != "" {
+		data["url"] = p
 	}
 	return expoMessage{To: dev.Token, Title: txt.Title, Body: txt.Body, Data: data, Sound: "default", Priority: "high"}
+}
+
+// pushPath is the web path the mobile app maps to a screen (#201). Links are
+// stored absolute when e-mails need them (doc task reminders); the push only
+// carries the path and query, never another host.
+func pushPath(u pgtype.Text) string {
+	if !u.Valid || u.String == "" {
+		return ""
+	}
+	if strings.HasPrefix(u.String, "/") && !strings.HasPrefix(u.String, "//") {
+		return u.String
+	}
+	parsed, err := url.Parse(u.String)
+	if err != nil || (parsed.Scheme != "https" && parsed.Scheme != "http") || parsed.Path == "" || !strings.HasPrefix(parsed.Path, "/") {
+		return ""
+	}
+	out := parsed.EscapedPath()
+	if parsed.RawQuery != "" {
+		out += "?" + parsed.RawQuery
+	}
+	return out
 }
 
 // SendMobilePush sends the Expo push for a notification row to all active
