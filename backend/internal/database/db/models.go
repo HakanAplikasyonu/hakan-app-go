@@ -951,6 +951,39 @@ type JournalDraftLine struct {
 	Confidence     pgtype.Numeric `json:"confidence"`
 }
 
+type LegalAcceptance struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	DocumentID     int64              `json:"document_id"`
+	UserID         int64              `json:"user_id"`
+	OrganizationID pgtype.Int8        `json:"organization_id"`
+	TaxpayerID     pgtype.Int8        `json:"taxpayer_id"`
+	Context        string             `json:"context"`
+	SubjectUuid    pgtype.UUID        `json:"subject_uuid"`
+	ContentSha256  string             `json:"content_sha256"`
+	Ip             string             `json:"ip"`
+	UserAgent      string             `json:"user_agent"`
+	AcceptedAt     pgtype.Timestamptz `json:"accepted_at"`
+	WithdrawnAt    pgtype.Timestamptz `json:"withdrawn_at"`
+}
+
+type LegalDocument struct {
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	Kind               string             `json:"kind"`
+	Language           string             `json:"language"`
+	Version            int32              `json:"version"`
+	Title              string             `json:"title"`
+	Body               string             `json:"body"`
+	Status             string             `json:"status"`
+	LegalReviewPending bool               `json:"legal_review_pending"`
+	ContentSha256      string             `json:"content_sha256"`
+	CreatedBy          pgtype.Int8        `json:"created_by"`
+	PublishedAt        pgtype.Timestamptz `json:"published_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LogPurgeRule struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`

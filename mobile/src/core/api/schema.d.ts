@@ -3238,7 +3238,7 @@ export interface paths {
         put?: never;
         /**
          * Owner approves an office's request
-         * @description Owners only. Opens the engagement (and ends one with another office, D2).
+         * @description Owners only. Opens the engagement (and ends one with another office, D2). The body names the privacy notice version shown (issue
          */
         post: operations["approveTaxpayerOnboardingRequest"];
         delete?: never;
@@ -4550,6 +4550,168 @@ export interface paths {
          * @description Requires `tenant.agents.write`. Sent every `heartbeat_seconds` (300). An agent silent for 30 minutes is marked `offline` by a scheduled sweep and the registering user is notified (`AGENT_OFFLINE`, 02 §6 / 05 §4); the next heartbeat brings it back `online`.
          */
         post: operations["heartbeatDesktopAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/legal/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current legal texts
+         * @description Public. The current published version of each KVKK text (privacy notice, explicit consent for sharing past data, data processing agreement, retention policy). `legal_review_pending` marks a draft awaiting legal review.
+         */
+        get: operations["listLegalDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/legal/documents/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A legal text
+         * @description Public. Current published version, or `version` (published or retired: what someone accepted). Drafts are never public.
+         */
+        get: operations["getLegalDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/legal-acceptances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My consents and acknowledgements
+         * @description Every legal text the caller accepted, in which flow, on whose behalf, and whether it was withdrawn (KVKK md. 11).
+         */
+        get: operations["listMyLegalAcceptances"];
+        put?: never;
+        /**
+         * Acknowledge a text
+         * @description The caller acknowledges the current version of the privacy notice or retention policy for themselves.
+         */
+        post: operations["acceptLegalDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/legal/dpa": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data processing agreement status
+         * @description Requires `tenant.settings.read`. The current agreement and whether the office accepted it (`up_to_date` is false after a new version).
+         */
+        get: operations["getOfficeDPA"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/legal/dpa/accept": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept the data processing agreement
+         * @description Requires `tenant.legal.accept` (owner, admin). Records the acceptance of the current version on behalf of the office (KVKK md. 12/2).
+         */
+        post: operations["acceptOfficeDPA"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/legal/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All legal text versions
+         * @description Requires `platform.legal.manage`.
+         */
+        get: operations["listAllLegalDocuments"];
+        put?: never;
+        /**
+         * New draft version
+         * @description Requires `platform.legal.manage`. The next version number of the kind and language, as a draft.
+         */
+        post: operations["createLegalDocumentDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/platform/legal/documents/{documentUuid}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish a draft
+         * @description Requires `platform.legal.manage`. The draft becomes current; older published versions are retired. A published text never changes (a correction is a new version); flows then ask for the new version.
+         */
+        post: operations["publishLegalDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7560,6 +7722,97 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
+        LegalDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "privacy_notice" | "history_share_consent" | "data_processing_agreement" | "retention_policy";
+            /** @enum {string} */
+            language: "tr" | "en";
+            version: number;
+            title: string;
+            /** @description Markdown */
+            body: string;
+            /** @enum {string} */
+            status: "draft" | "published" | "retired";
+            /** @description Draft text awaiting legal review; show a notice */
+            legal_review_pending: boolean;
+            /** @description sha256(title + newline + body) */
+            content_sha256: string;
+            /** Format: date-time */
+            published_at: string | null;
+        };
+        LegalAcceptance: {
+            /** Format: uuid */
+            uuid: string;
+            kind: string;
+            version: number;
+            /** @enum {string} */
+            context: "self" | "history_share" | "onboarding_consent" | "office_dpa";
+            /** Format: date-time */
+            accepted_at: string;
+        };
+        MyLegalAcceptance: {
+            /** Format: uuid */
+            uuid: string;
+            kind: string;
+            language: string;
+            version: number;
+            title: string;
+            /** @enum {string} */
+            context: "self" | "history_share" | "onboarding_consent" | "office_dpa";
+            organization: string | null;
+            taxpayer: string | null;
+            /** Format: date-time */
+            accepted_at: string;
+            /** Format: date-time */
+            withdrawn_at: string | null;
+        };
+        OfficeDPAStatus: {
+            document: components["schemas"]["LegalDocument"];
+            accepted: null | {
+                version: number;
+                /** Format: date-time */
+                accepted_at: string;
+                /** @description Email of the accepting user */
+                accepted_by: string;
+            };
+            up_to_date: boolean;
+        };
+        EnvelopeLegalDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LegalDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLegalDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["LegalDocument"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLegalAcceptance: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LegalAcceptance"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLegalAcceptanceList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["MyLegalAcceptance"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeOfficeDPAStatus: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeDPAStatus"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeTenantSettings: {
             /** @enum {boolean} */
             success: true;
@@ -9146,6 +9399,22 @@ export interface components {
              * @description Empty or missing means no upper bound
              */
             to_date?: string;
+            /** @description Version of the `history_share_consent` text the owner was shown and accepted (issue */
+            consent_version: number;
+            /** @enum {string} */
+            consent_language?: "tr" | "en";
+        };
+        PrivacyNoticeAcceptance: {
+            /** @description Version of the `privacy_notice` shown to the person approving (KVKK md. 10, issue */
+            privacy_notice_version: number;
+            /** @enum {string} */
+            privacy_notice_language?: "tr" | "en";
+        };
+        TaxpayerConsentApproveRequest: {
+            token: string;
+            privacy_notice_version: number;
+            /** @enum {string} */
+            privacy_notice_language?: "tr" | "en";
         };
         EngagementDocument: {
             /** Format: uuid */
@@ -15335,7 +15604,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["InvitationTokenRequest"];
+                "application/json": components["schemas"]["TaxpayerConsentApproveRequest"];
             };
         };
         responses: {
@@ -15460,7 +15729,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrivacyNoticeAcceptance"];
+            };
+        };
         responses: {
             /** @description Outcome */
             200: {
@@ -17591,6 +17864,283 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listLegalDocuments: {
+        parameters: {
+            query?: {
+                /** @description Falls back to Accept-Language, then Turkish (the binding text) */
+                lang?: "tr" | "en";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalDocumentList"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLegalDocument: {
+        parameters: {
+            query?: {
+                version?: number;
+                /** @description Falls back to Accept-Language, then Turkish (the binding text) */
+                lang?: "tr" | "en";
+            };
+            header?: never;
+            path: {
+                kind: "privacy_notice" | "history_share_consent" | "data_processing_agreement" | "retention_policy";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listMyLegalAcceptances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalAcceptanceList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acceptLegalDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "privacy_notice" | "retention_policy";
+                    version: number;
+                    /** @enum {string} */
+                    language?: "tr" | "en";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalAcceptance"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getOfficeDPA: {
+        parameters: {
+            query?: {
+                /** @description Falls back to Accept-Language, then Turkish (the binding text) */
+                lang?: "tr" | "en";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeDPAStatus"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    acceptOfficeDPA: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    version: number;
+                    /** @enum {string} */
+                    language?: "tr" | "en";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeDPAStatus"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAllLegalDocuments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalDocumentList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createLegalDocumentDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "privacy_notice" | "history_share_consent" | "data_processing_agreement" | "retention_policy";
+                    /** @enum {string} */
+                    language: "tr" | "en";
+                    title: string;
+                    /** @description Markdown */
+                    body: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    publishLegalDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description true clears legal_review_pending */
+                    legal_reviewed?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLegalDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

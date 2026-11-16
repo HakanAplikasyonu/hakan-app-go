@@ -81,6 +81,8 @@ tags:
     description: Excel / CSV import (04-excel-ice-aktarma.md)
   - name: Receipts
     description: Receipt capture (OCR drafts, vehicle list, plate check)
+  - name: Legal
+    description: KVKK texts (versioned) and acceptance records
   - name: Agents
     description: Desktop local agents (registration, heartbeat, AGENT_OFFLINE)
   - name: Summaries
@@ -4699,7 +4701,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/InvitationTokenRequest"
+              $ref: "#/components/schemas/TaxpayerConsentApproveRequest"
       responses:
         "200":
           description: Outcome
@@ -4785,9 +4787,15 @@ paths:
       tags: [TaxpayerOnboarding]
       operationId: approveTaxpayerOnboardingRequest
       summary: Owner approves an office's request
-      description: Owners only. Opens the engagement (and ends one with another office, D2).
+      description: Owners only. Opens the engagement (and ends one with another office, D2). The body names the privacy notice version shown (issue #57).
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PrivacyNoticeAcceptance"
       responses:
         "200":
           description: Outcome
@@ -6379,6 +6387,239 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/legal/documents:
+    get:
+      tags: [Legal]
+      operationId: listLegalDocuments
+      summary: Current legal texts
+      description: |
+        Public. The current published version of each KVKK text (privacy notice, explicit consent for sharing past data, data processing agreement, retention policy). `legal_review_pending` marks a draft awaiting legal review.
+      security: []
+      parameters:
+        - { name: lang, in: query, required: false, schema: { type: string, enum: [tr, en] }, description: "Falls back to Accept-Language, then Turkish (the binding text)" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalDocumentList"
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/legal/documents/{kind}:
+    get:
+      tags: [Legal]
+      operationId: getLegalDocument
+      summary: A legal text
+      description: |
+        Public. Current published version, or `version` (published or retired: what someone accepted). Drafts are never public.
+      security: []
+      parameters:
+        - { name: kind, in: path, required: true, schema: { type: string, enum: [privacy_notice, history_share_consent, data_processing_agreement, retention_policy] } }
+        - { name: version, in: query, required: false, schema: { type: integer, minimum: 1 } }
+        - { name: lang, in: query, required: false, schema: { type: string, enum: [tr, en] }, description: "Falls back to Accept-Language, then Turkish (the binding text)" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/me/legal-acceptances:
+    get:
+      tags: [Legal]
+      operationId: listMyLegalAcceptances
+      summary: My consents and acknowledgements
+      description: |
+        Every legal text the caller accepted, in which flow, on whose behalf, and whether it was withdrawn (KVKK md. 11).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalAcceptanceList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Legal]
+      operationId: acceptLegalDocument
+      summary: Acknowledge a text
+      description: |
+        The caller acknowledges the current version of the privacy notice or retention policy for themselves.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, version]
+              properties:
+                kind: { type: string, enum: [privacy_notice, retention_policy] }
+                version: { type: integer, minimum: 1 }
+                language: { type: string, enum: [tr, en] }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalAcceptance"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/legal/dpa:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Legal]
+      operationId: getOfficeDPA
+      summary: Data processing agreement status
+      description: |
+        Requires `tenant.settings.read`. The current agreement and whether the office accepted it (`up_to_date` is false after a new version).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: lang, in: query, required: false, schema: { type: string, enum: [tr, en] }, description: "Falls back to Accept-Language, then Turkish (the binding text)" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeDPAStatus"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/legal/dpa/accept:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Legal]
+      operationId: acceptOfficeDPA
+      summary: Accept the data processing agreement
+      description: |
+        Requires `tenant.legal.accept` (owner, admin). Records the acceptance of the current version on behalf of the office (KVKK md. 12/2).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+                language: { type: string, enum: [tr, en] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeDPAStatus"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/platform/legal/documents:
+    get:
+      tags: [Legal]
+      operationId: listAllLegalDocuments
+      summary: All legal text versions
+      description: |
+        Requires `platform.legal.manage`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalDocumentList"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Legal]
+      operationId: createLegalDocumentDraft
+      summary: New draft version
+      description: |
+        Requires `platform.legal.manage`. The next version number of the kind and language, as a draft.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, language, title, body]
+              properties:
+                kind: { type: string, enum: [privacy_notice, history_share_consent, data_processing_agreement, retention_policy] }
+                language: { type: string, enum: [tr, en] }
+                title: { type: string, maxLength: 200 }
+                body: { type: string, maxLength: 100000, description: Markdown }
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/platform/legal/documents/{documentUuid}/publish:
+    parameters:
+      - { name: documentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Legal]
+      operationId: publishLegalDocument
+      summary: Publish a draft
+      description: |
+        Requires `platform.legal.manage`. The draft becomes current; older published versions are retired. A published text never changes (a correction is a new version); flows then ask for the new version.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                legal_reviewed: { type: boolean, description: "true clears legal_review_pending" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLegalDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/invitations/preview:
     post:
@@ -10228,6 +10469,114 @@ components:
               items: { $ref: "#/components/schemas/DesktopAgent" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    LegalDocument:
+      type: object
+      required: [uuid, kind, language, version, title, body, status, legal_review_pending, content_sha256, published_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [privacy_notice, history_share_consent, data_processing_agreement, retention_policy] }
+        language: { type: string, enum: [tr, en] }
+        version: { type: integer }
+        title: { type: string }
+        body: { type: string, description: Markdown }
+        status: { type: string, enum: [draft, published, retired] }
+        legal_review_pending: { type: boolean, description: "Draft text awaiting legal review; show a notice" }
+        content_sha256: { type: string, description: "sha256(title + newline + body)" }
+        published_at: { type: [string, "null"], format: date-time }
+
+    LegalAcceptance:
+      type: object
+      required: [uuid, kind, version, context, accepted_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string }
+        version: { type: integer }
+        context: { type: string, enum: [self, history_share, onboarding_consent, office_dpa] }
+        accepted_at: { type: string, format: date-time }
+
+    MyLegalAcceptance:
+      type: object
+      required: [uuid, kind, language, version, title, context, organization, taxpayer, accepted_at, withdrawn_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string }
+        language: { type: string }
+        version: { type: integer }
+        title: { type: string }
+        context: { type: string, enum: [self, history_share, onboarding_consent, office_dpa] }
+        organization: { type: [string, "null"] }
+        taxpayer: { type: [string, "null"] }
+        accepted_at: { type: string, format: date-time }
+        withdrawn_at: { type: [string, "null"], format: date-time }
+
+    OfficeDPAStatus:
+      type: object
+      required: [document, accepted, up_to_date]
+      properties:
+        document: { $ref: "#/components/schemas/LegalDocument" }
+        accepted:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [version, accepted_at, accepted_by]
+              properties:
+                version: { type: integer }
+                accepted_at: { type: string, format: date-time }
+                accepted_by: { type: string, description: Email of the accepting user }
+        up_to_date: { type: boolean }
+
+    EnvelopeLegalDocument:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LegalDocument" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLegalDocumentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/LegalDocument" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLegalAcceptance:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LegalAcceptance" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLegalAcceptanceList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/MyLegalAcceptance" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeOfficeDPAStatus:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeDPAStatus" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     EnvelopeTenantSettings:
       type: object
       required: [success, data, meta]
@@ -12317,9 +12666,34 @@ components:
     CreateHistoryShareRequest:
       type: object
       additionalProperties: false
+      required: [consent_version]
       properties:
         from_date: { type: string, format: date, description: Empty or missing means no lower bound }
         to_date: { type: string, format: date, description: Empty or missing means no upper bound }
+        consent_version:
+          type: integer
+          minimum: 1
+          description: Version of the `history_share_consent` text the owner was shown and accepted (issue #57). Must be the current version (409 `LEGAL_VERSION_OUTDATED` otherwise).
+        consent_language: { type: string, enum: [tr, en] }
+
+    PrivacyNoticeAcceptance:
+      type: object
+      required: [privacy_notice_version]
+      properties:
+        privacy_notice_version:
+          type: integer
+          minimum: 1
+          description: Version of the `privacy_notice` shown to the person approving (KVKK md. 10, issue #57). Must be the current version (409 `LEGAL_VERSION_OUTDATED` otherwise).
+        privacy_notice_language: { type: string, enum: [tr, en] }
+
+    TaxpayerConsentApproveRequest:
+      type: object
+      additionalProperties: false
+      required: [token, privacy_notice_version]
+      properties:
+        token: { type: string }
+        privacy_notice_version: { type: integer, minimum: 1 }
+        privacy_notice_language: { type: string, enum: [tr, en] }
 
     EngagementDocument:
       type: object

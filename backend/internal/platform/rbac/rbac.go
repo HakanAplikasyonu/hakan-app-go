@@ -9,6 +9,7 @@ const (
 // Permission slugs (seeded).
 const (
 	PermPlatformUsersRead                 = "platform.users.read"
+	PermPlatformLegalManage               = "platform.legal.manage"
 	PermPlatformUsersWrite                = "platform.users.write"
 	PermPlatformUsersExport               = "platform.users.export"
 	PermPlatformUsersImport               = "platform.users.import"
@@ -108,6 +109,8 @@ const (
 	// Masaüstü yerel ajanı (issue #51): kayıt, heartbeat ve liste.
 	PermTenantAgentsRead  = "tenant.agents.read"
 	PermTenantAgentsWrite = "tenant.agents.write"
+	// KVKK (issue #57): veri işleyen sözleşmesini ofis adına kabul.
+	PermTenantLegalAccept = "tenant.legal.accept"
 )
 
 // IsSystemRole reports whether slug is a protected system role.

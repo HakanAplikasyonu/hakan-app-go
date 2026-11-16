@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/clientip"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
@@ -27,12 +29,28 @@ var ErrNoActiveOffice = errors.New("taxpayers: no active office to share history
 // (and can take back) data from before the current office, and every office
 // sees documents through engagement_document_visible.
 type History struct {
-	pool *pgxpool.Pool
-	q    *db.Queries
+	pool     *pgxpool.Pool
+	q        *db.Queries
+	consents ConsentRecorder
+}
+
+// ConsentRecorder ties a share to the explicit-consent text the owner
+// accepted (KVKK, issue #57). It is legal usecase.Service.
+type ConsentRecorder interface {
+	AcceptWith(ctx context.Context, q legalusecase.Queries, in legalusecase.AcceptInput) (legalusecase.Acceptance, error)
+	WithdrawWith(ctx context.Context, q legalusecase.Queries, subject uuid.UUID) error
 }
 
 // NewHistory builds the service.
 func NewHistory(pool *pgxpool.Pool) *History { return &History{pool: pool, q: db.New(pool)} }
+
+// WithConsents requires every share to carry the accepted version of the
+// explicit-consent text; the share and its evidence are written together and
+// withdrawn together.
+func (h *History) WithConsents(c ConsentRecorder) *History {
+	h.consents = c
+	return h
+}
 
 // HistoryShare is a stored consent record.
 type HistoryShare struct {
@@ -46,9 +64,16 @@ type HistoryShare struct {
 }
 
 // ShareInput is a date range; both ends optional (YYYY-MM-DD).
+// ConsentVersion is the version of the explicit-consent text
+// (history_share_consent) the owner was shown and accepted.
 type ShareInput struct {
-	FromDate string `json:"from_date"`
-	ToDate   string `json:"to_date"`
+	FromDate        string `json:"from_date"`
+	ToDate          string `json:"to_date"`
+	ConsentVersion  int    `json:"consent_version"`
+	ConsentLanguage string `json:"consent_language"`
+	// Request metadata for the consent evidence (set by the handler).
+	IP        string `json:"-"`
+	UserAgent string `json:"-"`
 }
 
 // List returns the company's consent records (owners only).
@@ -88,6 +113,9 @@ func (h *History) Share(ctx context.Context, s taxpayerctx.Scope, userID int64, 
 	if from.Valid && to.Valid && to.Time.Before(from.Time) {
 		return HistoryShare{}, fmt.Errorf("%w: to_date is before from_date", ErrInvalidRequest)
 	}
+	if h.consents != nil && in.ConsentVersion < 1 {
+		return HistoryShare{}, fmt.Errorf("%w: consent_version is required (accept the explicit-consent text)", ErrInvalidRequest)
+	}
 	eng, err := h.q.GetActiveEngagementOfTaxpayer(ctx, s.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return HistoryShare{}, ErrNoActiveOffice
@@ -95,9 +123,22 @@ func (h *History) Share(ctx context.Context, s taxpayerctx.Scope, userID int64, 
 	if err != nil {
 		return HistoryShare{}, err
 	}
-	row, err := h.q.CreateHistoryShare(ctx, db.CreateHistoryShareParams{
-		TaxpayerID: s.ID, OrganizationID: eng.OrganizationID, EngagementID: eng.ID,
-		FromDate: from, ToDate: to, GrantedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
+	var row db.CreateHistoryShareRow
+	err = h.inTx(ctx, func(q *db.Queries) error {
+		var err error
+		row, err = q.CreateHistoryShare(ctx, db.CreateHistoryShareParams{
+			TaxpayerID: s.ID, OrganizationID: eng.OrganizationID, EngagementID: eng.ID,
+			FromDate: from, ToDate: to, GrantedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
+		})
+		if err != nil || h.consents == nil {
+			return err
+		}
+		_, err = h.consents.AcceptWith(ctx, q, legalusecase.AcceptInput{
+			Kind: legalusecase.KindHistoryConsent, Version: in.ConsentVersion, Language: in.ConsentLanguage,
+			UserID: userID, Context: legalusecase.ContextHistory, TaxpayerID: s.ID, OrganizationID: eng.OrganizationID,
+			SubjectUUID: &row.Uuid, IP: in.IP, UserAgent: in.UserAgent,
+		})
+		return err
 	})
 	if err != nil {
 		return HistoryShare{}, err
@@ -111,16 +152,29 @@ func (h *History) Revoke(ctx context.Context, s taxpayerctx.Scope, userID int64,
 	if s.Role != taxpayerctx.RoleOwner {
 		return ErrNotOwner
 	}
-	n, err := h.q.RevokeHistoryShare(ctx, db.RevokeHistoryShareParams{
-		TaxpayerID: s.ID, Uuid: id, RevokedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
+	return h.inTx(ctx, func(q *db.Queries) error {
+		n, err := q.RevokeHistoryShare(ctx, db.RevokeHistoryShareParams{
+			TaxpayerID: s.ID, Uuid: id, RevokedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
+		})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return ErrNotFound
+		}
+		if h.consents != nil {
+			// Açık rıza geri alındı (KVKK md. 5): kanıt kaydı da işaretlenir.
+			return h.consents.WithdrawWith(ctx, q, id)
+		}
+		return nil
 	})
-	if err != nil {
-		return err
+}
+
+func (h *History) inTx(ctx context.Context, fn func(q *db.Queries) error) error {
+	if h.pool == nil {
+		return fn(h.q)
 	}
-	if n == 0 {
-		return ErrNotFound
-	}
-	return nil
+	return pgx.BeginFunc(ctx, h.pool, func(tx pgx.Tx) error { return fn(db.New(tx)) })
 }
 
 // Document is a document as an office sees it.
@@ -239,6 +293,7 @@ func (x *HistoryHandler) share(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
+	in.IP, in.UserAgent = clientip.From(r), r.UserAgent()
 	out, err := x.h.Share(r.Context(), taxpayerctx.Must(r.Context()), p.UserInternal, in)
 	if err != nil {
 		writeHistoryError(w, r, err)
@@ -280,6 +335,16 @@ func (x *HistoryHandler) officeShares(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeHistoryError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, legalusecase.ErrOutdated):
+		response.RecordFailure(w, err)
+		response.Conflict(w, r, "LEGAL_VERSION_OUTDATED", "The consent text changed; review and accept the current version")
+		return
+	case errors.Is(err, legalusecase.ErrNotFound):
+		response.RecordFailure(w, err)
+		response.InternalErr(w, r, err, "Consent text is not available")
+		return
+	}
 	if errors.Is(err, ErrNoActiveOffice) {
 		response.RecordFailure(w, err)
 		response.Conflict(w, r, response.CodeConflict, "The company has no active office")
