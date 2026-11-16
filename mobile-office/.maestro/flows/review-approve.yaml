@@ -1,25 +1,34 @@
-# İnceleme onayı: kuyruktaki ilk öneri açılır ve onaylanır. Kuyruk boşsa
-# yalnızca boş durum denetlenir (demo verisinde bekleyen öneri olmalı).
+# İnceleme onayı: panodaki "İnceleme kuyruğu" kartından kuyruk açılır, ilk
+# öneri açılır ve onaylanır. Demo verisinde bekleyen öneriler var (#318:
+# Atlas Gıda'nın OCR fişinin düşük güvenli alanları); kuyruk boşsa akış düşer.
+#
+# Kuyruğa derin bağlantıyla (hakanofis://review) değil karttan gidilir:
+# #318 gece koşusunda bağlantı panoda kaldı, "İnceleme kuyruğu" metni pano
+# kartında da geçtiği için doğrulama yanlışlıkla geçti ve onay dalı atlandı.
 appId: app.hakan.office
 name: review-approve
 tags: [smoke]
 ---
 - launchApp
-- openLink: "hakanofis://review"
-- assertVisible: "İnceleme kuyruğu"
-- runFlow:
-    when:
-      visible:
-        id: "suggestion-row"
-    commands:
-      - tapOn:
-          id: "suggestion-row"
-          index: 0
-      - extendedWaitUntil:
-          visible: "Onayla"
-          timeout: 15000
-      - tapOn: "Onayla"
-      - extendedWaitUntil:
-          visible: ".*onaylandı.*"
-          timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: "stat-review"
+    timeout: 20000
+- tapOn:
+    id: "stat-review"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion-row"
+    timeout: 20000
+- tapOn:
+    id: "suggestion-row"
+    index: 0
+- extendedWaitUntil:
+    visible: "Onayla"
+    timeout: 15000
+- tapOn: "Onayla"
+- extendedWaitUntil:
+    visible: ".*onaylandı.*"
+    timeout: 15000
+- back
 - back
