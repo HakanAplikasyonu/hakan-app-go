@@ -201,6 +201,18 @@ that scan every office (reminders, offline sweeps) run in one `rls.System`
 transaction with a reason. Questions that are not one tenant's ("which
 office serves this taxpayer now") read through `rls.System`.
 
+**Side effects (issue #311).** A write the request can do without — a
+notification, an activity row, a review-queue submission for a low-confidence
+OCR field, a data warning that only adds information — runs through
+`database.BestEffort(ctx, "name", fn)`: in a savepoint of the request's
+transaction, so its failure (an RLS refusal, a constraint) is rolled back
+alone, logged (`side_effect_failed`) and counted
+(`side_effect_failures_total{name}`) while the request commits its main work.
+A failed statement outside a savepoint aborts the whole transaction (25P02).
+Money, journal entries, approvals and the record the request is about are
+never side effects. `notifications.Enqueue` and `activity.Recorder` already do
+this for their callers.
+
 Exceptions, on purpose:
 - Secrets (`secret_records`, platform) are read and written by the vault on
   its own connection, never in a tenant scope.

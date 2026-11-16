@@ -323,9 +323,14 @@ func (s *Service) checkPlate(ctx context.Context, sc engagementctx.Scope, expens
 	if hasDate {
 		on = pgtype.Date{Time: date, Valid: true}
 	}
-	ok, err := s.q.VehicleRegisteredOn(ctx, db.VehicleRegisteredOnParams{TaxpayerID: sc.TaxpayerID, Plate: plate, OnDate: on})
-	if err != nil {
-		s.log.Warn("plate_check_failed", "error", err)
+	// The check and its warning only add information: side effects in
+	// savepoints, so a failure never aborts the upload (#311).
+	var ok bool
+	if err := database.BestEffort(ctx, "receipt_plate_check", func(ctx context.Context) error {
+		var err error
+		ok, err = s.q.VehicleRegisteredOn(ctx, db.VehicleRegisteredOnParams{TaxpayerID: sc.TaxpayerID, Plate: plate, OnDate: on})
+		return err
+	}); err != nil {
 		return "error"
 	}
 	result := "registered"
@@ -336,11 +341,12 @@ func (s *Service) checkPlate(ctx context.Context, sc engagementctx.Scope, expens
 	}
 	if s.warnings != nil && hasDate {
 		id := expenseID
-		if _, err := s.warnings.Apply(ctx, engine.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID},
-			PlateProducer, engine.Entity{Type: catalog.EntityExpense, ID: &id, Period: date.Format("2006-01")},
-			[]string{"PLATE_NOT_REGISTERED"}, findings); err != nil {
-			s.log.Warn("plate_warning_failed", "error", err)
-		}
+		_ = database.BestEffort(ctx, "receipt_plate_warning", func(ctx context.Context) error {
+			_, err := s.warnings.Apply(ctx, engine.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID},
+				PlateProducer, engine.Entity{Type: catalog.EntityExpense, ID: &id, Period: date.Format("2006-01")},
+				[]string{"PLATE_NOT_REGISTERED"}, findings)
+			return err
+		})
 	}
 	return result
 }
@@ -358,12 +364,14 @@ func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope,
 		if s.reviewer == nil {
 			continue
 		}
-		if err := s.reviewer.SubmitField(ctx, FieldReview{
-			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID,
-			TargetType: d.Type, TargetID: d.ID, Period: period, Field: f, Value: v, Model: res.Model, AttachmentID: attachmentID,
-		}); err != nil {
-			s.log.Warn("receipt_review_submit_failed", "field", f, "error", err)
-		}
+		// A field the queue could not take stays on the draft: a side
+		// effect in its own savepoint (#311); the next field still goes.
+		_ = database.BestEffort(ctx, "receipt_review_submit", func(ctx context.Context) error {
+			return s.reviewer.SubmitField(ctx, FieldReview{
+				OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID,
+				TargetType: d.Type, TargetID: d.ID, Period: period, Field: f, Value: v, Model: res.Model, AttachmentID: attachmentID,
+			})
+		})
 	}
 	return out
 }
