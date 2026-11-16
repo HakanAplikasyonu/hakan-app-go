@@ -47,6 +47,7 @@ x-backend-environment: &backend-environment
   DB_RLS_RUNTIME: ${DB_RLS_RUNTIME:-}
   # force_custom_plan (default) or auto; see docs/performans.md (#182).
   DB_PLAN_CACHE_MODE: ${DB_PLAN_CACHE_MODE:-}
+  DB_RLS_REQUEST_SCOPE: ${DB_RLS_REQUEST_SCOPE:-}
   REDIS_ADDR: redis.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:6379
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
   STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}
