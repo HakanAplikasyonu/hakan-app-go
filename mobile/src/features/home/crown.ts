@@ -8,8 +8,9 @@ export type { CrownState };
 
 /**
  * Sunucudaki fiş durumu → taç. `draft` müşavir onayında (sol kristal),
- * `approved` onaylandı, `exported` Luca'ya aktarıldı; okunamayan, reddedilen
- * ve mükerrer fiş "sorun".
+ * `approved` onaylandı; okunamayan, reddedilen ve mükerrer fiş "sorun".
+ * Fiş ucu "Luca'ya aktarıldı" aşamasını döndürmüyor; üç kristalin dolduğu
+ * durum fişlerde şimdilik görünmez.
  */
 export function receiptCrown(status: string | null | undefined): CrownState {
   switch (status) {
@@ -17,8 +18,6 @@ export function receiptCrown(status: string | null | undefined): CrownState {
       return 'yuklendi';
     case 'approved':
       return 'onaylandi';
-    case 'exported':
-      return 'aktarildi';
     case 'failed':
     case 'rejected':
     case 'duplicate':

@@ -6,7 +6,6 @@ import { dueLine, lateBadge, receiptCrown, taskCrown, waitingLine } from './crow
 test('receipt status to crown', () => {
   assert.equal(receiptCrown('draft'), 'yuklendi');
   assert.equal(receiptCrown('approved'), 'onaylandi');
-  assert.equal(receiptCrown('exported'), 'aktarildi');
   assert.equal(receiptCrown('failed'), 'sorun');
   assert.equal(receiptCrown('duplicate'), 'sorun');
   assert.equal(receiptCrown(undefined), 'bekleniyor');
