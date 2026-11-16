@@ -10,6 +10,7 @@
 #   E2E_PG_PORT       compose Postgres'inin host portu (varsayılan 5432)
 #   E2E_COMPOSE_FILES ek compose dosyaları, ":" ile ayrılmış (ör. yerel override)
 #   E2E_SKIP_BUILD=1  frontend derlemesini atla (önceki .next kullanılır)
+#   E2E_SA_EMAIL / E2E_SA_PASSWORD  oluşturulan platform yöneticisi
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -84,6 +85,10 @@ if ! command -v migrate >/dev/null 2>&1; then
 fi
 make -C "$ROOT" migrate-up ENV_FILE="$ENV_FILE" MIGRATE="$MIGRATE_CMD"
 (cd "$ROOT/backend" && go run ./cmd/demo-seed -reset)
+# Platform yöneticisi: yeni ofis açma senaryosu (ofis kaydı) için.
+(cd "$ROOT/backend" && go run ./cmd/create-super-admin \
+  -email "${E2E_SA_EMAIL:-sa@e2e.local}" -password "${E2E_SA_PASSWORD:-E2e-Admin-123!}" \
+  -name Platform -surname Yönetici)
 
 echo "== API"
 (cd "$ROOT/backend" && go build -o "$DIR/server" ./cmd/server)
