@@ -94,7 +94,12 @@ jobs:
 
       - name: APK (assembleRelease, x86_64)
         working-directory: ${{ matrix.app }}/android
-        run: ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace
+        # Eklenti/bağımlılık indirmesi ağ yüzünden düşebiliyor (plugins.gradle.org;
+        # #300 ikinci koşu): bir kez daha denenir. Derleme hatası iki kez de düşer.
+        run: |
+          ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace \
+            || { echo "::warning::Gradle ilk denemede düştü, yeniden deneniyor"; sleep 20; \
+                 ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon --stacktrace; }
 
       - name: Maestro
         run: |
