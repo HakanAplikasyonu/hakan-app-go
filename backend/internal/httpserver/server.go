@@ -587,6 +587,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		doctasks:      doctasksmodule.NewHandler(docTasksSvc),
 		officedash:    &officedashmodule.Handler{Q: deps.Queries},
 		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
+		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),
