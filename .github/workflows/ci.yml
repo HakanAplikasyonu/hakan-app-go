@@ -959,6 +959,23 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm run test:ui
+      # #332: ajan penceresinin ana ekranları dört temada ve üç pencere
+      # genişliğinde temel görüntüyle karşılaştırılır
+      # (desktop/tests/ui/gorsel/temel). Temel görüntüler CI'da doğrulanana
+      # kadar zorunlu değil; farklar desktop-gorsel artefaktında.
+      - name: UI görsel regresyon (zorunlu değil)
+        id: desktop_visual
+        continue-on-error: true
+        run: npm run test:visual
+      - name: UI görsel regresyon sonucu
+        if: steps.desktop_visual.outcome == 'failure'
+        run: echo "::warning title=desktop::Masaüstü görsel farkı var. Gerçek ve fark görüntüleri desktop-gorsel artefaktında."
+      - uses: actions/upload-artifact@v5
+        if: steps.desktop_visual.outcome == 'failure'
+        with:
+          name: desktop-gorsel
+          path: desktop/tests/ui/gorsel/sonuc/
+          retention-days: 7
       - name: Build sidecar
         run: npm run sidecar
       - name: Linux packages for Tauri
