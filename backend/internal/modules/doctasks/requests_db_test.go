@@ -3,6 +3,7 @@ package doctasks
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -69,7 +70,7 @@ func TestDocumentRequestFlow(t *testing.T) {
 			}
 		}
 	}
-	if len(notified) != 2 || !(notified[0] == creator || notified[1] == creator) || !(notified[0] == assignee || notified[1] == assignee) {
+	if !slices.Contains(notified, creator) || !slices.Contains(notified, assignee) || len(notified) != 2 {
 		t.Fatalf("office recipients = %v, want creator %d and assignee %d", notified, creator, assignee)
 	}
 
