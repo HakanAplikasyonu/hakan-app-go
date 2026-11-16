@@ -5,13 +5,11 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { useOfficeActions } from "../hooks/use-office";
 import { useDecideWarning } from "../hooks/use-warnings";
 import type {
   ApiDataWarning,
   WarningDecisionAction,
 } from "../services/warnings.service";
-import type { DataWarning } from "../types";
 
 /** Acknowledge / resolve on the API need this tenant permission. */
 export const WARNINGS_WRITE_PERMISSION = "tenant.warnings.write";
@@ -60,41 +58,6 @@ export function ApiWarningActions({ warning }: { warning: ApiDataWarning }) {
           {decide.error.message || t("office.warnings_api.action_error")}
         </p>
       ) : null}
-    </div>
-  );
-}
-
-/** open → acknowledged / resolved; kapalıysa yeniden aç (paket 05 §1). */
-export function WarningActions({ warning }: { warning: DataWarning }) {
-  const { t } = useLocale();
-  const { setWarningStatus } = useOfficeActions();
-  if (warning.status !== "open") {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setWarningStatus(warning.id, "open")}
-      >
-        {t("office.warning_reopen")}
-      </Button>
-    );
-  }
-  return (
-    <div className="flex gap-1">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setWarningStatus(warning.id, "acknowledged")}
-      >
-        {t("office.warning_acknowledge")}
-      </Button>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setWarningStatus(warning.id, "resolved")}
-      >
-        {t("office.warning_resolve")}
-      </Button>
     </div>
   );
 }

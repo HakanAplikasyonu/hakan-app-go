@@ -1,15 +1,11 @@
 "use client";
 
-import { FlaskConical } from "lucide-react";
-import { useEffect, useSyncExternalStore, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { Skeleton } from "@/components/ui/skeleton";
-import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { formatAmount, formatMoney } from "../lib/decimal";
-import { officeStore } from "../store/office-store";
 import type { DataWarning, Invoice, Severity } from "../types";
 
 /** Tutar, hesap kodu, VKN, ETTN: Geist Mono + hizalı rakam (D19). */
@@ -107,51 +103,6 @@ export function useWarningText() {
     const msg = t(key, params);
     return msg === key ? w.code : msg;
   };
-}
-
-/** Ekranların demo veri kaynağından okunduğunu açıkça söyler. */
-export function DemoNotice() {
-  const { t } = useLocale();
-  const { slug } = useTenant();
-  return (
-    <div className="text-muted-foreground bg-muted/50 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-dashed px-3 py-2 text-xs">
-      <FlaskConical className="size-3.5 shrink-0" aria-hidden />
-      <span className="flex-1">{t("office.demo_notice")}</span>
-      <button
-        type="button"
-        className="text-brand font-medium hover:underline"
-        onClick={() => officeStore(slug).getState().reset()}
-      >
-        {t("office.demo_reset")}
-      </button>
-    </div>
-  );
-}
-
-/**
- * Oturum deposundaki demo verisi istemcide yüklenene kadar iskelet gösterir;
- * sunucu çizimiyle uyuşmazlık (hydration) olmaz.
- */
-export function OfficeDataGate({ children }: { children: ReactNode }) {
-  const { slug } = useTenant();
-  const store = officeStore(slug);
-  const ready = useSyncExternalStore(
-    (cb) => store.persist.onFinishHydration(cb),
-    () => store.persist.hasHydrated(),
-    () => false,
-  );
-  useEffect(() => {
-    if (!store.persist.hasHydrated()) void store.persist.rehydrate();
-  }, [store]);
-  if (!ready) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
-  return <>{children}</>;
 }
 
 export function Panel({
