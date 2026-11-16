@@ -30,4 +30,3 @@ TESTDB_REQUIRED | omit | yalnızca testler (internal/testdb): CI'da veritabanı 
 CONTRACT_ | omit | yalnızca sözleşme testleri (internal/testutil/contract, #196): CONTRACT_LIVE ve CONTRACT_<AD>_* canlı sandbox anahtarları, üretimde okunmaz
 DEMO_PASSWORD | omit | yalnızca cmd/demo-seed okur; demo verisi üretim yığınında çalışmaz
 PERF_PASSWORD | omit | yalnızca cmd/perf-seed okur (#182); yük testi verisi üretim yığınında çalışmaz
-CONTRACT_ | omit | yalnızca entegratör sözleşme testleri (internal/testutil/contract, #196) okur; üretimde okunmaz
