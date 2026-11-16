@@ -7,6 +7,7 @@ pub mod bridge;
 pub mod logmask;
 mod secrets;
 pub mod supervisor;
+mod tray;
 pub mod updater;
 
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -14,8 +15,6 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
@@ -135,6 +134,7 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                 CommandEvent::Stdout(chunk) => {
                     for line in lines.push(&chunk) {
                         if let Some(ev) = bridge.on_line(&line) {
+                            tray::on_sidecar_event(&app, &ev);
                             if ev.event == "ready" {
                                 *app.state::<SidecarState>().ready.lock().unwrap() =
                                     Some(ev.data.clone());
@@ -153,6 +153,7 @@ fn start_sidecar(app: &AppHandle) -> Result<(), String> {
                 CommandEvent::Terminated(p) => {
                     log::warn!("sidecar kapandı: code={:?} signal={:?}", p.code, p.signal);
                     bridge.on_exit();
+                    tray::on_sidecar_exit(&app);
                     let _ = app.emit("sidecar://exit", p.code);
                     schedule_restart(&app, generation);
                     break;
@@ -208,13 +209,16 @@ fn set_paused(app: &AppHandle, paused: bool) -> Result<(), String> {
     if paused {
         stop_sidecar(app, Mode::Paused);
         let _ = app.emit("shell://paused", true);
+        tray::on_paused(app, true);
         return Ok(());
     }
     let state = app.state::<SidecarState>();
     *state.mode.lock().unwrap() = Mode::Running;
     state.backoff.lock().unwrap().reset();
     let _ = app.emit("shell://paused", false);
-    start_sidecar(app)
+    let res = start_sidecar(app);
+    tray::on_paused(app, false);
+    res
 }
 
 fn is_paused(app: &AppHandle) -> bool {
@@ -234,79 +238,6 @@ fn show_main(app: &AppHandle) {
 fn quit(app: &AppHandle) {
     stop_sidecar(app, Mode::ShuttingDown);
     app.exit(0);
-}
-
-/// Tepsi simgesi ve menüsü: Aç, İzlemeyi duraklat/sürdür, Oturum açılışında
-/// başlat, Çıkış (#204).
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Aç", true, None::<&str>)?;
-    let pause = MenuItem::with_id(app, "pause", "İzlemeyi duraklat", true, None::<&str>)?;
-    let autostart_on = app.autolaunch().is_enabled().unwrap_or(false);
-    let autostart = CheckMenuItem::with_id(
-        app,
-        "autostart",
-        "Oturum açılışında başlat",
-        true,
-        autostart_on,
-        None::<&str>,
-    )?;
-    let quit_item = MenuItem::with_id(app, "quit", "Çıkış", true, None::<&str>)?;
-    let menu = Menu::with_items(
-        app,
-        &[
-            &open,
-            &pause,
-            &PredefinedMenuItem::separator(app)?,
-            &autostart,
-            &PredefinedMenuItem::separator(app)?,
-            &quit_item,
-        ],
-    )?;
-
-    let pause_item = pause.clone();
-    let autostart_item = autostart.clone();
-    let mut tray = TrayIconBuilder::with_id("main")
-        .tooltip("Hakan")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(move |app, event| match event.id().as_ref() {
-            "open" => show_main(app),
-            "pause" => {
-                let paused = !is_paused(app);
-                if let Err(e) = set_paused(app, paused) {
-                    log::error!("izleme durumu değiştirilemedi: {e}");
-                }
-                let _ = pause_item.set_text(if is_paused(app) {
-                    "İzlemeyi sürdür"
-                } else {
-                    "İzlemeyi duraklat"
-                });
-            }
-            "autostart" => {
-                let want = !app.autolaunch().is_enabled().unwrap_or(false);
-                if let Err(e) = set_autostart(app, want) {
-                    log::error!("otomatik başlatma ayarlanamadı: {e}");
-                }
-                let _ = autostart_item.set_checked(app.autolaunch().is_enabled().unwrap_or(false));
-            }
-            "quit" => quit(app),
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_main(tray.app_handle());
-            }
-        });
-    if let Some(icon) = app.default_window_icon() {
-        tray = tray.icon(icon.clone());
-    }
-    tray.build(app)?;
-    Ok(())
 }
 
 fn set_autostart(app: &AppHandle, enabled: bool) -> Result<(), String> {
@@ -466,6 +397,9 @@ fn set_update_status(app: &AppHandle, f: impl FnOnce(&mut updater::Status)) -> u
         st.clone()
     };
     let _ = app.emit("updater://status", &snapshot);
+    if let Ok(v) = serde_json::to_value(&snapshot) {
+        tray::on_update_status(app, &v);
+    }
     snapshot
 }
 
@@ -698,6 +632,8 @@ fn chrono_now() -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Yerel saat dilimi iş parçacıkları açılmadan okunur (tepsi sayaçları).
+    tray::init_local_offset();
     let background = std::env::args().any(|a| a == BACKGROUND_ARG);
     let self_test_mode = std::env::args().any(|a| a == "--self-test");
 
@@ -753,7 +689,7 @@ pub fn run() {
             }
             // Tepsi yoksa (ör. masaüstü ortamı desteklemiyor) pencere kapanınca
             // uygulama görünmez kalmasın diye gizleme yerine çıkış yapılır.
-            let tray_ok = match build_tray(app.handle()) {
+            let tray_ok = match tray::build(app.handle()) {
                 Ok(()) => true,
                 Err(e) => {
                     log::error!("tepsi simgesi kurulamadı: {e}");
@@ -771,6 +707,10 @@ pub fn run() {
         .on_window_event(|window, event| {
             // Pencere kapanınca uygulama tepside kalır; sidecar ve klasör
             // izleme sürer (#204). Çıkış tepsi menüsünden.
+            if let WindowEvent::ThemeChanged(_) = event {
+                // Tepsi simgesi açık/koyu temaya göre yeniden çizilir.
+                tray::refresh(window.app_handle());
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 let tray = window
                     .try_state::<TrayReady>()

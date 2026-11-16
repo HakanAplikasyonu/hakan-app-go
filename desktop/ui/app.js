@@ -1026,6 +1026,12 @@ async function changePaused(p) {
 $("set-paused").addEventListener("change", (e) => changePaused(e.target.checked));
 $("paused-resume").addEventListener("click", () => changePaused(false));
 listen("shell://paused", (e) => setPaused(e.payload));
+// Tepsi menüsü (#325) pencereyi açıp bir sekmeyi ister: "Ayrıntılar" →
+// Sorunlar, son dosyalar → Geçmiş, "Ayarlar" → Ayarlar. Kurulum bitmeden
+// sekmeler yok; o zaman yalnızca pencere açılır.
+listen("shell://navigate", (e) => {
+  if (TABS.includes(e.payload) && TABS.includes(currentView)) selectTab(e.payload, true);
+});
 
 // Görünüm: palet ve kip (tema.js; bu bilgisayarda saklanır).
 function syncThemeControls() {

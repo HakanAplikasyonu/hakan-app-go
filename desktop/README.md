@@ -61,7 +61,7 @@ desktop/
 
 ## Arka planda çalışma (#204)
 
-- **Tepsi:** simge ve menü: Aç, İzlemeyi duraklat / sürdür, Oturum açılışında başlat, Çıkış. Sol tık pencereyi açar.
+- **Tepsi** (`src-tauri/src/tray.rs`, #325; tuval `docs/tasarim/tuval/AjanTepsi.dc.html`): simgenin 5 durumu (Bağlı, Gönderiyor, Duraklatıldı, Sorun var, Güncelleme hazır) kodla çizilen M3 taç türevidir (32 px RGBA; macOS'ta şablon simge, Windows/Linux'ta pencere temasına göre lacivert ya da açık). Menü: durum satırı, ofis · bilgisayar, 3 sayaç, son dosyalar ya da sorunlu dosyalar (Şimdi yeniden dene, Ayrıntılar), HAKAN'ı aç, Şimdi tara, İzlemeyi duraklat (30 dk / 2 sa / süresiz) ya da sürdür, Panelde aç, Ayarlar, Oturum açılışında başlat, sürüm / Güncelle ve yeniden başlat, Çıkış. Durum yalnızca mevcut sidecar olaylarından, `agent.status`'tan (kabuk içinden, dakikada bir ve olaylarda) ve güncelleyici durumundan okunur; sidecar değişmez. "Şimdi tara" ayrı RPC olmadığından izlenen ilk klasörü aynı değerlerle `watch.add` ile yeniden ekler (kayıt değişmez, tarama hemen tetiklenir). Sekme isteği ön yüze `shell://navigate` olayıyla gider. Sol tık pencereyi açar.
 - **Pencereyi kapatmak** uygulamayı kapatmaz: pencere gizlenir; sidecar ve klasör izleme sürer. Çıkış tepsi menüsünden. Tepsi kurulamazsa (masaüstü ortamı desteklemiyorsa) kapatmak uygulamadan çıkar.
 - **Otomatik başlatma** (`tauri-plugin-autostart`): varsayılan kapalı. Tepsiden ya da `set_autostart_enabled` komutuyla açılır. Oturum açılışında `--background` ile pencere göstermeden başlar.
 - **Tek örnek** (`tauri-plugin-single-instance`): ikinci açılış yeni süreç başlatmaz, açık pencereyi öne getirir.

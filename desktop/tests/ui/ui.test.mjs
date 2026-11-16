@@ -217,6 +217,29 @@ test("geçmiş ve sorunlar: geçici / kalıcı ayrımı, ham hata yok", async ()
   await page.close();
 });
 
+test("tepsi menüsü sekme ister (#325): kurulumda yok sayılır, sonra sekme açılır", async () => {
+  const { page, errors } = await open();
+  const nav = (tab) => page.evaluate((t) => window.__mock.emit("shell://navigate", t), tab);
+  await login(page);
+  await nav("problems");
+  assert.equal(await page.locator("#view-problems").isHidden(), true, "kurulumda sekme açılmamalı");
+  await page.getByRole("button", { name: "Kaydet" }).click();
+  await page.getByRole("heading", { name: "İlk klasörü bağla" }).waitFor();
+  await page.getByRole("button", { name: "Şimdilik atla" }).click();
+  await page.getByRole("heading", { name: "İzlenen klasörler" }).waitFor();
+  await nav("problems");
+  await page.locator("#view-problems").waitFor({ state: "visible" });
+  assert.equal(await page.getByRole("tab", { name: "Sorunlar" }).getAttribute("aria-selected"), "true");
+  await nav("history");
+  await page.locator("#view-history").waitFor({ state: "visible" });
+  await nav("settings");
+  await page.locator("#view-settings").waitFor({ state: "visible" });
+  await nav("bilinmeyen");
+  await page.locator("#view-settings").waitFor({ state: "visible" });
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => {
   const { page, errors } = await open();
   await signIn(page);

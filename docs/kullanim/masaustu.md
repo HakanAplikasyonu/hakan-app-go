@@ -105,8 +105,31 @@ zamanını ve son hatasını gösterir.
 
 - Pencereyi kapatmak uygulamayı kapatmaz: pencere gizlenir, klasör izleme
   sürer. Sistem tepsisindeki simgeden pencereyi açarsınız.
-- Tepsi menüsü: **Aç**, **İzlemeyi duraklat / sürdür**, **Oturum açılışında
-  başlat**, **Çıkış**.
+- **Tepsi simgesi** durumu söyler (üç kristalli taç; macOS'ta menü
+  çubuğunun rengine uyar):
+  - **Bağlı**: her şey yolunda.
+  - **Gönderiyor**: kristaller sırayla yanar; dosya gönderilirken.
+  - **Duraklatıldı**: simge soluk.
+  - **Sorun var**: kırmızı rozet (gönderilemeyen dosya, erişilemeyen
+    klasör, sunucuya ulaşılamıyor, oturum açılmamış).
+  - **Güncelleme hazır**: mavi rozet.
+- Simgeye tıklamak pencereyi açar. Sağ tık (macOS'ta tık) **tepsi
+  menüsünü** açar:
+  - Üstte durum satırı ("Her şey yolunda" ya da sorunun kendisi), ofis ve
+    bilgisayar adı.
+  - Üç sayaç: **bugün gönderilen** dosya sayısı (uygulama açıkken
+    sayılır), **izlenen klasör** sayısı ve **son tarama** zamanı.
+  - Son gönderilen dosyalar (mükellef adıyla); tıklayınca **Geçmiş** açılır.
+    Sorun varsa bunların yerine gönderilemeyen dosyalar ve nedenleri,
+    **Şimdi yeniden dene** ve **Ayrıntılar** (**Sorunlar** sekmesi) çıkar.
+  - **HAKAN'ı aç**, **Şimdi tara** (beklemeden klasörleri tarar),
+    **İzlemeyi duraklat** (**30 dakika**, **2 saat** ya da **Ben sürdürene
+    kadar**; duraklatılınca **İzlemeyi sürdür**), **Panelde aç** (web
+    panelini tarayıcıda açar), **Ayarlar**.
+  - **Oturum açılışında başlat**, sürüm satırı (yeni sürüm varsa
+    **Güncelle ve yeniden başlat**) ve **Çıkış**.
+- Süreli duraklatmada süre dolunca izleme kendiliğinden sürer; menüde
+  "Kendiliğinden sürer: 11:12" gibi saati görürsünüz.
 - **Oturum açılışında başlat** varsayılan olarak kapalıdır. Açarsanız
   bilgisayar açıldığında ajan pencere göstermeden başlar.
 - Aynı ayarlar **Ayarlar** bölümünde de var: **Bilgisayar açılınca
