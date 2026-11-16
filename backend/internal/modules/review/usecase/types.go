@@ -24,6 +24,10 @@ var (
 	ErrNoApplier   = errors.New("review: no applier for this suggestion kind")
 	ErrBadSubject  = errors.New("review: subject needs organization, engagement and taxpayer")
 	ErrApplyFailed = errors.New("review: applying the suggestion failed")
+	// ErrInvalidValue is what an Applier wraps when it refuses the value it
+	// was given. On Correct the value is the user's: the call answers 400,
+	// not a failed application (issue #302).
+	ErrInvalidValue = errors.New("review: the value is not valid for this suggestion")
 )
 
 // Origin is the primary provenance of a suggestion (G12).

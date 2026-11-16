@@ -147,6 +147,9 @@ func (s *Service) Correct(ctx context.Context, sub Subject, id uuid.UUID, userID
 			return Decision{}, ErrNoApplier
 		}
 		prev, err := a.Apply(ctx, tx, *sug, value)
+		if errors.Is(err, ErrInvalidValue) {
+			return Decision{}, fmt.Errorf("%w: %v", ErrInvalid, err)
+		}
 		if err != nil {
 			return Decision{}, fmt.Errorf("%w: %v", ErrApplyFailed, err)
 		}

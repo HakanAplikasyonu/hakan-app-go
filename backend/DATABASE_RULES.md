@@ -131,6 +131,16 @@ Each RLS table is in one of two states:
 | in transition | `rls_legacy` (`USING true`) | works as before |
 | enforced (`rls_enforced.txt`) | none; FORCE + owner `rls_system` policy | sees nothing, cannot write |
 
+**Owner forced everywhere (issue #302, migration 000086).** Every table with
+an `organization_id` or `taxpayer_id` column also has FORCE and the owner's
+`rls_system` policy (`rls_owner_force`, called by every `rls_apply_*`
+template), in transition or enforced. The runtime role is not affected (it is
+not the owner); a non-superuser owner sees and writes those tables only
+inside `rls.System` (`app.system`). A data migration touching any such table
+as a non-superuser owner must `SET LOCAL app.system = 'on'` first. The
+deliberate exceptions (boilerplate tables with office-less rows) are listed
+with their reason in `rlsInvariantExceptions` (`rls_invariant_db_test.go`).
+
 Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
 "reason", fn)`, the deliberate bypass for work that is not done on behalf of
 one tenant (cross-tenant workers, the demo seed, maintenance). Foreign key
@@ -197,7 +207,16 @@ in `internal/platform/rls`), `TestRLSCoversScopedTables` (every listed table has
 `TestRLSEnforcement` (every RLS table is in one state, the list matches),
 `TestEnforcedTablesDoNotLeak` (per enforced table: unscoped sees and writes
 nothing, office A sees and writes only its own rows, System sees all, the
-cascade still works).
+cascade still works), `TestRLSInvariant` (every table with an office or
+taxpayer column: RLS on, FORCE on, a policy and `rls_system`, or a listed
+exception).
+
+**Write sweep** (`internal/httpserver/write_sweep_db_test.go`, #302): every
+POST / PUT / PATCH / DELETE under `/v1/taxpayer/` and `/v1/tenant/` in
+`openapi.yaml` is called once through the real server, on the demo office and
+in the production request scope, as the demo taxpayer user and the office
+owner; any 5xx fails (a 503 only where the case names the unavailable
+external service). A new write endpoint fails the test until it has a case.
 
 ## Migration safety
 

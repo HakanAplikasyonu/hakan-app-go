@@ -142,7 +142,7 @@ func current(ctx context.Context, q *db.Queries, s review.Suggestion) (json.RawM
 func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.RawMessage) error {
 	var str *string
 	if err := json.Unmarshal(value, &str); err != nil {
-		return fmt.Errorf("reviewlink: value must be a JSON string or null: %w", err)
+		return fmt.Errorf("%w: reviewlink: value must be a JSON string or null: %v", review.ErrInvalidValue, err)
 	}
 	field := s.Input.TargetField
 	var dateV pgtype.Date
@@ -151,7 +151,7 @@ func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.R
 	if str != nil && *str != "" {
 		norm, ok := extract.Normalize(field, *str)
 		if !ok {
-			return fmt.Errorf("reviewlink: %q is not a valid %s", *str, field)
+			return fmt.Errorf("%w: reviewlink: %q is not a valid %s", review.ErrInvalidValue, *str, field)
 		}
 		switch field {
 		case extract.FieldDate:
