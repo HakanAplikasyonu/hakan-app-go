@@ -18,9 +18,12 @@ kırmızı olur ve PR birleşmez.
 Dependabot şunları izler: Go modülleri (`backend`, `desktop/sidecar`), npm
 (`frontend`, `mobile`, `desktop`, `e2e`), GitHub Actions, Dockerfile temel
 imajları (`backend`, `frontend`, `deploy/backup`) ve Cargo (`desktop/src-tauri`).
-Küçük ve yama sürümleri ekosistem başına tek PR'da gruplanır. Expo ve React
-Native'in büyük sürümleri hariç tutulur; bunlar `npx expo install --fix` ile
-birlikte yükseltilir.
+Küçük ve yama sürümleri ekosistem başına tek PR'da gruplanır. **Büyük
+sürümler hiçbir ekosistemde önerilmez** (`ignore` `"*"` semver-major): bunlar
+geçiş adımlarıyla birlikte elle planlanır. Ayrıca `golang` Docker imajının küçük
+sürümü (1.26 → 1.27) önerilmez; Go araç zinciri `go.mod` ile birlikte elle
+yükseltilir. React Native'in küçük sürümleri Expo SDK'yı izler
+(`npx expo install --fix`).
 
 ## Bu PR'da düzeltilenler
 
