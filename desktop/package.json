@@ -9,7 +9,7 @@
     "build": "npm run sidecar && tauri build",
     "icons": "tauri icon ../docs/brand/icons/png/tauri-1024.png",
     "tauri": "tauri",
-    "test": "node --test \"scripts/*.test.mjs\"",
+    "test": "node --test \"scripts/*.test.mjs\" tests/bildirim.test.mjs",
     "updater-manifest": "node scripts/updater-manifest.mjs",
     "test:ui": "node --test \"tests/ui/*.test.mjs\""
   },
