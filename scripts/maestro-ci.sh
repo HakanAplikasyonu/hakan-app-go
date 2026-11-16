@@ -56,6 +56,9 @@ code=0
   --debug-output "$out/debug" --flatten-debug-output \
   -e MAESTRO_EMAIL="${MAESTRO_EMAIL:?}" -e MAESTRO_PASSWORD="${MAESTRO_PASSWORD:?}" \
   "$flows") || code=$?
+# Maestro takeScreenshot görüntülerini --debug-output altına
+# (debug/<akış>/takeScreenshot/) yazar: screenshots/ içine topla.
+find "$out/debug" -path '*/takeScreenshot/*.png' -exec cp {} "$out/screenshots/" \; 2>/dev/null || true
 
 kill "$rec" 2>/dev/null || true
 adb shell pkill -INT screenrecord 2>/dev/null || true
