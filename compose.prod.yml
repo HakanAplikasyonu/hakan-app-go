@@ -44,6 +44,7 @@ x-backend-environment: &backend-environment
   DB_NAME: ${DB_NAME:?DB_NAME is required}
   DB_SSLMODE: ${DB_SSLMODE:-disable}
   DB_MAX_CONNS: ${DB_MAX_CONNS:-}
+  DB_RLS_RUNTIME: ${DB_RLS_RUNTIME:-}
   REDIS_ADDR: redis.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:6379
   REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
   STORAGE_DRIVER: ${STORAGE_DRIVER:-s3}

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 // dropDemo deletes the demo office and the data of its demo taxpayers (#148).
@@ -26,15 +27,18 @@ import (
 // taxpayer with RESTRICT, so it is deleted child-first by walking the foreign
 // keys in pg_catalog (deleteGraph); new tables need no change here.
 // Users are kept and reused.
+//
+// The reset spans tenants and enforced tables, so it runs as rls.System
+// (issue #166): the demo office's rows are found by slug, not by a scope.
 func dropDemo(ctx context.Context, pool *pgxpool.Pool) error {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
+	return rls.System(ctx, pool, "demo-seed reset", func(ctx context.Context, tx pgx.Tx) error {
+		return dropDemoTx(ctx, tx)
+	})
+}
 
+func dropDemoTx(ctx context.Context, tx pgx.Tx) error {
 	var orgID int64
-	err = tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = $1`, demo.OrgSlug).Scan(&orgID)
+	err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = $1`, demo.OrgSlug).Scan(&orgID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -77,7 +81,7 @@ func dropDemo(ctx context.Context, pool *pgxpool.Pool) error {
 	if _, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgID); err != nil {
 		return fmt.Errorf("delete demo office: %w", err)
 	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 // foreignKey is one FK edge child(cols) -> parent(refCols).

@@ -1,0 +1,13 @@
+# Satır güvenliği ZORLANMIŞ tablolar (issue #166, migration 000074+).
+# Bu tablolar hakan_rls_runtime için rls_legacy politikası taşımaz: kapsamsız
+# sorgu satır görmez ve yazamaz. Erişim yalnızca rls.WithScope (kiracı
+# kapsamı) ya da rls.System (gerekçeli atlama) içinden olur.
+#
+# Tablo eklemek için (grup grup):
+#   1. Tablonun bütün erişim yolları (API, worker, seed) WithScope ya da
+#      System içinde olmalı.
+#   2. Migration: SELECT rls_enforce('tablo');
+#   3. Bu listeye ekle.
+#   4. rls_enforcement_db_test.go içindeki leakFixtures'a satır ekleyicisini
+#      yaz: kiracılar arası sızıntı testi her tablo için çalışır.
+petitions
