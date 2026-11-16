@@ -33,6 +33,16 @@ func (f *fakeWarnings) Decide(_ context.Context, _, eng int64, _ uuid.UUID, s ca
 	return nil
 }
 
+func (f *fakeWarnings) Groups(_ context.Context, flt repository.Filter) ([]repository.Group, error) {
+	f.got = flt
+	return nil, nil
+}
+
+func (f *fakeWarnings) AcknowledgeBulk(_ context.Context, flt repository.Filter, _ *usecase.BulkInput) (int64, error) {
+	f.got = flt
+	return 0, nil
+}
+
 func req(method, target string, scope orgctx.Scope, eng int64) *http.Request {
 	r := httptest.NewRequest(method, target, nil)
 	ctx := orgctx.WithScope(r.Context(), scope)

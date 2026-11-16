@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -28,6 +29,7 @@ type Handler struct {
 	rules    Rules
 	warnings Warnings
 	controls ControlRunner
+	activity *activity.Recorder
 }
 
 // New builds the handler.

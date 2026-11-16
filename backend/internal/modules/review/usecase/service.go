@@ -343,3 +343,65 @@ func (s *Service) DeleteSetting(ctx context.Context, organizationID, engagementI
 	}
 	return nil
 }
+
+// Threshold-impact bounds (issue #333).
+var (
+	MinImpactThreshold  = decimal.RequireFromString("0.50")
+	DefaultImpactMonths = 6
+	MaxImpactMonths     = 24
+)
+
+// ThresholdImpact summarises what an office-wide threshold would have done
+// to the suggestions decided in the last Months months.
+type ThresholdImpact struct {
+	Threshold         string  `json:"threshold"`
+	Months            int     `json:"months"`
+	Kind              *string `json:"kind"`
+	CurrentThreshold  string  `json:"current_threshold"`
+	CurrentAutoAccept bool    `json:"current_auto_accept"`
+	ImpactCounts
+}
+
+// ThresholdImpact validates f and runs the aggregate. Threshold must be
+// 0.50–1.00 with at most two decimals, Months 1–24 (0 = default 6), Kind
+// optional. current_* is the office's effective policy for the kind.
+func (s *Service) ThresholdImpact(ctx context.Context, f ImpactFilter) (ThresholdImpact, error) {
+	organizationID, threshold, months, kind := f.OrganizationID, f.Threshold, f.Months, f.Kind
+	switch {
+	case threshold.LessThan(MinImpactThreshold) || threshold.GreaterThan(one):
+		return ThresholdImpact{}, fmt.Errorf("%w: threshold must be between 0.50 and 1.00", ErrInvalid)
+	case !threshold.Equal(threshold.Round(2)):
+		return ThresholdImpact{}, fmt.Errorf("%w: threshold must have at most two decimals", ErrInvalid)
+	}
+	if months == 0 {
+		months = DefaultImpactMonths
+	}
+	if months < 1 || months > MaxImpactMonths {
+		return ThresholdImpact{}, fmt.Errorf("%w: months must be between 1 and %d", ErrInvalid, MaxImpactMonths)
+	}
+	if kind != "" && (!identRe.MatchString(kind) || len(kind) > 64) {
+		return ThresholdImpact{}, fmt.Errorf("%w: kind", ErrInvalid)
+	}
+	rows, err := s.store.Settings(ctx, organizationID, 0)
+	if err != nil {
+		return ThresholdImpact{}, err
+	}
+	policyKind := kind
+	if policyKind == "" {
+		policyKind = AnyKind
+	}
+	policy := ResolvePolicy(rows, 0, policyKind)
+	f.Months = months
+	counts, err := s.store.ImpactCounts(ctx, f)
+	if err != nil {
+		return ThresholdImpact{}, err
+	}
+	out := ThresholdImpact{
+		Threshold: threshold.StringFixed(2), Months: months,
+		CurrentThreshold: policy.Threshold.StringFixed(4), CurrentAutoAccept: policy.AutoAccept, ImpactCounts: counts,
+	}
+	if kind != "" {
+		out.Kind = &kind
+	}
+	return out, nil
+}

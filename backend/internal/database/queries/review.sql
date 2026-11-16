@@ -111,3 +111,22 @@ WHERE organization_id = @organization_id AND engagement_id IS NULL AND kind = @k
 -- name: DeleteEngagementReviewSetting :execrows
 DELETE FROM review_settings
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind;
+
+-- tenant-lint: org-wide eşik etkisi özeti (#333); yalnızca sayım, read_all yoksa engagement_assignments ile süzülür
+-- name: ReviewThresholdImpact :one
+-- Son @months ayda karara bağlanmış (bekleyen ve yerine yenisi gelen hariç) öneriler.
+SELECT count(*)::bigint AS decided,
+       count(*) FILTER (WHERE s.confidence >= @threshold::numeric)::bigint AS would_auto_accept,
+       count(*) FILTER (WHERE s.confidence >= @threshold::numeric
+                          AND s.status IN ('corrected', 'rejected') AND s.decided_by IS NOT NULL)::bigint AS would_auto_accept_then_corrected,
+       count(*) FILTER (WHERE s.status = 'auto_accepted')::bigint AS currently_auto_accepted,
+       count(*) FILTER (WHERE s.confidence < @threshold::numeric)::bigint AS would_go_to_queue
+FROM suggestions s
+WHERE s.organization_id = @organization_id
+  AND (@all_engagements::bool OR s.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
+  AND s.status NOT IN ('pending', 'superseded')
+  AND s.decided_at IS NOT NULL
+  AND s.decided_at >= NOW() - make_interval(months => @months::int)
+  AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text);

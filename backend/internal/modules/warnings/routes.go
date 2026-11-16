@@ -35,6 +35,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("PUT /v1/tenant/warning-rules/{code}", write, h.SetOfficeRule)
 	r.Tenant("DELETE /v1/tenant/warning-rules/{code}", write, h.ResetOfficeRule)
 	r.Tenant("GET /v1/tenant/warnings", read, h.ListOfficeWarnings)
+	r.Tenant("GET /v1/tenant/warnings/groups", read, h.ListOfficeWarningGroups)
+	r.Tenant("POST /v1/tenant/warnings/acknowledge-bulk", rbac.PermTenantWarningsWrite, h.AcknowledgeOfficeWarnings)
 
 	if m.Engagements == nil {
 		return
@@ -48,6 +50,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("DELETE /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}", write, h.ResetEngagementRule, eng...)
 	decide := rbac.PermTenantWarningsWrite
 	r.Tenant("GET /v1/tenant/engagements/{engagementUuid}/warnings", read, h.ListEngagementWarnings, eng...)
+	r.Tenant("GET /v1/tenant/engagements/{engagementUuid}/warnings/groups", read, h.ListEngagementWarningGroups, eng...)
+	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk", decide, h.AcknowledgeEngagementWarnings, eng...)
 	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge", decide, h.AcknowledgeWarning, eng...)
 	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve", decide, h.ResolveWarning, eng...)
 	r.Tenant("POST /v1/tenant/engagements/{engagementUuid}/controls/run", decide, h.RunControls, eng...)

@@ -5211,6 +5211,71 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/warnings/groups:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Warnings]
+      operationId: listOfficeWarningGroups
+      summary: Office data warnings grouped by code
+      description: |
+        Requires `tenant.warnings.read`. Same visibility as
+        `GET /v1/tenant/warnings`: without `tenant.engagements.read_all` only
+        engagements assigned to the caller are counted. One row per code:
+        heaviest severity among its warnings, warning count, number of
+        distinct engagements and the latest update. Ordered blocker, warning,
+        info, then by count (descending). Status defaults to `open`; `all`
+        counts every status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: severity, in: query, required: false, schema: { $ref: "#/components/schemas/WarningSeverity" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, acknowledged, resolved, auto_resolved, all], default: open } }
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningGroups"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/warnings/acknowledge-bulk:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Warnings]
+      operationId: acknowledgeOfficeWarningsBulk
+      summary: Acknowledge every open warning of a code across the office
+      description: |
+        Requires `tenant.warnings.write`. Sets every open warning of `code`
+        (in `period` when given) to acknowledged, recording who and when on
+        each row as the single acknowledge does. Only engagements the caller
+        may see are touched (without `tenant.engagements.read_all`: assigned
+        ones), and only active engagements. The note goes to the activity log.
+        Returns how many warnings changed (0 is not an error).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WarningBulkAcknowledgeInput"
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningBulkAcknowledge"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/warnings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -5237,6 +5302,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeDataWarningPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warnings/groups:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Warnings]
+      operationId: listEngagementWarningGroups
+      summary: Data warnings of one engagement grouped by code
+      description: |
+        Requires `tenant.warnings.read`, `tenant.engagements.read` and
+        engagement access. As the office groups, without `engagements`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: severity, in: query, required: false, schema: { $ref: "#/components/schemas/WarningSeverity" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [open, acknowledged, resolved, auto_resolved, all], default: open } }
+      responses:
+        "200":
+          description: Groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningGroups"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Warnings]
+      operationId: acknowledgeEngagementWarningsBulk
+      summary: Acknowledge every open warning of a code in one engagement
+      description: |
+        Requires `tenant.warnings.write` and engagement access. Sets every
+        open warning of `code` (in `period` when given) of the engagement to
+        acknowledged, recording who and when on each row as the single
+        acknowledge does. The note goes to the activity log. Returns how many
+        warnings changed (0 is not an error).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WarningBulkAcknowledgeInput"
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWarningBulkAcknowledge"
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -6076,6 +6204,40 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeReviewSettings"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/threshold-impact:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: getReviewThresholdImpact
+      summary: What an office-wide auto-accept threshold would have done
+      description: |
+        Requires `tenant.review.read`. Over the office's suggestions decided
+        in the last `months` months (pending and superseded ones are not
+        decisions), counts how many a threshold of `threshold` would have
+        applied automatically (confidence >= threshold), how many of those a
+        person later corrected or rejected, how many are auto-accepted today
+        and how many would have gone to the queue. Without
+        `tenant.engagements.read_all` only assigned engagements are counted.
+        `current_threshold` / `current_auto_accept` are the office's effective
+        policy for `kind` (or `*`), as in `GET /v1/tenant/review/settings`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: threshold, in: query, required: true, description: "0.50–1.00, at most two decimals", schema: { type: string, pattern: "^(0\\.[5-9][0-9]?|1(\\.00?)?)$", example: "0.90" } }
+        - { name: months, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 24, default: 6 } }
+        - { name: kind, in: query, required: false, description: "Suggestion kind; omitted = every kind", schema: { type: string } }
+      responses:
+        "200":
+          description: Impact summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeReviewThresholdImpact"
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -10163,6 +10325,141 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/account-rules/preview:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: previewOfficeAccountRule
+      summary: Preview an unsaved office rule over every active engagement (#333)
+      description: |
+        Requires `tenant.account_rules.read`. Evaluates the rule (same body as
+        creating one; nothing is stored) over the invoice lines of the last 6
+        months of every active engagement of the office. A line / VAT rule
+        matches lines, a counterparty rule whole invoices. "approved" is the
+        field's confirmed account code; `approved_different` counts the
+        matches confirmed with another code. At most 20 000 lines are
+        evaluated (`truncated`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRulePreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-rules/preview:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Tenant]
+      operationId: previewEngagementAccountRule
+      summary: Preview an unsaved company rule over the last 6 months (#333)
+      description: Like the office preview, for this engagement only. Requires `tenant.account_rules.read`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleInput" }
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRulePreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/account-rule-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getAccountRuleSettings
+      summary: The office's rule candidate setting (#333)
+      description: |
+        Requires `tenant.account_rules.read`. How many matching decisions
+        (2–10, default 3) make a "make it a rule?" candidate and which
+        decisions count (`corrections_only` or `corrections_and_accepts`,
+        the default). Automatic acceptances never count. `default` is true
+        while the office has not set one.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putAccountRuleSettings
+      summary: Set the office's rule candidate setting (#333)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountRuleSettingsInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/account-rule-settings/preview:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: previewAccountRuleSettings
+      summary: Candidates today and under a proposed setting (#333)
+      description: |
+        Requires `tenant.account_rules.read`. Counts the open candidates (not
+        yet covered by a rule) over every active engagement, under the
+        current setting and under the proposed one (query parameters; a
+        missing one keeps the current value). Nothing is stored.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: rule_candidate_min_count, in: query, schema: { type: integer, minimum: 2, maximum: 10 } }
+        - { name: rule_candidate_decisions, in: query, schema: { type: string, enum: [corrections_only, corrections_and_accepts] } }
+      responses:
+        "200":
+          description: Both sides
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAccountRuleSettingsPreview" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/account-rules:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -11580,6 +11877,75 @@ components:
           properties:
             uuid: { type: string, format: uuid }
             status: { type: string, enum: [acknowledged, resolved] }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WarningGroup:
+      type: object
+      required: [code, severity, count, latest_at]
+      properties:
+        code: { type: string }
+        severity: { $ref: "#/components/schemas/WarningSeverity" }
+        count: { type: integer, format: int64 }
+        engagements: { type: integer, format: int64, description: "Distinct engagements; office view only" }
+        latest_at: { type: string, format: date-time }
+
+    EnvelopeWarningGroups:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/WarningGroup" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WarningBulkAcknowledgeInput:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code: { type: string, description: "Catalog warning code" }
+        period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        note: { type: string, maxLength: 500 }
+
+    EnvelopeWarningBulkAcknowledge:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [acknowledged]
+          properties:
+            acknowledged: { type: integer, format: int64 }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ReviewThresholdImpact:
+      type: object
+      required: [threshold, months, kind, current_threshold, current_auto_accept, decided, would_auto_accept,
+        would_auto_accept_then_corrected, currently_auto_accepted, would_go_to_queue]
+      properties:
+        threshold: { type: string, example: "0.90" }
+        months: { type: integer }
+        kind: { type: [string, "null"] }
+        current_threshold: { type: string, example: "0.9500" }
+        current_auto_accept: { type: boolean }
+        decided: { type: integer, format: int64 }
+        would_auto_accept: { type: integer, format: int64 }
+        would_auto_accept_then_corrected: { type: integer, format: int64, description: "Of would_auto_accept: corrected or rejected by a person" }
+        currently_auto_accepted: { type: integer, format: int64 }
+        would_go_to_queue: { type: integer, format: int64 }
+
+    EnvelopeReviewThresholdImpact:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ReviewThresholdImpact" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     Suggestion:
@@ -16188,6 +16554,78 @@ components:
         line_type: { type: string, enum: [goods, service, fixed_asset_candidate, discount, expense, unknown] }
         tax_rate: { type: string, examples: ["20"] }
 
+    AccountRuleSettingsInput:
+      type: object
+      additionalProperties: false
+      required: [rule_candidate_min_count, rule_candidate_decisions]
+      properties:
+        rule_candidate_min_count: { type: integer, minimum: 2, maximum: 10 }
+        rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
+    AccountRuleSettings:
+      type: object
+      required: [rule_candidate_min_count, rule_candidate_decisions, default]
+      properties:
+        rule_candidate_min_count: { type: integer }
+        rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
+        updated_at: { type: string, format: date-time }
+        default: { type: boolean, description: True while the office has not set one }
+    EnvelopeAccountRuleSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountRuleSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    AccountRuleSettingsPreviewSide:
+      allOf:
+        - $ref: "#/components/schemas/AccountRuleSettings"
+        - type: object
+          required: [candidates, engagements]
+          properties:
+            candidates: { type: integer }
+            engagements: { type: integer, description: Engagements with at least one candidate }
+    EnvelopeAccountRuleSettingsPreview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [current, proposed]
+          properties:
+            current: { $ref: "#/components/schemas/AccountRuleSettingsPreviewSide" }
+            proposed: { $ref: "#/components/schemas/AccountRuleSettingsPreviewSide" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    AccountRulePreview:
+      type: object
+      required: [months, since, documents, lines, approved, approved_different, truncated, samples]
+      properties:
+        months: { type: integer, example: 6 }
+        since: { type: string, format: date }
+        documents: { type: integer, description: Invoices the rule fits }
+        lines: { type: integer, description: Lines (or invoices for a counterparty rule) the rule fits }
+        approved: { type: integer, description: Matches with a confirmed account code }
+        approved_different: { type: integer, description: Matches confirmed with another code than the rule's }
+        truncated: { type: boolean }
+        samples:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [invoice_uuid, invoice_number, issue_date, approved_code]
+            properties:
+              invoice_uuid: { type: string, format: uuid }
+              invoice_number: { type: string }
+              issue_date: { type: string, format: date }
+              item_name: { type: string }
+              approved_code: { type: string }
+    EnvelopeAccountRulePreview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AccountRulePreview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     AccountRuleInput:
       type: object
       required: [account_code]

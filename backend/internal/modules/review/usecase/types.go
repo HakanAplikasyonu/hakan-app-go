@@ -206,4 +206,36 @@ type Store interface {
 	Settings(ctx context.Context, organizationID, engagementID int64) ([]SettingRow, error)
 	UpsertSetting(ctx context.Context, organizationID, engagementID int64, row SettingRow, userID int64) error
 	DeleteSetting(ctx context.Context, organizationID, engagementID int64, kind string) (bool, error)
+	// ImpactCounts aggregates the office's suggestions decided in the last
+	// f.Months months against f.Threshold.
+	ImpactCounts(ctx context.Context, f ImpactFilter) (ImpactCounts, error)
+}
+
+// ImpactFilter scopes a threshold-impact aggregate.
+type ImpactFilter struct {
+	OrganizationID int64
+	// AllEngagements is true for tenant.engagements.read_all callers; others
+	// count only engagements assigned to UserID.
+	AllEngagements bool
+	UserID         int64
+	Threshold      decimal.Decimal
+	Months         int
+	// Kind "" = every kind.
+	Kind string
+}
+
+// ImpactCounts are the numbers behind a threshold-impact summary.
+type ImpactCounts struct {
+	// Decided: suggestions with a decision in the window (not pending, not
+	// superseded).
+	Decided int64 `json:"decided"`
+	// WouldAutoAccept: confidence >= threshold.
+	WouldAutoAccept int64 `json:"would_auto_accept"`
+	// WouldAutoAcceptThenCorrected: of those, corrected or rejected by a
+	// person — errors the threshold would have let through.
+	WouldAutoAcceptThenCorrected int64 `json:"would_auto_accept_then_corrected"`
+	// CurrentlyAutoAccepted: status auto_accepted.
+	CurrentlyAutoAccepted int64 `json:"currently_auto_accepted"`
+	// WouldGoToQueue: confidence < threshold.
+	WouldGoToQueue int64 `json:"would_go_to_queue"`
 }

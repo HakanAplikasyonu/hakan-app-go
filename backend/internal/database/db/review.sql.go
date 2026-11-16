@@ -535,6 +535,63 @@ func (q *Queries) ListTenantSuggestions(ctx context.Context, arg ListTenantSugge
 	return items, nil
 }
 
+const reviewThresholdImpact = `-- name: ReviewThresholdImpact :one
+SELECT count(*)::bigint AS decided,
+       count(*) FILTER (WHERE s.confidence >= $1::numeric)::bigint AS would_auto_accept,
+       count(*) FILTER (WHERE s.confidence >= $1::numeric
+                          AND s.status IN ('corrected', 'rejected') AND s.decided_by IS NOT NULL)::bigint AS would_auto_accept_then_corrected,
+       count(*) FILTER (WHERE s.status = 'auto_accepted')::bigint AS currently_auto_accepted,
+       count(*) FILTER (WHERE s.confidence < $1::numeric)::bigint AS would_go_to_queue
+FROM suggestions s
+WHERE s.organization_id = $2
+  AND ($3::bool OR s.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = $2 AND a.user_id = $4))
+  AND s.status NOT IN ('pending', 'superseded')
+  AND s.decided_at IS NOT NULL
+  AND s.decided_at >= NOW() - make_interval(months => $5::int)
+  AND ($6::text IS NULL OR s.kind = $6::text)
+`
+
+type ReviewThresholdImpactParams struct {
+	Threshold      pgtype.Numeric `json:"threshold"`
+	OrganizationID int64          `json:"organization_id"`
+	AllEngagements bool           `json:"all_engagements"`
+	UserID         int64          `json:"user_id"`
+	Months         int32          `json:"months"`
+	Kind           pgtype.Text    `json:"kind"`
+}
+
+type ReviewThresholdImpactRow struct {
+	Decided                      int64 `json:"decided"`
+	WouldAutoAccept              int64 `json:"would_auto_accept"`
+	WouldAutoAcceptThenCorrected int64 `json:"would_auto_accept_then_corrected"`
+	CurrentlyAutoAccepted        int64 `json:"currently_auto_accepted"`
+	WouldGoToQueue               int64 `json:"would_go_to_queue"`
+}
+
+// tenant-lint: org-wide eşik etkisi özeti (#333); yalnızca sayım, read_all yoksa engagement_assignments ile süzülür
+// Son @months ayda karara bağlanmış (bekleyen ve yerine yenisi gelen hariç) öneriler.
+func (q *Queries) ReviewThresholdImpact(ctx context.Context, arg ReviewThresholdImpactParams) (ReviewThresholdImpactRow, error) {
+	row := q.db.QueryRow(ctx, reviewThresholdImpact,
+		arg.Threshold,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Months,
+		arg.Kind,
+	)
+	var i ReviewThresholdImpactRow
+	err := row.Scan(
+		&i.Decided,
+		&i.WouldAutoAccept,
+		&i.WouldAutoAcceptThenCorrected,
+		&i.CurrentlyAutoAccepted,
+		&i.WouldGoToQueue,
+	)
+	return i, err
+}
+
 const supersedePendingSuggestions = `-- name: SupersedePendingSuggestions :many
 
 UPDATE suggestions
