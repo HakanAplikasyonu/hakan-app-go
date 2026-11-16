@@ -39,6 +39,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Privacy
+    description: KVKK veri sahibi talepleri (#193)
   - name: Billing
     description: Ofis faturalama (D9, D14)
   - name: Sources
@@ -7414,6 +7416,180 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/privacy-requests:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Privacy]
+      operationId: listPrivacyRequests
+      summary: KVKK data subject requests of the engagement
+      description: Requires `tenant.privacy.request`. Newest first (issue #193).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePrivacyRequestList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Privacy]
+      operationId: createPrivacyRequest
+      summary: Open a data subject request (export or erasure)
+      description: |
+        Requires `tenant.privacy.request`. The request stays `pending` until an
+        office owner/admin approves it. `subject_type: user` needs
+        `subject_user_uuid` of a user of this engagement's taxpayer
+        (`422 PRIVACY_SUBJECT_UNKNOWN` otherwise).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PrivacyRequestInput" }
+      responses:
+        "201":
+          description: Opened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePrivacyRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "422":
+          description: "`PRIVACY_SUBJECT_UNKNOWN`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: requestUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Privacy]
+      operationId: getPrivacyRequest
+      summary: One data subject request
+      description: Requires `tenant.privacy.request`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePrivacyRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: requestUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Privacy]
+      operationId: approvePrivacyRequest
+      summary: Approve and run a pending request
+      description: |
+        Requires `tenant.privacy.approve` (owner/admin). An export becomes
+        downloadable until `expires_at`. An erasure anonymises in the same
+        transaction: taxpayer users with no other office or taxpayer tie are
+        anonymised (personal fields replaced, sessions, devices, passkeys,
+        sign-in links and notifications deleted), every user's link to the
+        taxpayer is removed, invitation and onboarding contact e-mails are
+        masked. Accounting records, the taxpayer identity, consent records
+        and the audit log are kept; `summary.retained` says until when.
+        `409 PRIVACY_REQUEST_DECIDED` when not pending.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PrivacyDecisionInput" }
+      responses:
+        "200":
+          description: Completed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePrivacyRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: requestUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Privacy]
+      operationId: rejectPrivacyRequest
+      summary: Reject a pending request
+      description: Requires `tenant.privacy.approve`. `note` is required (`400 NOTE_REQUIRED`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PrivacyDecisionInput" }
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopePrivacyRequest" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: requestUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Privacy]
+      operationId: downloadPrivacyExport
+      summary: Download an approved export (ZIP of JSON files)
+      description: |
+        Requires `tenant.privacy.approve`. `manifest.json` lists the files.
+        Built from current data at download time; every download is written
+        to the audit log. `409 PRIVACY_EXPORT_NOT_READY` (not an approved
+        export), `410 PRIVACY_EXPORT_EXPIRED`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ZIP archive
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "410":
+          description: "`PRIVACY_EXPORT_EXPIRED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/journal-export-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -13871,6 +14047,62 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/JournalExportDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    PrivacyRequestInput:
+      type: object
+      required: [kind, subject_type]
+      properties:
+        kind: { type: string, enum: [export, erasure] }
+        subject_type: { type: string, enum: [taxpayer, user] }
+        subject_user_uuid: { type: string, format: uuid, description: Required when subject_type is user }
+        reason: { type: string, maxLength: 2000 }
+
+    PrivacyDecisionInput:
+      type: object
+      properties:
+        note: { type: string }
+
+    PrivacyRequest:
+      type: object
+      required: [uuid, kind, subject_type, status, reason, decision_note, summary, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [export, erasure] }
+        subject_type: { type: string, enum: [taxpayer, user] }
+        subject_user_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [pending, rejected, completed, failed] }
+        reason: { type: string }
+        decision_note: { type: string }
+        summary:
+          type: object
+          additionalProperties: true
+          description: What the request did (erasure counts, `retained` with `retention_until`) or `export_expires_at`.
+        created_at: { type: string, format: date-time }
+        decided_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+
+    EnvelopePrivacyRequest:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PrivacyRequest" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopePrivacyRequestList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PrivacyRequest" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeJournalExportSettings:

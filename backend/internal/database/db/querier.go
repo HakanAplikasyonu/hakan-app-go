@@ -32,6 +32,9 @@ type Querier interface {
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
+	// The row stays (foreign keys, audit trail); every personal field is replaced
+	// and the account can never sign in again.
+	AnonymizePrivacyUser(ctx context.Context, arg AnonymizePrivacyUserParams) error
 	ApproveJournalDraft(ctx context.Context, arg ApproveJournalDraftParams) (int64, error)
 	ApprovePeriodSummary(ctx context.Context, arg ApprovePeriodSummaryParams) (PeriodSummary, error)
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
@@ -87,6 +90,13 @@ type Querier interface {
 	CountPeriodMatrixEngagements(ctx context.Context, arg CountPeriodMatrixEngagementsParams) (int64, error)
 	CountPermissions(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountPlatformNotifications(ctx context.Context, arg CountPlatformNotificationsParams) (int64, error)
+	// Accounting records are retained (VUK); the export reports their counts.
+	CountPrivacyAccountingRecords(ctx context.Context, taxpayerID int64) (CountPrivacyAccountingRecordsRow, error)
+	CountPrivacyNotifications(ctx context.Context, userID pgtype.Int8) (int64, error)
+	// Ties outside this taxpayer: such a user is not anonymised by this office.
+	// tenant-lint: cross-org counts a person's memberships in every office; returns numbers only
+	// tenant-lint: cross-taxpayer counts a person's memberships in every taxpayer; returns numbers only
+	CountPrivacyUserTies(ctx context.Context, arg CountPrivacyUserTiesParams) (CountPrivacyUserTiesRow, error)
 	CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error)
 	CountRoles(ctx context.Context, q_ pgtype.Text) (int64, error)
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
@@ -148,6 +158,8 @@ type Querier interface {
 	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
 	// tenant-lint: cross-org onay sonucu, token ile bulunan satırın id'siyle
 	DecideOnboardingRequest(ctx context.Context, arg DecideOnboardingRequestParams) error
+	// Only a pending request is decided, once.
+	DecidePrivacyRequest(ctx context.Context, arg DecidePrivacyRequestParams) (PrivacyRequest, error)
 	DeleteAccountAssignment(ctx context.Context, arg DeleteAccountAssignmentParams) (int64, error)
 	// Yeni sürüm gelince etkin plan değişir; eski sürümün özeti imports'ta kalır.
 	DeleteAccountPlanAccounts(ctx context.Context, arg DeleteAccountPlanAccountsParams) (int64, error)
@@ -177,6 +189,14 @@ type Querier interface {
 	DeleteOrganizationMember(ctx context.Context, arg DeleteOrganizationMemberParams) (int64, error)
 	DeleteOrganizationRole(ctx context.Context, arg DeleteOrganizationRoleParams) (int64, error)
 	DeletePeriodLock(ctx context.Context, arg DeletePeriodLockParams) (int64, error)
+	DeletePrivacyTaxpayerMember(ctx context.Context, arg DeletePrivacyTaxpayerMemberParams) (int64, error)
+	DeletePrivacyUserDevices(ctx context.Context, userID int64) (int64, error)
+	DeletePrivacyUserNotifications(ctx context.Context, userID pgtype.Int8) (int64, error)
+	DeletePrivacyUserOAuth(ctx context.Context, userID int64) (int64, error)
+	DeletePrivacyUserOTPs(ctx context.Context, arg DeletePrivacyUserOTPsParams) (int64, error)
+	DeletePrivacyUserPasskeys(ctx context.Context, userID int64) (int64, error)
+	DeletePrivacyUserPushSubscriptions(ctx context.Context, userID int64) (int64, error)
+	DeletePrivacyUserSessions(ctx context.Context, userID int64) (int64, error)
 	DeletePushDeviceForUser(ctx context.Context, arg DeletePushDeviceForUserParams) (int64, error)
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error
 	DeletePushTickets(ctx context.Context, ids []int64) error
@@ -323,6 +343,9 @@ type Querier interface {
 	GetPermissionBySlug(ctx context.Context, slug string) (Permission, error)
 	GetPetition(ctx context.Context, arg GetPetitionParams) (Petition, error)
 	GetPetitionContext(ctx context.Context, arg GetPetitionContextParams) (GetPetitionContextRow, error)
+	GetPrivacyRequest(ctx context.Context, arg GetPrivacyRequestParams) (PrivacyRequest, error)
+	GetPrivacyUser(ctx context.Context, id int64) (GetPrivacyUserRow, error)
+	GetPrivacyUserByUUID(ctx context.Context, argUuid uuid.UUID) (GetPrivacyUserByUUIDRow, error)
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 	GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error)
@@ -420,6 +443,8 @@ type Querier interface {
 	InsertPeriodLock(ctx context.Context, arg InsertPeriodLockParams) (PeriodLock, error)
 	InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLockEventParams) (PeriodLockEvent, error)
 	InsertPeriodSummary(ctx context.Context, arg InsertPeriodSummaryParams) (PeriodSummary, error)
+	// KVKK veri sahibi talepleri (issue #193).
+	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
@@ -599,6 +624,16 @@ type Querier interface {
 	ListPetitions(ctx context.Context, arg ListPetitionsParams) ([]ListPetitionsRow, error)
 	ListPlatformNotifications(ctx context.Context, arg ListPlatformNotificationsParams) ([]Notification, error)
 	ListPlatformNotificationsForExport(ctx context.Context, arg ListPlatformNotificationsForExportParams) ([]Notification, error)
+	ListPrivacyAcceptancesForTaxpayer(ctx context.Context, taxpayerID pgtype.Int8) ([]ListPrivacyAcceptancesForTaxpayerRow, error)
+	ListPrivacyAcceptancesForUser(ctx context.Context, userID int64) ([]ListPrivacyAcceptancesForUserRow, error)
+	ListPrivacyDevices(ctx context.Context, userID int64) ([]ListPrivacyDevicesRow, error)
+	ListPrivacyInvitations(ctx context.Context, arg ListPrivacyInvitationsParams) ([]ListPrivacyInvitationsRow, error)
+	ListPrivacyOAuthProviders(ctx context.Context, userID int64) ([]ListPrivacyOAuthProvidersRow, error)
+	ListPrivacyOnboardingRequests(ctx context.Context, arg ListPrivacyOnboardingRequestsParams) ([]ListPrivacyOnboardingRequestsRow, error)
+	ListPrivacyPasskeys(ctx context.Context, userID int64) ([]ListPrivacyPasskeysRow, error)
+	ListPrivacyRequests(ctx context.Context, arg ListPrivacyRequestsParams) ([]PrivacyRequest, error)
+	ListPrivacySessions(ctx context.Context, userID int64) ([]ListPrivacySessionsRow, error)
+	ListPrivacyTaxpayerMembers(ctx context.Context, taxpayerID int64) ([]ListPrivacyTaxpayerMembersRow, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
@@ -718,6 +753,8 @@ type Querier interface {
 	MarkSilentDesktopAgentsOffline(ctx context.Context, arg MarkSilentDesktopAgentsOfflineParams) ([]MarkSilentDesktopAgentsOfflineRow, error)
 	// OAuth sign-up stores a random hash; the user never chose a password.
 	MarkUserPasswordUnset(ctx context.Context, id int64) error
+	MaskPrivacyInvitations(ctx context.Context, arg MaskPrivacyInvitationsParams) (int64, error)
+	MaskPrivacyOnboardingContacts(ctx context.Context, arg MaskPrivacyOnboardingContactsParams) (int64, error)
 	NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNoParams) (int32, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.

@@ -1243,6 +1243,27 @@ type PgExtension struct {
 	Extname string `json:"extname"`
 }
 
+type PrivacyRequest struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	SubjectType    string             `json:"subject_type"`
+	SubjectUserID  pgtype.Int8        `json:"subject_user_id"`
+	Status         string             `json:"status"`
+	Reason         string             `json:"reason"`
+	DecisionNote   string             `json:"decision_note"`
+	Summary        []byte             `json:"summary"`
+	RequestedBy    pgtype.Int8        `json:"requested_by"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	ExpiresAt      pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type PushDevice struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

@@ -42,6 +42,18 @@ type Config struct {
 	Easytrade  EasytradeConfig
 	KolayBi    KolayBiConfig
 	Bank       BankConfig
+	Privacy    PrivacyConfig
+}
+
+// PrivacyConfig: KVKK data subject requests (issue #193, docs/kvkk.md §7).
+type PrivacyConfig struct {
+	// AccountingRetentionYears is reported on erasure as how long accounting
+	// records and the taxpayer identity are kept (PRIVACY_ACCOUNTING_RETENTION_YEARS,
+	// default 5: VUK md. 253).
+	AccountingRetentionYears int
+	// ExportTTL is how long an approved export can be downloaded
+	// (PRIVACY_EXPORT_TTL, default 168h).
+	ExportTTL time.Duration
 }
 
 // ParasutConfig is the Paraşüt integrator application (docs/kaynak 10 §1.1):
@@ -390,6 +402,10 @@ func Load() (Config, error) {
 		App: AppConfig{
 			Name: getEnv("APP_NAME", "api"),
 			Env:  getEnv("APP_ENV", "development"),
+		},
+		Privacy: PrivacyConfig{
+			AccountingRetentionYears: getInt("PRIVACY_ACCOUNTING_RETENTION_YEARS", 5),
+			ExportTTL:                getDuration("PRIVACY_EXPORT_TTL", 7*24*time.Hour),
 		},
 		Encryption: EncryptionConfig{
 			Key:                getEnv("APP_ENCRYPTION_KEY", defaultEncryptionKey),

@@ -105,3 +105,39 @@ OCR okuyamadığı ya da yanlış okuduğu bölgeyi kapatamaz. Bulanık ya da e�
 5. Yurt dışı aktarım. Yapay zekâ sağlayıcısına maskeli veri gidiyor (docs/01 D4). Maskeli veri kişisel veri sayılır mı, md. 9 kapsamına girer mi?
 6. VERBİS kaydı ve alt veri işleyenlerin listesi.
 7. Kaynak bağlantılarındaki `source_connections.consent_text` alanı. Bu alanın sürümlü metne (`legal_documents`) bağlanması.
+
+## 7. Veri sahibi talepleri: dışa aktarma ve silme (issue #193)
+
+Bu bölüm uygulamanın ne yaptığını anlatır. Hukuk metinlerine (`legal_documents`) dokunulmadı.
+
+**Akış.** Ofis çalışanı bir mükellef ilişkisinde (`engagement`) talep açar:
+`POST /v1/tenant/engagements/{eng}/privacy-requests`. Gerekli izin `tenant.privacy.request` (owner, admin, member).
+Talebi ofis sahibi ya da yöneticisi onaylar veya reddeder (`tenant.privacy.approve`).
+Onay işi aynı anda yürütür. Talep silinmez; ne yapıldığı `summary` alanında durur.
+Açma, onay, ret ve her indirme denetim kaydına (`activity_events`) yazılır.
+
+**Konu.** Talep iki konuda açılabilir:
+
+- `taxpayer`: mükellefin kendisi.
+- `user`: o mükellefin portal kullanıcılarından biri.
+
+**Dışa aktarma** (KVKK md. 11/1 b-c). Onaydan sonra `GET …/{uuid}/export` bir ZIP verir.
+ZIP'te `manifest.json` ve bölüm başına bir JSON dosyası bulunur:
+
+- **Mükellef için:** mükellef kimliği, ilişki, kullanıcılar, onay kayıtları, davetler, ekleme talepleri ve muhasebe kayıtlarının sayıları.
+- **Kullanıcı için:** profil, onaylar, oturumlar, cihazlar, geçiş anahtarları, giriş sağlayıcıları ve bildirim sayısı.
+
+Parola özeti, belirteç ve anahtar dosyaya hiç girmez.
+İndirme `PRIVACY_EXPORT_TTL` süresince açık kalır (varsayılan 7 gün).
+
+**Silme / anonimleştirme.**
+
+| Ne | Ne olur |
+|---|---|
+| Yalnızca bu mükellefe bağlı portal kullanıcısı | Ad, soyad, e-posta ve oda sicil no değiştirilir; parola silinir; hesap kapanır. Oturumlar, cihazlar, push abonelikleri, geçiş anahtarları, OAuth bağlantıları, tek kullanımlık kodlar ve bildirimler silinir. Satır kalır, böylece yabancı anahtarlar ve denetim izi kırılmaz. |
+| Başka bir ofiste ya da mükellefte de çalışan kullanıcı | Hesap kalır; yalnızca bu mükellefle bağı kaldırılır. |
+| Bu ilişkideki davetler, ekleme talebi iletişim e-postaları | E-posta maskelenir, davet iptal olur. |
+| Muhasebe kayıtları (fatura, banka, gider, perakende, yevmiye), mükellef kimliği (VKN/TCKN, unvan, vergi dairesi) | **Silinmez.** Yasal saklama süresi boyunca kalır. `summary.retained.retention_until` bu süreyi gösterir. Süre `PRIVACY_ACCOUNTING_RETENTION_YEARS` ile ayarlanır (varsayılan 5). |
+| Onay ve rıza kayıtları, denetim kaydı | **Silinmez.** İspat için tutulur. |
+
+Saklama süresi dolan muhasebe kaydını silen ya da anonimleştiren periyodik imha işi bu dilimde **yoktur** (4. bölüm).
