@@ -12,6 +12,8 @@ export type ReviewSuggestionPage =
   components["schemas"]["EnvelopeSuggestionPage"]["data"];
 export type ReviewSettings = components["schemas"]["ReviewSettings"];
 export type AccountPlanAccount = components["schemas"]["AccountPlanAccount"];
+export type AccountSuggestionList =
+  components["schemas"]["EnvelopeAccountSuggestionList"]["data"];
 export type AccountPlanAccountPage =
   components["schemas"]["EnvelopeAccountPlanAccountPage"]["data"];
 
@@ -106,6 +108,15 @@ export const reviewService = {
       "GET",
       "/v1/tenant/review/settings",
       { silent: true },
+    );
+  },
+  /** Runs the account-code rules for an invoice (#160); results join the queue. */
+  suggestInvoice(slug: string, engagement: string, invoice: string) {
+    return tenantRequest<AccountSuggestionList>(
+      slug,
+      "POST",
+      `/v1/tenant/engagements/${enc(engagement)}/invoices/${enc(invoice)}/account-suggestions`,
+      { body: {}, silent: true },
     );
   },
   accounts(slug: string, engagement: string, q: string) {

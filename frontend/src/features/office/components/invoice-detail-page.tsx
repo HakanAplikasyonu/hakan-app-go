@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, FileText } from "lucide-react";
+import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
@@ -12,12 +12,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
+import { toast } from "sonner";
 
 import {
   useEngagementInvoice,
   useEngagementOptions,
   useInvoiceUBL,
 } from "../hooks/use-office-invoices";
+import {
+  useDecisionErrorText,
+  useSuggestInvoiceAccounts,
+} from "../hooks/use-review";
 import { formatAmount } from "../lib/decimal";
 import { toPanelInvoice } from "../lib/from-api";
 import { AmountWaterfall } from "./amount-waterfall";
@@ -49,6 +55,9 @@ function Field({
   );
 }
 
+/** `POST .../account-suggestions` needs this (OpenAPI). */
+const REVIEW_DECIDE_PERMISSION = "tenant.review.decide";
+
 function InvoiceDetailInner({ id }: { id: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -58,6 +67,10 @@ function InvoiceDetailInner({ id }: { id: string }) {
   const { options } = useEngagementOptions(slug);
   const taxpayer = options.find((o) => o.engagement === engagement);
   const warningText = useWarningText();
+  const { can } = usePermission();
+  const router = useRouter();
+  const suggest = useSuggestInvoiceAccounts();
+  const suggestError = useDecisionErrorText();
   const backHref = `${routes.tenant.invoices(slug)}${engagement ? `?${ENGAGEMENT_PARAM}=${encodeURIComponent(engagement)}` : ""}`;
 
   const invoice = useMemo(
@@ -101,6 +114,41 @@ function InvoiceDetailInner({ id }: { id: string }) {
         actions={
           <div className="flex items-center gap-2">
             <InvoiceStateBadge status={d.status} />
+            {can(REVIEW_DECIDE_PERMISSION) ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={suggest.isPending}
+                onClick={() =>
+                  suggest.mutate(
+                    { engagement, invoice: id },
+                    {
+                      onSuccess: (res) => {
+                        const n = res.items.length;
+                        if (n === 0) {
+                          toast.info(t("office.suggest_accounts_none"));
+                          return;
+                        }
+                        toast.success(
+                          t("office.suggest_accounts_done", { count: n }),
+                          {
+                            action: {
+                              label: t("office.nav_review"),
+                              onClick: () =>
+                                router.push(routes.tenant.review(slug)),
+                            },
+                          },
+                        );
+                      },
+                      onError: (err) => toast.error(suggestError(err)),
+                    },
+                  )
+                }
+              >
+                <Sparkles className="size-4" />
+                {t("office.suggest_accounts")}
+              </Button>
+            ) : null}
             <Button asChild size="sm" variant="ghost">
               <Link href={backHref}>
                 <ArrowLeft className="size-4" />
