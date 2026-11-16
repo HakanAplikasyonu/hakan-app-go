@@ -17,6 +17,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
 
 // Expense is a source program's expense record (01 §4.10).
@@ -80,7 +81,13 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 		}
 		q := db.New(tx)
 		for _, e := range b.Expenses {
-			raw, _ := json.Marshal(e.Raw)
+			raw, err := json.Marshal(e.Raw)
+			if err != nil {
+				return err
+			}
+			if raw, err = secrets.SealField(secrets.PurposeExpenseRawPayload, raw); err != nil {
+				return err
+			}
 			rt := e.ReceiptType
 			if rt == "" {
 				rt = "other"

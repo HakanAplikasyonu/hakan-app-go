@@ -21,6 +21,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/events"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/fieldcrypt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mail"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
@@ -52,6 +53,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// Alan düzeyinde şifreleme (#168): ham banka/fatura verisi FIELD_ENCRYPTION_KEY
+	// ile mühürlenir. Anahtar geçersizse başlama; düz metin yazmak sessizce olmasın.
+	if fc, err := fieldcrypt.Install(cfg.Encryption); err != nil {
+		log.Error("field_encryption_init_failed", "error", err)
+		exit(1)
+	} else if fc == nil {
+		log.Warn("field_encryption_disabled")
+	}
 	db, err := database.NewPostgresPool(ctx, cfg.DB)
 	if err != nil {
 		log.Error("database_init_failed", "error", err)

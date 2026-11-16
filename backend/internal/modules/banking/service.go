@@ -17,6 +17,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
 
 var (
@@ -194,6 +195,11 @@ func (s *Service) normalize(taxpayerID int64, box db.CashBox, t Transaction) (no
 	}
 	rawJSON, err := json.Marshal(raw)
 	if err != nil {
+		return normalized{}, err
+	}
+	// The raw bank row is sealed (#168); the same envelope goes to the
+	// movement and to its source row, which share one purpose.
+	if rawJSON, err = secrets.SealField(secrets.PurposeBankRawPayload, rawJSON); err != nil {
 		return normalized{}, err
 	}
 	vkn, tckn := SplitTaxID(t.CounterpartyTaxID)

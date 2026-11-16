@@ -41,13 +41,19 @@ type Keyring struct {
 //	activeID SECRETS_ACTIVE_KEY_ID; empty means the last key in spec, or LegacyKEKID
 //	legacy   APP_ENCRYPTION_KEY (raw 32 bytes or base64 of 32 bytes); may be empty
 func ParseKeyring(spec, activeID, legacy string) (*Keyring, error) {
+	return parseKeyring(spec, activeID, legacy, LegacyKEKID, "APP_ENCRYPTION_KEY")
+}
+
+// parseKeyring is ParseKeyring with the id (and env name, for errors) of the
+// single base key: "app" for the vault, FieldBaseKEKID for field encryption.
+func parseKeyring(spec, activeID, base, baseID, baseName string) (*Keyring, error) {
 	kr := &Keyring{keys: map[string][]byte{}}
-	if strings.TrimSpace(legacy) != "" {
-		k, err := decodeKey(legacy)
+	if strings.TrimSpace(base) != "" {
+		k, err := decodeKey(base)
 		if err != nil {
-			return nil, fmt.Errorf("%w: APP_ENCRYPTION_KEY: %v", ErrInvalidKeyring, err)
+			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidKeyring, baseName, err)
 		}
-		kr.keys[LegacyKEKID] = k
+		kr.keys[baseID] = k
 	}
 	last := ""
 	for _, part := range strings.Split(spec, ",") {
@@ -60,8 +66,8 @@ func ParseKeyring(spec, activeID, legacy string) (*Keyring, error) {
 		if !ok || !kekIDRe.MatchString(id) {
 			return nil, fmt.Errorf("%w: entry must be <id>:<base64 key> with a lowercase id", ErrInvalidKeyring)
 		}
-		if id == LegacyKEKID {
-			return nil, fmt.Errorf("%w: id %q is reserved for APP_ENCRYPTION_KEY", ErrInvalidKeyring, id)
+		if id == LegacyKEKID || id == FieldBaseKEKID {
+			return nil, fmt.Errorf("%w: id %q is reserved", ErrInvalidKeyring, id)
 		}
 		if _, dup := kr.keys[id]; dup {
 			return nil, fmt.Errorf("%w: duplicate id %q", ErrInvalidKeyring, id)
@@ -79,7 +85,7 @@ func ParseKeyring(spec, activeID, legacy string) (*Keyring, error) {
 	case last != "":
 		kr.active = last
 	default:
-		kr.active = LegacyKEKID
+		kr.active = baseID
 	}
 	if _, ok := kr.keys[kr.active]; !ok {
 		return nil, fmt.Errorf("%w: active key %q is not in the keyring", ErrInvalidKeyring, kr.active)

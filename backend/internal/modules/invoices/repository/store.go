@@ -17,6 +17,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 )
 
 // Outcomes of SaveInvoice.
@@ -366,7 +367,10 @@ func findOrCreateCustomer(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv 
 			return pgtype.Int8{}, err
 		}
 	}
-	raw, _ := json.Marshal(cp)
+	raw, err := sealCounterparty(cp)
+	if err != nil {
+		return pgtype.Int8{}, err
+	}
 	if err := q.UpsertCustomerSourceLink(ctx, db.UpsertCustomerSourceLinkParams{
 		TaxpayerID: taxpayerID, CustomerID: c.ID, SourceSystem: inv.SourceSystem, SourceID: sourceID, RawPayload: raw,
 	}); err != nil {
@@ -377,7 +381,10 @@ func findOrCreateCustomer(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv 
 
 func insertCustomer(ctx context.Context, tx pgx.Tx, taxpayerID int64, inv model.Invoice, typ, sourceID string) (db.Customer, error) {
 	cp := inv.Counterparty
-	raw, _ := json.Marshal(cp)
+	raw, err := sealCounterparty(cp)
+	if err != nil {
+		return db.Customer{}, err
+	}
 	// A savepoint keeps the outer transaction usable if a concurrent insert wins.
 	sp, err := tx.Begin(ctx)
 	if err != nil {
@@ -449,6 +456,9 @@ func invoiceParams(taxpayerID int64, inv model.Invoice, customerID pgtype.Int8, 
 		raw = map[string]any{}
 	}
 	if p.RawPayload, err = json.Marshal(raw); err != nil {
+		return p, err
+	}
+	if p.RawPayload, err = secrets.SealField(secrets.PurposeInvoiceRawPayload, p.RawPayload); err != nil {
 		return p, err
 	}
 	return p, nil
@@ -525,4 +535,14 @@ func Date(t *time.Time) pgtype.Date {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// sealCounterparty is the customer raw_payload: the counterparty as parsed,
+// sealed with the field key (#168).
+func sealCounterparty(cp model.Party) ([]byte, error) {
+	raw, err := json.Marshal(cp)
+	if err != nil {
+		return nil, err
+	}
+	return secrets.SealField(secrets.PurposeCustomerRawPayload, raw)
 }

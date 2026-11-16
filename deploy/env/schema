@@ -21,9 +21,10 @@
 ##
 ## Keys left out here keep their compose.prod.yml defaults; .env.example documents them all.
 
-@version 2
+@version 3
 
 @norotate APP_ENCRYPTION_KEY
+@norotate FIELD_ENCRYPTION_KEY
 @norotate DB_PASSWORD
 
 # --- Identity ---
@@ -68,6 +69,9 @@ AUTH_SECRET | secret:b64:32
 AUTH_ADAPTER_SECRET | secret:hex:32
 # Encrypts credentials stored in the database. Never rotate it: they become unreadable.
 APP_ENCRYPTION_KEY | secret:b64:32
+# Encrypts raw bank / invoice payloads (field-level, separate from APP_ENCRYPTION_KEY).
+# Never rotate it in place: add a key to FIELD_ENCRYPTION_KEYRING and run field-crypt rotate.
+FIELD_ENCRYPTION_KEY | secret:b64:32
 CENTRIFUGO_API_KEY | secret:hex:32
 CENTRIFUGO_TOKEN_HMAC_SECRET | secret:hex:32
 MEILI_MASTER_KEY | secret:hex:32
