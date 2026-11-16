@@ -6,7 +6,9 @@
 #
 # 1. Migrates a fresh Postgres, backs up the still-empty bucket, then adds
 #    marker rows and objects.
-# 2. Runs backup-run (encrypted dump + roles + manifest, encrypted bucket tar).
+# 2. Runs backup-run as the backup role hakan_backup (scripts/db-roles.sql,
+#    #312: read-only, BYPASSRLS): encrypted dump + roles + manifest, encrypted
+#    bucket tar.
 # 3. Checks the backup files hold no plaintext marker.
 # 4. Restores the dump into a second, empty Postgres cluster and verifies the
 #    schema version and the row count of every table (verify-db).
@@ -57,7 +59,11 @@ b psql -Xq -v ON_ERROR_STOP=1 -c "INSERT INTO app_releases (version, git_sha, no
 b bash -c 'source /usr/local/bin/backup-lib.sh; objects_remote; r=$OBJECTS_REMOTE; rclone mkdir "${r}app"
   for i in 1 2 3; do printf "%s object %s\n" "$0" "$i" | rclone rcat "${r}app/drill/obj-$i.txt"; done' "$MARKER"
 
-b env BACKUP_DIR=/drill/backups backup-run
+# The backup runs as the read-only backup role (#312, scripts/db-roles.sql):
+# BYPASSRLS, so FORCE'd tables are dumped whole; not a superuser, so the
+# roles are dumped without password hashes.
+b psql -Xq -v ON_ERROR_STOP=1 -v backup_password=drill-backup-only -f - <scripts/db-roles.sql
+b env PGUSER=hakan_backup PGPASSWORD=drill-backup-only BACKUP_DIR=/drill/backups backup-run
 dump=$(b sh -c 'ls /drill/backups/db/*.dump.age' | tr -d '\r')
 archive=$(b sh -c 'ls /drill/backups/objects/*.tar.age' | tr -d '\r')
 [[ -n $dump && -n $archive ]] || die "backup files missing"

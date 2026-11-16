@@ -509,8 +509,11 @@ services:
     environment:
       PGHOST: postgres.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}
       PGPORT: "5432"
-      PGUSER: ${DB_USER:?DB_USER is required}
-      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      # Yedek rolü (#312, scripts/db-roles.sql): hakan_backup yalnızca okur ve
+      # RLS'yi atlar. Boşsa veritabanı sahibi (DB_USER) kullanılır; sahip süper
+      # kullanıcı değilse pg_dump FORCE'lu tablolarda hata verir.
+      PGUSER: ${DB_BACKUP_USER:-${DB_USER:?DB_USER is required}}
+      PGPASSWORD: ${DB_BACKUP_PASSWORD:-${DB_PASSWORD:?DB_PASSWORD is required}}
       PGDATABASE: ${DB_NAME:?DB_NAME is required}
       S3_ENDPOINT: http://seaweedfs.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:8333
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}

@@ -104,6 +104,38 @@ Felaket senaryosu: yeni sunucu, boş volume'lar.
 `restore-db` tabloları olan bir veritabanını reddeder. Mevcut bir veritabanının
 üzerine yazmak için `--clean` gerekir; bunu yalnızca ne yaptığından eminsen kullan.
 
+## Veritabanı rolleri ve yedek rolü (#312)
+
+`scripts/db-roles.sql` rolleri bir kez, bir süper kullanıcıyla kurar; tekrar çalıştırmak güvenlidir:
+
+```bash
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -v owner_password="$DB_OWNER_PASSWORD" -v backup_password="$DB_BACKUP_PASSWORD" -f scripts/db-roles.sql
+```
+
+| Rol | Ne için | Özellik |
+|---|---|---|
+| `hakan_owner` | tablo sahibi, migration ve uygulama bağlantısı (`DB_USER`) | süper kullanıcı değil, `BYPASSRLS` yok; FORCE RLS ona da uygulanır, tablolara yalnızca `rls.System` (`app.system`) içinden erişir |
+| `hakan_rls_runtime`, `hakan_rls_app`, `hakan_rls_worker` | uygulamanın geçtiği roller | `NOLOGIN`; sahip `ADMIN`, `SET` ile ve `INHERIT FALSE` ile üye (miras alsaydı `rls_legacy` sahibe de uygulanır, FORCE etkisiz kalırdı) |
+| `hakan_backup` | `pg_dump` | yalnızca okur (`pg_read_all_data`), RLS'yi atlar (`BYPASSRLS`), yazamaz |
+
+Yedek servisi `DB_BACKUP_USER` / `DB_BACKUP_PASSWORD` doluysa bu rolle bağlanır, boşsa `DB_USER` ile. Sahip süper kullanıcı değilken `pg_dump` sahiple çalışmaz: FORCE'lu tablolarda `query would be affected by row-level security policy` hatası verir. Bu yüzden yedek rolü gerekir. Süper kullanıcı olmayan rol parola özetlerini okuyamaz. Bu durumda roller parolasız yedeklenir (`--no-role-passwords`); geri yüklemeden sonra parolalar `db-roles.sql` ile yeniden verilir.
+
+### Geri yükleme kuru koşusu (süper kullanıcı olmayan sahip)
+
+#312'de yerel Postgres 16 üzerinde denendi:
+
+- **Kaynak:** `hakan_owner` sahipli bir veritabanı; migration'lar bu rolle uygulandı, üzerine demo ofis verisi kuruldu.
+- **Yedek:**
+  1. `pg_dump --format=custom` `hakan_owner` ile çalıştırıldı: RLS hatasıyla durdu (beklenen).
+  2. Aynı komut `hakan_backup` ile çalıştırıldı: başarılı.
+  3. `pg_dumpall --roles-only --no-role-passwords` `hakan_backup` ile çalıştırıldı: başarılı.
+  4. `hakan_backup` ile `UPDATE` denendi: `permission denied` (rol yazamıyor).
+- **Geri yükleme:**
+  1. Boş bir veritabanına `pg_restore --exit-on-error --single-transaction`, hem süper kullanıcıyla hem `hakan_owner` ile ayrı ayrı denendi; ikisi de başarılı. `pg_dump`, RLS'yi açan ve FORCE'u koyan komutları ve politikaları veriden sonra yazar.
+  2. 109 tablonun satır sayıları kaynakla aynıydı. Şema sürümü 89, 71 tablo FORCE'lu ve sahip `hakan_owner`.
+
+CI tatbikatı (`scripts/backup-drill.sh`) yedeği `hakan_backup` ile alır, geri yüklemeyi hedef kümenin yöneticisiyle yapar.
+
 ## Tatbikat (CI)
 
 `backup-drill` işi altyapı değişikliklerinde (`deploy/**`, migration'lar,

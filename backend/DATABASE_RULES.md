@@ -131,6 +131,18 @@ Each RLS table is in one of two states:
 | in transition | `rls_legacy` (`USING true`) | works as before |
 | enforced (`rls_enforced.txt`) | none; FORCE + owner `rls_system` policy | sees nothing, cannot write |
 
+**Roles (issue #312, `scripts/db-roles.sql`).** In production the tables
+belong to `hakan_owner`, which is not a superuser: FORCE applies to it. It is
+a member of the runtime roles with `INHERIT FALSE` (inheriting
+`hakan_rls_runtime` would open every `rls_legacy` table to the owner).
+Migrations must not create roles or grant memberships that already exist
+(000046, 000074 check first). A SECURITY DEFINER function that a policy
+calls runs as the owner and must carry `SET app.system = 'on'` (000089) or
+it sees nothing under FORCE. CI's `backend-owner` job runs the whole suite
+and migrate up / down / up with that owner; `TestNonSuperuserOwnerIsForced`
+checks it. Backups use `hakan_backup` (read-only, BYPASSRLS), see
+`docs/yedekleme.md`.
+
 **Owner forced everywhere (issue #302, migration 000086).** Every table with
 an `organization_id` or `taxpayer_id` column also has FORCE and the owner's
 `rls_system` policy (`rls_owner_force`, called by every `rls_apply_*`
