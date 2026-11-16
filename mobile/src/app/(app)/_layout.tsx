@@ -22,6 +22,7 @@ export default function AppLayout() {
         <Stack.Screen name="receipts/[id]" options={{ headerShown: true, title: 'Fiş' }} />
         <Stack.Screen name="tasks" options={{ headerShown: true, title: 'Görevler' }} />
         <Stack.Screen name="task/[uuid]" options={{ headerShown: true, title: 'Görev' }} />
+        <Stack.Screen name="profile" options={{ headerShown: true, title: 'Profil ve hesap' }} />
       </Stack>
     </ReceiptsProvider>
   );

@@ -69,6 +69,19 @@ Diğer profiller: `development-simulator`, `preview`, `production`.
   Değişken boşsa yalnızca şema çalışır.
 - Tanınmayan bağlantı ana ekranı açar (`src/app/+native-intent.tsx`).
 
+## Hata, çevrimdışı ve hesap (#202)
+
+- **Çevrimdışı açılış:** kayıtlı oturum açılışta doğrulanamazsa (ağ yok, zaman aşımı, sunucu hatası) oturum silinmez; "Bağlantı yok, tekrar dene" ekranı açılır. Yalnızca reddedilen oturum (401) çıkış yaptırır.
+- **Hata ekranları:** kök `ErrorBoundary` "Tekrar dene" düğmesi sunar; bilinmeyen rota `+not-found` ekranını açar.
+- **Parolamı unuttum:** giriş ekranından açılır. `/v1/auth/password/forgot` e-postaya kod gönderir, `/v1/auth/password/reset` yeni parolayı kaydeder.
+- **Profil ve hesap:** gizlilik ve destek bağlantıları, çıkış ve hesap silme. Silme, `/v1/auth/account/deactivate/request` ile gelen e-posta koduyla onaylanır.
+- **Yapılandırma** (derleme anında, `EXPO_PUBLIC_*`):
+  - `EXPO_PUBLIC_PRIVACY_URL`: https adresi.
+  - `EXPO_PUBLIC_SUPPORT_URL`: https ya da `mailto:` adresi.
+  - `EXPO_PUBLIC_SENTRY_DSN`: boşsa Sentry kapalıdır. Kişisel veri gönderilmez (`sendDefaultPii: false`); kullanıcı yalnızca uuid ile işaretlenir.
+  - Boş bağlantılar ekranda gösterilmez.
+- **Sentry kaynak eşlemeleri:** `eas.json` içinde `SENTRY_DISABLE_AUTO_UPLOAD=true` olduğu için yükleme kapalıdır. Açmak için EAS secret'ına `SENTRY_AUTH_TOKEN`, `SENTRY_ORG` ve `SENTRY_PROJECT` eklenir ve bu değişken kaldırılır.
+
 ## Dizinler
 
 - `src/app/` ekranlar (expo-router). `(app)/` giriş ve şirket seçimi sonrası.

@@ -113,7 +113,8 @@ export default function HomeScreen() {
       <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
         {me?.user.email}
       </Text>
-      <Button title="Çıkış yap" variant="secondary" onPress={signOut} />
+      <Button title="Profil ve hesap" variant="secondary" onPress={() => router.push('/profile')} />
+      <Button title="Çıkış yap" variant="ghost" onPress={signOut} />
     </Screen>
   );
 }

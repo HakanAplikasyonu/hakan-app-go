@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 
@@ -83,6 +84,7 @@ export default function LoginScreen() {
         ) : null}
 
         <Button title="Giriş yap" onPress={submit} loading={busy} disabled={!canSubmit} />
+        <Button title="Parolamı unuttum" variant="ghost" onPress={() => router.push('/forgot-password')} />
         <Text variant="caption" tone="muted" style={{ textAlign: 'center' }}>
           Hesabınız yoksa mali müşavirinizden davet isteyin.
         </Text>

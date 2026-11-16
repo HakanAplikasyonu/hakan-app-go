@@ -58,7 +58,8 @@
         {
           "color": "#1447E6"
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true
