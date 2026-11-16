@@ -85,7 +85,7 @@ func (d *S3Driver) Upload(ctx context.Context, file File, objectPath string) err
 	}
 	_, err = d.client.PutObject(ctx, input)
 	if err != nil {
-		return fmt.Errorf("storage: s3 upload: %w", err)
+		return writeError("s3 upload", err)
 	}
 	return nil
 }

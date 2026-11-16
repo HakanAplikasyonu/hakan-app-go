@@ -5309,7 +5309,7 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
         "503":
-          description: "`RECEIPTS_UNAVAILABLE` ya da `AI_UNAVAILABLE`"
+          description: "`RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247)"
           content:
             application/json:
               schema:
@@ -5460,6 +5460,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
 
   /v1/taxpayer/uploads/{uuid}:
     parameters:
@@ -5907,6 +5908,7 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
     get:
       tags: [ExcelImports]
       operationId: listExcelImports
@@ -6203,6 +6205,7 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
     get:
       tags: [Receipts]
       operationId: listReceiptCaptures
@@ -7043,6 +7046,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
     get:
       tags: [Invoices]
       operationId: listTenantUBLUploads
@@ -9485,6 +9489,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
 
   /v1/taxpayer/document-tasks/{taskUuid}/uploads/{uploadUuid}/file:
     parameters:
@@ -10105,6 +10110,17 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    StorageUnavailable:
+      description: |
+        `STORAGE_UNAVAILABLE`: the object store refused the write (full or
+        unavailable, #247). Retry after `Retry-After` seconds.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     BadRequest:
       description: Validation or malformed request
       content:

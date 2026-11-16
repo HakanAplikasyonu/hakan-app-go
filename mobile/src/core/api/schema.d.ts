@@ -11777,6 +11777,19 @@ export interface components {
         };
     };
     responses: {
+        /**
+         * @description `STORAGE_UNAVAILABLE`: the object store refused the write (full or
+         *     unavailable, #247). Retry after `Retry-After` seconds.
+         */
+        StorageUnavailable: {
+            headers: {
+                "Retry-After"?: number;
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Validation or malformed request */
         BadRequest: {
             headers: {
@@ -17599,7 +17612,7 @@ export interface operations {
             };
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
-            /** @description `RECEIPTS_UNAVAILABLE` ya da `AI_UNAVAILABLE` */
+            /** @description `RECEIPTS_UNAVAILABLE`, `AI_UNAVAILABLE` ya da `STORAGE_UNAVAILABLE` (nesne deposu yazmayı reddetti, #247) */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -17782,6 +17795,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getTaxpayerUpload: {
@@ -18411,6 +18425,7 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getExcelImport: {
@@ -18806,6 +18821,7 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getReceiptCapture: {
@@ -19873,6 +19889,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     getTenantUBLUpload: {
@@ -22974,6 +22991,7 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
         };
     };
     downloadTaxpayerDocumentTaskUpload: {

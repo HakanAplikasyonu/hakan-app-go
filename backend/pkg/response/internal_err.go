@@ -1,6 +1,9 @@
 package response
 
-import "net/http"
+import (
+	"errors"
+	"net/http"
+)
 
 // StatusClientClosedRequest is the non-standard 499 used when the client went
 // away before the handler finished (nginx convention). Never sent to a live
@@ -17,6 +20,16 @@ type errorCodeRecorder interface {
 
 type failureRecorder interface {
 	RecordFailure(err error)
+}
+
+// Unavailable is implemented by errors that mean a dependency is out of
+// service for a while (object store full, issue #247). InternalErr answers
+// them with 503 and the error's code instead of a generic 500, so clients
+// can say "try again later" and retry safely.
+type Unavailable interface {
+	error
+	UnavailableCode() string
+	UnavailableMessage() string
 }
 
 // InternalErr writes a generic 500 response and records err for server-side
@@ -36,6 +49,12 @@ func InternalErr(w http.ResponseWriter, r *http.Request, err error, publicMessag
 	if err != nil {
 		if rec, ok := recorder[serverErrorRecorder](w); ok {
 			rec.RecordServerError(err, publicMessage)
+		}
+		var u Unavailable
+		if errors.As(err, &u) {
+			w.Header().Set("Retry-After", "300")
+			Error(w, r, http.StatusServiceUnavailable, u.UnavailableCode(), u.UnavailableMessage())
+			return
 		}
 	}
 	Internal(w, r, publicMessage)

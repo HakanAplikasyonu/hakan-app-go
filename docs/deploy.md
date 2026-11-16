@@ -107,6 +107,31 @@ docker compose -f deploy/compose.prod.yml up -d
 - Güncelleme: `.env.server`'daki `BACKEND_IMAGE` / `FRONTEND_IMAGE`
   etiketini değiştir (ya da `:main` ile kal) ve `up -d`'yi tekrar çalıştır.
 
+## Nesne deposu kapasitesi (SeaweedFS, #247)
+
+SeaweedFS dosyaları sabit boyutlu birimlere (volume) yazar.
+
+- **Ayarlar:**
+
+  | Değişken | Varsayılan | Anlamı |
+  |---|---|---|
+  | `SEAWEEDFS_VOLUME_SIZE_MB` | `256` | Birim boyutu (önce 1024'tü) |
+  | `SEAWEEDFS_VOLUME_MAX` | `0` | Birim sayısı; `0` boş diske göre hesaplar |
+
+- **Disk dolunca:** yeni birim açılamaz ve yazma durur.
+  - API bu durumda `503 STORAGE_UNAVAILABLE` döner (`Retry-After: 300`); önceden genel bir 500'dü. Arayüz ve mobil uygulama "biraz sonra tekrar deneyin" der.
+  - Mobil kuyruk fişi telefonda tutup sonra yeniden dener.
+- **Neden küçük birim:** küçük birim, yarı dolu birimlerde kalan kullanılmaz alanı azaltır. Var olan 1 GB'lık birimler olduğu gibi kalır; yeni birimler yeni boyutla açılır.
+- **İzleme:** `storage_write_failures_total{reason="no_space"|"server"}` (API ve worker `/metrics`). Sıfırdan büyükse disk büyütülmeli ya da eski veri taşınmalı.
+
+  Örnek uyarı:
+
+  ```promql
+  increase(storage_write_failures_total[15m]) > 0
+  ```
+
+- **Diski izleme:** `seaweedfs_data` biriminin bulunduğu diskin doluluğu sunucu izlemesinden takip edilmeli. Üretimde nesne deposu için ayrı disk önerilir.
+
 ## Geri alma
 
 1. `BACKEND_IMAGE` / `FRONTEND_IMAGE`'ı önceki `v0.N` etiketine çevir ve `up -d`.

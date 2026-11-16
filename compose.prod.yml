@@ -234,10 +234,14 @@ services:
       - |
         set -eu
         printf '{"identities":[{"name":"app","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY" > /tmp/s3.json
-        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB=1024 -volume.max=0 -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+        # Capacity (#247): smaller volumes leave less unusable space per volume
+        # when the disk fills; -volume.max=0 sizes the count to the free disk.
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -master.volumeSizeLimitMB="$$SEAWEEDFS_VOLUME_SIZE_MB" -volume.max="$$SEAWEEDFS_VOLUME_MAX" -s3 -s3.port=8333 -s3.config=/tmp/s3.json
     environment:
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      SEAWEEDFS_VOLUME_SIZE_MB: ${SEAWEEDFS_VOLUME_SIZE_MB:-256}
+      SEAWEEDFS_VOLUME_MAX: ${SEAWEEDFS_VOLUME_MAX:-0}
     volumes:
       - seaweedfs_data:/data
     healthcheck:
