@@ -102,6 +102,8 @@ Yönetici olarak takip etmeniz gerekenler:
   **Geri al** ile geri çevrilir; reddedilen öneri geri alınamaz.
 - Hesap planı yüklenmemişse kodlar elle yazılır. Hesap planı mükellef
   ayrıntısından yüklenir.
+- Mükellefin mizanını yükleyip kararlarınızı kurala çevirmek için
+  [Mizan hafızası](mizan-hafizasi.md) kılavuzuna bakın.
 - Hızlı karar için **İnceleme stüdyosu**nu kullanın:
   [Ofis çalışanı kılavuzu](ofis-calisani.md#inceleme).
 

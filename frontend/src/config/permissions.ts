@@ -68,6 +68,13 @@ export const Permission = {
   TenantJournalsRead: "tenant.journals.read",
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
+  /** Review queue decisions (accept / correct / revert). */
+  TenantReviewDecide: "tenant.review.decide",
+  /** Mizan hafızası (#30, #310): account plan and account rules. */
+  TenantAccountPlanRead: "tenant.account_plan.read",
+  TenantAccountPlanWrite: "tenant.account_plan.write",
+  TenantAccountRulesRead: "tenant.account_rules.read",
+  TenantAccountRulesWrite: "tenant.account_rules.write",
   /** Desktop agents of the office (issue #51, #285). */
   TenantAgentsRead: "tenant.agents.read",
   TenantAgentsWrite: "tenant.agents.write",
@@ -192,6 +199,17 @@ export const permissions = {
       read: Permission.TenantJournalsRead,
       write: Permission.TenantJournalsWrite,
       export: Permission.TenantJournalsExport,
+    },
+    review: {
+      decide: Permission.TenantReviewDecide,
+    },
+    accountPlan: {
+      read: Permission.TenantAccountPlanRead,
+      write: Permission.TenantAccountPlanWrite,
+    },
+    accountRules: {
+      read: Permission.TenantAccountRulesRead,
+      write: Permission.TenantAccountRulesWrite,
     },
     agents: {
       read: Permission.TenantAgentsRead,

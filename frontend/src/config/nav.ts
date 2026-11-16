@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   BookOpenCheck,
+  BrainCircuit,
   LifeBuoy,
   MonitorSmartphone,
   ClipboardCheck,
@@ -338,6 +339,13 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.journals(slug),
             icon: BookOpenCheck,
             permission: permissions.tenant.journals.read,
+          },
+          {
+            id: "account-plan",
+            titleKey: "office.memory.nav",
+            href: routes.tenant.accountPlan(slug),
+            icon: BrainCircuit,
+            permission: permissions.tenant.accountPlan.read,
           },
           {
             id: "agents",
