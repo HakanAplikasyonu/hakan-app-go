@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed \
-	free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down tools create-super-admin search-reindex check-i18n
+	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down tools create-super-admin search-reindex check-i18n
 
 infra:
 	@if [ -n "$(ENV_FILE)" ]; then \
@@ -174,3 +174,14 @@ search-reindex:
 
 check-i18n:
 	node scripts/check-i18n.mjs
+
+# Uçtan uca duman testi (#170, e2e/README.md). Ortam her koşudan önce
+# sıfırdan kurulur: make e2e-up && make e2e-test; make e2e-down.
+e2e-up:
+	scripts/e2e-up.sh
+
+e2e-test:
+	cd e2e && npx playwright test
+
+e2e-down:
+	scripts/e2e-down.sh
