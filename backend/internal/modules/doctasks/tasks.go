@@ -148,7 +148,7 @@ func (s *Service) Generate(ctx context.Context, scope engagementctx.Scope, actor
 	}
 	res.Created = len(ids)
 	if res.Created > 0 {
-		res.Notified = s.notifyMembers(ctx, TemplateCreated, scope.OrganizationID, scope.TaxpayerID, res.Created)
+		res.Notified = s.notifyMembers(ctx, TemplateCreated, scope.OrganizationID, scope.TaxpayerID, res.Created, s.singleTask(ctx, scope.OrganizationID, scope.ID, ids))
 	}
 	return res, nil
 }

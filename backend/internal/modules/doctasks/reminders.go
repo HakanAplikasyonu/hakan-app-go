@@ -35,7 +35,7 @@ func (s *Service) SendReminders(ctx context.Context) (ReminderReport, error) {
 	for _, r := range rows {
 		rep.Engagements++
 		rep.Tasks += int(r.TaskCount)
-		rep.Notified += s.notifyMembers(ctx, TemplateReminder, r.OrganizationID, r.TaxpayerID, int(r.TaskCount))
+		rep.Notified += s.notifyMembers(ctx, TemplateReminder, r.OrganizationID, r.TaxpayerID, int(r.TaskCount), s.singleTask(ctx, r.OrganizationID, r.EngagementID, r.TaskIds))
 		// Marked even when nobody could be told (no member yet): backoff
 		// keeps the job from retrying the same group every run.
 		if _, err := s.q.MarkDocumentTasksReminded(ctx, db.MarkDocumentTasksRemindedParams{
@@ -57,7 +57,20 @@ func (s *Service) SendRemindersCount(ctx context.Context) (int, error) {
 // notifyMembers sends template to every member of the taxpayer (in-app, which
 // mirrors to mobile push, and email). Failures are logged: a notification
 // never blocks a task. Returns how many members were notified.
-func (s *Service) notifyMembers(ctx context.Context, template string, organizationID, taxpayerID int64, count int) int {
+// singleTask is the uuid of the only task of a notification, or "" when it
+// covers several (the link then opens the task list).
+func (s *Service) singleTask(ctx context.Context, organizationID, engagementID int64, ids []int64) string {
+	if len(ids) != 1 {
+		return ""
+	}
+	id, err := s.q.GetDocumentTaskUUID(ctx, db.GetDocumentTaskUUIDParams{OrganizationID: organizationID, EngagementID: engagementID, ID: ids[0]})
+	if err != nil {
+		return ""
+	}
+	return id.String()
+}
+
+func (s *Service) notifyMembers(ctx context.Context, template string, organizationID, taxpayerID int64, count int, taskUUID string) int {
 	if s.notifier == nil {
 		return 0
 	}
@@ -75,6 +88,9 @@ func (s *Service) notifyMembers(ctx context.Context, template string, organizati
 		return 0
 	}
 	link := s.link(names.TaxpayerUuid.String())
+	if taskUUID != "" {
+		link += "/" + taskUUID
+	}
 	sent := 0
 	for _, uid := range users {
 		org, user := organizationID, uid

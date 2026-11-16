@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -194,6 +195,24 @@ func TestAcceptanceFlow(t *testing.T) {
 	}
 	if in := w.notif.got[0]; in.UserID == nil || *in.UserID != w.member || in.TemplateVars["count"] != "2" {
 		t.Fatalf("notification: %+v", in)
+	}
+	// Two tasks: the link opens the task list; one task: the task itself (#201).
+	if in := w.notif.got[0]; in.ActionURL == nil || !strings.HasSuffix(*in.ActionURL, "/tasks") {
+		t.Fatalf("two-task link = %v", in.ActionURL)
+	}
+	var taskID int64
+	var taskUUID string
+	if err := w.d.Pool.QueryRow(ctx, `SELECT id, uuid::text FROM document_tasks WHERE engagement_id = $1 ORDER BY id LIMIT 1`, w.scope.ID).Scan(&taskID, &taskUUID); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.svc.singleTask(ctx, w.scope.OrganizationID, w.scope.ID, []int64{taskID}); got != taskUUID {
+		t.Fatalf("singleTask = %q, want %q", got, taskUUID)
+	}
+	if got := w.svc.singleTask(ctx, w.scope.OrganizationID, w.scope.ID, []int64{taskID, taskID + 1}); got != "" {
+		t.Fatalf("several tasks: %q", got)
+	}
+	if got := w.svc.singleTask(ctx, w.scope.OrganizationID+999, w.scope.ID, []int64{taskID}); got != "" {
+		t.Fatalf("another office: %q", got)
 	}
 	if again, err := w.svc.Generate(ctx, w.scope, 0, GenerateInput{Period: "2026-10"}); err != nil || again.Created != 0 {
 		t.Fatalf("generate again: %+v %v", again, err)
