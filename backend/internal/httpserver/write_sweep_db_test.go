@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -17,6 +19,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -31,6 +34,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 )
 
 // Write sweep (issue #302). #277 and #281 were 500s on mükellef write paths
@@ -49,30 +53,46 @@ import (
 // parameters are filled from the demo data at call time (paramValue), so a
 // later case sees what an earlier one created. Operations run in spec order;
 // `late` ones run after them and `last` ones (ending the engagement,
-// leaving the office) at the very end. `unavailable` names the external service a 503 stands for in
-// this test (no AI provider, no bank or source API); any other 5xx fails.
+// leaving the office) at the very end. Every 5xx fails: the external
+// services (KolayBi, Paraşüt, Easytrade, Vakıfbank, the AI provider) are
+// internal/testfakes servers, so their endpoints run their real path (#318).
 type sweepCase struct {
-	body        string // JSON body; empty sends {}
-	file        string // multipart field name; the part is fileName / fileBody
-	fileName    string
-	fileBody    string
-	late        bool // after the others (needs rows they create, or closes one)
-	last        bool // after the late ones (ends the engagement, leaves the office)
-	unavailable string
+	body     string // JSON body; empty sends {}
+	file     string // multipart field name; the part is fileName / fileBody
+	fileName string
+	fileBody string
+	late     bool // after the others (needs rows they create, or closes one)
+	last     bool // after the late ones (ends the engagement, leaves the office)
 }
 
-const pngStub = "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+// receiptPNG is a small valid PNG: the AI fake reads it as a fuel receipt.
+// The office's upload is another image, or it would be the taxpayer's
+// receipt again (status duplicate) and approve / reject would not run.
+var receiptPNG, officeReceiptPNG = pngOf(0xff), pngOf(0xf0)
+
+func pngOf(shade byte) string {
+	img := image.NewRGBA(image.Rect(0, 0, 32, 48))
+	for i := range img.Pix {
+		img.Pix[i] = shade
+	}
+	var b bytes.Buffer
+	_ = png.Encode(&b, img)
+	return b.String()
+}
 
 var taxpayerWrites = map[string]sweepCase{
 	"POST /v1/taxpayer/onboarding-requests/{uuid}/approve": {body: `{"privacy_notice_version":1,"privacy_notice_language":"tr"}`},
 	"POST /v1/taxpayer/onboarding-requests/{uuid}/reject":  {},
 	"POST /v1/taxpayer/history-shares":                     {body: `{"consent_version":1}`},
 	"DELETE /v1/taxpayer/history-shares/{uuid}":            {},
-	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: pngStub, unavailable: "AI provider (receipt OCR)"},
-	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"100,00"}]}`},
+	"POST /v1/taxpayer/receipts":                           {file: "image", fileName: "fis.png", fileBody: receiptPNG},
+	"POST /v1/taxpayer/receipts/{uuid}/corrections":        {body: `{"corrections":[{"field":"total_amount","value":"1300,00"}]}`},
 	"POST /v1/taxpayer/uploads":                            {file: "file", fileName: "atlas-03-tevkifat.xml", fileBody: "@ubl:atlas-03-tevkifat.xml"},
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":  {file: "file", fileName: "fatura.pdf", fileBody: "%PDF-1.4\n% sweep\n"},
 }
+
+// sweepRange is the sync window of the source connections.
+const sweepRange = `{"from":"2026-10-01","to":"2026-10-31"}`
 
 var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/roles":                                                                       {body: `{"key":"sweep_role","name":"Tarama","permissions":["tenant.engagements.read"]}`},
@@ -117,7 +137,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit":              {},
 	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback":            {},
 	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                                     {},
-	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                       {file: "image", fileName: "fis.png", fileBody: pngStub, unavailable: "AI provider (receipt OCR)"},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                       {file: "image", fileName: "fis.png", fileBody: officeReceiptPNG},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":                 {},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":                  {},
 	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                                       {body: `{"plate":"34ABC123"}`},
@@ -140,19 +160,19 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/privacy-requests/{requestUuid}/reject":          {body: `{"note":"tarama"}`, late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-export-settings":                         {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-matching":                                  {body: `{"period":"2026-10"}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                          {body: `{}`, unavailable: "EasyTrade API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":    {unavailable: "EasyTrade API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections":                            {body: `{}`, unavailable: "KolayBi API"},
-	"PUT /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/company":    {body: `{}`, unavailable: "KolayBi API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/sync":      {unavailable: "KolayBi API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections":                            {body: `{}`, unavailable: "Paraşüt API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/authorize": {body: `{}`, unavailable: "Paraşüt API"},
-	"PUT /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/company":    {body: `{}`, unavailable: "Paraşüt API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/sync":      {unavailable: "Paraşüt API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections":                               {body: `{}`, unavailable: "bank API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted":    {unavailable: "bank API"},
-	"PUT /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials":   {body: `{}`, unavailable: "bank API"},
-	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":         {unavailable: "bank API"},
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                          {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":    {body: sweepRange},
+	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections":                            {body: `{"api_key":"` + testfakes.KolayBiAPIKey + `"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/company":    {body: `{"company_id":"` + testfakes.KolayBiCompanyID + `"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/sync":      {body: sweepRange},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections":                            {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/authorize": {body: `{"code":"sweep-auth-code"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/company":    {body: `{"company_id":"` + testfakes.ParasutCompanyID + `"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/parasut-connections/{connectionUuid}/sync":      {body: sweepRange},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections":                               {body: `{"bank_id":"vakifbank","environment":"test"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/submitted":    {},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials":   {body: `{"values":{"customer_no":"123456789","username":"atlas_ws","password":"sweep-pw"}}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":         {body: `{"from":"2026-11-03","to":"2026-11-03"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-statements":                                {file: "file", fileName: "ekstre.csv", fileBody: "Tarih;Açıklama;Tutar;Bakiye\n05.10.2026;Ödeme;-100,00;900,00\n"},
 	"POST /v1/tenant/engagements/{engagementUuid}/cash-boxes":                                     {body: `{"type":"cash","name":"Tarama kasası"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                      {body: `{"name":"Tarama kasası 2"}`},
@@ -195,6 +215,16 @@ type sweepEnv struct {
 	tpUUID    string
 	backend   string
 	createdBy map[string]bool
+	fakes     sweepFakes
+}
+
+// sweepFakes are the external services of the sweep (internal/testfakes).
+type sweepFakes struct {
+	ai        *testfakes.AI
+	kolaybi   *testfakes.KolayBi
+	parasut   *testfakes.Parasut
+	easytrade *testfakes.Easytrade
+	bank      *testfakes.Vakifbank
 }
 
 func TestWriteEndpointsNo5xx(t *testing.T) {
@@ -256,6 +286,32 @@ func TestWriteEndpointsNo5xx(t *testing.T) {
 	for _, op := range append(late, last...) {
 		run(op)
 	}
+	e.deepPaths(t)
+}
+
+// deepPaths (#318): the external services were really called and the
+// receipt path went past OCR: drafts, low-confidence fields in the review
+// queue, the source and bank syncs wrote rows.
+func (e *sweepEnv) deepPaths(t *testing.T) {
+	t.Helper()
+	if !slices.Contains(e.fakes.ai.Purposes, "receipt") {
+		t.Errorf("the AI fake read no receipt: %v", e.fakes.ai.Purposes)
+	}
+	if e.fakes.kolaybi.Tokens == 0 || e.fakes.easytrade.Logins == 0 || e.fakes.parasut.Refreshes == 0 || e.fakes.bank.Requests == 0 {
+		t.Errorf("an external fake was not called: kolaybi tokens %d, easytrade logins %d, paraşüt tokens %d, bank calls %d",
+			e.fakes.kolaybi.Tokens, e.fakes.easytrade.Logins, e.fakes.parasut.Refreshes, e.fakes.bank.Requests)
+	}
+	counts := map[string]string{
+		"receipts read into a draft (not failed)": `SELECT count(*) FROM receipt_captures WHERE taxpayer_id = $3 AND status <> 'failed' AND kind IS NOT NULL AND $1 > 0 AND $2 > 0`,
+		"receipt fields in the review queue":      `SELECT count(*) FROM suggestions WHERE organization_id = $1 AND engagement_id = $2 AND kind = 'receipt_field' AND $3 > 0`,
+		"invoices from the source syncs":          `SELECT count(*) FROM invoices WHERE taxpayer_id = $3 AND source_system IN ('kolaybi', 'parasut', 'easytrade') AND $1 > 0 AND $2 > 0`,
+		"bank movements from the web service":     `SELECT count(*) FROM bank_transactions WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0`,
+	}
+	for what, q := range counts {
+		if n := e.one(t, q, what); n == "0" {
+			t.Errorf("deep path: no %s", what)
+		}
+	}
 }
 
 type specOp struct{ method, path string }
@@ -297,6 +353,12 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	}
 	pass, _ := u.User.Password()
 	mr := miniredis.RunT(t)
+	fakes := sweepFakes{
+		ai: &testfakes.AI{}, kolaybi: testfakes.KolayBiSample(), parasut: testfakes.ParasutSample(),
+		easytrade: testfakes.EasytradeSample(), bank: &testfakes.Vakifbank{},
+	}
+	aiSrv, kbSrv, prsSrv := testfakes.Serve(t, fakes.ai), testfakes.Serve(t, fakes.kolaybi), testfakes.Serve(t, fakes.parasut)
+	etSrv, bankSrv := testfakes.Serve(t, fakes.easytrade), testfakes.Serve(t, fakes.bank)
 	env := map[string]string{
 		"APP_ENV": "development", "APP_NAME": "api", "APP_HTTP_ADDR": ":0",
 		"DB_HOST": u.Hostname(), "DB_PORT": u.Port(), "DB_USER": u.User.Username(), "DB_PASSWORD": pass,
@@ -304,7 +366,12 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 		"REDIS_ADDR": mr.Addr(), "JWT_ACCESS_SECRET": strings.Repeat("s", 40),
 		"QUEUE_ENABLED": "false", "SEARCH_ENABLED": "false", "CENTRIFUGO_ENABLED": "false",
 		"SMTP_HOST": "127.0.0.1", "SMTP_PORT": "9", "SMTP_TIMEOUT": "1s",
-		"AI_PROVIDER": "anthropic", "AI_API_KEY": "", "RATE_LIMIT_STORE": "memory",
+		"AI_PROVIDER": "openai_compatible", "AI_BASE_URL": aiSrv.URL, "AI_API_KEY": "sweep", "AI_MODEL": "fake-ocr",
+		"AI_IMAGE_REDACTION": "off", "RATE_LIMIT_STORE": "memory",
+		"KOLAYBI_BASE_URL": kbSrv.URL, "KOLAYBI_CHANNEL": testfakes.KolayBiChannel,
+		"EASYTRADE_API_BASE_URL": etSrv.URL,
+		"PARASUT_BASE_URL":       prsSrv.URL, "PARASUT_CLIENT_ID": testfakes.ParasutClientID,
+		"PARASUT_CLIENT_SECRET": testfakes.ParasutClientSecret, "PARASUT_REDIRECT_URL": "https://panel.example.test/parasut/callback",
 		"STORAGE_DRIVER": "s3", "TENANCY_ENABLED": "true",
 	}
 	if p := u.Query().Get("sslmode"); p != "" {
@@ -340,13 +407,14 @@ func newSweepEnv(t *testing.T) *sweepEnv {
 	log := slog.New(slog.NewTextHandler(logOut, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	srv, err := New(cfg, log, Deps{
 		DB: d.Pool, Queries: database.NewQueries(d.Pool),
-		Redis:   redis.NewClient(&redis.Options{Addr: mr.Addr()}),
-		Storage: memDriver{storage.NewMemory()},
+		Redis:         redis.NewClient(&redis.Options{Addr: mr.Addr()}),
+		Storage:       memDriver{storage.NewMemory()},
+		BankEndpoints: map[string]string{"vakifbank": bankSrv.URL},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	e := &sweepEnv{d: d, h: srv.http.Handler, backend: backendRoot(), createdBy: map[string]bool{}}
+	e := &sweepEnv{d: d, h: srv.http.Handler, backend: backendRoot(), createdBy: map[string]bool{}, fakes: fakes}
 	ctx := context.Background()
 	if err := rls.System(ctx, d.Pool, "test: sweep fixture", func(ctx context.Context, tx pgx.Tx) error {
 		if err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = 'demo-smmm'`).Scan(&e.orgID); err != nil {
@@ -402,9 +470,6 @@ func (e *sweepEnv) call(t *testing.T, op specOp, c sweepCase, taxpayer bool) {
 		t.Logf("%d %s %s %s", rec.Code, op.method, op.path, strings.TrimSpace(firstLine(rec.Body.String())))
 	}
 	if rec.Code < 500 {
-		return
-	}
-	if rec.Code == http.StatusServiceUnavailable && c.unavailable != "" {
 		return
 	}
 	t.Errorf("%s %s (%s) = %d: %s", op.method, op.path, path, rec.Code, strings.TrimSpace(rec.Body.String()))

@@ -2,13 +2,8 @@ package easytrade
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,120 +13,11 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 )
 
-type fakeET struct {
-	invoices map[string]map[string]any // id → detail
-	branchOf map[string]string         // invoice/expense id → branch
-	expenses map[string]map[string]any
-	license  bool // false → LICENSE_EXPIRED
-	logins   int
-}
-
-func (f *fakeET) server(t *testing.T) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		js := func(v any) { _ = json.NewEncoder(w).Encode(v) }
-		if r.URL.Path == "/auth/login" {
-			var in map[string]string
-			_ = json.NewDecoder(r.Body).Decode(&in)
-			if in["password"] != "pw" {
-				w.WriteHeader(401)
-				return
-			}
-			f.logins++
-			js(map[string]any{"data": map[string]any{"token": "tok", "expires_at": time.Now().Add(720 * time.Hour).Format(time.RFC3339)}})
-			return
-		}
-		if r.Header.Get("Authorization") != "Bearer tok" || r.Header.Get("X-Company-ID") != "42" {
-			w.WriteHeader(401)
-			return
-		}
-		if !f.license {
-			w.WriteHeader(403)
-			js(map[string]any{"error_code": "LICENSE_EXPIRED"})
-			return
-		}
-		br := r.Header.Get("X-Branch-ID")
-		switch {
-		case r.URL.Path == "/company/branches":
-			js(map[string]any{"data": []map[string]any{{"id": 1, "name": "Merkez"}, {"id": 2, "name": "Kadıköy"}}})
-		case r.URL.Path == "/company/invoices/sales" || r.URL.Path == "/company/invoices/purchases":
-			dir := map[bool]string{true: "outgoing", false: "incoming"}[strings.HasSuffix(r.URL.Path, "sales")]
-			var rows []map[string]any
-			for id, d := range f.invoices {
-				if d["direction"].(map[string]any)["value"] == dir && f.branchOf[id] == br {
-					rows = append(rows, map[string]any{"id": json.Number(id), "issue_date": d["issue_date"]})
-				}
-			}
-			f.page(w, r, rows, "issue_date")
-		case strings.HasPrefix(r.URL.Path, "/company/invoices/"):
-			js(map[string]any{"data": f.invoices[strings.TrimPrefix(r.URL.Path, "/company/invoices/")]})
-		case r.URL.Path == "/company/expenses":
-			var rows []map[string]any
-			for id, d := range f.expenses {
-				if f.branchOf["e"+id] == br {
-					rows = append(rows, map[string]any{"id": json.Number(id), "expense_date": d["expense_date"]})
-				}
-			}
-			f.page(w, r, rows, "expense_date")
-		case strings.HasPrefix(r.URL.Path, "/company/expenses/"):
-			js(map[string]any{"data": f.expenses[strings.TrimPrefix(r.URL.Path, "/company/expenses/")]})
-		case r.URL.Path == "/company/reports/vat":
-			js(map[string]any{"data": map[string]any{"sales": f.vat("outgoing"), "purchases": f.vat("incoming")}})
-		default:
-			w.WriteHeader(404)
-		}
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
-func (f *fakeET) page(w http.ResponseWriter, r *http.Request, rows []map[string]any, field string) {
-	// Stable: date desc, then id desc (a real ORDER BY must break ties too, or
-	// rows on a page boundary can be skipped; see the PR's decision list).
-	sort.Slice(rows, func(i, j int) bool {
-		if rows[i][field].(string) != rows[j][field].(string) {
-			return rows[i][field].(string) > rows[j][field].(string)
-		}
-		a, _ := strconv.Atoi(string(rows[i]["id"].(json.Number)))
-		b, _ := strconv.Atoi(string(rows[j]["id"].(json.Number)))
-		return a > b
-	})
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-	last := (len(rows) + per - 1) / per
-	if last == 0 {
-		last = 1
-	}
-	lo, hi := (page-1)*per, page*per
-	if lo > len(rows) {
-		lo = len(rows)
-	}
-	if hi > len(rows) {
-		hi = len(rows)
-	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"data": rows[lo:hi], "meta": map[string]any{"current_page": page, "last_page": last}})
-}
-
-// vat is Easytrade's own October VAT report: what its user sees (09 §8).
-func (f *fakeET) vat(dir string) map[string]any {
-	n := 0
-	base, vat := decimal.Zero, decimal.Zero
-	for _, d := range f.invoices {
-		if d["direction"].(map[string]any)["value"] != dir || !strings.HasPrefix(d["issue_date"].(string), "2026-10") ||
-			d["status"].(map[string]any)["value"] == "cancelled" {
-			continue
-		}
-		n++
-		am := d["amounts"].(map[string]any)
-		base = base.Add(decimal.RequireFromString(am["tax_exclusive_amount"].(string)))
-		vat = vat.Add(decimal.RequireFromString(am["tax_amount"].(string)))
-	}
-	return map[string]any{"invoice_count": n, "totals": map[string]any{"base": base.StringFixed(2), "vat": vat.StringFixed(2)}}
-}
-
-func dataset() *fakeET {
-	f := &fakeET{invoices: map[string]map[string]any{}, branchOf: map[string]string{}, expenses: map[string]map[string]any{}, license: true}
+func dataset() *testfakes.Easytrade {
+	f := &testfakes.Easytrade{Invoices: map[string]map[string]any{}, BranchOf: map[string]string{}, Expenses: map[string]map[string]any{}, License: true}
 	for i := 1; i <= 230; i++ { // > 2 pages per branch at 100 per page
 		id := fmt.Sprint(i)
 		dir := "outgoing"
@@ -157,22 +43,22 @@ func dataset() *fakeET {
 				"line_extension_amount": b.StringFixed(2), "tax_exclusive_amount": b.StringFixed(2), "total_tax_amount": v.StringFixed(2),
 				"tax_inclusive_amount": b.Add(v).StringFixed(2), "unit": map[string]any{"code": "C62"}})
 		}
-		f.invoices[id] = map[string]any{"id": i, "uuid": fmt.Sprintf("00000000-0000-4000-8000-%012d", i), "invoice_number": fmt.Sprintf("ETR2026%09d", i),
+		f.Invoices[id] = map[string]any{"id": i, "uuid": fmt.Sprintf("00000000-0000-4000-8000-%012d", i), "invoice_number": fmt.Sprintf("ETR2026%09d", i),
 			"direction": map[string]any{"value": dir, "label": "x"}, "type": map[string]any{"value": "SATIS"},
 			"profile": map[string]any{"value": "TEMELFATURA"}, "status": map[string]any{"value": status}, "issue_date": issue,
 			"currency": map[string]any{"code": "TRY"}, "customer": map[string]any{"name": "Yıldız Market", "tax_number": "9100000021"},
 			"amounts": map[string]any{"tax_exclusive_amount": base.StringFixed(2), "tax_amount": vat.StringFixed(2), "payable_amount": base.Add(vat).StringFixed(2)},
 			"items":   items}
 		if dir == "incoming" {
-			f.invoices[id]["type"] = map[string]any{"value": "ALIS"}
+			f.Invoices[id]["type"] = map[string]any{"value": "ALIS"}
 		}
-		f.branchOf[id] = fmt.Sprint(i%2 + 1)
+		f.BranchOf[id] = fmt.Sprint(i%2 + 1)
 	}
 	for i := 1; i <= 5; i++ {
 		id := fmt.Sprint(900 + i)
-		f.expenses[id] = map[string]any{"id": 900 + i, "expense_date": fmt.Sprintf("2026-10-%02d", i), "amount": "120.00", "tax_rate": map[string]any{"value": "20_kdv"},
+		f.Expenses[id] = map[string]any{"id": 900 + i, "expense_date": fmt.Sprintf("2026-10-%02d", i), "amount": "120.00", "tax_rate": map[string]any{"value": "20_kdv"},
 			"description": map[bool]string{true: "06 ABC 123 yakıt", false: "kırtasiye"}[i == 1], "is_main_expense": i == 5}
-		f.branchOf["e"+id] = "1"
+		f.BranchOf["e"+id] = "1"
 	}
 	return f
 }
@@ -184,7 +70,7 @@ func TestAcceptance(t *testing.T) {
 	ctx := context.Background()
 	tp := d.Taxpayer(t, "legal", "9000000017")
 	f := dataset()
-	srv := f.server(t)
+	srv := testfakes.Serve(t, f)
 	kr, _ := secrets.ParseKeyring("", "", "test-legacy-key-32-bytes-long!!!")
 	svc := NewService(d.Pool, secrets.New(kr, secrets.NewPGStore(db.New(d.Pool))), srv.URL, srv.Client())
 	svc.interval = 0
@@ -233,7 +119,7 @@ func TestAcceptance(t *testing.T) {
 	}
 
 	// 403 LICENSE_EXPIRED: connection disabled, not retried (09 §1.3).
-	f.license = false
+	f.License = false
 	svc.now = func() time.Time { return time.Now().Add(2 * (SyncThrottle + time.Minute)) }
 	if _, err := svc.Sync(ctx, tp, c.UUID, from, to); !errors.Is(err, ErrLicense) {
 		t.Fatalf("license: %v", err)

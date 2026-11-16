@@ -17,13 +17,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testutil/contract"
 )
 
-func contractFake(n int) *fakeParasut {
-	f := &fakeParasut{}
+func contractFake(n int) *testfakes.Parasut {
+	f := &testfakes.Parasut{}
 	for i := range n {
-		f.add(&f.sales, resource{ID: fmt.Sprint(i + 1), Type: "sales_invoices",
+		f.Add(&f.Sales, resource{ID: fmt.Sprint(i + 1), Type: "sales_invoices",
 			Attributes: attrs(map[string]any{"issue_date": fmt.Sprintf("2026-10-%02d", i%28+1)})})
 	}
 	return f
@@ -66,38 +68,38 @@ func TestParasutContract(t *testing.T) {
 	}
 
 	t.Run("pagination", func(t *testing.T) {
-		n, err := walk(ctx, contractClient(serve(t, contractFake(2*PageSize+3).handler()), "sec"))
+		n, err := walk(ctx, contractClient(serve(t, contractFake(2*PageSize+3)), "sec"))
 		if err != nil || n != 2*PageSize+3 {
 			t.Fatalf("walked %d, %v; want %d over 3 pages", n, err, 2*PageSize+3)
 		}
 	})
 	t.Run("auth_refused", func(t *testing.T) {
-		if _, err := walk(ctx, contractClient(serve(t, contractFake(1).handler()), "wrong")); !errors.Is(err, ErrAuth) {
+		if _, err := walk(ctx, contractClient(serve(t, contractFake(1)), "wrong")); !errors.Is(err, ErrAuth) {
 			t.Fatalf("err = %v, want ErrAuth", err)
 		}
 	})
 	t.Run("revoked_token_refreshed_once", func(t *testing.T) {
 		f := contractFake(1)
-		fault := &contract.Fault{Next: f.handler(), Status: http.StatusUnauthorized, Times: 1, Match: listCalls}
+		fault := &contract.Fault{Next: f, Status: http.StatusUnauthorized, Times: 1, Match: listCalls}
 		n, err := walk(ctx, contractClient(serve(t, fault), "sec"))
-		if err != nil || n != 1 || f.refreshs != 2 {
-			t.Fatalf("walked %d, %v, refreshes %d; want one extra refresh", n, err, f.refreshs)
+		if err != nil || n != 1 || f.Refreshes != 2 {
+			t.Fatalf("walked %d, %v, refreshes %d; want one extra refresh", n, err, f.Refreshes)
 		}
 	})
 	t.Run("rate_limit_backoff", func(t *testing.T) {
-		fault := &contract.Fault{Next: contractFake(1).handler(), Status: http.StatusTooManyRequests, Times: 2, Match: listCalls}
+		fault := &contract.Fault{Next: contractFake(1), Status: http.StatusTooManyRequests, Times: 2, Match: listCalls}
 		if n, err := walk(ctx, contractClient(serve(t, fault), "sec")); err != nil || n != 1 {
 			t.Fatalf("walked %d, %v after 429", n, err)
 		}
 	})
 	t.Run("server_error_reported", func(t *testing.T) {
-		fault := &contract.Fault{Next: contractFake(1).handler(), Status: http.StatusInternalServerError, Times: -1, Match: listCalls}
+		fault := &contract.Fault{Next: contractFake(1), Status: http.StatusInternalServerError, Times: -1, Match: listCalls}
 		if _, err := walk(ctx, contractClient(serve(t, fault), "sec")); err == nil || errors.Is(err, ErrAuth) {
 			t.Fatalf("err = %v, want an HTTP error", err)
 		}
 	})
 	t.Run("timeout", func(t *testing.T) {
-		fault := &contract.Fault{Next: contractFake(1).handler(), Delay: time.Second, Times: -1, Match: listCalls}
+		fault := &contract.Fault{Next: contractFake(1), Delay: time.Second, Times: -1, Match: listCalls}
 		cctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 		defer cancel()
 		start := time.Now()

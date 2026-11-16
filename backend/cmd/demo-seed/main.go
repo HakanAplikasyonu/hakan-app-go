@@ -161,6 +161,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 			if err := linkTaxpayerUser(ctx, pool, identity.UUID.String(), byEmail[demo.TaxpayerUser.Email].ID); err != nil {
 				return fmt.Errorf("taxpayer user → %s: %w", tp.Key, err)
 			}
+			// Pending low-confidence receipt fields in the review queue (#318).
+			if err := seedReview(ctx, pool, org.ID, eng.ID, identity.UUID.String()); err != nil {
+				return fmt.Errorf("review queue → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}

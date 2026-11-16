@@ -3,12 +3,12 @@ package webservice_test
 import (
 	"bytes"
 	"context"
-	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
@@ -18,32 +18,11 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
-// fakeBank answers like the Vakıfbank test system: the fixture, or a result code.
-type fakeBank struct {
-	code     string // "" → fixture
-	requests int
-	lastBody string
-}
-
-func (f *fakeBank) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	f.requests++
-	var b bytes.Buffer
-	_, _ = b.ReadFrom(r.Body)
-	f.lastBody = b.String()
-	if f.code == "" {
-		fx, _ := os.ReadFile("vakifbank/testdata/getirhareket.xml")
-		_, _ = w.Write(fx)
-		return
-	}
-	_, _ = w.Write([]byte(`<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope"><s:Body><GetirHareketResponse><GetirHareketResult>` +
-		`<IslemKodu>` + f.code + `</IslemKodu><IslemAciklamasi>x</IslemAciklamasi></GetirHareketResult></GetirHareketResponse></s:Body></s:Envelope>`))
-}
-
-func setup(t *testing.T, taxID string) (*webservice.Service, *fakeBank, *testdb.DB, int64, *time.Time) {
+func setup(t *testing.T, taxID string) (*webservice.Service, *testfakes.Vakifbank, *testdb.DB, int64, *time.Time) {
 	t.Helper()
 	d := testdb.Open(t)
 	tp := d.Taxpayer(t, "legal", taxID)
-	fb := &fakeBank{}
+	fb := &testfakes.Vakifbank{}
 	srv := httptest.NewServer(fb)
 	t.Cleanup(srv.Close)
 	kr, err := secrets.ParseKeyring("", "", "test-legacy-key-32-bytes-long!!!")
@@ -105,8 +84,8 @@ func TestConnectionFlow(t *testing.T) {
 		t.Fatalf("verified: %+v", c)
 	}
 	// Verification is a one-day query for today (Türkiye time).
-	if !strings.Contains(fb.lastBody, "<dto:SorguBaslangicTarihi>2026-11-04 00:00<") {
-		t.Errorf("verify window: %s", fb.lastBody)
+	if !strings.Contains(fb.LastBody, "<dto:SorguBaslangicTarihi>2026-11-04 00:00<") {
+		t.Errorf("verify window: %s", fb.LastBody)
 	}
 	// The password is in the vault, never in source_connections.
 	var metaText, ref string
@@ -168,7 +147,7 @@ func TestRefusals(t *testing.T) {
 	}
 	creds := map[string]string{"customer_no": "1", "username": "u", "password": "p"}
 
-	fb.code = "VBH0009"
+	fb.Code = "VBH0009"
 	c, err = svc.SetCredentials(ctx, tp, c.UUID, creds)
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +161,7 @@ func TestRefusals(t *testing.T) {
 	}
 
 	// Corrected at the branch: the same credentials now pass.
-	fb.code = ""
+	fb.Code = ""
 	if c, err = svc.SetCredentials(ctx, tp, c.UUID, creds); err != nil || c.SetupState != "active" || c.Error != nil {
 		t.Fatalf("retry: %+v %v", c, err)
 	}

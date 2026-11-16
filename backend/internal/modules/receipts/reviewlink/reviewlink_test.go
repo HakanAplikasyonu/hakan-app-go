@@ -3,6 +3,7 @@ package reviewlink
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"testing"
 	"time"
@@ -109,5 +110,15 @@ func TestLowConfidenceFieldsReachQueueAndCorrectionsApply(t *testing.T) {
 	must(pool.QueryRow(ctx, `SELECT tax_amount::text FROM expenses WHERE uuid = $1`, v.Draft.UUID).Scan(&tax))
 	if tax != "20.0000" {
 		t.Fatalf("after refused correction tax=%s", tax)
+	}
+	// #318: a taxpayer's total below the VAT is the taxpayer's input error
+	// (receipts.ErrInvalid → 400), not a check constraint failure (500).
+	if _, err := svc.Correct(ctx, sc, v.UUID, user, []receipts.Correction{{Field: extract.FieldTotal, Value: "10,00"}}); !errors.Is(err, receipts.ErrInvalid) {
+		t.Fatalf("total below VAT: err = %v, want receipts.ErrInvalid", err)
+	}
+	var amount string
+	must(pool.QueryRow(ctx, `SELECT amount::text FROM expenses WHERE uuid = $1`, v.Draft.UUID).Scan(&amount))
+	if amount != "120.0000" {
+		t.Fatalf("after refused total amount=%s", amount)
 	}
 }

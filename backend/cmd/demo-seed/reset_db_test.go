@@ -100,6 +100,12 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM taxpayer_members`); n != 1 {
 		t.Fatalf("after reseed taxpayer_members = %d, want 1", n)
 	}
+	// #318: the review queue has the demo receipt's pending fields, once.
+	if n := count(t, d, `
+		SELECT count(*) FROM suggestions s JOIN organizations o ON o.id = s.organization_id AND o.slug = $1
+		WHERE s.kind = 'receipt_field' AND s.status = 'pending'`, demo.OrgSlug); n != len(demoReceiptFields) {
+		t.Fatalf("pending receipt fields = %d, want %d", n, len(demoReceiptFields))
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,
