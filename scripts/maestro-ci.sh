@@ -7,7 +7,8 @@
 #
 # MAESTRO_EMAIL / MAESTRO_PASSWORD ortamdan gelir (demo seed hesabı).
 # Çıktı: report.xml (JUnit), debug/ (Maestro komut günlüğü ve hata anı
-# ekran görüntüleri), recordings/ (ekran kaydı, 170 sn'lik parçalar),
+# ekran görüntüleri), screenshots/ (ana ekranlar, açık ve koyu; #332),
+# recordings/ (ekran kaydı, 170 sn'lik parçalar),
 # logcat.txt. Çıkış kodu Maestro'nunkidir.
 set -uo pipefail
 
@@ -50,6 +51,27 @@ code=0
   --debug-output "$out/debug" --flatten-debug-output \
   -e MAESTRO_EMAIL="${MAESTRO_EMAIL:?}" -e MAESTRO_PASSWORD="${MAESTRO_PASSWORD:?}" \
   "$app/.maestro" || code=$?
+
+# Ekran görüntüleri (#332): duman akışlarından sonra, açık ve koyu sistem
+# temasında ayrı akış (<uygulama>/.maestro/ekranlar). Test değil; düşerse
+# yalnızca not düşülür, çıkış kodu duman akışlarınınkidir. takeScreenshot
+# çalışma klasörüne yazdığı için Maestro o klasörde çalıştırılır.
+shots="$out/screenshots"
+mkdir -p "$shots"
+flow="$(cd "$app/.maestro/ekranlar" 2>/dev/null && pwd)/ekranlar.yaml"
+if [ -f "$flow" ]; then
+  for tema in light dark; do
+    if [ "$tema" = dark ]; then adb shell cmd uimode night yes >/dev/null 2>&1 || true; else adb shell cmd uimode night no >/dev/null 2>&1 || true; fi
+    (
+      cd "$shots" &&
+        "$maestro" test --debug-output "$out/debug/ekranlar-$tema" --flatten-debug-output \
+          -e MAESTRO_EMAIL="$MAESTRO_EMAIL" -e MAESTRO_PASSWORD="$MAESTRO_PASSWORD" -e TEMA="$tema" \
+          "$flow"
+    ) || echo "maestro-ci: ekran görüntüsü akışı düştü ($tema); görüntüler eksik olabilir"
+  done
+  adb shell cmd uimode night no >/dev/null 2>&1 || true
+  echo "maestro-ci: $(find "$shots" -name '*.png' | wc -l) ekran görüntüsü ($shots)"
+fi
 
 kill "$rec" 2>/dev/null || true
 adb shell pkill -INT screenrecord 2>/dev/null || true

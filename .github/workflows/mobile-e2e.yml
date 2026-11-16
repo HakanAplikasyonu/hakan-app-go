@@ -3,7 +3,8 @@ name: Mobile E2E (Maestro)
 # #300: mobile/ ve mobile-office/ Maestro duman akışları Android emülatöründe,
 # demo verili gerçek bir backend'e karşı (scripts/e2e-up.sh: compose,
 # migration, demo seed, Go API). Zorunlu kontrol DEĞİL: yalnızca rapor üretir
-# (JUnit özeti, hata anı ekran görüntüleri, ekran kaydı, logcat, API logu).
+# (JUnit özeti, hata anı ekran görüntüleri, ana ekranların açık / koyu
+# ekran görüntüleri (#332), ekran kaydı, logcat, API logu).
 #
 # Gece (schedule) ve elle (workflow_dispatch) çalışır. Bu dosya, betiği,
 # Maestro akışları ya da demo seed değişince de koşar.
@@ -139,6 +140,10 @@ jobs:
             else
               echo "Rapor yok: akışlar çalışmadan iş düştü (yukarıdaki adımlara bakın)."
             fi
+            # Ekran görüntüleri (#332): maestro-<app> artefaktında screenshots/.
+            n=$(find "$OUT/screenshots" -name '*.png' 2>/dev/null | wc -l)
+            echo ""
+            echo "Ekran görüntüleri: $n (açık ve koyu tema; maestro-${{ matrix.app }} artefaktında screenshots/)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: API logu

@@ -1,0 +1,36 @@
+# Ekran görüntüleri (#332): ana ekranlar, CI'da açık ve koyu sistem temasında
+# (scripts/maestro-ci.sh, TEMA=light|dark). Duman akışlarından ayrı klasörde:
+# test değil, artifact üretir. Görüntüler Maestro'nun çalışma klasörüne
+# (maestro-out/screenshots) yazılır.
+appId: app.hakan.mukellef
+name: ekranlar
+env:
+  TEMA: light
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Giriş yap"
+- takeScreenshot: mukellef-${TEMA}-00-giris
+- runFlow: ../flows/login.yaml
+- runFlow: ../flows/select-taxpayer.yaml
+- takeScreenshot: mukellef-${TEMA}-01-ana
+- tapOn:
+    id: "tab-tasks"
+- assertVisible: "İstekler"
+- takeScreenshot: mukellef-${TEMA}-02-istekler
+- tapOn:
+    id: "tab-history"
+- assertVisible: "Geçmiş"
+- takeScreenshot: mukellef-${TEMA}-03-gecmis
+- tapOn:
+    id: "tab-profile"
+- assertVisible:
+    id: "app-version"
+- takeScreenshot: mukellef-${TEMA}-04-profil
+- tapOn:
+    id: "tab-index"
+- tapOn:
+    id: "open-notifications"
+- assertVisible: "Bildirimler"
+- takeScreenshot: mukellef-${TEMA}-05-bildirimler
+- back
