@@ -103,22 +103,31 @@ jobs:
           m down 3
           m up
       - name: Yedek (hakan_backup) ve geri yükleme
+        # pg_dump / pg_restore inside the postgres container: the runner's
+        # client tools are older than the server (pg_dump refuses a newer
+        # server), and production runs them from an image of the same version.
         run: |
           set -euo pipefail
-          if pg_dump --format=custom -d "$OWNER/app" -f /tmp/owner.dump 2>/tmp/owner.err; then
+          pgc() { docker compose -f compose.local.yml exec -T postgres "$@"; }
+          in_owner=postgres://hakan_owner:owner-rehearsal-only@127.0.0.1:5432
+          in_backup=postgres://hakan_backup:backup-rehearsal-only@127.0.0.1:5432
+          pgc pg_dump --version
+          if pgc pg_dump --format=custom -d "$in_owner/app" -f /tmp/owner.dump 2>/tmp/owner.err; then
             echo "pg_dump as the owner should fail under FORCE"; exit 1
           fi
+          cat /tmp/owner.err
           grep -q 'row-level security' /tmp/owner.err
-          pg_dump --format=custom -d "$BACKUP/app" -f /tmp/backup.dump
-          pg_dumpall --roles-only --no-role-passwords -d "$BACKUP/app" >/tmp/roles.sql
+          pgc pg_dump --format=custom -d "$in_backup/app" -f /tmp/backup.dump
+          pgc sh -c "pg_dumpall --roles-only --no-role-passwords -d '$in_backup/app' > /tmp/roles.sql"
           psql "$ADMIN/app" -XqAc 'CREATE DATABASE restored OWNER hakan_owner'
           psql "$ADMIN/restored" -XqAc 'ALTER SCHEMA public OWNER TO hakan_owner'
-          pg_restore --exit-on-error --single-transaction -d "$OWNER/restored" /tmp/backup.dump
+          pgc pg_restore --exit-on-error --single-transaction -d "$in_owner/restored" /tmp/backup.dump
           q="SELECT string_agg(relname || '=' || n, ',' ORDER BY relname) FROM (SELECT c.relname,
                (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM public.' || quote_ident(c.relname), false, true, '')))[1]::text::int AS n
              FROM pg_class c JOIN pg_namespace s ON s.oid = c.relnamespace WHERE s.nspname = 'public' AND c.relkind = 'r') x"
-          [ "$(psql "$ADMIN/app" -XtAc "$q")" = "$(psql "$ADMIN/restored" -XtAc "$q")" ] || { echo "row counts differ"; exit 1; }
-          echo "restore: row counts identical"
+          src=$(psql "$ADMIN/app" -XtAc "$q"); dst=$(psql "$ADMIN/restored" -XtAc "$q")
+          [ "$src" = "$dst" ] || { echo "row counts differ"; diff <(tr , '\n' <<<"$src") <(tr , '\n' <<<"$dst"); exit 1; }
+          echo "restore: row counts identical across $(tr , '\n' <<<"$src" | wc -l) tables"
       - name: Geri dönüş ve yeniden geçiş
         run: |
           ADMIN_URL="$ADMIN/app?sslmode=disable" scripts/db-owner-rollback.sh --dry-run
