@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# backup-db [STAMP] — pg_dump (custom format) of PGDATABASE, encrypted with age,
+# plus a plaintext manifest (schema version and row count per table) that
+# verify-db compares a restore against. Writes to $BACKUP_DIR/db/.
+# Connection: PGHOST PGPORT PGUSER PGPASSWORD PGDATABASE.
+source /usr/local/bin/backup-lib.sh
+
+ts=${1:-$(stamp)}
+require_recipients
+mapfile -t recipients < <(age_recipient_args)
+dir=$BACKUP_DIR/db
+mkdir -p "$dir"
+out=$dir/db-$ts.dump.age
+tmp=$out.partial
+
+log "db: dumping ${PGDATABASE:?PGDATABASE is required} to $(basename "$out")"
+# pipefail: a pg_dump failure fails the pipeline; the partial file is removed.
+if ! pg_dump --format=custom | age "${recipients[@]}" -o "$tmp"; then
+  rm -f "$tmp"
+  die "db: pg_dump failed"
+fi
+mv "$tmp" "$out"
+
+# Cluster roles the schema refers to (RLS roles, grants). pg_dump does not
+# carry them; restore-db applies them first. Encrypted: they hold password hashes.
+if ! pg_dumpall --roles-only | age "${recipients[@]}" -o "$dir/db-$ts.roles.sql.age"; then
+  rm -f "$dir/db-$ts.roles.sql.age"
+  die "db: pg_dumpall --roles-only failed"
+fi
+
+{
+  printf '{"created_at":"%s","database":"%s",' "$ts" "$PGDATABASE"
+  printf '"schema_version":%s,' "$(psql -XtAq -c "SELECT COALESCE((SELECT version FROM schema_migrations WHERE NOT dirty), -1)")"
+  printf '"tables":{'
+  verify-db --counts-json
+  printf '}}\n'
+} >"$dir/db-$ts.manifest.json"
+log "db: done ($(du -h "$out" | cut -f1))"

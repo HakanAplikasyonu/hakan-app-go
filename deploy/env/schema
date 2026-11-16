@@ -21,7 +21,7 @@
 ##
 ## Keys left out here keep their compose.prod.yml defaults; .env.example documents them all.
 
-@version 4
+@version 5
 
 @norotate APP_ENCRYPTION_KEY
 @norotate FIELD_ENCRYPTION_KEY
@@ -40,6 +40,7 @@ NAME_PREFIX | ask:{APP_LABEL}
 IMAGE_REPO | ask:
 BACKEND_IMAGE | derive:{IMAGE_REPO}-backend:main
 FRONTEND_IMAGE | derive:{IMAGE_REPO}-frontend:main
+BACKUP_IMAGE | derive:{IMAGE_REPO}-backup:main
 IMAGE_PULL_POLICY | const:always
 
 # --- Public URLs ---
@@ -91,6 +92,11 @@ SMTP_HOST | empty
 SMTP_PORT | const:587
 SMTP_USERNAME | empty
 SMTP_PASSWORD | empty
+
+# --- Backups (docs/yedekleme.md) ---
+# age public key(s), comma separated (age-keygen on an offline machine; keep the
+# private key OFF this server). Empty: the backup service writes nothing and is unhealthy.
+BACKUP_AGE_RECIPIENTS | empty
 
 # --- Error tracking (optional; empty = off) ---
 BACKEND_SENTRY_DSN | empty

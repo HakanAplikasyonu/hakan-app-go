@@ -154,7 +154,8 @@ host-down:
 	docker compose -f deploy/compose.prod.yml down
 
 # Empty-host smoke test of deploy/compose.prod.yml with locally built images
-# local/hakan-backend:main and local/hakan-frontend:main (CI: prod-smoke).
+# local/hakan-backend:main, local/hakan-frontend:main and local/hakan-backup:main
+# (CI: prod-smoke).
 prod-smoke:
 	scripts/prod-smoke.sh
 

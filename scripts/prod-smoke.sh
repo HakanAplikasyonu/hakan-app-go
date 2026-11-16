@@ -7,12 +7,13 @@
 # deploy/compose.prod.yml with the images already in the local Docker cache
 # (IMAGE_PULL_POLICY=missing), then checks: migrate exited 0 and recorded a
 # schema version, backend /readyz, the proxy serves the frontend /health and
-# reaches the API through the BFF. Everything (containers, volumes, the env
-# file) is removed afterwards. Refuses to run when .env.server already exists.
+# reaches the API through the BFF, and one encrypted backup run works.
+# Everything (containers, volumes, the env file) is removed afterwards.
+# Refuses to run when .env.server already exists.
 #
 # Env: SMOKE_IMAGE_REPO (default local/hakan: images local/hakan-backend:main,
-# local/hakan-frontend:main), SMOKE_TIMEOUT seconds (default 420),
-# SMOKE_KEEP=1 to leave the stack running for debugging.
+# local/hakan-frontend:main, local/hakan-backup:main), SMOKE_TIMEOUT seconds
+# (default 420), SMOKE_KEEP=1 to leave the stack running for debugging.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -50,9 +51,15 @@ scripts/prod-env.sh init --file "$ENV_FILE" --yes \
   --set CENTRIFUGO_WS_URL=ws://realtime.localhost/connection/websocket \
   --set PROXY_REALTIME_SITE=http://realtime.localhost
 
-for img in "$REPO-backend:main" "$REPO-frontend:main"; do
+for img in "$REPO-backend:main" "$REPO-frontend:main" "$REPO-backup:main"; do
   docker image inspect "$img" >/dev/null 2>&1 || die "image $img not in the local cache (build it first)"
 done
+
+# Backups on (#178): a throwaway age key; the identity stays in a temp dir.
+keydir=$(mktemp -d)
+docker run --rm --entrypoint age-keygen -v "$keydir:/k" "$REPO-backup:main" -o /k/id.txt 2>/dev/null
+printf 'BACKUP_AGE_RECIPIENTS=%s\n' "$(docker run --rm --entrypoint age-keygen -v "$keydir:/k" "$REPO-backup:main" -y /k/id.txt)" >>"$ENV_FILE"
+rm -rf "$keydir" 2>/dev/null || true
 
 compose config --quiet
 compose up -d
@@ -91,4 +98,9 @@ curl -fsS -o /dev/null http://localhost/health || die "proxy -> frontend /health
 code=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/api/v1/app/config)
 [[ $code == 200 ]] || die "proxy -> BFF -> API /v1/app/config returned $code"
 echo "prod-smoke: proxy -> frontend -> API ok"
+
+# One backup run against the real stack (database + object store).
+compose exec -T backup backup-run || die "backup-run failed"
+compose exec -T backup sh -c 'ls /backups/db/*.dump.age /backups/objects/*.tar.age' >/dev/null || die "backup files missing"
+echo "prod-smoke: backup run ok"
 echo "prod-smoke: ok"

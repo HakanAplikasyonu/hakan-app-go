@@ -11,6 +11,7 @@ Gerçek sunucu adresi ya da kimlik bilgisi repoda yoktur; hepsi sunucudaki
 |---|---|---|
 | Backend imajı | `backend/Dockerfile` | Çok aşamalı: Go derleme → alpine. İçinde `server`, `worker`, `migrate` CLI, `release-record`, `create-super-admin`, `secrets-rotate`, `field-crypt` ve `migrations/`. Kullanıcı `appuser` (10001). Rol `APP_ROLE` ile seçilir (`deploy/docker/entrypoint.sh`). |
 | Web imajı | `frontend/Dockerfile` | Çok aşamalı Next.js `standalone` çıktısı. |
+| Yedek imajı | `deploy/backup/Dockerfile` | Zamanlanmış şifreli yedek ve geri yükleme: `docs/yedekleme.md`. |
 | İmaj listesi | `deploy/images.json` | CI bu listeyi matris olarak gezer. |
 | Uygulama yığını | `compose.prod.yml` | Postgres, Redis, SeaweedFS (S3), Meilisearch, Centrifugo, `migrate`, backend, worker, isteğe bağlı `worker-egress`, frontend. Dokploy bu dosyayı kullanır. |
 | Düz Docker sunucusu | `deploy/compose.prod.yml` | Yukarıdaki yığın ile Caddy ters vekil (`deploy/proxy.yml`, `deploy/caddy/Caddyfile`). |
@@ -41,11 +42,11 @@ migration'ı yalnızca bu iş çalıştırır.
 - `image-build`: altyapı değişikliğinde (Dockerfile, `compose.prod.yml`,
   `deploy/**`, migration, bağımlılık dosyaları), haftalık ve elle tetiklemede
   her imajı derler. Push etmez.
-- `prod-smoke`: aynı koşulda iki imajı yerelde derler. Ardından
+- `prod-smoke`: aynı koşulda backend, frontend ve yedek imajlarını yerelde derler. Ardından
   `scripts/prod-smoke.sh` boş runner'da `deploy/compose.prod.yml`'ı tek
   kullanımlık sırlarla ayağa kaldırır ve şunları kontrol eder: migration son
   sürümde ve kirli değil, backend `/readyz`, Caddy → frontend `/health`, Caddy
-  → BFF → API `/v1/app/config`. Sonunda her şeyi (volume'lar dahil) siler.
+  → BFF → API `/v1/app/config`, bir şifreli yedek çalıştırması (`backup-run`). Sonunda her şeyi (volume'lar dahil) siler.
 - `publish-images`: yalnızca `main` push'unda, testler yeşilse imajları
   `ghcr.io/<owner>/<repo>-<service>` olarak `:main`, `:sha-<kısa>` ve `:v0.N`
   etiketleriyle iter. Kimlik `secrets.GITHUB_TOKEN`; başka sır yok.
@@ -60,6 +61,10 @@ docker build -t local/hakan-backend:main backend
 
 ```bash
 docker build -t local/hakan-frontend:main frontend
+```
+
+```bash
+docker build -t local/hakan-backup:main deploy/backup
 ```
 
 ```bash

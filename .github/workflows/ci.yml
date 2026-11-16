@@ -114,7 +114,7 @@ jobs:
               # Order matters: first match wins (case globs, * spans '/').
               case "$file" in
                 docs/*|*.md|.github/*)              : ;;   # nothing (before app dirs: backend/*.md is docs)
-                compose.prod.yml|deploy/*|scripts/prod-smoke.sh|scripts/prod-env.sh)
+                compose.prod.yml|deploy/*|scripts/prod-smoke.sh|scripts/prod-env.sh|scripts/backup-drill.sh)
                                                     infra=true ;;
                 */Dockerfile|Dockerfile)            infra=true ;;
                 # Image-shaping files outside the Dockerfile: the build loop
@@ -428,8 +428,41 @@ jobs:
           push: false
           tags: local/hakan-frontend:main
           cache-from: type=gha,scope=frontend
+      - name: Build backup image (load, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/backup
+          file: deploy/backup/Dockerfile
+          load: true
+          push: false
+          tags: local/hakan-backup:main
+          cache-from: type=gha,scope=backup
       - name: Smoke test deploy/compose.prod.yml
         run: scripts/prod-smoke.sh
+
+  # Backup / restore drill (#178, docs/yedekleme.md): build the backup image,
+  # migrate a fresh Postgres, back up (encrypted dump + roles + bucket), check
+  # no plaintext leaks, restore into a second empty cluster and a new bucket,
+  # then compare schema version, every table's row count and the objects.
+  backup-drill:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true' || needs.changes.outputs.full == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backup image (load, no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: deploy/backup
+          file: deploy/backup/Dockerfile
+          load: true
+          push: false
+          tags: local/hakan-backup:main
+          cache-from: type=gha,scope=backup
+      - name: Restore drill
+        run: scripts/backup-drill.sh
 
   # Main push: decide the release ONCE, before any image is built, so every
   # image bakes the same provenance and release-tag cuts exactly this version.
@@ -790,7 +823,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, mobile, desktop, image-build, prod-smoke, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, mobile, desktop, image-build, prod-smoke, backup-drill, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

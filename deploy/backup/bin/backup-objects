@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# backup-objects [STAMP] — full copy of the app bucket (S3_BUCKET), packed as
+# a tar and encrypted with age, to $BACKUP_DIR/objects/.
+source /usr/local/bin/backup-lib.sh
+
+ts=${1:-$(stamp)}
+require_recipients
+mapfile -t recipients < <(age_recipient_args)
+objects_remote
+src=$OBJECTS_REMOTE${S3_BUCKET:?S3_BUCKET is required}
+dir=$BACKUP_DIR/objects
+mkdir -p "$dir"
+work=$(mktemp -d "$BACKUP_DIR/.objects-XXXXXX")
+trap 'rm -rf "$work"' EXIT
+out=$dir/objects-$ts.tar.age
+
+log "objects: copying bucket $S3_BUCKET"
+rclone copy --checksum --quiet "$src" "$work/bucket"
+count=$(find "$work/bucket" -type f | wc -l)
+tar -C "$work" -cf - bucket | age "${recipients[@]}" -o "$out.partial"
+mv "$out.partial" "$out"
+printf '{"created_at":"%s","bucket":"%s","objects":%s}\n' "$ts" "$S3_BUCKET" "$count" >"$dir/objects-$ts.manifest.json"
+log "objects: done ($count objects, $(du -h "$out" | cut -f1))"

@@ -427,6 +427,50 @@ services:
     networks:
       - app
 
+  # Scheduled encrypted backups (#178, docs/yedekleme.md): pg_dump + roles and
+  # the object store bucket, age-encrypted to BACKUP_AGE_RECIPIENTS (public
+  # keys only; the private key stays offline), kept BACKUP_RETENTION_DAYS in
+  # the backups volume and optionally copied off-site. Without recipients it
+  # writes nothing and stays unhealthy (it never blocks the deploy).
+  backup:
+    image: ${BACKUP_IMAGE:?BACKUP_IMAGE is required}
+    pull_policy: ${IMAGE_PULL_POLICY:-always}
+    container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}
+      PGPORT: "5432"
+      PGUSER: ${DB_USER:?DB_USER is required}
+      PGPASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      PGDATABASE: ${DB_NAME:?DB_NAME is required}
+      S3_ENDPOINT: http://seaweedfs.${APP_NETWORK_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-app}:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: ${S3_BUCKET:?S3_BUCKET is required}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      BACKUP_AGE_RECIPIENTS: ${BACKUP_AGE_RECIPIENTS:-}
+      BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-17 2 * * *}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_OBJECTS: ${BACKUP_OBJECTS:-true}
+      BACKUP_MAX_AGE_HOURS: ${BACKUP_MAX_AGE_HOURS:-26}
+      # Optional off-site copy (any S3-compatible store); empty bucket = off.
+      BACKUP_OFFSITE_S3_ENDPOINT: ${BACKUP_OFFSITE_S3_ENDPOINT:-}
+      BACKUP_OFFSITE_S3_REGION: ${BACKUP_OFFSITE_S3_REGION:-}
+      BACKUP_OFFSITE_S3_BUCKET: ${BACKUP_OFFSITE_S3_BUCKET:-}
+      BACKUP_OFFSITE_S3_ACCESS_KEY: ${BACKUP_OFFSITE_S3_ACCESS_KEY:-}
+      BACKUP_OFFSITE_S3_SECRET_KEY: ${BACKUP_OFFSITE_S3_SECRET_KEY:-}
+      BACKUP_OFFSITE_PREFIX: ${BACKUP_OFFSITE_PREFIX:-}
+      BACKUP_OFFSITE_RETENTION_DAYS: ${BACKUP_OFFSITE_RETENTION_DAYS:-}
+    volumes:
+      - backups_data:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    networks:
+      - app
+
   frontend:
     <<: *frontend-image
     container_name: ${NAME_PREFIX:?NAME_PREFIX is required}-frontend
@@ -480,6 +524,8 @@ volumes:
     name: ${SEAWEEDFS_VOLUME_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod-seaweedfs}
   meili_data:
     name: ${MEILI_VOLUME_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod-meilisearch}
+  backups_data:
+    name: ${BACKUPS_VOLUME_NAME:-${NAME_PREFIX:?NAME_PREFIX is required}-prod-backups}
 
 networks:
   # Created by Compose for this app only.

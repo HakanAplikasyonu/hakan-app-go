@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# verify-db MANIFEST     compare the database (PG* env) with a backup manifest:
+#                        same schema version, same row count in every table.
+# verify-db --counts-json  print "schema.table":rows,… for the database.
+source /usr/local/bin/backup-lib.sh
+
+counts() {
+  local q
+  q=$(psql -XtAq -c "SELECT string_agg(format('SELECT %L, count(*) FROM %I.%I', n.nspname || '.' || c.relname, n.nspname, c.relname), ' UNION ALL ' ORDER BY n.nspname, c.relname)
+    FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind IN ('r', 'p') AND NOT c.relispartition
+      AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'")
+  [[ -n $q ]] || return 0
+  psql -XtAq -F $'\t' -c "$q"
+}
+
+if [[ ${1:-} == --counts-json ]]; then
+  counts | awk -F'\t' 'BEGIN { sep = "" } { printf "%s\"%s\":%s", sep, $1, $2; sep = "," }'
+  exit 0
+fi
+
+manifest=${1:?usage: verify-db MANIFEST | --counts-json}
+[[ -f $manifest ]] || die "manifest $manifest not found"
+want_version=$(jq -r .schema_version "$manifest")
+got_version=$(psql -XtAq -c "SELECT COALESCE((SELECT version FROM schema_migrations WHERE NOT dirty), -1)")
+fail=0
+if [[ $got_version != "$want_version" ]]; then
+  log "verify: schema version $got_version, backup has $want_version"
+  fail=1
+fi
+got=$(mktemp)
+counts | sort >"$got"
+want=$(mktemp)
+jq -r '.tables | to_entries[] | "\(.key)\t\(.value)"' "$manifest" | sort >"$want"
+if ! diff -u --label backup --label restored "$want" "$got" >&2; then
+  log "verify: row counts differ"
+  fail=1
+fi
+rm -f "$got" "$want"
+((fail == 0)) || die "verify: restore does not match the backup"
+log "verify: ok (schema version $got_version, $(jq '.tables | length' "$manifest") tables, $(jq '[.tables[]] | add // 0' "$manifest") rows)"
