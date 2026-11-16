@@ -15,6 +15,8 @@ trap 'rm -rf "$work"' EXIT
 out=$dir/objects-$ts.tar.age
 
 log "objects: copying bucket $S3_BUCKET"
+# An empty bucket copies nothing: the directory must exist for the archive.
+mkdir -p "$work/bucket"
 rclone copy --checksum --quiet "$src" "$work/bucket"
 count=$(find "$work/bucket" -type f | wc -l)
 tar -C "$work" -cf - bucket | age "${recipients[@]}" -o "$out.partial"
