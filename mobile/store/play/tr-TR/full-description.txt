@@ -1,0 +1,8 @@
+Hakan Mükellef, mali müşavirinizle çalışan şirketler için mobil uygulamadır.
+
+• Fiş ve Z raporu: Kamerayla fotoğraf çekin ya da galeriden seçin; belge müşavirinizin ofisine gider ve inceleme durumunu buradan izlersiniz.
+• Görevler: Müşavirinizin sizden beklediği belgeleri ve son tarihleri tek listede görün.
+• Birden çok şirket: Yetkili olduğunuz şirketler arasında geçiş yapın.
+• Bildirimler: Yeni görev ve belge durumu değişikliklerinden haberdar olun.
+
+Uygulamayı kullanmak için mali müşavirinizin Hakan platformunu kullanması ve sizi şirketinizin mükellef paneline davet etmesi gerekir.

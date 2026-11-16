@@ -110,3 +110,20 @@ Duman testi: `hakan-desktop --self-test` uygulamayı açar, sidecar'a
 
 Sırlar yoksa iş düşmez; imzasız paket üretir ve özetine yazar. Anahtarlar koda
 ya da depoya girmez.
+
+### Kanallar ve sürüm numarası (#183)
+
+- Sürüm `package.json` `version`; etiket iş akışında yazar.
+- Kanal etiketten seçilir: `desktop-vX.Y.Z` → **stable**, `desktop-vX.Y.Z-beta.N` → **beta**.
+- Güncelleyici yalnızca kendi kanalının `latest.json`'ına bakar. `TAURI_UPDATER_BASE_URL` verilirse adres `<base>/<kanal>/latest.json` olur, verilmezse GitHub Release adresi kullanılır.
+- `manifest` işi imzalı paketlerden kanal başına `latest.json` üretir ve iş çıktısı olarak yükler; **yayımlamaz**.
+
+```bash
+npm run updater-manifest -- --dir <paketler> --version 1.2.3 --channel stable --tag desktop-v1.2.3
+```
+
+```bash
+npm test
+```
+
+Ayrıntı ve açık kararlar: [`docs/07-surum-hazirligi.md`](../docs/07-surum-hazirligi.md).

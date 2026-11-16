@@ -40,6 +40,20 @@ npm run api:generate   # backend/docs/openapi.yaml → src/core/api/schema.d.ts
 cd mobile && npx -y openapi-typescript@7.13.0 ../backend/docs/openapi.yaml -o src/core/api/schema.d.ts
 ```
 
+## Sürüm (#183)
+
+Profiller ve sürüm numarası stratejisi: [`docs/07-surum-hazirligi.md`](../docs/07-surum-hazirligi.md).
+
+- Görünen sürüm: `app.json` `expo.version` ile `package.json` `version` aynı tutulur.
+- Derleme numarası EAS'te tutulur (`appVersionSource: remote`, `production` otomatik artırır).
+- Mağaza meta veri taslakları `store/` altında; gönderim yapılmaz.
+
+```bash
+npx eas-cli build --profile development
+```
+
+Diğer profiller: `development-simulator`, `preview`, `production`.
+
 ## Dizinler
 
 - `src/app/` ekranlar (expo-router). `(app)/` giriş ve şirket seçimi sonrası.
