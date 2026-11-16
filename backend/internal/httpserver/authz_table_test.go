@@ -39,6 +39,15 @@ const (
 // authzTable classifies every operation (generated from the observed
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
+	// Own notifications in the office / company inbox (#333): every member, for themselves.
+	"GET /v1/tenant/notifications":                azTenantMember,
+	"GET /v1/tenant/notifications/unread-count":   azTenantMember,
+	"POST /v1/tenant/notifications/read-all":      azTenantMember,
+	"POST /v1/tenant/notifications/{uuid}/read":   azTenantMember,
+	"GET /v1/taxpayer/notifications":              azTaxpayerRead,
+	"GET /v1/taxpayer/notifications/unread-count": azTaxpayerRead,
+	"POST /v1/taxpayer/notifications/read-all":    azTaxpayerWrite,
+	"POST /v1/taxpayer/notifications/{uuid}/read": azTaxpayerWrite,
 	"GET /healthz":                                                                  azPublic,
 	"GET /readyz":                                                                   azPublic,
 	"GET /v1/app/config":                                                            azPublic,
