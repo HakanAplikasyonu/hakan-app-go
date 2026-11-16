@@ -57,5 +57,6 @@
   "actions.vat.opening.delete": "KDV açılış devri silindi",
   "actions.security.rate_limited": "Hız sınırı aşıldı",
   "actions.security.login_locked": "Başarısız denemelerden sonra giriş kilitlendi",
-  "actions.security.upload_rejected": "Yükleme reddedildi (dosya türü)"
+  "actions.security.upload_rejected": "Yükleme reddedildi (dosya türü)",
+  "actions.warnings.acknowledge_bulk": "Uyarılar toplu görüldü"
 }
