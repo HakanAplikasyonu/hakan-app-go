@@ -19,6 +19,7 @@ import (
 	notifmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
@@ -364,7 +365,8 @@ func uploadHTTP(t *testing.T, h *Handler, w *world, task uuid.UUID, name string,
 	ctx := authctx.WithPrincipal(req.Context(), authctx.Principal{UserInternal: w.member})
 	ctx = taxpayerctx.WithScope(ctx, taxpayerctx.Scope{ID: w.taxpayerID, Role: taxpayerctx.RoleOwner})
 	rec := httptest.NewRecorder()
-	h.UploadMine(rec, req.WithContext(ctx))
+	// The production request scope: a taxpayer scope, no office (#281).
+	rls.Middleware(w.d.Pool, nil, nil)(http.HandlerFunc(h.UploadMine)).ServeHTTP(rec, req.WithContext(ctx))
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("upload status %d: %s", rec.Code, rec.Body.String())
 	}

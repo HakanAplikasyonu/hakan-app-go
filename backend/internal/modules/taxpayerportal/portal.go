@@ -28,8 +28,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/pagecursor"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -318,7 +319,12 @@ func (h *Handler) createUpload(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, r, http.StatusBadRequest, "FILE_UNREADABLE", "could not read the file")
 		return
 	}
-	job, err := h.uploads.Upload(r.Context(), scope, p.UserInternal, header.Filename, data)
+	var job upload.Job
+	err = forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		job, err = h.uploads.Upload(ctx, scope, p.UserInternal, header.Filename, data)
+		return err
+	})
 	switch {
 	case errors.Is(err, upload.ErrEmpty):
 		response.Error(w, r, http.StatusBadRequest, "FILE_EMPTY", "the file is empty")
@@ -377,6 +383,17 @@ func (h *Handler) activeScope(w http.ResponseWriter, r *http.Request) (engagemen
 		TaxpayerID: s.ID, TaxpayerUUID: s.UUID, Status: eng.Status}, true
 }
 
+// forOffice runs a mükellef upload as work handed to the engagement's office
+// (issue #281). The panel request is in a taxpayer scope; the receipt,
+// review queue, data warning and upload code writes the office's records
+// (suggestions, data_warnings, ...), which the office policies refuse in
+// that scope. rls.ForOffice switches the transaction to the office scope
+// narrowed to this taxpayer for the call, after checking that the office
+// serves the scope's own taxpayer.
+func forOffice(ctx context.Context, sc engagementctx.Scope, fn func(ctx context.Context) error) error {
+	return rls.ForOffice(ctx, sc.OrganizationID, sc.TaxpayerID, fn)
+}
+
 // createReceipt: POST /v1/taxpayer/receipts (multipart: image, kind;
 // Idempotency-Key header). The mobile app's capture (#199): the photo is read
 // for the company's current office like an office-side capture. A retry with
@@ -395,7 +412,12 @@ func (h *Handler) createReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
-	v, err := h.receipts.CaptureKeyed(r.Context(), scope, p.UserInternal, name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+	var v receiptsusecase.View
+	err := forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		v, err = h.receipts.CaptureKeyed(ctx, scope, p.UserInternal, name, data, r.FormValue("kind"), r.Header.Get("Idempotency-Key"))
+		return err
+	})
 	receiptshandler.WriteCapture(w, r, v, err)
 }
 
@@ -432,7 +454,12 @@ func (h *Handler) correctReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
-	fields, err := h.receipts.Correct(r.Context(), scope, id, p.UserInternal, in.Corrections)
+	var fields []string
+	err = forOffice(r.Context(), scope, func(ctx context.Context) error {
+		var err error
+		fields, err = h.receipts.Correct(ctx, scope, id, p.UserInternal, in.Corrections)
+		return err
+	})
 	if err != nil {
 		receiptshandler.WriteError(w, r, err)
 		return
