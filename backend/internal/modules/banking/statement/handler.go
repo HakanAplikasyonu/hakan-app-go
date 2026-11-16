@@ -45,10 +45,15 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	authn := middleware.Authenticate(tokens, loader)
 	org := middleware.RequireOrganization(orgResolver)
 	eng := middleware.RequireEngagement(engResolver)
+	read := middleware.RequireTenantPermission(rbac.PermTenantBankRead)
 	write := middleware.RequireTenantPermission(rbac.PermTenantBankWrite)
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-statements"
 	mux.Handle("POST "+base, middleware.Chain(http.HandlerFunc(h.upload), authn, org, write, eng))
 	mux.Handle("DELETE "+base+"/{importId}", middleware.Chain(http.HandlerFunc(h.undo), authn, org, write, eng))
+	boxes := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/cash-boxes"
+	mux.Handle("GET "+boxes, middleware.Chain(http.HandlerFunc(h.listCashBoxes), authn, org, read, eng))
+	mux.Handle("POST "+boxes, middleware.Chain(http.HandlerFunc(h.createCashBox), authn, org, write, eng))
+	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.renameCashBox), authn, org, write, eng))
 }
 
 // upload: multipart "file", optional "cash_box_uuid" (when the file names no
@@ -132,7 +137,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 			details[i] = response.Detail{Field: "account", Message: maskAccount(a)}
 		}
 		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "UNKNOWN_BANK_ACCOUNT",
-			"the file names a bank account that is not defined for this taxpayer; add it as a new bank account first", details)
+			"the file names a bank account that is not defined for this taxpayer; add it first with POST .../cash-boxes", details)
 	case errors.Is(err, ErrAccountRequired):
 		response.Error(w, r, http.StatusUnprocessableEntity, "BANK_ACCOUNT_REQUIRED", "the file names no account; send cash_box_uuid")
 	case errors.Is(err, ErrUnsupported):

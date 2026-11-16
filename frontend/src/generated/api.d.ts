@@ -5586,7 +5586,8 @@ export interface paths {
          * @description Requires `tenant.bank.write` and an active engagement. The account is
          *     found from the IBAN in the file (or the `:25:` account number); when
          *     the file names none, send `cash_box_uuid`. A file naming an account
-         *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`).
+         *     the taxpayer does not have imports nothing (`UNKNOWN_BANK_ACCOUNT`);
+         *     add it first with `POST .../cash-boxes`.
          *     Movements go through the duplicate rules (same source key, running
          *     balance, lookalike) and are classified. A balance that does not add
          *     up raises `BNK_GAP`; a text PDF whose balance does not add up is
@@ -5597,6 +5598,74 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/cash-boxes": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's bank accounts and cash registers
+         * @description Requires `tenant.bank.read`. Accounts created here and those a bank
+         *     web service connection created (`web_service: true`).
+         */
+        get: operations["listTenantCashBoxes"];
+        put?: never;
+        /**
+         * Add a bank account or cash register
+         * @description Requires `tenant.bank.write` and an active engagement. Needed before a
+         *     statement file naming this account can be imported
+         *     (`UNKNOWN_BANK_ACCOUNT`, #144). `type` defaults to `bank_account`,
+         *     which needs an `iban` or a `bank_account_number`. The IBAN is
+         *     validated (mod 97) and the bank is read from it. An IBAN the taxpayer
+         *     already has returns `409 CASH_BOX_EXISTS`. Without `name` a name is
+         *     made from the currency and the IBAN's last four digits.
+         */
+        post: operations["createTenantCashBox"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                cashBoxUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename a cash box
+         * @description Requires `tenant.bank.write`. Only the name changes; IBAN and currency are fixed once movements exist.
+         */
+        patch: operations["renameTenantCashBox"];
         trace?: never;
     };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}": {
@@ -9373,6 +9442,44 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TenantPermissionList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CashBox: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            type: "cash" | "bank_account" | "credit_card" | "valor";
+            name: string;
+            /** @description Bank read from the IBAN, e.g. ziraat */
+            bank_id: string | null;
+            iban: string | null;
+            currency: string;
+            bank_account_number: string | null;
+            bank_branch_code: string | null;
+            /** @description Created by a bank web service connection */
+            web_service: boolean;
+        };
+        CreateCashBoxRequest: {
+            /**
+             * @default bank_account
+             * @enum {string}
+             */
+            type: "cash" | "bank_account" | "credit_card" | "valor";
+            name?: string;
+            /** @description Spaces are ignored; validated (mod 97) */
+            iban?: string;
+            /**
+             * @description TL / TRL / YTL become TRY
+             * @default TRY
+             */
+            currency: string;
+            bank_account_number?: string;
+            bank_branch_code?: string;
+        };
+        EnvelopeCashBox: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CashBox"];
             meta: components["schemas"]["ResponseMeta"];
         };
         CreateTaxpayerRequestRequest: {
@@ -19909,6 +20016,141 @@ export interface operations {
              * @description `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
              *     `STATEMENT_BALANCE_MISMATCH` (text PDF) or `SCANNED_PDF`
              */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantCashBoxes: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cash boxes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["CashBox"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantCashBox: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashBoxRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCashBox"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVALID_CASH_BOX` (type, iban, currency or name; the field is in `details`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    renameTenantCashBox: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                cashBoxUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Renamed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCashBox"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVALID_CASH_BOX` (empty or too long name) */
             422: {
                 headers: {
                     [name: string]: unknown;
