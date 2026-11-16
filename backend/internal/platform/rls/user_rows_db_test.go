@@ -9,7 +9,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
-// TestUserRowPolicies (issue #307, migration 000088; 000091 for the user's
+// TestUserRowPolicies (issue #307, migration 000088; 000092 for the user's
 // own notifications, #333): notifications and
 // activity_events. An office scope reads and writes its own office's rows
 // (any user's) and reads only its own user's office-less rows (for
@@ -97,7 +97,7 @@ func TestUserRowPolicies(t *testing.T) {
 		refused(ctx, tx, "office A writing an office-less notification", notif, nil, f.ownerA, "x")
 		refused(ctx, tx, "office A writing office B's notification", notif, f.orgB, f.ownerB, "x")
 		refused(ctx, tx, "office A writing office-less activity", event, nil, f.ownerA, "x")
-		// The user's own notification is markable in any scope (000091, #333);
+		// The user's own notification is markable in any scope (000092, #333);
 		// another user's office-less one is not.
 		refused(ctx, tx, "office A marking another user's office-less notification", `UPDATE notifications SET status = 'read' WHERE organization_id IS NULL AND user_id <> $1`, f.ownerA)
 		if tag, err := tx.Exec(ctx, `UPDATE notifications SET status = 'read' WHERE organization_id IS NULL AND user_id = $1`, f.ownerA); err != nil || tag.RowsAffected() != 1 {
@@ -113,7 +113,7 @@ func TestUserRowPolicies(t *testing.T) {
 
 	// Taxpayer scope as office A's staff member: own office-less rows only.
 	err = rls.WithScope(ctx, f.d.Pool, rls.Scope{UserID: f.staffA, TaxpayerIDs: []int64{f.tpA}}, func(ctx context.Context, tx pgx.Tx) error {
-		// Its user's own notifications in any office (000091, #333), the
+		// Its user's own notifications in any office (000092, #333), the
 		// office-less user-less ones; no other user's.
 		same("taxpayer scope notifications", names(ctx, tx, `SELECT title FROM notifications`), "null-staffA", "null-nobody", "a-staff", "a-new")
 		same("taxpayer scope activity", names(ctx, tx, `SELECT action FROM activity_events`), "null-staffA")
