@@ -23,6 +23,9 @@ var (
 	// International (+90 555 123 45 67) and Turkish mobile (0555 123 45 67) numbers.
 	rePhoneIntl = regexp.MustCompile(`\+\d{1,3}[\s\-.]?\(?\d{2,4}\)?(?:[\s\-.]?\d{2,4}){2,4}`)
 	rePhoneTR   = regexp.MustCompile(`\b0?5\d{2}[\s\-.]?\d{3}[\s\-.]?\d{2}[\s\-.]?\d{2}\b`)
+	// IBAN: country code, check digits, 11–30 alphanumerics (spaces allowed
+	// in groups of four). TR IBANs are 26 characters.
+	reIBAN = regexp.MustCompile(`(?i)\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b`)
 )
 
 // sensitiveKeyParts mark map keys whose values are never sent.
@@ -30,6 +33,8 @@ var sensitiveKeyParts = []string{
 	"password", "passwd", "secret", "token", "authorization", "cookie",
 	"email", "e_mail", "phone", "gsm", "msisdn", "dsn", "api_key", "apikey",
 	"private_key", "otp", "totp", "ticket", "session_token", "credential",
+	// Tax and bank identifiers (issue #179).
+	"vkn", "tckn", "iban", "tax_id", "tax_number", "identity_number", "national_id",
 }
 
 // allowedHeaders are the only request headers forwarded to the tracker.
@@ -41,12 +46,22 @@ var allowedHeaders = map[string]bool{
 	"X-Request-Id":   true,
 }
 
-// ScrubString removes emails, phone numbers, bearer/JWT tokens and
-// key=value secrets from free text (error messages, log attributes).
+// ScrubString removes emails, phone numbers, bearer/JWT tokens, key=value
+// secrets, IBANs and VKN/TCKN numbers from free text (error messages, log
+// attributes). A standalone run of exactly 10 digits is taken for a VKN and
+// of 11 digits not starting with 0 for a TCKN; longer numbers (invoice
+// numbers, ids) stay.
 func ScrubString(s string) string {
 	if s == "" {
 		return s
 	}
+	s = reIBAN.ReplaceAllStringFunc(s, func(v string) string {
+		if compact := strings.ReplaceAll(v, " ", ""); len(compact) >= 15 && hasDigitTail(compact) {
+			return "[iban]"
+		}
+		return v
+	})
+	s = scrubDigitRuns(s)
 	s = rePush.ReplaceAllString(s, "[push-token]")
 	s = reJWT.ReplaceAllString(s, "[token]")
 	s = reBearer.ReplaceAllString(s, "$1 [token]")
@@ -209,4 +224,56 @@ func scrubEvent(event *sentry.Event) *sentry.Event {
 		sp.Data = scrubMap(sp.Data)
 	}
 	return event
+}
+
+// hasDigitTail reports whether an IBAN candidate has digits after its
+// country code and check digits, so words like "AB12CDEFGHIJKLMN" in
+// identifiers are not taken for IBANs too eagerly.
+func hasDigitTail(v string) bool {
+	n := 0
+	for _, r := range v[4:] {
+		if r >= '0' && r <= '9' {
+			n++
+		}
+	}
+	return n >= 8
+}
+
+func isAlnum(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'
+}
+
+// scrubDigitRuns replaces standalone 10-digit runs with [vkn] and 11-digit
+// runs not starting with 0 with [tckn]. "VKN:1234567890" is scrubbed,
+// "a1234567890b" (inside a uuid) is not.
+func scrubDigitRuns(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		c := s[i]
+		if c < '0' || c > '9' {
+			b.WriteByte(c)
+			i++
+			continue
+		}
+		j := i
+		for j < len(s) && s[j] >= '0' && s[j] <= '9' {
+			j++
+		}
+		run := s[i:j]
+		// Digits glued to letters belong to an id (uuid, hex trace id).
+		glued := (i > 0 && isAlnum(s[i-1])) || (j < len(s) && isAlnum(s[j]))
+		switch {
+		case glued:
+			b.WriteString(run)
+		case len(run) == 10:
+			b.WriteString("[vkn]")
+		case len(run) == 11 && run[0] != '0':
+			b.WriteString("[tckn]")
+		default:
+			b.WriteString(run)
+		}
+		i = j
+	}
+	return b.String()
 }

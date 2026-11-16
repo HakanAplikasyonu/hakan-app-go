@@ -17,7 +17,8 @@ func New(level, format string) *slog.Logger {
 		handler = slog.NewJSONHandler(os.Stdout, opts)
 	}
 
-	return slog.New(handler)
+	// Personal data is scrubbed before any sink sees a record (#179).
+	return slog.New(Redact(handler))
 }
 
 func parseLevel(level string) slog.Level {

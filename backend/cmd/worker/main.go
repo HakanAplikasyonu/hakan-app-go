@@ -6,12 +6,14 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/cache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/logging"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/metrics"
 	agentsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/agents/usecase"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
@@ -41,6 +43,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/queue"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/tracing"
+
+	"github.com/hibiken/asynq"
 )
 
 func main() {
@@ -71,6 +76,20 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// OpenTelemetry (#179): off unless OTEL_EXPORTER_OTLP_ENDPOINT is set.
+	if shutdownTracing, err := tracing.Init(ctx, cfg.Tracing, "worker"); err != nil {
+		log.Warn("tracing_init_failed", "error", err)
+	} else {
+		if cfg.Tracing.Endpoint != "" {
+			log.Info("tracing_enabled", "service", cfg.Tracing.ServiceName, "sample_ratio", cfg.Tracing.SampleRatio)
+		}
+		defer func() {
+			sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = shutdownTracing(sctx)
+		}()
+	}
 
 	// Alan düzeyinde şifreleme (#168): ham banka/fatura verisi FIELD_ENCRYPTION_KEY
 	// ile mühürlenir. Anahtar geçersizse başlama; düz metin yazmak sessizce olmasın.
@@ -155,7 +174,9 @@ func main() {
 	defer func() { _ = queueClient.Close() }()
 	notifSvc.WithPushQueue(queueClient)
 	persist := logging.Attach(log, logsSvc)
-	log = persist.Logger()
+	// Outermost: the app_logs table and the error tracker get scrubbed
+	// records too, with request and office ids (#179).
+	log = slog.New(logging.Redact(persist.Logger().Handler()))
 	defer persist.Close()
 
 	// Entegratör senkronu (#40): bağlantı kimlik bilgileri sır kasasında.
@@ -241,6 +262,14 @@ func main() {
 				log.Error("log_purge_scheduler_stopped", "error", err)
 			}
 		}()
+	}
+
+	// Prometheus metrics with queue depth (#179).
+	inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: cfg.Redis.Addr, Password: cfg.Redis.Password, DB: cfg.Redis.DB})
+	defer func() { _ = inspector.Close() }()
+	metrics.Default.MustRegister(metrics.NewQueueCollector(inspector, queue.AllQueues()))
+	if err := metrics.Default.Serve(ctx, cfg.Metrics.WorkerAddr, cfg.Metrics.Token, log); err != nil {
+		log.Warn("metrics_listen_failed", "addr", cfg.Metrics.WorkerAddr, "error", err)
 	}
 
 	log.Info("worker_started",

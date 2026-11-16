@@ -32,6 +32,8 @@ type Config struct {
 	Expo       ExpoConfig
 	Search     SearchConfig
 	Sentry     SentryConfig
+	Metrics    MetricsConfig
+	Tracing    TracingConfig
 	Tenancy    TenancyConfig
 	AI         AIConfig
 	Parasut    ParasutConfig
@@ -117,6 +119,30 @@ type TenancyConfig struct {
 
 // SentryConfig configures error reporting to a Sentry-protocol endpoint.
 // An empty DSN disables reporting entirely.
+// MetricsConfig configures the Prometheus listener (issue #179). It runs on
+// its own port so it is never exposed through the public API proxy.
+type MetricsConfig struct {
+	// Addr is the API's metrics listener (METRICS_ADDR, "" = off).
+	Addr string
+	// WorkerAddr is the worker's (WORKER_METRICS_ADDR, "" = off).
+	WorkerAddr string
+	// Token, when set, is required as "Authorization: Bearer <token>".
+	Token string
+}
+
+// TracingConfig configures OpenTelemetry tracing (issue #179). The OTLP
+// exporter itself reads the standard OTEL_EXPORTER_OTLP_* variables.
+type TracingConfig struct {
+	// Endpoint is OTEL_EXPORTER_OTLP_ENDPOINT or
+	// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT; empty = tracing off.
+	Endpoint string
+	// ServiceName is OTEL_SERVICE_NAME (default: APP_NAME).
+	ServiceName string
+	// SampleRatio is OTEL_TRACES_SAMPLER_ARG (0–1, default 0.1), used with a
+	// parent-based ratio sampler.
+	SampleRatio float64
+}
+
 type SentryConfig struct {
 	DSN         string
 	Environment string
@@ -462,6 +488,16 @@ func Load() (Config, error) {
 			MeiliHost:   getEnv("MEILI_HOST", "http://127.0.0.1:7700"),
 			MeiliKey:    getEnv("MEILI_MASTER_KEY", defaultMeiliMasterKey),
 			IndexPrefix: getEnv("MEILI_INDEX_PREFIX", "app"),
+		},
+		Metrics: MetricsConfig{
+			Addr:       getEnv("METRICS_ADDR", ":9091"),
+			WorkerAddr: getEnv("WORKER_METRICS_ADDR", ":9092"),
+			Token:      getEnv("METRICS_TOKEN", ""),
+		},
+		Tracing: TracingConfig{
+			Endpoint:    strings.TrimSpace(getEnv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", getEnv("OTEL_EXPORTER_OTLP_ENDPOINT", ""))),
+			ServiceName: getEnv("OTEL_SERVICE_NAME", getEnv("APP_NAME", "app")),
+			SampleRatio: clampRate(getFloat("OTEL_TRACES_SAMPLER_ARG", 0.1)),
 		},
 		Sentry: SentryConfig{
 			DSN:              strings.TrimSpace(getEnv("SENTRY_DSN", "")),
