@@ -161,6 +161,10 @@ type Deps struct {
 	Realtime realtime.Publisher
 	Worker   *queue.Worker
 	Events   events.Bus
+	// BankEndpoints overrides a bank web service's endpoint by bank id
+	// (tests: internal/testfakes, #318). Empty in production: the adapter's
+	// own test / production endpoint is used.
+	BankEndpoints map[string]string
 }
 
 // Server is the HTTP composition root for infrastructure routes.
@@ -469,6 +473,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankws.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankws.NewHandler(bankws.NewService(deps.DB, sourceVault, bankSvc, bankws.Registry{
 			"vakifbank": func(env string) bankws.Adapter {
+				if ep := deps.BankEndpoints["vakifbank"]; ep != "" {
+					return vakifbank.New(ep, bankHTTP)
+				}
 				if env == bankws.EnvTest {
 					return vakifbank.New(vakifbank.TestEndpoint, bankHTTP)
 				}

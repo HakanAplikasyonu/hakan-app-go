@@ -76,6 +76,9 @@ func (s *Service) Submit(ctx context.Context, sub Subject, in Input) (Suggestion
 			return nil
 		}
 		prev, err := applier.Apply(ctx, tx, sug, in.Value)
+		if errors.Is(err, ErrInvalidValue) {
+			return fmt.Errorf("%w: %v", ErrInvalid, err)
+		}
 		if err != nil {
 			return fmt.Errorf("%w: %v", ErrApplyFailed, err)
 		}
@@ -104,6 +107,9 @@ func (s *Service) Accept(ctx context.Context, sub Subject, id uuid.UUID, userID 
 			return Decision{}, ErrNoApplier
 		}
 		prev, err := a.Apply(ctx, tx, *sug, sug.Input.Value)
+		if errors.Is(err, ErrInvalidValue) {
+			return Decision{}, fmt.Errorf("%w: %v", ErrInvalid, err)
+		}
 		if err != nil {
 			return Decision{}, fmt.Errorf("%w: %v", ErrApplyFailed, err)
 		}

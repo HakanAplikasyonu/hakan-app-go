@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
@@ -18,9 +20,9 @@ func TestConnectionFlow(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
 	tp := d.Taxpayer(t, "legal", "9000000017")
-	f := &fakeParasut{}
+	f := &testfakes.Parasut{}
 	dataset(f)
-	srv := f.server(t)
+	srv := testfakes.Serve(t, f)
 	kr, err := secrets.ParseKeyring("", "", "test-legacy-key-32-bytes-long!!!")
 	if err != nil {
 		t.Fatal(err)

@@ -6,10 +6,11 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
@@ -39,10 +40,7 @@ func serve(t *testing.T, status int, body string, seen *string) *Client {
 }
 
 func TestFetchMapsAccountsAndMovements(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/getirhareket.xml")
-	if err != nil {
-		t.Fatal(err)
-	}
+	fixture := testfakes.VakifbankFixture()
 	var req string
 	c := serve(t, 200, string(fixture), &req)
 	res, err := c.Fetch(context.Background(), creds, window())

@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
+
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources"
@@ -17,8 +19,8 @@ import (
 // refunds, a cancelled invoice, estimates, one of September) and bills
 // (detailed, e-invoice without lines, kalemsiz receipts). It returns the
 // October totals a person would add up in Paraşüt.
-func dataset(f *fakeParasut) (salesN int, salesSum decimal.Decimal, buyN int, buySum decimal.Decimal, expN int, expSum decimal.Decimal) {
-	f.included = append(f.included,
+func dataset(f *testfakes.Parasut) (salesN int, salesSum decimal.Decimal, buyN int, buySum decimal.Decimal, expN int, expSum decimal.Decimal) {
+	f.Included = append(f.Included,
 		resource{ID: "c1", Type: "contacts", Attributes: attrs(map[string]any{"name": "Yıldız Market Ltd. Şti.", "tax_number": "9100000021", "contact_type": "company"})},
 		resource{ID: "c2", Type: "contacts", Attributes: attrs(map[string]any{"name": "Ayşe Kaya", "tax_number": "10000000146", "contact_type": "person"})},
 		resource{ID: "s1", Type: "contacts", Attributes: attrs(map[string]any{"name": "Kalem Kırtasiye", "tax_number": "9200000035"})},
@@ -47,7 +49,7 @@ func dataset(f *fakeParasut) (salesN int, salesSum decimal.Decimal, buyN int, bu
 		if i%2 == 0 {
 			contact = "c2"
 		}
-		f.add(&f.sales, resource{ID: fmt.Sprint(1000 + i), Type: "sales_invoices",
+		f.Add(&f.Sales, resource{ID: fmt.Sprint(1000 + i), Type: "sales_invoices",
 			Attributes: attrs(map[string]any{"item_type": typ, "invoice_series": "ATL", "invoice_id": 100 + i, "issue_date": issue,
 				"currency": "TRL", "gross_total": money(net), "total_discount": "0.00", "total_invoice_discount": "0.00",
 				"before_taxes_total": money(net), "total_vat": money(vat), "net_total": money(net + vat)}),
@@ -65,13 +67,13 @@ func dataset(f *fakeParasut) (salesN int, salesSum decimal.Decimal, buyN int, bu
 			"issue_date": issue, "currency": "TRL", "gross_total": money(net), "total_vat": money(vat), "net_total": money(net + vat),
 			"is_detailed": detailed, "description": desc}),
 			Relationships: map[string]rel{"supplier": relOne("contacts", "s1"), "active_e_document": relOne("e_invoices", edoc)}}
-		var inc []resource
+		var inc []any
 		if lines {
 			r.Relationships["details"] = relMany("purchase_bill_details", "bd"+id)
 			inc = append(inc, resource{ID: "bd" + id, Type: "purchase_bill_details", Attributes: attrs(map[string]any{
 				"quantity": 1, "unit_price": money(net), "vat_rate": 20, "net_total": money(net)})})
 		}
-		f.add(&f.bills, r, inc...)
+		f.Add(&f.Bills, r, inc...)
 	}
 	bill("1", "purchase_bill", "2026-10-03", true, "", 1000, 200, "", true)     // invoice with lines
 	bill("2", "purchase_bill", "2026-10-05", false, "ei9", 500, 100, "", false) // e-invoice without lines → invoice
@@ -92,9 +94,9 @@ func TestAcceptanceCountsAndTotals(t *testing.T) {
 	ctx := context.Background()
 	tp := d.Taxpayer(t, "legal", "9000000017")
 
-	f := &fakeParasut{}
+	f := &testfakes.Parasut{}
 	salesN, salesSum, buyN, buySum, expN, expSum := dataset(f)
-	srv := f.server(t)
+	srv := testfakes.Serve(t, f)
 	app := App{BaseURL: srv.URL, ClientID: "cid", ClientSecret: "sec", RedirectURL: "https://portal.example/cb"}
 	var stored Tokens
 	c := NewClient(app, srv.Client(), "777", Tokens{RefreshToken: "ref0"})
@@ -179,13 +181,13 @@ func TestAcceptanceCountsAndTotals(t *testing.T) {
 // TestWalkStopsAtWindowStart: the client never pages past the first record
 // older than the window (10 §2.1 safe method).
 func TestWalkStopsAtWindowStart(t *testing.T) {
-	f := &fakeParasut{}
+	f := &testfakes.Parasut{}
 	for i := 0; i < 60; i++ {
-		f.add(&f.sales, resource{ID: fmt.Sprint(i), Type: "sales_invoices", Attributes: attrs(map[string]any{
+		f.Add(&f.Sales, resource{ID: fmt.Sprint(i), Type: "sales_invoices", Attributes: attrs(map[string]any{
 			"item_type": "invoice", "issue_date": time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC).AddDate(0, 0, -i).Format("2006-01-02"),
 			"net_total": "1.00", "total_vat": "0.00", "gross_total": "1.00"})})
 	}
-	srv := f.server(t)
+	srv := testfakes.Serve(t, f)
 	c := NewClient(App{BaseURL: srv.URL, ClientID: "cid", ClientSecret: "sec"}, srv.Client(), "777", Tokens{AccessToken: "acc0", ExpiresAt: time.Now().Add(time.Hour)})
 	c.Interval = 0
 	b, err := c.Read(context.Background(), time.Date(2026, 10, 25, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC))
@@ -196,7 +198,7 @@ func TestWalkStopsAtWindowStart(t *testing.T) {
 		t.Fatalf("invoices: %d", len(b.Invoices))
 	}
 	pages := 0
-	for _, r := range f.requests {
+	for _, r := range f.Requests {
 		if u, _ := url.Parse(r); u.Path == "/v4/777/sales_invoices" {
 			pages++
 		}
@@ -210,8 +212,8 @@ func TestPlateAndAuth(t *testing.T) {
 	if plate("yakıt 06 abc 4567 istasyon") != "06ABC4567" || plate("fatura") != "" {
 		t.Fatal("plate")
 	}
-	f := &fakeParasut{}
-	srv := f.server(t)
+	f := &testfakes.Parasut{}
+	srv := testfakes.Serve(t, f)
 	c := NewClient(App{BaseURL: srv.URL, ClientID: "cid", ClientSecret: "wrong"}, srv.Client(), "777", Tokens{RefreshToken: "x"})
 	c.Interval = 0
 	if _, err := c.Companies(context.Background()); err == nil {

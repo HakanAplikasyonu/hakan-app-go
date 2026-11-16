@@ -2,13 +2,8 @@ package kolaybi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -18,95 +13,14 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testfakes"
 )
-
-type fakeKB struct {
-	docs    map[string][]map[string]any // type → records
-	tokens  int
-	expired bool // next authed call answers 401 once
-}
-
-func (f *fakeKB) server(t *testing.T) *httptest.Server {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		js := func(v any) { _ = json.NewEncoder(w).Encode(v) }
-		if r.Header.Get("Channel") != "HAKAN" {
-			w.WriteHeader(403)
-			return
-		}
-		if r.URL.Path == "/kolaybi/v1/access_token" {
-			var in map[string]string
-			_ = json.NewDecoder(r.Body).Decode(&in)
-			if in["api_key"] != "key-1" {
-				w.WriteHeader(401)
-				return
-			}
-			f.tokens++
-			js(map[string]any{"data": map[string]any{"access_token": "t" + strconv.Itoa(f.tokens)}})
-			return
-		}
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer t") || f.expired {
-			f.expired = false
-			w.WriteHeader(401)
-			return
-		}
-		switch {
-		case r.URL.Path == "/kolaybi/v1/companies":
-			js(map[string]any{"data": []map[string]any{{"id": 5, "title": "Atlas Gıda"}, {"id": 6, "title": "Atlas Lojistik"}}})
-		case r.URL.Path == "/kolaybi/v1/invoices":
-			q := r.URL.Query()
-			if q.Get("company_id") != "5" {
-				w.WriteHeader(422)
-				return
-			}
-			var rows []map[string]any
-			for _, d := range f.docs[q.Get("type")] {
-				if d["order_date"].(string) >= q.Get("min_issue_date") && d["order_date"].(string) <= q.Get("max_issue_date") {
-					row := map[string]any{}
-					for k, v := range d {
-						if k == "items" && d["id"].(int)%2 == 0 {
-							continue // even ids: list without lines → detail call
-						}
-						row[k] = v
-					}
-					rows = append(rows, row)
-				}
-			}
-			sort.Slice(rows, func(i, j int) bool { return rows[i]["id"].(int) < rows[j]["id"].(int) })
-			page, _ := strconv.Atoi(q.Get("page"))
-			per := 15
-			last := (len(rows) + per - 1) / per
-			lo, hi := (page-1)*per, page*per
-			if lo > len(rows) {
-				lo = len(rows)
-			}
-			if hi > len(rows) {
-				hi = len(rows)
-			}
-			js(map[string]any{"data": map[string]any{"data": rows[lo:hi], "current_page": page, "last_page": last}})
-		case strings.HasPrefix(r.URL.Path, "/kolaybi/v1/invoices/"):
-			id, _ := strconv.Atoi(strings.TrimPrefix(r.URL.Path, "/kolaybi/v1/invoices/"))
-			for _, list := range f.docs {
-				for _, d := range list {
-					if d["id"].(int) == id {
-						js(map[string]any{"data": d})
-						return
-					}
-				}
-			}
-			w.WriteHeader(404)
-		default:
-			w.WriteHeader(404)
-		}
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
 
 // dataset: 40 sale invoices, 6 sale returns, 12 purchase invoices and 5
 // general expenses in October, plus September records; it returns the
 // October count and grand total per direction a KolayBi user would see.
-func dataset() (*fakeKB, map[string]int, map[string]decimal.Decimal) {
-	f := &fakeKB{docs: map[string][]map[string]any{}}
+func dataset() (*testfakes.KolayBi, map[string]int, map[string]decimal.Decimal) {
+	f := &testfakes.KolayBi{Docs: map[string][]map[string]any{}}
 	n := map[string]int{}
 	sum := map[string]decimal.Decimal{}
 	id := 0
@@ -128,7 +42,7 @@ func dataset() (*fakeKB, map[string]int, map[string]decimal.Decimal) {
 			if kind == "general_expense" {
 				d["description"] = "34 KB 1234 akaryakıt"
 			}
-			f.docs[kind] = append(f.docs[kind], d)
+			f.Docs[kind] = append(f.Docs[kind], d)
 			if i <= count {
 				n[dir]++
 				sum[dir] = sum[dir].Add(net.Add(vat))
@@ -148,7 +62,7 @@ func TestAcceptance(t *testing.T) {
 	ctx := context.Background()
 	tp := d.Taxpayer(t, "legal", "9000000017")
 	f, wantN, wantSum := dataset()
-	srv := f.server(t)
+	srv := testfakes.Serve(t, f)
 	kr, _ := secrets.ParseKeyring("", "", "test-legacy-key-32-bytes-long!!!")
 	vault := secrets.New(kr, secrets.NewPGStore(db.New(d.Pool)))
 
@@ -179,7 +93,7 @@ func TestAcceptance(t *testing.T) {
 		t.Fatal("api key outside the vault")
 	}
 
-	f.expired = true // token expired: a new one is taken with the api key
+	f.Expired = true // token expired: a new one is taken with the api key
 	from, to := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)
 	rep, err := svc.Sync(ctx, tp, c.UUID, from, to)
 	if err != nil {

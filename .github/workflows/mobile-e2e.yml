@@ -5,8 +5,8 @@ name: Mobile E2E (Maestro)
 # migration, demo seed, Go API). Zorunlu kontrol DEĞİL: yalnızca rapor üretir
 # (JUnit özeti, hata anı ekran görüntüleri, ekran kaydı, logcat, API logu).
 #
-# Gece (schedule) ve elle (workflow_dispatch) çalışır. Bu dosya ya da
-# betikleri değişince de koşar ki iş akışının kendisi denenmiş olsun.
+# Gece (schedule) ve elle (workflow_dispatch) çalışır. Bu dosya, betiği,
+# Maestro akışları ya da demo seed değişince de koşar.
 on:
   schedule:
     - cron: "23 1 * * *" # her gece 01:23 UTC (04:23 TSİ)
@@ -15,6 +15,10 @@ on:
     paths:
       - .github/workflows/mobile-e2e.yml
       - scripts/maestro-ci.sh
+      # Akışlar ya da onların koştuğu demo verisi değişince (#318).
+      - mobile/.maestro/**
+      - mobile-office/.maestro/**
+      - backend/cmd/demo-seed/**
 
 concurrency:
   group: mobile-e2e-${{ github.ref }}

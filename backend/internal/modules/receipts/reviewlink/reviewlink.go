@@ -70,6 +70,11 @@ func (r *Reviewer) SubmitField(ctx context.Context, f receipts.FieldReview) erro
 		Kind: Kind, TargetType: f.TargetType, TargetID: &targetID, TargetField: f.Field, Period: f.Period,
 		Value: raw, Confidence: decimal.NewFromFloat(f.Value.Confidence), Rationale: why, Provenance: prov,
 	})
+	if errors.Is(err, review.ErrInvalid) {
+		// A value the draft cannot take (a correction whose VAT exceeds the
+		// total): the caller's input error, not a server failure (#318).
+		return fmt.Errorf("%w: %v", receipts.ErrInvalid, err)
+	}
 	return err
 }
 
@@ -165,6 +170,11 @@ func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.R
 		}
 	}
 	id := *s.Input.TargetID
+	if numV.Valid && (field == extract.FieldTotal || field == extract.FieldTax) {
+		if err := checkAmounts(ctx, q, s, field, decimal.NewFromBigInt(numV.Int, numV.Exp)); err != nil {
+			return err
+		}
+	}
 	var err error
 	switch s.Input.TargetType {
 	case "expense":
@@ -178,6 +188,42 @@ func write(ctx context.Context, q *db.Queries, s review.Suggestion, value json.R
 		return errors.New("reviewlink: draft is no longer pending")
 	}
 	return err
+}
+
+// checkAmounts refuses a total or VAT that would leave the draft's VAT above
+// its total: the net amount (total - VAT) must not go negative
+// (chk_expenses_amounts; #318 found it as a 500).
+func checkAmounts(ctx context.Context, q *db.Queries, s review.Suggestion, field string, v decimal.Decimal) error {
+	var total, tax pgtype.Numeric
+	switch s.Input.TargetType {
+	case "expense":
+		e, err := q.GetExpense(ctx, db.GetExpenseParams{TaxpayerID: s.TaxpayerID, ID: *s.Input.TargetID})
+		if err != nil {
+			return err
+		}
+		total, tax = e.Amount, e.TaxAmount
+	case "retail_sale":
+		r, err := q.GetRetailSale(ctx, db.GetRetailSaleParams{TaxpayerID: s.TaxpayerID, ID: *s.Input.TargetID})
+		if err != nil {
+			return err
+		}
+		total, tax = r.TotalAmount, r.TaxAmount
+	default:
+		return nil
+	}
+	t, x := numText(total), numText(tax)
+	if field == extract.FieldTotal {
+		t = v.String()
+	} else {
+		x = v.String()
+	}
+	if t == "" || x == "" {
+		return nil
+	}
+	if decimal.RequireFromString(x).GreaterThan(decimal.RequireFromString(t)) {
+		return fmt.Errorf("%w: reviewlink: VAT %s is more than the total %s", review.ErrInvalidValue, x, t)
+	}
+	return nil
 }
 
 func dateText(d pgtype.Date) string {
