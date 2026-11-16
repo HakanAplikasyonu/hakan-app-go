@@ -7,7 +7,8 @@
 # deploy/compose.prod.yml with the images already in the local Docker cache
 # (IMAGE_PULL_POLICY=missing), then checks: migrate exited 0 and recorded a
 # schema version, backend /readyz, the proxy serves the frontend /health and
-# reaches the API through the BFF, and one encrypted backup run works.
+# reaches the API through the BFF, one encrypted backup run works, and the
+# egress proxy (#256) lets an allowlisted host through and refuses another.
 # Everything (containers, volumes, the env file) is removed afterwards.
 # Refuses to run when .env.server already exists.
 #
@@ -60,13 +61,16 @@ keydir=$(mktemp -d)
 docker run --rm --entrypoint age-keygen -v "$keydir:/k" "$REPO-backup:main" -o /k/id.txt 2>/dev/null
 printf 'BACKUP_AGE_RECIPIENTS=%s\n' "$(docker run --rm --entrypoint age-keygen -v "$keydir:/k" "$REPO-backup:main" -y /k/id.txt)" >>"$ENV_FILE"
 rm -rf "$keydir" 2>/dev/null || true
+# Egress proxy (#256): in CI the allowlist is a host that is reachable from
+# the runner (the real İşNet / Vakıfbank hosts only answer allowlisted IPs).
+printf 'EGRESS_PROXY_HOSTS=%s\n' "example.com,api.ipify.org" >>"$ENV_FILE"
 
 compose config --quiet
 compose up -d
 
 # Wait for the long-running services to be healthy.
 deadline=$((SECONDS + TIMEOUT))
-for svc in backend frontend proxy; do
+for svc in backend frontend proxy egress-proxy; do
   while :; do
     cid=$(compose ps -q "$svc" || true)
     state=$([[ -n $cid ]] && docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$cid" || echo missing)
@@ -98,6 +102,21 @@ curl -fsS -o /dev/null http://localhost/health || die "proxy -> frontend /health
 code=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/api/v1/app/config)
 [[ $code == 200 ]] || die "proxy -> BFF -> API /v1/app/config returned $code"
 echo "prod-smoke: proxy -> frontend -> API ok"
+
+# Egress proxy (#256), with the backend's own client (egress-check): an
+# allowlisted host leaves through the proxy, a host outside the allowlist is
+# refused by it, and the outbound IP is shown (informational: it depends on
+# an external IP echo service).
+out=$(compose exec -T backend /app/egress-check -probe https://example.com/) || die "egress: allowlisted host failed: $out"
+[[ $out == *"proxied=true"* ]] || die "egress: allowlisted host did not go through the proxy: $out"
+echo "prod-smoke: egress allowlisted host ok ($out)"
+set +e
+out=$(compose exec -T backend /app/egress-check -probe https://example.org/ -force-proxy)
+rc=$?
+set -e
+[[ $rc == 3 ]] || die "egress: host outside the allowlist was not refused (exit $rc): $out"
+echo "prod-smoke: egress proxy refuses other hosts ok"
+compose exec -T backend /app/egress-check || echo "prod-smoke: egress IP check unavailable (informational)"
 
 # One backup run against the real stack (database + object store).
 compose exec -T backup backup-run || die "backup-run failed"

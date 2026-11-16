@@ -13,7 +13,7 @@ Gerçek sunucu adresi ya da kimlik bilgisi repoda yoktur; hepsi sunucudaki
 | Web imajı | `frontend/Dockerfile` | Çok aşamalı Next.js `standalone` çıktısı. |
 | Yedek imajı | `deploy/backup/Dockerfile` | Zamanlanmış şifreli yedek ve geri yükleme: `docs/yedekleme.md`. |
 | İmaj listesi | `deploy/images.json` | CI bu listeyi matris olarak gezer. |
-| Uygulama yığını | `compose.prod.yml` | Postgres, Redis, SeaweedFS (S3), Meilisearch, Centrifugo, `migrate`, backend, worker, isteğe bağlı `worker-egress`, frontend. Dokploy bu dosyayı kullanır. |
+| Uygulama yığını | `compose.prod.yml` | Postgres, Redis, SeaweedFS (S3), Meilisearch, Centrifugo, `migrate`, backend, worker, isteğe bağlı `worker-egress`, `egress-proxy` (sabit çıkış IP'si, #256), frontend. Dokploy bu dosyayı kullanır. |
 | Düz Docker sunucusu | `deploy/compose.prod.yml` | Yukarıdaki yığın ile Caddy ters vekil (`deploy/proxy.yml`, `deploy/caddy/Caddyfile`). |
 | Ortam şeması | `deploy/env/schema` | `scripts/prod-env.sh init/upgrade/check` (betiğin başındaki açıklama). |
 
@@ -106,6 +106,75 @@ docker compose -f deploy/compose.prod.yml up -d
   `COMPOSE_PROJECT_NAME` ver (varsayılan proje adı `hakan-prod`).
 - Güncelleme: `.env.server`'daki `BACKEND_IMAGE` / `FRONTEND_IMAGE`
   etiketini değiştir (ya da `:main` ile kal) ve `up -d`'yi tekrar çalıştır.
+
+## Sabit çıkış IP'si: İşNet ve Vakıfbank (#256)
+
+İşNet e-fatura servisleri ve Vakıfbank hesap hareketi servisi yalnızca izin
+listelerindeki sabit IP'lerden gelen çağrıyı kabul eder (`docs/kaynak`
+32 §2, 20 §4, 22 §1). İşNet tanımsız IP'ye hiç cevap vermez; çağrı zaman
+aşımına düşer.
+
+- **`egress-proxy` servisi** (squid): yalnızca `EGRESS_PROXY_HOSTS`'taki
+  hostlara HTTPS (CONNECT 443) açar, gerisini 403 ile reddeder.
+- **Backend ve worker** bu hostlara `EGRESS_PROXY_URL` üzerinden çıkar
+  (varsayılan `http://egress-proxy.<ağ>:3128`). Diğer bütün trafik
+  doğrudan çıkar. Banka adaptörü (API) ve entegratör senkronu (worker) aynı
+  kuralı kullanır.
+- **`EGRESS_PROXY_HOSTS`** varsayılanı:
+  - İşNet test ve canlı: `einvoiceservicetest.isnet.net.tr`, `einvoiceservice.isnet.net.tr`
+  - Vakıfbank test ve canlı: `vbtestservice.vakifbank.com.tr`, `vbservice.vakifbank.com.tr`
+  - IP denetimi: `api.ipify.org`
+
+  Virgülle ayrılır; `.alan.com.tr` biçimi alt alan adlarını da kapsar.
+- **Vekili kapatmak için:** `EGRESS_PROXY_URL=` (boş). Başka bir sabit IP'li
+  vekil kullanılacaksa onun adresi yazılır.
+
+Çıkış IP'si, vekilin çalıştığı sunucunun IP'sidir. Bu yüzden vekil, IP'si
+değişmeyen (rezerve) bir sunucuda çalışmalı. Sunucu değişirse bütün
+mükelleflerin bankaya ve entegratöre yeniden başvurması gerekir (20 §4).
+
+### Sabit IP'yi entegratöre ve bankaya bildirme
+
+1. **Yığını ayağa kaldırın** ve vekilin dışarıya hangi IP'den çıktığını
+   görün:
+
+   ```bash
+   docker compose -f deploy/compose.prod.yml exec backend /app/egress-check
+   ```
+
+   Çıktı `observed_ip=<IP> via_proxy=true` biçimindedir. Dokploy'da aynı
+   komut `backend` konteynerinde çalıştırılır.
+2. **Bu IP'yi** `.env.server` (ya da Dokploy ortamı) içinde
+   `EGRESS_EXPECTED_IPS`'e yazın ve yeniden deploy edin. Worker IP'yi
+   `EGRESS_CHECK_INTERVAL` aralığıyla denetler; IP değişirse günlüğe ve
+   Sentry'ye yazar. Durum `GET /v1/platform/egress` ucundadır.
+3. **Banka:** aynı IP'yi `BANK_EGRESS_IPS`'e yazın. Mükellefin şube
+   talimatı formunda bu IP görünür.
+4. **İşNet:** IP'yi test ortamı tanımı için İşNet'e iletin (32 §2, adım 2).
+   Canlı tanım, test faturaları başarıyla tamamlandıktan sonra yapılır.
+5. **Vakıfbank:** IP, mükellefin şube talimatıyla tanımlanır. Talimatta
+   Easytrade teknik yetkili ve hizmet sağlayıcı olarak yer alır (20 §5.2).
+6. **Bir hostun vekilden geçtiğini doğrulayın:**
+
+   ```bash
+   docker compose -f deploy/compose.prod.yml exec backend /app/egress-check -probe https://einvoiceservicetest.isnet.net.tr/
+   ```
+
+   Çıktıda `proxied=true` olmalı. Tanım yapılmadan önce İşNet cevap
+   vermez; bu beklenen bir zaman aşımıdır.
+
+`egress-check` çıkış kodları:
+
+| Kod | Anlamı |
+|---|---|
+| 0 | tamam |
+| 1 | hata |
+| 2 | IP, `EGRESS_EXPECTED_IPS` içinde değil |
+| 3 | vekil hostu reddetti; izin listesinde değil |
+
+CI'daki duman testi (`scripts/prod-smoke.sh`) aynı aracı kullanır. İzin
+listesindeki bir host vekilden geçmeli, listede olmayan bir host vekil
+tarafından reddedilmelidir.
 
 ## Nesne deposu kapasitesi (SeaweedFS, #247)
 

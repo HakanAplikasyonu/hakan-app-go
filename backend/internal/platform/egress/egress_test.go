@@ -166,3 +166,71 @@ func TestIsIPNotAllowlisted(t *testing.T) {
 		}
 	}
 }
+
+// TestProxyHostsRouteOnlyAllowlistedHosts (issue #256): with ProxyHosts set,
+// only those hosts (".domain" also covers subdomains and the domain itself)
+// and the IP check host go through the proxy; any other host is called
+// directly.
+func TestProxyHostsRouteOnlyAllowlistedHosts(t *testing.T) {
+	var seen []string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.Host)
+		_, _ = fmt.Fprint(w, "192.0.2.10")
+	}))
+	defer proxy.Close()
+	var direct atomic.Int64
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		direct.Add(1)
+		_, _ = fmt.Fprint(w, "direct")
+	}))
+	defer target.Close()
+
+	cfg := Config{
+		ProxyURL:   proxy.URL,
+		CheckURL:   "http://ip-check.invalid/",
+		ProxyHosts: []string{" einvoiceservice.isnet.invalid ", ".vakifbank.invalid"},
+	}
+	hc, err := cfg.HTTPClient(5 * time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, u := range []string{
+		"http://einvoiceservice.isnet.invalid/svc",
+		"http://vbservice.vakifbank.invalid/svc",
+		"http://vakifbank.invalid/",
+		"http://ip-check.invalid/", // the IP check host is always proxied
+	} {
+		resp, err := hc.Get(u)
+		if err != nil {
+			t.Fatalf("%s: %v", u, err)
+		}
+		_ = resp.Body.Close()
+	}
+	if len(seen) != 4 {
+		t.Fatalf("proxy saw %v, want the 4 allowlisted hosts", seen)
+	}
+	// Not allowlisted: straight to the target, never through the proxy.
+	resp, err := hc.Get(target.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if direct.Load() != 1 || len(seen) != 4 {
+		t.Fatalf("other host: direct=%d proxy=%v", direct.Load(), seen)
+	}
+
+	if !cfg.Proxied("einvoiceservice.isnet.invalid") || !cfg.Proxied("x.vakifbank.invalid") || cfg.Proxied("example.com") {
+		t.Error("Proxied does not follow ProxyHosts")
+	}
+	if (Config{ProxyHosts: []string{"a.invalid"}}).Proxied("a.invalid") {
+		t.Error("no ProxyURL: nothing is proxied")
+	}
+	if !(Config{ProxyURL: proxy.URL}).Proxied("any.invalid") {
+		t.Error("empty ProxyHosts: everything is proxied")
+	}
+	for _, bad := range []string{"*.isnet.net.tr", "http://x.invalid", "a b", "."} {
+		if err := (Config{ProxyHosts: []string{bad}}).Validate(); err == nil {
+			t.Errorf("host %q accepted", bad)
+		}
+	}
+}
