@@ -9,14 +9,14 @@ VALUES (sqlc.arg(organization_id), sqlc.arg(taxpayer_id))
 RETURNING *;
 
 -- name: GetEngagementByUUID :one
-SELECT e.*, t.uuid AS taxpayer_uuid
+SELECT e.*, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = sqlc.arg(organization_id)
   AND e.uuid = sqlc.arg(uuid);
 
 -- name: ListEngagementsByOrg :many
-SELECT e.*, t.uuid AS taxpayer_uuid
+SELECT e.*, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = sqlc.arg(organization_id)
@@ -31,7 +31,7 @@ WHERE e.organization_id = sqlc.arg(organization_id)
   AND (sqlc.narg(status)::text IS NULL OR e.status = sqlc.narg(status));
 
 -- name: ListAssignedEngagements :many
-SELECT e.*, t.uuid AS taxpayer_uuid
+SELECT e.*, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 INNER JOIN engagement_assignments a

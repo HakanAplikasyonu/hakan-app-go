@@ -34,6 +34,9 @@ type UploadEvent struct {
 	Outcome        string `json:"outcome"` // uploaded | duplicate | rejected | failed
 	JobUUID        string `json:"job_uuid,omitempty"`
 	Error          string `json:"error,omitempty"`
+	// Reason kullanıcıya gösterilecek Türkçe açıklama (#206); Error ham
+	// ayrıntıdır ve yalnızca günlükte / Gelişmiş bölümünde kullanılır.
+	Reason string `json:"reason,omitempty"`
 }
 
 // Uploader, Client.UploadUBL'in test edilebilir hâli.
@@ -57,6 +60,96 @@ type Watcher struct {
 	known map[string]fileMark
 	// Geçici hatada (ağ, 5xx) dosya bir sonraki taramada yeniden denenir.
 	stats WatchStats
+	// folders klasör başına son etkinlik (#206); bellekte tutulur.
+	folders map[string]*FolderActivity
+}
+
+// maxFolderErrors klasör başına tutulan en fazla hata.
+const maxFolderErrors = 20
+
+// FileError bir dosyanın kullanıcıya gösterilecek hatası.
+type FileError struct {
+	Name    string    `json:"name"`
+	Message string    `json:"message"`
+	Retry   bool      `json:"retry"` // geçici hata: sonraki taramada yeniden denenir
+	At      time.Time `json:"at"`
+}
+
+// FolderActivity bir klasörün son yükleme durumu ve hata listesi (#206).
+type FolderActivity struct {
+	LastFile     string      `json:"last_file,omitempty"`
+	LastOutcome  string      `json:"last_outcome,omitempty"` // uploaded | rejected | failed
+	LastAt       *time.Time  `json:"last_at,omitempty"`
+	LastUploadAt *time.Time  `json:"last_upload_at,omitempty"`
+	Uploaded     int         `json:"uploaded"`
+	FolderError  string      `json:"folder_error,omitempty"`
+	Errors       []FileError `json:"errors"`
+}
+
+// Activity klasörün etkinliğinin kopyası (yoksa boş).
+func (w *Watcher) Activity(path string) FolderActivity {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	a, ok := w.folders[path]
+	if !ok {
+		return FolderActivity{Errors: []FileError{}}
+	}
+	out := *a
+	out.Errors = append([]FileError{}, a.Errors...)
+	return out
+}
+
+// ClearErrors klasörün hata listesini temizler.
+func (w *Watcher) ClearErrors(path string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if a, ok := w.folders[path]; ok {
+		a.Errors = nil
+	}
+}
+
+func (w *Watcher) folderLocked(path string) *FolderActivity {
+	if w.folders == nil {
+		w.folders = map[string]*FolderActivity{}
+	}
+	a, ok := w.folders[path]
+	if !ok {
+		a = &FolderActivity{}
+		w.folders[path] = a
+	}
+	return a
+}
+
+// note bir dosya sonucunu klasörün etkinliğine işler.
+func (w *Watcher) note(folder string, ev UploadEvent, now time.Time) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	a := w.folderLocked(folder)
+	t := now
+	a.LastFile, a.LastOutcome, a.LastAt = ev.Name, ev.Outcome, &t
+	if ev.Outcome == "uploaded" {
+		a.Uploaded++
+		a.LastUploadAt = &t
+		return
+	}
+	// Aynı dosyanın önceki hatası güncellenir; liste en yeni başta.
+	errs := a.Errors[:0]
+	for _, e := range a.Errors {
+		if e.Name != ev.Name {
+			errs = append(errs, e)
+		}
+	}
+	fe := FileError{Name: ev.Name, Message: ev.Reason, Retry: ev.Outcome == "failed", At: t}
+	a.Errors = append([]FileError{fe}, errs...)
+	if len(a.Errors) > maxFolderErrors {
+		a.Errors = a.Errors[:maxFolderErrors]
+	}
+}
+
+func (w *Watcher) setFolderError(folder, msg string) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.folderLocked(folder).FolderError = msg
 }
 
 // WatchStats heartbeat'e eklenen sayaçlar.
@@ -98,8 +191,10 @@ func (w *Watcher) Scan(ctx context.Context, now time.Time) {
 		entries, err := os.ReadDir(wt.Path)
 		if err != nil {
 			w.setError("klasör okunamadı: " + err.Error())
+			w.setFolderError(wt.Path, folderReason(err))
 			continue
 		}
+		w.setFolderError(wt.Path, "")
 		for _, e := range entries {
 			if ctx.Err() != nil {
 				return
@@ -138,12 +233,18 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 	}
 	name := filepath.Base(path)
 	ev := UploadEvent{Path: path, Name: name, EngagementUUID: wt.EngagementUUID}
+	defer func() {
+		if ev.Outcome != "" {
+			w.note(wt.Path, ev, now)
+		}
+	}()
 	if cur.size == 0 {
 		return
 	}
 	if cur.size > MaxFileBytes {
 		w.markKnown(path, cur)
-		w.finish(ev, "", "rejected", "dosya 200 MB sınırını aşıyor", "")
+		ev.Reason = "Dosya 200 MB sınırını aşıyor; yüklenmedi."
+		ev = w.finish(ev, "", "rejected", "dosya 200 MB sınırını aşıyor", "")
 		return
 	}
 	data, err := os.ReadFile(path)
@@ -160,11 +261,12 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 	switch {
 	case err == nil:
 		w.markKnown(path, cur)
-		w.finish(ev, sha, "uploaded", "", job.UUID)
+		ev = w.finish(ev, sha, "uploaded", "", job.UUID)
 	case errors.As(err, &ae) && permanent(ae.Status):
 		// Biçim / boyut / yetki hatası: yeniden denemek sonuç değiştirmez.
 		w.markKnown(path, cur)
-		w.finish(ev, sha, "rejected", ae.Error(), "")
+		ev.Reason = rejectReason(ae.Status)
+		ev = w.finish(ev, sha, "rejected", ae.Error(), "")
 	default:
 		w.mu.Lock()
 		w.stats.Failed++
@@ -173,6 +275,7 @@ func (w *Watcher) consider(ctx context.Context, now time.Time, wt Watch, path st
 		delete(w.marks, path)
 		w.mu.Unlock()
 		ev.Outcome, ev.Error = "failed", err.Error()
+		ev.Reason = "Sunucuya gönderilemedi; bir sonraki taramada yeniden denenecek."
 		w.emit(ev)
 	}
 }
@@ -192,7 +295,7 @@ func permanent(status int) bool {
 	return false
 }
 
-func (w *Watcher) finish(ev UploadEvent, sha, outcome, errMsg, job string) {
+func (w *Watcher) finish(ev UploadEvent, sha, outcome, errMsg, job string) UploadEvent {
 	if sha != "" {
 		rec := Uploaded{Name: ev.Name, EngagementUUID: ev.EngagementUUID, JobUUID: job, At: time.Now().UTC()}
 		if outcome == "rejected" {
@@ -209,6 +312,35 @@ func (w *Watcher) finish(ev UploadEvent, sha, outcome, errMsg, job string) {
 	w.mu.Unlock()
 	ev.Outcome, ev.Error, ev.JobUUID = outcome, errMsg, job
 	w.emit(ev)
+	return ev
+}
+
+// rejectReason kalıcı yükleme hatasının kullanıcıya gösterilecek metni.
+func rejectReason(status int) string {
+	switch status {
+	case http.StatusUnsupportedMediaType:
+		return "Dosya e-fatura (UBL-TR) değil; yüklenmedi."
+	case http.StatusRequestEntityTooLarge:
+		return "Dosya çok büyük; yüklenmedi."
+	case http.StatusForbidden:
+		return "Bu mükellefe yükleme yetkiniz yok."
+	case http.StatusNotFound:
+		return "Mükellef ilişkisi bulunamadı ya da sona ermiş."
+	default:
+		return "Dosya okunamadı ya da geçerli bir e-fatura değil; yüklenmedi."
+	}
+}
+
+// folderReason klasör okuma hatasının kullanıcıya gösterilecek metni.
+func folderReason(err error) string {
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		return "Klasör bulunamadı. Taşınmış ya da silinmiş olabilir."
+	case errors.Is(err, os.ErrPermission):
+		return "Klasöre erişim izni yok."
+	default:
+		return "Klasör okunamadı."
+	}
 }
 
 func (w *Watcher) emit(ev UploadEvent) {

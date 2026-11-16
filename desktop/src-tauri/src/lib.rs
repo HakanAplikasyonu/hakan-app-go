@@ -44,6 +44,7 @@ const ALLOWED_METHODS: &[&str] = &[
     "agent.engagements",
     "watch.add",
     "watch.remove",
+    "watch.clear_errors",
     "source.test",
     "source.preview",
 ];
@@ -405,6 +406,26 @@ fn sidecar_restart(app: AppHandle) -> Result<(), String> {
     set_paused(&app, false)
 }
 
+/// İşletim sisteminin klasör seçicisi (#206): kullanıcı yol yazmaz. İptal
+/// edilirse `None`. Diyalog yalnızca kabuktan açılır; ön yüze dosya sistemi
+/// izni verilmez.
+#[tauri::command]
+async fn pick_folder(app: AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let mut dialog = app.dialog().file().set_title("İzlenecek klasörü seçin");
+    if let Some(w) = app.get_webview_window(MAIN_WINDOW) {
+        dialog = dialog.set_parent(&w);
+    }
+    dialog.pick_folder(move |p| {
+        let _ = tx.send(p);
+    });
+    let picked = rx.await.map_err(|_| "Klasör seçici kapandı.".to_string())?;
+    Ok(picked
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned()))
+}
+
 #[derive(serde::Serialize)]
 struct ShellSettings {
     autostart: bool,
@@ -687,6 +708,7 @@ pub fn run() {
         }))
         .plugin(log_plugin())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -767,6 +789,7 @@ pub fn run() {
             shell_settings,
             set_autostart_enabled,
             set_watch_paused,
+            pick_folder,
             update_status,
             update_check,
             update_set_channel,

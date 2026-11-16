@@ -20,13 +20,14 @@ Dosyaları taşımaz ve silmez; aynı içerik bir kez yüklenir.
 
 ![Oturum açma](../../frontend/public/yardim/img/masaustu-oturum.jpg)
 
-1. **API adresi**ni yazın (yöneticinizden alın, ör.
-   `https://api.ofisiniz.com`) ve **Sunucuyu dene** ile denetleyin.
-2. Ofis panelindeki e-posta ve parolanızla oturum açın. İki adımlı
-   doğrulama açıksa kodu da girin.
-3. Ofisi seçin, bu bilgisayar için bir **ajan adı** verin (ör.
-   `Muhasebe-PC-01`) ve **Ajanı başlat**'a basın. Ajan ofise kaydolur;
-   rozet **Çevrimiçi** olur.
+1. Ofis panelindeki e-posta ve parolanızla oturum açın. İki adımlı
+   doğrulama açıksa uygulama kodu ister.
+2. İlk açılışta **Sunucu adresi** bölümüne yöneticinizin verdiği adresi
+   yazın (ör. `https://hakan.ofisiniz.com`). **Bağlantıyı dene** ile
+   denetleyebilirsiniz. Adres bir kez kaydedilir.
+3. Ofisi seçin, bu bilgisayara ofiste görünecek bir ad verin (ör.
+   `Muhasebe masası`) ve **Devam et**'e basın. Ajan ofise kaydolur; sağ
+   üstteki rozet **Çevrimiçi** olur.
 
 Parolanız bilgisayarda saklanmaz. Oturum belirteci işletim sisteminin
 anahtar zincirinde (Windows Kimlik Bilgisi Yöneticisi, macOS Anahtar
@@ -36,20 +37,35 @@ Zinciri) tutulur.
 
 ![Klasör izleme](../../frontend/public/yardim/img/masaustu-izleme.jpg)
 
-1. **Mükellef**i seçin ve isterseniz bir **etiket** yazın (ör. "Atlas Gıda
-   indirilenler").
-2. **Klasör yolu**nu yazın ya da klasörü pencereye sürükleyin ve **Ekle**'ye
-   basın.
-3. Ajan klasörü 15 saniyede bir tarar. Boyutu ve zamanı iki taramada
+1. **Klasörler** sekmesinde **Klasör ekle**'ye basın.
+2. **Mükellef**i adıyla arayıp seçin.
+3. **Klasör seç…** ile klasörü işletim sisteminin penceresinden seçin (yol
+   yazmanız gerekmez). Klasörü uygulama penceresine sürükleyip
+   bırakabilirsiniz de.
+4. İsterseniz kısa bir ad verin (ör. "Gelen e-faturalar") ve **İzlemeye
+   al**'a basın.
+5. Ajan klasörü 15 saniyede bir tarar. Boyutu ve zamanı iki taramada
    değişmeyen (yazılması bitmiş) `.xml` ve `.zip` dosyalarını yükler.
-4. **Son yüklemeler** her dosyanın sonucunu gösterir:
-   - **yüklendi:** faturalar ofis panelinde görünür.
-   - **reddedildi:** dosya geçerli bir UBL değil ya da çok büyük; yeniden
-     denenmez. Dosyayı kontrol edin.
-   - **gönderilemedi, yeniden denenecek:** ağ ya da sunucu sorunu; bir
-     sonraki taramada yeniden denenir.
 
-Bir klasörü izlemeden çıkarmak için satırındaki **Kaldır**'a basın.
+Her klasörün kartında mükellefin adı, son yükleme zamanı ve durum görünür:
+
+- **Son yükleme …:** dosyalar sorunsuz yükleniyor.
+- **N dosyada sorun var:** **Sorunlu dosyalar** listesini açın. Her
+  dosyanın adı ve nedeni yazar (ör. "Dosya e-fatura (UBL-TR) değil").
+  Dosyayı düzelttikten sonra **Listeyi temizle**'ye basabilirsiniz.
+- **Klasör bulunamadı:** klasör taşınmış ya da silinmiş; klasörü kaldırıp
+  yeniden ekleyin.
+
+**Son yüklemeler** bu oturumdaki dosyaları mükellef adıyla gösterir:
+
+- **Yüklendi:** faturalar ofis panelinde görünür.
+- **Yüklenmedi** (nedeniyle): dosya geçerli bir e-fatura değil ya da çok
+  büyük; yeniden denenmez.
+- **Gönderilemedi, yeniden denenecek:** ağ ya da sunucu sorunu; bir sonraki
+  taramada yeniden denenir.
+
+Bir klasörü izlemeden çıkarmak için kartındaki **Kaldır**'a basın.
+Klasördeki dosyalara dokunulmaz.
 
 ## Arka planda çalışma
 
@@ -59,14 +75,31 @@ Bir klasörü izlemeden çıkarmak için satırındaki **Kaldır**'a basın.
   başlat**, **Çıkış**.
 - **Oturum açılışında başlat** varsayılan olarak kapalıdır. Açarsanız
   bilgisayar açıldığında ajan pencere göstermeden başlar.
+- Aynı ayarlar **Ayarlar** sekmesinde de var: **Bilgisayar açılınca
+  Hakan'ı başlat** ve **Klasör izlemeyi duraklat**. İzleme duraklatılınca
+  pencerenin üstünde bir uyarı ve **İzlemeyi sürdür** düğmesi görünür.
+
+## Güncellemeler
+
+- Uygulama açılışta ve 6 saatte bir yeni sürümü denetler. Yeni sürüm varsa
+  pencerenin üstünde **Güncelle ve yeniden başlat** görünür; indirme
+  ilerleme çubuğuyla izlenir, sonra uygulama yeniden açılır.
+- **Ayarlar → Güncellemeler**'de kanalı seçebilirsiniz: **Kararlı** ya da
+  **Beta (erken erişim)**. **Şimdi denetle** hemen denetler.
+- "Bu derlemede otomatik güncelleme kapalı" yazıyorsa yöneticinizden yeni
+  kurulum dosyasını isteyin.
 
 ## Logo / Mikro yerel okuma
 
 Mükellefin Logo Tiger, Logo GO ya da Mikro veritabanına salt okunur bir SQL
 kullanıcısıyla bağlanır. Yalnızca önceden tanımlı sorgular çalışır.
 
-- **Bağlantıyı dene:** bağlantıyı ve beklenen tabloları denetler.
-- **Geçen ayı önizle:** bir aylık veriyi okuyup özetler.
+**Muhasebe programı** sekmesinde:
+
+- **Bağlantıyı dene:** bağlantıyı ve beklenen tabloları denetler; kaç
+  tablonun bulunduğunu ve bulunamayanları yazar.
+- **Geçen ayı önizle:** bir aylık faturaları okur; satış / alış sayısını ve
+  ilk faturaları (belge no, tarih, karşı taraf, tutar) tablo olarak gösterir.
 
 > Tablo ve alan adları pilot mükellefte doğrulanacak. Okunan veri şimdilik sunucuya gönderilmez.
 
@@ -74,13 +107,17 @@ kullanıcısıyla bağlanır. Yalnızca önceden tanımlı sorgular çalışır.
 
 | Belirti | Ne yapmalı |
 |---|---|
-| Rozet **Oturum yok** | Oturum açın. Oturum sunucuda kapatıldıysa (ör. parola değişti) yeniden açın. |
-| Rozet **Ofis seçilmedi** | Ofisi seçip **Ajanı başlat**'a basın. |
-| Rozet **Bağlantı sorunu** | İnternet bağlantısını ve API adresini denetleyin. Ajan 30 dakika sessiz kalırsa ofis panelinde çevrimdışı görünür ve kaydeden kullanıcıya bildirim gider. |
-| Yerel ajan **Kapandı** | Ajan kendini kısa aralıklarla (1, 2, 4… en çok 16 sn) yeniden başlatır. Düzelmezse **Yeniden başlat**'a basın. |
-| Dosya yüklenmiyor | Uzantı `.xml` ya da `.zip` mi? Dosya hâlâ yazılıyor olabilir: iki tarama bekleyin. İzleme duraklatılmış olabilir: tepsiden **İzlemeyi sürdür**. |
-| "Çok fazla yükleme" | Kısa sürede çok sayıda dosya gönderildi. Ajan bir sonraki taramada yeniden dener. |
-| Güncelleme | **Güncelleme denetle**. Bu derlemede güncelleyici kapalıysa yöneticinizden yeni kurulum dosyasını isteyin. |
+| Rozet **Oturum açılmadı** | Oturum açın. Oturum sunucuda kapatıldıysa (ör. parola değişti) yeniden açın. |
+| Rozet **Ofis seçilmedi** | Ofisi seçip **Devam et**'e basın. |
+| Rozet **Bağlantı sorunu** | İnternet bağlantısını ve sunucu adresini denetleyin. Ajan 30 dakika sessiz kalırsa ofis panelinde çevrimdışı görünür ve kaydeden kullanıcıya bildirim gider. |
+| Rozet **Yerel ajan yeniden başlatılıyor…** | Ajan kendini kısa aralıklarla (1, 2, 4… en çok 16 sn) yeniden başlatır. Düzelmezse **Gelişmiş → Yerel ajanı yeniden başlat**. |
+| Dosya yüklenmiyor | Klasörün **Sorunlu dosyalar** listesine bakın. Uzantı `.xml` ya da `.zip` mi? Dosya hâlâ yazılıyor olabilir: iki tarama bekleyin. İzleme duraklatılmış olabilir: **İzlemeyi sürdür**. |
+| "Gönderilemedi, yeniden denenecek" | Ağ ya da sunucu sorunu. Ajan bir sonraki taramada yeniden dener. |
+| Mükellef listede yok | Yalnızca size atanmış etkin mükellefler listelenir. Ofis yöneticinizden atama isteyin. |
+
+**Gelişmiş** sekmesi destek içindir: uygulama ve yerel ajan sürümü, son
+teknik hata, **Yerel ajanı dene** ve bir e-fatura XML dosyasını yerelde
+denetleme (dosyayı pencereye sürükleyin; sunucuya gönderilmez).
 
 **Günlük dosyası** (destek isterken ekleyin): `hakan.log`
 

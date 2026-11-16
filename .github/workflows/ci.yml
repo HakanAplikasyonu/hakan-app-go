@@ -884,6 +884,11 @@ jobs:
       # HAKAN (#183): sürüm betikleri (güncelleyici manifesti, kanal seçimi).
       - name: Release scripts test
         run: npm test
+      # HAKAN (#206): ui/ dosyaları Chromium'da sahte Tauri IPC'siyle.
+      - name: UI test (Playwright, mock IPC)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:ui
       - name: Build sidecar
         run: npm run sidecar
       - name: Linux packages for Tauri
