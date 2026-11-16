@@ -10,6 +10,7 @@
 #   E2E_PG_PORT       compose Postgres'inin host portu (varsayılan 5432)
 #   E2E_COMPOSE_FILES ek compose dosyaları, ":" ile ayrılmış (ör. yerel override)
 #   E2E_SKIP_BUILD=1  frontend derlemesini atla (önceki .next kullanılır)
+#   E2E_SKIP_FRONTEND=1  frontend'i hiç başlatma (yalnızca API; mobil Maestro işi, #300)
 #   E2E_SA_EMAIL / E2E_SA_PASSWORD  oluşturulan platform yöneticisi
 set -euo pipefail
 
@@ -114,15 +115,19 @@ setsid nohup "$DIR/server" > "$DIR/server.log" 2>&1 < /dev/null &
 echo $! > "$DIR/server.pid"
 wait_for api "http://127.0.0.1:8080/readyz" 60
 
-echo "== frontend (next build && next start)"
-if [ "${E2E_SKIP_BUILD:-}" != "1" ]; then
-  (cd "$ROOT/frontend" && pnpm build > "$DIR/frontend-build.log" 2>&1) || { tail -60 "$DIR/frontend-build.log" >&2; exit 1; }
+if [ "${E2E_SKIP_FRONTEND:-}" = "1" ]; then
+  echo "== frontend atlandı (E2E_SKIP_FRONTEND=1)"
+else
+  echo "== frontend (next build && next start)"
+  if [ "${E2E_SKIP_BUILD:-}" != "1" ]; then
+    (cd "$ROOT/frontend" && pnpm build > "$DIR/frontend-build.log" 2>&1) || { tail -60 "$DIR/frontend-build.log" >&2; exit 1; }
+  fi
+  (
+    cd "$ROOT/frontend"
+    setsid nohup ./node_modules/.bin/next start > "$DIR/frontend.log" 2>&1 < /dev/null &
+    echo $! > "$DIR/frontend.pid"
+  )
+  wait_for frontend "http://127.0.0.1:3000/login" 90
 fi
-(
-  cd "$ROOT/frontend"
-  setsid nohup ./node_modules/.bin/next start > "$DIR/frontend.log" 2>&1 < /dev/null &
-  echo $! > "$DIR/frontend.pid"
-)
-wait_for frontend "http://127.0.0.1:3000/login" 90
 
-echo "e2e ortamı hazır: http://localhost:3000 (Mailhog http://localhost:${MAILHOG_UI_PORT:-8025})"
+echo "e2e ortamı hazır: API http://localhost:8080, panel http://localhost:3000 (Mailhog http://localhost:${MAILHOG_UI_PORT:-8025})"
