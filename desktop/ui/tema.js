@@ -14,9 +14,13 @@ function oku(anahtar, gecerli, varsayilan) {
   }
 }
 
+/** Kayıtlı seçim: { palet: 'm3' | 'n3', kip: 'light' | 'dark' | 'system' }. */
+export function temaTercihi() {
+  return { palet: oku(PALET, ['m3', 'n3'], 'm3'), kip: oku(KIP, ['light', 'dark', 'system'], 'system') };
+}
+
 export function temaUygula() {
-  const palet = oku(PALET, ['m3', 'n3'], 'm3');
-  const kip = oku(KIP, ['light', 'dark', 'system'], 'system');
+  const { palet, kip } = temaTercihi();
   const koyu = kip === 'dark' || (kip === 'system' && mq.matches);
   document.documentElement.dataset.theme = `${palet}-${koyu ? 'dark' : 'light'}`;
 }
