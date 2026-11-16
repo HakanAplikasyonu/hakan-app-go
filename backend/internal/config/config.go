@@ -365,6 +365,10 @@ type EgressConfig struct {
 	CheckURL string
 	// CheckInterval is the period of the IP check.
 	CheckInterval time.Duration
+	// ProxyHosts limits ProxyURL to these hosts (".example.com" also covers
+	// subdomains, as in squid's dstdomain); every other host goes direct
+	// (issue #256). Empty: everything through ProxyURL.
+	ProxyHosts []string
 }
 
 // BulkConfig controls bulk action engine thresholds.
@@ -469,6 +473,7 @@ func Load() (Config, error) {
 			ExpectedIPs:   splitCSV(getEnv("EGRESS_EXPECTED_IPS", "")),
 			CheckURL:      getEnv("EGRESS_IP_CHECK_URL", "https://api.ipify.org"),
 			CheckInterval: getDuration("EGRESS_CHECK_INTERVAL", 15*time.Minute),
+			ProxyHosts:    splitCSV(getEnv("EGRESS_PROXY_HOSTS", "")),
 		},
 		Bulk: BulkConfig{
 			SyncMax:       getInt("BULK_SYNC_MAX", 50),
