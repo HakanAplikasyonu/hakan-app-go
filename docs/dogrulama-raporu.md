@@ -218,3 +218,124 @@ Bütün ofis sayfaları tarandı (genel bakış, komuta merkezi, mükellefler, f
 - **Yevmiye ekranının varsayılan dönemi:** ekran içinde bulunulan ayı açıyor, faturalar çoğunlukla bir önceki aya ait (#161'deki not).
 - **1. turun §6 listesi geçerli:** mobil uygulama cihazda, masaüstü ajanı, gerçek dış servisler ve kilitli döneme fatura gelmesi bu turda da denenmedi.
 - **Fatura uyarıları:** demo UBL seti fatura uyarısı üretmedi; uyarı ekranı BNK uyarısıyla doğrulandı.
+
+---
+
+## 3. tur (#195)
+
+| | |
+|---|---|
+| Doğrulanan commit | `474e65f` ile `422beee` arası main (imajlar `474e65f`'ten, testler `422beee`'den) |
+| Yığın | `deploy/compose.prod.yml` (düz Docker sunucusu, Caddy vekil): Postgres 18, Redis, SeaweedFS, Meilisearch, Centrifugo, migrate, backend, worker, frontend, backup, proxy |
+| İmajlar | `backend`, `frontend`, `backup` yerelde `deploy/images.json`'daki Dockerfile'larla derlendi (`local/hakan-*:main`) |
+| Env | `scripts/prod-env.sh init` (APP_URL `http://localhost`, sırlar üretildi). Üretilen değerlere şunlar eklendi: yedek için `age` alıcısı, `METRICS_TOKEN`, SMTP'yi Mailhog'a yönlendiren ayar |
+| Ek | Yalnızca bu tur için bir override dosyası: Mailhog, API ve metrik portlarını `127.0.0.1`'e açma. Depoya girmedi |
+
+### Özet
+
+- **Üretim yığını temiz kurulumda ayakta:**
+  - Migration'lar 78. sürümde ve dirty değil.
+  - Bütün servisler sağlıklı.
+  - Vekil → frontend → BFF → API zinciri 200 dönüyor; güvenlik başlıkları var.
+- **Ofis ana akışı üretim yığınında 6/6 geçti** (`e2e/tests/office-onboarding.spec.ts`): ofis kaydı → mükellef ekleme ve onay → UBL yükle → hesap önerisi onayı → yevmiye → Luca/Zirve indirme → mükellef paneli.
+- **Yedekten geri yükleme çalışıyor:**
+  - Yığın birimleriyle silindi, belgedeki adımlarla geri yüklendi.
+  - Şema, tablolar, satırlar ve 6 nesne manifestle doğrulandı.
+  - Uygulama sayıları birebir aynı; eski kullanıcı giriş yapabiliyor, nesne deposundaki dosya indiriliyor.
+- **RLS açık, metrikler çalışıyor.** Loglarda kişisel veri ya da belirteç görülmedi.
+- **Yeni bulgular (4):**
+  - #219: 5xx nedeni loglanmıyordu → [#220](https://github.com/HakanAplikasyonu/hakan-app-go/pull/220).
+  - #221: e2e'de yükleme yarışı → [#222](https://github.com/HakanAplikasyonu/hakan-app-go/pull/222), birleşti.
+  - #246: `frontend/.dockerignore` yok → [#249](https://github.com/HakanAplikasyonu/hakan-app-go/pull/249).
+  - #247: SeaweedFS kapasite ayarı; ürün kararı gerekiyor.
+
+### 3.1 Kurulum
+
+| Adım | Sonuç |
+|---|---|
+| İmaj derleme (backend, frontend, backup) | ✅. Frontend önce düştü: `.dockerignore` olmadığı için bağlama 4,8 GB'lık `.next` ve `node_modules` girdi (#246). Git'teki temiz dosyalarla derlendi. Bu sandbox'ın vekili için derlemede geçici bir CA katmanı kullanıldı (depoya girmedi) |
+| `prod-env.sh init` | ✅ şema v5, 42 anahtar, sırlar üretildi. `APP_URL` https değil uyarısı beklendiği gibi |
+| `compose up` | ❌→✅ İlk denemede `SMTP_TLS=off` yazdım. Backend ve worker açık bir hata mesajıyla durdu (`auto|starttls|implicit|none`). `none` ile düzeldi; ürün hatası değil |
+| Migration | ✅ `migrate` 0 ile çıktı, `schema_migrations` = 78, dirty değil |
+| Sağlık | ✅ backend, frontend, postgres, redis, seaweedfs, meilisearch, centrifugo, backup sağlıklı; proxy çalışıyor |
+| Vekil | ✅ `/health` 200, `/api/v1/app/config` 200 |
+| Güvenlik başlıkları | ✅ HSTS, CSP (`frame-ancestors 'self'`), `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` |
+
+### 3.2 Uçtan uca akış (üretim yığını)
+
+- Platform yöneticisi imajdaki `create-super-admin` ile oluşturuldu.
+- `office-onboarding.spec.ts`, `E2E_BASE_URL=http://localhost` (Caddy) ve API'nin doğrudan adresiyle koştu: **6/6** (18 sn).
+
+| Adım | Sonuç |
+|---|---|
+| Ofis kaydı: platform panelinden ofis + e-posta daveti + davetle kayıt | ✅ |
+| Mükellef ekleme: onay e-postası, mükellefin kaydı ve onayı | ✅ |
+| UBL yükle: yeni VKN ile türetilen 2 fatura | ✅ |
+| Hesap önerisi ve kuyruktan onay | ✅ |
+| Yevmiye: taslak, onay, Luca ve Zirve indirme | ✅ |
+| Mükellef paneli ve ofisler arası erişim reddi | ✅ |
+
+Duman testi, davet ve erişim reddi testleri demo verisine dayanıyor. Demo seed üretimde (`APP_ENV=production`) çalışmayı reddediyor, bu yüzden o testler bu yığında koşmadı. e2e ortamında yeşiller.
+
+### 3.3 Yedek ve geri yükleme
+
+| Adım | Sonuç |
+|---|---|
+| Yedek öncesi | `org=1 users=3 taxpayers=1 invoices=2 journal_drafts=2 upload_jobs=2 schema=78` |
+| `backup-run` | ✅ şifreli `db-*.dump.age`, `db-*.roles.sql.age`, `objects-*.tar.age` (6 nesne, 92 KB) ve manifestler |
+| Felaket | Yığın `down -v` ile birimleriyle silindi |
+| Geri yükleme (`docs/yedekleme.md`) | ✅ yalnızca postgres, seaweedfs ve backup başlatıldı. `restore-db`: roller + döküm, manifest doğrulaması "schema version 78, 106 tables, 668 rows". `restore-objects`: 6 nesne. Toplam **3 sn** (küçük veri) |
+| Tam yığın | ✅ `migrate` 0 ile çıktı, bütün servisler sağlıklı |
+| Yedek sonrası | `org=1 users=3 taxpayers=1 invoices=2 journal_drafts=2 upload_jobs=2 schema=78`, **aynı** |
+| Uygulama | ✅ ofis sahibi eski şifresiyle giriş yaptı; iki fatura listede; nesne deposundaki `zirve_fis_2026-11.xlsx` indirildi (200, geçerli xlsx) |
+
+Yedek anahtarı ve `.env.server` işten sonra silindi.
+
+### 3.4 RLS (#166)
+
+| Denetim | Sonuç |
+|---|---|
+| Ayar | `DB_RLS_RUNTIME` ve `DB_RLS_REQUEST_SCOPE` üretim compose'unda boş, kod varsayılanı `true`: açık |
+| Roller | `hakan_rls_app`, `hakan_rls_runtime`, `hakan_rls_worker` var |
+| Zorlanmış tablolar | `petitions`, `vat_carry_forwards`, `export_settings`: `relrowsecurity` ve `relforcerowsecurity` açık (`rls_enforced.txt` ile aynı) |
+| Kapsamsız okuma | `SET ROLE hakan_rls_runtime` ile kapsamsız: zorlanmış tablolarda 0 satır (bu veride zaten 0 satırdı, kesin kanıt değil). Henüz zorlanmayan `invoices` kapsamsız okunabiliyor; kademeli geçiş tasarımı gereği |
+| Kiracı izolasyonu | ✅ yeni ofisin sahibi demo ofisine `NO_TENANT_MEMBERSHIP` aldı; yeni mükellef yalnızca kendi faturalarını görüyor |
+
+Zorlanmış tablolarda satır bazlı sızıntı testi (`rls_enforcement_db_test.go`) CI'da çalışıyor. Bu turda üretim verisinde ayrıca denenmedi.
+
+### 3.5 Log maskeleme (#179)
+
+- **Biçim:** JSON, `LOG_LEVEL=info`.
+- **Yapılan deneme:** akış ve kasıtlı hatalar (e-postayla hatalı giriş; sorgu dizesinde e-posta, TCKN ve IBAN) sonrası backend ve worker logları tarandı.
+- **Aranan ve bulunmayanlar:** test e-postaları, VKN, JWT (`eyJ…`), şifre, `Bearer`, onay ve davet belirteçleri. Hiçbiri yok.
+- **Ne loglanıyor:** erişim logu yalnızca rota, durum, süre ve istek kimliğini yazıyor; sorgu dizesi yazılmıyor.
+- **Eksik:** 401 gibi 4xx'lerin gerekçesi ve 5xx'lerin nedeni loga düşmüyordu (#219). Düzeltme #220'de. #220 birleşince gerekçeler maskelenmiş (`ScrubString`) olarak yazılacak.
+
+### 3.6 Metrikler (#179)
+
+| Denetim | Sonuç |
+|---|---|
+| API `:9091/metrics` tokensız | ✅ 401 |
+| API tokenla | ✅ `http_requests_total`, `http_request_duration_seconds` (rota kalıbı ve durumla) |
+| Worker `:9092/metrics` | ✅ `queue_tasks`, `queue_latency_seconds`, `queue_inspect_up` |
+
+### 3.7 3. turda açılan issue'lar
+
+| Issue | Konu | Önem | Durum |
+|---|---|---|---|
+| [#219](https://github.com/HakanAplikasyonu/hakan-app-go/issues/219) | 5xx nedeni ve 4xx gerekçesi loglanmıyor: metrik (#187) ve RLS (#191) yazıcıları kaydediciyi gizliyor | Yüksek (gözlemlenebilirlik) | [#220](https://github.com/HakanAplikasyonu/hakan-app-go/pull/220), auto-merge açık |
+| [#221](https://github.com/HakanAplikasyonu/hakan-app-go/issues/221) | e2e `office-onboarding` ikinci yükleme işini beklemiyor (CI'da kararsız) | Orta | ✅ [#222](https://github.com/HakanAplikasyonu/hakan-app-go/pull/222) birleşti |
+| [#246](https://github.com/HakanAplikasyonu/hakan-app-go/issues/246) | `frontend/.dockerignore` yok: yerel derleme host `node_modules`/`.next`'i imaja kopyalıyor | Orta | [#249](https://github.com/HakanAplikasyonu/hakan-app-go/pull/249), auto-merge açık |
+| [#247](https://github.com/HakanAplikasyonu/hakan-app-go/issues/247) | SeaweedFS `-volume.max=0`: disk azalınca nesne yazımı 500 dönüyor | Orta (kapasite) | Ürün kararı gerekiyor |
+
+### 3.8 Karar bekleyenler ve doğrulanmayanlar
+
+- **Nesne deposu kapasitesi ve izlenmesi (#247):** birim boyutu, `-volume.max`, ayrı disk ve boş birim uyarısı.
+- **RLS zorlaması:** şu an 3 tablo zorlanmış. Geri kalan tabloların gruplar halinde zorlanma takvimi #166'da.
+- **CI'daki `prod-smoke` kararsızlığı:** #234'ün koşusunda `prod-smoke` yedek adımında düştü. SeaweedFS henüz lider seçmemişti ("raft.Server: Not current leader"), değişiklikle ilgisi yok. Yedek adımından önce SeaweedFS'in yazmaya hazır olması beklenmeli; tekrar ederse ayrı issue açılacak.
+- **Doğrulanmayanlar:**
+  - HTTPS (gerçek alan adı ve Caddy otomatik sertifika); bu turda `http://localhost` kullanıldı.
+  - Gerçek SMTP sağlayıcısı.
+  - Worker'ın ayrı çıkış IP'li kopyası (`worker-egress`).
+  - Sentry ve OpenTelemetry dışa aktarımı.
+  - Demo verisine dayanan duman, davet ve erişim testlerinin üretim yığınında koşması.
