@@ -39,6 +39,8 @@
   "resources.platform.integrations.apple": "Apple entegrasyonu",
   "resources.auth.step_up": "Step-up doğrulama",
   "resources.auth.account": "Hesap",
+  "resources.security": "Güvenlik",
+  "resources.storage": "Dosya deposu",
   "actions.organizations.created": "Organizasyon oluşturuldu",
   "actions.organizations.updated": "Organizasyon güncellendi",
   "actions.organizations.deleted": "Organizasyon silindi",
@@ -52,5 +54,8 @@
   "actions.organizations.invitation_revoked": "Davet iptal edildi",
   "actions.organizations.invitation_accepted": "Davet kabul edildi",
   "actions.vat.opening.set": "KDV açılış devri girildi",
-  "actions.vat.opening.delete": "KDV açılış devri silindi"
+  "actions.vat.opening.delete": "KDV açılış devri silindi",
+  "actions.security.rate_limited": "Hız sınırı aşıldı",
+  "actions.security.login_locked": "Başarısız denemelerden sonra giriş kilitlendi",
+  "actions.security.upload_rejected": "Yükleme reddedildi (dosya türü)"
 }
