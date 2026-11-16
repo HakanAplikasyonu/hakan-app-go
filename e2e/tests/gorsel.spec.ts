@@ -63,7 +63,9 @@ async function snap(page: Page, path: string, name: string) {
         await page.goto(path);
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         await settle(page);
-        await expect(page).toHaveScreenshot(`${name}-${theme}-${vp.name}.png`, {
+        // Yumuşak: bir fark sonraki çekimleri durdurmaz; CI bütün farkları
+        // (ve -actual görüntülerini) tek koşuda toplar.
+        await expect.soft(page).toHaveScreenshot(`${name}-${theme}-${vp.name}.png`, {
           animations: "disabled",
           caret: "hide",
           mask: [
