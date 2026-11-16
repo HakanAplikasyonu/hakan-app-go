@@ -152,7 +152,7 @@ func (h *Handler) listInvoices(w http.ResponseWriter, r *http.Request) {
 			Status: row.StatusNormalized, SourceSystem: row.SourceSystem, CaptureMethod: row.CaptureMethod,
 		})
 	}
-	if n := len(rows); n > 0 && int32(n) == limit {
+	if n := len(rows); n > 0 && n == int(limit) {
 		next := pagecursor.Encode(rows[n-1].IssueDate.Time, rows[n-1].ID)
 		out.NextCursor = &next
 	}
