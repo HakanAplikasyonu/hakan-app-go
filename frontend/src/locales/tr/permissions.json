@@ -17,6 +17,7 @@
   "view_empty_title": "İzin yok",
   "view_empty": "Gösterilecek izin bulunmuyor.",
   "labels.platform.users.read": "Platform kullanıcılarını görüntüle",
+  "labels.platform.legal.manage": "Hukuki metinleri yönet",
   "labels.platform.users.write": "Platform kullanıcılarını yönet",
   "labels.platform.roles.read": "Platform rollerini görüntüle",
   "labels.platform.roles.write": "Platform rollerini yönet",

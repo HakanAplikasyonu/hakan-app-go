@@ -11,6 +11,7 @@ import {
   onboardingKeys,
   taxpayerOnboardingService,
   type CreateTaxpayerRequestBody,
+  type PrivacyNoticeAcceptance,
 } from "@/features/taxpayer-onboarding/services/taxpayer-onboarding.service";
 import { useAppMutation } from "@/lib/query/mutation";
 import { useLocale } from "@/providers/locale-provider";
@@ -74,8 +75,13 @@ export function useApproveOnboardingRequest(taxpayer: string) {
   const { t } = useLocale();
   const queryClient = useQueryClient();
   return useAppMutation({
-    mutationFn: (uuid: string) =>
-      taxpayerOnboardingService.approve(taxpayer, uuid),
+    mutationFn: ({
+      uuid,
+      notice,
+    }: {
+      uuid: string;
+      notice: PrivacyNoticeAcceptance;
+    }) => taxpayerOnboardingService.approve(taxpayer, uuid, notice),
     onSuccess: () => appToast.success(t("onboarding.panel_toast_approved")),
     onSettled: () =>
       void queryClient.invalidateQueries({

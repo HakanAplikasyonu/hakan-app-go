@@ -62,6 +62,8 @@ export const Permission = {
   TenantInvoicesWrite: "tenant.invoices.write",
   TenantBankRead: "tenant.bank.read",
   TenantBankWrite: "tenant.bank.write",
+  /** Accept the data processing agreement for the office (issue #57). */
+  TenantLegalAccept: "tenant.legal.accept",
 } as const;
 
 export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
@@ -173,6 +175,9 @@ export const permissions = {
     engagements: {
       read: Permission.TenantEngagementsRead,
       write: Permission.TenantEngagementsWrite,
+    },
+    legal: {
+      accept: Permission.TenantLegalAccept,
     },
   },
 } as const;

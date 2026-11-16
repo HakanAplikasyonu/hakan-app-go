@@ -14,10 +14,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { routes } from "@/config/routes";
+import {
+  isLegalVersionOutdated,
+  LegalConsentCheckbox,
+  LegalDocumentDialog,
+  useLegalConsent,
+  type LegalConsentState,
+} from "@/features/legal";
 import { KIND_LABEL_KEYS } from "@/features/taxpayer-onboarding/lib/status";
 import {
   onboardingKeys,
   taxpayerConsentService,
+  type PrivacyNoticeAcceptance,
 } from "@/features/taxpayer-onboarding/services/taxpayer-onboarding.service";
 import { ApiError } from "@/lib/api/errors";
 import { useAppMutation } from "@/lib/query/mutation";
@@ -61,10 +69,41 @@ function Message({
 
 type Outcome = "forwarded" | "approved" | "rejected";
 
+/** Signed out: the notice can be read before signing in to approve. */
+function PrivacyNoticeLink({ notice }: { notice: LegalConsentState }) {
+  const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <p className="text-muted-foreground text-sm">
+        {t("onboarding.privacy_notice_hint")}{" "}
+        <Button
+          type="button"
+          variant="link"
+          className="h-auto p-0 text-sm"
+          onClick={() => setOpen(true)}
+        >
+          {t("legal.kind_privacy_notice")}
+        </Button>
+      </p>
+      <LegalDocumentDialog
+        open={open}
+        onOpenChange={setOpen}
+        kind="privacy_notice"
+        document={notice.document}
+      />
+    </>
+  );
+}
+
 /**
  * `/consent/{token}` — an office asks to add the mükellef (issue #7). Works
  * signed out: sign in, or create the account for the contact address (the
  * token opens registration for it), then come back via ?next=.
+ *
+ * Approving requires acknowledging the privacy notice (Aydınlatma metni,
+ * KVKK md. 10, issue #57); its version travels with the approval. Rejecting
+ * does not.
  */
 export function TaxpayerConsentPage({ token }: { token: string }) {
   const { t, locale } = useLocale();
@@ -73,6 +112,7 @@ export function TaxpayerConsentPage({ token }: { token: string }) {
   const { user, isAuthenticated, bootstrapped, logout, hydrateProfile } =
     useAuth();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const notice = useLegalConsent("privacy_notice");
 
   const preview = useQuery({
     queryKey: onboardingKeys.consentPreview(token),
@@ -84,7 +124,8 @@ export function TaxpayerConsentPage({ token }: { token: string }) {
   });
 
   const approve = useAppMutation({
-    mutationFn: () => taxpayerConsentService.approve(token),
+    mutationFn: (accepted: PrivacyNoticeAcceptance) =>
+      taxpayerConsentService.approve(token, accepted),
   });
   const reject = useAppMutation({
     mutationFn: () => taxpayerConsentService.reject(token),
@@ -92,10 +133,19 @@ export function TaxpayerConsentPage({ token }: { token: string }) {
   const busy = approve.isPending || reject.isPending;
 
   const onApprove = async () => {
+    const accepted = notice.acceptance;
+    if (!accepted) return; // the button is disabled until ticked
     let result;
     try {
-      result = await approve.mutateAsync();
-    } catch {
+      result = await approve.mutateAsync({
+        privacy_notice_version: accepted.version,
+        privacy_notice_language: accepted.language,
+      });
+    } catch (error) {
+      if (isLegalVersionOutdated(error)) {
+        notice.markOutdated(); // the notice changed: show it again
+        return;
+      }
       void preview.refetch(); // shown as a toast; refresh the status
       return;
     }
@@ -240,6 +290,7 @@ export function TaxpayerConsentPage({ token }: { token: string }) {
         </p>
         {!isAuthenticated || !user ? (
           <>
+            <PrivacyNoticeLink notice={notice} />
             <p className="text-muted-foreground text-sm">
               {t("onboarding.consent_sign_in_hint", {
                 email: req.contact_email,
@@ -261,23 +312,31 @@ export function TaxpayerConsentPage({ token }: { token: string }) {
             </Button>
           </>
         ) : sameAccount ? (
-          <div className="flex gap-2">
-            <Button
-              className="flex-1"
+          <>
+            <LegalConsentCheckbox
+              consent={notice}
+              label={t("onboarding.privacy_notice_label")}
+              acceptLabel={t("onboarding.privacy_notice_read")}
               disabled={busy}
-              onClick={() => void onApprove()}
-            >
-              {t("onboarding.consent_approve")}
-            </Button>
-            <Button
-              className="flex-1"
-              variant="outline"
-              disabled={busy}
-              onClick={() => void onReject()}
-            >
-              {t("onboarding.consent_reject")}
-            </Button>
-          </div>
+            />
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                disabled={busy || !notice.acceptance}
+                onClick={() => void onApprove()}
+              >
+                {t("onboarding.consent_approve")}
+              </Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void onReject()}
+              >
+                {t("onboarding.consent_reject")}
+              </Button>
+            </div>
+          </>
         ) : (
           <>
             <p className="text-muted-foreground text-sm">

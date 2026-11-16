@@ -17,6 +17,7 @@
   "view_empty_title": "No permissions",
   "view_empty": "There are no permissions to display.",
   "labels.platform.users.read": "Read platform users",
+  "labels.platform.legal.manage": "Manage legal documents",
   "labels.platform.users.write": "Write platform users",
   "labels.platform.roles.read": "Read platform roles",
   "labels.platform.roles.write": "Write platform roles",

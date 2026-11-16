@@ -146,6 +146,17 @@ export const routes = {
   inviteTaxpayer: (token: string) => `/invite/m/${encodeURIComponent(token)}`,
   /** Consent link an office's add-mükellef request emails (public). */
   consent: (token: string) => `/consent/${encodeURIComponent(token)}`,
+  /**
+   * Public KVKK text (issue #57): current version, or `version` (what
+   * someone accepted) in `lang`.
+   */
+  legal: (kind: string, opts: { version?: number; lang?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (opts.version) q.set("version", String(opts.version));
+    if (opts.lang) q.set("lang", opts.lang);
+    const qs = q.toString();
+    return `/legal/${encodeURIComponent(kind)}${qs ? `?${qs}` : ""}`;
+  },
   errors: {
     unauthorized: "/unauthorized",
     forbidden: "/forbidden",

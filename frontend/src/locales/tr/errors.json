@@ -48,5 +48,6 @@
   "sign_in": "Giriş yap",
   "back_to_login": "Girişe dön",
   "continue": "Devam et",
-  "area_requires": "Bu alan yalnızca {{area}} erişimi gerektirir."
+  "area_requires": "Bu alan yalnızca {{area}} erişimi gerektirir.",
+  "codes.LEGAL_VERSION_OUTDATED": "Metin güncellendi. Lütfen yeni sürümü okuyup yeniden onaylayın."
 }

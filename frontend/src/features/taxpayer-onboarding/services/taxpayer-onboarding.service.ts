@@ -1,5 +1,6 @@
 import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
+import { withLegalVersionCheck } from "@/features/legal/services/legal.service";
 import { taxpayerRequest } from "@/features/taxpayer/services/taxpayer.service";
 
 export type TaxpayerRequest = components["schemas"]["TaxpayerRequest"];
@@ -18,6 +19,12 @@ export type TaxpayerPendingRequest =
   components["schemas"]["TaxpayerPendingRequest"];
 export type TaxpayerPendingRequestList =
   components["schemas"]["TaxpayerPendingRequestList"];
+/**
+ * Version (and language) of the privacy notice shown to the person
+ * approving (KVKK md. 10, issue #57). Rejecting does not need it.
+ */
+export type PrivacyNoticeAcceptance =
+  components["schemas"]["PrivacyNoticeAcceptance"];
 
 export const onboardingKeys = {
   officeRequests: (slug: string, page: { limit: number; offset: number }) =>
@@ -72,11 +79,15 @@ export const taxpayerConsentService = {
       "/v1/taxpayer-consents/preview",
       { body: { token }, silent: true },
     ),
-  approve: (token: string) =>
-    taxpayerRequest<TaxpayerConsentOutcome>(
-      "POST",
-      "/v1/taxpayer-consents/approve",
-      { body: { token } },
+  /** A stale notice version rejects with LegalVersionOutdatedError. */
+  approve: (token: string, notice: PrivacyNoticeAcceptance) =>
+    withLegalVersionCheck(() =>
+      taxpayerRequest<TaxpayerConsentOutcome>(
+        "POST",
+        "/v1/taxpayer-consents/approve",
+        // Other errors are toasted by the mutation cache.
+        { body: { token, ...notice }, silent: true },
+      ),
     ),
   reject: (token: string) =>
     taxpayerRequest<unknown>("POST", "/v1/taxpayer-consents/reject", {
@@ -93,11 +104,14 @@ export const taxpayerOnboardingService = {
       // Non-owners get 403: the card hides itself, no toast.
       { taxpayer, silent: true },
     ),
-  approve: (taxpayer: string, uuid: string) =>
-    taxpayerRequest<TaxpayerConsentOutcome>(
-      "POST",
-      `/v1/taxpayer/onboarding-requests/${encodeURIComponent(uuid)}/approve`,
-      { taxpayer },
+  /** A stale notice version rejects with LegalVersionOutdatedError. */
+  approve: (taxpayer: string, uuid: string, notice: PrivacyNoticeAcceptance) =>
+    withLegalVersionCheck(() =>
+      taxpayerRequest<TaxpayerConsentOutcome>(
+        "POST",
+        `/v1/taxpayer/onboarding-requests/${encodeURIComponent(uuid)}/approve`,
+        { taxpayer, body: notice, silent: true },
+      ),
     ),
   reject: (taxpayer: string, uuid: string) =>
     taxpayerRequest<unknown>(

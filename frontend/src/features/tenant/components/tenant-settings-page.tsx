@@ -11,6 +11,7 @@ import { AppForm, AppInput } from "@/components/forms";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
+import { OfficeDpaCard } from "@/features/legal";
 import {
   usePatchTenantSettings,
   useTenantSettings,
@@ -23,6 +24,7 @@ import { usePermission } from "@/providers/permission-provider";
  * `/t/{slug}/settings` — organization name. The app-defined `settings`
  * object is left to apps (PATCH /v1/tenant/settings accepts it); the slug is
  * managed by the platform because every /t/{slug} link depends on it.
+ * Below it, the data processing agreement of the office (issue #57).
  */
 export function TenantSettingsPage() {
   const { t } = useLocale();
@@ -119,6 +121,7 @@ export function TenantSettingsPage() {
           </AppForm>
         </EntitySectionCard>
       ) : null}
+      <OfficeDpaCard slug={tenant.slug} />
     </EntityPage>
   );
 }

@@ -1,4 +1,5 @@
 import type { components } from "@/generated/api";
+import { withLegalVersionCheck } from "@/features/legal/services/legal.service";
 import { taxpayerRequest } from "@/features/taxpayer/services/taxpayer.service";
 
 export type HistoryShare = components["schemas"]["HistoryShare"];
@@ -23,11 +24,20 @@ export const historyShareService = {
       taxpayer,
       silent: true,
     }),
+  /**
+   * `consent_version` is the `history_share_consent` text the owner accepted
+   * (issue #57); a stale one rejects with LegalVersionOutdatedError.
+   */
   create: (taxpayer: string, body: CreateHistoryShareBody) =>
-    taxpayerRequest<HistoryShare>("POST", "/v1/taxpayer/history-shares", {
-      taxpayer,
-      body,
-    }),
+    withLegalVersionCheck(() =>
+      taxpayerRequest<HistoryShare>("POST", "/v1/taxpayer/history-shares", {
+        taxpayer,
+        body,
+        // Other errors are toasted by the mutation cache.
+        silent: true,
+      }),
+    ),
+  /** Also withdraws the explicit consent given for the share. */
   revoke: (taxpayer: string, uuid: string) =>
     taxpayerRequest<unknown>(
       "DELETE",
