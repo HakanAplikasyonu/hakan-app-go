@@ -7,6 +7,7 @@
     "./ui": "./src/ui/ui.tsx",
     "./screens": "./src/ui/screens.tsx",
     "./hakan": "./src/ui/hakan.tsx",
+    "./ui/ikon": "./src/ui/ikon.tsx",
     "./*": "./src/*.ts"
   },
   "scripts": {
