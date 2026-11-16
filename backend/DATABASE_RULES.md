@@ -150,10 +150,23 @@ How code joins a scope: `database.NewQueries(pool)` (and `database.Ambient`)
 run each statement on the transaction carried by the context, so a
 repository called inside `WithScope` / `System` stays in that scope;
 `Ambient.Begin` opens a savepoint there instead of a new, unscoped
-connection (never call `pool.Begin` in code that may run in a scope). For
-HTTP routes, `rls.Middleware` runs the whole request in one scoped
-transaction (buffered answer, rollback on 4xx/5xx; office-wide routes get the
-office's visible taxpayers).
+connection (never call `pool.Begin` in code that may run in a scope; use
+`database.Begin` / `database.BeginFunc` / `database.QueriesFor`).
+
+**Every tenant request runs in a scope** (`DB_RLS_REQUEST_SCOPE`, default
+on): `RequireOrganization` opens `rls.Middleware` for the office (taxpayers:
+the user's visible engagements), `RequireEngagement` narrows it to the
+engagement's taxpayer (`rls.Narrow`). Writes are buffered and roll back on
+4xx/5xx; GET/HEAD stream. Inside the scope every RLS table, enforced or in
+transition, is filtered by the scope policies.
+
+Exceptions, on purpose:
+- Secrets (`secret_records`, platform) are read and written by the vault on
+  its own connection, never in a tenant scope.
+- Office-wide facts that do not depend on the viewer (the bill's active
+  taxpayer count) read through `rls.System` with a reason.
+- Never nest `rls.System` inside a scope on the same transaction: its
+  `SET LOCAL ROLE NONE` would outlive a released savepoint.
 
 To enforce a table group: move every access path (API, worker, seed) into
 `WithScope` or `System`, then `SELECT rls_enforce('my_table');` in a

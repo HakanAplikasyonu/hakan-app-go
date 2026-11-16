@@ -7,7 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -53,6 +56,21 @@ func TestMonthlyActiveTaxpayers(t *testing.T) {
 	}
 	if u.ActiveTaxpayers != 4 { // a, b, c, g (g once)
 		t.Fatalf("October: %d %+v", u.ActiveTaxpayers, u.Taxpayers)
+	}
+	// Inside a tenant request scope of a member who sees no engagement, the
+	// bill still counts the whole office (issue #166).
+	err = rls.WithScope(ctx, d.Pool, rls.Scope{OrganizationID: org, UserID: d.User(t)}, func(ctx context.Context, _ pgx.Tx) error {
+		u, err := svc.Usage(ctx, org, "2026-10")
+		if err != nil {
+			return err
+		}
+		if u.ActiveTaxpayers != 4 {
+			t.Errorf("October in a member's scope: %d, want 4", u.ActiveTaxpayers)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 	if u, _ := svc.Usage(ctx, org, "2026-09"); u.ActiveTaxpayers != 4 { // a, c, e, g
 		t.Fatalf("September: %+v", u)

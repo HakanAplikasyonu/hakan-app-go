@@ -259,6 +259,10 @@ type DBConfig struct {
 	// "force_custom_plan" (default) plans with the real values each time;
 	// "auto" restores the Postgres default.
 	PlanCacheMode string
+	// RLSRequestScope runs every tenant request in one row level security
+	// transaction for its office (issue #166). Off only as an emergency
+	// switch (DB_RLS_REQUEST_SCOPE=false).
+	RLSRequestScope bool
 }
 
 func (c DBConfig) DSN() string {
@@ -414,6 +418,8 @@ func Load() (Config, error) {
 			// RLS for every query (issue #166); false is the emergency switch.
 			RLSRuntime:    getBool("DB_RLS_RUNTIME", true),
 			PlanCacheMode: strings.TrimSpace(getEnv("DB_PLAN_CACHE_MODE", "force_custom_plan")),
+			// Tenant requests in one scoped transaction (issue #166).
+			RLSRequestScope: getBool("DB_RLS_REQUEST_SCOPE", true),
 		},
 		Redis: RedisConfig{
 			Addr:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),
