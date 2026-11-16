@@ -21,7 +21,7 @@
 ##
 ## Keys left out here keep their compose.prod.yml defaults; .env.example documents them all.
 
-@version 4
+@version 5
 
 @norotate APP_ENCRYPTION_KEY
 @norotate FIELD_ENCRYPTION_KEY
@@ -51,6 +51,10 @@ CENTRIFUGO_ALLOWED_ORIGINS | derive:{APP_URL}
 # Centrifugo has its own domain (Dokploy: service centrifugo, container port 8000).
 CENTRIFUGO_WS_URL | ask:wss://realtime.{APP_HOST}/connection/websocket
 NEXT_PUBLIC_CENTRIFUGO_URL | derive:{CENTRIFUGO_WS_URL}
+# Plain Docker host only (deploy/compose.prod.yml, Caddy). Dokploy ignores them.
+# https:// sites get Let's Encrypt certificates; keep them in step with the URLs above.
+PROXY_APP_SITE | derive:{APP_URL}
+PROXY_REALTIME_SITE | ask:{APP_SCHEME}://realtime.{APP_HOST}
 
 # --- Database, cache, object storage ---
 DB_USER | const:app

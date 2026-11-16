@@ -1,0 +1,17 @@
+# Reverse proxy for a plain Docker host (deploy/compose.prod.yml, docs/deploy.md).
+# On Dokploy, Traefik does this job and this file is unused.
+#
+# Site addresses come from .env.server (deploy/env/schema):
+#   PROXY_APP_SITE       https://app.example.com  -> frontend (it proxies /api to the backend)
+#   PROXY_REALTIME_SITE  https://realtime.example.com -> centrifugo websocket
+# An https:// address gets an automatic Let's Encrypt certificate (ports 80 and
+# 443 must reach this host); an http:// address serves plain HTTP (local smoke test).
+
+{$PROXY_APP_SITE} {
+	encode zstd gzip
+	reverse_proxy frontend.{$APP_NETWORK}:3000
+}
+
+{$PROXY_REALTIME_SITE} {
+	reverse_proxy centrifugo.{$APP_NETWORK}:8000
+}

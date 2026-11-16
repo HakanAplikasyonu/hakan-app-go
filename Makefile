@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed \
-	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down tools create-super-admin search-reindex check-i18n
+	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n
 
 infra:
 	@if [ -n "$(ENV_FILE)" ]; then \
@@ -144,6 +144,20 @@ prod-up:
 
 prod-down:
 	docker compose --env-file $(PROD_ENV_FILE) -f compose.prod.yml down
+
+# Plain Docker host (no Dokploy): app stack + Caddy reverse proxy (docs/deploy.md).
+# Reads .env.server at the repo root.
+host-up:
+	docker compose -f deploy/compose.prod.yml up -d
+
+host-down:
+	docker compose -f deploy/compose.prod.yml down
+
+# Empty-host smoke test of deploy/compose.prod.yml with locally built images
+# local/hakan-backend:main, local/hakan-frontend:main and local/hakan-backup:main
+# (CI: prod-smoke).
+prod-smoke:
+	scripts/prod-smoke.sh
 
 tools:
 	@echo "docker:  $$(docker version --format '{{.Server.Version}}' 2>&1)"
