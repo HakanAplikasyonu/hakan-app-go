@@ -107,18 +107,37 @@ When a migration adds a `tenant.*` permission:
   Inserting into `role_permissions` for the template only does not reach
   existing offices.
 
-## Row level security (HAKAN, issue #6)
+## Row level security (HAKAN, issues #6 and #166)
 
 Scoped tables (`tenant_tables.txt`, `taxpayer_tables.txt`) have Postgres RLS
 policies for two scoped roles, `hakan_rls_app` and `hakan_rls_worker` (no
-BYPASSRLS). The connection user owns the tables and is not restricted (tables
-are not FORCE'd), so migrations and unscoped code paths work unchanged.
-Code that wants the database to enforce isolation runs in
+BYPASSRLS). Code that wants the database to enforce isolation runs in
 `rls.WithScope(ctx, pool, rls.FromRequest(ctx), fn)` (`internal/platform/rls`):
 `SET LOCAL ROLE` plus `SET LOCAL app.organization_id / app.user_id /
 app.taxpayer_ids / app.engagements_read_all`.
 
-A migration that creates a scoped table must also call one template:
+**Runtime role (issue #166).** Every application connection runs as
+`hakan_rls_runtime` (`database.NewPostgresPool`, `DB_RLS_RUNTIME`, default
+on; tests via `testdb` too). It is not a superuser, has no BYPASSRLS and owns
+nothing, so RLS applies to every query. FORCE ROW LEVEL SECURITY alone would
+not do this: it only affects the table owner, and a superuser (the official
+postgres image's `POSTGRES_USER`, CI's `postgres`) skips it. Migrations run
+as the owner and are not affected.
+
+Each RLS table is in one of two states:
+
+| State | Policies for `hakan_rls_runtime` | Unscoped query |
+|---|---|---|
+| in transition | `rls_legacy` (`USING true`) | works as before |
+| enforced (`rls_enforced.txt`) | none; FORCE + owner `rls_system` policy | sees nothing, cannot write |
+
+Enforced tables answer only inside `rls.WithScope` or `rls.System(ctx, pool,
+"reason", fn)`, the deliberate bypass for work that is not done on behalf of
+one tenant (cross-tenant workers, the demo seed, maintenance). Foreign key
+cascades still delete enforced rows.
+
+A migration that creates a scoped table must also call one template (the new
+table starts in transition):
 
 ```sql
 SELECT rls_apply_org('my_table');         -- organization_id
@@ -127,7 +146,18 @@ SELECT rls_apply_taxpayer('my_table');    -- taxpayer_id
 SELECT rls_apply_platform('my_table');    -- no rows for scoped roles
 ```
 
-`TestRLSCoversScopedTables` fails while a listed table has no policy.
+To enforce a table group: move every access path (API, worker, seed) into
+`WithScope` or `System`, then `SELECT rls_enforce('my_table');` in a
+migration, add the table to `internal/database/rls_enforced.txt` and its row
+inserter to `leakFixtures` (`rls_enforcement_db_test.go`). A data migration
+touching an enforced table as a non-superuser owner must
+`SET LOCAL app.system = 'on'` first.
+
+Tests: `TestRLSCoversScopedTables` (every listed table has a policy),
+`TestRLSEnforcement` (every RLS table is in one state, the list matches),
+`TestEnforcedTablesDoNotLeak` (per enforced table: unscoped sees and writes
+nothing, office A sees and writes only its own rows, System sees all, the
+cascade still works).
 
 ## Migration safety
 

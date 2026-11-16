@@ -1,12 +1,19 @@
 // Package rls runs database work under Postgres row-level security
 // (issue #6, G8).
 //
-// The application connects as the table owner, which RLS does not restrict
-// (tables are not FORCE'd), so existing code paths keep working. Work that
-// should be isolated by the database as well as by its WHERE clauses runs in
-// WithScope: a transaction that switches to a scoped role (SET LOCAL ROLE,
-// no BYPASSRLS) and sets the request context with SET LOCAL. The policies of
-// migration 000046 then hide every row outside that context:
+// Application connections run as hakan_rls_runtime (migration 000074,
+// issue #166; database.NewPostgresPool). Row level security applies to every
+// query. Tables still in transition have an rls_legacy policy that lets the
+// runtime role see everything, as before; enforced tables
+// (internal/database/rls_enforced.txt) answer only inside one of:
+//
+//   - WithScope: a transaction that switches to a scoped role (SET LOCAL
+//     ROLE, no BYPASSRLS) and sets the request context with SET LOCAL. The
+//     policies of migration 000046 then hide every row outside that context;
+//   - System: a deliberate, named bypass for work that is not done on behalf
+//     of one tenant (workers spanning tenants, the demo seed, maintenance).
+//
+// WithScope policies:
 //
 //	org tables         organization_id = app.organization_id
 //	engagement tables  + assigned to app.user_id, or app.engagements_read_all
@@ -117,4 +124,34 @@ func onOff(v bool) string {
 		return "on"
 	}
 	return ""
+}
+
+// ErrNoReason guards System: every bypass says why.
+var ErrNoReason = errors.New("rls: System needs a reason")
+
+// System runs fn in a transaction that deliberately bypasses row level
+// security: the role falls back to the login role (SET LOCAL ROLE NONE) and
+// app.system is on, which the rls_system policy of enforced tables accepts
+// for a table owner that is not a superuser. Use it only for work that is
+// not done on behalf of one tenant; reason names that work (greppable,
+// reviewable). The transaction is put on the context like WithScope's.
+func System(ctx context.Context, db Beginner, reason string, fn func(ctx context.Context, tx pgx.Tx) error) error {
+	if strings.TrimSpace(reason) == "" {
+		return ErrNoReason
+	}
+	tx, err := db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("rls: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, "SET LOCAL ROLE NONE"); err != nil {
+		return fmt.Errorf("rls: reset role: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.system', 'on', true)`); err != nil {
+		return fmt.Errorf("rls: set system: %w", err)
+	}
+	if err := fn(dbtx.WithTx(ctx, tx), tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

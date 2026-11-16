@@ -210,6 +210,11 @@ type DBConfig struct {
 	Name     string
 	SSLMode  string
 	MaxConns int32
+	// RLSRuntime switches every pooled connection to hakan_rls_runtime
+	// (migration 000074, issue #166): row level security then applies to all
+	// application queries, not only to rls.WithScope. Off only as an
+	// emergency switch (DB_RLS_RUNTIME=false).
+	RLSRuntime bool
 }
 
 func (c DBConfig) DSN() string {
@@ -362,6 +367,8 @@ func Load() (Config, error) {
 			Name:     getEnv("DB_NAME", "app"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 			MaxConns: int32(getInt("DB_MAX_CONNS", 20)),
+			// RLS for every query (issue #166); false is the emergency switch.
+			RLSRuntime: getBool("DB_RLS_RUNTIME", true),
 		},
 		Redis: RedisConfig{
 			Addr:     getEnv("REDIS_ADDR", "127.0.0.1:6379"),

@@ -78,13 +78,28 @@ func Open(t testing.TB) *DB {
 	if err := migrate(ctx, dbURL); err != nil {
 		t.Fatalf("testdb: migrate: %v", err)
 	}
-	pool, err := pgxpool.New(context.Background(), dbURL)
+	poolCfg, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		t.Fatalf("testdb: pool config: %v", err)
+	}
+	// Tests see the database the way the application does (issue #166):
+	// every connection runs as hakan_rls_runtime, so row level security
+	// applies. Fixtures for enforced tables go through rls.System.
+	poolCfg.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		_, err := conn.Exec(ctx, "SET ROLE "+RuntimeRole)
+		return err
+	}
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
 		t.Fatalf("testdb: pool: %v", err)
 	}
 	t.Cleanup(pool.Close)
 	return &DB{URL: dbURL, Pool: pool, Name: name}
 }
+
+// RuntimeRole mirrors database.RuntimeRole (migration 000074); testdb does
+// not import internal/database.
+const RuntimeRole = "hakan_rls_runtime"
 
 // MigrationsDir is backend/migrations, found from this source file.
 func MigrationsDir() string {
