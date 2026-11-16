@@ -10407,13 +10407,22 @@ components:
 
     AIPrivacy:
       type: object
-      required: [enabled, masking, masked_kinds, primary, fallback]
+      required: [enabled, masking, masked_kinds, image_redaction, primary, fallback]
       properties:
         enabled: { type: boolean }
         masking: { type: boolean }
         masked_kinds:
           type: array
-          items: { type: string, enum: [VKN, TCKN, IBAN, AD] }
+          items: { type: string, enum: [VKN, TCKN, IBAN, AD, EPOSTA, TEL] }
+        image_redaction:
+          type: string
+          enum: [required, unavailable, "off"]
+          description: |
+            `required`: images (receipt photos) are sent only after an OCR
+            pre-pass blacks out VKN, TCKN, IBAN, names, e-mail and phone
+            numbers. `unavailable`: required, but no OCR engine is installed,
+            so image calls are refused. `off`: images are sent as they are
+            (also when masking is off).
         primary:
           oneOf:
             - $ref: "#/components/schemas/AIProviderPrivacy"

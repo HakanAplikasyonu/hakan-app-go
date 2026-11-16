@@ -102,6 +102,9 @@ x-backend-environment: &backend-environment
   AI_MASKING: ${AI_MASKING:-true}
   AI_DISABLE_PROVIDER_STORE: ${AI_DISABLE_PROVIDER_STORE:-true}
   AI_MAX_TOKENS: ${AI_MAX_TOKENS:-}
+  AI_IMAGE_REDACTION: ${AI_IMAGE_REDACTION:-required}
+  AI_OCR_TESSERACT_PATH: ${AI_OCR_TESSERACT_PATH:-tesseract}
+  AI_OCR_LANG: ${AI_OCR_LANG:-tur}
   MAIL_FROM: ${MAIL_FROM:-noreply@localhost}
   MAIL_FROM_NAME: ${MAIL_FROM_NAME:-App}
   MAIL_DRIVER: ${MAIL_DRIVER:-smtp}

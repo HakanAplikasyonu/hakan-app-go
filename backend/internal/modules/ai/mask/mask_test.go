@@ -27,9 +27,12 @@ func TestMaskVKNAndTCKN(t *testing.T) {
 
 func TestMaskElevenDigitsStartingWithZeroIsNotTCKN(t *testing.T) {
 	m := New()
-	in := "Tel 05321234567"
-	if out := m.Mask(in); out != in {
-		t.Fatalf("phone with leading 0 masked: %q", out)
+	// A number starting with 0 is a phone number, not a TCKN (#169).
+	if out := m.Mask("Tel 05321234567"); out != "Tel [TEL_1]" {
+		t.Fatalf("got %q", out)
+	}
+	if m.Counts()[KindTCKN] != 0 {
+		t.Fatalf("counts = %v", m.Counts())
 	}
 }
 

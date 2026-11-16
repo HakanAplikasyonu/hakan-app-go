@@ -76,6 +76,12 @@ type Options struct {
 	DisableProviderStore bool
 	MaxTokens            int
 	Logger               *slog.Logger
+	// ImageRedaction is RedactionRequired (default) or RedactionOff. It
+	// applies only while Masking is on.
+	ImageRedaction string
+	// ImageRedactor blacks out personal data in images (OCR pre-pass);
+	// nil = no OCR engine.
+	ImageRedactor ImageRedactor
 }
 
 // Service runs AI calls.
@@ -159,6 +165,10 @@ func (s *Service) Complete(ctx context.Context, call Call) (Result, error) {
 	}
 	if m != nil {
 		req = maskRequest(m, req)
+		var err error
+		if req, err = s.redactImages(ctx, m, req); err != nil {
+			return Result{}, err
+		}
 	}
 
 	backend, isFallback := s.primary, false
@@ -267,11 +277,15 @@ func (s *Service) runTool(ctx context.Context, available map[string]tools.Tool, 
 // Privacy describes the data-handling settings of the configured providers
 // (the "your data is not used for model training" statement, docs/01 §3).
 type Privacy struct {
-	Enabled     bool             `json:"enabled"`
-	Masking     bool             `json:"masking"`
-	MaskedKinds []string         `json:"masked_kinds"`
-	Primary     *ProviderPrivacy `json:"primary"`
-	Fallback    *ProviderPrivacy `json:"fallback"`
+	Enabled     bool     `json:"enabled"`
+	Masking     bool     `json:"masking"`
+	MaskedKinds []string `json:"masked_kinds"`
+	// ImageRedaction: "required" (images go only with personal data blacked
+	// out), "unavailable" (required, but no OCR engine: image calls are
+	// refused) or "off".
+	ImageRedaction string           `json:"image_redaction"`
+	Primary        *ProviderPrivacy `json:"primary"`
+	Fallback       *ProviderPrivacy `json:"fallback"`
 }
 
 // ProviderPrivacy is one provider's statement.
@@ -288,9 +302,17 @@ type ProviderPrivacy struct {
 // Privacy returns the current data-handling statement.
 func (s *Service) Privacy() Privacy {
 	p := Privacy{
-		Enabled:     s.Enabled(),
-		Masking:     s.opts.Masking,
-		MaskedKinds: []string{string(mask.KindVKN), string(mask.KindTCKN), string(mask.KindIBAN), string(mask.KindName)},
+		Enabled: s.Enabled(),
+		Masking: s.opts.Masking,
+		MaskedKinds: []string{string(mask.KindVKN), string(mask.KindTCKN), string(mask.KindIBAN), string(mask.KindName),
+			string(mask.KindEmail), string(mask.KindPhone)},
+		ImageRedaction: RedactionOff,
+	}
+	if s.opts.Masking && s.redactionPolicy() == RedactionRequired {
+		p.ImageRedaction = RedactionRequired
+		if s.opts.ImageRedactor == nil {
+			p.ImageRedaction = "unavailable"
+		}
 	}
 	if s.primary != nil {
 		p.Primary = s.providerPrivacy(s.primary)
