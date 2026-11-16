@@ -30,7 +30,7 @@ RUN if [ -n "${RELEASE_JSON_B64}" ]; then \
       go build -trimpath -ldflags="${LDFLAGS}" -o "/out/${cmd}" "./cmd/${cmd}" || exit 1; \
     done
 
-FROM migrate/migrate:v4.19.1 AS migrate
+FROM migrate/migrate:v4.20.1 AS migrate
 
 FROM alpine:3.22 AS runtime
 
