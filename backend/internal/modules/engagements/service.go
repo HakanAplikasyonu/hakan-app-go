@@ -30,12 +30,15 @@ var (
 
 // Engagement is the API shape of an engagement.
 type Engagement struct {
-	UUID         uuid.UUID  `json:"uuid"`
-	TaxpayerUUID uuid.UUID  `json:"taxpayer_uuid"`
-	Status       string     `json:"status"`
-	StartedAt    time.Time  `json:"started_at"`
-	EndedAt      *time.Time `json:"ended_at"`
-	CreatedAt    time.Time  `json:"created_at"`
+	UUID         uuid.UUID `json:"uuid"`
+	TaxpayerUUID uuid.UUID `json:"taxpayer_uuid"`
+	// TaxpayerTitle is the mükellef's unvan / ad soyad, so that office
+	// clients (masaüstü ajanı #206) can list engagements by name.
+	TaxpayerTitle string     `json:"taxpayer_title"`
+	Status        string     `json:"status"`
+	StartedAt     time.Time  `json:"started_at"`
+	EndedAt       *time.Time `json:"ended_at"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // Assignment is a member assigned to an engagement.
@@ -85,7 +88,7 @@ func (s *Service) Create(ctx context.Context, orgID int64, taxpayerUUID uuid.UUI
 		return Engagement{}, err
 	}
 	return Engagement{
-		UUID: row.Uuid, TaxpayerUUID: tp.Uuid, Status: row.Status,
+		UUID: row.Uuid, TaxpayerUUID: tp.Uuid, TaxpayerTitle: tp.Title, Status: row.Status,
 		StartedAt: row.StartedAt.Time, EndedAt: tsPtr(row.EndedAt), CreatedAt: row.CreatedAt.Time,
 	}, nil
 }
@@ -109,7 +112,7 @@ func (s *Service) List(ctx context.Context, scope orgctx.Scope, userID int64, st
 		out := make([]Engagement, 0, len(rows))
 		for _, r := range rows {
 			out = append(out, Engagement{
-				UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, Status: r.Status,
+				UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle, Status: r.Status,
 				StartedAt: r.StartedAt.Time, EndedAt: tsPtr(r.EndedAt), CreatedAt: r.CreatedAt.Time,
 			})
 		}
@@ -122,7 +125,7 @@ func (s *Service) List(ctx context.Context, scope orgctx.Scope, userID int64, st
 	out := make([]Engagement, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, Engagement{
-			UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, Status: r.Status,
+			UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle, Status: r.Status,
 			StartedAt: r.StartedAt.Time, EndedAt: tsPtr(r.EndedAt), CreatedAt: r.CreatedAt.Time,
 		})
 	}
@@ -139,7 +142,7 @@ func (s *Service) Get(ctx context.Context, orgID int64, id uuid.UUID) (Engagemen
 		return Engagement{}, err
 	}
 	return Engagement{
-		UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, Status: r.Status,
+		UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle, Status: r.Status,
 		StartedAt: r.StartedAt.Time, EndedAt: tsPtr(r.EndedAt), CreatedAt: r.CreatedAt.Time,
 	}, nil
 }

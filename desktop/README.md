@@ -72,6 +72,16 @@ desktop/
   - Dönerek tutulur: 5 dosya × 2 MB.
   - Satırlar yazılmadan önce maskelenir (`src/logmask.rs`): e-posta, VKN/TCKN, IBAN, telefon, JWT, `Bearer` ve belirteç/şifre alanları.
 
+## Arayüz (#206)
+
+`ui/` derleme adımı olmayan düz HTML/JS. Son kullanıcıya göre kuruldu:
+
+- **Akış:** oturum aç (iki adımlı doğrulama dahil) → ofis seç → sekmeler: **Klasörler**, **Muhasebe programı**, **Ayarlar**, **Gelişmiş**.
+- **Klasör ekleme:** mükellef adıyla aranıp seçilir (`agent.engagements` yanıtındaki `taxpayer_title`). Klasör `pick_folder` kabuk komutuyla, işletim sisteminin seçicisinden (`tauri-plugin-dialog`) gelir. Ön yüze dosya sistemi ya da diyalog izni verilmez. Sürükle-bırak da çalışır.
+- **Klasör başına durum:** sidecar `agent.status` içinde her klasör için `activity` döner: son dosya, son yükleme zamanı, bu oturumda yüklenen sayısı, klasör okuma hatası ve son 20 dosya hatası. Hatalar Türkçe `reason` / `message` alanıyla gelir; ham hata yalnızca günlükte kalır. `watch.clear_errors` listeyi temizler.
+- **Kural:** hiçbir ekranda UUID, iç hata kodu ya da ham JSON gösterilmez. Logo/Mikro sonuçları özet ve tablo olarak gösterilir. Ping ve yerel ajanı yeniden başlatma **Gelişmiş** sekmesindedir.
+- **Test:** `npm run test:ui` (`tests/ui/`). Arayüz Chromium'da sahte Tauri IPC'siyle (`tests/ui/mock-tauri.js`) çalışır. Oturum, ofis seçimi, klasör ekleme, hata listesi, program sonuçları, ayarlar ve güncelleme bandı denenir; her ekranda UUID/JSON/iç kod olmadığı denetlenir. Tarayıcı: `npx playwright install chromium`; başka bir Chromium için `PW_CHROMIUM_PATH`.
+
 ## Otomatik güncelleme (#205)
 
 - **Yapılandırma derleme zamanında:** `TAURI_UPDATER_PUBKEY` (imza açık anahtarı) ve `TAURI_UPDATER_BASE_URL` (manifest kökü) `cargo`/`tauri build` sırasında ortamdan okunur (`src/updater.rs`, `option_env!`).

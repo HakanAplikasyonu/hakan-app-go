@@ -3,6 +3,7 @@ package engagements
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
@@ -33,7 +34,7 @@ func newFakeStore() *fakeStore {
 
 func (f *fakeStore) addTaxpayer() db.Taxpayer {
 	f.nextID++
-	t := db.Taxpayer{ID: f.nextID, Uuid: uuid.New()}
+	t := db.Taxpayer{ID: f.nextID, Uuid: uuid.New(), Title: fmt.Sprintf("Mükellef %d", f.nextID)}
 	f.taxpayers[t.Uuid] = t
 	return t
 }
@@ -45,6 +46,15 @@ func (f *fakeStore) addMember(orgID, userID int64) uuid.UUID {
 	u := uuid.New()
 	f.members[orgID][u] = userID
 	return u
+}
+
+func (f *fakeStore) title(taxpayerID int64) string {
+	for _, t := range f.taxpayers {
+		if t.ID == taxpayerID {
+			return t.Title
+		}
+	}
+	return ""
 }
 
 func (f *fakeStore) GetTaxpayerByUUID(_ context.Context, id uuid.UUID) (db.Taxpayer, error) {
@@ -82,14 +92,14 @@ func (f *fakeStore) GetEngagement(_ context.Context, orgID int64, id uuid.UUID) 
 		return db.GetEngagementByUUIDRow{}, errNoRows
 	}
 	e := f.engagements[i]
-	return db.GetEngagementByUUIDRow{ID: e.ID, Uuid: e.Uuid, OrganizationID: e.OrganizationID, TaxpayerID: e.TaxpayerID, Status: e.Status, EndedAt: e.EndedAt}, nil
+	return db.GetEngagementByUUIDRow{ID: e.ID, Uuid: e.Uuid, OrganizationID: e.OrganizationID, TaxpayerID: e.TaxpayerID, Status: e.Status, EndedAt: e.EndedAt, TaxpayerTitle: f.title(e.TaxpayerID)}, nil
 }
 
 func (f *fakeStore) ListEngagements(_ context.Context, orgID int64, _ pgtype.Text, _, _ int32) ([]db.ListEngagementsByOrgRow, int64, error) {
 	var out []db.ListEngagementsByOrgRow
 	for _, e := range f.engagements {
 		if e.OrganizationID == orgID {
-			out = append(out, db.ListEngagementsByOrgRow{ID: e.ID, Uuid: e.Uuid, Status: e.Status})
+			out = append(out, db.ListEngagementsByOrgRow{ID: e.ID, Uuid: e.Uuid, Status: e.Status, TaxpayerTitle: f.title(e.TaxpayerID)})
 		}
 	}
 	return out, int64(len(out)), nil
@@ -99,7 +109,7 @@ func (f *fakeStore) ListAssignedEngagements(_ context.Context, orgID, userID int
 	var out []db.ListAssignedEngagementsRow
 	for _, e := range f.engagements {
 		if e.OrganizationID == orgID && f.assignments[[2]int64{e.ID, userID}] {
-			out = append(out, db.ListAssignedEngagementsRow{ID: e.ID, Uuid: e.Uuid, Status: e.Status})
+			out = append(out, db.ListAssignedEngagementsRow{ID: e.ID, Uuid: e.Uuid, Status: e.Status, TaxpayerTitle: f.title(e.TaxpayerID)})
 		}
 	}
 	return out, int64(len(out)), nil
@@ -289,6 +299,9 @@ func TestListRespectsReadAll(t *testing.T) {
 	items, total, err := svc.List(ctx, member, 42, "", 50, 0)
 	if err != nil || total != 1 || len(items) != 1 || items[0].UUID != e1.UUID {
 		t.Fatalf("member list = %v %d %v", items, total, err)
+	}
+	if items[0].TaxpayerTitle == "" || items[0].TaxpayerTitle != e1.TaxpayerTitle {
+		t.Fatalf("taxpayer_title = %q, create = %q", items[0].TaxpayerTitle, e1.TaxpayerTitle)
 	}
 	owner := orgctx.Scope{ID: 1, Permissions: []string{rbac.PermTenantEngagementsRead, rbac.PermTenantEngagementsReadAll}}
 	if _, total, _ := svc.List(ctx, owner, 7, "", 50, 0); total != 2 {

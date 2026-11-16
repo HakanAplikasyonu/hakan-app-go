@@ -13482,10 +13482,11 @@ components:
 
     Engagement:
       type: object
-      required: [uuid, taxpayer_uuid, status, started_at, ended_at, created_at]
+      required: [uuid, taxpayer_uuid, taxpayer_title, status, started_at, ended_at, created_at]
       properties:
         uuid: { type: string, format: uuid }
         taxpayer_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string, description: "Mükellefin unvanı ya da adı soyadı (ofis kapsamında; #206)" }
         status: { type: string, enum: [active, ended] }
         started_at: { type: string, format: date-time }
         ended_at: { type: [string, "null"], format: date-time }

@@ -10,164 +10,256 @@
   <body>
     <header class="top">
       <img src="logo.svg" alt="" width="28" height="28" />
-      <h1>Hakan masaüstü</h1>
-      <span id="app-version" class="muted"></span>
+      <div class="brand">
+        <strong>Hakan</strong>
+        <span id="office-name" class="muted"></span>
+      </div>
       <span class="grow-x"></span>
-      <span id="agent-badge" class="badge" data-state="wait">Oturum yok</span>
+      <span id="agent-badge" class="badge" data-state="wait" role="status">Bağlanıyor…</span>
     </header>
 
     <div id="update-banner" class="banner" role="status" hidden>
       <span id="update-banner-text"></span>
       <button id="update-banner-install" type="button">Güncelle ve yeniden başlat</button>
     </div>
+    <div id="paused-banner" class="banner warn" role="status" hidden>
+      <span>Klasör izleme duraklatıldı. Yeni dosyalar yüklenmiyor.</span>
+      <button id="paused-resume" type="button">İzlemeyi sürdür</button>
+    </div>
+
+    <nav id="tabs" class="tabs" role="tablist" aria-label="Bölümler" hidden>
+      <button type="button" role="tab" data-view="folders" aria-selected="true">Klasörler</button>
+      <button type="button" role="tab" data-view="program" aria-selected="false">Muhasebe programı</button>
+      <button type="button" role="tab" data-view="settings" aria-selected="false">Ayarlar</button>
+      <button type="button" role="tab" data-view="advanced" aria-selected="false">Gelişmiş</button>
+    </nav>
 
     <main>
-      <section class="card" aria-labelledby="login-title">
-        <h2 id="login-title">Ofis oturumu</h2>
-        <form id="login-form" class="stack">
-          <label>
-            <span>API adresi</span>
-            <input id="api-url" type="url" placeholder="https://api.ornek.com" required />
-          </label>
-          <div class="row">
-            <label class="grow">
+      <!-- Bağlantı bekleniyor -->
+      <section id="view-loading" class="view center" aria-live="polite">
+        <p class="muted">Hakan başlatılıyor…</p>
+      </section>
+
+      <!-- Oturum aç -->
+      <section id="view-login" class="view narrow" hidden aria-labelledby="login-title">
+        <div class="card">
+          <h1 id="login-title">Ofis hesabınızla oturum açın</h1>
+          <p class="muted">Ofisinizin Hakan hesabındaki e-posta ve parolanızı kullanın.</p>
+          <form id="login-form" class="stack" novalidate>
+            <label>
               <span>E-posta</span>
               <input id="email" type="email" autocomplete="username" required />
             </label>
-            <label class="grow">
+            <label>
               <span>Parola</span>
               <input id="password" type="password" autocomplete="current-password" required />
             </label>
-          </div>
-          <label id="totp-row" hidden>
-            <span>Doğrulama kodu</span>
-            <input id="totp" inputmode="numeric" autocomplete="one-time-code" />
-          </label>
-          <div class="row">
-            <button type="submit">Oturum aç</button>
-            <button id="api-check" type="button" class="ghost">Sunucuyu dene</button>
-          </div>
-        </form>
-        <div id="org-pick" class="stack" hidden>
-          <label>
-            <span>Ofis</span>
-            <select id="org"></select>
-          </label>
-          <label>
-            <span>Bu bilgisayarın adı</span>
-            <input id="agent-name" maxlength="120" />
-          </label>
-          <button id="org-use" type="button">Ajanı başlat</button>
-        </div>
-        <div id="signed-in" class="stack" hidden>
-          <dl class="kv" id="agent-info"></dl>
-          <div class="row"><button id="logout" type="button" class="ghost">Oturumu kapat</button></div>
-        </div>
-        <p id="login-out" class="muted" aria-live="polite"></p>
-      </section>
-
-      <section class="card" aria-labelledby="watch-title">
-        <h2 id="watch-title">Klasör izleme</h2>
-        <p class="muted">
-          Klasöre düşen <b>.xml</b> ve <b>.zip</b> e-faturalar seçili mükellefe yüklenir. Dosyalar taşınmaz ya
-          da silinmez; aynı içerik bir kez yüklenir.
-        </p>
-        <form id="watch-form" class="stack">
-          <label>
-            <span>Mükellef (hizmet ilişkisi)</span>
-            <select id="engagement" required></select>
-          </label>
-          <label>
-            <span>Etiket</span>
-            <input id="watch-label" placeholder="ör. Atlas Gıda indirilenler" maxlength="80" />
-          </label>
-          <div class="row">
-            <label class="grow">
-              <span>Klasör yolu (ya da klasörü pencereye sürükleyin)</span>
-              <input id="watch-path" required />
+            <label id="totp-row" hidden>
+              <span>Doğrulama uygulamasındaki 6 haneli kod</span>
+              <input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
             </label>
-            <button type="submit">Ekle</button>
-          </div>
-        </form>
-        <ul id="watches" class="list"></ul>
-        <h3>Son yüklemeler</h3>
-        <ul id="uploads" class="list small"></ul>
+            <details id="server-box" class="subtle">
+              <summary>Sunucu adresi</summary>
+              <label class="stack">
+                <span>Ofisinize verilen Hakan adresi</span>
+                <input id="api-url" type="url" placeholder="https://hakan.ornek.com" />
+              </label>
+              <div class="row">
+                <button id="api-check" type="button" class="ghost">Bağlantıyı dene</button>
+              </div>
+            </details>
+            <p id="login-msg" class="msg" role="alert" hidden></p>
+            <button id="login-submit" type="submit">Oturum aç</button>
+          </form>
+        </div>
       </section>
 
-      <section class="card" aria-labelledby="src-title">
-        <h2 id="src-title">Logo / Mikro yerel okuma</h2>
-        <p class="muted">
-          Salt okunur SQL kullanıcısıyla, yalnızca önceden tanımlı sorgular. Tablo ve alan adları pilot mükellefte
-          doğrulanacak; veri şimdilik sunucuya gönderilmez.
-        </p>
-        <form id="src-form" class="stack">
+      <!-- Ofis seçimi -->
+      <section id="view-office" class="view narrow" hidden aria-labelledby="office-title">
+        <div class="card">
+          <h1 id="office-title">Hangi ofis için çalışacak?</h1>
+          <p class="muted">Bu bilgisayar seçtiğiniz ofisin klasörlerini izler ve dosyaları o ofise yükler.</p>
+          <div id="office-list" class="choices" role="radiogroup" aria-label="Ofisler"></div>
+          <label class="stack">
+            <span>Bu bilgisayarın adı (ofiste görünür)</span>
+            <input id="agent-name" maxlength="120" placeholder="ör. Muhasebe masası" />
+          </label>
+          <p id="office-msg" class="msg" role="alert" hidden></p>
           <div class="row">
-            <label class="grow">
-              <span>Program</span>
-              <select id="src-kind">
-                <option value="logo_tiger">Logo Tiger</option>
-                <option value="logo_go">Logo GO</option>
-                <option value="mikro">Mikro</option>
+            <button id="office-use" type="button">Devam et</button>
+            <button id="office-logout" type="button" class="ghost">Başka hesapla aç</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Klasörler -->
+      <section id="view-folders" class="view" hidden aria-labelledby="folders-title">
+        <div class="summary">
+          <div><span class="muted">Bağlantı</span><strong id="sum-conn">—</strong></div>
+          <div><span class="muted">Son eşitleme</span><strong id="sum-beat">—</strong></div>
+          <div><span class="muted">İzlenen klasör</span><strong id="sum-folders">0</strong></div>
+          <div><span class="muted">İşlenen dosya</span><strong id="sum-uploaded">0</strong></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h2 id="folders-title">İzlenen klasörler</h2>
+            <button id="add-open" type="button">Klasör ekle</button>
+          </div>
+          <p class="muted">
+            Klasöre düşen e-fatura dosyaları (.xml, .zip) seçili mükellefe otomatik yüklenir. Dosyalar taşınmaz,
+            silinmez; aynı dosya bir kez yüklenir.
+          </p>
+
+          <form id="add-form" class="add stack" hidden aria-label="Klasör ekle">
+            <label>
+              <span>Mükellef</span>
+              <input id="taxpayer-search" type="search" placeholder="Mükellef adıyla arayın" autocomplete="off" />
+            </label>
+            <select id="engagement" size="6" aria-label="Mükellef listesi" required></select>
+            <p id="engagement-empty" class="muted" hidden>Size atanmış etkin mükellef yok.</p>
+            <div class="stack">
+              <span class="label">Klasör</span>
+              <div class="row tight">
+                <button id="pick-folder" type="button" class="ghost">Klasör seç…</button>
+                <span id="picked-folder" class="muted">Henüz seçilmedi. Klasörü pencereye sürükleyebilirsiniz.</span>
+              </div>
+            </div>
+            <label>
+              <span>Kısa ad (isteğe bağlı)</span>
+              <input id="watch-label" placeholder="ör. Gelen e-faturalar" maxlength="80" />
+            </label>
+            <p id="add-msg" class="msg" role="alert" hidden></p>
+            <div class="row">
+              <button id="add-submit" type="submit">İzlemeye al</button>
+              <button id="add-cancel" type="button" class="ghost">Vazgeç</button>
+            </div>
+          </form>
+
+          <ul id="watches" class="watches"></ul>
+        </div>
+
+        <div class="card">
+          <h2>Son yüklemeler</h2>
+          <ul id="uploads" class="feed"></ul>
+        </div>
+      </section>
+
+      <!-- Muhasebe programı -->
+      <section id="view-program" class="view" hidden aria-labelledby="program-title">
+        <div class="card">
+          <h2 id="program-title">Logo / Mikro bağlantısı</h2>
+          <p class="muted">
+            Muhasebe programının veritabanına salt okunur bir kullanıcıyla bağlanır ve yalnızca fatura başlıklarını
+            okur. Veri şimdilik sunucuya gönderilmez; bu ekran bağlantıyı denemek içindir.
+          </p>
+          <form id="src-form" class="stack">
+            <div class="row">
+              <label class="grow">
+                <span>Program</span>
+                <select id="src-kind">
+                  <option value="logo_tiger">Logo Tiger</option>
+                  <option value="logo_go">Logo GO</option>
+                  <option value="mikro">Mikro</option>
+                </select>
+              </label>
+              <label class="grow"><span>Sunucu</span><input id="src-host" required placeholder="ör. MUHASEBE-PC\SQLEXPRESS" /></label>
+              <label><span>Port</span><input id="src-port" type="number" min="1" max="65535" placeholder="1433" /></label>
+            </div>
+            <div class="row">
+              <label class="grow"><span>Veritabanı</span><input id="src-db" required /></label>
+              <label class="grow"><span>Kullanıcı</span><input id="src-user" required /></label>
+              <label class="grow"><span>Parola</span><input id="src-pass" type="password" required /></label>
+            </div>
+            <div class="row" id="logo-only">
+              <label><span>Firma no</span><input id="src-firm" maxlength="3" placeholder="001" /></label>
+              <label><span>Dönem no</span><input id="src-period" maxlength="2" placeholder="01" /></label>
+            </div>
+            <div class="row">
+              <button type="submit">Bağlantıyı dene</button>
+              <button id="src-preview" type="button" class="ghost">Geçen ayı önizle</button>
+            </div>
+          </form>
+          <div id="src-result" class="result" aria-live="polite" hidden></div>
+        </div>
+      </section>
+
+      <!-- Ayarlar -->
+      <section id="view-settings" class="view" hidden>
+        <div class="card" aria-labelledby="up-title">
+          <div class="card-head">
+            <h2 id="up-title">Güncellemeler</h2>
+            <span id="up-badge" class="badge" data-state="wait">Denetlenmedi</span>
+          </div>
+          <p id="up-text" class="muted" aria-live="polite"></p>
+          <div class="row">
+            <label>
+              <span>Kanal</span>
+              <select id="up-channel">
+                <option value="stable">Kararlı</option>
+                <option value="beta">Beta (erken erişim)</option>
               </select>
             </label>
-            <label class="grow"><span>Sunucu</span><input id="src-host" required /></label>
-            <label><span>Port</span><input id="src-port" type="number" min="1" max="65535" placeholder="1433" /></label>
+            <button id="up-check" type="button" class="ghost">Şimdi denetle</button>
+            <button id="up-install" type="button" hidden>Güncelle ve yeniden başlat</button>
           </div>
-          <div class="row">
-            <label class="grow"><span>Veritabanı</span><input id="src-db" required /></label>
-            <label class="grow"><span>Kullanıcı</span><input id="src-user" required /></label>
-            <label class="grow"><span>Parola</span><input id="src-pass" type="password" required /></label>
+          <div id="up-progress-row" class="stack" hidden>
+            <progress id="up-progress" max="100"></progress>
+            <span id="up-progress-text" class="muted"></span>
           </div>
-          <div class="row" id="logo-only">
-            <label><span>Firma no</span><input id="src-firm" maxlength="3" placeholder="001" /></label>
-            <label><span>Dönem no</span><input id="src-period" maxlength="2" placeholder="01" /></label>
-          </div>
-          <div class="row">
-            <button type="submit">Bağlantıyı dene</button>
-            <button id="src-preview" type="button" class="ghost">Geçen ayı önizle</button>
-          </div>
-        </form>
-        <pre id="src-out" class="out" aria-live="polite"></pre>
-      </section>
-
-      <section class="card" aria-labelledby="up-title">
-        <div class="card-head">
-          <h2 id="up-title">Güncellemeler</h2>
-          <span id="up-badge" class="badge" data-state="wait">Denetlenmedi</span>
         </div>
-        <p id="up-text" class="muted" aria-live="polite"></p>
-        <div class="row">
-          <label>
-            <span>Kanal</span>
-            <select id="up-channel">
-              <option value="stable">Kararlı</option>
-              <option value="beta">Beta (erken erişim)</option>
-            </select>
+
+        <div class="card">
+          <h2>Arka planda çalışma</h2>
+          <p class="muted">Pencereyi kapattığınızda Hakan saat yanındaki simgede çalışmaya devam eder.</p>
+          <label class="check">
+            <input id="set-autostart" type="checkbox" />
+            <span>Bilgisayar açılınca Hakan'ı başlat</span>
           </label>
-          <button id="up-check" type="button" class="ghost">Şimdi denetle</button>
-          <button id="up-install" type="button" hidden>Güncelle ve yeniden başlat</button>
+          <label class="check">
+            <input id="set-paused" type="checkbox" />
+            <span>Klasör izlemeyi duraklat</span>
+          </label>
+          <p id="settings-msg" class="msg" role="alert" hidden></p>
         </div>
-        <div id="up-progress-row" class="stack" hidden>
-          <progress id="up-progress" max="100"></progress>
-          <span id="up-progress-text" class="muted"></span>
+
+        <div class="card">
+          <h2>Hesap</h2>
+          <dl class="kv" id="account-info"></dl>
+          <div class="row">
+            <button id="logout" type="button" class="ghost">Oturumu kapat</button>
+          </div>
         </div>
       </section>
 
-      <section class="card" aria-labelledby="sc-title">
-        <div class="card-head">
-          <h2 id="sc-title">Yerel ajan (Go sidecar)</h2>
-          <span id="sc-badge" class="badge" data-state="wait">Başlatılıyor…</span>
+      <!-- Gelişmiş -->
+      <section id="view-advanced" class="view" hidden>
+        <div class="card">
+          <h2>Gelişmiş</h2>
+          <p class="muted">Destek ekibi sorun ararken bu bölümü kullanmanızı isteyebilir.</p>
+          <dl class="kv" id="adv-info"></dl>
+          <div class="row">
+            <button id="adv-ping" type="button" class="ghost">Yerel ajanı dene</button>
+            <button id="adv-restart" type="button" class="ghost">Yerel ajanı yeniden başlat</button>
+          </div>
+          <p id="adv-out" class="muted" aria-live="polite"></p>
         </div>
-        <dl class="kv" id="sc-info"></dl>
-        <div class="row">
-          <button id="sc-ping" type="button" class="ghost">Ping</button>
-          <button id="sc-restart" type="button" class="ghost">Yeniden başlat</button>
+        <div class="card">
+          <h2>E-fatura dosyası denetimi</h2>
+          <p class="muted">
+            Bir .xml e-faturayı pencereye sürükleyin. Dosya bu bilgisayarda okunur, sunucuya gönderilmez.
+          </p>
+          <dl class="kv" id="ubl-out"></dl>
         </div>
-        <p id="sc-out" class="muted" aria-live="polite"></p>
-        <h3>UBL dosyası denetimi</h3>
-        <p class="muted">XML faturayı pencereye sürükleyin; dosya yerelde go-ubltr ile okunur, sunucuya gönderilmez.</p>
-        <dl class="kv" id="ubl-out"></dl>
       </section>
     </main>
+
+    <dialog id="confirm" aria-labelledby="confirm-text">
+      <p id="confirm-text"></p>
+      <div class="row end">
+        <button id="confirm-no" type="button" class="ghost">Vazgeç</button>
+        <button id="confirm-yes" type="button" class="danger">Kaldır</button>
+      </div>
+    </dialog>
   </body>
 </html>

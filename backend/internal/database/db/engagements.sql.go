@@ -154,7 +154,7 @@ func (q *Queries) EndEngagement(ctx context.Context, arg EndEngagementParams) (E
 }
 
 const getEngagementByUUID = `-- name: GetEngagementByUUID :one
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1
@@ -178,6 +178,7 @@ type GetEngagementByUUIDRow struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
 
 func (q *Queries) GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error) {
@@ -195,6 +196,7 @@ func (q *Queries) GetEngagementByUUID(ctx context.Context, arg GetEngagementByUU
 		&i.UpdatedAt,
 		&i.ArchiveUntil,
 		&i.TaxpayerUuid,
+		&i.TaxpayerTitle,
 	)
 	return i, err
 }
@@ -224,7 +226,7 @@ func (q *Queries) GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Tax
 }
 
 const listAssignedEngagements = `-- name: ListAssignedEngagements :many
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 INNER JOIN engagement_assignments a
@@ -256,6 +258,7 @@ type ListAssignedEngagementsRow struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
 
 func (q *Queries) ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error) {
@@ -285,6 +288,7 @@ func (q *Queries) ListAssignedEngagements(ctx context.Context, arg ListAssignedE
 			&i.UpdatedAt,
 			&i.ArchiveUntil,
 			&i.TaxpayerUuid,
+			&i.TaxpayerTitle,
 		); err != nil {
 			return nil, err
 		}
@@ -345,7 +349,7 @@ func (q *Queries) ListEngagementAssignments(ctx context.Context, arg ListEngagem
 }
 
 const listEngagementsByOrg = `-- name: ListEngagementsByOrg :many
-SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid
+SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at, e.created_at, e.updated_at, e.archive_until, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title
 FROM engagements e
 INNER JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = $1
@@ -373,6 +377,7 @@ type ListEngagementsByOrgRow struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ArchiveUntil   pgtype.Timestamptz `json:"archive_until"`
 	TaxpayerUuid   uuid.UUID          `json:"taxpayer_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
 }
 
 func (q *Queries) ListEngagementsByOrg(ctx context.Context, arg ListEngagementsByOrgParams) ([]ListEngagementsByOrgRow, error) {
@@ -401,6 +406,7 @@ func (q *Queries) ListEngagementsByOrg(ctx context.Context, arg ListEngagementsB
 			&i.UpdatedAt,
 			&i.ArchiveUntil,
 			&i.TaxpayerUuid,
+			&i.TaxpayerTitle,
 		); err != nil {
 			return nil, err
 		}
