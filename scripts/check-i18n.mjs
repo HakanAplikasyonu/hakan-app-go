@@ -310,9 +310,16 @@ function collectStaticFrontendKeys(tsFiles) {
       const trimmed = line.trim();
       if (trimmed.startsWith("//")) return;
       for (const m of line.matchAll(
-        /\b(?:t|tp)\(\s*(?:`([^`$]+)`|'([^']+)'|"([^"]+)")/g,
+        /\b(t|tp)\(\s*(?:`([^`$]+)`|'([^']+)'|"([^"]+)")/g,
       )) {
-        pushLoc(used, m[1] || m[2] || m[3], `${rel(file)}:${n}`);
+        const key = m[2] || m[3] || m[4];
+        // tp() çoğul biçimi seçer: anahtar_one / anahtar_other.
+        if (m[1] === "tp") {
+          pushLoc(used, `${key}_one`, `${rel(file)}:${n}`);
+          pushLoc(used, `${key}_other`, `${rel(file)}:${n}`);
+        } else {
+          pushLoc(used, key, `${rel(file)}:${n}`);
+        }
       }
       for (const m of line.matchAll(
         /\b(?:labelKey|titleKey|label_key|title_key)\s*:\s*(?:`([^`$]+)`|'([^']+)'|"([^"]+)")/g,

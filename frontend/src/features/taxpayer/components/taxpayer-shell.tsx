@@ -1,10 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { MarkaLogosu } from "@/components/hakan";
+import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,12 +17,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { routes } from "@/config/routes";
 import {
   fetchTaxpayerContext,
@@ -97,56 +101,127 @@ export function TaxpayerShell({
 
   return (
     <div className="bg-background min-h-svh">
-      <header className="border-b">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <span className="font-semibold">{context.data.taxpayer.title}</span>
-          <CompanySwitcher current={context.data.taxpayer.uuid} />
+      <a
+        href="#taxpayer-main"
+        className="bg-brand text-on-brand sr-only rounded-md px-3 py-2 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50"
+      >
+        {t("taxpayer.skip_to_content")}
+      </a>
+      {/* Mükellef web portalı başlığı (arayüz 8/9, #331; tuval MukellefWeb). */}
+      <header className="bg-surface border-line border-b">
+        <div className="mx-auto flex h-[60px] max-w-[1200px] items-center gap-6 px-4 md:px-8">
+          <Link
+            href={routes.taxpayer.home(context.data.taxpayer.uuid)}
+            className="shrink-0 rounded-md"
+            aria-label={t("taxpayer.brand_home")}
+          >
+            <MarkaLogosu varyant="tam" boyut={24} />
+          </Link>
+          <div className="hidden h-full min-w-0 flex-1 md:flex">
+            <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
+            <CompanySwitcher
+              current={context.data.taxpayer.uuid}
+              title={context.data.taxpayer.title}
+            />
+            <UserMenu />
+          </div>
         </div>
-        <div className="mx-auto max-w-5xl px-4 pb-2">
+        <div className="border-line h-12 border-t px-2 md:hidden">
           <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main
+        id="taxpayer-main"
+        className="mx-auto max-w-[1200px] px-4 py-6 md:px-8 md:py-8"
+      >
         {children(context.data)}
       </main>
     </div>
   );
 }
 
-/** Company selector: the caller's taxpayer memberships from /me. */
-export function CompanySwitcher({ current }: { current: string }) {
+function companyInitials(title: string) {
+  const parts = title
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return (
+    (parts[0]?.[0] ?? "") + (parts.length > 1 ? (parts[1]?.[0] ?? "") : "")
+  ).toLocaleUpperCase("tr-TR");
+}
+
+/**
+ * Şirket seçici: /me'deki mükellef üyelikleri. Tek şirketi olan kullanıcı
+ * yalnız şirketin adını görür (değiştirecek bir şey yok).
+ */
+export function CompanySwitcher({
+  current,
+  title,
+}: {
+  current: string;
+  title?: string;
+}) {
   const { t } = useLocale();
   const router = useRouter();
   const { user } = useAuth();
   const companies = user?.taxpayers ?? [];
-  if (companies.length < 2) return null;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-muted-foreground text-sm">
-        {t("taxpayer.switcher_label")}
-      </span>
-      <Select
-        value={current}
-        onValueChange={(value) => {
-          if (value && value !== current) {
-            router.push(routes.taxpayer.home(String(value)));
-          }
-        }}
+  const name = title ?? companies.find((c) => c.uuid === current)?.title ?? "";
+  const face = (
+    <>
+      <span
+        aria-hidden
+        className="bg-brand text-on-brand flex size-7 shrink-0 items-center justify-center rounded-md text-[11px] font-bold"
       >
-        <SelectTrigger
-          className="w-56"
-          aria-label={t("taxpayer.switcher_label")}
+        {companyInitials(name) || "•"}
+      </span>
+      <span className="hidden max-w-48 truncate text-sm font-medium sm:inline">
+        {name}
+      </span>
+    </>
+  );
+  if (companies.length < 2) {
+    return (
+      <span className="flex items-center gap-2 px-1" title={name}>
+        <span className="sr-only">{t("taxpayer.switcher_label")}: </span>
+        {face}
+      </span>
+    );
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="border-line hover:bg-surface-2 focus-visible:ring-ring flex min-h-11 items-center gap-2 rounded-lg border px-2 focus-visible:ring-2 focus-visible:outline-none md:min-h-10"
+          aria-label={`${t("taxpayer.switcher_label")}: ${name}`}
         >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
+          {face}
+          <ChevronDown aria-hidden className="text-text-3 size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuLabel className="text-text-3 text-xs font-normal">
+          {t("taxpayer.switcher_label")}
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={current}>
           {companies.map((c) => (
-            <SelectItem key={c.uuid} value={c.uuid}>
+            <DropdownMenuRadioItem
+              key={c.uuid}
+              value={c.uuid}
+              className="min-h-10"
+              onSelect={() => {
+                if (c.uuid !== current)
+                  router.push(routes.taxpayer.home(c.uuid));
+              }}
+            >
               {c.title}
-            </SelectItem>
+            </DropdownMenuRadioItem>
           ))}
-        </SelectContent>
-      </Select>
-    </div>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

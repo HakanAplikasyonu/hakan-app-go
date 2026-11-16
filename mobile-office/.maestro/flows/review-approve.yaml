@@ -1,30 +1,29 @@
-# Kaydırarak onay (arayüz v1, #327): kuyruktaki ilk kart alt "Onayla"
-# düğmesiyle onaylanır (kaydırma hareketinin erişilebilir eşi). Kuyruk boşsa
-# yalnızca boş durum denetlenir (demo verisinde bekleyen öneri olmalı).
+# Kaydırarak onay (arayüz v1, #327): panodaki onay kuyruğu kartından kuyruk
+# açılır, ilk kart alt "Onayla" düğmesiyle (kaydırmanın erişilebilir eşi)
+# onaylanır. Demo verisinde bekleyen öneriler var (#318); kuyruk boşsa akış
+# düşer.
+#
+# Kuyruğa derin bağlantıyla (hakanofis://review) değil karttan gidilir (#343):
+# bağlantı panoda kalırsa doğrulama yanlışlıkla geçebiliyordu.
 appId: app.hakan.office
 name: review-approve
 tags: [smoke]
 ---
 - launchApp
-- openLink: "hakanofis://review"
 - extendedWaitUntil:
-    visible: "Onay"
+    visible:
+      id: "stat-review"
+    timeout: 20000
+- tapOn:
+    id: "stat-review"
+- extendedWaitUntil:
+    visible:
+      id: "suggestion-card"
+    timeout: 20000
+- assertVisible:
+    id: "review-remaining"
+- tapOn:
+    id: "review-approve"
+- extendedWaitUntil:
+    visible: ".*onaylandı.*"
     timeout: 15000
-- runFlow:
-    when:
-      visible:
-        id: "suggestion-card"
-    commands:
-      - assertVisible:
-          id: "review-remaining"
-      - tapOn:
-          id: "review-approve"
-      - extendedWaitUntil:
-          visible: ".*onaylandı.*"
-          timeout: 15000
-- runFlow:
-    when:
-      notVisible:
-        id: "suggestion-card"
-    commands:
-      - assertVisible: "Kuyruk boş"

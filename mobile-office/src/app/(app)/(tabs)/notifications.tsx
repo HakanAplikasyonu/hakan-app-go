@@ -16,7 +16,7 @@ import { filterInbox, inboxFilters, type InboxFilter } from '@/features/notifica
 /**
  * Bildirimler (MusavirMobil · 5, yeni ekran): Tümü / Engel / Yükleme.
  * Okunmamış satır `brand-tint` zeminli, ekran okuyucu "Okunmadı" der.
- * Liste ucu #333 ile gelecek; o zamana kadar istek atılmaz, boş durum görünür.
+ * Liste `GET /v1/tenant/notifications` (#333); okununca `{uuid}/read`.
  */
 export default function NotificationsScreen() {
   const { colors: c } = useTheme();

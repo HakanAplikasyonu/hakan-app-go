@@ -5,7 +5,7 @@ import { api } from '@/core/api/client';
 import { useOrganization } from '@/core/auth/auth-provider';
 
 /**
- * Ofis bildirim listesi. Uç #333 ile gelecek; o zamana kadar `available`
+ * Ofis bildirim listesi (`GET /v1/tenant/notifications`, #333). Uç tablosu boşsa `available`
  * false döner ve hiç istek atılmaz (ekran boş durumu gösterir).
  */
 export function useInbox() {
@@ -14,7 +14,7 @@ export function useInbox() {
   const q = useQuery({
     queryKey: ['inbox', org],
     enabled: ep !== null,
-    queryFn: async (): Promise<InboxItem[]> => normalizeInbox(await api.get<unknown>(ep!.list, { organization: org })),
+    queryFn: async (): Promise<InboxItem[]> => normalizeInbox(await api.get<unknown>(ep!.list, { organization: org, query: { limit: 50 } })),
     refetchInterval: 60_000,
   });
   return { ...q, available: ep !== null, items: q.data ?? [] };

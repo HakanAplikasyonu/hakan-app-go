@@ -124,7 +124,7 @@ func TestUserRowTablesPolicies(t *testing.T) {
 					t.Errorf("%s.rls_user_write: %s %q %q (must not open office-less rows)", table, cmd, qual, check)
 				}
 			case "rls_user_own":
-				// notifications (000091, #333): the user's own row, in any scope,
+				// notifications (000092, #333): the user's own row, in any scope,
 				// for reading and marking read; never another user's.
 				if table != "notifications" || cmd != "UPDATE" || !strings.Contains(qual, "user_id = app_current_user_id()") ||
 					!strings.Contains(check, "user_id = app_current_user_id()") {

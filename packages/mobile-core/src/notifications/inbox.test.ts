@@ -3,9 +3,26 @@ import { test } from 'node:test';
 
 import { crownFor, inboxA11yLabel, inboxEndpoint, inboxTime, normalizeInbox, unreadCount } from './inbox.ts';
 
-test('no inbox endpoint until #333 lands', () => {
-  assert.equal(inboxEndpoint('office'), null);
-  assert.equal(inboxEndpoint('taxpayer'), null);
+test('inbox endpoints (#333)', () => {
+  assert.equal(inboxEndpoint('office')?.list, '/v1/tenant/notifications');
+  assert.equal(inboxEndpoint('office')?.read('u1'), '/v1/tenant/notifications/u1/read');
+  assert.equal(inboxEndpoint('taxpayer')?.readAll, '/v1/taxpayer/notifications/read-all');
+});
+
+test('kind from template code or source event', () => {
+  const items = normalizeInbox({
+    items: [
+      { uuid: 'a', title: 'Engelleyici', template_code: 'warnings.blocker', action_url: '/t/ofis/warnings' },
+      { uuid: 'b', title: 'Belge yüklendi', source_event: 'doc_tasks.submitted' },
+      { uuid: 'c', title: 'Ajan çevrimdışı', template_code: 'agents.offline' },
+      { uuid: 'd', title: 'Hatırlatma', template_code: 'doc_tasks.reminder' },
+      { uuid: 'e', title: 'Bilinmeyen', template_code: 'yeni.olay' },
+    ],
+    total: 5,
+    unread: 5,
+  });
+  assert.deepEqual(items.map((i) => i.kind), ['blocker', 'upload', 'agent', 'reminder', 'other']);
+  assert.equal(items[0].url, '/t/ofis/warnings');
 });
 
 test('normalizeInbox keeps valid rows and maps unknown kinds', () => {

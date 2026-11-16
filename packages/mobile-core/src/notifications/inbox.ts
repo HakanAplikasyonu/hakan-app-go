@@ -3,19 +3,20 @@
  * İki uygulama ortak kullanır. Saf modül: React Native içe aktarmaz,
  * node --test ile sınanır.
  *
- * Backend ucu #333 ile gelecek (mükellef ve ofis için listeleme ve okundu
- * işaretleme). Uç gelene kadar `inboxEndpoint` null döner; ekranlar istek
- * atmaz, boş durumu "yakında" metniyle gösterir. Uç gelince yalnızca
- * `INBOX_ENDPOINTS` doldurulur ve `normalizeInbox` gelen satır biçimine
- * göre gözden geçirilir.
+ * Uçlar #333 (#339): ofiste `/v1/tenant/notifications` (X-Organization),
+ * mükellefte `/v1/taxpayer/notifications` (X-Taxpayer); yanıt `ScopedInbox`
+ * (`items`, `total`, `unread`). Satırda tür alanı yok; tür `template_code`
+ * (yoksa `source_event`) olay adından çıkarılır.
  */
 
 export type InboxAudience = 'office' | 'taxpayer';
 
-/** Liste ve okundu işaretleme uçları; null: backend'de henüz yok (#333). */
+const uclar = (base: string) => ({ list: base, read: (uuid: string) => `${base}/${uuid}/read`, readAll: `${base}/read-all` });
+
+/** Liste ve okundu işaretleme uçları (#333); null olursa ekran istek atmaz, boş durum gösterir. */
 export const INBOX_ENDPOINTS: Record<InboxAudience, { list: string; read: (uuid: string) => string; readAll: string } | null> = {
-  office: null,
-  taxpayer: null,
+  office: uclar('/v1/tenant/notifications'),
+  taxpayer: uclar('/v1/taxpayer/notifications'),
 };
 
 export function inboxEndpoint(audience: InboxAudience) {
@@ -41,6 +42,25 @@ export type InboxItem = {
 
 const KINDS: readonly InboxKind[] = ['blocker', 'upload', 'task', 'agent', 'export', 'reminder', 'other'];
 
+/** Olay adı (backend/internal/platform/events/catalog.go) → tür. */
+const OLAYLAR: Record<string, InboxKind> = {
+  'warnings.blocker': 'blocker',
+  'doc_tasks.submitted': 'upload',
+  'doc_tasks.created': 'task',
+  'doc_tasks.requested': 'task',
+  'doc_tasks.reminder': 'reminder',
+  'agents.offline': 'agent',
+  'exports.ready': 'export',
+  'reports.export.completed': 'export',
+};
+
+/** Satırın türü: açık `kind` alanı, yoksa şablon kodu ya da olay adı. */
+export function kindOf(o: { kind?: unknown; template_code?: unknown; source_event?: unknown }): InboxKind {
+  const k = str(o.kind);
+  if ((KINDS as readonly string[]).includes(k)) return k as InboxKind;
+  return OLAYLAR[str(o.template_code)] ?? OLAYLAR[str(o.source_event)] ?? 'other';
+}
+
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 
 /**
@@ -56,15 +76,14 @@ export function normalizeInbox(raw: unknown): InboxItem[] {
     const uuid = str(o.uuid);
     const title = str(o.title);
     if (!uuid || !title) continue;
-    const k = str(o.kind);
     out.push({
       uuid,
-      kind: (KINDS as readonly string[]).includes(k) ? (k as InboxKind) : 'other',
+      kind: kindOf(o),
       title,
       body: str(o.body),
       createdAt: str(o.created_at),
       read: Boolean(o.read_at) || o.read === true,
-      url: str(o.url) || null,
+      url: str(o.action_url) || str(o.url) || null,
     });
   }
   return out;
