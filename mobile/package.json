@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
-    "@sentry/react-native": "~8.28.0",
+    "@sentry/react-native": "~8.35.0",
     "@tanstack/react-query": "^5.104.0",
     "expo": "~58.0.19",
     "expo-application": "~58.1.2",
@@ -33,12 +33,12 @@
     "expo-splash-screen": "~58.0.11",
     "expo-status-bar": "~58.0.4",
     "expo-updates": "~58.0.22",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-native": "0.88.1",
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.0",
-    "react-native-svg": "15.16.0",
+    "react-native-svg": "15.16.1",
     "react-native-web": "^0.21.4"
   },
   "devDependencies": {
