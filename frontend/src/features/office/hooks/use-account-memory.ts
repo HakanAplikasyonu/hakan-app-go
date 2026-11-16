@@ -1,10 +1,16 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import {
   accountMemoryKeys,
   accountMemoryService,
+  type AccountRuleInput,
   type AccountRulePromoteInput,
   type MissingPlanAccount,
 } from "../services/account-memory.service";
@@ -69,10 +75,35 @@ export function useAccountMemoryActions(slug: string, engagement: string) {
           accounts,
         ),
     }),
+    createRule: useMutation({
+      mutationFn: (input: AccountRuleInput) =>
+        accountMemoryService.createRule(slug, engagement, input),
+      onSuccess: refresh,
+    }),
     promote: useMutation({
       mutationFn: (input: AccountRulePromoteInput) =>
         accountMemoryService.promote(slug, engagement, input),
       onSuccess: refresh,
     }),
   };
+}
+
+/** Kural editörünün "kaydetmeden önce" önizlemesi (#330). */
+export function useRulePreview(
+  slug: string,
+  engagement: string,
+  input: AccountRuleInput | null,
+) {
+  return useQuery({
+    queryKey: [
+      ...accountMemoryKeys.all(slug, engagement),
+      "rule-preview",
+      input,
+    ],
+    queryFn: () => accountMemoryService.previewRule(slug, engagement, input!),
+    enabled: !!input && !!engagement,
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+    retry: false,
+  });
 }

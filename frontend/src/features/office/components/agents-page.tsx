@@ -26,12 +26,6 @@ import { Panel, TableBox } from "./office-ui";
  */
 export function AgentsPage() {
   const { t } = useLocale();
-  const { slug } = useTenant();
-  const { can } = usePermission();
-  const agents = useDesktopAgents(slug);
-  const items = agents.data?.items ?? [];
-  const offline = items.filter((a) => a.status === "offline").length;
-
   return (
     <div className="space-y-4">
       <PageHeader
@@ -39,71 +33,85 @@ export function AgentsPage() {
         description={t("office.agents.description")}
         icon={<MonitorSmartphone className="size-6" />}
       />
-      <Panel
-        title={t("office.agents.list_title", { count: items.length })}
-        description={
-          offline
-            ? t("office.agents.offline_count", { count: offline })
-            : undefined
-        }
-        actions={
-          <Link
-            href={routes.help.guide("masaustu")}
-            className="text-brand text-xs font-medium hover:underline"
-          >
-            {t("office.agents.guide_link")}
-          </Link>
-        }
-      >
-        {agents.isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : agents.isError ? (
-          <ErrorState
-            title={t("office.agents.load_error")}
-            onRetry={() => void agents.refetch()}
-          />
-        ) : items.length === 0 ? (
-          <div className="space-y-1 p-6 text-center">
-            <p className="font-medium">{t("office.agents.empty_title")}</p>
-            <p className="text-muted-foreground text-sm">
-              {t("office.agents.empty_description")}
-            </p>
-          </div>
-        ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th>{t("office.agents.col_name")}</th>
-                <th>{t("office.agents.col_platform")}</th>
-                <th>{t("office.agents.col_version")}</th>
-                <th>{t("office.agents.col_status")}</th>
-                <th>{t("office.agents.col_last_seen")}</th>
-                <th>{t("office.agents.col_last_error")}</th>
-                {can(permissions.tenant.agents.write) ? (
-                  <th>
-                    <span className="sr-only">
-                      {t("office.agents.col_actions")}
-                    </span>
-                  </th>
-                ) : null}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((a) => (
-                <AgentRow
-                  key={a.uuid}
-                  agent={a}
-                  canRevoke={can(permissions.tenant.agents.write)}
-                />
-              ))}
-            </tbody>
-          </TableBox>
-        )}
-      </Panel>
+      <AgentsPanel />
     </div>
+  );
+}
+
+/** Ajan listesi: /agents sayfası ve Ayarlar → Masaüstü ajanları (#330). */
+export function AgentsPanel() {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { can } = usePermission();
+  const agents = useDesktopAgents(slug);
+  const items = agents.data?.items ?? [];
+  const offline = items.filter((a) => a.status === "offline").length;
+
+  return (
+    <Panel
+      title={t("office.agents.list_title", { count: items.length })}
+      description={
+        offline
+          ? t("office.agents.offline_count", { count: offline })
+          : undefined
+      }
+      actions={
+        <Link
+          href={routes.help.guide("masaustu")}
+          className="text-brand text-xs font-medium hover:underline"
+        >
+          {t("office.agents.guide_link")}
+        </Link>
+      }
+    >
+      {agents.isLoading ? (
+        <div className="space-y-2 p-4">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      ) : agents.isError ? (
+        <ErrorState
+          title={t("office.agents.load_error")}
+          onRetry={() => void agents.refetch()}
+        />
+      ) : items.length === 0 ? (
+        <div className="space-y-1 p-6 text-center">
+          <p className="font-medium">{t("office.agents.empty_title")}</p>
+          <p className="text-muted-foreground text-sm">
+            {t("office.agents.empty_description")}
+          </p>
+        </div>
+      ) : (
+        <TableBox>
+          <thead>
+            <tr>
+              <th>{t("office.agents.col_name")}</th>
+              <th>{t("office.agents.col_platform")}</th>
+              <th>{t("office.agents.col_version")}</th>
+              <th>{t("office.agents.col_status")}</th>
+              <th>{t("office.agents.col_last_seen")}</th>
+              <th>{t("office.agents.col_last_error")}</th>
+              {can(permissions.tenant.agents.write) ? (
+                <th>
+                  <span className="sr-only">
+                    {t("office.agents.col_actions")}
+                  </span>
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <AgentRow
+                key={a.uuid}
+                agent={a}
+                canRevoke={can(permissions.tenant.agents.write)}
+              />
+            ))}
+          </tbody>
+        </TableBox>
+      )}
+    </Panel>
   );
 }
 

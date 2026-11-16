@@ -114,5 +114,11 @@
   "accept_status_revoked": "Bu davet iptal edildi.",
   "accept_not_found_title": "Davet bulunamadı",
   "accept_not_found_description": "Bağlantı geçersiz ya da eksik. E-postanızdaki adresi kontrol edin.",
-  "accept_done": "{{name}} organizasyonuna katıldınız."
+  "accept_done": "{{name}} organizasyonuna katıldınız.",
+  "settings_nav_label": "Ayarlar menüsü",
+  "settings_section_agents": "Masaüstü ajanları",
+  "settings_section_ai": "Yapay zekâ ve onay",
+  "settings_section_ai_description": "Otomatik onay ve kural adayı ayarları ofisin bütün mükelleflerine uygulanır.",
+  "settings_section_appearance": "Görünüm",
+  "settings_section_office": "Ofis bilgileri"
 }

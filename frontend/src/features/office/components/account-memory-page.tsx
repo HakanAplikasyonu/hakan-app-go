@@ -42,6 +42,7 @@ import type {
 } from "../services/account-memory.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { Panel, TableBox } from "./office-ui";
+import { RuleEditor } from "./rule-editor";
 
 type Translate = (
   key: string,
@@ -335,6 +336,7 @@ function RulesPanel({ engagement }: { engagement: string }) {
     <Panel
       title={t("office.memory.rules_title", { count: items.length })}
       description={t("office.memory.rules_description")}
+      actions={canWrite ? <RuleEditor engagement={engagement} /> : undefined}
     >
       {rules.isLoading ? (
         <Skeleton className="m-4 h-16" />
@@ -538,11 +540,12 @@ function AccountMemoryInner() {
         selected={selected}
         onSelect={select}
       />
+      {/* OfisMizan sırası: kurallar, hafıza (adaylar ve otomatik kodlananlar), hesap planı. */}
+      <RulesPanel engagement={engagement} />
+      <CandidatesPanel engagement={engagement} />
+      <AutoCodedPanel engagement={engagement} />
       <PlanPanel engagement={engagement} />
       <MissingPanel engagement={engagement} />
-      <CandidatesPanel engagement={engagement} />
-      <RulesPanel engagement={engagement} />
-      <AutoCodedPanel engagement={engagement} />
     </div>
   );
 }

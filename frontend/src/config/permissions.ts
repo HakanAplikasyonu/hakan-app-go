@@ -69,7 +69,10 @@ export const Permission = {
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
   /** Review queue decisions (accept / correct / revert). */
+  TenantReviewRead: "tenant.review.read",
   TenantReviewDecide: "tenant.review.decide",
+  /** Auto-accept threshold of the office (#330, Ayarlar → Yapay zekâ ve onay). */
+  TenantReviewSettingsWrite: "tenant.review.settings.write",
   /** Mizan hafızası (#30, #310): account plan and account rules. */
   TenantAccountPlanRead: "tenant.account_plan.read",
   TenantAccountPlanWrite: "tenant.account_plan.write",
@@ -201,7 +204,9 @@ export const permissions = {
       export: Permission.TenantJournalsExport,
     },
     review: {
+      read: Permission.TenantReviewRead,
       decide: Permission.TenantReviewDecide,
+      settingsWrite: Permission.TenantReviewSettingsWrite,
     },
     accountPlan: {
       read: Permission.TenantAccountPlanRead,
