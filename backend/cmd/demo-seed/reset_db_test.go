@@ -1,0 +1,185 @@
+package main
+
+import (
+	"context"
+	"testing"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
+)
+
+func count(t *testing.T, d *testdb.DB, sql string, args ...any) int {
+	t.Helper()
+	var n int
+	if err := d.Pool.QueryRow(context.Background(), sql, args...).Scan(&n); err != nil {
+		t.Fatalf("%s: %v", sql, err)
+	}
+	return n
+}
+
+// uploadUBL loads the demo UBL files with prefix into an engagement through
+// the real upload flow (customers, invoices, lines, sources, warnings, …).
+// ownTaxID, when set, is the party the files are checked against (a real
+// office's taxpayer reusing the demo files); empty uses the taxpayer's own.
+func uploadUBL(t *testing.T, d *testdb.DB, scope engagementctx.Scope, actor int64, prefix, ownTaxID string) {
+	t.Helper()
+	files, err := demo.UBL(prefix)
+	if err != nil || len(files) == 0 {
+		t.Fatalf("demo UBL %q: %d files, %v", prefix, len(files), err)
+	}
+	svc := upload.New(d.Pool, storage.NewMemory(), nil, nil)
+	if ownTaxID != "" {
+		svc = svc.WithOwnTaxIDResolver(func(context.Context, int64) (string, error) { return ownTaxID, nil })
+	}
+	for _, f := range files {
+		job, err := svc.Upload(context.Background(), scope, actor, f.Name, f.Data)
+		if err != nil {
+			t.Fatalf("upload %s: %v", f.Name, err)
+		}
+		if job.Report == nil || job.Report.Added == 0 {
+			t.Fatalf("upload %s: %+v", f.Name, job.Report)
+		}
+	}
+}
+
+func demoScope(t *testing.T, d *testdb.DB, key string) engagementctx.Scope {
+	t.Helper()
+	var taxID string
+	for _, tp := range demo.Taxpayers {
+		if tp.Key == key {
+			taxID = tp.TaxID
+		}
+	}
+	var s engagementctx.Scope
+	err := d.Pool.QueryRow(context.Background(), `
+		SELECT e.id, e.organization_id, e.taxpayer_id FROM engagements e
+		JOIN organizations o ON o.id = e.organization_id AND o.slug = $1
+		JOIN taxpayers t ON t.id = e.taxpayer_id AND t.tax_id = $2`, demo.OrgSlug, taxID).
+		Scan(&s.ID, &s.OrganizationID, &s.TaxpayerID)
+	if err != nil {
+		t.Fatalf("demo engagement %s: %v", key, err)
+	}
+	return s
+}
+
+// TestSeedLinksTaxpayerUser (#145): the taxpayer-side account is an owner of
+// Atlas Gıda, so it lands in the mükellef panel instead of the CMS shell.
+func TestSeedLinksTaxpayerUser(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+		t.Fatal(err)
+	}
+	var atlasTaxID string
+	for _, tp := range demo.Taxpayers {
+		if tp.Key == demo.TaxpayerUserOf {
+			atlasTaxID = tp.TaxID
+		}
+	}
+	if n := count(t, d, `
+		SELECT count(*) FROM taxpayer_members m
+		JOIN users u ON u.id = m.user_id AND u.email = $1
+		JOIN taxpayers t ON t.id = m.taxpayer_id AND t.tax_id = $2
+		WHERE m.role = $3`, demo.TaxpayerUser.Email, atlasTaxID, demo.TaxpayerUserRole); n != 1 {
+		t.Fatalf("taxpayer user membership = %d, want 1", n)
+	}
+	// Only Atlas: the other demo taxpayer has no taxpayer-side member.
+	if n := count(t, d, `SELECT count(*) FROM taxpayer_members`); n != 1 {
+		t.Fatalf("taxpayer_members = %d, want 1", n)
+	}
+	// -reset and seed again: still exactly one membership.
+	if err := dropDemo(ctx, d.Pool); err != nil {
+		t.Fatal(err)
+	}
+	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(t, d, `SELECT count(*) FROM taxpayer_members`); n != 1 {
+		t.Fatalf("after reseed taxpayer_members = %d, want 1", n)
+	}
+}
+
+// TestResetAfterUpload (#148): after UBL was uploaded to the demo office,
+// -reset deletes the demo-only taxpayers with all their data and leaves real
+// tenants alone, including a demo tax id that another office also serves.
+func TestResetAfterUpload(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+		t.Fatal(err)
+	}
+	actor := d.User(t)
+	atlas := demoScope(t, d, "atlas")
+	selin := demoScope(t, d, "selin")
+	uploadUBL(t, d, atlas, actor, "atlas-", "")
+	uploadUBL(t, d, selin, actor, "selin-", "")
+
+	// A real office with its own taxpayer and data.
+	realOrg := d.Organization(t)
+	realTP := d.Taxpayer(t, "legal", "1410000001")
+	realEng := d.Engagement(t, realOrg, realTP)
+	uploadUBL(t, d, engagementctx.Scope{ID: realEng, OrganizationID: realOrg, TaxpayerID: realTP}, actor, "atlas-", demo.Taxpayers[0].TaxID)
+	// The real office served the demo taxpayer "selin" before (an ended
+	// engagement, office change #8): its identity and data must stay.
+	if _, err := d.Pool.Exec(ctx, `
+		INSERT INTO engagements (organization_id, taxpayer_id, status, ended_at)
+		VALUES ($1, $2, 'ended', NOW())`, realOrg, selin.TaxpayerID); err != nil {
+		t.Fatal(err)
+	}
+
+	realInvoices := count(t, d, `SELECT count(*) FROM invoices WHERE taxpayer_id = $1`, realTP)
+	realCustomers := count(t, d, `SELECT count(*) FROM customers WHERE taxpayer_id = $1`, realTP)
+	selinInvoices := count(t, d, `SELECT count(*) FROM invoices WHERE taxpayer_id = $1`, selin.TaxpayerID)
+	if realInvoices == 0 || realCustomers == 0 || selinInvoices == 0 {
+		t.Fatalf("setup: real invoices=%d customers=%d selin invoices=%d", realInvoices, realCustomers, selinInvoices)
+	}
+	if n := count(t, d, `SELECT count(*) FROM customers WHERE taxpayer_id = $1`, atlas.TaxpayerID); n == 0 {
+		t.Fatal("setup: no demo customers (the RESTRICT case of #148)")
+	}
+
+	if err := dropDemo(ctx, d.Pool); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+
+	// Demo office and the demo-only taxpayer with every row of its data.
+	if n := count(t, d, `SELECT count(*) FROM organizations WHERE slug = $1`, demo.OrgSlug); n != 0 {
+		t.Fatalf("demo office left: %d", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM taxpayers WHERE id = $1`, atlas.TaxpayerID); n != 0 {
+		t.Fatal("demo-only taxpayer left")
+	}
+	for _, table := range []string{"invoices", "customers", "invoice_sources", "data_warnings", "attachments", "taxpayer_members"} {
+		if n := count(t, d, `SELECT count(*) FROM `+table+` WHERE taxpayer_id = $1`, atlas.TaxpayerID); n != 0 {
+			t.Errorf("%s rows of the demo taxpayer left: %d", table, n)
+		}
+	}
+
+	// Real tenant untouched.
+	if n := count(t, d, `SELECT count(*) FROM invoices WHERE taxpayer_id = $1`, realTP); n != realInvoices {
+		t.Errorf("real invoices = %d, want %d", n, realInvoices)
+	}
+	if n := count(t, d, `SELECT count(*) FROM customers WHERE taxpayer_id = $1`, realTP); n != realCustomers {
+		t.Errorf("real customers = %d, want %d", n, realCustomers)
+	}
+	if n := count(t, d, `SELECT count(*) FROM engagements WHERE organization_id = $1`, realOrg); n != 2 {
+		t.Errorf("real engagements = %d, want 2", n)
+	}
+	// A demo tax id another office serves keeps its identity and data.
+	if n := count(t, d, `SELECT count(*) FROM taxpayers WHERE id = $1`, selin.TaxpayerID); n != 1 {
+		t.Error("shared demo taxpayer was deleted")
+	}
+	if n := count(t, d, `SELECT count(*) FROM invoices WHERE taxpayer_id = $1`, selin.TaxpayerID); n != selinInvoices {
+		t.Errorf("shared taxpayer invoices = %d, want %d", n, selinInvoices)
+	}
+
+	// The demo can be rebuilt afterwards.
+	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+		t.Fatalf("reseed: %v", err)
+	}
+	if err := dropDemo(ctx, d.Pool); err != nil {
+		t.Fatalf("second reset: %v", err)
+	}
+}

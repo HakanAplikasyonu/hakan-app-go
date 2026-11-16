@@ -8,13 +8,14 @@
 //
 // What it creates (all identities invented, see internal/demo):
 //   - office "demo-smmm" with an owner, an admin (müşavir) and a member (stajyer)
-//   - a taxpayer-side user (not linked yet: taxpayer_members arrives with #4)
 //   - two taxpayers (VKN/TCKN, unvan, vergi dairesi) with an active
 //     engagement each and their assignments
+//   - a taxpayer-side user, owner of Atlas Gıda (taxpayer_members), who signs
+//     in to the mükellef panel (/m)
 //
-// What it does not create yet, and why:
-//   - invoices: the UBL set (internal/demo/ubl) is written to the database by
-//     the upload flow (#11). Until then upload it from the office panel.
+// Invoices are not seeded: upload the UBL set (internal/demo/ubl) from the
+// office panel (UBL yükle) so the demo shows the real upload flow. -reset
+// removes that data too (only for demo-only taxpayers, see dropDemo).
 //
 // It refuses to run with APP_ENV=production.
 package main
@@ -27,7 +28,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
@@ -157,6 +157,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 				return fmt.Errorf("assign %s → %s: %w", email, tp.Key, err)
 			}
 		}
+		if tp.Key == demo.TaxpayerUserOf {
+			if err := linkTaxpayerUser(ctx, pool, identity.UUID.String(), byEmail[demo.TaxpayerUser.Email].ID); err != nil {
+				return fmt.Errorf("taxpayer user → %s: %w", tp.Key, err)
+			}
+		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
@@ -196,41 +201,21 @@ func ensureUser(ctx context.Context, pool *pgxpool.Pool, repo *authrepo.Postgres
 	}, true)
 }
 
-// dropDemo deletes the demo office; memberships, engagements and assignments
-// go with it (ON DELETE CASCADE). Its taxpayers are removed afterwards when
-// nothing else references them. Users are kept and reused.
-func dropDemo(ctx context.Context, pool *pgxpool.Pool) error {
-	tx, err := pool.Begin(ctx)
+// linkTaxpayerUser makes the demo taxpayer-side account a member of its
+// company (issue #4 taxpayer_members), so it lands in the mükellef panel.
+func linkTaxpayerUser(ctx context.Context, pool *pgxpool.Pool, taxpayerUUID string, userID int64) error {
+	tag, err := pool.Exec(ctx, `
+		INSERT INTO taxpayer_members (taxpayer_id, user_id, role)
+		SELECT id, $2, $3 FROM taxpayers WHERE uuid = $1
+		ON CONFLICT (taxpayer_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+		taxpayerUUID, userID, demo.TaxpayerUserRole)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	var orgID int64
-	err = tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = $1`, demo.OrgSlug).Scan(&orgID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("taxpayer %s not found", taxpayerUUID)
 	}
-	if err != nil {
-		return err
-	}
-	rows, err := tx.Query(ctx, `SELECT DISTINCT taxpayer_id FROM engagements WHERE organization_id = $1`, orgID)
-	if err != nil {
-		return err
-	}
-	taxpayers, err := pgx.CollectRows(rows, pgx.RowTo[int64])
-	if err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgID); err != nil {
-		return err
-	}
-	for _, id := range taxpayers {
-		if _, err := tx.Exec(ctx, `DELETE FROM taxpayers t WHERE t.id = $1 AND NOT EXISTS (SELECT 1 FROM engagements e WHERE e.taxpayer_id = t.id)`, id); err != nil {
-			return fmt.Errorf("taxpayer %d still referenced: %w", id, err)
-		}
-	}
-	return tx.Commit(ctx)
+	return nil
 }
 
 func printSummary() {
@@ -240,12 +225,12 @@ func printSummary() {
 	for _, m := range demo.Members {
 		fmt.Printf("  %-28s %-7s %s %s · %s\n", m.Email, m.RoleKey, m.Name, m.Surname, m.Title)
 	}
-	fmt.Printf("  %-28s %-7s %s %s · %s (mükellef tarafı, #4 bekleniyor)\n", demo.TaxpayerUser.Email, "-", demo.TaxpayerUser.Name, demo.TaxpayerUser.Surname, demo.TaxpayerUser.Title)
+	fmt.Printf("  %-28s %-7s %s %s · %s (mükellef paneli: /m)\n", demo.TaxpayerUser.Email, demo.TaxpayerUserRole, demo.TaxpayerUser.Name, demo.TaxpayerUser.Surname, demo.TaxpayerUser.Title)
 	fmt.Println("Taxpayers:")
 	for _, tp := range demo.Taxpayers {
 		fmt.Printf("  %-6s %-11s %s (%s VD)\n", tp.Key, tp.TaxID, tp.Title, tp.TaxOffice)
 	}
-	fmt.Println("UBL set:    backend/internal/demo/ubl (upload from the office panel until #11)")
+	fmt.Println("UBL set:    backend/internal/demo/ubl (ofis panelinden \"UBL yükle\" ile yükleyin)")
 }
 
 func fatal(format string, args ...any) {
