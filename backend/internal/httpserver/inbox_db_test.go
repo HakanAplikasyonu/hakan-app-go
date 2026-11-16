@@ -17,7 +17,7 @@ import (
 // filter unread and period, mark one or all read, and never touch another
 // user's or another scope's notification. The mükellef's notification is
 // the office's row (organization_id = office): readable and markable in
-// the mükellef's scope since migration 000091.
+// the mükellef's scope since migration 000092.
 func TestScopedInboxes(t *testing.T) {
 	e := newSweepEnv(t)
 	ctx := context.Background()
