@@ -47,11 +47,13 @@ type Task struct {
 	Kind             string          `json:"kind"`
 	Period           string          `json:"period"`
 	Status           string          `json:"status"`
+	Title            string          `json:"title"`
 	Note             string          `json:"note"`
 	DueAt            time.Time       `json:"due_at"`
 	Overdue          bool            `json:"overdue"`
 	OrganizationName string          `json:"organization_name,omitempty"`
 	ReminderCount    *int32          `json:"reminder_count,omitempty"`
+	RequestCount     *int32          `json:"request_count,omitempty"`
 	LastRemindedAt   *time.Time      `json:"last_reminded_at,omitempty"`
 	NextReminderAt   *time.Time      `json:"next_reminder_at,omitempty"`
 	SubmittedAt      *time.Time      `json:"submitted_at"`
@@ -64,7 +66,8 @@ type Task struct {
 	CreatedAt        time.Time       `json:"created_at"`
 	UpdatedAt        time.Time       `json:"updated_at"`
 
-	id, organizationID, engagementID, taxpayerID, bankTransactionID int64
+	id, organizationID, engagementID, taxpayerID int64
+	bankTransactionID                            pgtype.Int8
 }
 
 // Filter narrows a task list.
@@ -239,24 +242,39 @@ func (s *Service) uploads(ctx context.Context, t Task) ([]Upload, error) {
 }
 
 func officeTask(r db.GetDocumentTaskRow, now time.Time) Task {
-	rc := r.ReminderCount
+	rc, rq := r.ReminderCount, r.RequestCount
 	t := Task{
-		UUID: r.Uuid, Code: r.Code, Kind: r.Kind, Period: r.Period, Status: r.Status, Note: r.Note,
-		DueAt: r.DueAt.Time, ReminderCount: &rc,
+		UUID: r.Uuid, Code: r.Code, Kind: r.Kind, Period: r.Period, Status: r.Status, Title: r.Title, Note: r.Note,
+		DueAt: r.DueAt.Time, ReminderCount: &rc, RequestCount: &rq,
 		LastRemindedAt: tsPtr(r.LastRemindedAt), NextReminderAt: tsPtr(r.NextReminderAt),
 		SubmittedAt: tsPtr(r.SubmittedAt), MatchedAt: tsPtr(r.MatchedAt),
 		CancelledAt: tsPtr(r.CancelledAt), CancelReason: textPtr(r.CancelReason),
-		BankTransaction: BankTransaction{
-			UUID: r.BankTransactionUuid, Date: dateString(r.TransactionDate), Direction: direction(r.DebitCredit),
-			Amount: numericString(r.Amount), Currency: r.Currency,
-			CounterpartyName: textPtr(r.CounterpartyName), Description: r.Description,
-		},
 		UploadCount: r.UploadCount, CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
 		id: r.ID, organizationID: r.OrganizationID, engagementID: r.EngagementID,
 		taxpayerID: r.TaxpayerID, bankTransactionID: r.BankTransactionID,
 	}
+	t.BankTransaction = bankTransaction(t, r.BankTransactionUuid, r.TransactionDate, r.DebitCredit, r.Amount, r.Currency, r.CounterpartyName, r.Description)
 	t.Overdue = t.Status == StatusOpen && !now.Before(t.DueAt)
 	return t
+}
+
+// bankTransaction is the movement of a bank task. A document request
+// (issue #240) has none; it gets a stand-in so that clients built for bank
+// tasks (mükellef mobil #200 reads bank_transaction unconditionally) keep
+// working: the task's own uuid, the due date, amount 0 and the title as
+// description.
+func bankTransaction(t Task, id pgtype.UUID, date pgtype.Date, dc pgtype.Text, amount pgtype.Numeric, currency, counterparty, description pgtype.Text) BankTransaction {
+	if !id.Valid {
+		return BankTransaction{
+			UUID: t.UUID, Date: t.DueAt.Format(time.DateOnly), Direction: "out", Amount: "0", Currency: "TRY",
+			Description: t.Title,
+		}
+	}
+	return BankTransaction{
+		UUID: uuid.UUID(id.Bytes), Date: dateString(date), Direction: direction(dc.String),
+		Amount: numericString(amount), Currency: currency.String,
+		CounterpartyName: textPtr(counterparty), Description: description.String,
+	}
 }
 
 func direction(dc string) string {

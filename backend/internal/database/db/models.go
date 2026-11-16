@@ -503,7 +503,7 @@ type DocumentTask struct {
 	OrganizationID    int64              `json:"organization_id"`
 	EngagementID      int64              `json:"engagement_id"`
 	TaxpayerID        int64              `json:"taxpayer_id"`
-	BankTransactionID int64              `json:"bank_transaction_id"`
+	BankTransactionID pgtype.Int8        `json:"bank_transaction_id"`
 	WarningID         pgtype.Int8        `json:"warning_id"`
 	Code              string             `json:"code"`
 	Kind              string             `json:"kind"`
@@ -522,6 +522,8 @@ type DocumentTask struct {
 	CancelReason      pgtype.Text        `json:"cancel_reason"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	Title             string             `json:"title"`
+	RequestCount      int32              `json:"request_count"`
 }
 
 type DocumentTaskUpload struct {

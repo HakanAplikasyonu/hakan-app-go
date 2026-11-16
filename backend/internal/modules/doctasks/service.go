@@ -62,6 +62,10 @@ const (
 const (
 	TemplateCreated  = events.DocTasksCreated
 	TemplateReminder = events.DocTasksReminder
+	// TemplateRequested tells the mükellef about a document request (#240).
+	TemplateRequested = events.DocTasksRequested
+	// TemplateSubmitted tells the office that the mükellef uploaded (#240).
+	TemplateSubmitted = events.DocTasksSubmitted
 )
 
 // MaxUploadBytes caps one uploaded document (02 §7: en fazla 20 MB).

@@ -140,20 +140,23 @@ func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 	if err != nil {
 		return res, fmt.Errorf("doctasks: upload row: %w", err)
 	}
-	cancelled, err := q.IsBankTransactionCancelled(ctx, db.IsBankTransactionCancelledParams{TaxpayerID: taxpayerID, ID: task.BankTransactionID})
-	if err != nil {
-		return res, err
-	}
+	// A document request (issue #240) waits for the office; a bank task is
+	// matched to its transaction automatically unless that was cancelled.
 	status := StatusSubmitted
-	if !cancelled {
-		// Automatic match: the task names exactly one bank transaction.
-		if err := q.InsertBankTransactionDocument(ctx, db.InsertBankTransactionDocumentParams{
-			TaxpayerID: taxpayerID, BankTransactionID: task.BankTransactionID, AttachmentID: att.ID,
-			Method: "taxpayer_upload", MatchedBy: user,
-		}); err != nil {
-			return res, fmt.Errorf("doctasks: match: %w", err)
+	if task.BankTransactionID.Valid {
+		cancelled, err := q.IsBankTransactionCancelled(ctx, db.IsBankTransactionCancelledParams{TaxpayerID: taxpayerID, ID: task.BankTransactionID.Int64})
+		if err != nil {
+			return res, err
 		}
-		status = StatusMatched
+		if !cancelled {
+			if err := q.InsertBankTransactionDocument(ctx, db.InsertBankTransactionDocumentParams{
+				TaxpayerID: taxpayerID, BankTransactionID: task.BankTransactionID.Int64, AttachmentID: att.ID,
+				Method: "taxpayer_upload", MatchedBy: user,
+			}); err != nil {
+				return res, fmt.Errorf("doctasks: match: %w", err)
+			}
+			status = StatusMatched
+		}
 	}
 	if err := q.SetDocumentTaskStatus(ctx, db.SetDocumentTaskStatusParams{
 		Status: status, OrganizationID: task.OrganizationID, EngagementID: task.EngagementID, ID: task.ID,
@@ -171,15 +174,20 @@ func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 
 	// Re-run the control for this transaction. A failure here leaves the
 	// match in place; the next detection run resolves the warning.
-	sub := engine.Subject{OrganizationID: task.OrganizationID, EngagementID: task.EngagementID, TaxpayerID: taxpayerID}
-	if rep, err := s.DetectTransaction(ctx, sub, task.BankTransactionID); err != nil {
-		s.log.Warn("doctasks_redetect_failed", "error", err, "task", taskID)
-	} else {
-		res.WarningResolved = rep.AutoResolved > 0
+	if task.BankTransactionID.Valid {
+		sub := engine.Subject{OrganizationID: task.OrganizationID, EngagementID: task.EngagementID, TaxpayerID: taxpayerID}
+		if rep, err := s.DetectTransaction(ctx, sub, task.BankTransactionID.Int64); err != nil {
+			s.log.Warn("doctasks_redetect_failed", "error", err, "task", taskID)
+		} else {
+			res.WarningResolved = rep.AutoResolved > 0
+		}
 	}
 	if res.Task, err = s.GetMine(ctx, taxpayerID, taskID); err != nil {
 		return res, err
 	}
+	// The office hears about it (issue #240): who opened the task and the
+	// engagement's assignees.
+	s.notifyOffice(ctx, task.OrganizationID, task.EngagementID, taxpayerID, task.CreatedBy, res.Task)
 	return res, nil
 }
 
@@ -239,18 +247,14 @@ func (s *Service) open(ctx context.Context, key string, ct, name pgtype.Text) (F
 
 func taxpayerTask(r db.GetTaxpayerDocumentTaskRow, now time.Time) Task {
 	t := Task{
-		UUID: r.Uuid, Code: r.Code, Kind: r.Kind, Period: r.Period, Status: r.Status, Note: r.Note,
+		UUID: r.Uuid, Code: r.Code, Kind: r.Kind, Period: r.Period, Status: r.Status, Title: r.Title, Note: r.Note,
 		DueAt: r.DueAt.Time, OrganizationName: r.OrganizationName,
 		SubmittedAt: tsPtr(r.SubmittedAt), MatchedAt: tsPtr(r.MatchedAt),
-		BankTransaction: BankTransaction{
-			UUID: r.BankTransactionUuid, Date: dateString(r.TransactionDate), Direction: direction(r.DebitCredit),
-			Amount: numericString(r.Amount), Currency: r.Currency,
-			CounterpartyName: textPtr(r.CounterpartyName), Description: r.Description,
-		},
 		UploadCount: r.UploadCount, CreatedAt: r.CreatedAt.Time, UpdatedAt: r.UpdatedAt.Time,
 		id: r.ID, organizationID: r.OrganizationID, engagementID: r.EngagementID,
 		taxpayerID: r.TaxpayerID, bankTransactionID: r.BankTransactionID,
 	}
+	t.BankTransaction = bankTransaction(t, r.BankTransactionUuid, r.TransactionDate, r.DebitCredit, r.Amount, r.Currency, r.CounterpartyName, r.Description)
 	t.Overdue = t.Status == StatusOpen && !now.Before(t.DueAt)
 	return t
 }
