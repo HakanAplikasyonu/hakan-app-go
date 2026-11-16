@@ -12,6 +12,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ublunit"
 )
 
 // Invoice is one invoice row.
@@ -47,10 +48,12 @@ type Detail struct {
 
 // Item is one line.
 type Item struct {
-	LineNo       int32  `json:"line_no"`
-	Name         string `json:"name"`
-	Quantity     string `json:"quantity"`
-	UnitCode     string `json:"unit_code,omitempty"`
+	LineNo   int32  `json:"line_no"`
+	Name     string `json:"name"`
+	Quantity string `json:"quantity"`
+	UnitCode string `json:"unit_code,omitempty"`
+	// UnitName is the Turkish name of UnitCode ("C62" → "adet", #378).
+	UnitName     string `json:"unit_name,omitempty"`
 	UnitPrice    string `json:"unit_price"`
 	TaxRate      string `json:"tax_rate"`
 	TaxExclusive string `json:"tax_exclusive_amount"`
@@ -102,7 +105,7 @@ func LoadDetail(ctx context.Context, q *db.Queries, inv db.Invoice) (Detail, err
 	out := Detail{Invoice: FromInvoice(inv), Notes: inv.Notes.String, Items: []Item{}, TaxSummary: []TaxSummaryRow{}, Sources: []Source{}}
 	for _, it := range items {
 		out.Items = append(out.Items, Item{
-			LineNo: it.LineNo, Name: it.Name, Quantity: repository.Dec(it.Quantity).String(), UnitCode: it.UnitCode.String,
+			LineNo: it.LineNo, Name: it.Name, Quantity: repository.Dec(it.Quantity).String(), UnitCode: it.UnitCode.String, UnitName: ublunit.Name(it.UnitCode.String),
 			UnitPrice: repository.Dec(it.UnitPrice).String(), TaxRate: repository.Dec(it.TaxRate).String(),
 			TaxExclusive: Money(it.TaxExclusiveAmount), TaxAmount: Money(it.TotalTaxAmount),
 		})

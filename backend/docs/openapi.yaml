@@ -12952,6 +12952,7 @@ components:
                 name: { type: string }
                 quantity: { type: string }
                 unit_code: { type: ["string", "null"] }
+                unit_name: { type: ["string", "null"], description: "Turkish name of unit_code (C62 → adet, #378)" }
                 line_amount: { type: string }
                 tax_rate: { type: string }
             - type: "null"
@@ -15615,6 +15616,7 @@ components:
                   name: { type: string }
                   quantity: { type: string }
                   unit_code: { type: string }
+                  unit_name: { type: string, description: "Turkish name of unit_code (C62 → adet, #378)" }
                   unit_price: { type: string }
                   tax_rate: { type: string }
                   tax_exclusive_amount: { type: string }

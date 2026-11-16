@@ -13,7 +13,7 @@ import { Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { receiptImageSource, useClientTitles } from '@/features/clients/api';
-import { money } from '@/features/clients/format';
+import { money, quantity } from '@/features/clients/format';
 import { useDecide, useReviewQueue, useSuggestionContext, type Suggestion, type SuggestionContext } from '@/features/review/api';
 import { confidencePercent, groupQueue, proposedCode, proposedText, queueEta, queueProgress, suggestionLabel, type QueueGrouping } from '@/features/review/format';
 import { KaydirmaKarti } from '@/features/review/kaydirma-karti';
@@ -303,7 +303,7 @@ function CardBody({ s, approving }: { s: Suggestion; approving: boolean }) {
         </Text>
         {d?.item ? (
           <Text style={[metin.sm, { color: c.text2 }]} numberOfLines={2}>
-            {d.item.name} · {d.item.quantity} {d.item.unit_code ?? ''}
+            {d.item.name} · {quantity(d.item.quantity, d.item.unit_name, d.item.unit_code)}
           </Text>
         ) : null}
       </View>

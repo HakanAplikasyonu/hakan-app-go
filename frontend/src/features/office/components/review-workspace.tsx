@@ -204,7 +204,9 @@ function EvidenceChain({
       ? t("office.review_api.invoice_line", { line: ctx.lineNo })
       : undefined,
   ].filter(Boolean);
-  const source = s.provenance.rule_ref ?? s.provenance.model;
+  // Kural anahtarı ("global:line_goods") gösterilmez (#378); yalnızca model adı.
+  const source =
+    s.provenance.origin === "model" ? s.provenance.model : undefined;
   const steps = [
     {
       icon: ScrollText,

@@ -9828,6 +9828,8 @@ export interface components {
                 name: string;
                 quantity: string;
                 unit_code: string | null;
+                /** @description Turkish name of unit_code (C62 → adet, #378) */
+                unit_name?: string | null;
                 line_amount: string;
                 tax_rate: string;
             } | null;
@@ -11948,6 +11950,8 @@ export interface components {
                 name: string;
                 quantity: string;
                 unit_code?: string;
+                /** @description Turkish name of unit_code (C62 → adet, #378) */
+                unit_name?: string;
                 unit_price: string;
                 tax_rate: string;
                 tax_exclusive_amount: string;

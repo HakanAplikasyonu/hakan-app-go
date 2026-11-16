@@ -46,6 +46,17 @@ export function money(amount: string, currency = 'TRY'): string {
   return currency === 'TRY' ? `${s} ₺` : `${s} ${currency}`;
 }
 
+/**
+ * Miktar (#378): tr-TR, gereksiz ondalık yok ("1.000000" → "1", "2.500000" →
+ * "2,5"); birim Türkçe adıyla (API `unit_name`, "C62" → "adet").
+ */
+export function quantity(amount: string, unitName?: string | null, unitCode?: string | null): string {
+  const n = Number(amount);
+  const q = Number.isFinite(n) ? n.toLocaleString('tr-TR', { maximumFractionDigits: 6 }) : amount;
+  const unit = unitName || unitCode || '';
+  return unit ? `${q} ${unit}` : q;
+}
+
 /** Liste satırının alt satırı: VKN/TCKN · uyarı · görev. */
 export function clientSubtitle(c: { tax_id: string; kind: string; open_warnings: number; open_blockers: number; open_tasks: number }): string {
   const parts = [`${c.kind === 'legal' ? 'VKN' : 'TCKN'} ${c.tax_id}`];

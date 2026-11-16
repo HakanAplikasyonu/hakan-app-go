@@ -8,11 +8,14 @@ import { errorMessage } from '@/core/api/envelope';
 import { useAuth, useOrganization } from '@/core/auth/auth-provider';
 import { useColors } from '@/core/theme';
 import { receiptImageSource } from '@/features/clients/api';
-import { money } from '@/features/clients/format';
+import { money, quantity } from '@/features/clients/format';
 import { useDecide, useSuggestion, useSuggestionContext } from '@/features/review/api';
 import { confidenceBand, confidencePercent, fieldLabel, proposedCode, proposedText } from '@/features/review/format';
 import { ReasonSheet, type ReasonSheetMode } from '@/features/review/reason-sheet';
 import { periodLabel } from '@/features/warnings/format';
+
+/** Önerinin kaynağı kullanıcı diliyle; kural anahtarı gösterilmez (#378). */
+const KAYNAK: Record<string, string> = { rule: 'kural', model: 'yapay zekâ', document: 'belge', input: 'girdi' };
 
 /** Öneri ayrıntısı (#239): belge, önerilen hesap kodu ve gerekçe; onayla / düzelt / reddet. */
 export default function SuggestionScreen() {
@@ -74,7 +77,7 @@ export default function SuggestionScreen() {
                 {doc.item.line_no}. kalem: {doc.item.name || '—'}
               </Text>
               <Text variant="caption" tone="muted">
-                {doc.item.quantity} {doc.item.unit_code ?? ''} · {money(doc.item.line_amount, doc.invoice.currency)} · KDV %{Number(doc.item.tax_rate)}
+                {quantity(doc.item.quantity, doc.item.unit_name, doc.item.unit_code)} · {money(doc.item.line_amount, doc.invoice.currency)} · KDV %{Number(doc.item.tax_rate)}
               </Text>
             </View>
           ) : null}
@@ -101,7 +104,7 @@ export default function SuggestionScreen() {
           </Text>
           <Text>{sug.rationale}</Text>
           <Text variant="caption" tone="muted">
-            Kaynak: {sug.provenance.origin === 'rule' ? `kural ${sug.provenance.rule_ref ?? ''}` : sug.provenance.origin === 'model' ? `yapay zekâ ${sug.provenance.model ?? ''}` : sug.provenance.origin}
+            Kaynak: {KAYNAK[sug.provenance.origin] ?? sug.provenance.origin}
           </Text>
           {!pending ? <Chip label={`Durum: ${sug.status}`} /> : null}
         </Card>

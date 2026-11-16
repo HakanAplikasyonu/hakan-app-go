@@ -1,5 +1,6 @@
 "use client";
 
+import { quantity } from "@/lib/utils/format";
 import { useMutation } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
@@ -23,7 +24,6 @@ import {
   useEngagementInvoice,
   useInvoiceUBL,
 } from "../hooks/use-office-invoices";
-import { formatAmount } from "../lib/decimal";
 import { toPanelInvoice } from "../lib/from-api";
 import { createDocumentRequest } from "../services/engagement-documents.service";
 import { AmountWaterfall } from "./amount-waterfall";
@@ -228,7 +228,7 @@ export function InvoiceDrawer({
                           <td className="px-3 py-2">{l.name}</td>
                           <td className="px-3 py-2 text-end whitespace-nowrap">
                             <Figure>
-                              {formatAmount(l.quantity)} {l.unit}
+                              {quantity(l.quantity)} {l.unit}
                             </Figure>
                           </td>
                           <td className="px-3 py-2 text-end">
