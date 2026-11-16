@@ -1,107 +1,86 @@
-/* shadcn new-york · slate + HAKAN marka katmanı (D19, docs/brand) */
+/*
+ * HAKAN arayüz v1 (#324). Kaynak: docs/tasarim/tokens/.
+ * 1) tokens.css: dört tema (m3-light, m3-dark, n3-light, n3-dark) ham token'ları.
+ *    <html data-theme="…"> ile seçilir; seçimi theme-provider ve layout'taki
+ *    erken betik yapar (Ayarlar → Görünüm, varsayılan "sistemi izle").
+ * 2) Bu dosya: shadcn anlam değişkenleri ve Tailwind v4 eşlemesi
+ *    (docs/tasarim/tokens/tailwind-theme.css). Mevcut ekranlar bozulmasın diye
+ *    eski ad (brand-foreground, brand-check, status-*, sidebar-*, chart-*)
+ *    yeni token'lara bağlanır.
+ */
+@import "./tokens.css";
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  /* #194: muted zemin (#f1f5f9) üzerinde ≥ 4.5:1 kontrast için koyulaştırıldı. */
-  --muted-foreground: oklch(0.5 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  /* Yazı tipleri next/font ile <html> üzerinde tanımlanır (app/layout.tsx). */
+  --font-display:
+    var(--font-inter-tight), "Inter Tight", var(--font-inter), "Inter",
+    system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Inter", system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, monospace;
 
-  /* Marka (D19) */
-  --brand: #1447e6;
-  --brand-foreground: #ffffff;
-  --brand-check: #5b8cff;
-  /* Durum renkleri: onaylandı / inceleme / uyarı / engelleyici */
-  --status-approved: #006b63; /* #194: ≥ 4.5:1 beyaz ve %20 açık zeminde (önce #009689) */
-  --status-approved-foreground: #ffffff;
-  --status-review: #ffb900;
-  --status-review-foreground: #0f172b;
-  --status-warning: #ad3a00; /* #194: önce #f54900 */
-  --status-warning-foreground: #ffffff;
-  --status-blocking: #b80008; /* #194: önce #e7000b */
-  --status-blocking-foreground: #ffffff;
-}
+  /* shadcn anlam değişkenleri → HAKAN token'ları */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --primary: var(--brand);
+  --primary-foreground: var(--on-brand);
+  --secondary: var(--surface-3);
+  --secondary-foreground: var(--text);
+  --muted: var(--surface-2);
+  /*
+   * Tasarım eşlemesi text-3; ancak text-3 (#6B6B76) açık zeminde ~4.6:1 ve
+   * tonlu kutularda (ör. bg-status-blocking/5) 4.39:1'e düşüyor. 4.5:1 kuralı
+   * (#194, README Erişilebilirlik) için text-2 kullanılır. t-3 / text-text-3
+   * yalnızca beyaz yüzeyde ikincil etiketler için kalır.
+   */
+  --muted-foreground: var(--text-2);
+  --accent: var(--brand-tint);
+  --accent-foreground: var(--brand-text);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--focus);
+  --radius: var(--radius-md);
 
-.dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  --chart-1: var(--c-mid);
+  --chart-2: var(--c-dark);
+  --chart-3: var(--c-light);
+  --chart-4: var(--ok);
+  --chart-5: var(--warn);
 
-  /* Koyu temada metin ve ince çizgi olarak okunabilsin diye bir ton açık */
-  --brand: #5b8cff;
-  --brand-foreground: #020618;
-  --brand-check: #1447e6;
-  --status-approved: #00bba7;
-  --status-approved-foreground: #020618;
-  --status-review: #ffb900;
-  --status-review-foreground: #0f172b;
-  --status-warning: #ff6900;
-  --status-warning-foreground: #020618;
-  --status-blocking: #fb2c36;
-  --status-blocking-foreground: #ffffff;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--on-brand);
+  --sidebar-accent: var(--brand-tint);
+  --sidebar-accent-foreground: var(--brand-text);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--focus);
+
+  /* Eski marka adları (D19) — yeni token'lara bağlı geçiş takma adları */
+  --brand-foreground: var(--on-brand);
+  --brand-check: var(--c-mid);
+
+  /* Durum renkleri: mevcut ad korunur (onaylandı / inceleme / uyarı / engelleyici) */
+  --status-approved: var(--ok);
+  --status-approved-foreground: var(--surface);
+  --status-review: var(--warn);
+  --status-review-foreground: var(--surface);
+  --status-warning: var(--warn);
+  --status-warning-foreground: var(--surface);
+  --status-blocking: var(--danger);
+  --status-blocking-foreground: var(--surface);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -135,9 +114,30 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
   --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
+  --color-on-brand: var(--on-brand);
+  --color-brand-foreground: var(--on-brand);
   --color-brand-check: var(--brand-check);
+  --color-brand-text: var(--brand-text);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-tint: var(--brand-tint);
+  --color-crystal-light: var(--c-light);
+  --color-crystal-mid: var(--c-mid);
+  --color-crystal-dark: var(--c-dark);
+  --color-ok: var(--ok);
+  --color-ok-tint: var(--ok-tint);
+  --color-warn: var(--warn);
+  --color-warn-tint: var(--warn-tint);
+  --color-danger: var(--danger);
+  --color-danger-tint: var(--danger-tint);
   --color-status-approved: var(--status-approved);
   --color-status-approved-foreground: var(--status-approved-foreground);
   --color-status-review: var(--status-review);
@@ -147,19 +147,85 @@
   --color-status-blocking: var(--status-blocking);
   --color-status-blocking-foreground: var(--status-blocking-foreground);
 
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono:
-    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
-  --font-display: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, SFMono-Regular,
+    Menlo, monospace;
+  --font-display:
+    var(--font-inter-tight), "Inter Tight", var(--font-inter), "Inter",
+    ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-card: var(--shadow);
+  --shadow-overlay: var(--shadow-lg);
+  --ease-hakan: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 /*
- * Tutar, hesap kodu, VKN ve ETTN: Geist Mono + hizalı rakamlar (D19).
- * Kullanım: <span className="figure">1.284.560,40</span>
+ * Hesap kodu, VKN ve ETTN: JetBrains Mono + hizalı rakamlar.
+ * Kullanım: <span className="figure">120.01.003</span>
  */
 @utility figure {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* Tutarlar: gövde yazısı + hizalı rakamlar. <span className="num">1.284.560,40</span> */
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Büyük harfli mono başlık (tablo başlıkları, bölüm etiketleri). */
+@utility t-cap {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* Kristal kesik köşe: yalnızca vurgulu kartlar (pano özeti, onay kartı). */
+@utility chamfer {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+
+/* KristalYukleyici: üç kristal sırayla yükselir (1.4 sn, 180 ms gecikme). */
+@keyframes hk-rise {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.35;
+  }
+  45% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+@keyframes hk-fade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  45% {
+    opacity: 1;
+  }
+}
+.hk-yukleyici > i {
+  transform-origin: bottom;
+  animation: hk-rise 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hk-yukleyici > i {
+    animation-name: hk-fade;
+  }
+}
+
+/*
+ * Metin olarak marka rengi: `--brand` dolgu içindir (N3'te #01FF11 beyaz
+ * zeminde, M3 koyuda #2448FF siyah zeminde okunmaz). Metin her zaman
+ * `--brand-text` ile yazılır; dolgu (bg-primary, bg-brand) değişmez.
+ */
+.text-primary,
+.text-brand {
+  color: var(--brand-text);
 }

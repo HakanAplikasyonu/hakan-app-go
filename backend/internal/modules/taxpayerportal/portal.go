@@ -29,6 +29,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/pagecursor"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
@@ -102,7 +103,10 @@ type invoicePage struct {
 func (h *Handler) listInvoices(w http.ResponseWriter, r *http.Request) {
 	s := taxpayerctx.Must(r.Context())
 	limit, offset := page(r)
-	period := strings.TrimSpace(r.URL.Query().Get("period"))
+	period, ok := periodq.Parse(w, r)
+	if !ok {
+		return
+	}
 	direction := strings.TrimSpace(r.URL.Query().Get("direction"))
 	if direction != "" && direction != "outgoing" && direction != "incoming" {
 		response.Error(w, r, http.StatusBadRequest, "INVALID_DIRECTION", "direction must be outgoing or incoming")
@@ -211,12 +215,17 @@ type receiptPage struct {
 func (h *Handler) listReceipts(w http.ResponseWriter, r *http.Request) {
 	s := taxpayerctx.Must(r.Context())
 	limit, offset := page(r)
-	rows, err := h.q.ListTaxpayerReceiptCaptures(r.Context(), db.ListTaxpayerReceiptCapturesParams{TaxpayerID: s.ID, Lim: limit, Off: offset})
+	period, ok := periodq.Parse(w, r)
+	if !ok {
+		return
+	}
+	per := pgtype.Text{String: period, Valid: period != ""}
+	rows, err := h.q.ListTaxpayerReceiptCaptures(r.Context(), db.ListTaxpayerReceiptCapturesParams{TaxpayerID: s.ID, Period: per, Lim: limit, Off: offset})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not list receipts")
 		return
 	}
-	total, err := h.q.CountTaxpayerReceiptCaptures(r.Context(), s.ID)
+	total, err := h.q.CountTaxpayerReceiptCaptures(r.Context(), db.CountTaxpayerReceiptCapturesParams{TaxpayerID: s.ID, Period: per})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not count receipts")
 		return
@@ -257,7 +266,12 @@ func (h *Handler) listUploads(w http.ResponseWriter, r *http.Request) {
 	s := taxpayerctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
 	limit, offset := page(r)
-	rows, err := h.q.ListTaxpayerUploadJobs(r.Context(), db.ListTaxpayerUploadJobsParams{TaxpayerID: s.ID, ActorID: p.UserInternal, Lim: limit, Off: offset})
+	period, ok := periodq.Parse(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.q.ListTaxpayerUploadJobs(r.Context(), db.ListTaxpayerUploadJobsParams{TaxpayerID: s.ID, ActorID: p.UserInternal,
+		Period: pgtype.Text{String: period, Valid: period != ""}, Lim: limit, Off: offset})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not list uploads")
 		return

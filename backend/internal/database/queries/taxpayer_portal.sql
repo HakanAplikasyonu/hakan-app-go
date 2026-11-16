@@ -38,18 +38,21 @@ WHERE taxpayer_id = @taxpayer_id
 -- name: ListTaxpayerReceiptCaptures :many
 SELECT uuid, kind, status, media_type, fields, error, created_at
 FROM receipt_captures
-WHERE taxpayer_id = @taxpayer_id
+WHERE receipt_captures.taxpayer_id = @taxpayer_id
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period))
 ORDER BY created_at DESC, id DESC
 LIMIT @lim OFFSET @off;
 
 -- tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
 -- name: CountTaxpayerReceiptCaptures :one
-SELECT COUNT(*)::bigint FROM receipt_captures WHERE taxpayer_id = @taxpayer_id;
+SELECT COUNT(*)::bigint FROM receipt_captures WHERE receipt_captures.taxpayer_id = @taxpayer_id
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE((SELECT x.period FROM expenses x WHERE x.taxpayer_id = receipt_captures.taxpayer_id AND x.id = receipt_captures.expense_id), (SELECT y.period FROM retail_sales y WHERE y.taxpayer_id = receipt_captures.taxpayer_id AND y.id = receipt_captures.retail_sale_id), to_char(receipt_captures.created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')) = sqlc.narg(period));
 
 -- tenant-lint: cross-org mükellef panelinde kullanıcının kendi yüklemeleri; taxpayer_id + actor_id ile sınırlı
 -- name: ListTaxpayerUploadJobs :many
 SELECT * FROM ubl_upload_jobs
 WHERE taxpayer_id = @taxpayer_id AND actor_id = @actor_id
+  AND (sqlc.narg(period)::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = sqlc.narg(period))
 ORDER BY created_at DESC, id DESC
 LIMIT @lim OFFSET @off;
 

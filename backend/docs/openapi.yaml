@@ -4430,6 +4430,226 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/notifications:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Notifications]
+      operationId: getTenantNotifications
+      summary: Own notifications in this office (#333)
+      description: |
+        The caller's in-app notifications of this office (X-Organization), newest first.
+        `unread=true` lists only unread ones; `period` (YYYY-MM) the month
+        they were created in. Every member may read their own; no other
+        user's notification is listed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/PeriodFilter"
+        - name: unread
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Page with the unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeScopedInbox"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/tenant/notifications/unread-count:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Notifications]
+      operationId: getTenantNotificationsUnreadCount
+      summary: Unread count of own notifications in this office (#333)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [count]
+                    properties:
+                      count: { type: integer, format: int64 }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/tenant/notifications/read-all:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Notifications]
+      operationId: markTenantNotificationsReadAll
+      summary: Mark all own notifications in this office read (#333)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: How many were marked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [marked]
+                    properties:
+                      marked: { type: integer, format: int64 }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/tenant/notifications/{uuid}/read:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Notifications]
+      operationId: markTenantNotificationRead
+      summary: Mark one own notification in this office read (#333)
+      description: Another user's or another office's notification is `404`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeNotification"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /v1/taxpayer/notifications:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [Notifications]
+      operationId: getTaxpayerNotifications
+      summary: Own notifications in this company (#333)
+      description: |
+        The caller's in-app notifications about this company (X-Taxpayer: requests, reminders), newest first.
+        `unread=true` lists only unread ones; `period` (YYYY-MM) the month
+        they were created in. Every member may read their own; no other
+        user's notification is listed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/PeriodFilter"
+        - name: unread
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Page with the unread count
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeScopedInbox"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/taxpayer/notifications/unread-count:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [Notifications]
+      operationId: getTaxpayerNotificationsUnreadCount
+      summary: Unread count of own notifications in this company (#333)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [count]
+                    properties:
+                      count: { type: integer, format: int64 }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/taxpayer/notifications/read-all:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    post:
+      tags: [Notifications]
+      operationId: markTaxpayerNotificationsReadAll
+      summary: Mark all own notifications in this company read (#333)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: How many were marked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [marked]
+                    properties:
+                      marked: { type: integer, format: int64 }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /v1/taxpayer/notifications/{uuid}/read:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Notifications]
+      operationId: markTaxpayerNotificationRead
+      summary: Mark one own notification in this company read (#333)
+      description: Another user's or another company's notification is `404`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeNotification"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/tenant/settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -5494,9 +5714,11 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
+        "400": { $ref: "#/components/responses/BadRequest" }
         "200":
           description: OK
           content:
@@ -5645,9 +5867,11 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
+        "400": { $ref: "#/components/responses/BadRequest" }
         "200":
           description: OK
           content:
@@ -5793,6 +6017,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
         - { name: kind, in: query, required: false, schema: { type: string } }
         - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
@@ -5887,6 +6112,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
         - { name: kind, in: query, required: false, schema: { type: string } }
         - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
@@ -6498,10 +6724,12 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: status, in: query, required: false, schema: { type: string, enum: [draft, duplicate, failed, approved, rejected] } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
+        "400": { $ref: "#/components/responses/BadRequest" }
         "200":
           description: OK
           content:
@@ -7338,9 +7566,11 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
+        "400": { $ref: "#/components/responses/BadRequest" }
         "200":
           description: Jobs
           content:
@@ -9803,6 +10033,7 @@ paths:
       security:
         - bearerAuth: []
       parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
         - { name: status, in: query, schema: { type: string, enum: [open, submitted, matched, cancelled, all], default: open } }
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
@@ -10428,6 +10659,16 @@ components:
       bearerFormat: JWT
 
   parameters:
+    PeriodFilter:
+      name: period
+      in: query
+      required: false
+      description: |
+        The panel's period selector (#333): one accounting month, YYYY-MM.
+        A record's period is its own (invoice, expense, suggestion, task);
+        without one, the month it was created in (Europe/Istanbul). A
+        malformed value answers `400 INVALID_PERIOD`.
+      schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
     BankConnectionUuid:
       name: connectionUuid
       in: path
@@ -13050,6 +13291,24 @@ components:
         surname: { type: string }
         email: { type: string, format: email }
 
+    ScopedInbox:
+      type: object
+      required: [items, total, unread, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        total: { type: integer, format: int64 }
+        unread: { type: integer, format: int64, description: Unread ones under the same filters }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+    EnvelopeScopedInbox:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ScopedInbox" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     NotificationPage:
       type: object
       required: [items, total, limit, offset]

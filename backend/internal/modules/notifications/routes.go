@@ -6,7 +6,9 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 )
 
 // RegisterRoutes mounts notification routes.
@@ -79,4 +81,31 @@ func RegisterRoutes(
 	mux.Handle("GET /v1/platform/notifications", middleware.Chain(
 		http.HandlerFunc(h.ListPlatform), authn, requirePerm(rbac.PermPlatformNotificationsRead),
 	))
+}
+
+// RegisterScopedRoutes mounts the office and mükellef panel inboxes (issue
+// #333). Without a resolver (tenancy off) that side is not mounted.
+func RegisterScopedRoutes(
+	mux *http.ServeMux,
+	h *handler.Handler,
+	tokens *jwt.Manager,
+	loader middleware.IdentityLoader,
+	orgResolver orgctx.Resolver,
+	tpResolver taxpayerctx.Resolver,
+) {
+	authn := middleware.Authenticate(tokens, loader)
+	if orgResolver != nil {
+		org := middleware.RequireOrganization(orgResolver)
+		mux.Handle("GET /v1/tenant/notifications", middleware.Chain(http.HandlerFunc(h.TenantInbox), authn, org))
+		mux.Handle("GET /v1/tenant/notifications/unread-count", middleware.Chain(http.HandlerFunc(h.TenantUnread), authn, org))
+		mux.Handle("POST /v1/tenant/notifications/read-all", middleware.Chain(http.HandlerFunc(h.TenantReadAll), authn, org))
+		mux.Handle("POST /v1/tenant/notifications/{uuid}/read", middleware.Chain(http.HandlerFunc(h.TenantMarkRead), authn, org))
+	}
+	if tpResolver != nil {
+		tp := middleware.RequireTaxpayer(tpResolver)
+		mux.Handle("GET /v1/taxpayer/notifications", middleware.Chain(http.HandlerFunc(h.TaxpayerInbox), authn, tp))
+		mux.Handle("GET /v1/taxpayer/notifications/unread-count", middleware.Chain(http.HandlerFunc(h.TaxpayerUnread), authn, tp))
+		mux.Handle("POST /v1/taxpayer/notifications/read-all", middleware.Chain(http.HandlerFunc(h.TaxpayerReadAll), authn, tp))
+		mux.Handle("POST /v1/taxpayer/notifications/{uuid}/read", middleware.Chain(http.HandlerFunc(h.TaxpayerMarkRead), authn, tp))
+	}
 }

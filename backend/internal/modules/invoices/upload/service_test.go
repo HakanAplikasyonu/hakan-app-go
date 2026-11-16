@@ -157,7 +157,7 @@ func TestUpload100InvoiceZipTwice(t *testing.T) {
 		t.Fatalf("attachments after re-upload = %d", n)
 	}
 	// List and Get see the jobs.
-	list, err := e.svc.List(ctx, e.scope, 10, 0)
+	list, err := e.svc.List(ctx, e.scope, "", 10, 0)
 	if err != nil || len(list) != 2 || list[0].Report.Items != nil {
 		t.Fatalf("list: %v %d", err, len(list))
 	}

@@ -104,6 +104,8 @@ type Querier interface {
 	CountPrivacyUserTies(ctx context.Context, arg CountPrivacyUserTiesParams) (CountPrivacyUserTiesRow, error)
 	CountReceiptCaptures(ctx context.Context, arg CountReceiptCapturesParams) (int64, error)
 	CountRoles(ctx context.Context, q_ pgtype.Text) (int64, error)
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	CountScopedInbox(ctx context.Context, arg CountScopedInboxParams) (CountScopedInboxRow, error)
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
@@ -111,7 +113,7 @@ type Querier interface {
 	CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
-	CountTaxpayerReceiptCaptures(ctx context.Context, taxpayerID int64) (int64, error)
+	CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTaxpayerReceiptCapturesParams) (int64, error)
 	CountTaxpayers(ctx context.Context, q_ pgtype.Text) (int64, error)
 	// tenant-lint: org-wide ofis uyarı listesi sayımı; ListTenantDataWarnings ile aynı süzgeç
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
@@ -149,6 +151,7 @@ type Querier interface {
 	CreateOrganizationRole(ctx context.Context, arg CreateOrganizationRoleParams) (Role, error)
 	// Dilekçeler (issue #56).
 	CreatePetition(ctx context.Context, arg CreatePetitionParams) (Petition, error)
+	// session_uuid: a new one at sign-in, the session's own on rotation (#323).
 	CreateRefreshToken(ctx context.Context, arg CreateRefreshTokenParams) (RefreshToken, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateSourceConnection(ctx context.Context, arg CreateSourceConnectionParams) (SourceConnection, error)
@@ -228,6 +231,8 @@ type Querier interface {
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
 	EndEngagementByID(ctx context.Context, id int64) error
+	// Sign-out: the token's whole session ends, its access tokens with it (#323).
+	EndRefreshSessionByHash(ctx context.Context, tokenHash string) (int64, error)
 	// Yükleme sonrası otomatik öneri (#319) yalnızca hesap planı ya da etkin
 	// kuralı olan mükellefte çalışır.
 	EngagementHasAccountMemory(ctx context.Context, arg EngagementHasAccountMemoryParams) (bool, error)
@@ -694,6 +699,12 @@ type Querier interface {
 	ListRolesFiltered(ctx context.Context, arg ListRolesFilteredParams) ([]Role, error)
 	ListRolesForExport(ctx context.Context, q_ pgtype.Text) ([]Role, error)
 	ListRolesForUserIDs(ctx context.Context, userIds []int64) ([]ListRolesForUserIDsRow, error)
+	// Scoped inbox (issue #333): the caller's in-app notifications for one office
+	// (organization_id) or one company (payload taxpayer_uuid, the mükellef
+	// panel), optionally unread only and in one month (period, YYYY-MM, office
+	// time). Email rows are never listed (see ListNotificationsForUser).
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	ListScopedInbox(ctx context.Context, arg ListScopedInboxParams) ([]Notification, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
@@ -800,6 +811,10 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
+	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
+	MarkScopedInboxAllRead(ctx context.Context, arg MarkScopedInboxAllReadParams) (int64, error)
+	// tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle
+	MarkScopedInboxRead(ctx context.Context, arg MarkScopedInboxReadParams) (Notification, error)
 	// tenant-lint: cross-org zamanlanmış sağlık taraması bütün ofislerin sessiz ajanlarını işaretler
 	// @silent_before'dan beri haber vermeyen çevrimiçi ajanlar offline olur.
 	// Dönen satırlar bu çalıştırmada offline'a geçenlerdir (bildirim bir kez).
@@ -834,6 +849,8 @@ type Querier interface {
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	// Access tokens of an ended (or unknown) session are refused (#323).
+	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
@@ -856,17 +873,21 @@ type Querier interface {
 	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
+	// Password change / reset, deactivation: every session ends (#323).
 	RevokeAllRefreshTokensForUser(ctx context.Context, userID int64) error
 	RevokeDesktopAgent(ctx context.Context, arg RevokeDesktopAgentParams) (int64, error)
 	RevokeHistoryShare(ctx context.Context, arg RevokeHistoryShareParams) (int64, error)
 	// Only owners may cancel an invitation that would grant the owner role
 	// (allow_owner); for anyone else such a row is simply not found.
 	RevokeOrganizationInvitation(ctx context.Context, arg RevokeOrganizationInvitationParams) (OrganizationInvitation, error)
+	// $2 is the caller's session (session_uuid) (#323).
 	RevokeOtherRefreshTokensForUser(ctx context.Context, arg RevokeOtherRefreshTokensForUserParams) error
 	// A new invitation replaces older open ones for the same address.
 	RevokePendingOrganizationInvitationsForEmail(ctx context.Context, arg RevokePendingOrganizationInvitationsForEmailParams) (int64, error)
 	RevokePendingTaxpayerInvitationsForEmail(ctx context.Context, arg RevokePendingTaxpayerInvitationsForEmailParams) error
+	// Rotation: the token is used up, the session goes on.
 	RevokeRefreshTokenByHash(ctx context.Context, tokenHash string) (int64, error)
+	// $1 is the session (session_uuid): the whole session ends (#323).
 	RevokeRefreshTokenByUUIDForUser(ctx context.Context, arg RevokeRefreshTokenByUUIDForUserParams) (int64, error)
 	RevokeStorageLink(ctx context.Context, argUuid uuid.UUID) (StorageLink, error)
 	RevokeTaxpayerInvitation(ctx context.Context, arg RevokeTaxpayerInvitationParams) (int64, error)

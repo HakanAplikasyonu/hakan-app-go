@@ -200,3 +200,16 @@ func TestPushBestEffortPreferencesError(t *testing.T) {
 		t.Fatalf("expected no subscription lookup on preferences error, got %d", q.list)
 	}
 }
+
+func (m *pushTestQuerier) ListScopedInbox(context.Context, db.ListScopedInboxParams) ([]db.Notification, error) {
+	return nil, nil
+}
+func (m *pushTestQuerier) CountScopedInbox(context.Context, db.CountScopedInboxParams) (db.CountScopedInboxRow, error) {
+	return db.CountScopedInboxRow{}, nil
+}
+func (m *pushTestQuerier) MarkScopedInboxRead(context.Context, db.MarkScopedInboxReadParams) (db.Notification, error) {
+	return db.Notification{}, nil
+}
+func (m *pushTestQuerier) MarkScopedInboxAllRead(context.Context, db.MarkScopedInboxAllReadParams) (int64, error) {
+	return 0, nil
+}

@@ -136,6 +136,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx/orgcache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
@@ -530,6 +531,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	nh := notifhandler.New(notifSvc)
 	nh.SetRateLimiter(limiter)
 	notifmodule.RegisterRoutes(mux, nh, tokens, loader)
+	// Ofis ve mükellef paneli bildirim kutusu (#333).
+	notifmodule.RegisterScopedRoutes(mux, nh, tokens, loader, tenantResolver, taxpayerResolver)
 	notifmodule.RegisterEventHandlers(eventBus, notifSvc, log)
 
 	ioReg := ioengine.NewRegistry(
@@ -644,7 +647,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	s.http = &http.Server{
 		Addr:         cfg.HTTP.Addr,
-		Handler:      tracing.HTTP(middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(metrics.Default.HTTP(limiter.UploadGuard(mux)))))),
+		Handler:      tracing.HTTP(middleware.RequestID(clientip.Middleware(ipResolver)(middleware.ServerErrors(log)(metrics.Default.HTTP(limiter.UploadGuard(periodq.Middleware(mux))))))),
 		ReadTimeout:  cfg.HTTP.ReadTimeout,
 		WriteTimeout: cfg.HTTP.WriteTimeout,
 		IdleTimeout:  cfg.HTTP.IdleTimeout,

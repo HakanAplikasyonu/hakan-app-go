@@ -1,20 +1,33 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 
 import { brand } from "@/config/brand";
+import { themeBootScript } from "@/config/theme";
 import { AppProviders } from "@/providers/app-providers";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Arayüz v1 (#324): gövde Inter, başlık Inter Tight, kod ve sayı etiketi
+// JetBrains Mono. Değişkenler <html> üzerinde; theme.css :root'ta kullanır.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin", "latin-ext"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
   subsets: ["latin", "latin-ext"],
+  weight: ["600", "700", "800"],
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -32,10 +45,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" suppressHydrationWarning className="h-full">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-full font-sans antialiased`}
-      >
+    <html
+      lang="tr"
+      suppressHydrationWarning
+      data-theme="m3-light"
+      className={`${inter.variable} ${interTight.variable} ${jetbrainsMono.variable} h-full`}
+    >
+      <head>
+        {/* Tema (m3/n3 × açık/koyu/sistem) boyamadan önce uygulanır. */}
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
+      <body className="min-h-full font-sans antialiased">
         {/* Runtime browser config (Sentry DSN); must run before hydration. */}
         <Script src="/api/client-env" strategy="beforeInteractive" />
         <AppProviders>{children}</AppProviders>

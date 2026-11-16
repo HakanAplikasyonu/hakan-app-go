@@ -159,21 +159,24 @@ func (q *Queries) GetUBLUploadJob(ctx context.Context, arg GetUBLUploadJobParams
 const listUBLUploadJobs = `-- name: ListUBLUploadJobs :many
 SELECT id, uuid, organization_id, engagement_id, taxpayer_id, actor_id, file_name, file_key, sha256, size_bytes, status, report, error, started_at, finished_at, created_at, updated_at FROM ubl_upload_jobs
 WHERE organization_id = $1 AND engagement_id = $2
+  AND ($3::text IS NULL OR to_char(created_at AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM') = $3)
 ORDER BY created_at DESC, id DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListUBLUploadJobsParams struct {
-	OrganizationID int64 `json:"organization_id"`
-	EngagementID   int64 `json:"engagement_id"`
-	Off            int32 `json:"off"`
-	Lim            int32 `json:"lim"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	Period         pgtype.Text `json:"period"`
+	Off            int32       `json:"off"`
+	Lim            int32       `json:"lim"`
 }
 
 func (q *Queries) ListUBLUploadJobs(ctx context.Context, arg ListUBLUploadJobsParams) ([]UblUploadJob, error) {
 	rows, err := q.db.Query(ctx, listUBLUploadJobs,
 		arg.OrganizationID,
 		arg.EngagementID,
+		arg.Period,
 		arg.Off,
 		arg.Lim,
 	)

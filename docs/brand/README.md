@@ -1,46 +1,58 @@
-# Marka dosyaları (D19)
+# Marka dosyaları (arayüz v1, M3 "Taç kristal")
 
-Kaynak kanvas: https://claude.ai/artifact/X3LAbL8LTy645XLYtAL16N. "Hakan" geçici ad; işaret ad değişse de kalır.
+Kaynak: onaylı tasarım tuvali, `docs/tasarim/README.md` ve `docs/tasarim/tuval/Main.dc.html`. M3 işareti eski D19 işaretinin (borç/alacak "H") yerine geçer (#324). "Hakan" geçici ad; işaret ad değişse de kalır.
 
 ## İşaret
 
+Üç kristal: sol **açık** (mükellef), orta **mavi** (beyanname / Luca), sağ **lacivert** (mali müşavir). `viewBox="0 0 181 198"`.
+
+| Rol | M3 | N3 (alternatif tema) |
+|---|---|---|
+| Açık kristal | `#CFD8FF` | `#D4D3D8` |
+| Orta kristal | `#2448FF` | `#01FF11` |
+| Koyu kristal | `#102290` | `#0A0A0A` (koyu temada `#F3F3F5`) |
+
 | Dosya | Kullanım |
 |---|---|
-| `logo-mark.svg` | Ana işaret, açık zemin (koyu karo, beyaz sütunlar, `#5b8cff` onay) |
-| `icons/logo-mark-dark.svg` | Koyu zemin (beyaz karo, koyu sütunlar, `#1447e6` onay) |
+| `logo-mark.svg` | Ana işaret. Açık (`#F3F3F5`) ve siyah (`#0A0A0A`) zeminde aynı renkler. |
+| `icons/logo-mark-dark.svg` | Siyah zemin; `logo-mark.svg` ile aynı (tuvalde ayrı renk yok). |
+| `icons/logo-mark-brand.svg` | Mavi (`#2448FF`) zemin: orta kristal beyaz. |
+
+Uygulamalarda işaret token'dan boyanır (`--c-light / --c-mid / --c-dark`), N3 seçilince kendiliğinden değişir: web `AppMark` / `MarkaLogosu`, Expo `MarkaLogosu` (`@hakan/mobile-core/hakan`).
 
 ## Uygulama ikonları
 
+Mükellef uygulaması ve web **siyah** karo, müşavir (ofis) uygulaması ve masaüstü ajanı **mavi** karo (orta kristal beyaz); ana ekranda karışmaz. Karoda işaret yüksekliği ≈ %58 (tuval: 64 px karoda 37 px).
+
 | Dosya | Hedef |
 |---|---|
-| `icons/app-icon-ios.svg` → `png/ios-1024.png` | iOS App Store. Köşesiz; maskeyi iOS uygular. |
-| `icons/app-icon-rounded.svg` → `png/android-play-512.png`, `png/apple-touch-180.png`, `png/pwa-192.png` | Play Store, apple-touch, PWA |
-| `icons/android-adaptive.svg` | Android adaptive önizleme (daire maske) |
-| `icons/android-adaptive-foreground.svg` → `png/android-adaptive-foreground-432.png` | Adaptive ön plan, 108dp kanvas, 66dp güvenli alan. Arka plan rengi `#0f172b`. |
-| `icons/tauri.svg` → `png/tauri-1024.png` | Masaüstü. `cargo tauri icon docs/brand/icons/png/tauri-1024.png` ile tüm boyutlar üretilir. |
-| `icons/favicon-48.svg`, `favicon-32.svg`, `favicon-16.svg` → `favicon.ico` | Favicon. 16 px'te onay çizgisi okunmadığı için çıkarıldı (kanvastaki gibi). |
+| `icons/app-icon-ios.svg` → `png/ios-1024.png` | iOS, mükellef (`mobile/assets/icon.png`). Köşesiz; maskeyi iOS uygular. |
+| `icons/app-icon-ios-office.svg` → `png/ios-office-1024.png` | iOS, ofis (`mobile-office/assets/icon.png`). |
+| `icons/app-icon-rounded.svg` → `png/android-play-512.png`, `png/apple-touch-180.png`, `png/pwa-192.png` | Play Store, apple-touch, PWA (mükellef ve web). |
+| `icons/app-icon-rounded-office.svg` → `png/android-play-office-512.png`, `png/splash-office-512.png`, `png/favicon-office-48.png` | Ofis: Play Store, açılış ekranı, Expo web favicon. |
+| `icons/android-adaptive.svg` | Android adaptive önizleme (daire maske). |
+| `icons/android-adaptive-foreground.svg` → `png/android-adaptive-foreground-432.png` | Adaptive ön plan (mükellef), 108dp kanvas. Arka plan `#0A0A0A`. |
+| `icons/android-adaptive-foreground-office.svg` → `png/android-adaptive-foreground-office-432.png` | Adaptive ön plan (ofis). Arka plan `#2448FF`. |
+| `icons/splash.svg` → `png/splash-512.png` | Mükellef açılış ekranı (zemin `#F3F3F5` / koyu `#0A0A0A`). |
+| `icons/tauri.svg` → `png/tauri-1024.png` | Masaüstü ajanı (mavi karo). `cd desktop && npm run icons` tüm boyutları üretir. |
+| `icons/favicon-48.svg`, `favicon-32.svg`, `favicon-16.svg` → `favicon.ico` | Web favicon (siyah karo). |
 
-PNG'ler SVG'lerden Chromium ile üretildi. SVG değişirse PNG'ler de yeniden üretilmeli.
+PNG'ler SVG'lerden Chromium ile üretildi (`deviceScaleFactor: 1`, saydam zemin). SVG değişirse PNG'ler de yeniden üretilmeli.
 
-Frontend: `frontend/src/app/icon.svg` = `favicon-32.svg`, `frontend/src/app/favicon.ico` = `icons/favicon.ico`, `apple-icon.tsx` aynı işareti çizer.
+Frontend: `frontend/src/app/icon.svg` = `favicon-32.svg`, `frontend/src/app/favicon.ico` = `icons/favicon.ico`, `apple-icon.tsx` aynı işareti siyah karoda çizer. Tauri: `desktop/ui/logo.svg` = `logo-mark.svg`.
 
-## Renk tokenları
+## Renk ve token'lar
 
-`frontend/src/styles/theme.css`. Boilerplate'in slate tokenları korunur, üstüne:
+Tek kaynak `docs/tasarim/tokens/`. Uygulamalardaki kopyalar:
 
-| Token | Açık | Koyu | Tailwind |
-|---|---|---|---|
-| `--brand` | `#1447e6` | `#5b8cff` | `bg-brand`, `text-brand` |
-| `--brand-check` | `#5b8cff` | `#1447e6` | logo onay çizgisi |
-| `--status-approved` (onaylandı) | `#009689` | `#00bba7` | `bg-status-approved` |
-| `--status-review` (inceleme) | `#ffb900` | `#ffb900` | `bg-status-review` |
-| `--status-warning` (uyarı) | `#f54900` | `#ff6900` | `bg-status-warning` |
-| `--status-blocking` (engelleyici) | `#e7000b` | `#fb2c36` | `bg-status-blocking` |
+| Yüzey | Dosya |
+|---|---|
+| Web (Next.js, Tailwind v4) | `frontend/src/styles/tokens.css` + `theme.css` (shadcn eşlemesi, eski adlar için takma adlar) |
+| Expo (iki uygulama) | `packages/mobile-core/src/ui/tokens.ts` (+ `theme.ts`, `palette.ts` eski adlar) |
+| Tauri ajanı | `desktop/ui/tokens.css` (+ `style.css` eski adlar) |
 
-Her durum tokenının `-foreground` eşi var (ör. `text-status-review-foreground`). İnceleme sarısının üstüne koyu yazı gelir.
-
-Koyu temada marka ve durum renkleri bir ton açıldı; `#1447e6` koyu zeminde metin olarak okunmuyor.
+Dört tema: `m3-light`, `m3-dark`, `n3-light`, `n3-dark` (`<html data-theme>`). Varsayılan M3, "sistemi izle".
 
 ## Yazı
 
-Geist (metin) ve Geist Mono. Tutar, hesap kodu, VKN ve ETTN her yerde `figure` sınıfıyla yazılır: Geist Mono + `tabular-nums`.
+Başlık Inter Tight, gövde Inter, kod ve sayı etiketi JetBrains Mono. Geist bırakıldı. Tutarlar `tabular-nums` (web `num`), hesap kodu / VKN / ETTN mono (web `figure`). Web `next/font/google`, Expo `@expo-google-fonts/*`, Tauri çevrimdışı `desktop/ui/fonts/` (OFL-1.1).

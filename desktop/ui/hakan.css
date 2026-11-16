@@ -1,0 +1,70 @@
+/*
+ * HAKAN ortak bileşenleri · Tauri (#324). Web'deki TacRozeti / GuvenOlcegi /
+ * KristalYukleyici / BosDurum ile aynı ölçü ve davranış (docs/tasarim/bilesenler.md,
+ * tuval Kristal.dc.html). CSP inline stile izin vermez; boyutlar sınıflarla verilir.
+ */
+
+/* Taç rozeti: üç kristal, yanlar 11/16, orta 16/16. */
+.tac { display: inline-flex; align-items: flex-end; flex: none; gap: 2px; height: 16px; }
+.tac i { display: block; width: 5px; background: var(--line-strong); clip-path: polygon(0 3px, 50% 0, 100% 3px, 100% 100%, 0 100%); transition: background var(--dur-slow) var(--ease-out); }
+.tac i:nth-child(1), .tac i:nth-child(3) { height: 11px; }
+.tac i:nth-child(2) { height: 16px; }
+.tac.b30 { gap: 3px; height: 30px; }
+.tac.b30 i { width: 9px; clip-path: polygon(0 5px, 50% 0, 100% 5px, 100% 100%, 0 100%); }
+.tac.b30 i:nth-child(1), .tac.b30 i:nth-child(3) { height: 21px; }
+.tac.b30 i:nth-child(2) { height: 30px; }
+.tac.b72 { gap: 6px; height: 72px; }
+.tac.b72 i { width: 22px; background: var(--surface-3); clip-path: polygon(0 10px, 50% 0, 100% 10px, 100% 100%, 0 100%); }
+.tac.b72 i:nth-child(1), .tac.b72 i:nth-child(3) { height: 50px; }
+.tac.b72 i:nth-child(2) { height: 72px; }
+.tac[data-durum="yuklendi"] i:nth-child(1),
+.tac[data-durum="onaylandi"] i:nth-child(1),
+.tac[data-durum="aktarildi"] i:nth-child(1),
+.tac[data-durum="sorun"] i:nth-child(1) { background: var(--c-light); }
+.tac[data-durum="onaylandi"] i:nth-child(3),
+.tac[data-durum="aktarildi"] i:nth-child(3) { background: var(--c-dark); }
+.tac[data-durum="aktarildi"] i:nth-child(2) { background: var(--c-mid); }
+.tac[data-durum="sorun"] i:nth-child(3) { background: var(--danger); }
+.tac:not(.b30):not(.b72)[data-durum="sorun"] i { background: var(--danger); opacity: 0.85; }
+.tac-etiket { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.tac-etiket[data-durum="sorun"] { color: var(--danger); }
+
+/* Güven ölçeği: 3 kademeli kristal (6/9/12 px). */
+.guven { display: inline-flex; align-items: center; gap: 8px; }
+.guven-k { display: inline-flex; align-items: flex-end; gap: 2px; }
+.guven-k i { display: block; width: 4px; background: var(--line-strong); clip-path: polygon(0 2px, 50% 0, 100% 2px, 100% 100%, 0 100%); }
+.guven-k i:nth-child(1) { height: 6px; }
+.guven-k i:nth-child(2) { height: 9px; }
+.guven-k i:nth-child(3) { height: 12px; }
+.guven[data-kademe="dusuk"] .guven-k i:nth-child(1) { background: var(--warn); }
+.guven[data-kademe="orta"] .guven-k i:nth-child(-n + 2) { background: var(--brand-text); }
+.guven[data-kademe="yuksek"] .guven-k i { background: var(--ok); }
+.guven-ad { font-size: 12px; font-weight: 600; color: var(--text-2); }
+
+/* Kristal yükleyici: 1.4 sn döngü, 180 ms gecikme. */
+@keyframes hk-rise { 0%, 100% { transform: scaleY(0.35); opacity: 0.35; } 45% { transform: scaleY(1); opacity: 1; } }
+@keyframes hk-fade { 0%, 100% { opacity: 0.35; } 45% { opacity: 1; } }
+.yukleyici { display: inline-flex; align-items: flex-end; gap: 4px; height: 40px; }
+.yukleyici[data-gizli] { visibility: hidden; }
+.yukleyici i { display: block; width: 12px; transform-origin: bottom; clip-path: polygon(0 6px, 50% 0, 100% 6px, 100% 100%, 0 100%); animation: hk-rise 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
+.yukleyici i:nth-child(1) { height: 28px; background: var(--c-light); }
+.yukleyici i:nth-child(2) { height: 40px; background: var(--c-mid); animation-delay: 0.18s; }
+.yukleyici i:nth-child(3) { height: 28px; background: var(--c-dark); animation-delay: 0.36s; }
+.yukleyici.kucuk { gap: 2px; height: 16px; }
+.yukleyici.kucuk i { width: 5px; clip-path: polygon(0 3px, 50% 0, 100% 3px, 100% 100%, 0 100%); }
+.yukleyici.kucuk i:nth-child(1), .yukleyici.kucuk i:nth-child(3) { height: 11px; }
+.yukleyici.kucuk i:nth-child(2) { height: 16px; }
+@media (prefers-reduced-motion: reduce) { .yukleyici i { animation-name: hk-fade; } }
+
+/* İskelet (listeler yükleyici yerine bunu kullanır). */
+@keyframes hk-shimmer { 0% { background-position: -200px 0; } 100% { background-position: 200px 0; } }
+.iskelet { border-radius: 6px; height: 14px; background: linear-gradient(90deg, var(--surface-3) 0, var(--surface-2) 50%, var(--surface-3) 100%); background-size: 400px 100%; animation: hk-shimmer 1.4s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .iskelet { animation: none; } }
+
+/* Boş durum: kesik çizgili kristaller + tek eylem. */
+.bos-durum { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 32px 20px; text-align: center; }
+.bos-kristal { display: flex; align-items: flex-end; gap: 8px; height: 80px; }
+.bos-kristal i { display: block; width: 34px; height: 56px; border: 2px dashed var(--line-strong); border-bottom: none; background: var(--surface-2); clip-path: polygon(0 14px, 50% 0, 100% 14px, 100% 100%, 0 100%); }
+.bos-kristal i:nth-child(2) { height: 80px; }
+.bos-durum h3 { margin: 0; font-size: 17px; }
+.bos-durum p { margin: 0; color: var(--text-2); max-width: 380px; }

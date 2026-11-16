@@ -23,6 +23,7 @@ WHERE s.organization_id = $1
   AND ($5::text IS NULL OR s.status = $5::text)
   AND ($6::text IS NULL OR s.kind = $6::text)
   AND ($7::bool IS NULL OR s.rule_candidate = $7::bool)
+  AND ($8::text IS NULL OR s.period = $8::text)
 `
 
 type CountTenantSuggestionsParams struct {
@@ -33,6 +34,7 @@ type CountTenantSuggestionsParams struct {
 	Status         pgtype.Text `json:"status"`
 	Kind           pgtype.Text `json:"kind"`
 	RuleCandidate  pgtype.Bool `json:"rule_candidate"`
+	Period         pgtype.Text `json:"period"`
 }
 
 // tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
@@ -45,6 +47,7 @@ func (q *Queries) CountTenantSuggestions(ctx context.Context, arg CountTenantSug
 		arg.Status,
 		arg.Kind,
 		arg.RuleCandidate,
+		arg.Period,
 	)
 	var column_1 int64
 	err := row.Scan(&column_1)
@@ -420,8 +423,9 @@ WHERE s.organization_id = $1
   AND ($5::text IS NULL OR s.status = $5::text)
   AND ($6::text IS NULL OR s.kind = $6::text)
   AND ($7::bool IS NULL OR s.rule_candidate = $7::bool)
+  AND ($8::text IS NULL OR s.period = $8::text)
 ORDER BY CASE WHEN s.status = 'pending' THEN s.confidence END ASC NULLS LAST, s.updated_at DESC, s.id DESC
-LIMIT $9 OFFSET $8
+LIMIT $10 OFFSET $9
 `
 
 type ListTenantSuggestionsParams struct {
@@ -432,6 +436,7 @@ type ListTenantSuggestionsParams struct {
 	Status         pgtype.Text `json:"status"`
 	Kind           pgtype.Text `json:"kind"`
 	RuleCandidate  pgtype.Bool `json:"rule_candidate"`
+	Period         pgtype.Text `json:"period"`
 	Off            int32       `json:"off"`
 	Lim            int32       `json:"lim"`
 }
@@ -478,6 +483,7 @@ func (q *Queries) ListTenantSuggestions(ctx context.Context, arg ListTenantSugge
 		arg.Status,
 		arg.Kind,
 		arg.RuleCandidate,
+		arg.Period,
 		arg.Off,
 		arg.Lim,
 	)

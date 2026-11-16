@@ -303,8 +303,12 @@ func (r *memRepo) GetRefreshSession(_ context.Context, _ string) (model.RefreshS
 	return model.RefreshSession{}, repository.ErrNotFound
 }
 
-func (r *memRepo) RevokeRefresh(context.Context, string) error   { return nil }
-func (r *memRepo) RevokeAllRefresh(context.Context, int64) error { return nil }
+func (r *memRepo) RevokeRefresh(context.Context, string) error     { return nil }
+func (r *memRepo) RevokeAllRefresh(context.Context, int64) error   { return nil }
+func (r *memRepo) EndRefreshSession(context.Context, string) error { return nil }
+func (r *memRepo) RefreshSessionEnded(context.Context, int64, uuid.UUID) (bool, error) {
+	return false, nil
+}
 
 func (r *memRepo) CreateOTP(context.Context, *int64, string, string, string, time.Time) error {
 	return nil

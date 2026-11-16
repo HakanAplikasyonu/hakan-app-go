@@ -13,6 +13,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/periodq"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
@@ -84,7 +85,11 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if v, err := strconv.Atoi(r.URL.Query().Get("offset")); err == nil && v >= 0 && v <= 1_000_000 {
 		offset = int32(v) //nolint:gosec // bounded above
 	}
-	items, err := h.svc.List(r.Context(), scope, limit, offset)
+	period, ok := periodq.Parse(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.svc.List(r.Context(), scope, period, limit, offset)
 	if err != nil {
 		writeError(w, r, err)
 		return
