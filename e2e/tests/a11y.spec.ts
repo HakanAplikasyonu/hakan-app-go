@@ -41,7 +41,7 @@ async function scan(page: Page, name: string) {
 }
 
 test.describe("@a11y misafir sayfaları", () => {
-  for (const path of ["/login", "/platform/register", "/forgot-password"]) {
+  for (const path of ["/login", "/platform/register", "/forgot-password", "/yardim", "/yardim/ofis-yoneticisi"]) {
     test(path, async ({ page }) => {
       await page.goto(path);
       await scan(page, path);

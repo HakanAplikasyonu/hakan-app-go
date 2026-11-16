@@ -17,6 +17,7 @@ import enImports from "@/locales/en/imports.json";
 import enIntegrations from "@/locales/en/integrations.json";
 import enLogs from "@/locales/en/logs.json";
 import enLayout from "@/locales/en/layout.json";
+import enHelp from "@/locales/en/help.json";
 import enLegal from "@/locales/en/legal.json";
 import enNotifications from "@/locales/en/notifications.json";
 import enOffice from "@/locales/en/office.json";
@@ -52,6 +53,7 @@ import trImports from "@/locales/tr/imports.json";
 import trIntegrations from "@/locales/tr/integrations.json";
 import trLogs from "@/locales/tr/logs.json";
 import trLayout from "@/locales/tr/layout.json";
+import trHelp from "@/locales/tr/help.json";
 import trLegal from "@/locales/tr/legal.json";
 import trNotifications from "@/locales/tr/notifications.json";
 import trOffice from "@/locales/tr/office.json";
@@ -108,6 +110,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     organizations: trOrganizations,
     office: trOffice,
     onboarding: trOnboarding,
+    help: trHelp,
     legal: trLegal,
     petitions: trPetitions,
   },
@@ -145,6 +148,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     organizations: enOrganizations,
     office: enOffice,
     onboarding: enOnboarding,
+    help: enHelp,
     legal: enLegal,
     petitions: enPetitions,
   },

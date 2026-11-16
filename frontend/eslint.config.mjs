@@ -50,6 +50,7 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "src/generated/**",
+    "src/features/help/content.generated.ts",
   ]),
 ]);
 

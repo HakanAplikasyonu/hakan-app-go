@@ -2,6 +2,7 @@ import {
   Activity,
   Bell,
   BookOpenCheck,
+  LifeBuoy,
   ClipboardCheck,
   FileText,
   TriangleAlert,
@@ -365,6 +366,13 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.settings(slug),
             icon: Settings2,
             permission: permissions.tenant.settings.read,
+          },
+          {
+            // Kullanım kılavuzları (#274); herkese açık sayfa.
+            id: "help",
+            titleKey: "help.nav",
+            href: routes.help.index(),
+            icon: LifeBuoy,
           },
         ],
       },
