@@ -22,6 +22,9 @@ import (
 type Module struct {
 	H           *vathandler.Handler
 	Engagements engagementctx.Resolver
+	// Scope runs each request in one row level security transaction
+	// (rls.Middleware, issue #166): vat_carry_forwards is enforced.
+	Scope func(http.Handler) http.Handler
 }
 
 // Name implements module.Module.
@@ -34,13 +37,20 @@ func (m Module) Routes(r *module.Router) {
 		h = &vathandler.Handler{}
 	}
 	read, write := rbac.PermTenantVATRead, rbac.PermTenantVATWrite
-	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office)
+	var office []func(http.Handler) http.Handler
+	if m.Scope != nil {
+		office = append(office, m.Scope)
+	}
+	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office, office...)
 	if m.Engagements == nil {
 		return
 	}
 	eng := []func(http.Handler) http.Handler{
 		middleware.RequireTenantPermission(rbac.PermTenantEngagementsRead),
 		middleware.RequireEngagement(m.Engagements),
+	}
+	if m.Scope != nil {
+		eng = append(eng, m.Scope)
 	}
 	base := "/v1/tenant/engagements/{engagementUuid}/vat-forecast"
 	r.Tenant("GET "+base, read, h.Get, eng...)

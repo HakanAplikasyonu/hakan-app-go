@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -96,6 +97,18 @@ type leakFixture func(ctx context.Context, q pgx.Tx, org, eng, user int64) error
 // leakFixtures has one entry per enforced table (TestEnforcedTablesDoNotLeak
 // fails for an enforced table without one).
 var leakFixtures = map[string]leakFixture{
+	"vat_carry_forwards": func(ctx context.Context, q pgx.Tx, org, eng, user int64) error {
+		_, err := q.Exec(ctx, `
+			INSERT INTO vat_carry_forwards (organization_id, engagement_id, period, amount, updated_by)
+			VALUES ($1, $2, '2026-01', 100, $3)`, org, eng, user)
+		return err
+	},
+	"export_settings": func(ctx context.Context, q pgx.Tx, org, eng, user int64) error {
+		_, err := q.Exec(ctx, `
+			INSERT INTO export_settings (organization_id, engagement_id, updated_by)
+			VALUES ($1, $2, $3)`, org, eng, user)
+		return err
+	},
 	"petitions": func(ctx context.Context, q pgx.Tx, org, eng, user int64) error {
 		_, err := q.Exec(ctx, `
 			INSERT INTO petitions (organization_id, engagement_id, template_key, template_version, rendered, draft, created_by)
@@ -106,7 +119,43 @@ var leakFixtures = map[string]leakFixture{
 
 // cascadesWithOffice: enforced tables whose rows go with their engagement
 // (ON DELETE CASCADE); the leak test also checks that cascade.
-var cascadesWithOffice = map[string]bool{"petitions": true}
+var cascadesWithOffice = map[string]bool{"petitions": true, "vat_carry_forwards": true, "export_settings": true}
+
+// leakTaxIDs are distinct VKNs with valid check digits, two per enforced table.
+var leakTaxIDs = validVKNs(64)
+
+func validVKNs(n int) []string {
+	var out []string
+	for base := 141000000; len(out) < n; base++ {
+		for c := 0; c < 10; c++ {
+			v := fmt.Sprintf("%d%d", base, c)
+			if vknValid(v) {
+				out = append(out, v)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// vknValid is the VKN check digit rule (internal/platform/taxid), repeated so
+// this package does not import it for a fixture.
+func vknValid(v string) bool {
+	sum := 0
+	for i := 0; i < 9; i++ {
+		t := (int(v[i]-'0') + 10 - (i + 1)) % 10
+		if t == 9 {
+			sum += 9
+			continue
+		}
+		p := 1
+		for k := 0; k < 10-(i+1); k++ {
+			p *= 2
+		}
+		sum += (t * p) % 9
+	}
+	return (10-sum%10)%10 == int(v[9]-'0')
+}
 
 // TestEnforcedTablesDoNotLeak is the cross-tenant test for every enforced
 // table: with one row for office A and one for office B,
@@ -116,15 +165,15 @@ var cascadesWithOffice = map[string]bool{"petitions": true}
 func TestEnforcedTablesDoNotLeak(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
-	orgA, orgB := d.Organization(t), d.Organization(t)
-	userA, userB := d.User(t), d.User(t)
-	engA := d.Engagement(t, orgA, d.Taxpayer(t, "legal", "1234567890"))
-	engB := d.Engagement(t, orgB, d.Taxpayer(t, "legal", "1111111114"))
-
 	tables := readEnforcedTables(t)
 	sort.Strings(tables)
-	for _, table := range tables {
+	for i, table := range tables {
 		t.Run(table, func(t *testing.T) {
+			// Fresh offices per table: the cascade step deletes B's engagement.
+			orgA, orgB := d.Organization(t), d.Organization(t)
+			userA, userB := d.User(t), d.User(t)
+			engA := d.Engagement(t, orgA, d.Taxpayer(t, "legal", leakTaxIDs[2*i]))
+			engB := d.Engagement(t, orgB, d.Taxpayer(t, "legal", leakTaxIDs[2*i+1]))
 			fx, ok := leakFixtures[table]
 			if !ok {
 				t.Fatalf("no leak fixture for enforced table %s (add one to leakFixtures)", table)

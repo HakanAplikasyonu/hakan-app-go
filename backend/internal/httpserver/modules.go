@@ -1,6 +1,8 @@
 package httpserver
 
 import (
+	"net/http"
+
 	accessmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access"
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	accountplanmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan"
@@ -62,6 +64,8 @@ type moduleHandlers struct {
 	vat          *vatforecasthandler.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
+	// rlsScope is rls.Middleware for modules whose tables are enforced.
+	rlsScope func(http.Handler) http.Handler
 	// taxpayers resolves X-Taxpayer for /v1/taxpayer/* module routes.
 	taxpayers taxpayerctx.Resolver
 }
@@ -87,6 +91,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		legalmodule.Module{H: h.legal},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
-		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements},
+		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
 	}
 }

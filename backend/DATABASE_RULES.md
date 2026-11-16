@@ -146,6 +146,15 @@ SELECT rls_apply_taxpayer('my_table');    -- taxpayer_id
 SELECT rls_apply_platform('my_table');    -- no rows for scoped roles
 ```
 
+How code joins a scope: `database.NewQueries(pool)` (and `database.Ambient`)
+run each statement on the transaction carried by the context, so a
+repository called inside `WithScope` / `System` stays in that scope;
+`Ambient.Begin` opens a savepoint there instead of a new, unscoped
+connection (never call `pool.Begin` in code that may run in a scope). For
+HTTP routes, `rls.Middleware` runs the whole request in one scoped
+transaction (buffered answer, rollback on 4xx/5xx; office-wide routes get the
+office's visible taxpayers).
+
 To enforce a table group: move every access path (API, worker, seed) into
 `WithScope` or `System`, then `SELECT rls_enforce('my_table');` in a
 migration, add the table to `internal/database/rls_enforced.txt` and its row

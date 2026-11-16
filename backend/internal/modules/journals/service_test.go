@@ -9,11 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
@@ -70,6 +73,7 @@ func init() {
 }
 
 type env struct {
+	pool  *pgxpool.Pool
 	svc   *Service
 	store *storage.Memory
 	scope engagementctx.Scope
@@ -84,7 +88,7 @@ func setup(t *testing.T) env {
 	tp := d.Taxpayer(t, "legal", "1288331521")
 	eng := d.Engagement(t, org, tp)
 	store := storage.NewMemory()
-	return env{svc: New(d.Pool, store), store: store, scope: engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}, actor: user}
+	return env{pool: d.Pool, svc: New(d.Pool, store), store: store, scope: engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}, actor: user}
 }
 
 func dec(s string) decimal.Decimal { return decimal.RequireFromString(s) }
@@ -220,11 +224,13 @@ func TestApproveRefusesUnbalanced(t *testing.T) {
 
 func TestInvoicesReachLucaDirectly(t *testing.T) {
 	e := setup(t)
-	ctx := context.Background()
 	inv := e.draft(t, oct, LineInput{Account: "120", Debit: dec("120"), SourceKind: "invoice", SourceID: uuid.NewString()}, credit("600", "100"), credit("391", "20"))
 	bank := e.draft(t, oct, debit("102", "120"), credit("120", "120"))
 	e.approve(t, inv)
 	e.approve(t, bank)
+	// export_settings is enforced (issue #166): the settings and the export
+	// run in the engagement's row level security scope, as in the API.
+	ctx := e.scoped(t)
 	if _, err := e.svc.q.UpsertExportSettings(ctx, dbSettings(e.scope, true)); err != nil {
 		t.Fatal(err)
 	}
@@ -299,4 +305,33 @@ func TestExportWithLucaDriver(t *testing.T) {
 	if !found {
 		t.Fatalf("issues: %+v", b.Issues)
 	}
+}
+
+// rlsScope is the scope rls.Middleware builds for the engagement.
+func (e env) rlsScope() rls.Scope {
+	return rls.Scope{OrganizationID: e.scope.OrganizationID, UserID: e.actor, EngagementsReadAll: true, TaxpayerIDs: []int64{e.scope.TaxpayerID}}
+}
+
+// scoped opens the engagement's row level security transaction for the rest
+// of the test and returns its context; it commits at cleanup.
+func (e env) scoped(t *testing.T) context.Context {
+	t.Helper()
+	ready := make(chan context.Context)
+	done := make(chan struct{})
+	errc := make(chan error, 1)
+	go func() {
+		errc <- rls.WithScope(context.Background(), e.pool, e.rlsScope(), func(ctx context.Context, _ pgx.Tx) error {
+			ready <- ctx
+			<-done
+			return nil
+		})
+	}()
+	ctx := <-ready
+	t.Cleanup(func() {
+		close(done)
+		if err := <-errc; err != nil {
+			t.Errorf("scope: %v", err)
+		}
+	})
+	return ctx
 }

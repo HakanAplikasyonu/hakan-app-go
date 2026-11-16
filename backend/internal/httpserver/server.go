@@ -134,6 +134,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/outbox"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ratelimit"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine"
 	searchadapters "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/searchengine/adapters"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
@@ -396,12 +397,18 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		}
 	}
 	invoiceoffice.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceoffice.NewHandler(deps.Queries, ublDownload))
+	// Satır güvenliği zorlanmış tabloların uçları istek başına tek kapsamlı
+	// işlemde çalışır (issue #166, rls.Middleware).
+	var rlsScope func(http.Handler) http.Handler
+	if deps.DB != nil {
+		rlsScope = rls.Middleware(deps.DB, database.VisibleTaxpayers(deps.DB), log)
+	}
 	// Yevmiye taslağı ve Luca / Zirve / Excel çıktısı (#143, #26). Hedef hesap
 	// planı (#30) yüklüyse çıktıda ACCOUNT_NOT_IN_TARGET_PLAN denetlenir.
 	if deps.Storage != nil {
 		journalSvc := journalsmodule.New(deps.DB, deps.Storage).
 			WithPlanLoader(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries)).PlanLoader())
-		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage))
+		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage), rlsScope)
 	}
 	if s.worker != nil {
 		s.worker.WithUBLUpload(ublSvc.Process)
@@ -564,6 +571,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),
 		engagements: engagementResolver,
+		rlsScope:    rlsScope,
 		taxpayers:   taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
