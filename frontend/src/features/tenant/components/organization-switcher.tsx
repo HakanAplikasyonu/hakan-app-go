@@ -48,8 +48,9 @@ export function OrganizationSwitcher() {
             <SidebarMenuButton
               size="lg"
               className="data-[state=open]:bg-sidebar-accent"
-              aria-label={t("tenant.switcher_label")}
             >
+              {/* Ad görünen metinden gelir (WCAG 2.5.3); ön ek ekran okuyucu için. */}
+              <span className="sr-only">{t("tenant.switcher_label")}: </span>
               <OrgMark name={current.name} />
               <div className="grid flex-1 text-start text-sm leading-tight">
                 <span className="truncate font-medium">{current.name}</span>

@@ -1,5 +1,8 @@
+"use client";
+
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { useLocale } from "@/providers/locale-provider";
 
 export type BreadcrumbItem = {
   label: string;
@@ -7,8 +10,12 @@ export type BreadcrumbItem = {
 };
 
 export function Breadcrumb({ items }: { items: BreadcrumbItem[] }) {
+  const { t } = useLocale();
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm">
+    <nav
+      aria-label={t("common.breadcrumb")}
+      className="flex items-center gap-1 text-sm"
+    >
       {items.map((item, index) => {
         const last = index === items.length - 1;
         return (

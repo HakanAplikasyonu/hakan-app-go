@@ -336,13 +336,14 @@ jobs:
   # compose altyapısını kurar, migration'ları sıfırdan uygular, demo seed'i
   # yükler, API'yi ve Next.js üretim derlemesini başlatır; e2e/ testleri
   # ofis paneli → mükellef paneli → Luca/Zirve indirme akışını koşar.
-  # İlk aşamada zorunlu değil: `ci` kapısının needs listesinde yok ve
-  # continue-on-error ile iş düşse de iş akışı kırmızıya dönmez.
+  # Zorunluluk (#194): ortam kurulumu ve erişilebilirlik taraması (axe-core,
+  # kritik / ciddi ihlal, `@a11y` testleri) `ci` kapısını kırar. Akış
+  # testleri henüz zorunlu değil: adım düzeyinde continue-on-error, düşerse
+  # uyarı yazılır ve rapor artefaktta kalır.
   e2e:
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-24.04
-    continue-on-error: true
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -371,13 +372,23 @@ jobs:
         run: npm run typecheck
       - name: Start environment
         run: scripts/e2e-up.sh
-      - name: Playwright
+      - name: Erişilebilirlik (axe-core, zorunlu)
         working-directory: e2e
         env:
           CI: "true"
-        run: npx playwright test
+        run: npx playwright test --grep @a11y
+      - name: Akış testleri (zorunlu değil)
+        id: flows
+        continue-on-error: true
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npx playwright test --grep-invert @a11y
+      - name: Akış testleri sonucu
+        if: steps.flows.outcome == 'failure'
+        run: echo "::warning title=e2e::Akış testleri düştü (zorunlu değil). Ayrıntı e2e-report artefaktında."
       - name: Logs on failure
-        if: failure()
+        if: failure() || steps.flows.outcome == 'failure'
         run: |
           for f in e2e/.run/server.log e2e/.run/frontend.log; do
             echo "::group::$f"; tail -200 "$f" || true; echo "::endgroup::"
@@ -919,7 +930,7 @@ jobs:
   # in branch protection (not the individual jobs, which skip by design).
   ci:
     if: always()
-    needs: [changes, backend, frontend, env, security, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, frontend, env, security, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate

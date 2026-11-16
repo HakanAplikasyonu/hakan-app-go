@@ -31,5 +31,11 @@
   "theme_dark": "Koyu",
   "theme_system": "Sistem",
   "no_results": "Sonuç bulunamadı",
-  "copy": "Kopyala"
+  "copy": "Kopyala",
+  "toggle_sidebar": "Kenar çubuğunu aç / kapat",
+  "breadcrumb": "Sayfa yolu",
+  "select_all": "Tümünü seç",
+  "select_row": "Satırı seç",
+  "reorder": "Sırala",
+  "live_notifications": "Canlı bildirimler"
 }

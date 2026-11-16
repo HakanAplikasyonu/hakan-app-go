@@ -7,11 +7,8 @@ import { AppWordmark } from "@/components/brand";
 import { LocaleSwitch } from "@/components/layout/locale-switch";
 import { ThemeSwitch } from "@/components/layout/theme-switch";
 import { routes } from "@/config/routes";
-import { useLocale } from "@/providers/locale-provider";
 
 export function AuthShell({ children }: { children: ReactNode }) {
-  const { t } = useLocale();
-
   return (
     <div className="bg-muted relative flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
       <div className="absolute top-4 right-4 flex items-center gap-1">
@@ -19,11 +16,8 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <ThemeSwitch />
       </div>
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <Link
-          href={routes.guest.login}
-          className="self-center"
-          aria-label={t("common.app_product")}
-        >
+        {/* Erişilebilir ad görünen ürün adından gelir (WCAG 2.5.3). */}
+        <Link href={routes.guest.login} className="self-center">
           <AppWordmark />
         </Link>
         {children}

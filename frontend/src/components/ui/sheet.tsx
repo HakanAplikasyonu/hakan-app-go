@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
 
 export const Sheet = DialogPrimitive.Root;
 export const SheetTrigger = DialogPrimitive.Trigger;
@@ -56,7 +57,7 @@ export const SheetContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close className="focus:ring-ring absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:outline-none">
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <CloseLabel />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </SheetPortal>
@@ -101,3 +102,9 @@ export const SheetDescription = React.forwardRef<
   />
 ));
 SheetDescription.displayName = DialogPrimitive.Description.displayName;
+
+/** Kapat düğmesinin ekran okuyucu metni (#194). */
+function CloseLabel() {
+  const { t } = useLocale();
+  return <span className="sr-only">{t("common.close")}</span>;
+}

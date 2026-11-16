@@ -48,12 +48,13 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="rounded-full"
-          aria-label={t("auth.profile")}
-        >
+        <Button variant="ghost" size="icon" className="rounded-full">
+          {/* Ad = ekran okuyucu metni + görünen baş harfler (WCAG 2.5.3). */}
+          <span className="sr-only">
+            {user?.fullName
+              ? `${t("auth.profile")}: ${user.fullName}`
+              : t("auth.profile")}
+          </span>
           <Avatar className="size-8">
             <AvatarFallback className="text-xs">
               {initials(user?.fullName)}
