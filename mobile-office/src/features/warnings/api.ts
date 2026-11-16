@@ -9,16 +9,20 @@ export type WarningPage = { items: DataWarning[]; total: number; limit: number; 
 
 const PAGE = 20;
 
-export const warningsKey = (org: string, status: WarningStatus | 'all') => ['warnings', org, status] as const;
+export const warningsKey = (org: string, status: WarningStatus | 'all', engagement?: string) => ['warnings', org, status, engagement ?? ''] as const;
 
-/** Ofis çapı uyarılar (`GET /v1/tenant/warnings`), sayfalı. */
-export function useWarnings(status: WarningStatus | 'all') {
+/**
+ * Uyarılar, sayfalı: ofis çapı (`GET /v1/tenant/warnings`) ya da bir
+ * mükellefin (`.../engagements/{uuid}/warnings`, kritik uyarı bildirimi #241).
+ */
+export function useWarnings(status: WarningStatus | 'all', engagement?: string) {
   const org = useOrganization();
+  const path = engagement ? `/v1/tenant/engagements/${engagement}/warnings` : '/v1/tenant/warnings';
   return useInfiniteQuery({
-    queryKey: warningsKey(org, status),
+    queryKey: warningsKey(org, status, engagement),
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
-      api.get<WarningPage>('/v1/tenant/warnings', {
+      api.get<WarningPage>(path, {
         organization: org,
         query: { status: status === 'all' ? undefined : status, limit: PAGE, offset: pageParam },
       }),

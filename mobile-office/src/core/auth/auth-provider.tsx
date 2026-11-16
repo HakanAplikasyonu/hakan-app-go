@@ -4,7 +4,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { api, request } from '../api/client';
 import { isApiError, type Schemas } from '../api/envelope';
+import { setReportUser } from '../observability/sentry';
 import { registerPushDevice, unregisterPushDevice } from '../push/push';
+import { launchFailure } from './launch';
 import { secure, StorageKeys } from '../storage';
 import { officeAccess, pickOffice, type OfficeAccess, type OfficeOption } from './offices';
 import { session, type Tokens } from './session';
@@ -16,7 +18,9 @@ export type TenantContext = Schemas['TenantContext'];
  * booting → (oturum yok) signedOut → giriş → selectOffice → ready.
  * Ofis üyeliği olmayan hesap `denied` durumuna düşer (mükellef hesabı ya da davetsiz).
  */
-export type AuthStatus = 'booting' | 'signedOut' | 'denied' | 'selectOffice' | 'ready';
+// `offline`: kayıtlı oturum açılışta denetlenemedi (bağlantı yok, zaman aşımı,
+// sunucu hatası). Oturum korunur; `retry` yeniden dener (#241, kaynak #202).
+export type AuthStatus = 'booting' | 'offline' | 'signedOut' | 'denied' | 'selectOffice' | 'ready';
 
 type AuthState = {
   status: AuthStatus;
@@ -35,6 +39,8 @@ type AuthApi = AuthState & {
   /** Seçiciye dön (başka ofis seçilene kadar açık ofis korunur). */
   switchOffice: () => void;
   reload: () => Promise<void>;
+  /** Çevrimdışı açılıştan sonra kayıtlı oturumu yeniden denetler. */
+  retry: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Açık ofiste izin var mı (`tenant.*`). */
   can: (permission: string) => boolean;
@@ -63,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const office = await api.get<TenantContext>('/v1/tenant/context', { organization: slug });
         await secure.set(StorageKeys.organization, slug);
         setState({ status: 'ready', me, offices, office, officeSlug: slug, access });
+        setReportUser(me.user?.uuid ?? null);
         void registerPushDevice();
         return;
       } catch (e) {
@@ -75,6 +82,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'selectOffice', me, offices, office: null, officeSlug: null, access });
   }, []);
 
+  // Açılışta kayıtlı oturum: yalnızca reddedilen oturum (401) çıkış yapar;
+  // bağlantı yoksa oturum korunur ve uygulama yeniden denemeyi önerir.
+  const check = useCallback(async () => {
+    try {
+      await resolve(null);
+    } catch (e) {
+      if (launchFailure(e) === 'signedOut') {
+        await session.clear();
+        setState({ ...initial, status: 'signedOut' });
+        return;
+      }
+      if (mounted.current) setState({ ...initial, status: 'offline' });
+    }
+  }, [resolve]);
+
+  const retry = useCallback(async () => {
+    setState({ ...initial, status: 'booting' });
+    await check();
+  }, [check]);
+
   useEffect(() => {
     mounted.current = true;
     const off = session.subscribe((s) => {
@@ -86,18 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState({ ...initial, status: 'signedOut' });
         return;
       }
-      try {
-        await resolve(null);
-      } catch (e) {
-        if (isApiError(e) && e.status === 401) await session.clear();
-        setState({ ...initial, status: 'signedOut' });
-      }
+      await check();
     })();
     return () => {
       mounted.current = false;
       off();
     };
-  }, [resolve]);
+  }, [check]);
 
   const signIn = useCallback<AuthApi['signIn']>(
     async (input) => {
@@ -124,14 +146,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await secure.remove(StorageKeys.organization);
     await session.clear();
+    setReportUser(null);
     setState({ ...initial, status: 'signedOut' });
   }, []);
 
   const can = useCallback((permission: string) => !!state.office?.permissions.includes(permission), [state.office]);
 
   const value = useMemo<AuthApi>(
-    () => ({ ...state, signIn, selectOffice, switchOffice, reload, signOut, can }),
-    [state, signIn, selectOffice, switchOffice, reload, signOut, can],
+    () => ({ ...state, signIn, selectOffice, switchOffice, reload, retry, signOut, can }),
+    [state, signIn, selectOffice, switchOffice, reload, retry, signOut, can],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -20,6 +20,7 @@ EXPO_PUBLIC_API_URL=http://<bilgisayar-ip>:8080 npx expo start
 |---|---|
 | `EXPO_PUBLIC_API_URL` | Go API kökü (`/v1` olmadan). Boşsa `http://localhost:8080`. Mağaza derlemesinde https zorunlu. |
 | `EXPO_PUBLIC_APP_ENV` | `development` / `preview` / `production` (eas.json profilleri ayarlar). |
+| `EXPO_PUBLIC_SENTRY_DSN` | Sentry DSN (https). Boşsa çökme raporu kapalı (#241). |
 | `EAS_OFFICE_PROJECT_ID` | `eas init` öncesinde push için EAS proje kimliği (mükellef uygulamasınınkinden ayrı). |
 
 ## Akış
@@ -30,6 +31,19 @@ EXPO_PUBLIC_API_URL=http://<bilgisayar-ip>:8080 npx expo start
 - Ofisler `GET /v1/auth/me` → `organizations`. Yalnızca ofis üyeliği olan hesap girer; yalnızca mükellef üyeliği olan hesap `denied` ekranında mükellef uygulamasına yönlendirilir.
 - Son kullanılan ofis (üyelik ve erişim sürüyorsa) ya da seçilebilir tek ofis doğrudan açılır; askıdaki veya erişim süresi dolmuş ofis seçilemez. Seçim `GET /v1/tenant/context` (`X-Organization: <slug>`) ile doğrulanır.
 
+## Bildirimler ve derin bağlantılar (#241)
+
+Push kaydı oturum açılınca yapılır; izin yalnızca ana sayfadaki “Bildirimleri aç” ile istenir. Bildirime dokununca `data.url` (ofis panelinin yolu) uygulama ekranına eşlenir (`src/core/push/links.ts`); bağlantı başka bir ofise aitse önce o ofis seçilir.
+
+| Bildirim | Tür (`kind`) | Açılan ekran |
+|---|---|---|
+| Mükellef belge yükledi / görev tamamlandı | `doc_task_submitted` | Görev ayrıntısı (`/t/{slug}/engagements/{eng}?task={uuid}`) |
+| Kritik (engelleyici) uyarı | `warnings_blocker` | Mükellefin uyarıları (`/t/{slug}/warnings?engagement={eng}`) |
+
+Şema bağlantıları: `hakanofis://warnings`, `hakanofis://review`, `hakanofis://clients/{eng}`, `hakanofis://tasks/{uuid}?engagement={eng}`. Bilinmeyen bağlantı ana sayfayı açar; bilinmeyen ekran `+not-found`.
+
+Hata ekranı (`ErrorBoundary`), bağlantısız açılış ekranı (oturum korunur, “Tekrar dene”) ve Sentry `mobile/` ile aynı kalıptadır.
+
 ## Kopyalanan çekirdek
 
 Aşağıdakiler `mobile/src/` altından kopyalandı ve dosya başında kaynağı yazıyor. Ortak paket çıkarmak ayrı bir issue; o zamana kadar düzeltmeler iki tarafa da uygulanmalı.
@@ -37,6 +51,7 @@ Aşağıdakiler `mobile/src/` altından kopyalandı ve dosya başında kaynağı
 - `core/api/client.ts` (`X-Taxpayer` yerine `X-Organization`), `core/api/envelope.ts`, `core/api/schema.d.ts` (üretilir)
 - `core/auth/session.ts`, `core/storage.ts` (anahtarlar `hakanofis.*`), `core/push/push.ts`, `core/config/env.ts`
 - `components/ui.tsx`, `components/brand-mark.tsx`, `core/theme.ts`, `core/brand.ts`
+- `core/observability/sentry.ts`, `core/auth/launch.ts`, `core/config/safe-link.ts`, `app/+not-found.tsx`; `core/push/links.ts` ve `use-notification-routing.ts` aynı kalıpla ofis yollarına uyarlandı
 
 ## Komutlar
 

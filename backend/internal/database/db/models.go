@@ -1733,6 +1733,14 @@ type WarningCode struct {
 	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
+type WarningOfficeAlert struct {
+	WarningID      int64              `json:"warning_id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	NotifiedAt     pgtype.Timestamptz `json:"notified_at"`
+	Recipients     int32              `json:"recipients"`
+}
+
 type WarningRuleConfig struct {
 	ID             int64              `json:"id"`
 	OrganizationID int64              `json:"organization_id"`

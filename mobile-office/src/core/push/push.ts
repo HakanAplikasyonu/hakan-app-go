@@ -12,6 +12,7 @@ import { Platform } from 'react-native';
 
 import { api } from '../api/client';
 import { secure, StorageKeys } from '../storage';
+import { notificationUrl } from './links';
 
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -143,4 +144,34 @@ export function installForegroundHandler() {
       shouldSetBadge: true,
     }),
   });
+}
+
+type ResponseHandler = (url: string, id: string) => void;
+
+/**
+ * Bildirime dokunuş (#241; kaynak mobile/src/core/push/push.ts, #201): uygulama
+ * açıkken gelen ve uygulamayı soğuk başlatan dokunuşlar. Aynı dokunuş bir kez
+ * işlenir.
+ */
+export function subscribeNotificationOpens(onOpen: ResponseHandler): () => void {
+  const N = notificationsModule();
+  if (!N) return () => {};
+  const seen = new Set<string>();
+  const handle = (r: import('expo-notifications').NotificationResponse | null | undefined) => {
+    if (!r) return;
+    const id = r.notification.request.identifier;
+    if (seen.has(id)) return;
+    seen.add(id);
+    const url = notificationUrl(r.notification.request.content.data);
+    if (url) onOpen(url, id);
+  };
+  const sub = N.addNotificationResponseReceivedListener(handle);
+  N.getLastNotificationResponseAsync()
+    .then((r) => {
+      handle(r);
+      // Bir sonraki açılışta aynı dokunuş yeniden açılmasın.
+      N.clearLastNotificationResponseAsync?.().catch(() => {});
+    })
+    .catch(() => {});
+  return () => sub.remove();
 }
