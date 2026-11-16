@@ -9264,6 +9264,53 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankTransactions
+      summary: The taxpayer's bank transactions (office "Banka" tab)
+      description: |
+        Requires `tenant.bank.read` (#329). Newest first; cancelled
+        transactions are left out. `summary` counts the same filter without
+        `match_status` (in / out totals and match states).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+        - name: match_status
+          in: query
+          schema: { type: string, enum: [unmatched, suggested, matched, ignored, all] }
+        - name: cash_box_uuid
+          in: query
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 }
+      responses:
+        "200":
+          description: Bank transactions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BankTransactionPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/cash-boxes:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -14844,6 +14891,46 @@ components:
         data: { $ref: "#/components/schemas/TenantPermissionList" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    BankTransaction:
+      type: object
+      required: [uuid, transaction_date, direction, amount, currency, description, counterparty_name, kind, kind_detail, match_status, period, possible_duplicate, cash_box_uuid, cash_box_name]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        direction:
+          type: string
+          enum: [in, out]
+          description: in = alacak (A, para girişi), out = borç (B, para çıkışı)
+        amount: { type: string, description: Decimal string, example: "18500.00" }
+        currency: { type: string, example: TRY }
+        description: { type: string }
+        counterparty_name: { type: [string, "null"] }
+        kind: { type: string, description: Bank classification (DIGER when unknown) }
+        kind_detail: { type: string, example: customer_collection }
+        match_status: { type: string, enum: [unmatched, suggested, matched, ignored] }
+        period: { type: string, example: "2026-10" }
+        possible_duplicate: { type: boolean }
+        cash_box_uuid: { type: string, format: uuid }
+        cash_box_name: { type: string }
+    BankTransactionPage:
+      type: object
+      required: [items, limit, offset, summary]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/BankTransaction" }
+        limit: { type: integer }
+        offset: { type: integer }
+        summary:
+          type: object
+          required: [total, in_total, out_total, unmatched, suggested, matched]
+          properties:
+            total: { type: integer, format: int64 }
+            in_total: { type: string, description: Decimal string }
+            out_total: { type: string, description: Decimal string }
+            unmatched: { type: integer, format: int64 }
+            suggested: { type: integer, format: int64 }
+            matched: { type: integer, format: int64 }
     CashBox:
       type: object
       required: [uuid, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, web_service]

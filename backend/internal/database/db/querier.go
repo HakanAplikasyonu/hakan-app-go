@@ -554,6 +554,9 @@ type Querier interface {
 	ListBankTransactionsForMatching(ctx context.Context, arg ListBankTransactionsForMatchingParams) ([]BankTransaction, error)
 	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
 	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
+	// Banka hareketleri sekmesi (#329): mükellefin hareketleri, yeniden eskiye.
+	// İptal edilen hareket listelenmez.
+	ListBankTransactionsPage(ctx context.Context, arg ListBankTransactionsPageParams) ([]ListBankTransactionsPageRow, error)
 	ListBankTransactionsToClassify(ctx context.Context, arg ListBankTransactionsToClassifyParams) ([]BankTransaction, error)
 	// Faturalama (issue #52). Planlar platform düzeyinde; ofis satırları
 	// organization_id ile.
@@ -945,6 +948,9 @@ type Querier interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
+	// Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
+	// durumları.
+	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
 	// Onaylı masraflar (beyana yalnızca onaylı masraf girer).
 	SummaryExpenseTotals(ctx context.Context, arg SummaryExpenseTotalsParams) (SummaryExpenseTotalsRow, error)
 	// AI dönem özeti (issue #35): olgu sorguları ve taslaklar.

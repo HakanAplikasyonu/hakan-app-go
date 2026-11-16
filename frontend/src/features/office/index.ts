@@ -11,3 +11,4 @@ export { JournalsPage } from "./components/journals-page";
 export { AgentsPage, OfflineAgentsCard } from "./components/agents-page";
 export { AccountMemoryPage } from "./components/account-memory-page";
 export { EngagementOverviewPage } from "./components/engagement-overview";
+export { EngagementBankPage } from "./components/engagement-bank-page";
