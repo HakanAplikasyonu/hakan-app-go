@@ -121,7 +121,7 @@ export function TaxpayerInvoiceDetailPage({
         <CardHeader>
           <CardTitle>{t("taxpayer.lines_title")}</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto">
+        <CardContent className="relative overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-muted-foreground text-left">
               <tr className="border-b">

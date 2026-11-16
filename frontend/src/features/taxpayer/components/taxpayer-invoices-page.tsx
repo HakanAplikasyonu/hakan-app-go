@@ -95,7 +95,7 @@ export function TaxpayerInvoicesPage({ taxpayer }: { taxpayer: string }) {
           </p>
         ) : (
           <>
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-muted-foreground text-left">
                   <tr className="border-b">
@@ -131,7 +131,7 @@ export function TaxpayerInvoicesPage({ taxpayer }: { taxpayer: string }) {
                       <td className="py-2 pr-3">
                         <Link
                           href={routes.taxpayer.invoice(taxpayer, inv.uuid)}
-                          className="figure underline-offset-4 hover:underline"
+                          className="figure inline-flex min-h-6 items-center underline-offset-4 hover:underline max-md:min-h-11"
                         >
                           {inv.invoice_number}
                         </Link>

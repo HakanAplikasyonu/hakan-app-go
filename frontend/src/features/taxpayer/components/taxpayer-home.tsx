@@ -109,7 +109,7 @@ export function TaxpayerHome({
               </h2>
               <Link
                 href={routes.taxpayer.requests(taxpayer)}
-                className="text-brand-text text-sm font-medium hover:underline"
+                className="text-brand-text inline-flex min-h-6 items-center text-sm font-medium hover:underline max-md:min-h-11"
               >
                 {t("taxpayer.home_requests_all")}
               </Link>
@@ -375,13 +375,13 @@ function RecentCard({ taxpayer }: { taxpayer: string }) {
       <div className="mt-4 flex gap-4 text-sm">
         <Link
           href={routes.taxpayer.receipts(taxpayer)}
-          className="text-brand-text font-medium hover:underline"
+          className="text-brand-text inline-flex min-h-6 items-center font-medium hover:underline max-md:min-h-11"
         >
           {t("taxpayer.nav_receipts")}
         </Link>
         <Link
           href={routes.taxpayer.uploads(taxpayer)}
-          className="text-brand-text font-medium hover:underline"
+          className="text-brand-text inline-flex min-h-6 items-center font-medium hover:underline max-md:min-h-11"
         >
           {t("taxpayer.recent_uploads_link")}
         </Link>

@@ -112,7 +112,7 @@ export function TaxpayerShell({
         <div className="mx-auto flex h-[60px] max-w-[1200px] items-center gap-6 px-4 md:px-8">
           <Link
             href={routes.taxpayer.home(context.data.taxpayer.uuid)}
-            className="shrink-0 rounded-md"
+            className="flex min-h-11 shrink-0 items-center rounded-md"
             aria-label={t("taxpayer.brand_home")}
           >
             <MarkaLogosu varyant="tam" boyut={24} />
