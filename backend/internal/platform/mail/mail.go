@@ -1,12 +1,16 @@
 package mail
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"mime"
+	"mime/multipart"
 	"net"
 	"net/smtp"
+	"net/textproto"
 	"strconv"
 	"strings"
 	"time"
@@ -22,6 +26,17 @@ type Message struct {
 	To      []string
 	Subject string
 	Body    string
+	// Attachments are sent as multipart/mixed parts after the text body
+	// (issue #386: the taxpayer report PDF).
+	Attachments []Attachment
+}
+
+// Attachment is one file attached to a message.
+type Attachment struct {
+	// Name is the file name the recipient sees (UTF-8 allowed).
+	Name        string
+	ContentType string
+	Data        []byte
 }
 
 // Sender delivers email messages.
@@ -101,9 +116,13 @@ func (s *SMTPSender) Send(ctx context.Context, msg Message) error {
 	payload.WriteString(subject)
 	payload.WriteString("\r\n")
 	payload.WriteString("MIME-Version: 1.0\r\n")
-	payload.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	payload.WriteString("\r\n")
-	payload.WriteString(msg.Body)
+	if len(msg.Attachments) == 0 {
+		payload.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+		payload.WriteString("\r\n")
+		payload.WriteString(msg.Body)
+	} else if err := writeMultipart(&payload, msg); err != nil {
+		return fmt.Errorf("mail: %w", err)
+	}
 
 	if err := s.deliver(ctx, from, msg.To, []byte(payload.String())); err != nil {
 		return fmt.Errorf("mail: send: %w", err)
@@ -209,6 +228,61 @@ func (s *SMTPSender) deliver(ctx context.Context, from string, to []string, payl
 	// the server drops the connection) must not report the send as failed, or
 	// the queue would retry and deliver a duplicate.
 	_ = c.Quit()
+	return nil
+}
+
+// writeMultipart writes a multipart/mixed body: the text part, then each
+// attachment base64-encoded in 76-character lines.
+func writeMultipart(b *strings.Builder, msg Message) error {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	b.WriteString("Content-Type: multipart/mixed; boundary=\"" + w.Boundary() + "\"\r\n\r\n")
+	text, err := w.CreatePart(textproto.MIMEHeader{
+		"Content-Type":              {"text/plain; charset=UTF-8"},
+		"Content-Transfer-Encoding": {"8bit"},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := text.Write([]byte(msg.Body)); err != nil {
+		return err
+	}
+	for _, a := range msg.Attachments {
+		ct := a.ContentType
+		if ct == "" {
+			ct = "application/octet-stream"
+		}
+		name := stripHeaderBreaks(a.Name)
+		if name == "" {
+			name = "attachment"
+		}
+		disp := mime.FormatMediaType("attachment", map[string]string{"filename": name})
+		if disp == "" {
+			disp = `attachment; filename="attachment"`
+		}
+		part, err := w.CreatePart(textproto.MIMEHeader{
+			"Content-Type":              {mime.FormatMediaType(ct, map[string]string{"name": name})},
+			"Content-Disposition":       {disp},
+			"Content-Transfer-Encoding": {"base64"},
+		})
+		if err != nil {
+			return err
+		}
+		enc := base64.StdEncoding.EncodeToString(a.Data)
+		for len(enc) > 76 {
+			if _, err := part.Write([]byte(enc[:76] + "\r\n")); err != nil {
+				return err
+			}
+			enc = enc[76:]
+		}
+		if _, err := part.Write([]byte(enc + "\r\n")); err != nil {
+			return err
+		}
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	b.Write(buf.Bytes())
 	return nil
 }
 

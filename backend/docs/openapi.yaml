@@ -7269,6 +7269,162 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/report/pdf:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reports]
+      operationId: getEngagementReportPdf
+      summary: Taxpayer report as PDF
+      description: |
+        Requires `tenant.engagements.read` (#386). The A4 PDF the taxpayer
+        receives: office-branded header, the four totals, the four charts,
+        the monthly table and the notes, Turkish number format. Only an
+        approved AI comment is printed.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportPeriod"
+        - $ref: "#/components/parameters/ReportYear"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/report/deliveries:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reports]
+      operationId: listEngagementReportDeliveries
+      summary: Report email history of the taxpayer
+      description: Requires `tenant.engagements.read`. Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReportDeliveryPage" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Reports]
+      operationId: sendEngagementReport
+      summary: Email the report to the taxpayer (one click)
+      description: |
+        Requires `tenant.engagements.write`. Builds the report (approved AI
+        comment only), keeps a snapshot and queues the email; the worker
+        renders the PDF from the snapshot and sends it within a minute
+        (three attempts). `recipient` defaults to the taxpayer's contact
+        email; 422 `NO_RECIPIENT` when there is none. Give exactly one of
+        `period` and `year`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, example: "2026-10" }
+                year: { type: string, example: "2026" }
+                recipient: { type: string, format: email }
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReportDelivery" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`NO_RECIPIENT`: the taxpayer has no contact email"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/report-deliveries:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Reports]
+      operationId: listOfficeReportDeliveries
+      summary: Report email history of the office
+      description: |
+        Requires `tenant.engagements.read` (#386). Every engagement with
+        `tenant.engagements.read_all`, otherwise the caller's assigned ones.
+        Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReportDeliveryPage" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Reports]
+      operationId: sendReportsBulk
+      summary: Email the report to selected taxpayers
+      description: |
+        Requires `tenant.engagements.write`. Queues the report email for each
+        engagement (1-200). An engagement the caller may not reach
+        (`no_access`), an ended one (`ended`) or a taxpayer without a usable
+        contact email (`no_email`, `invalid_email`) is skipped and reported
+        per item.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [engagement_uuids]
+              properties:
+                engagement_uuids:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string, format: uuid }
+                period: { type: string, example: "2026-10" }
+                year: { type: string, example: "2026" }
+      responses:
+        "202":
+          description: Queued / skipped per engagement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReportBulkResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/agents:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -13243,6 +13399,80 @@ components:
         data: { $ref: "#/components/schemas/TaxpayerReport" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    ReportDelivery:
+      type: object
+      required: [uuid, taxpayer_title, kind, period, label, recipient, origin, status, attempts, last_error, sent_at, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        kind: { type: string, enum: [month, year] }
+        period: { type: string, example: "2026-10" }
+        label: { type: string, example: Ekim 2026 }
+        recipient: { type: string }
+        origin: { type: string, enum: [manual, bulk, scheduled] }
+        status: { type: string, enum: [queued, sending, sent, failed] }
+        attempts: { type: integer, format: int32 }
+        last_error: { type: [string, "null"] }
+        sent_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+
+    EnvelopeReportDelivery:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ReportDelivery" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeReportDeliveryPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ReportDelivery" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer, format: int32 }
+            offset: { type: integer, format: int32 }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ReportBulkItem:
+      type: object
+      required: [engagement_uuid, status, reason, delivery]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [queued, skipped] }
+        reason:
+          oneOf:
+            - type: "null"
+            - type: string
+              enum: [no_access, ended, no_email, invalid_email]
+        delivery:
+          oneOf:
+            - type: "null"
+            - $ref: "#/components/schemas/ReportDelivery"
+
+    EnvelopeReportBulkResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, queued, skipped]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ReportBulkItem" }
+            queued: { type: integer }
+            skipped: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     DesktopAgent:
       type: object
       required: [uuid, machine_id, name, platform, version, status, last_seen_at, offline_since, heartbeat, created_at, last_error, heartbeat_seconds]

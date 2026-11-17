@@ -1,18 +1,21 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { permissions } from "@/config/permissions";
 import { EngagementTabs } from "@/features/office/components/engagement-overview";
 import { usePeriodMatrix } from "@/features/office/hooks/use-office-data";
 import { useOfficePeriod } from "@/features/office/period";
 import { useEngagementReport } from "@/features/reports/hooks/use-report";
-import type {
-  ReportRange,
-  TaxpayerReport,
-} from "@/features/reports/services/reports.service";
+import type { ReportRange } from "@/features/reports/services/reports.service";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
+
+import { EngagementDeliveryHistory } from "./delivery-history";
+import { ReportActions } from "./report-actions";
 
 import { ReportRangePicker } from "./report-range-picker";
 import { ReportSkeleton, ReportView } from "./report-view";
@@ -20,17 +23,12 @@ import { ReportSkeleton, ReportView } from "./report-view";
 /**
  * `/t/{slug}/engagements/{uuid}/report` (#386, "mükellef bazlı özel ilgi"):
  * mükellefin aylık / yıllık raporu. İlk açılışta ofisin global dönemi
- * (Tüm dönemler seçiliyse beyan dönemi). `actions` raporun yanındaki
- * düğmeler (PDF, e-posta).
+ * (Tüm dönemler seçiliyse beyan dönemi). PDF indirme, tek tıkla e-posta
+ * ve gönderim geçmişi aynı sayfada.
  */
-export function EngagementReportPage({
-  engagement,
-  actions,
-}: {
-  engagement: string;
-  actions?: (report: TaxpayerReport, range: ReportRange) => ReactNode;
-}) {
+export function EngagementReportPage({ engagement }: { engagement: string }) {
   const { t } = useLocale();
+  const { can } = usePermission();
   const { slug } = useTenant();
   const { focus } = useOfficePeriod();
   const matrix = usePeriodMatrix(1);
@@ -52,9 +50,14 @@ export function EngagementReportPage({
       <EngagementTabs engagement={engagement} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ReportRangePicker value={range} onChange={setRange} />
-        {report.data && actions ? (
+        {report.data ? (
           <div className="flex flex-wrap gap-2">
-            {actions(report.data, range)}
+            <ReportActions
+              engagement={engagement}
+              report={report.data}
+              range={range}
+              canSend={can(permissions.tenant.engagements.write)}
+            />
           </div>
         ) : null}
       </div>
@@ -76,6 +79,16 @@ export function EngagementReportPage({
       ) : (
         <ReportSkeleton />
       )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {t("reports.history.title")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EngagementDeliveryHistory engagement={engagement} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

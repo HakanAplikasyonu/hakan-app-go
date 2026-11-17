@@ -1392,6 +1392,28 @@ type RefreshToken struct {
 	EndedAt            pgtype.Timestamptz `json:"ended_at"`
 }
 
+type ReportDelivery struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Kind           string             `json:"kind"`
+	Period         string             `json:"period"`
+	Recipient      string             `json:"recipient"`
+	Origin         string             `json:"origin"`
+	Status         string             `json:"status"`
+	Attempts       int32              `json:"attempts"`
+	NextAttemptAt  pgtype.Timestamptz `json:"next_attempt_at"`
+	LastError      pgtype.Text        `json:"last_error"`
+	Report         []byte             `json:"report"`
+	OfficeName     string             `json:"office_name"`
+	RequestedBy    pgtype.Int8        `json:"requested_by"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RetailSale struct {
 	ID              int64              `json:"id"`
 	Uuid            uuid.UUID          `json:"uuid"`

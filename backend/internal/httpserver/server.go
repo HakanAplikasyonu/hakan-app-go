@@ -631,7 +631,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		periods:      periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:    summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Mükellef raporu (#386).
-		reports: reportsmodule.NewHandler(deps.Queries),
+		reports: reportsmodule.NewHandler(deps.Queries, engagementResolver),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
 		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
 		legal:         legalhandler.New(legalSvc),

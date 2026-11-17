@@ -33,6 +33,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
+	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
@@ -261,6 +262,10 @@ func main() {
 			func(ctx context.Context, p queue.EasytradeSyncPayload) error {
 				return easytradeSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID)
 			}).
+		// Mükellef raporu e-postaları (#386): kuyruğa alınan gönderimler,
+		// bütün ofisler (gerekçeli satır güvenliği atlaması).
+		WithReportDeliveries(systemCount(pool, "reports: deliveries across offices",
+			(&reportsmodule.Sender{Q: database.NewQueries(pool), Mail: mailer, Log: log}).SendDue)).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -300,6 +305,10 @@ func main() {
 		}
 		if err := queue.RegisterEasytradeSweepSchedule(scheduler); err != nil {
 			log.Error("easytrade_sweep_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterReportDeliveriesSchedule(scheduler); err != nil {
+			log.Error("report_deliveries_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {
