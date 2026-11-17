@@ -1,0 +1,16 @@
+Belge bekleniyor
+
+Merhaba,
+
+Örnek Müşavirlik, Örnek Gıda A.Ş. için 3 banka hareketinin belgesini
+istiyor.
+Fotoğrafını ya da PDF'ini uygulamadan yükleyebilirsiniz.
+
+Belgeleri yükle:
+https://app.example.com/m/belgeler?t=1&x=2
+
+--
+Bu e-postayı Örnek Gıda A.Ş. mükellef panelinin üyesi olduğunuz için
+aldınız.
+Bildirim tercihleri: https://app.example.com/profile
+Bu e-posta HAKAN üzerinden gönderildi.

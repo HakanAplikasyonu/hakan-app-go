@@ -1,0 +1,17 @@
+Sayın Örnek Gıda A.Ş.,
+
+Ekim 2026 dönemine ait raporunuz ektedir (PDF).
+
+Özet (KDV hariç)
+  Ciro:  1.250.000,00 ₺
+  Gider: 830.400,50 ₺
+  Net:   419.599,50 ₺
+
+Müşavir yorumu:
+Ciro geçen aya göre arttı. Ayrıntı: https://app.example.com/rapor.
+
+Saygılarımızla,
+Örnek Müşavirlik
+
+--
+Bu e-posta HAKAN üzerinden gönderildi.
