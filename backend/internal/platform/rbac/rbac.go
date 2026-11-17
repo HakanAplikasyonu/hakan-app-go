@@ -115,6 +115,9 @@ const (
 	PermTenantJournalsRead   = "tenant.journals.read"
 	PermTenantJournalsWrite  = "tenant.journals.write"
 	PermTenantJournalsExport = "tenant.journals.export"
+	// Personel, bordro ve SGK (issue #382).
+	PermTenantPayrollRead  = "tenant.payroll.read"
+	PermTenantPayrollWrite = "tenant.payroll.write"
 
 	// KVKK data subject requests (issue #193).
 	PermTenantPrivacyRequest = "tenant.privacy.request"

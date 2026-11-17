@@ -39,6 +39,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Payroll
+    description: Personel, bordro ve SGK primleri (#382)
   - name: Privacy
     description: KVKK veri sahibi talepleri (#193)
   - name: Billing
@@ -6100,6 +6102,70 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/payroll/documents:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerPayrollDocuments
+      summary: Şirketin bordro PDF'leri (salt okuma)
+      description: |
+        Mükellef web paneli ve mobil uygulama (#382). Ofisin mükellefe açtığı
+        bordro dökümleri; yalnızca mükellefin sahip rolü görür.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollDocumentPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/payroll/documents/{documentUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: documentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: downloadTaxpayerPayrollDocument
+      summary: Bordro PDF'ini indir
+      description: |
+        Mükellefe açık bir bordro belgesi (#382); her zaman ek olarak iner.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/taxpayer/context:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -8780,6 +8846,573 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/employees:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: listPayrollEmployees
+      summary: The taxpayer's employees
+      description: |
+        Requires `tenant.payroll.read` (#382). Sorted by name. `status`: active (no exit date or a future one), exited, all. `q` searches name, SGK no and job title. The national id is masked.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, exited, all] } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollEmployeePage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Payroll]
+      operationId: createPayrollEmployee
+      summary: Add an employee by hand
+      description: |
+        Requires `tenant.payroll.write` (#382). `national_id` (TCKN) is checked and stored masked with a keyed digest, never in clear.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayrollEmployeeInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollEmployee" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/employees/{employeeUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: employeeUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Payroll]
+      operationId: updatePayrollEmployee
+      summary: Update an employee
+      description: |
+        Requires `tenant.payroll.write` (#382). Omitted fields stay; an empty string clears a field.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayrollEmployeeInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollEmployee" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/imports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Payroll]
+      operationId: importPayroll
+      summary: Import a payroll workbook (Excel / CSV)
+      description: |
+        Requires `tenant.payroll.write` (#382). Luca, Zirve, Logo payroll exports and free-form sheets. Columns are
+        mapped from the header words; when name, gross or net is missing and
+        an AI provider is configured, the AI column mapper (excelimport, #24)
+        is asked. `mapping` (JSON, column letter to field) overrides the
+        mapping. `?preview=true` writes nothing. A commit replaces the
+        period's run and lines, links employees by TCKN (or name) and writes
+        the period's SGK accrual. 422 `PAYROLL_MAPPING_INCOMPLETE` /
+        `PAYROLL_PERIOD_REQUIRED` name what is missing in `details`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: preview, in: query, schema: { type: boolean } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                mapping: { type: string, description: 'JSON object, e.g. {"B":"gross","F":"net"}' }
+      responses:
+        "200":
+          description: Preview (nothing written)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollImportResult" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "201":
+          description: Imported
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollImportResult" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { description: File too large }
+        "422": { description: "`PAYROLL_MAPPING_INCOMPLETE`, `PAYROLL_PERIOD_REQUIRED`, `PAYROLL_SHEET_NOT_FOUND`" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/runs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: listPayrollRuns
+      summary: Payroll runs by period
+      description: |
+        Requires `tenant.payroll.read` (#382). Newest period first, with the net paid through matched bank payments, the SGK accrual status and the journal draft.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: year, in: query, schema: { type: string, pattern: "^[0-9]{4}$", example: "2026" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollRunPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: runUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Payroll]
+      operationId: getPayrollRun
+      summary: A payroll run with its lines
+      description: |
+        Requires `tenant.payroll.read` (#382). 
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollRunDetail" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Payroll]
+      operationId: deletePayrollRun
+      summary: Delete a payroll run
+      description: |
+        Requires `tenant.payroll.write` (#382). Lines go with it; its bank matches are removed. Refused (409 `PAYROLL_RUN_LOCKED`) when its journal draft is approved or exported.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: runUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Payroll]
+      operationId: exportPayrollRun
+      summary: Download the run as Excel
+      description: |
+        Requires `tenant.payroll.read` (#382). One sheet, one row per employee and a total row; the TCKN stays masked.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Workbook
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}/journal-draft:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: runUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Payroll]
+      operationId: createPayrollJournalDraft
+      summary: Write the run's journal draft
+      description: |
+        Requires `tenant.payroll.write` (#382). A `journal_drafts` entry dated the period's last day: 770 debit (gross +
+        employer shares − incentive), 335 (net), 360 (income and stamp tax −
+        AGİ), 361 (SGK and unemployment, both shares − incentive) and 336
+        (other deductions) credit. Accounts may be overridden. 409
+        `PAYROLL_JOURNAL_EXISTS` when the run has one.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PayrollAccounts" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/JournalDraft" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { description: "`PAYROLL_UNAVAILABLE`" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/bank-match:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Payroll]
+      operationId: matchPayrollBank
+      summary: Match salary and SGK payments
+      description: |
+        Requires `tenant.payroll.write` (#382). Outgoing TRY movements from the period's first day to 15 days after the
+        SGK due date: an SGK payment of the open accrual amount marks the
+        accrual paid; one movement of the whole net, or one per employee
+        (IBAN or name and the line's net), is matched to the run.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollBankMatchResult" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: listSgkPremiums
+      summary: SGK accruals and payments
+      description: |
+        Requires `tenant.payroll.read` (#382). Newest period first. `status`: accrued, partial, paid, overdue.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: year, in: query, schema: { type: string, pattern: "^[0-9]{4}$", example: "2026" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/SgkPremiumPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Payroll]
+      operationId: createSgkPremium
+      summary: Record an SGK accrual by hand
+      description: |
+        Requires `tenant.payroll.write` (#382). For a period without an imported payroll. The due date defaults to the end of the next month.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SgkPremiumInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/SgkPremium" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/{premiumUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: premiumUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Payroll]
+      operationId: updateSgkPremium
+      summary: Record an SGK payment or correct an accrual
+      description: |
+        Requires `tenant.payroll.write` (#382). `paid_amount` / `paid_at` record the payment. The amounts of an accrual that comes from a payroll cannot be changed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SgkPremiumInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/SgkPremium" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: listPayrollDocuments
+      summary: Payroll PDFs
+      description: |
+        Requires `tenant.payroll.read` (#382). Payroll printouts, payslips and SGK documents, newest period first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollDocumentPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Payroll]
+      operationId: uploadPayrollDocument
+      summary: Attach a payroll PDF
+      description: |
+        Requires `tenant.payroll.write` (#382). PDF only (content checked), up to 20 MB. `visible_to_taxpayer` (default true) shows it in the mükellef panel and app.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, period]
+              properties:
+                file: { type: string, format: binary }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                kind: { type: string, enum: [payroll, payslip, sgk_accrual, sgk_receipt, other] }
+                title: { type: string }
+                employee_uuid: { type: string, format: uuid }
+                visible_to_taxpayer: { type: boolean, default: true }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PayrollDocument" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "415": { description: "`NOT_PDF`" }
+        "503": { description: "`PAYROLL_UNAVAILABLE`: storage is not configured" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: documentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Payroll]
+      operationId: deletePayrollDocument
+      summary: Delete a payroll PDF
+      description: |
+        Requires `tenant.payroll.write` (#382). 
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: documentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Payroll]
+      operationId: downloadPayrollDocument
+      summary: Download a payroll PDF
+      description: |
+        Requires `tenant.payroll.read` (#382). Always an attachment.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/journal-export-settings:
     parameters:
@@ -16057,6 +16690,276 @@ components:
             unmatched: { type: integer, format: int64 }
             suggested: { type: integer, format: int64 }
             matched: { type: integer, format: int64 }
+    PayrollEmployee:
+      type: object
+      description: An employee of the taxpayer (#382). The national id is never returned in clear.
+      required: [uuid, full_name, national_id_masked, sgk_no, job_title, department, iban, hire_date, exit_date, exit_reason, status, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        full_name: { type: string }
+        national_id_masked: { type: [string, "null"], example: "123******01" }
+        sgk_no: { type: [string, "null"] }
+        job_title: { type: [string, "null"] }
+        department: { type: [string, "null"] }
+        iban: { type: [string, "null"] }
+        hire_date: { type: [string, "null"], format: date }
+        exit_date: { type: [string, "null"], format: date }
+        exit_reason: { type: [string, "null"] }
+        status: { type: string, enum: [active, exited] }
+        created_at: { type: string, format: date-time }
+    PayrollEmployeeInput:
+      type: object
+      additionalProperties: false
+      properties:
+        full_name: { type: string }
+        national_id: { type: string, description: "TCKN (11 digits, checksum checked); empty clears" }
+        sgk_no: { type: string }
+        job_title: { type: string }
+        department: { type: string }
+        iban: { type: string }
+        hire_date: { type: string, format: date }
+        exit_date: { type: string, format: date }
+        exit_reason: { type: string }
+    PayrollEmployeePage:
+      type: object
+      required: [items, total, limit, offset, active, exited]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollEmployee" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+        active: { type: integer, format: int64 }
+        exited: { type: integer, format: int64 }
+    PayrollTotals:
+      type: object
+      description: Decimal strings.
+      required: [employee_count, gross_total, net_total, sgk_employee_total, unemployment_employee_total, sgk_employer_total, unemployment_employer_total, sgk_incentive_total, income_tax_total, stamp_tax_total, exemption_total, other_deductions_total, employer_cost_total]
+      properties:
+        employee_count: { type: integer }
+        gross_total: { type: string }
+        net_total: { type: string }
+        sgk_employee_total: { type: string }
+        unemployment_employee_total: { type: string }
+        sgk_employer_total: { type: string }
+        unemployment_employer_total: { type: string }
+        sgk_incentive_total: { type: string }
+        income_tax_total: { type: string }
+        stamp_tax_total: { type: string }
+        exemption_total: { type: string, description: Minimum wage income and stamp tax exemptions }
+        other_deductions_total: { type: string }
+        employer_cost_total: { type: string }
+    PayrollIssue:
+      type: object
+      required: [row, code, message]
+      properties:
+        row: { type: integer, description: 1-based sheet row; 0 for the whole file }
+        code: { type: string, enum: [NET_MISMATCH, INVALID_TCKN, MISSING_NAME, ZERO_GROSS, EMPLOYER_COST_MISMATCH, DUPLICATE_TCKN, NEGATIVE_AMOUNT, MISSING_REQUIRED_COLUMN, NO_ROWS, PERIOD_UNKNOWN, TOTAL_ROW_SKIPPED] }
+        message: { type: string }
+    PayrollLine:
+      type: object
+      description: One employee row. Amounts are decimal strings; taxes are payable amounts after the exemptions.
+      required: [row, employee_name, gross, sgk_base, sgk_employee, unemployment_employee, income_tax_base, income_tax, income_tax_exemption, stamp_tax, stamp_tax_exemption, agi, other_deductions, net, sgk_employer, unemployment_employer, sgk_incentive, employer_cost]
+      properties:
+        row: { type: integer }
+        employee_uuid: { type: [string, "null"], format: uuid }
+        employee_name: { type: string }
+        national_id_masked: { type: string }
+        sgk_no: { type: string }
+        job_title: { type: string }
+        department: { type: string }
+        hire_date: { type: string, format: date-time }
+        exit_date: { type: string, format: date-time }
+        days_worked: { type: integer }
+        gross: { type: string }
+        sgk_base: { type: string }
+        sgk_employee: { type: string }
+        unemployment_employee: { type: string }
+        income_tax_base: { type: string }
+        income_tax: { type: string }
+        income_tax_exemption: { type: string }
+        stamp_tax: { type: string }
+        stamp_tax_exemption: { type: string }
+        agi: { type: string }
+        other_deductions: { type: string }
+        net: { type: string }
+        sgk_employer: { type: string }
+        unemployment_employer: { type: string }
+        sgk_incentive: { type: string }
+        employer_cost: { type: string }
+    PayrollPremiumStatus:
+      type: object
+      required: [uuid, payable_amount, paid_amount, due_date, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        payable_amount: { type: string }
+        paid_amount: { type: string }
+        due_date: { type: string, format: date }
+        status: { type: string, enum: [accrued, partial, paid, overdue] }
+    PayrollRun:
+      type: object
+      required: [uuid, period, source, source_system, source_file_name, totals, issues, net_paid, payment_status, sgk, journal_draft_uuid, journal_draft_status, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string, example: "2026-10" }
+        source: { type: string, enum: [import, manual, demo] }
+        source_system: { type: string, enum: [luca, zirve, logo, generic] }
+        source_file_name: { type: [string, "null"] }
+        totals: { $ref: "#/components/schemas/PayrollTotals" }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollIssue" }
+        net_paid: { type: string, description: Net salaries paid through matched bank movements }
+        payment_status: { type: string, enum: [unpaid, partial, paid] }
+        sgk:
+          oneOf:
+            - $ref: "#/components/schemas/PayrollPremiumStatus"
+            - type: "null"
+        journal_draft_uuid: { type: [string, "null"], format: uuid }
+        journal_draft_status: { type: [string, "null"], enum: [draft, approved, exported, null] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    PayrollRunPage:
+      type: object
+      required: [items, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollRun" }
+        limit: { type: integer }
+        offset: { type: integer }
+    PayrollRunDetail:
+      allOf:
+        - $ref: "#/components/schemas/PayrollRun"
+        - type: object
+          required: [lines]
+          properties:
+            lines:
+              type: array
+              items: { $ref: "#/components/schemas/PayrollLine" }
+    PayrollColumnMap:
+      type: object
+      required: [column, header, field, confidence, origin, needs_review]
+      properties:
+        column: { type: string, example: "B" }
+        header: { type: string }
+        field: { type: string, description: "Target field; empty when unmapped" }
+        confidence: { type: number }
+        origin: { type: string, enum: [template, ai, user] }
+        needs_review: { type: boolean }
+    PayrollImportResult:
+      type: object
+      required: [period, source_system, sheet, header_row, columns, missing, mapped_by, lines, line_count, totals, issues, warnings, committed]
+      properties:
+        period: { type: string, description: "YYYY-MM; empty when neither the file nor the request names it" }
+        source_system: { type: string, enum: [luca, zirve, logo, generic] }
+        sheet: { type: string }
+        header_row: { type: integer }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollColumnMap" }
+        missing:
+          type: array
+          items: { type: string }
+        mapped_by: { type: string, enum: [template, ai, user] }
+        lines:
+          type: array
+          description: The first 50 lines
+          items: { $ref: "#/components/schemas/PayrollLine" }
+        line_count: { type: integer }
+        totals: { $ref: "#/components/schemas/PayrollTotals" }
+        issues:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollIssue" }
+        warnings:
+          type: array
+          items: { type: string }
+        committed: { type: boolean }
+        run: { $ref: "#/components/schemas/PayrollRun" }
+    PayrollAccounts:
+      type: object
+      additionalProperties: false
+      properties:
+        expense_account: { type: string, default: "770" }
+        personnel_account: { type: string, default: "335" }
+        taxes_account: { type: string, default: "360" }
+        sgk_account: { type: string, default: "361" }
+        other_deductions_account: { type: string, default: "336" }
+    PayrollBankMatchResult:
+      type: object
+      required: [period, examined, salary_matched, sgk_matched, bank_transaction_uuids]
+      properties:
+        period: { type: string }
+        examined: { type: integer }
+        salary_matched: { type: integer }
+        sgk_matched: { type: integer }
+        bank_transaction_uuids:
+          type: array
+          items: { type: string, format: uuid }
+    SgkPremium:
+      type: object
+      required: [uuid, period, accrual_amount, incentive_amount, payable_amount, due_date, document_no, paid_amount, paid_at, status, bank_transaction_uuid, note, from_payroll]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        accrual_amount: { type: string, description: Employee and employer SGK and unemployment shares }
+        incentive_amount: { type: string }
+        payable_amount: { type: string }
+        due_date: { type: string, format: date }
+        document_no: { type: [string, "null"] }
+        paid_amount: { type: string }
+        paid_at: { type: [string, "null"], format: date }
+        status: { type: string, enum: [accrued, partial, paid, overdue] }
+        bank_transaction_uuid: { type: [string, "null"], format: uuid }
+        note: { type: [string, "null"] }
+        from_payroll: { type: boolean }
+    SgkPremiumInput:
+      type: object
+      additionalProperties: false
+      properties:
+        period: { type: string, description: Create only }
+        accrual_amount: { type: string }
+        incentive_amount: { type: string }
+        due_date: { type: string, format: date }
+        document_no: { type: string }
+        paid_amount: { type: string }
+        paid_at: { type: string, format: date }
+        note: { type: string }
+    SgkPremiumPage:
+      type: object
+      required: [items, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/SgkPremium" }
+        limit: { type: integer }
+        offset: { type: integer }
+    PayrollDocument:
+      type: object
+      required: [uuid, period, kind, title, file_name, size_bytes, content_type, visible_to_taxpayer, employee_uuid, employee_name, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        kind: { type: string, enum: [payroll, payslip, sgk_accrual, sgk_receipt, other] }
+        title: { type: string }
+        file_name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        content_type: { type: string }
+        visible_to_taxpayer: { type: boolean }
+        employee_uuid: { type: [string, "null"], format: uuid }
+        employee_name: { type: [string, "null"] }
+        created_at: { type: string, format: date-time }
+    PayrollDocumentPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PayrollDocument" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
     CashBox:
       type: object
       required: [uuid, type, name, bank_id, iban, currency, bank_account_number, bank_branch_code, web_service]

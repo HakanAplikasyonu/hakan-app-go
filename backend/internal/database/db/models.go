@@ -584,6 +584,25 @@ type DocumentTaskUpload struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type Employee struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	FullName         string             `json:"full_name"`
+	NationalIDMasked pgtype.Text        `json:"national_id_masked"`
+	NationalIDDigest pgtype.Text        `json:"national_id_digest"`
+	SgkNo            pgtype.Text        `json:"sgk_no"`
+	JobTitle         pgtype.Text        `json:"job_title"`
+	Department       pgtype.Text        `json:"department"`
+	Iban             pgtype.Text        `json:"iban"`
+	HireDate         pgtype.Date        `json:"hire_date"`
+	ExitDate         pgtype.Date        `json:"exit_date"`
+	ExitReason       pgtype.Text        `json:"exit_reason"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Engagement struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -1230,6 +1249,81 @@ type OutboxEvent struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 }
 
+type PayrollDocument struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Period            string             `json:"period"`
+	PayrollRunID      pgtype.Int8        `json:"payroll_run_id"`
+	EmployeeID        pgtype.Int8        `json:"employee_id"`
+	Kind              string             `json:"kind"`
+	Title             string             `json:"title"`
+	StorageKey        string             `json:"storage_key"`
+	Sha256            string             `json:"sha256"`
+	SizeBytes         int64              `json:"size_bytes"`
+	ContentType       string             `json:"content_type"`
+	FileName          string             `json:"file_name"`
+	VisibleToTaxpayer bool               `json:"visible_to_taxpayer"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type PayrollLine struct {
+	ID                   int64              `json:"id"`
+	TaxpayerID           int64              `json:"taxpayer_id"`
+	PayrollRunID         int64              `json:"payroll_run_id"`
+	EmployeeID           pgtype.Int8        `json:"employee_id"`
+	LineNo               int32              `json:"line_no"`
+	EmployeeName         string             `json:"employee_name"`
+	NationalIDMasked     pgtype.Text        `json:"national_id_masked"`
+	DaysWorked           pgtype.Int4        `json:"days_worked"`
+	Gross                pgtype.Numeric     `json:"gross"`
+	SgkBase              pgtype.Numeric     `json:"sgk_base"`
+	SgkEmployee          pgtype.Numeric     `json:"sgk_employee"`
+	UnemploymentEmployee pgtype.Numeric     `json:"unemployment_employee"`
+	IncomeTaxBase        pgtype.Numeric     `json:"income_tax_base"`
+	IncomeTax            pgtype.Numeric     `json:"income_tax"`
+	IncomeTaxExemption   pgtype.Numeric     `json:"income_tax_exemption"`
+	StampTax             pgtype.Numeric     `json:"stamp_tax"`
+	StampTaxExemption    pgtype.Numeric     `json:"stamp_tax_exemption"`
+	Agi                  pgtype.Numeric     `json:"agi"`
+	OtherDeductions      pgtype.Numeric     `json:"other_deductions"`
+	Net                  pgtype.Numeric     `json:"net"`
+	SgkEmployer          pgtype.Numeric     `json:"sgk_employer"`
+	UnemploymentEmployer pgtype.Numeric     `json:"unemployment_employer"`
+	SgkIncentive         pgtype.Numeric     `json:"sgk_incentive"`
+	EmployerCost         pgtype.Numeric     `json:"employer_cost"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+}
+
+type PayrollRun struct {
+	ID                        int64              `json:"id"`
+	Uuid                      uuid.UUID          `json:"uuid"`
+	TaxpayerID                int64              `json:"taxpayer_id"`
+	Period                    string             `json:"period"`
+	Source                    string             `json:"source"`
+	SourceSystem              string             `json:"source_system"`
+	SourceFileName            pgtype.Text        `json:"source_file_name"`
+	EmployeeCount             int32              `json:"employee_count"`
+	GrossTotal                pgtype.Numeric     `json:"gross_total"`
+	NetTotal                  pgtype.Numeric     `json:"net_total"`
+	SgkEmployeeTotal          pgtype.Numeric     `json:"sgk_employee_total"`
+	UnemploymentEmployeeTotal pgtype.Numeric     `json:"unemployment_employee_total"`
+	SgkEmployerTotal          pgtype.Numeric     `json:"sgk_employer_total"`
+	UnemploymentEmployerTotal pgtype.Numeric     `json:"unemployment_employer_total"`
+	SgkIncentiveTotal         pgtype.Numeric     `json:"sgk_incentive_total"`
+	IncomeTaxTotal            pgtype.Numeric     `json:"income_tax_total"`
+	StampTaxTotal             pgtype.Numeric     `json:"stamp_tax_total"`
+	ExemptionTotal            pgtype.Numeric     `json:"exemption_total"`
+	OtherDeductionsTotal      pgtype.Numeric     `json:"other_deductions_total"`
+	EmployerCostTotal         pgtype.Numeric     `json:"employer_cost_total"`
+	Issues                    []byte             `json:"issues"`
+	JournalDraftID            pgtype.Int8        `json:"journal_draft_id"`
+	CreatedBy                 pgtype.Int8        `json:"created_by"`
+	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+}
+
 type PeriodLock struct {
 	ID             int64              `json:"id"`
 	OrganizationID int64              `json:"organization_id"`
@@ -1483,6 +1577,25 @@ type SecretRecord struct {
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 	RotatedAt  pgtype.Timestamptz `json:"rotated_at"`
+}
+
+type SgkPremium struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Period            string             `json:"period"`
+	PayrollRunID      pgtype.Int8        `json:"payroll_run_id"`
+	AccrualAmount     pgtype.Numeric     `json:"accrual_amount"`
+	IncentiveAmount   pgtype.Numeric     `json:"incentive_amount"`
+	PayableAmount     pgtype.Numeric     `json:"payable_amount"`
+	DueDate           pgtype.Date        `json:"due_date"`
+	DocumentNo        pgtype.Text        `json:"document_no"`
+	PaidAmount        pgtype.Numeric     `json:"paid_amount"`
+	PaidAt            pgtype.Date        `json:"paid_at"`
+	BankTransactionID pgtype.Int8        `json:"bank_transaction_id"`
+	Note              pgtype.Text        `json:"note"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SourceConnection struct {
