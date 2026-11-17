@@ -16,7 +16,14 @@ import { useLocale } from "@/providers/locale-provider";
  * Mükellef portalının sekmeleri (#39; arayüz 8/9, #331): etkin sekmenin
  * altında marka çizgisi, İstekler'de açık istek sayısı.
  */
-export function TaxpayerNav({ taxpayer }: { taxpayer: string }) {
+export function TaxpayerNav({
+  taxpayer,
+  owner = false,
+}: {
+  taxpayer: string;
+  /** Bordro PDF'leri yalnızca şirketin sahibine görünür (#382). */
+  owner?: boolean;
+}) {
   const { t } = useLocale();
   const pathname = usePathname();
   const open = useQuery({
@@ -48,6 +55,14 @@ export function TaxpayerNav({ taxpayer }: { taxpayer: string }) {
       href: routes.taxpayer.uploads(taxpayer),
       label: t("taxpayer.nav_uploads"),
     },
+    ...(owner
+      ? [
+          {
+            href: routes.taxpayer.payroll(taxpayer),
+            label: t("taxpayer.nav_payroll"),
+          },
+        ]
+      : []),
     {
       href: routes.taxpayer.report(taxpayer),
       label: t("taxpayer.nav_report"),

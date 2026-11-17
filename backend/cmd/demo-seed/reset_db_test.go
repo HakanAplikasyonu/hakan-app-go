@@ -125,6 +125,21 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM retail_sales WHERE source_system = 'easytrade' AND z_report_number IS NOT NULL`); n != 5 {
 		t.Fatalf("Z reports = %d, want 5", n)
 	}
+	// #382: Atlas'ın iki dönem bordrosu, beş personeli, Eylül SGK'sı ödenmiş,
+	// Eylül bordrosunun fiş taslağı ve mükellefe açık dört PDF, bir kez.
+	for q, want := range map[string]int{
+		`SELECT count(*) FROM payroll_runs`:                                    2,
+		`SELECT count(*) FROM employees`:                                       5,
+		`SELECT count(*) FROM payroll_lines`:                                   8,
+		`SELECT count(*) FROM sgk_premiums WHERE paid_at IS NOT NULL`:          1,
+		`SELECT count(*) FROM payroll_runs WHERE journal_draft_id IS NOT NULL`: 1,
+		`SELECT count(*) FROM payroll_documents WHERE visible_to_taxpayer`:     4,
+		`SELECT count(*) FROM employees WHERE national_id_masked LIKE '100%'`:  4,
+	} {
+		if n := count(t, d, q); n != want {
+			t.Errorf("%s = %d, want %d", q, n, want)
+		}
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,

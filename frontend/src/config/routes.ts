@@ -173,6 +173,8 @@ export const routes = {
     uploads: (uuid: string) => `/m/${encodeURIComponent(uuid)}/uploads`,
     /** Aylık / yıllık rapor (#386). */
     report: (uuid: string) => `/m/${encodeURIComponent(uuid)}/report`,
+    /** Bordro PDF'leri, salt okuma (#382). */
+    payroll: (uuid: string) => `/m/${encodeURIComponent(uuid)}/payroll`,
   },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,

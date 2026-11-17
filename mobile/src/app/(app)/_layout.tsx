@@ -40,6 +40,10 @@ export default function AppLayout() {
             name="destek"
             options={{ headerShown: true, title: "Destek" }}
           />
+          <Stack.Screen
+            name="payroll"
+            options={{ headerShown: true, title: "Bordro belgeleri" }}
+          />
         </Stack>
       </ReceiptsProvider>
     </IlkAcilisKapisi>
