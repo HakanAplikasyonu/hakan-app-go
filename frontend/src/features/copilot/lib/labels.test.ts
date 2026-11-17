@@ -54,6 +54,9 @@ describe("copilot labels", () => {
     "copilot.driver.luca",
     "copilot.driver.zirve",
     "copilot.error.generic",
+    ...["proposed", "running", "done", "cancelled"].map(
+      (s) => `copilot.recent.status_${s}`,
+    ),
   ];
   it.each([
     ["tr", tr as Record<string, string>],

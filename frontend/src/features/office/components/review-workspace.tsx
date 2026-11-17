@@ -79,6 +79,7 @@ import {
   REVIEW_PAGE_MAX,
   type ReviewSuggestion,
 } from "../services/review.service";
+import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { FilterSelect, Figure } from "./office-ui";
 import { ReviewGrid } from "./review-grid";
 import {
@@ -484,7 +485,10 @@ function ReviewWorkspaceInner() {
   const { period } = useOfficePeriod();
   const invoiceFilter = params.get("invoice");
 
-  const [engagement, setEngagement] = useState("all");
+  // ?taxpayer=<engagement> (co-pilot, #392) opens the queue on one taxpayer.
+  const [engagement, setEngagement] = useState(
+    () => params.get(ENGAGEMENT_PARAM) ?? "all",
+  );
   const [kind, setKind] = useState("all");
   const [tier, setTier] = useState<Tier>("all");
   const query = useReviewSuggestions({

@@ -72,7 +72,6 @@ export function StepChain({
               <TooltipTrigger asChild>
                 <span
                   tabIndex={0}
-                  aria-label={label}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium",
                     statusToneClass[STATUS_TONE[s.status]],
@@ -82,13 +81,16 @@ export function StepChain({
                   )}
                 >
                   <Icon aria-hidden className="size-3.5" />
+                  <span className="sr-only">{label}</span>
                   {compact ? null : (
-                    <span className="hidden @3xl/content:inline">
+                    <span aria-hidden className="hidden @3xl/content:inline">
                       {stepLabel(t, s.key)}
                     </span>
                   )}
                   {s.count > 0 && s.status !== "done" ? (
-                    <span className="tabular-nums">{s.count}</span>
+                    <span aria-hidden className="tabular-nums">
+                      {s.count}
+                    </span>
                   ) : null}
                 </span>
               </TooltipTrigger>
