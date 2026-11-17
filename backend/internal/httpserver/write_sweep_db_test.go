@@ -168,6 +168,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-matching":                                  {body: `{"period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                          {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":    {body: sweepRange},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":        {body: `{"sync_interval_minutes":60}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections":                            {body: `{"api_key":"` + testfakes.KolayBiAPIKey + `"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/company":    {body: `{"company_id":"` + testfakes.KolayBiCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/kolaybi-connections/{connectionUuid}/sync":      {body: sweepRange},

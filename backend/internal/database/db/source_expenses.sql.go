@@ -12,7 +12,7 @@ import (
 )
 
 const listSourceConnectionsBySystem = `-- name: ListSourceConnectionsBySystem :many
-SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at FROM source_connections
+SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1 AND source_system = $2
 ORDER BY id
 `
@@ -51,6 +51,9 @@ func (q *Queries) ListSourceConnectionsBySystem(ctx context.Context, arg ListSou
 			&i.LastSuccessAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SyncIntervalMinutes,
+			&i.NextSyncAt,
+			&i.SyncFailures,
 		); err != nil {
 			return nil, err
 		}
@@ -67,7 +70,7 @@ UPDATE source_connections
 SET external_company_id = $1, setup_state = $2, status = $3,
     last_error = NULL, meta = meta || $4::jsonb
 WHERE taxpayer_id = $5 AND id = $6
-RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures
 `
 
 type SetSourceConnectionCompanyParams struct {
@@ -109,6 +112,9 @@ func (q *Queries) SetSourceConnectionCompany(ctx context.Context, arg SetSourceC
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }
@@ -119,7 +125,7 @@ SET setup_state = $1, status = $2, last_error = $3,
     meta = meta || $4::jsonb,
     last_success_at = CASE WHEN $5::bool THEN NOW() ELSE last_success_at END
 WHERE taxpayer_id = $6 AND id = $7
-RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures
 `
 
 type SetSourceConnectionStateParams struct {
@@ -163,6 +169,9 @@ func (q *Queries) SetSourceConnectionState(ctx context.Context, arg SetSourceCon
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }

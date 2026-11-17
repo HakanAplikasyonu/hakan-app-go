@@ -64,7 +64,7 @@ func (q *Queries) LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashB
 
 const listBankConnections = `-- name: ListBankConnections :many
 
-SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at FROM source_connections
+SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1 AND source_system LIKE 'bank\_%' AND source_system <> 'bank_file'
 ORDER BY id
 `
@@ -100,6 +100,9 @@ func (q *Queries) ListBankConnections(ctx context.Context, taxpayerID int64) ([]
 			&i.LastSuccessAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SyncIntervalMinutes,
+			&i.NextSyncAt,
+			&i.SyncFailures,
 		); err != nil {
 			return nil, err
 		}
@@ -136,7 +139,7 @@ SET setup_state = $1,
     last_error  = $3,
     meta        = meta || $4::jsonb
 WHERE taxpayer_id = $5 AND id = $6
-RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures
 `
 
 type UpdateBankConnectionSetupParams struct {
@@ -178,6 +181,9 @@ func (q *Queries) UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankC
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }

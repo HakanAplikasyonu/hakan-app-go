@@ -38,7 +38,9 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	one := base + "/{connectionUuid}"
 	mux.Handle("GET "+base, middleware.Chain(http.HandlerFunc(h.list), authn, org, read, eng))
 	mux.Handle("POST "+base, middleware.Chain(http.HandlerFunc(h.connect), authn, org, write, eng))
+	mux.Handle("PATCH "+one, middleware.Chain(http.HandlerFunc(h.schedule), authn, org, write, eng))
 	mux.Handle("POST "+one+"/sync", middleware.Chain(http.HandlerFunc(h.sync), authn, org, write, eng))
+	mux.Handle("GET "+one+"/sync-runs", middleware.Chain(http.HandlerFunc(h.runs), authn, org, read, eng))
 	mux.Handle("GET "+one+"/vat-reconciliation", middleware.Chain(http.HandlerFunc(h.reconcile), authn, org, read, eng))
 }
 
@@ -104,6 +106,45 @@ func (h *Handler) sync(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, rep)
 }
 
+// schedule sets the connection's sync interval; null or 0 turns the
+// schedule off (manual sync only).
+func (h *Handler) schedule(w http.ResponseWriter, r *http.Request) {
+	id, ok := connID(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		SyncIntervalMinutes *int `json:"sync_interval_minutes"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "invalid JSON body")
+		return
+	}
+	var every time.Duration
+	if in.SyncIntervalMinutes != nil {
+		every = time.Duration(*in.SyncIntervalMinutes) * time.Minute
+	}
+	c, err := h.svc.SetSchedule(r.Context(), tp(r), id, every)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, c)
+}
+
+func (h *Handler) runs(w http.ResponseWriter, r *http.Request) {
+	id, ok := connID(w, r)
+	if !ok {
+		return
+	}
+	items, err := h.svc.Runs(r.Context(), tp(r), id, 20)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
 func (h *Handler) reconcile(w http.ResponseWriter, r *http.Request) {
 	id, ok := connID(w, r)
 	if !ok {
@@ -132,6 +173,12 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "CONNECTION_STATE", "missing input or not allowed in the connection's current state")
 	case errors.Is(err, ErrThrottle):
 		response.Error(w, r, http.StatusTooManyRequests, "SYNC_THROTTLED", "a sync was requested less than 5 minutes ago")
+	case errors.Is(err, ErrBusy):
+		response.Conflict(w, r, "SYNC_RUNNING", "a sync of this connection is already running")
+	case errors.Is(err, ErrBadInterval):
+		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_INTERVAL", "sync_interval_minutes is 15 to 10080, or null to turn the schedule off")
+	case errors.Is(err, ErrUpstream):
+		response.Error(w, r, http.StatusBadGateway, "EASYTRADE_UNAVAILABLE", "Easytrade answered with an error; the schedule retries")
 	case errors.Is(err, ErrBadRange):
 		response.Error(w, r, http.StatusUnprocessableEntity, "INVALID_RANGE", "the range is reversed or longer than 400 days")
 	case errors.Is(err, ErrLicense):

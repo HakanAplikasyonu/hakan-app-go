@@ -1434,25 +1434,28 @@ type SecretRecord struct {
 }
 
 type SourceConnection struct {
-	ID                int64              `json:"id"`
-	Uuid              uuid.UUID          `json:"uuid"`
-	TaxpayerID        int64              `json:"taxpayer_id"`
-	SourceSystem      string             `json:"source_system"`
-	ExternalCompanyID pgtype.Text        `json:"external_company_id"`
-	ExternalBranchIds []byte             `json:"external_branch_ids"`
-	CredentialsRef    pgtype.Text        `json:"credentials_ref"`
-	SetupState        string             `json:"setup_state"`
-	Status            string             `json:"status"`
-	LastError         []byte             `json:"last_error"`
-	Meta              []byte             `json:"meta"`
-	ConsentText       pgtype.Text        `json:"consent_text"`
-	ConsentAt         pgtype.Timestamptz `json:"consent_at"`
-	SyncCursor        []byte             `json:"sync_cursor"`
-	Capabilities      []byte             `json:"capabilities"`
-	LastFullSyncAt    pgtype.Timestamptz `json:"last_full_sync_at"`
-	LastSuccessAt     pgtype.Timestamptz `json:"last_success_at"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	TaxpayerID          int64              `json:"taxpayer_id"`
+	SourceSystem        string             `json:"source_system"`
+	ExternalCompanyID   pgtype.Text        `json:"external_company_id"`
+	ExternalBranchIds   []byte             `json:"external_branch_ids"`
+	CredentialsRef      pgtype.Text        `json:"credentials_ref"`
+	SetupState          string             `json:"setup_state"`
+	Status              string             `json:"status"`
+	LastError           []byte             `json:"last_error"`
+	Meta                []byte             `json:"meta"`
+	ConsentText         pgtype.Text        `json:"consent_text"`
+	ConsentAt           pgtype.Timestamptz `json:"consent_at"`
+	SyncCursor          []byte             `json:"sync_cursor"`
+	Capabilities        []byte             `json:"capabilities"`
+	LastFullSyncAt      pgtype.Timestamptz `json:"last_full_sync_at"`
+	LastSuccessAt       pgtype.Timestamptz `json:"last_success_at"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	SyncIntervalMinutes pgtype.Int4        `json:"sync_interval_minutes"`
+	NextSyncAt          pgtype.Timestamptz `json:"next_sync_at"`
+	SyncFailures        int32              `json:"sync_failures"`
 }
 
 type StepupSetting struct {

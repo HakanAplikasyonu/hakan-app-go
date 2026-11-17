@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -219,6 +221,8 @@ func main() {
 		log.Warn("egress_expected_ips_empty", "detail", "EGRESS_EXPECTED_IPS is empty: the IP check records the IP but cannot alarm")
 	}
 	entegratorSvc := entegrator.New(pool, vault, store, entegrator.Config{HTTP: egressHTTP}, log)
+	// Zamanlanmış Easytrade senkronu (#385): kasa yoksa tarama boş döner.
+	easytradeSvc := easytrade.NewService(pool, vault, cfg.Easytrade.BaseURL, nil)
 
 	// Yükleme sonrası hesap kodu önerileri (#319): UBL işi bitince ayrı bir
 	// kuyruk işi; kurala uyan kalemler inceleme kuyruğuna düşmeden uygulanır.
@@ -247,6 +251,16 @@ func main() {
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
+		WithEasytrade(
+			// The sweep scans every office: deliberate row level security bypass.
+			systemCount(pool, "easytrade: due connections across offices", func(ctx context.Context) (int, error) {
+				return easytradeSvc.EnqueueDue(ctx, func(_ context.Context, taxpayerID int64, id uuid.UUID) error {
+					return queue.EnqueueEasytradeSync(queueClient, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
+				})
+			}),
+			func(ctx context.Context, p queue.EasytradeSyncPayload) error {
+				return easytradeSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID)
+			}).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -282,6 +296,10 @@ func main() {
 		}
 		if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
 			log.Error("agents_offline_sweep_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterEasytradeSweepSchedule(scheduler); err != nil {
+			log.Error("easytrade_sweep_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {
