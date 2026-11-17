@@ -33,6 +33,7 @@ import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
+import { RelatedRecordsPanel } from "./related-records";
 import { InvoiceStateBadge } from "./invoices-page";
 import {
   Figure,
@@ -257,6 +258,12 @@ function InvoiceDetailInner({ id }: { id: string }) {
               </ul>
             ) : null}
           </Panel>
+
+          <RelatedRecordsPanel
+            engagement={engagement}
+            kind="invoice"
+            uuid={id}
+          />
 
           <Panel title={t("office.lines")}>
             <DataTable<InvoiceLine>

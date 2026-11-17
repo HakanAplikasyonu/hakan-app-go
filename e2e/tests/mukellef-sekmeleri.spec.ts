@@ -2,15 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { scan } from "./a11y";
 import {
+  addConsentedTaxpayer,
   Api,
-  consentTokenFor,
   DEMO,
   deriveUbl,
   engagementOf,
   officePath,
-  registerWithToken,
   uiLogin,
-  uniqueEmail,
   uniqueVkn,
   waitForUploads,
 } from "./lib";
@@ -40,36 +38,8 @@ test.describe("mükellef sekmeleri", () => {
     try {
       atlas = await engagementOf(api, DEMO.atlas.title);
 
-      // Yeni mükellef: onay iste → mükellef kaydolur ve onaylar.
-      const contact = uniqueEmail("sekme");
-      const office = await (await browser.newContext()).newPage();
-      try {
-        await uiLogin(office, DEMO.owner);
-        await office.goto(officePath("/taxpayer-requests"));
-        await office.locator('input[name="tax_id"]').fill(taxpayer.vkn);
-        await office.locator('input[name="title"]').fill(taxpayer.title);
-        await office.locator('input[name="contact_email"]').fill(contact);
-        await office.getByRole("button", { name: "Onay iste" }).click();
-        await expect(office.getByText(contact).first()).toBeVisible();
-      } finally {
-        await office.context().close();
-      }
-      const token = await consentTokenFor(contact);
-      const tp = await (await browser.newContext()).newPage();
-      try {
-        await registerWithToken(tp, token, `/consent/${token}`, {
-          name: "Sekme",
-          surname: "Mükellef",
-          password: "E2e-Parola-123!",
-        });
-        await expect(tp.getByRole("checkbox").first()).toBeVisible();
-        for (const box of await tp.getByRole("checkbox").all()) await box.check();
-        await tp.getByRole("button", { name: "Onayla" }).click();
-        await tp.waitForURL(/\/m\/[0-9a-f-]{36}/);
-      } finally {
-        await tp.context().close();
-      }
-      engagement = await engagementOf(api, taxpayer.title);
+      // Yeni mükellef: onay iste → mükellef kaydolup onaylar.
+      engagement = await addConsentedTaxpayer(browser, api, taxpayer, "sekme");
 
       for (const f of UBL) {
         const res = await api.upload(`/v1/tenant/engagements/${engagement}/ubl-uploads`, deriveUbl(f, taxpayer.vkn, taxpayer.title));
