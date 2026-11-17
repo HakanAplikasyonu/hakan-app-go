@@ -61,6 +61,7 @@ test.describe("@a11y ofis paneli", () => {
     await uiLogin(page, DEMO.owner);
     const screens = [
       "",
+      "/copilot",
       "/command",
       "/taxpayers",
       "/taxpayer-requests",

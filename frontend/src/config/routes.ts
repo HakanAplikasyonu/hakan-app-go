@@ -129,6 +129,8 @@ export const routes = {
     /** Mükellef raporları: toplu e-posta ve gönderim geçmişi (#386). */
     reports: (slug: string) => `/t/${encodeURIComponent(slug)}/reports`,
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
+    /** Co-pilot: sıradaki iş akışı ve komut çubuğu (#392). */
+    copilot: (slug: string) => `/t/${encodeURIComponent(slug)}/copilot`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */

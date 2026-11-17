@@ -4,6 +4,7 @@ import { useMemo, type ReactNode } from "react";
 
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { shellNav } from "@/config/nav";
+import { CopilotProvider, useOptionalCopilot } from "@/features/copilot";
 import { ImpersonationBanner } from "@/features/auth/components/impersonation-banner";
 import { NotificationLiveBridge } from "@/features/notifications/components/notification-live-bridge";
 import {
@@ -41,35 +42,47 @@ export function OfficeShell({
 
   return (
     <CommandPaletteProvider>
-      <SidebarProvider
-        open={xl}
-        onOpenChange={noop}
-        style={
-          {
-            "--sidebar-width": "240px",
-            "--sidebar-width-icon": "72px",
-          } as React.CSSProperties
-        }
-      >
-        <OfficeMenu
-          catalog={nav.catalog}
-          homeHref={nav.homeHref}
-          counts={counts}
-        />
-        <SidebarInset className="@container/content min-w-0">
-          <OfficeTopbar />
-          <main
-            id="main"
-            className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-4 pb-24 md:px-6 md:pb-8"
-          >
-            <ImpersonationBanner />
-            {children}
-          </main>
-        </SidebarInset>
-        <OfficeTabbar counts={counts} />
-        <NotificationLiveBridge />
-        <CommandPalette catalogs={nav.paletteCatalogs} />
-      </SidebarProvider>
+      <CopilotProvider>
+        <SidebarProvider
+          open={xl}
+          onOpenChange={noop}
+          style={
+            {
+              "--sidebar-width": "240px",
+              "--sidebar-width-icon": "72px",
+            } as React.CSSProperties
+          }
+        >
+          <OfficeMenu
+            catalog={nav.catalog}
+            homeHref={nav.homeHref}
+            counts={counts}
+          />
+          <SidebarInset className="@container/content min-w-0">
+            <OfficeTopbar />
+            <main
+              id="main"
+              className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-4 pb-24 md:px-6 md:pb-8"
+            >
+              <ImpersonationBanner />
+              {children}
+            </main>
+          </SidebarInset>
+          <OfficeTabbar counts={counts} />
+          <NotificationLiveBridge />
+          <OfficeCommandPalette catalogs={nav.paletteCatalogs} />
+        </SidebarProvider>
+      </CopilotProvider>
     </CommandPaletteProvider>
   );
+}
+
+/** ⌘K: pages, records, and "Co-pilot'a sor" for a typed command (#392). */
+function OfficeCommandPalette({
+  catalogs,
+}: {
+  catalogs: ReturnType<typeof shellNav>["paletteCatalogs"];
+}) {
+  const copilot = useOptionalCopilot();
+  return <CommandPalette catalogs={catalogs} onAsk={copilot?.ask} />;
 }
