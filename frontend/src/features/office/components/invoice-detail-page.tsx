@@ -28,6 +28,7 @@ import {
 import { toPanelInvoice } from "../lib/from-api";
 import { AmountWaterfall } from "./amount-waterfall";
 import type { InvoiceLine } from "../types";
+import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
@@ -62,7 +63,10 @@ const REVIEW_DECIDE_PERMISSION = "tenant.review.decide";
 function InvoiceDetailInner({ id }: { id: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const engagement = useSearchParams().get(ENGAGEMENT_PARAM) ?? "";
+  const search = useSearchParams();
+  // Mükellef detayında (#468) mükellef rotadan; genel sayfada ?taxpayer=.
+  const scope = useEngagementScope();
+  const engagement = scope ?? search.get(ENGAGEMENT_PARAM) ?? "";
   const detail = useEngagementInvoice(slug, engagement, id);
   const ubl = useInvoiceUBL(slug, engagement, id, !!detail.data?.has_ubl);
   const { options } = useEngagementOptions(slug);
@@ -72,7 +76,10 @@ function InvoiceDetailInner({ id }: { id: string }) {
   const router = useRouter();
   const suggest = useSuggestInvoiceAccounts();
   const suggestError = useDecisionErrorText();
-  const backHref = `${routes.tenant.invoices(slug)}${engagement ? `?${ENGAGEMENT_PARAM}=${encodeURIComponent(engagement)}` : ""}`;
+  // Geri dönüş listenin süzgeç ve sayfa durumunu korur (URL parametreleri).
+  const backHref = scope
+    ? `${routes.tenant.engagementInvoices(slug, scope)}${carryListParams(search)}`
+    : `${routes.tenant.invoices(slug)}${engagement ? `?${ENGAGEMENT_PARAM}=${encodeURIComponent(engagement)}` : ""}`;
 
   const invoice = useMemo(
     () =>
@@ -112,6 +119,7 @@ function InvoiceDetailInner({ id }: { id: string }) {
         title={d.invoice_number}
         description={`${d.counterparty_name ?? ""} · ${taxpayer?.title ?? ""}`}
         icon={<FileText className="size-6" />}
+        headingLevel={scope ? 2 : 1}
         breadcrumbs={[
           { label: t("office.nav_invoices"), href: backHref },
           { label: d.invoice_number },

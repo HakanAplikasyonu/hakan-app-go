@@ -19,12 +19,16 @@ export const ENGAGEMENT_PARAM = "taxpayer";
  * (?taxpayer=<engagement uuid>) so links keep it; the first one is picked
  * when none is given.
  */
-export function useSelectedEngagement(slug: string) {
+export function useSelectedEngagement(
+  slug: string,
+  /** Mükellef bağlamında sabit mükellef: URL'ye yazılmaz (#468). */
+  fixed?: string | null,
+) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const { options, isLoading, isError } = useEngagementOptions(slug);
-  const wanted = params.get(ENGAGEMENT_PARAM) ?? "";
+  const wanted = fixed || (params.get(ENGAGEMENT_PARAM) ?? "");
   const selected =
     options.find((o) => o.engagement === wanted) ?? options[0] ?? null;
 
@@ -38,10 +42,10 @@ export function useSelectedEngagement(slug: string) {
   };
 
   useEffect(() => {
-    if (!wanted && selected) select(selected.engagement);
+    if (!fixed && !wanted && selected) select(selected.engagement);
     // select depends on params; run only when the default appears.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wanted, selected?.engagement]);
+  }, [fixed, wanted, selected?.engagement]);
 
   return { options, selected, select, isLoading, isError };
 }

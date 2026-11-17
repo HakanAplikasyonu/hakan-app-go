@@ -637,6 +637,7 @@ export function EngagementPetitionsPage({
       title={t("petitions.page_title")}
       description={t("petitions.page_description")}
       permission={permissions.tenant.engagements.read}
+      headingLevel={2}
       forbiddenFallback={
         <ErrorState
           title={t("common.error_forbidden")}

@@ -33,7 +33,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import {
   periodRange,
   useEasytrade,
@@ -43,7 +42,6 @@ import {
   type EasytradeZReport,
 } from "../hooks/use-easytrade";
 import { useOfficePeriod, usePeriodText } from "../period";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 
 /** Senkron aralığı seçenekleri (dakika); "off" yalnızca elle senkron. */
@@ -94,21 +92,18 @@ export function EngagementEasytradePage({
 }) {
   const { t } = useLocale();
   const { focus } = useOfficePeriod();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   const et = useEasytrade(engagement, focus);
 
   return (
     <div className="space-y-5">
       <div className="min-w-0">
-        <h1 className="font-display truncate text-2xl font-bold">
-          {row?.taxpayer_title ?? t("sources.easytrade.title")}
-        </h1>
+        <h2 className="font-display truncate text-xl font-bold">
+          {t("sources.easytrade.title")}
+        </h2>
         <p className="text-text-2 text-sm">
           {t("sources.easytrade.description")}
         </p>
       </div>
-      <EngagementTabs engagement={engagement} />
 
       {et.connections.isLoading ? (
         <div className="space-y-2">

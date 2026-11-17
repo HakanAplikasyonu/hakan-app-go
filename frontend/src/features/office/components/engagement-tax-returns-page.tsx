@@ -34,7 +34,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod } from "../period";
 import {
   TAX_RETURN_KINDS,
@@ -51,7 +50,6 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 
@@ -128,8 +126,6 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
   // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
   const { focus: period, setPeriod } = useOfficePeriod();
   const dates = useDates();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   const listState = useUrlListState({ initialPageSize: 50 });
   const rawKind = listState.getParam("kind") as TaxReturnKind | null;
   const kind: TaxReturnKind =
@@ -210,9 +206,9 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display truncate text-2xl font-bold">
-            {row?.taxpayer_title ?? t("office.tax_returns.title")}
-          </h1>
+          <h2 className="font-display truncate text-xl font-bold">
+            {t("office.tax_returns.title")}
+          </h2>
           <p className="text-text-2 text-sm">
             {t("office.tax_returns.description")}
           </p>
@@ -232,7 +228,6 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
           {t("office.tax_returns.export")}
         </Button>
       </div>
-      <EngagementTabs engagement={engagement} />
 
       <div
         role="group"

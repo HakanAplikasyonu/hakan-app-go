@@ -17,11 +17,11 @@ import { TacRozeti } from "@/components/hakan";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import type { OfficeInvoice } from "../services/office-invoices.service";
 import { directionOf } from "../lib/from-api";
@@ -57,8 +57,9 @@ export function InvoiceStateBadge({ status }: { status: string }) {
 
 type InvoiceRow = OfficeInvoice;
 
-function useInvoiceColumns(slug: string, engagement: string) {
+function useInvoiceColumns(engagement: string) {
   const { t } = useLocale();
+  const invoiceHref = useInvoiceHref();
   return useMemo<ColumnDef<InvoiceRow, unknown>[]>(
     () => [
       createColumn<InvoiceRow>({
@@ -91,7 +92,7 @@ function useInvoiceColumns(slug: string, engagement: string) {
           return (
             <div className="flex items-center gap-1.5">
               <Link
-                href={routes.tenant.invoice(slug, inv.uuid, engagement)}
+                href={invoiceHref(inv.uuid, engagement)}
                 className="hover:underline"
               >
                 <Figure className="font-medium">{inv.invoice_number}</Figure>
@@ -176,16 +177,18 @@ function useInvoiceColumns(slug: string, engagement: string) {
         cell: ({ row }) => <InvoiceStateBadge status={row.original.status} />,
       }),
     ],
-    [engagement, slug, t],
+    [engagement, invoiceHref, t],
   );
 }
 
 function InvoicesInner() {
   const { t } = useLocale();
   const { slug } = useTenant();
+  // Mükellef detayının Faturalar sekmesinde mükellef sabit, seçici yok (#468).
+  const scope = useEngagementScope();
   const { options, selected, select, isLoading, isError } =
-    useSelectedEngagement(slug);
-  const engagement = selected?.engagement ?? "";
+    useSelectedEngagement(slug, scope);
+  const engagement = scope ?? selected?.engagement ?? "";
 
   // Sayfa, sayfa boyutu ve süzgeçler URL'de (#381); çekmecedeki fatura da
   // URL'de (#329): geri tuşu ve paylaşılan bağlantı çalışır.
@@ -202,7 +205,7 @@ function InvoicesInner() {
     limit: listState.params.limit,
     offset: listState.params.offset,
   });
-  const baseColumns = useInvoiceColumns(slug, engagement);
+  const baseColumns = useInvoiceColumns(engagement);
   const columns = useMemo<ColumnDef<InvoiceRow, unknown>[]>(
     () => [
       ...baseColumns,
@@ -235,9 +238,10 @@ function InvoicesInner() {
       title={t("office.invoices_title")}
       description={t("office.invoices_description")}
       icon={<FileText className="size-6" />}
+      headingLevel={scope ? 2 : 1}
     />
   );
-  if (isLoading) {
+  if (!scope && isLoading) {
     return (
       <div className="space-y-4">
         {header}
@@ -245,7 +249,7 @@ function InvoicesInner() {
       </div>
     );
   }
-  if (isError || options.length === 0) {
+  if (!scope && (isError || options.length === 0)) {
     return (
       <div className="space-y-4">
         {header}
@@ -266,11 +270,13 @@ function InvoicesInner() {
     <div className="space-y-4">
       {header}
       <div className="flex flex-wrap gap-3">
-        <EngagementPicker
-          options={options}
-          selected={selected}
-          onSelect={select}
-        />
+        {scope ? null : (
+          <EngagementPicker
+            options={options}
+            selected={selected}
+            onSelect={select}
+          />
+        )}
         <FilterSelect<Dir>
           label={t("office.col_direction")}
           value={direction}

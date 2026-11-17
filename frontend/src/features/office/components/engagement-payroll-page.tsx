@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod, usePeriodText } from "../period";
 import {
   payrollKeys,
@@ -49,7 +48,6 @@ import {
   type PayrollRun,
   type SgkPremium,
 } from "../services/payroll.service";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 
 type View = "runs" | "employees" | "sgk" | "documents";
@@ -100,8 +98,6 @@ function usePeriodLabel() {
  */
 export function EngagementPayrollPage({ engagement }: { engagement: string }) {
   const { t } = useLocale();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   const [view, setView] = useState<View>("runs");
   const icons = {
     runs: FileSpreadsheet,
@@ -113,12 +109,11 @@ export function EngagementPayrollPage({ engagement }: { engagement: string }) {
   return (
     <div className="space-y-5">
       <div className="min-w-0">
-        <h1 className="font-display truncate text-2xl font-bold">
-          {row?.taxpayer_title ?? t("office.payroll.title")}
-        </h1>
+        <h2 className="font-display truncate text-xl font-bold">
+          {t("office.payroll.title")}
+        </h2>
         <p className="text-text-2 text-sm">{t("office.payroll.description")}</p>
       </div>
-      <EngagementTabs engagement={engagement} />
       <div
         role="group"
         aria-label={t("office.payroll.views")}
