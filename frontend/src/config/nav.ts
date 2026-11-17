@@ -5,6 +5,7 @@ import {
   BrainCircuit,
   ChartColumn,
   LifeBuoy,
+  MessageCircle,
   MonitorSmartphone,
   ClipboardCheck,
   FileText,
@@ -376,6 +377,13 @@ export function tenantNav(slug: string): NavCatalog {
             href: routes.tenant.agents(slug),
             icon: MonitorSmartphone,
             permission: permissions.tenant.agents.read,
+          },
+          {
+            id: "whatsapp",
+            titleKey: "office.whatsapp.nav",
+            href: routes.tenant.whatsapp(slug),
+            icon: MessageCircle,
+            permission: permissions.tenant.receipts.read,
           },
           {
             id: "members",

@@ -19,6 +19,8 @@ export function GET() {
     sentryDsn: runtimeEnv("SENTRY_DSN"),
     sentryEnvironment:
       runtimeEnv("SENTRY_ENVIRONMENT") || process.env.NODE_ENV || "",
+    // WhatsApp Web uzantısı (#388): eşleştirme kartında gösterilen API adresi.
+    publicApiUrl: runtimeEnv("PUBLIC_API_URL"),
     clickfix: {
       scriptUrl: runtimeEnv("NEXT_PUBLIC_CLICKFIX_SCRIPT_URL"),
       widgetId: runtimeEnv("NEXT_PUBLIC_CLICKFIX_WIDGET_ID"),

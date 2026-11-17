@@ -955,8 +955,14 @@ jobs:
         run: npm run typecheck
       - name: Test (vitest + jsdom, WhatsApp Web fixture'ları)
         run: npm test
-      - name: Build
-        run: npm run build
+      - name: Paket (zip, mağazaya gönderilmez)
+        run: npm run package
+      - uses: actions/upload-artifact@v5
+        with:
+          name: hakan-whatsapp-uzantisi
+          path: extensions/whatsapp/hakan-whatsapp-*.zip
+          if-no-files-found: error
+          retention-days: 30
 
   desktop:
     needs: changes

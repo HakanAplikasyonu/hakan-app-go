@@ -17,7 +17,7 @@ const out = path.join(root, "frontend/src/features/help/content.generated.ts");
 const imgDir = path.join(root, "frontend/public/yardim/img");
 
 // Sıra: Yardım sayfasındaki sıra. README yalnızca depoda okunur.
-const ORDER = ["ofis-yoneticisi", "ofis-calisani", "mizan-hafizasi", "mukellef", "masaustu"];
+const ORDER = ["ofis-yoneticisi", "ofis-calisani", "mizan-hafizasi", "mukellef", "masaustu", "whatsapp-uzantisi"];
 
 const files = readdirSync(srcDir).filter((f) => f.endsWith(".md") && f !== "README.md");
 const slugs = files.map((f) => f.replace(/\.md$/, ""));
