@@ -20,7 +20,7 @@ const COMMANDS = new Set([
   'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat',
 ]);
 const ALLOWED_ENV = new Set(['MAESTRO_EMAIL', 'MAESTRO_PASSWORD']);
-const ORDER = ['login', 'select-office', 'dashboard', 'review-approve', 'task-create', 'signout'];
+const ORDER = ['login', 'select-office', 'dashboard', 'review-approve', 'task-create', 'client-documents', 'signout'];
 
 function flows() {
   return readdirSync(flowsDir)
@@ -75,6 +75,10 @@ test('the ids the flows tap exist in the screens', () => {
     src('(app)/(tabs)/review/index.tsx'),
     src('(app)/(tabs)/notifications.tsx'),
     src('(app)/tasks/new.tsx'),
+    src('(app)/clients/[engagement].tsx'),
+    src('(app)/belgeler/[engagement].tsx'),
+    src('../features/payroll/payroll-tab.tsx'),
+    src('../features/files/file-row.tsx'),
   ].join('\n');
   // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").
   const has = (id: string) => {

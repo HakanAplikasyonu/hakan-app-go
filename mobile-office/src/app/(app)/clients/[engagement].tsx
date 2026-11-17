@@ -16,6 +16,7 @@ import {
   useRecentReceipts,
 } from '@/features/clients/api';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
+import { visibleTabs } from '@/features/documents/tabs';
 import { taskTitle } from '@/features/doctasks/format';
 import { periodLabel } from '@/features/warnings/format';
 
@@ -34,6 +35,8 @@ export default function ClientDetailScreen() {
   const invoices = useRecentInvoices(engagement, can('tenant.invoices.read'));
   const receipts = useRecentReceipts(engagement, can('tenant.receipts.read'));
   const tasks = useOpenTasks(engagement, can('tenant.doc_tasks.read'));
+
+  const docTabs = visibleTabs(can).tabs;
 
   const ct = contacts.data;
   const phone = telHref(ct?.phone);
@@ -109,6 +112,23 @@ export default function ClientDetailScreen() {
             />
           </View>
         </View>
+      ) : null}
+
+      {docTabs.length ? (
+        <Card>
+          <Text variant="heading">Belgeler</Text>
+          <View style={{ gap: 8 }}>
+            {docTabs.map((t) => (
+              <View key={t.key} testID={`client-documents-${t.key}`}>
+                <Row
+                  title={t.label}
+                  accessibilityLabel={`${t.label} belgelerini aç`}
+                  onPress={() => router.push({ pathname: '/belgeler/[engagement]', params: { engagement, title: ct?.title ?? title ?? '', tab: t.key } })}
+                />
+              </View>
+            ))}
+          </View>
+        </Card>
       ) : null}
 
       {tasks.data ? (

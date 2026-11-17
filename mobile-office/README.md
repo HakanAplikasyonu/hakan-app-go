@@ -33,6 +33,16 @@ EXPO_PUBLIC_API_URL=http://<bilgisayar-ip>:8080 npx expo start
 - Ofisler `GET /v1/auth/me` → `organizations`. Yalnızca ofis üyeliği olan hesap girer; yalnızca mükellef üyeliği olan hesap `denied` ekranında mükellef uygulamasına yönlendirilir.
 - Son kullanılan ofis (üyelik ve erişim sürüyorsa) ya da seçilebilir tek ofis doğrudan açılır; askıdaki veya erişim süresi dolmuş ofis seçilemez. Seçim `GET /v1/tenant/context` (`X-Organization: <slug>`) ile doğrulanır.
 
+## Mükellef belgeleri (#393)
+
+Mükellef ayrıntısındaki **Belgeler** kartı `belgeler/[engagement]` ekranını açar; sekmeler kullanıcının okuma iznine göre görünür:
+
+| Sekme | İzin | Uç |
+|---|---|---|
+| Bordro | `tenant.payroll.read` | `GET .../payroll/runs`, `GET .../payroll/documents` (personel bazında PDF) |
+
+Satıra dokununca belge önizlenir (Android'de varsayılan PDF görüntüleyici, iOS'ta sistem önizlemesi); sağdaki düğme sistem paylaş menüsünü açar (`expo-sharing`). Dosya `X-Organization` ve oturum belirteciyle önbelleğe indirilir (`src/features/files/open.ts`).
+
 ## Bildirimler ve derin bağlantılar (#241)
 
 Push kaydı oturum açılınca yapılır; izin yalnızca ana sayfadaki “Bildirimleri aç” ile istenir. Bildirime dokununca `data.url` (ofis panelinin yolu) uygulama ekranına eşlenir (`src/core/push/links.ts`); bağlantı başka bir ofise aitse önce o ofis seçilir.
@@ -68,7 +78,7 @@ CI'daki `mobile-office` işi tipleri yeniden üretir (işlenmiş dosya eskiyse u
 
 ## Duman testleri ve sürüm (#242)
 
-- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
+- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
 
   ```bash
   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
