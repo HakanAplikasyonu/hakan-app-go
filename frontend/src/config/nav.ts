@@ -3,6 +3,7 @@ import {
   Bell,
   BookOpenCheck,
   BrainCircuit,
+  ChartColumn,
   LifeBuoy,
   MonitorSmartphone,
   ClipboardCheck,
@@ -321,6 +322,12 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.nav_invoices",
             href: routes.tenant.invoices(slug),
             icon: FileText,
+          },
+          {
+            id: "reports",
+            titleKey: "office.nav_reports",
+            href: routes.tenant.reports(slug),
+            icon: ChartColumn,
           },
           {
             id: "account-plan",

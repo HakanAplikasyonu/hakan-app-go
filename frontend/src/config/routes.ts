@@ -126,6 +126,8 @@ export const routes = {
     invoice: (slug: string, id: string, engagement?: string) =>
       `/t/${encodeURIComponent(slug)}/invoices/${encodeURIComponent(id)}${engagement ? `?taxpayer=${encodeURIComponent(engagement)}` : ""}`,
     warnings: (slug: string) => `/t/${encodeURIComponent(slug)}/warnings`,
+    /** Mükellef raporları: toplu e-posta ve gönderim geçmişi (#386). */
+    reports: (slug: string) => `/t/${encodeURIComponent(slug)}/reports`,
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,

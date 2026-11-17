@@ -24,7 +24,7 @@ const MaxBulk = 200
 
 // Handler serves the report routes.
 type Handler struct {
-	q           DeliveryQueries
+	q           ScheduleQueries
 	deliveries  *DeliveryService
 	engagements engagementctx.Resolver
 	now         func() time.Time
@@ -32,7 +32,7 @@ type Handler struct {
 
 // NewHandler builds the handler; engagements resolves the bulk request's
 // engagements (nil: bulk sending answers 404 for every engagement).
-func NewHandler(q DeliveryQueries, engagements engagementctx.Resolver) *Handler {
+func NewHandler(q ScheduleQueries, engagements engagementctx.Resolver) *Handler {
 	return &Handler{q: q, deliveries: NewDeliveryService(q), engagements: engagements, now: time.Now}
 }
 
@@ -217,6 +217,30 @@ func (h *Handler) Bulk(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	response.JSON(w, r, http.StatusAccepted, map[string]any{"items": items, "queued": queued, "skipped": len(items) - queued})
+}
+
+// GetSchedule: GET /v1/tenant/engagements/{engagementUuid}/report/schedule.
+func (h *Handler) GetSchedule(w http.ResponseWriter, r *http.Request) {
+	v, err := h.deliveries.GetSchedule(r.Context(), h.q, engagementctx.Must(r.Context()))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
+}
+
+// PutSchedule: PUT /v1/tenant/engagements/{engagementUuid}/report/schedule.
+func (h *Handler) PutSchedule(w http.ResponseWriter, r *http.Request) {
+	var in ScheduleInput
+	if !decode(w, r, &in) {
+		return
+	}
+	v, err := h.deliveries.PutSchedule(r.Context(), h.q, engagementctx.Must(r.Context()), userID(r), in)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
 }
 
 // Mine: GET /v1/taxpayer/report?period=|year= (mükellef paneli). The

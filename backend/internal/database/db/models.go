@@ -1524,6 +1524,20 @@ type ReportDelivery struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ReportSchedule struct {
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	Enabled        bool               `json:"enabled"`
+	DayOfMonth     int32              `json:"day_of_month"`
+	Recipient      pgtype.Text        `json:"recipient"`
+	LastPeriod     pgtype.Text        `json:"last_period"`
+	LastError      pgtype.Text        `json:"last_error"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RetailSale struct {
 	ID              int64              `json:"id"`
 	Uuid            uuid.UUID          `json:"uuid"`

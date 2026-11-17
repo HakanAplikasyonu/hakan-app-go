@@ -105,6 +105,24 @@ Yevmiye fişi hazırlama, onay ve Luca / Zirve / Excel çıktısı
 [Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-ciktisi)nda
 anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
 
+## Mükellef raporu
+
+Mükellef ayrıntısındaki **Rapor** sekmesi seçtiğiniz ayın ya da yılın
+cirosunu, giderlerini (kategoriye göre), KDV'sini ve gelir-gider trendini
+dört grafikte gösterir. Rakamlar portaldaki faturalardan, onaylı
+masraflardan ve onaylı Z raporlarından hesaplanır; KDV tutarı tahminidir.
+
+- **PDF indir**: mükellefe giden raporun aynısı (ofis adınızla).
+- **E-postayla gönder**: raporu PDF ekiyle mükellefin kayıtlı e-postasına
+  (ya da yazdığınız adrese) gönderir. Dönem yorumu yalnızca onaylıysa
+  eklenir. Gönderimin durumu **Gönderim geçmişi**nde görünür.
+- **Otomatik aylık gönderim**: açarsanız ay kapanınca, seçtiğiniz günden
+  itibaren önceki ayın raporu bir kez kendiliğinden gönderilir.
+
+Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
+**Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.
+E-posta adresi olmayan mükellefler atlanır ve size bildirilir.
+
 ## Sık sorulanlar
 
 - **"Çok fazla deneme" uyarısı:** kısa sürede çok sayıda istek gönderdiniz

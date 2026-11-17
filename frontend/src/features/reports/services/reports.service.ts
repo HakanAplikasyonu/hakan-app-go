@@ -15,6 +15,12 @@ export type ReportDeliveryPage =
 export type ReportBulkResult =
   components["schemas"]["EnvelopeReportBulkResult"]["data"];
 export type PageParams = { limit: number; offset: number };
+export type ReportSchedule = components["schemas"]["ReportSchedule"];
+export type ReportScheduleInput = {
+  enabled: boolean;
+  day_of_month: number;
+  recipient?: string;
+};
 
 /** Bir ay (YYYY-MM) ya da bir takvim yılı (YYYY). */
 export type ReportRange =
@@ -47,6 +53,14 @@ export const reportKeys = {
       "engagements",
       engagement.toLowerCase(),
       "report-deliveries",
+    ] as const,
+  schedule: (slug: string, engagement: string) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "engagements",
+      engagement.toLowerCase(),
+      "report-schedule",
     ] as const,
   officeDeliveries: (slug: string) =>
     ["tenant", slug.toLowerCase(), "report-deliveries"] as const,
@@ -122,6 +136,21 @@ export const reportService = {
       "POST",
       "/v1/tenant/report-deliveries",
       { body: { engagement_uuids: engagements, ...rangeQuery(range) } },
+    );
+  },
+  schedule(slug: string, engagement: string) {
+    return tenantRequest<ReportSchedule>(
+      slug,
+      "GET",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/report/schedule`,
+    );
+  },
+  saveSchedule(slug: string, engagement: string, body: ReportScheduleInput) {
+    return tenantRequest<ReportSchedule>(
+      slug,
+      "PUT",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/report/schedule`,
+      { body, silent: true },
     );
   },
   mine(taxpayer: string, range: ReportRange) {

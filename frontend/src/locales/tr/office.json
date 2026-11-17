@@ -4,6 +4,7 @@
   "nav_invoices": "Faturalar",
   "nav_review": "İnceleme kuyruğu",
   "nav_warnings": "Uyarılar",
+  "nav_reports": "Raporlar",
   "nav_upload": "UBL yükle",
   "home_description": "{{role}} olarak giriş yaptınız · Dönem {{period}}",
   "stat_taxpayers": "Mükellef",

@@ -264,8 +264,10 @@ func main() {
 			}).
 		// Mükellef raporu e-postaları (#386): kuyruğa alınan gönderimler,
 		// bütün ofisler (gerekçeli satır güvenliği atlaması).
-		WithReportDeliveries(systemCount(pool, "reports: deliveries across offices",
-			(&reportsmodule.Sender{Q: database.NewQueries(pool), Mail: mailer, Log: log}).SendDue)).
+		// Önce günü gelen zamanlanmış raporlar kuyruğa yazılır, sonra
+		// kuyruk gönderilir.
+		WithReportDeliveries(systemCount(pool, "reports: schedules and deliveries across offices",
+			reportSweep(database.NewQueries(pool), mailer, log))).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -369,6 +371,20 @@ func main() {
 
 // systemCount runs a cross-office sweep in one rls.System transaction; the
 // sweep's queries (database.NewQueries) join it.
+// reportSweep queues the due scheduled reports, then sends the queue (#386).
+func reportSweep(q *db.Queries, m mail.Sender, log *slog.Logger) func(context.Context) (int, error) {
+	sched := &reportsmodule.Scheduler{Q: q, Log: log}
+	send := &reportsmodule.Sender{Q: q, Mail: m, Log: log}
+	return func(ctx context.Context) (int, error) {
+		if n, err := sched.RunDue(ctx); err != nil {
+			return 0, err
+		} else if n > 0 {
+			log.Info("report_schedules_queued", "queued", n)
+		}
+		return send.SendDue(ctx)
+	}
+}
+
 func systemCount(pool *pgxpool.Pool, reason string, fn func(context.Context) (int, error)) func(context.Context) (int, error) {
 	return func(ctx context.Context) (int, error) {
 		var n int
