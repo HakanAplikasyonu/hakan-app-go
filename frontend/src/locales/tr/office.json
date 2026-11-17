@@ -747,5 +747,21 @@
   "review_api.line_type_service": "Hizmet",
   "review_api.line_type_fixed_asset_candidate": "Demirbaş adayı",
   "review_api.line_type_discount": "İskonto",
-  "review_api.line_type_expense": "Gider"
+  "review_api.line_type_expense": "Gider",
+  "review_grid.view_label": "Görünüm",
+  "review_grid.view_queue": "Kuyruk",
+  "review_grid.view_grid": "Tablo",
+  "review_grid.label": "Hesap kodu önerileri",
+  "review_grid.hint": "Hesap kodunu yazın ya da Excel'den bir kolon yapıştırın. Değişen kod düzeltme olarak kaydedilir; önerilen kodu onaylamak için kararı “Onayla”, reddetmek için “Reddet” yapın. Satırlar tek tek kaydedilir.",
+  "review_grid.col_taxpayer": "Mükellef",
+  "review_grid.col_counterparty": "Karşı taraf",
+  "review_grid.col_item": "Kalem",
+  "review_grid.col_proposed": "Önerilen",
+  "review_grid.col_confidence": "Güven",
+  "review_grid.col_code": "Hesap kodu",
+  "review_grid.col_decision": "Karar",
+  "review_grid.decision_accept": "Onayla",
+  "review_grid.decision_reject": "Reddet",
+  "review_grid.decision_auto": "Koda göre",
+  "review_grid.plan_hint": "Hesap planı önerileri için mükellef seçin."
 }

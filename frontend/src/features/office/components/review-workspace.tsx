@@ -80,6 +80,7 @@ import {
   type ReviewSuggestion,
 } from "../services/review.service";
 import { FilterSelect, Figure } from "./office-ui";
+import { ReviewGrid } from "./review-grid";
 import {
   kindTitle,
   lineTypeLabel,
@@ -1155,6 +1156,7 @@ function ReviewWorkspaceInner() {
         >
           {t("office.review_pending", { count: left })}
         </span>
+        <ReviewViewSwitch view="queue" />
         <div
           role="group"
           aria-label={t("office.review.tier_label")}
@@ -1458,7 +1460,47 @@ function ReviewWorkspaceInner() {
 export function ReviewWorkspace() {
   return (
     <Suspense>
-      <ReviewWorkspaceInner />
+      <ReviewWorkspaceRouter />
     </Suspense>
+  );
+}
+
+/** `?view=grid`: öneri düzeltme ızgarası (#394); aksi halde kuyruk. */
+function ReviewWorkspaceRouter() {
+  const params = useSearchParams();
+  return params.get("view") === "grid" ? (
+    <ReviewGrid viewSwitch={<ReviewViewSwitch view="grid" />} />
+  ) : (
+    <ReviewWorkspaceInner />
+  );
+}
+
+function ReviewViewSwitch({ view }: { view: "queue" | "grid" }) {
+  const { t } = useLocale();
+  return (
+    <div
+      role="group"
+      aria-label={t("office.review_grid.view_label")}
+      className="flex gap-1"
+    >
+      {(
+        [
+          ["queue", "?", t("office.review_grid.view_queue")],
+          ["grid", "?view=grid", t("office.review_grid.view_grid")],
+        ] as const
+      ).map(([value, href, label]) => (
+        <Button
+          key={value}
+          asChild
+          size="sm"
+          variant={view === value ? "secondary" : "ghost"}
+          className="pointer-coarse:h-11"
+        >
+          <Link href={href} aria-current={view === value ? "page" : undefined}>
+            {label}
+          </Link>
+        </Button>
+      ))}
+    </div>
   );
 }

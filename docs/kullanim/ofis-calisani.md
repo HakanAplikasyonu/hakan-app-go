@@ -70,6 +70,21 @@ ile güveni seçtiğiniz değerin üstündeki önerileri topluca onaylayabilirsi
 "Düşük güven" ve "Orta güven" düğmeleri kuyruğu süzer. Reddedilen öneri geri
 alınamaz.
 
+### Tablo görünümü
+
+Çok sayıda kodu bir arada düzeltmek için başlıktaki **Tablo** düğmesine basın.
+Öneriler Excel benzeri bir tabloda listelenir:
+
+- **Hesap kodu** kolonuna yazın ya da Excel'den bir kolonu kopyalayıp
+  yapıştırın (Ctrl+V). Değişen kod düzeltme olarak kaydedilir.
+- **Karar** kolonunda "Onayla" önerilen kodu onaylar, "Reddet" öneriyi
+  reddeder. Ctrl+D seçimin ilk satırını aşağı doldurur; köşedeki küçük kareyi
+  sürükleyerek de doldurabilirsiniz.
+- Ok tuşları, Tab ve Enter ile gezinin; Shift+ok ile aralık seçin. Ctrl+Z geri
+  alır.
+- Satırlar tek tek kaydedilir: Ctrl+S o satırı, **Tümünü kaydet** bütün
+  değişen satırları kaydeder. Hatalı kod kırmızı işaretlenir ve kaydedilmez.
+
 ## Uyarılar
 
 Kontroller (KDV tutarlılığı, eksik ya da silinmiş kayıt, banka eşleşmesi
