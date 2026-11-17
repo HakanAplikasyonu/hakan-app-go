@@ -4,10 +4,16 @@ import { AlertTriangle, Eye, FileDown, FileText, Save } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
-import { EntityPage, EntitySectionCard } from "@/components/entity";
+import {
+  EntityPage,
+  EntitySectionCard,
+  EntityTable,
+} from "@/components/entity";
+import { createActionsColumn, createColumn } from "@/components/tables";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -503,89 +509,101 @@ function PetitionsList({
     }
   }
 
+  const columns = useMemo<ColumnDef<Petition, unknown>[]>(
+    () => [
+      createColumn<Petition>({
+        id: "title",
+        labelKey: "petitions.col_title",
+        accessorFn: (p) =>
+          p.rendered.title ||
+          templates.find((x) => x.key === p.template_key)?.title ||
+          "",
+        gridPrimary: true,
+        cell: ({ row, getValue }) => (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium">{getValue() as string}</span>
+            {row.original.draft ? (
+              <Badge variant="warning">{t("petitions.draft_badge")}</Badge>
+            ) : null}
+          </div>
+        ),
+      }),
+      createColumn<Petition>({
+        id: "subject",
+        labelKey: "petitions.col_subject",
+        accessorFn: (p) => p.rendered.subject,
+        meta: {
+          cellClassName: "text-muted-foreground max-w-[22rem] truncate",
+        },
+      }),
+      createColumn<Petition>({
+        id: "created_at",
+        labelKey: "petitions.col_created",
+        accessorKey: "created_at",
+        gridSecondary: true,
+        meta: { cellClassName: "text-muted-foreground whitespace-nowrap" },
+        // Saatli biçim (dd.MM.yyyy HH:mm) ve altında oluşturan korunur.
+        cell: ({ row }) => (
+          <>
+            {datetime(row.original.created_at, undefined, locale)}
+            {row.original.created_by ? (
+              <span className="block text-xs">{row.original.created_by}</span>
+            ) : null}
+          </>
+        ),
+      }),
+      createActionsColumn<Petition>({
+        labelKey: "petitions.col_actions",
+        cell: (petition) => (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={opening === petition.uuid}
+            onClick={() => void openPdf(petition)}
+          >
+            <FileDown className="size-4" />
+            {t("petitions.pdf_action")}
+          </Button>
+        ),
+      }),
+    ],
+    // openPdf yalnızca slug/engagement'a bağlı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [templates, opening, locale, t, slug, engagement],
+  );
+
   return (
     <EntitySectionCard title={t("petitions.list_title")}>
-      {query.isLoading ? <Loading label={t("common.loading")} /> : null}
-      {query.isError ? (
-        <ErrorState
-          title={t("common.error_generic")}
-          onRetry={() => void query.refetch()}
-          retryLabel={t("common.retry")}
-        />
-      ) : null}
-      {query.data && items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("petitions.list_empty")}
-        </p>
-      ) : null}
-      {items.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("petitions.col_title")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("petitions.col_subject")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("petitions.col_created")}
-                </th>
-                <th className="py-2 text-end font-medium">
-                  <span className="sr-only">{t("petitions.col_actions")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((petition) => {
-                const tpl = templates.find(
-                  (x) => x.key === petition.template_key,
-                );
-                return (
-                  <tr key={petition.uuid} className="border-b last:border-0">
-                    <td className="py-2 pe-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">
-                          {petition.rendered.title || tpl?.title}
-                        </span>
-                        {petition.draft ? (
-                          <Badge variant="warning">
-                            {t("petitions.draft_badge")}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="text-muted-foreground max-w-[22rem] truncate py-2 pe-3">
-                      {petition.rendered.subject}
-                    </td>
-                    <td className="text-muted-foreground py-2 pe-3 whitespace-nowrap">
-                      {datetime(petition.created_at, undefined, locale)}
-                      {petition.created_by ? (
-                        <span className="block text-xs">
-                          {petition.created_by}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="py-2 text-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={opening === petition.uuid}
-                        onClick={() => void openPdf(petition)}
-                      >
-                        <FileDown className="size-4" />
-                        {t("petitions.pdf_action")}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
+      <EntityTable<Petition>
+        columns={columns}
+        data={items}
+        getRowId={(p) => p.uuid}
+        isLoading={query.isLoading}
+        isError={query.isError}
+        errorTitle={t("common.error_generic")}
+        onRetry={() => void query.refetch()}
+        emptyTitle={t("petitions.list_empty")}
+        emptyDescription=""
+        bordered={false}
+        // Sunucu toplam, sıralama ve arama vermiyor: sayfalama aşağıdaki
+        // önceki/sonraki düğmeleriyle (limit/offset) kalır.
+        features={{
+          toolbar: false,
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          facetedFilters: false,
+          rowSelection: false,
+          pagination: false,
+          viewMode: false,
+          columnVisibility: false,
+          columnResizing: false,
+          columnPinning: false,
+          columnOrdering: false,
+          density: false,
+        }}
+      />
       {offset > 0 || hasNext ? (
         <div className="mt-4 flex items-center justify-end gap-2 text-sm">
           <Button
