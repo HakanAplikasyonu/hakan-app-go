@@ -18,7 +18,7 @@ endef
 
 FRONTEND_PORT ?= 3000
 
-.PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo demo-seed perf-seed perf-load \
+.PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo smoke demo-seed perf-seed perf-load \
 	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n check-migrations
 
 infra:
@@ -193,6 +193,11 @@ SA_SURNAME  ?= Admin
 # make demo ARGS=--no-infra. Senaryo: docs/kullanim/demo-senaryosu.md
 demo:
 	@ENV_FILE="$(ENV_FILE)" scripts/demo.sh $(ARGS)
+
+# Pilot demosunun duman testi (#456): API çalışırken ana akışları okuyarak
+# denetler (scripts/smoke.mjs). CI'da scripts/e2e-up.sh sonunda koşar.
+smoke:
+	node scripts/smoke.mjs
 
 # Temiz veritabanında tek komutla demo (#17): göçler + demo ofisi.
 # Baştan kurmak için: make demo-seed ARGS=-reset
