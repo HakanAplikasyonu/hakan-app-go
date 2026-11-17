@@ -11,7 +11,12 @@ import {
   Wand2,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AnimatePresence,
+  motion,
+  useIsPresent,
+  useReducedMotion,
+} from "motion/react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -309,6 +314,9 @@ function CodePicker({
   children: React.ReactNode;
 }) {
   const { t } = useLocale();
+  // Karar kartı çıkış animasyonundayken açık kalan seçici kapanır; yoksa
+  // bir sonraki kartın seçicisiyle üst üste iki arama kutusu görünür (#397).
+  const present = useIsPresent();
   const [q, setQ] = useState("");
   const search = useDeferredValue(q.trim());
   const accounts = useAccountPlanAccounts(engagement, search, open);
@@ -318,11 +326,30 @@ function CodePicker({
   const typed = q.trim();
   const custom =
     ACCOUNT_CODE_RE.test(typed) && !items.some((a) => a.code === typed);
+  // Arama sunucudan sonradan gelir; o arada önceki sonuçlar görünür
+  // (keepPreviousData). Enter yazılan kodu işlesin (#397): tam eşleşen hesap
+  // en üstte (cmdk yazınca ilk öğeyi seçer), liste her değiştiğinde de ilk
+  // öğe yeniden seçilir; yoksa eski seçim yeni listede kalmaz, Enter boşa
+  // düşer ya da eski listenin ilk hesabını ("100 KASA") işler.
+  const exact = items.find((a) => a.code === typed);
+  const shown = exact ? [exact, ...items.filter((a) => a !== exact)] : items;
+  const first = custom ? `custom-${typed}` : (shown[0]?.code ?? "");
+  const listKey = `${first}|${shown.map((a) => a.code).join(",")}`;
+  const [selected, setSelected] = useState(first);
+  const [shownKey, setShownKey] = useState(listKey);
+  if (listKey !== shownKey) {
+    setShownKey(listKey);
+    setSelected(first);
+  }
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={open && present} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>{children}</PopoverAnchor>
       <PopoverContent className="w-96 p-0" align="start">
-        <Command shouldFilter={false}>
+        <Command
+          shouldFilter={false}
+          value={selected}
+          onValueChange={setSelected}
+        >
           <CommandInput
             value={q}
             onValueChange={setQ}
@@ -352,7 +379,7 @@ function CodePicker({
             ) : null}
             {items.length ? (
               <CommandGroup heading={t("office.review_api.plan_accounts")}>
-                {items.map((a) => (
+                {shown.map((a) => (
                   <CommandItem
                     key={a.code}
                     value={a.code}
@@ -372,6 +399,22 @@ function CodePicker({
         {footer ? <div className="border-t p-3">{footer}</div> : null}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Karar kartı. Öneri değişince eski kart çıkış animasyonu boyunca DOM'da
+ * kalır (popLayout); o sürede erişilebilirlik ağacından ve odaktan çıkar,
+ * yoksa ekran okuyucu ve klavye iki "Kodu düzelt" / "Onayla" görür (#397).
+ */
+function PresentArticle(props: React.ComponentProps<typeof motion.article>) {
+  const present = useIsPresent();
+  return (
+    <motion.article
+      {...props}
+      aria-hidden={present ? undefined : true}
+      inert={!present}
+    />
   );
 }
 
@@ -457,6 +500,9 @@ function ReviewWorkspaceInner() {
   /** Decided in this session; hidden until the refetch drops them. */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   const [cursor, setCursor] = useState(0);
+  // Tıklanan öneri kimliğiyle tutulur: liste yeniden gelip sıra değişince
+  // (süzgeç, yenileme) seçim başka bir öneriye kaymaz (#397).
+  const [pinned, setPinned] = useState<string>();
   const [log, setLog] = useState<Decision[]>([]);
   const [picking, setPicking] = useState(false);
   const [ruleOnCorrect, setRuleOnCorrect] = useState(false);
@@ -500,7 +546,10 @@ function ReviewWorkspaceInner() {
         : pending.filter((s) => tierOf(confidenceOf(s)) === tier),
     [pending, tier],
   );
-  const index = Math.min(cursor, Math.max(queue.length - 1, 0));
+  const pinnedAt = pinned ? queue.findIndex((s) => s.uuid === pinned) : -1;
+  if (pinnedAt >= 0 && pinnedAt !== cursor) setCursor(pinnedAt);
+  const index =
+    pinnedAt >= 0 ? pinnedAt : Math.min(cursor, Math.max(queue.length - 1, 0));
   const current = queue[index];
   const currentValue = current ? accountValue(current.proposed_value) : {};
   const canCorrect = !!current && current.kind === ACCOUNT_KIND;
@@ -703,6 +752,7 @@ function ReviewWorkspaceInner() {
   const select = (i: number) => {
     setDirection("skip");
     setCursor(i);
+    setPinned(queue[i]?.uuid);
     setPicking(false);
     if (isMobile) {
       setDetailOpen(true);
@@ -723,9 +773,11 @@ function ReviewWorkspaceInner() {
       const k = e.key.toLowerCase();
       if (k === "j" || e.key === "ArrowDown") {
         setDirection("skip");
+        setPinned(undefined);
         setCursor((c) => Math.min(c + 1, queue.length - 1));
       } else if (e.key === "ArrowUp") {
         setDirection("skip");
+        setPinned(undefined);
         setCursor((c) => Math.max(c - 1, 0));
       } else if (k === "a" || e.key === "Enter") void decide("accepted");
       else if (k === "r" || e.key === "Backspace") void decide("rejected");
@@ -824,7 +876,7 @@ function ReviewWorkspaceInner() {
     const ruleLabel = t("office.review.rule_for_counterparty");
     detail = (
       <AnimatePresence mode="popLayout" initial={false}>
-        <motion.article
+        <PresentArticle
           key={current.uuid}
           aria-labelledby="review-detail-title"
           initial={reduce ? { opacity: 0 } : { opacity: 0, y: 16 }}
@@ -1086,7 +1138,7 @@ function ReviewWorkspaceInner() {
               <Kbd>Z</Kbd> {t("office.review.undo_hint")}
             </span>
           </div>
-        </motion.article>
+        </PresentArticle>
       </AnimatePresence>
     );
   }
@@ -1124,6 +1176,7 @@ function ReviewWorkspaceInner() {
               onClick={() => {
                 setTier(value);
                 setCursor(0);
+                setPinned(undefined);
               }}
             >
               {label}
@@ -1142,6 +1195,7 @@ function ReviewWorkspaceInner() {
             onChange={(v) => {
               setEngagement(v);
               setCursor(0);
+              setPinned(undefined);
             }}
             options={[
               { value: "all", label: t("office.filter_all") },
@@ -1157,6 +1211,7 @@ function ReviewWorkspaceInner() {
             onChange={(v) => {
               setKind(v);
               setCursor(0);
+              setPinned(undefined);
             }}
             options={[
               { value: "all", label: t("office.filter_all") },

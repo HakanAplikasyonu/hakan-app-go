@@ -38,6 +38,10 @@ func TestParseTaxpayerListCSV(t *testing.T) {
 	if bozuk.Valid() || bozuk.Errors[0].Field != "tax_id" || bozuk.Errors[0].Code != RowErrInvalid {
 		t.Errorf("bad check digit = %+v", bozuk)
 	}
+	// Ofis Türkçe gerekçe görür; Go hata zinciri ("invalid request: tax_id: …") değil (#397).
+	if got, want := bozuk.Errors[0].Message, "VKN/TCKN geçersiz: sağlama hanesi tutmuyor"; got != want {
+		t.Errorf("bad check digit message = %q, want %q", got, want)
+	}
 	if epostasiz.Valid() || epostasiz.Errors[0].Field != "contact_email" || epostasiz.Errors[0].Code != RowErrRequired {
 		t.Errorf("no email = %+v", epostasiz)
 	}
@@ -84,5 +88,30 @@ func TestParseTaxpayerListErrors(t *testing.T) {
 	}
 	if _, err := ParseTaxpayerList("x.csv", []byte(b.String())); !errors.Is(err, ErrImportTooLarge) {
 		t.Errorf("too large: %v", err)
+	}
+}
+
+func TestValidationMessageTurkish(t *testing.T) {
+	cases := []struct {
+		in   CreateInput
+		want string
+	}{
+		{CreateInput{Kind: KindLegal, TaxID: "123", Title: "A"}, "VKN 10, TCKN 11 haneli olmalı"},
+		{CreateInput{Kind: KindLegal, TaxID: "1234567891", Title: "A"}, "VKN/TCKN geçersiz: sağlama hanesi tutmuyor"},
+		{CreateInput{Kind: KindLegal, TaxID: "10000000146", Title: "A"}, "tüzel kişi için 10 haneli VKN gerekli"},
+		{CreateInput{Kind: KindLegal, TaxID: "1234567890", Title: strings.Repeat("a", maxTitleLen+1)}, "unvan boş ya da 255 karakterden uzun"},
+		{CreateInput{Kind: KindLegal, TaxID: "1234567890", Title: "A", TaxOffice: strings.Repeat("a", maxTaxOfficeLen+1)}, "vergi dairesi en çok 128 karakter olabilir"},
+	}
+	for _, c := range cases {
+		_, _, err := Validate(c.in)
+		if err == nil {
+			t.Fatalf("Validate(%+v) = nil", c.in)
+		}
+		if !errors.Is(err, ErrInvalidRequest) {
+			t.Errorf("Validate(%+v) = %v, not ErrInvalidRequest", c.in, err)
+		}
+		if got := validationMessage(err); got != c.want {
+			t.Errorf("validationMessage(%v) = %q, want %q", err, got, c.want)
+		}
 	}
 }

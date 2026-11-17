@@ -39,6 +39,12 @@ var (
 	ErrInvalidRequest = errors.New("taxpayers: invalid request")
 	ErrAlreadyExists  = errors.New("taxpayers: tax id already registered")
 	ErrNotFound       = errors.New("taxpayers: not found")
+
+	// Validate's causes, wrapped under ErrInvalidRequest. The bulk import
+	// shows each one to the office in Turkish (rowMessage, #397).
+	errLegalNeedsVKN = errors.New("a legal entity needs a 10-digit VKN")
+	errTitle         = fmt.Errorf("title is required (max %d characters)", maxTitleLen)
+	errTaxOfficeLen  = fmt.Errorf("tax_office is too long (max %d characters)", maxTaxOfficeLen)
 )
 
 // Taxpayer is the API shape of a taxpayer identity.
@@ -91,18 +97,18 @@ func Validate(in CreateInput) (CreateInput, taxid.Type, error) {
 	}
 	n, typ, err := taxid.Parse(in.TaxID)
 	if err != nil {
-		return in, "", fmt.Errorf("%w: tax_id: %s", ErrInvalidRequest, err.Error())
+		return in, "", fmt.Errorf("%w: tax_id: %w", ErrInvalidRequest, err)
 	}
 	if kind == KindLegal && typ != taxid.VKN {
-		return in, "", fmt.Errorf("%w: a legal entity needs a 10-digit VKN", ErrInvalidRequest)
+		return in, "", fmt.Errorf("%w: %w", ErrInvalidRequest, errLegalNeedsVKN)
 	}
 	title := strings.Join(strings.Fields(in.Title), " ")
 	if title == "" || utf8.RuneCountInString(title) > maxTitleLen {
-		return in, "", fmt.Errorf("%w: title is required (max %d characters)", ErrInvalidRequest, maxTitleLen)
+		return in, "", fmt.Errorf("%w: %w", ErrInvalidRequest, errTitle)
 	}
 	office := strings.Join(strings.Fields(in.TaxOffice), " ")
 	if utf8.RuneCountInString(office) > maxTaxOfficeLen {
-		return in, "", fmt.Errorf("%w: tax_office is too long (max %d characters)", ErrInvalidRequest, maxTaxOfficeLen)
+		return in, "", fmt.Errorf("%w: %w", ErrInvalidRequest, errTaxOfficeLen)
 	}
 	return CreateInput{Kind: kind, TaxID: n, Title: title, TaxOffice: office}, typ, nil
 }
@@ -181,14 +187,14 @@ func (s *Service) Patch(ctx context.Context, id uuid.UUID, in PatchInput) (Taxpa
 	if in.Title != nil {
 		t := strings.Join(strings.Fields(*in.Title), " ")
 		if t == "" || utf8.RuneCountInString(t) > maxTitleLen {
-			return Taxpayer{}, fmt.Errorf("%w: title is required (max %d characters)", ErrInvalidRequest, maxTitleLen)
+			return Taxpayer{}, fmt.Errorf("%w: %w", ErrInvalidRequest, errTitle)
 		}
 		params.Title = pgtype.Text{String: t, Valid: true}
 	}
 	if in.TaxOffice != nil {
 		o := strings.Join(strings.Fields(*in.TaxOffice), " ")
 		if utf8.RuneCountInString(o) > maxTaxOfficeLen {
-			return Taxpayer{}, fmt.Errorf("%w: tax_office is too long (max %d characters)", ErrInvalidRequest, maxTaxOfficeLen)
+			return Taxpayer{}, fmt.Errorf("%w: %w", ErrInvalidRequest, errTaxOfficeLen)
 		}
 		params.TaxOffice = pgtype.Text{String: o, Valid: true}
 	}
