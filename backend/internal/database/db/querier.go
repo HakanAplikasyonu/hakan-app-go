@@ -70,6 +70,19 @@ type Querier interface {
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
+	// Dönemin banka hareketleri, banka eşleştirme ekranındaki durumlarla
+	// (CountBankPostings): önerisiz, önerili, onaylı (fişe girmemiş), fişte.
+	CopilotBankCounts(ctx context.Context, arg CopilotBankCountsParams) ([]CopilotBankCountsRow, error)
+	// Dönemin açık (istenmiş, henüz eşleşmemiş) belge talepleri.
+	CopilotDocumentTaskCounts(ctx context.Context, arg CopilotDocumentTaskCountsParams) ([]CopilotDocumentTaskCountsRow, error)
+	CopilotJournalCounts(ctx context.Context, arg CopilotJournalCountsParams) ([]CopilotJournalCountsRow, error)
+	CopilotReportCounts(ctx context.Context, arg CopilotReportCountsParams) ([]CopilotReportCountsRow, error)
+	// Dönemin bekleyen inceleme önerileri; banka hesabı önerileri banka adımında
+	// sayılır.
+	CopilotSuggestionCounts(ctx context.Context, arg CopilotSuggestionCountsParams) ([]CopilotSuggestionCountsRow, error)
+	// Dönemin çıktılarının muhasebe programına aktarımları: her çıktının son
+	// aktarımı sayılır.
+	CopilotTransferCounts(ctx context.Context, arg CopilotTransferCountsParams) ([]CopilotTransferCountsRow, error)
 	CopyOfficeAccountRules(ctx context.Context, arg CopyOfficeAccountRulesParams) (int32, error)
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
 	CountAccountingTransfers(ctx context.Context, arg CountAccountingTransfersParams) (int64, error)
@@ -84,6 +97,8 @@ type Querier interface {
 	CountBankTransactionMatches(ctx context.Context, arg CountBankTransactionMatchesParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
+	// tenant-lint: org-wide sıradaki iş listesi sayımı; ListCopilotEngagements ile aynı süzgeç
+	CountCopilotEngagements(ctx context.Context, arg CountCopilotEngagementsParams) (int64, error)
 	CountDocumentTasks(ctx context.Context, arg CountDocumentTasksParams) (int64, error)
 	CountEmployees(ctx context.Context, taxpayerID int64) (CountEmployeesRow, error)
 	// Görünürlük yalnızca tarihe bağlı olduğundan her farklı tarih için bir kez
@@ -355,6 +370,9 @@ type Querier interface {
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
+	GetCopilotEngagement(ctx context.Context, arg GetCopilotEngagementParams) (GetCopilotEngagementRow, error)
+	GetCopilotPlan(ctx context.Context, arg GetCopilotPlanParams) (CopilotPlan, error)
+	GetCopilotPlanForUpdate(ctx context.Context, arg GetCopilotPlanForUpdateParams) (CopilotPlan, error)
 	// Cari hafızası (#319): karşı tarafın VKN'si ile hatırlanan cari hesap.
 	GetCounterpartyAccount(ctx context.Context, arg GetCounterpartyAccountParams) (GetCounterpartyAccountRow, error)
 	// KVKK hukuki metinleri ve onaylar (issue #57). Platform geneli tablolar;
@@ -547,6 +565,7 @@ type Querier interface {
 	// Banka hareketi modeli (#20). Bütün sorgular mükellef kapsamında (taxpayer_id).
 	InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (CashBox, error)
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
+	InsertCopilotPlan(ctx context.Context, arg InsertCopilotPlanParams) (CopilotPlan, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertDocumentTaskUpload(ctx context.Context, arg InsertDocumentTaskUploadParams) (DocumentTaskUpload, error)
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
@@ -679,6 +698,10 @@ type Querier interface {
 	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
 	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
 	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)
+	// Co-pilot: sıradaki iş akışı ve onaylı aksiyon planları (issue #392).
+	// tenant-lint: org-wide sıradaki iş listesi; read_all yoksa engagement_assignments ile süzülür
+	ListCopilotEngagements(ctx context.Context, arg ListCopilotEngagementsParams) ([]ListCopilotEngagementsRow, error)
+	ListCopilotPlans(ctx context.Context, arg ListCopilotPlansParams) ([]CopilotPlan, error)
 	ListCurrentLegalDocuments(ctx context.Context, language string) ([]LegalDocument, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
@@ -1179,6 +1202,7 @@ type Querier interface {
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	UpdateCopilotPlan(ctx context.Context, arg UpdateCopilotPlanParams) (CopilotPlan, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
 	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
 	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)

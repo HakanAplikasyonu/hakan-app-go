@@ -51,6 +51,7 @@ import (
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	copilotmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/copilot"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
@@ -659,6 +660,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		summaries:    summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Mükellef raporu (#386).
 		reports: reportsmodule.NewHandler(deps.Queries, engagementResolver),
+		// Co-pilot (#392): planlayıcı AI varsa onu, yoksa kural tabanlı çözümleyiciyi kullanır.
+		copilot: newCopilotHandler(deps.Queries, aiSvc, log),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
 		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
 		legal:         legalhandler.New(legalSvc),
@@ -856,4 +859,9 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+func newCopilotHandler(q copilotmodule.Queries, ai copilotmodule.AI, log *slog.Logger) *copilotmodule.Handler {
+	svc := copilotmodule.NewService(q)
+	return copilotmodule.NewHandler(svc, copilotmodule.NewPlans(svc, copilotmodule.NewAIPlanner(ai), log))
 }
