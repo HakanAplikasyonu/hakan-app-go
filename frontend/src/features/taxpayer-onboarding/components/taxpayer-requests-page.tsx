@@ -1,14 +1,25 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { MailCheck, Send } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { StatusChip } from "@/components/common/status-chip";
-import { EntityPage, EntitySectionCard } from "@/components/entity";
+import {
+  EntityPage,
+  EntitySectionCard,
+  EntityTable,
+  useUrlListState,
+} from "@/components/entity";
 import { AppForm, AppInput, AppSelect } from "@/components/forms";
+import {
+  createActionsColumn,
+  createColumn,
+  createDateColumn,
+} from "@/components/tables";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
@@ -29,7 +40,6 @@ import type {
   TaxpayerKind,
   TaxpayerRequest,
 } from "@/features/taxpayer-onboarding/services/taxpayer-onboarding.service";
-import { date } from "@/lib/utils/format";
 import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
@@ -155,14 +165,9 @@ function AddTaxpayerForm() {
   );
 }
 
-function RequestRow({
-  request,
-  canWrite,
-}: {
-  request: TaxpayerRequest;
-  canWrite: boolean;
-}) {
-  const { t, locale } = useLocale();
+/** Bekleyen talebi iptal eder; onay penceresi ve bekleme durumu satır başına. */
+function CancelRequestButton({ request }: { request: TaxpayerRequest }) {
+  const { t } = useLocale();
   const { slug } = useTenant();
   const { confirm } = useDialogs();
   const cancel = useCancelTaxpayerRequest(slug);
@@ -177,133 +182,126 @@ function RequestRow({
   };
 
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pe-3">
-        <div className="font-medium">{request.title}</div>
-        <div className="text-muted-foreground text-xs">
-          {t(KIND_LABEL_KEYS[request.kind])}
-          {" · "}
-          <span className="font-mono">{request.tax_id}</span>
-        </div>
-      </td>
-      <td className="py-2 pe-3">{request.contact_email}</td>
-      <td className="py-2 pe-3">
-        <StatusChip
-          label={t(REQUEST_STATUS_LABEL_KEYS[request.status])}
-          tone={REQUEST_STATUS_TONES[request.status]}
-        />
-      </td>
-      <td className="text-muted-foreground py-2 pe-3">
-        {date(request.created_at, "dd.MM.yyyy", locale)}
-      </td>
-      <td className="text-muted-foreground py-2 pe-3">
-        {request.status === "pending"
-          ? date(request.expires_at, "dd.MM.yyyy", locale)
-          : "—"}
-      </td>
-      <td className="py-2 text-end">
-        {canWrite && request.status === "pending" ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={cancel.isPending}
-            onClick={() => void onCancel()}
-          >
-            {t("onboarding.cancel")}
-          </Button>
-        ) : null}
-      </td>
-    </tr>
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      disabled={cancel.isPending}
+      onClick={() => void onCancel()}
+    >
+      {t("onboarding.cancel")}
+    </Button>
+  );
+}
+
+function useRequestColumns(canWrite: boolean) {
+  const { t } = useLocale();
+  return useMemo<ColumnDef<TaxpayerRequest, unknown>[]>(
+    () => [
+      createColumn<TaxpayerRequest>({
+        id: "taxpayer",
+        labelKey: "onboarding.col_taxpayer",
+        accessorKey: "title",
+        gridPrimary: true,
+        cell: ({ row }) => (
+          <>
+            <div className="font-medium">{row.original.title}</div>
+            <div className="text-muted-foreground text-xs">
+              {t(KIND_LABEL_KEYS[row.original.kind])}
+              {" · "}
+              <span className="font-mono">{row.original.tax_id}</span>
+            </div>
+          </>
+        ),
+      }),
+      createColumn<TaxpayerRequest>({
+        id: "contact_email",
+        labelKey: "onboarding.col_email",
+        accessorKey: "contact_email",
+        gridSecondary: true,
+      }),
+      createColumn<TaxpayerRequest>({
+        id: "status",
+        labelKey: "onboarding.col_status",
+        accessorKey: "status",
+        cell: ({ row }) => (
+          <StatusChip
+            label={t(REQUEST_STATUS_LABEL_KEYS[row.original.status])}
+            tone={REQUEST_STATUS_TONES[row.original.status]}
+          />
+        ),
+      }),
+      createDateColumn<TaxpayerRequest>({
+        id: "created_at",
+        labelKey: "onboarding.col_created",
+        accessor: (r) => r.created_at,
+        className: "text-muted-foreground",
+      }),
+      createDateColumn<TaxpayerRequest>({
+        id: "expires_at",
+        labelKey: "onboarding.col_expires",
+        // Süre yalnızca bekleyen talepte anlamlı; diğerlerinde "—".
+        accessor: (r) => (r.status === "pending" ? r.expires_at : null),
+        className: "text-muted-foreground",
+      }),
+      createActionsColumn<TaxpayerRequest>({
+        cell: (r) =>
+          canWrite && r.status === "pending" ? (
+            <CancelRequestButton request={r} />
+          ) : null,
+      }),
+    ],
+    [canWrite, t],
   );
 }
 
 function RequestsSection({ canWrite }: { canWrite: boolean }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const [offset, setOffset] = useState(0);
-  const query = useOfficeTaxpayerRequests(slug, { limit: PAGE_SIZE, offset });
-  const items = query.data?.items ?? [];
+  // Sayfa ve sayfa boyutu URL'de (#381).
+  const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
+  const query = useOfficeTaxpayerRequests(slug, {
+    limit: listState.params.limit,
+    offset: listState.params.offset,
+  });
   const total = query.data?.total ?? 0;
+  const columns = useRequestColumns(canWrite);
 
   return (
     <EntitySectionCard title={t("onboarding.list_title")} badge={total}>
       <p className="text-muted-foreground mb-4 text-sm">
         {t("onboarding.list_description")}
       </p>
-      {query.isLoading ? <Loading label={t("common.loading")} /> : null}
-      {query.isError ? (
-        <ErrorState
-          title={t("common.error_generic")}
-          onRetry={() => void query.refetch()}
-          retryLabel={t("common.retry")}
-        />
-      ) : null}
-      {query.data && items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("onboarding.list_empty")}
-        </p>
-      ) : null}
-      {items.length ? (
-        <div className="relative overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("onboarding.col_taxpayer")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("onboarding.col_email")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("onboarding.col_status")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("onboarding.col_created")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("onboarding.col_expires")}
-                </th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((r) => (
-                <RequestRow key={r.uuid} request={r} canWrite={canWrite} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      {total > PAGE_SIZE ? (
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-          <span className="text-muted-foreground">
-            {t("onboarding.list_range", {
-              from: offset + 1,
-              to: Math.min(offset + PAGE_SIZE, total),
-              total,
-            })}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={offset === 0 || query.isFetching}
-            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-          >
-            {t("onboarding.list_prev")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={offset + PAGE_SIZE >= total || query.isFetching}
-            onClick={() => setOffset((o) => o + PAGE_SIZE)}
-          >
-            {t("onboarding.list_next")}
-          </Button>
-        </div>
-      ) : null}
+      <EntityTable<TaxpayerRequest>
+        columns={columns}
+        data={query.data?.items ?? []}
+        getRowId={(r) => r.uuid}
+        isLoading={query.isLoading}
+        isError={query.isError}
+        errorTitle={t("common.error_generic")}
+        onRetry={() => void query.refetch()}
+        emptyTitle={t("onboarding.list_empty")}
+        emptyDescription=""
+        state={listState.tableState}
+        rowCount={total}
+        pageSizeOptions={[25, 50, 100]}
+        bordered={false}
+        // Sunucu sıralama ve arama sunmuyor; yalnızca sayfalama.
+        features={{
+          toolbar: false,
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          columnVisibility: false,
+          columnResizing: false,
+          columnPinning: false,
+          columnOrdering: false,
+          rowSelection: false,
+          density: false,
+          viewMode: false,
+          facetedFilters: false,
+        }}
+      />
     </EntitySectionCard>
   );
 }
@@ -343,7 +341,9 @@ export function TaxpayerRequestsPage() {
             <AddTaxpayerForm />
           </EntitySectionCard>
         ) : null}
-        <RequestsSection canWrite={canWrite} />
+        <Suspense fallback={<Loading label={t("common.loading")} />}>
+          <RequestsSection canWrite={canWrite} />
+        </Suspense>
       </div>
     </EntityPage>
   );

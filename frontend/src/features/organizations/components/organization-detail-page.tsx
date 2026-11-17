@@ -1,5 +1,6 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { Building2, Pause, Play, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -20,6 +21,12 @@ import {
   AppInput,
   AppSelect,
 } from "@/components/forms";
+import {
+  DataTable,
+  createActionsColumn,
+  createColumn,
+  createDateColumn,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -290,7 +297,7 @@ function AccessSection({
   );
 }
 
-function MemberRow({
+function MemberRoleCell({
   orgUuid,
   member,
   canWrite,
@@ -299,9 +306,43 @@ function MemberRow({
   member: OrganizationMember;
   canWrite: boolean;
 }) {
-  const { t, locale } = useLocale();
-  const { confirmDelete } = useDialogs();
+  const { t } = useLocale();
   const changeRole = useChangeOrganizationMemberRole(orgUuid);
+  if (!canWrite) return <>{roleLabel(t, member.role.key, member.role.name)}</>;
+  return (
+    <Select
+      value={member.role.key}
+      disabled={changeRole.isPending}
+      onValueChange={(roleKey) =>
+        changeRole.mutate({ userUuid: member.user.uuid, roleKey })
+      }
+    >
+      <SelectTrigger
+        className="h-8 w-36"
+        aria-label={t("organizations.members_role")}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {TENANT_ROLE_KEYS.map((key) => (
+          <SelectItem key={key} value={key}>
+            {t(TENANT_ROLE_LABEL_KEYS[key])}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function MemberRemoveButton({
+  orgUuid,
+  member,
+}: {
+  orgUuid: string;
+  member: OrganizationMember;
+}) {
+  const { t } = useLocale();
+  const { confirmDelete } = useDialogs();
   const remove = useRemoveOrganizationMember(orgUuid);
   const fullName = `${member.user.name} ${member.user.surname}`.trim();
 
@@ -315,55 +356,96 @@ function MemberRow({
   };
 
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pe-3">
-        <div className="font-medium">{fullName}</div>
-        <div className="text-muted-foreground text-xs">{member.user.email}</div>
-      </td>
-      <td className="py-2 pe-3">
-        {canWrite ? (
-          <Select
-            value={member.role.key}
-            disabled={changeRole.isPending}
-            onValueChange={(roleKey) =>
-              changeRole.mutate({ userUuid: member.user.uuid, roleKey })
-            }
-          >
-            <SelectTrigger
-              className="h-8 w-36"
-              aria-label={t("organizations.members_role")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TENANT_ROLE_KEYS.map((key) => (
-                <SelectItem key={key} value={key}>
-                  {t(TENANT_ROLE_LABEL_KEYS[key])}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          roleLabel(t, member.role.key, member.role.name)
-        )}
-      </td>
-      <td className="text-muted-foreground py-2 pe-3 text-sm">
-        {date(member.created_at, "dd.MM.yyyy", locale)}
-      </td>
-      <td className="py-2 text-end">
-        {canWrite ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={remove.isPending}
-            onClick={() => void onRemove()}
-          >
-            {t("organizations.members_remove")}
-          </Button>
-        ) : null}
-      </td>
-    </tr>
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      disabled={remove.isPending}
+      onClick={() => void onRemove()}
+    >
+      {t("organizations.members_remove")}
+    </Button>
+  );
+}
+
+function MembersTable({
+  orgUuid,
+  members,
+  canWrite,
+}: {
+  orgUuid: string;
+  members: OrganizationMember[];
+  canWrite: boolean;
+}) {
+  const columns = useMemo<ColumnDef<OrganizationMember, unknown>[]>(
+    () => [
+      createColumn<OrganizationMember>({
+        id: "user",
+        labelKey: "organizations.members_user",
+        accessorFn: (m) => `${m.user.name} ${m.user.surname}`.trim(),
+        gridPrimary: true,
+        cell: ({ row, getValue }) => (
+          <>
+            <div className="font-medium">{String(getValue())}</div>
+            <div className="text-muted-foreground text-xs">
+              {row.original.user.email}
+            </div>
+          </>
+        ),
+      }),
+      createColumn<OrganizationMember>({
+        id: "role",
+        labelKey: "organizations.members_role",
+        accessorFn: (m) => m.role.key,
+        cell: ({ row }) => (
+          <MemberRoleCell
+            orgUuid={orgUuid}
+            member={row.original}
+            canWrite={canWrite}
+          />
+        ),
+      }),
+      createDateColumn<OrganizationMember>({
+        id: "created_at",
+        labelKey: "organizations.members_since",
+        accessor: (m) => m.created_at,
+        className: "text-muted-foreground",
+      }),
+      ...(canWrite
+        ? [
+            createActionsColumn<OrganizationMember>({
+              cell: (member) => (
+                <MemberRemoveButton orgUuid={orgUuid} member={member} />
+              ),
+            }),
+          ]
+        : []),
+    ],
+    [canWrite, orgUuid],
+  );
+
+  return (
+    <DataTable<OrganizationMember>
+      columns={columns}
+      data={members}
+      getRowId={(m) => m.user.uuid}
+      bordered={false}
+      // Gömülü küçük liste: yalnızca sıralama açık.
+      features={{
+        toolbar: false,
+        pagination: false,
+        rowSelection: false,
+        columnFilters: false,
+        globalFilter: false,
+        facetedFilters: false,
+        viewMode: false,
+        columnVisibility: false,
+        columnResizing: false,
+        columnPinning: false,
+        columnOrdering: false,
+        density: false,
+      }}
+    />
   );
 }
 
@@ -446,34 +528,11 @@ function MembersSection({
         </p>
       ) : null}
       {members.length ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-start text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("organizations.members_user")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("organizations.members_role")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("organizations.members_since")}
-                </th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((member) => (
-                <MemberRow
-                  key={member.user.uuid}
-                  orgUuid={org.uuid}
-                  member={member}
-                  canWrite={canWrite}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <MembersTable
+          orgUuid={org.uuid}
+          members={members}
+          canWrite={canWrite}
+        />
       ) : null}
     </EntitySectionCard>
   );

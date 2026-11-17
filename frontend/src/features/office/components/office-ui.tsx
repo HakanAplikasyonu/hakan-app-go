@@ -143,19 +143,6 @@ export function Panel({
   );
 }
 
-/** Yatay kayan, sade tablo kabı. */
-export function TableBox({ children }: { children: ReactNode }) {
-  return (
-    // relative: içteki sr-only (absolute) öğeler kaydırma kutusundan taşıp
-    // sayfayı yatay kaydırmasın (#367).
-    <div className="relative overflow-x-auto">
-      <table className="[&_th]:text-muted-foreground w-full text-sm [&_tbody_tr]:border-b [&_tbody_tr:last-child]:border-0 [&_td]:px-4 [&_td]:py-2.5 [&_th]:px-4 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-medium [&_thead]:border-b">
-        {children}
-      </table>
-    </div>
-  );
-}
-
 export function FilterSelect<T extends string>({
   label,
   value,
