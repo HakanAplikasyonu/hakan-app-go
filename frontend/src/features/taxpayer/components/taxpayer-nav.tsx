@@ -49,6 +49,10 @@ export function TaxpayerNav({ taxpayer }: { taxpayer: string }) {
       label: t("taxpayer.nav_uploads"),
     },
     {
+      href: routes.taxpayer.report(taxpayer),
+      label: t("taxpayer.nav_report"),
+    },
+    {
       // Kullanım kılavuzu (#274).
       href: routes.help.guide("mukellef"),
       label: t("help.nav"),

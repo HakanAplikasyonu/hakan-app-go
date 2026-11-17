@@ -25,6 +25,7 @@ import enOnboarding from "@/locales/en/onboarding.json";
 import enOrganizations from "@/locales/en/organizations.json";
 import enPermissions from "@/locales/en/permissions.json";
 import enPetitions from "@/locales/en/petitions.json";
+import enReports from "@/locales/en/reports.json";
 import enRoles from "@/locales/en/roles.json";
 import enSearch from "@/locales/en/search.json";
 import enErrors from "@/locales/en/errors.json";
@@ -62,6 +63,7 @@ import trOnboarding from "@/locales/tr/onboarding.json";
 import trOrganizations from "@/locales/tr/organizations.json";
 import trPermissions from "@/locales/tr/permissions.json";
 import trPetitions from "@/locales/tr/petitions.json";
+import trReports from "@/locales/tr/reports.json";
 import trRoles from "@/locales/tr/roles.json";
 import trSearch from "@/locales/tr/search.json";
 import trErrors from "@/locales/tr/errors.json";
@@ -115,6 +117,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: trHelp,
     legal: trLegal,
     petitions: trPetitions,
+    reports: trReports,
     setup: trSetup,
   },
   en: {
@@ -154,6 +157,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     help: enHelp,
     legal: enLegal,
     petitions: enPetitions,
+    reports: enReports,
     setup: enSetup,
   },
 };

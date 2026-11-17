@@ -47,6 +47,11 @@
   --dur-base: 200ms;
   --dur-slow: 320ms;
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* Rapor grafikleri (#386): gelir, gider, net. Doğrulanmış kategorik
+     palet (CVD ve kontrast denetimi geçti); markadan bağımsız. */
+  --viz-revenue: #2a78d6;
+  --viz-expense: #eb6834;
+  --viz-net: #1baf7a;
 }
 [data-theme="m3-dark"] {
   --bg: #0a0a0a;
@@ -78,6 +83,10 @@
   --focus: #93a5ff;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  /* Rapor grafikleri (#386): koyu yüzey için adımlanmış aynı tonlar. */
+  --viz-revenue: #3987e5;
+  --viz-expense: #d95926;
+  --viz-net: #199e70;
 }
 [data-theme="n3-light"] {
   --bg: #f3f3f5;
@@ -107,6 +116,11 @@
   --info: #0a0a0a;
   --info-tint: #ededf1;
   --focus: #0a0a0a;
+  /* Rapor grafikleri (#386): gelir, gider, net. Doğrulanmış kategorik
+     palet (CVD ve kontrast denetimi geçti); markadan bağımsız. */
+  --viz-revenue: #2a78d6;
+  --viz-expense: #eb6834;
+  --viz-net: #1baf7a;
 }
 [data-theme="n3-dark"] {
   --bg: #0a0a0a;
@@ -138,6 +152,10 @@
   --focus: #01ff11;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+  /* Rapor grafikleri (#386): koyu yüzey için adımlanmış aynı tonlar. */
+  --viz-revenue: #3987e5;
+  --viz-expense: #d95926;
+  --viz-net: #199e70;
 }
 @media (prefers-reduced-motion: reduce) {
   :root {

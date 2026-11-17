@@ -73,6 +73,10 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
       href: routes.tenant.engagementPetitions(slug, engagement),
       label: t("office.engagement.tab_petitions"),
     },
+    {
+      href: routes.tenant.engagementReport(slug, engagement),
+      label: t("office.engagement.tab_report"),
+    },
   ];
   return (
     <nav
