@@ -68,6 +68,12 @@ func seedJournals(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.S
 			{Account: "100.01", Description: "Kasa", Credit: amt("1250.00")},
 		}},
 	}
+	// Çift kayıt koruması (#466): demo ofisinin Luca'sı İşNet faturalarını
+	// kendisi çekiyor. Demo fişleri faturadan değil; ayar ekranda görünür ve
+	// İşNet faturasından kesilen bir fiş Luca çıktısına onaysız girmez.
+	if _, err := svc.SaveOfficeSettings(ctx, scope.OrganizationID, actor, journals.OfficeSettings{LucaPullIntegrators: []string{"isnet"}}); err != nil {
+		return fmt.Errorf("office export settings: %w", err)
+	}
 	var ids []uuid.UUID
 	for _, v := range vouchers {
 		d, err := svc.CreateDraft(ctx, scope, actor, v)

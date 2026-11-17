@@ -60,6 +60,9 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	}
 	read, write, export := rbac.PermTenantJournalsRead, rbac.PermTenantJournalsWrite, rbac.PermTenantJournalsExport
 	mux.Handle("GET /v1/tenant/export-drivers", tenant(read, h.drivers))
+	// Office-wide export settings (#466): integrators Luca fetches itself.
+	mux.Handle("GET /v1/tenant/journal-export-settings", tenant(read, h.getOfficeSettings))
+	mux.Handle("PUT /v1/tenant/journal-export-settings", tenant(export, h.putOfficeSettings))
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
 	mux.Handle("GET "+base+"/journal-drafts", engaged(read, h.listDrafts))
 	mux.Handle("POST "+base+"/journal-drafts", engaged(write, h.createDraft))
@@ -68,6 +71,9 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
 	mux.Handle("POST "+base+"/journal-exports", scoped(export, h.export))
+	// Pre-export check and the document → file trail (#466).
+	mux.Handle("POST "+base+"/journal-exports/check", scoped(export, h.check))
+	mux.Handle("GET "+base+"/journal-export-documents", engaged(read, h.listDocuments))
 	mux.Handle("GET "+base+"/journal-exports/{batchUuid}", engaged(read, h.getBatch))
 	mux.Handle("GET "+base+"/journal-exports/{batchUuid}/files/{fileName}", engaged(read, h.download))
 	mux.Handle("GET "+base+"/journal-export-settings", scoped(read, h.getSettings))
@@ -221,6 +227,76 @@ func (h *Handler) export(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusCreated, b)
 }
 
+// check is the pre-export check: same body as export, nothing is written.
+func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
+	var in ExportInput
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "request body is not a valid export request")
+		return
+	}
+	if strings.TrimSpace(in.Driver) == "" {
+		response.BadRequest(w, r, "DRIVER_REQUIRED", "driver is required (see GET /v1/tenant/export-drivers)")
+		return
+	}
+	if in.Period == "" && len(in.Drafts) == 0 {
+		response.BadRequest(w, r, "SELECTION_REQUIRED", "give a period or the drafts to export")
+		return
+	}
+	v, err := h.svc.Check(r.Context(), engagementctx.Must(r.Context()), in)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
+}
+
+// listDocuments is the document → file trail of the export history.
+func (h *Handler) listDocuments(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	limit, offset := paging(q.Get("limit"), q.Get("offset"))
+	f := DocumentFilter{Q: q.Get("q"), Limit: limit, Offset: offset}
+	if b := strings.TrimSpace(q.Get("batch")); b != "" {
+		id, err := uuid.Parse(b)
+		if err != nil {
+			response.BadRequest(w, r, "INVALID_BATCH", "batch must be an export uuid")
+			return
+		}
+		f.Batch = &id
+	}
+	items, err := h.svc.ListDocuments(r.Context(), engagementctx.Must(r.Context()), f)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items, "limit": limit, "offset": offset})
+}
+
+func (h *Handler) getOfficeSettings(w http.ResponseWriter, r *http.Request) {
+	org := orgctx.Must(r.Context())
+	st, err := h.svc.GetOfficeSettings(r.Context(), org.ID)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load office export settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+func (h *Handler) putOfficeSettings(w http.ResponseWriter, r *http.Request) {
+	org := orgctx.Must(r.Context())
+	var in OfficeSettings
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "request body is not valid office export settings")
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	st, err := h.svc.SaveOfficeSettings(r.Context(), org.ID, p.UserInternal, in)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
 func (h *Handler) getBatch(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathUUID(w, r, "batchUuid")
 	if !ok {
@@ -272,7 +348,7 @@ func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
-	var in Settings
+	var in SettingsInput
 	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
 		response.BadRequest(w, r, "INVALID_BODY", "request body is not valid export settings")
 		return
@@ -280,7 +356,7 @@ func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
 	p, _ := authctx.PrincipalFrom(r.Context())
 	st, err := h.svc.SaveSettings(r.Context(), engagementctx.Must(r.Context()), p.UserInternal, in)
 	if err != nil {
-		response.InternalErr(w, r, err, "could not save export settings")
+		h.fail(w, r, err)
 		return
 	}
 	response.JSON(w, r, http.StatusOK, st)
@@ -299,6 +375,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "EXPORT_BLOCKED", "export blocked by validation issues", details)
 	case errors.Is(err, ErrNotFound):
 		response.NotFound(w, r, "not found")
+	case errors.Is(err, ErrInvalidIntegrator):
+		response.BadRequest(w, r, "INVALID_INTEGRATOR", err.Error())
 	case errors.Is(err, ErrUnbalanced):
 		response.Error(w, r, http.StatusUnprocessableEntity, "JOURNAL_UNBALANCED", err.Error())
 	case errors.Is(err, ErrReasonRequired):
