@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -170,8 +171,18 @@ func TestTaxReturnFlow(t *testing.T) {
 		t.Fatalf("babs %+v", b)
 	}
 
+	// Excel çıktısı: verilmiş KDV1 donmuş görüntüsüyle.
+	rec := raw(t, http.MethodGet, base+"/kdv1/2026-10/export", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Disposition"), "kdv1-2026-10.xlsx") ||
+		!bytes.HasPrefix(rec.Body.Bytes(), []byte("PK")) {
+		t.Fatalf("export: %d %v", rec.Code, rec.Header())
+	}
+	if rec := raw(t, http.MethodGet, base+"/babs/2026-10/export", ""); rec.Code != http.StatusOK {
+		t.Fatalf("babs export: %d %s", rec.Code, rec.Body)
+	}
+
 	// Liste ve hatalı istekler.
-	rec := raw(t, http.MethodGet, base+"?year=2026", "")
+	rec = raw(t, http.MethodGet, base+"?year=2026", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"status":"filed"`) {
 		t.Fatalf("list: %d %s", rec.Code, rec.Body)
 	}

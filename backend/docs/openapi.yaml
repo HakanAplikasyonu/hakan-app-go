@@ -14559,6 +14559,45 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    get:
+      tags: [TaxReturns]
+      operationId: exportEngagementTaxReturn
+      summary: Download the return as an Excel workbook
+      description: |
+        Requires `tenant.tax_returns.read`. `.xlsx` in the form's order,
+        field names as on the GİB form and amounts as numbers, for
+        re-keying or importing into the accounting program (Luca / Zirve):
+
+        - `kdv1`: sheet `KDV1` (matrah, kısmi tevkifat, özel matrah,
+          indirimler with the rate breakdown, istisnalar, sonuç, ek bilgiler).
+        - `muhsgk`: `MUHSGK` (vergi bildirimi, bordro toplamları, SGK) and
+          `Çalışanlar` (national ids masked).
+        - `babs`: `Form Ba` and `Form Bs` in the GİB column order (unvan,
+          ülke, VKN, TCKN, belge sayısı, toplam bedel).
+
+        Every workbook ends with `Kontrol listesi`. A prepared or filed
+        return exports its snapshot; a draft the live preview (the title row
+        says "Taslak"). GİB e-beyanname XML is not produced.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Workbook
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   # WhatsApp Web uzantısı (issue #388).
   /v1/auth/whatsapp/pair:
     post:

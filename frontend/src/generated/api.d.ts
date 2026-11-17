@@ -11202,6 +11202,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the return as an Excel workbook
+         * @description Requires `tenant.tax_returns.read`. `.xlsx` in the form's order,
+         *     field names as on the GİB form and amounts as numbers, for
+         *     re-keying or importing into the accounting program (Luca / Zirve):
+         *
+         *     - `kdv1`: sheet `KDV1` (matrah, kısmi tevkifat, özel matrah,
+         *       indirimler with the rate breakdown, istisnalar, sonuç, ek bilgiler).
+         *     - `muhsgk`: `MUHSGK` (vergi bildirimi, bordro toplamları, SGK) and
+         *       `Çalışanlar` (national ids masked).
+         *     - `babs`: `Form Ba` and `Form Bs` in the GİB column order (unvan,
+         *       ülke, VKN, TCKN, belge sayısı, toplam bedel).
+         *
+         *     Every workbook ends with `Kontrol listesi`. A prepared or filed
+         *     return exports its snapshot; a draft the live preview (the title row
+         *     says "Taslak"). GİB e-beyanname XML is not produced.
+         */
+        get: operations["exportEngagementTaxReturn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/whatsapp/pair": {
         parameters: {
             query?: never;
@@ -35986,6 +36030,42 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workbook */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
