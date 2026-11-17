@@ -1038,8 +1038,12 @@ function ReviewWorkspaceInner() {
                 <button
                   type="button"
                   onClick={() => canCorrect && setPicking(true)}
+                  // Erişilebilir ad görünen metni (kod + hesap adı) içermeli (axe
+                  // label-content-name-mismatch; banka önerileri adı taşır, #383).
                   aria-label={t("office.review.code_button", {
-                    code: valueLabel(current.proposed_value),
+                    code: currentValue.name
+                      ? `${valueLabel(current.proposed_value)} ${currentValue.name}`
+                      : valueLabel(current.proposed_value),
                   })}
                   className={cn(
                     "group flex w-full flex-wrap items-baseline gap-x-3 rounded-[10px] border border-dashed p-3 text-start transition-colors",
