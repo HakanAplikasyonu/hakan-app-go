@@ -199,6 +199,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest":            {body: `{"note":"Faturanın ikinci sayfası eksik"}`},
 	"POST /v1/tenant/account-rules":                                                               {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
 	"POST /v1/tenant/account-rules/preview":                                                       {body: `{"role":"line","account_code":"770.01","conditions":{"item_name_contains":["hizmet"]}}`},
+	"PUT /v1/tenant/support-settings":                                                             {body: `{"clickfix_widget_id":"ofis-destek"}`},
 	"PUT /v1/tenant/account-rule-settings":                                                        {body: `{"rule_candidate_min_count":4,"rule_candidate_decisions":"corrections_only"}`},
 	"PUT /v1/tenant/account-rules/{ruleKey}":                                                      {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
 	"DELETE /v1/tenant/account-rules/{ruleKey}":                                                   {},

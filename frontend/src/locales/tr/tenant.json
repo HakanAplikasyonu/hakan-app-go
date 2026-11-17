@@ -120,5 +120,14 @@
   "settings_section_ai": "Yapay zekâ ve onay",
   "settings_section_ai_description": "Otomatik onay ve kural adayı ayarları ofisin bütün mükelleflerine uygulanır.",
   "settings_section_appearance": "Görünüm",
-  "settings_section_office": "Ofis bilgileri"
+  "settings_section_office": "Ofis bilgileri",
+  "settings_section_support": "Destek",
+  "settings_section_support_description": "Mükelleflerinizin destek talepleri ClickFix üzerinden doğrudan ofisinize gelir.",
+  "support_card_title": "ClickFix widget kimliği",
+  "support_card_description": "Mükellef portalındaki Destek düğmesi bu widget'ı açar; talepler ofisinizin ClickFix gelen kutusuna düşer. Boş bırakırsanız platformun varsayılan destek kanalı kullanılır.",
+  "support_widget_label": "ClickFix widget kimliği",
+  "support_widget_help": "ClickFix panelinde Web widget → Kurulum sekmesindeki data-widget değeri.",
+  "support_widget_placeholder": "Örn. 3f2a9c1e-…",
+  "support_widget_invalid": "Yalnız harf, rakam, - ve _ kullanılabilir (en fazla 128 karakter).",
+  "support_saved": "Destek ayarı kaydedildi."
 }

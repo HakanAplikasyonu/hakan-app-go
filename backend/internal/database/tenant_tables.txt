@@ -53,3 +53,4 @@ privacy_requests engagement
 warning_office_alerts engagement
 taxpayer_import_batches
 account_rule_settings
+office_support_settings

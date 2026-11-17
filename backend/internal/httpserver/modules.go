@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officesetup"
+	supportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/support"
 	"net/http"
 
 	accessmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access"
@@ -72,6 +73,8 @@ type moduleHandlers struct {
 	accountrules *accountruleshandler.Handler
 	vat          *vatforecasthandler.Handler
 	setup        *officesetup.Handler
+	// support: ClickFix destek widget'ı ayarı (issue #387).
+	support *supportmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -104,6 +107,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
 		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
 		officesetup.Module{H: h.setup},
+		supportmodule.Module{H: h.support, Taxpayers: h.taxpayers},
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
 	}
 }

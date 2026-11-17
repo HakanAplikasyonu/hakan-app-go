@@ -219,3 +219,18 @@ export const taxpayerTaskService = {
       { "Idempotency-Key": crypto.randomUUID() },
     ),
 };
+
+export type TaxpayerSupport = components["schemas"]["TaxpayerSupport"];
+
+/** Destek kanalı (#387): şirketin ofisi ve ofisin ClickFix widget kimliği. */
+export const taxpayerSupportKeys = {
+  support: (uuid: string) =>
+    ["taxpayer", uuid.toLowerCase(), "support"] as const,
+};
+
+export function fetchTaxpayerSupport(uuid: string) {
+  return taxpayerRequest<TaxpayerSupport>("GET", "/v1/taxpayer/support", {
+    taxpayer: uuid,
+    silent: true,
+  });
+}

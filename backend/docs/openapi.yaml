@@ -10573,6 +10573,105 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/support:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: getTaxpayerSupport
+      summary: Support channel of the company's office (#387)
+      description: |
+        The ClickFix widget of the taxpayer's current office: requests from
+        the mükellef portal go to their own office. `office` is null without
+        an active office; an empty `clickfix_widget_id` means the office has
+        none and the portal uses the platform default.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Support channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerSupport" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/support-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getSupportSettings
+      summary: The office's support widget setting (#387)
+      description: |
+        Requires `tenant.settings.read`. The office's own ClickFix widget id;
+        the office's taxpayers write to it from the mükellef portal. Empty =
+        the platform default.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSupportSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putSupportSettings
+      summary: Set the office's support widget id (#387)
+      description: Requires `tenant.settings.write` (office owner / admin). Empty string clears it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SupportSettingsInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSupportSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/support/clickfix-identity:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getClickFixIdentity
+      summary: Verified ClickFix identity of the member (#387)
+      description: |
+        Requires `tenant.settings.read`. For the office panel's support
+        widget (software provider channel): `user_hash` is
+        hex(HMAC-SHA256(CLICKFIX_IDENTITY_SECRET, user_id + "\n" + company_id))
+        with the user uuid and office uuid. Without the secret
+        `available` is false and the visitor stays unverified.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Identity
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeClickFixIdentity" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16927,6 +17026,62 @@ components:
       properties:
         rule_candidate_min_count: { type: integer, minimum: 2, maximum: 10 }
         rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
+    SupportSettings:
+      type: object
+      required: [clickfix_widget_id]
+      properties:
+        clickfix_widget_id: { type: string, description: "Office's ClickFix widget id; empty = platform default" }
+        updated_at: { type: [string, "null"], format: date-time }
+    SupportSettingsInput:
+      type: object
+      required: [clickfix_widget_id]
+      additionalProperties: false
+      properties:
+        clickfix_widget_id: { type: string, maxLength: 128, pattern: "^[A-Za-z0-9_-]*$" }
+    EnvelopeSupportSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SupportSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ClickFixIdentity:
+      type: object
+      required: [available]
+      properties:
+        available: { type: boolean }
+        user_id: { type: string }
+        user_hash: { type: string }
+        company_id: { type: string }
+    EnvelopeClickFixIdentity:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ClickFixIdentity" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    TaxpayerSupport:
+      type: object
+      required: [office]
+      properties:
+        office:
+          description: The current office; null without an active office
+          oneOf:
+            - $ref: "#/components/schemas/TaxpayerSupportOffice"
+            - type: "null"
+    TaxpayerSupportOffice:
+      type: object
+      required: [name, clickfix_widget_id]
+      properties:
+        name: { type: string }
+        clickfix_widget_id: { type: string, description: "Empty = platform default" }
+    EnvelopeTaxpayerSupport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerSupport" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     AccountRuleSettings:
       type: object
       required: [rule_candidate_min_count, rule_candidate_decisions, default]

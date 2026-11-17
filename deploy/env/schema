@@ -21,7 +21,7 @@
 ##
 ## Keys left out here keep their compose.prod.yml defaults; .env.example documents them all.
 
-@version 6
+@version 7
 
 @norotate APP_ENCRYPTION_KEY
 @norotate FIELD_ENCRYPTION_KEY
@@ -110,3 +110,7 @@ NEXT_PUBLIC_CLICKFIX_WIDGET_ID | empty
 # office settings. Empty = taxpayers of such offices see no support button.
 NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID | empty
 NEXT_PUBLIC_CLICKFIX_SCRIPT_URL | ask:https://getclickfix.com/widget.js
+# Identity secret of the office panel widget (ClickFix → Web widget → Güvenlik →
+# Anahtar oluştur). Server only: signs the signed-in office user (user_hash) so
+# ClickFix shows them as verified. Empty = unverified visitor (name/e-mail only).
+CLICKFIX_IDENTITY_SECRET | empty

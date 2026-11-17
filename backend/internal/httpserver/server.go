@@ -108,6 +108,7 @@ import (
 	storageusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/storage/usecase"
 	summarieshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/handler"
 	summariesusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/summaries/usecase"
+	supportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/support"
 	taxpayerportal "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayerportal"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
@@ -629,6 +630,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officeClients: &officedashmodule.ClientsHandler{Q: deps.Queries, Store: deps.Storage},
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
+		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

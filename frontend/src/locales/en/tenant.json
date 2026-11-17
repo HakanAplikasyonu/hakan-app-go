@@ -120,5 +120,14 @@
   "settings_section_ai": "AI and approval",
   "settings_section_ai_description": "Auto-approval and rule candidate settings apply to every taxpayer of the office.",
   "settings_section_appearance": "Appearance",
-  "settings_section_office": "Office details"
+  "settings_section_office": "Office details",
+  "settings_section_support": "Support",
+  "settings_section_support_description": "Your taxpayers' support requests reach your office directly through ClickFix.",
+  "support_card_title": "ClickFix widget id",
+  "support_card_description": "The Support button in the taxpayer portal opens this widget; requests land in your office's ClickFix inbox. Leave it empty to use the platform's default support channel.",
+  "support_widget_label": "ClickFix widget id",
+  "support_widget_help": "The data-widget value on the Web widget → Install tab of the ClickFix panel.",
+  "support_widget_placeholder": "e.g. 3f2a9c1e-…",
+  "support_widget_invalid": "Only letters, digits, - and _ are allowed (up to 128 characters).",
+  "support_saved": "Support setting saved."
 }

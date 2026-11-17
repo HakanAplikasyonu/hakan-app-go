@@ -1124,6 +1124,13 @@ type OauthProviderSetting struct {
 	ApplePrivateKeyEnc pgtype.Text        `json:"apple_private_key_enc"`
 }
 
+type OfficeSupportSetting struct {
+	OrganizationID   int64              `json:"organization_id"`
+	ClickfixWidgetID string             `json:"clickfix_widget_id"`
+	UpdatedBy        pgtype.Int8        `json:"updated_by"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Organization struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

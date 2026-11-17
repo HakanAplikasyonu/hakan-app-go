@@ -70,7 +70,7 @@ func demoScope(t *testing.T, d *testdb.DB, key string) engagementctx.Scope {
 func TestSeedLinksTaxpayerUser(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
-	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
 		t.Fatal(err)
 	}
 	var atlasTaxID string
@@ -94,7 +94,7 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 	if err := dropDemo(ctx, d.Pool); err != nil {
 		t.Fatal(err)
 	}
-	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
 		t.Fatal(err)
 	}
 	if n := count(t, d, `SELECT count(*) FROM taxpayer_members`); n != 1 {
@@ -114,7 +114,7 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 func TestResetAfterUpload(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
-	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
 		t.Fatal(err)
 	}
 	actor := d.User(t)
@@ -182,10 +182,29 @@ func TestResetAfterUpload(t *testing.T) {
 	}
 
 	// The demo can be rebuilt afterwards.
-	if err := seed(ctx, d.Pool, "Demo-Test-1!"); err != nil {
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
 		t.Fatalf("reseed: %v", err)
 	}
 	if err := dropDemo(ctx, d.Pool); err != nil {
 		t.Fatalf("second reset: %v", err)
+	}
+}
+
+// TestSeedClickFixWidget (#387): with a widget id the demo office's support
+// setting is written, so its taxpayers see the support button in the portal.
+func TestSeedClickFixWidget(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", "demo-ofis-destek"); err != nil {
+		t.Fatal(err)
+	}
+	var id string
+	if err := d.Pool.QueryRow(ctx, `
+		SELECT s.clickfix_widget_id FROM office_support_settings s
+		JOIN organizations o ON o.id = s.organization_id WHERE o.slug = $1`, demo.OrgSlug).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if id != "demo-ofis-destek" {
+		t.Fatalf("widget id = %q", id)
 	}
 }
