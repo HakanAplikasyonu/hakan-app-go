@@ -57,6 +57,7 @@ type meta struct {
 	LastSyncAt      *time.Time      `json:"last_sync_at,omitempty"`
 	LastSyncRequest *time.Time      `json:"last_sync_request_at,omitempty"`
 	LastReport      *sources.Report `json:"last_report,omitempty"`
+	LastWebhookAt   *time.Time      `json:"last_webhook_at,omitempty"`
 }
 
 // Connection is the API view.
@@ -75,7 +76,9 @@ type Connection struct {
 	LastSuccessAt       *time.Time `json:"last_success_at,omitempty"`
 	SyncFailures        int32      `json:"sync_failures"`
 	LastRun             *Run       `json:"last_run,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
+	// LastWebhookAt: the last signed push from Easytrade (issue #385).
+	LastWebhookAt *time.Time `json:"last_webhook_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
 }
 
 // view adds the last run to the row's view.
@@ -92,7 +95,7 @@ func view(row db.SourceConnection) Connection {
 	var m meta
 	_ = json.Unmarshal(row.Meta, &m)
 	c := Connection{UUID: row.Uuid, SetupState: row.SetupState, Status: row.Status, CompanyID: row.ExternalCompanyID.String,
-		Branches: m.Branches, LastSyncAt: m.LastSyncAt, LastReport: m.LastReport, CreatedAt: row.CreatedAt.Time}
+		Branches: m.Branches, LastSyncAt: m.LastSyncAt, LastReport: m.LastReport, LastWebhookAt: m.LastWebhookAt, CreatedAt: row.CreatedAt.Time}
 	if c.Branches == nil {
 		c.Branches = []Branch{}
 	}

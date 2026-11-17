@@ -55,6 +55,7 @@ var authzTable = map[string]authzClass{
 	"GET /healthz":                                                                  azPublic,
 	"GET /readyz":                                                                   azPublic,
 	"GET /v1/app/config":                                                            azPublic,
+	"POST /v1/webhooks/easytrade":                                                   azPublic,
 	"POST /v1/auth/account/deactivate":                                              azSelf,
 	"POST /v1/auth/account/deactivate/request":                                      azSelf,
 	"POST /v1/auth/email-code/request":                                              azPublic,
