@@ -110,3 +110,17 @@ SELECT DISTINCT code FROM data_warnings
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND entity_type = @entity_type AND entity_id = @entity_id AND status = 'open'
 ORDER BY code;
+
+-- name: InsertImportedRetailSale :one
+INSERT INTO retail_sales (
+    taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number,
+    subtotal_amount, tax_amount, total_amount, currency, cash_amount, card_amount, other_payment_amount, receipt_count,
+    content_hash
+) VALUES (
+    @taxpayer_id, 'excel_import', @source_id, 'excel_import', @sale_date, @period, sqlc.narg(z_report_number),
+    sqlc.narg(okc_serial_number), sqlc.narg(subtotal_amount), sqlc.narg(tax_amount), @total_amount, 'TRY',
+    sqlc.narg(cash_amount), sqlc.narg(card_amount), sqlc.narg(other_payment_amount), sqlc.narg(receipt_count),
+    @content_hash
+)
+ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
+RETURNING *;

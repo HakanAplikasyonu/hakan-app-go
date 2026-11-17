@@ -7601,6 +7601,142 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: exportEngagementExpenses
+      summary: Expense list as Excel
+      description: |
+        Requires `tenant.receipts.read` and engagement access. The filtered
+        expense list (Tarih, Satıcı, VKN / TCKN, Fiş No, Açıklama, Kategori, Hesap Kodu, KDV Oranı, KDV, Toplam, Ödeme, Plaka, Durum, Yevmiye No) as .xlsx (at most 10 000 rows). The file is also the import
+        template: edited and uploaded again, only its new rows are added.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, rejected] } }
+        - { name: category, in: query, required: false, schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/import:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Receipts]
+      operationId: importEngagementExpenses
+      summary: Import expenses from Excel / CSV
+      description: |
+        Requires `tenant.receipts.write` and engagement access. .xlsx or .csv
+        (max 10 MB, 5 000 rows) with the export's columns; Tarih and Toplam
+        are required, the header row is found anywhere in the first sheet
+        that has one (common aliases accepted: Fiş Tarihi, Firma, Tutar,
+        Ödeme Şekli). Rows become pending expenses (capture_method
+        excel_import); a Kategori (code or name) or Hesap Kodu cell becomes
+        the office's choice; only KDV Oranı computes the VAT from the
+        total. A row with the same date, vendor, VKN, receipt number and
+        total is skipped. Bad rows are listed with their line, the others
+        are imported.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReceiptImportResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: exportEngagementRetailSales
+      summary: Z reports as Excel
+      description: |
+        Requires `tenant.receipts.read` and engagement access. The filtered
+        Z list (Tarih, ÖKC Seri No, Z No, Fiş Sayısı, Nakit, Kart, Diğer Ödeme, %0 / %1 / %10 / %20 Matrah and KDV, Toplam KDV, Toplam, Durum, Uyarılar, Yevmiye No) as .xlsx (at most 10 000 rows). The file is also the import
+        template: edited and uploaded again, only its new rows are added.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, rejected] } }
+        - { name: okc, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/import:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Receipts]
+      operationId: importEngagementRetailSales
+      summary: Import Z reports from Excel / CSV
+      description: |
+        Requires `tenant.receipts.write` and engagement access. .xlsx or .csv
+        with the export's columns; Tarih and Toplam are required. Rows become
+        pending Z reports with the payment and VAT rate breakdown; the
+        continuity check of every ÖKC touched runs afterwards. A row with the
+        same date, ÖKC, Z number and total is skipped.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeReceiptImportResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/controls/run:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -15883,6 +16019,28 @@ components:
                   last_date: { type: [string, "null"], format: date }
             limit: { type: integer, format: int32 }
             offset: { type: integer, format: int32 }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeReceiptImportResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [rows, inserted, skipped, errors]
+          properties:
+            rows: { type: integer }
+            inserted: { type: integer }
+            skipped: { type: integer, description: already imported (same row identity) }
+            errors:
+              type: array
+              items:
+                type: object
+                required: [line, message]
+                properties:
+                  line: { type: integer, description: 1-based sheet row }
+                  message: { type: string }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeReceiptCapture:

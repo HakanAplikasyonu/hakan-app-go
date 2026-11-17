@@ -143,6 +143,18 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 			t.Errorf("%s = %d, want %d", q, n, want)
 		}
 	}
+	// #384: Excel'den masraflar ve Z raporları; ilk günler onaylı ve
+	// yevmiye taslağında, Z'de bir numara ve bir gün boşluğu uyarısı.
+	if n := count(t, d, `
+		SELECT count(*) FROM receipt_postings p JOIN organizations o ON o.id = p.organization_id AND o.slug = $1
+		WHERE p.journal_draft_id IS NOT NULL`, demo.OrgSlug); n != 6 {
+		t.Fatalf("receipt journal drafts = %d, want 6", n)
+	}
+	if n := count(t, d, `
+		SELECT count(*) FROM data_warnings w JOIN organizations o ON o.id = w.organization_id AND o.slug = $1
+		WHERE w.code IN ('Z_NUMBER_GAP', 'Z_DAY_GAP') AND w.status = 'open'`, demo.OrgSlug); n != 2 {
+		t.Fatalf("Z continuity warnings = %d, want 2", n)
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,
