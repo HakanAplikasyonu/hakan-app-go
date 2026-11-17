@@ -107,6 +107,27 @@ Yevmiye fişi hazırlama, onay ve Luca / Zirve / Excel çıktısı
 [Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-ciktisi)nda
 anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
 
+## Banka: Luca ekstresi (CSV)
+
+Mükellefin **Banka** sayfasındaki **Luca ekstresi** sekmesi, banka
+hareketlerini Luca'nın "Banka Ekstreleri" ekranının okuyacağı CSV olarak
+indirir.
+
+1. Hesabı ve tarih aralığını seçin (varsayılan: üst çubuktaki dönem).
+2. Tutar düzenini seçin: tek sütun işaretli (giriş +, çıkış −) ya da Borç /
+   Alacak iki sütun. Ayraç noktalı virgül ya da virgül olabilir.
+3. **CSV indir**. Dosya Windows-1254 kodludur; tarih gg.aa.yyyy, ondalık
+   virgüldür.
+4. Luca'daki ekstre tanımını bir kez kurun: sekmedeki **adım adım** rehber
+   her CSV sütununun Luca'da hangi fiş sütununa ve veri türüne (Metin,
+   Tarih, Para) eşleneceğini gösterir.
+
+Daha önce dışa aktarılmış bir hareket yeniden bir dosyaya girerse indirme
+sonrası uyarı çıkar ve hareketler listesinde "Luca'ya N kez aktarıldı"
+işareti görünür. **İndirme geçmişi** her dosyayı hesap, tarih ve hareket
+sayısıyla listeler. Biçim Luca'da doğrulanmadı; ilk aktarımı bir deneme
+mükellefinde yapın.
+
 ## Sıradaki iş ve co-pilot
 
 Kenar menüdeki **Sıradaki iş** ekranı, üst çubukta seçili dönemin (seçim

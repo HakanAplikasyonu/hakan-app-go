@@ -28,6 +28,7 @@ import { useOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
 import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
+import { LucaBankExportPanel } from "./luca-bank-export-panel";
 import { Money } from "./office-ui";
 import { useRelatedColumn } from "./related-column";
 
@@ -35,8 +36,9 @@ type BankPage = components["schemas"]["BankTransactionPage"];
 type BankRow = components["schemas"]["BankTransaction"];
 type MatchFilter = "all" | "unmatched" | "suggested" | "matched";
 // #383: hareketler, hareket → mizan hesabı eşleştirme, karşı taraf takma adları.
-type BankView = "movements" | "posting" | "aliases";
-const VIEWS: BankView[] = ["movements", "posting", "aliases"];
+// #465: Luca banka ekstresi CSV'si ve eşleme rehberi.
+type BankView = "movements" | "posting" | "aliases" | "luca";
+const VIEWS: BankView[] = ["movements", "posting", "aliases", "luca"];
 const MATCH_FILTERS: MatchFilter[] = [
   "all",
   "unmatched",
@@ -82,6 +84,23 @@ function useBankColumns() {
                 {x.possible_duplicate ? (
                   <span className="text-warn ms-1 font-semibold">
                     · {t("office.bank.possible_duplicate")}
+                  </span>
+                ) : null}
+                {x.luca_exports ? (
+                  <span
+                    className={cn(
+                      "ms-1",
+                      x.luca_exports > 1
+                        ? "text-warn font-semibold"
+                        : "text-text-3",
+                    )}
+                  >
+                    ·{" "}
+                    {x.luca_exports > 1
+                      ? t("office.bank.luca.exported_again", {
+                          count: x.luca_exports,
+                        })
+                      : t("office.bank.luca.exported_once")}
                   </span>
                 ) : null}
               </div>
@@ -295,6 +314,8 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
         {header}
         {view === "posting" ? (
           <BankPostingPanel engagement={engagement} period={period} />
+        ) : view === "luca" ? (
+          <LucaBankExportPanel engagement={engagement} period={period} />
         ) : (
           <BankAliasPanel engagement={engagement} />
         )}
