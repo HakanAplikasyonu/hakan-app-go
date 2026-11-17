@@ -137,6 +137,29 @@ func (r Renderer) Render(e Email) (Rendered, error) {
 	return Rendered{HTML: h.String(), Text: tidyText(txt.String())}, nil
 }
 
+// RenderSafe is Render for senders that must not drop a message: a button
+// or preferences link that is not https (e.g. a plain-http staging origin)
+// is turned into plain text instead of failing. The address is still in the
+// text part; the HTML just does not link it.
+func (r Renderer) RenderSafe(e Email) (Rendered, error) {
+	out, err := r.Render(e)
+	if !errors.Is(err, ErrInsecureLink) {
+		return out, err
+	}
+	blocks := make([]Block, 0, len(e.Blocks))
+	for _, b := range e.Blocks {
+		if b.Kind == Button && !SafeURL(b.URL) {
+			b = Block{Kind: Paragraph, Text: b.Label + ":\n" + b.URL}
+		}
+		blocks = append(blocks, b)
+	}
+	e.Blocks = blocks
+	if e.PreferencesURL != "" && !SafeURL(e.PreferencesURL) {
+		e.PreferencesURL = ""
+	}
+	return r.Render(e)
+}
+
 func (r Renderer) checkLinks(e Email) error {
 	for _, b := range e.Blocks {
 		if b.Kind == Button && !SafeURL(b.URL) {

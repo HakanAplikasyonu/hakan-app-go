@@ -1,0 +1,22 @@
+Sayın Örnek Gıda Ticaret Ltd. Şti.,
+
+Ekim 2026 dönemine ait raporunuz ektedir (PDF).
+
+Özet (KDV hariç)
+  Ciro:                   ₺95.000,00
+  Gider:                  ₺29.500,00
+  Net:                    ₺65.500,00
+  Ödenecek KDV (tahmini): ₺13.200,00
+
+Müşavir yorumu:
+Satışlarınız önceki aya göre arttı.
+
+Masraflar incelendi.
+
+Saygılarımızla,
+Demo Müşavirlik
+
+--
+Rakamlar portala kayıtlı verilerden hesaplanmıştır; KDV tutarı tahminidir ve
+önceki dönem devrini içermez.
+Bu e-posta HAKAN üzerinden gönderildi.

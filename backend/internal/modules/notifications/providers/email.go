@@ -82,10 +82,10 @@ func (p EmailProvider) Message(n db.Notification, userUUID *uuid.UUID) mail.Mess
 		e.PreferencesURL = p.Links.PreferencesURL()
 		e.Reason = reasonText(lang)
 	}
-	out, err := p.Render.Render(e)
+	out, err := p.Render.RenderSafe(e)
 	if err != nil {
-		// An unrenderable row (e.g. a non-https link outside development)
-		// still goes out as plain text rather than not at all.
+		// An unrenderable row still goes out as plain text rather than not
+		// at all.
 		return msg
 	}
 	msg.Body, msg.HTML = out.Text, out.HTML

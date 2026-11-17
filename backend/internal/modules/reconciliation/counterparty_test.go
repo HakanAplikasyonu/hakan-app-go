@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mailtpl"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -105,9 +106,16 @@ func TestLetterHelpers(t *testing.T) {
 	if LetterFileName(snap) != "mutabakat-2026-10-31-oz-seker-ltd-sti.pdf" {
 		t.Fatal(LetterFileName(snap))
 	}
-	m := LetterEmail(snap, "L")
-	if !strings.Contains(m.Subject, "Atlas Gıda") || !strings.Contains(m.Body, "500,00 TL borç") || !strings.Contains(m.Body, "\nL\n") {
+	link := "https://app.test/mutabakat/" + tok
+	m, err := LetterEmail(snap, link, mailtpl.New("https://app.test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(m.Subject, "Atlas Gıda") || !strings.Contains(strings.ReplaceAll(m.Body, "\n", " "), "500,00 TL borç") || !strings.Contains(m.Body, "\n"+link+"\n") {
 		t.Fatalf("mail %+v", m)
+	}
+	if !strings.Contains(m.HTML, `href="`+link+`"`) || !strings.Contains(m.HTML, "500,00 TL borç") {
+		t.Fatal("html part lacks the answer link or the balance")
 	}
 	for in, want := range map[string]string{"2026-10": "2026-10", "10/2026": "2026-10", "2026/9": "2026-09", "Ekim 2026": "2026-10", "x": "x"} {
 		if got := normPeriod(in); got != want {

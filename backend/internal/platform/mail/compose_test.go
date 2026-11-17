@@ -325,3 +325,21 @@ func TestRecorderValidates(t *testing.T) {
 		t.Fatalf("recorded %d", len(r.Sent()))
 	}
 }
+
+func TestInspectMatchesCompose(t *testing.T) {
+	pdf := []byte("%PDF-1.4 x")
+	msg := Message{To: []string{"a@example.com"}, Subject: "Ekim 2026 — rapor", Body: sampleText, HTML: sampleHTML,
+		Attachments: []Attachment{{Name: "rapor.pdf", ContentType: "application/pdf", Data: pdf}}}
+	raw, err := Compose(msg, ComposeOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in, err := Inspect(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if in.Tree != "multipart/mixed[multipart/alternative[text/plain,text/html],application/pdf]" ||
+		in.Subject != msg.Subject || in.Text != msg.Body || in.HTML != msg.HTML || !bytes.Equal(in.Attachments["rapor.pdf"], pdf) {
+		t.Fatalf("inspected %+v", in)
+	}
+}

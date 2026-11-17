@@ -26,6 +26,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ioengine"
 	platformmail "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mail"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mailtpl"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
@@ -637,22 +638,38 @@ func RenderLetterPDF(s LetterSnapshot, link string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// LetterEmail is the letter's email (without recipient and attachment).
-func LetterEmail(s LetterSnapshot, link string) platformmail.Message {
-	var b strings.Builder
-	fmt.Fprintf(&b, "Sayın %s,\n\n", s.CounterpartyName)
-	b.WriteString(BalanceSentence(s) + "\n\n")
-	b.WriteString("Mutabakat mektubu ektedir (PDF). Mutabık olup olmadığınızı aşağıdaki bağlantıdan tek tıkla bildirebilirsiniz:\n")
-	b.WriteString(link + "\n\n")
-	if strings.TrimSpace(s.Note) != "" {
-		b.WriteString("Not: " + s.Note + "\n\n")
+// LetterContent is the letter's email content: the balance, the one-click
+// answer link and the sender's sign-off. The PDF carries the full letter.
+func LetterContent(s LetterSnapshot, link string) mailtpl.Email {
+	e := mailtpl.Email{
+		Subject:   fmt.Sprintf("%s — %s tarihli cari hesap mutabakatı", s.TaxpayerTitle, trDate(s.AsOfDate)),
+		Preheader: BalanceSentence(s),
+		Greeting:  fmt.Sprintf("Sayın %s,", s.CounterpartyName),
+		Blocks: []mailtpl.Block{
+			{Kind: mailtpl.Paragraph, Text: BalanceSentence(s)},
+			{Kind: mailtpl.Paragraph, Text: "Mutabakat mektubu ektedir (PDF). Kayıtlarınızla mutabık olup olmadığınızı aşağıdaki bağlantıdan tek tıkla bildirebilirsiniz."},
+			{Kind: mailtpl.Button, Label: "Mutabakatı yanıtla", URL: link},
+		},
+		SignOff: []string{"Saygılarımızla,", s.TaxpayerTitle},
 	}
-	fmt.Fprintf(&b, "Saygılarımızla,\n%s\n", s.TaxpayerTitle)
+	if note := strings.TrimSpace(s.Note); note != "" {
+		e.Blocks = append(e.Blocks, mailtpl.Block{Kind: mailtpl.Note, Label: "Not", Text: note})
+	}
 	if s.Office != "" {
-		fmt.Fprintf(&b, "(Mali müşavir: %s)\n", s.Office)
+		e.SignOff = append(e.SignOff, "(Mali müşavir: "+s.Office+")")
 	}
-	b.WriteString("\nBu e-posta HAKAN üzerinden gönderildi.\n")
-	return platformmail.Message{Subject: fmt.Sprintf("%s — %s tarihli cari hesap mutabakatı", s.TaxpayerTitle, trDate(s.AsOfDate)), Body: b.String()}
+	return e
+}
+
+// LetterEmail renders the letter's email (without recipient and
+// attachment): readable text and the themed HTML alternative.
+func LetterEmail(s LetterSnapshot, link string, r mailtpl.Renderer) (platformmail.Message, error) {
+	e := LetterContent(s, link)
+	out, err := r.RenderSafe(e)
+	if err != nil {
+		return platformmail.Message{}, err
+	}
+	return platformmail.Message{Subject: e.Subject, Body: out.Text, HTML: out.HTML}, nil
 }
 
 // LetterSender sends queued letters (worker sweep, every office: run it
@@ -721,7 +738,10 @@ func (s *LetterSender) send(ctx context.Context, l db.ReconciliationLetter) erro
 	if err != nil {
 		return fmt.Errorf("pdf: %w", err)
 	}
-	msg := LetterEmail(v.Snapshot, link)
+	msg, err := LetterEmail(v.Snapshot, link, mailtpl.New(s.Config.FrontendURL))
+	if err != nil {
+		return fmt.Errorf("email: %w", err)
+	}
 	msg.To = []string{l.RecipientEmail.String}
 	msg.Attachments = []platformmail.Attachment{{Name: LetterFileName(v.Snapshot), ContentType: "application/pdf", Data: body}}
 	return s.Mail.Send(ctx, msg)
