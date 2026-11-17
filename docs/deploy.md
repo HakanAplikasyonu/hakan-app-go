@@ -225,6 +225,14 @@ API_URL=https://api.ornek.test scripts/new-office.sh --name "Örnek Mali Müşav
 3. Alan şifrelemesi gibi veri biçimi değişikliklerinde sürümün belgesindeki
    geri alma adımı önce çalıştırılır (örnek: `backend/docs/alan-sifreleme.md`).
 
+## E-posta teslimi (#467)
+
+Canlıya çıkmadan önce gönderen alan adı için SPF, DKIM, DMARC, ters DNS ve
+`MAIL_FROM` / `MAIL_REPLY_TO` / `SMTP_TLS` ayarlarını
+[docs/runbook/e-posta-teslim.md](runbook/e-posta-teslim.md) kontrol
+listesiyle tamamlayın. `PUBLIC_FRONTEND_URL` https olmalı: e-postalardaki
+düğmeler, logo ve tek tık abonelikten çıkma bağlantısı bu adresten üretilir.
+
 ## Sırlar
 
 Sırlar yalnızca `.env.server`'da durur (git'e girmez, `.gitignore`). CI imaj
