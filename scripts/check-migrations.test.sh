@@ -99,6 +99,17 @@ branch_tree 000001_init 000002_users 000003_late 000004_from_main
 against 1 "000003_late main'da yok ve main'ın en yüksek numarası 000004"
 ok "a branch-only migration below main's highest number fails"
 
+# İki PR aynı numarayla birleşince main'de çift numara kalır; düzelten dal
+# birini yeni numaraya taşır ve diğerini yerinde bırakabilir.
+commit_main 000001_init 000002_a_first 000002_b_second
+branch_tree 000001_init 000002_a_first 000003_b_second
+against 0 "check-migrations: ok"
+branch_tree 000001_init 000002_b_second 000003_a_first
+against 0 "check-migrations: ok"
+branch_tree 000001_init 000002_c_other 000003_b_second
+against 1 "000002 numarası main'da 000002_a_first ve 000002_b_second olarak kullanılıyor"
+ok "a number duplicated on main accepts either of its names"
+
 code=0; "$GCHK" --against no-such-ref >"$T/out" 2>&1 || code=$?
 [[ $code == 0 ]] && grep -q "no-such-ref bulunamadı" "$T/out" || { cat "$T/out" >&2; fail "missing ref must warn and pass"; }
 ok "a missing ref warns and skips the comparison"

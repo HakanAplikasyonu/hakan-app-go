@@ -89,15 +89,18 @@ if [[ -n $against ]]; then
     while IFS= read -r path; do
       base=${path##*/}
       [[ $base =~ ^([0-9]{6})_([a-z0-9_]+)\.up\.sql$ ]] || continue
-      ref_name[${BASH_REMATCH[1]}]=${BASH_REMATCH[2]}
+      # Hedef dalda aynı numara birden çok adla olabilir (iki PR aynı anda
+      # birleşti): adlar "|" ile birikir, dal bunlardan birini taşıyabilir.
+      ref_name[${BASH_REMATCH[1]}]+="|${BASH_REMATCH[2]}"
       v=$((10#${BASH_REMATCH[1]}))
       ((v > ref_max)) && ref_max=$v
     done < <(git -C "$ROOT" ls-tree --name-only "$against" -- "$rel/")
     for n in "${nums[@]}"; do
       here=${name_of[$n]}
       there=${ref_name[$n]:-}
-      if [[ -n $there && $there != "$here" ]]; then
-        err "$n numarası $against'da ${n}_${there} olarak kullanılıyor; bu dalda ${n}_${here}. $against'ı çekin ve numarayı $(printf '%06d' $((ref_max + 1))) ya da üstü yapın."
+      if [[ -n $there && "$there|" != *"|$here|"* ]]; then
+        there=${there#|}
+        err "$n numarası $against'da ${n}_${there//|/ ve ${n}_} olarak kullanılıyor; bu dalda ${n}_${here}. $against'ı çekin ve numarayı $(printf '%06d' $((ref_max + 1))) ya da üstü yapın."
       elif [[ -z $there ]] && ((10#$n < ref_max)); then
         err "${n}_${here} $against'da yok ve $against'ın en yüksek numarası $(printf '%06d' "$ref_max"); yeni migration en yüksek numara +1 olmalı ($(printf '%06d' $((ref_max + 1))))."
       fi

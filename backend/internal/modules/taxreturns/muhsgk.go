@@ -194,7 +194,7 @@ func ComputeMUHSGK(in MUHSGKInput) (MUHSGK, []CheckItem) {
 	totalTax, totalStamp := decimal.Zero, decimal.Zero
 	expected := se.Add(ue).Add(ser).Add(uer)
 	if in.Run != nil {
-		p.EmployeeCount = int32(len(in.Lines))
+		p.EmployeeCount = in.Run.EmployeeCount
 		p.Gross, p.IncomeTaxBase, p.IncomeTax, p.IncomeTaxExemption = M(gross), M(itb), M(it), M(ite)
 		p.StampTax, p.StampTaxExemption, p.SGKBase = M(st), M(ste), M(sb)
 		p.SGKEmployee, p.UnemploymentEmployee, p.SGKEmployer, p.UnemploymentEmployer = M(se), M(ue), M(ser), M(uer)
