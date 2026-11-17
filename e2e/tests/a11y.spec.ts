@@ -182,8 +182,13 @@ test.describe("@a11y mutabakat yanıt sayfası", () => {
       await api.get(`/v1/tenant/engagements/${atlas}/reconciliation/letters`),
     );
     await api.dispose();
-    // Demo verisi: yanıt bekleyen (kuyrukta / gönderildi) bir mektup.
-    const open = letters.items.find((l) => l.status === "queued" || l.status === "sent");
+    // Demo verisi: yanıt bekleyen bir mektup. Demo tohumu taslak bırakır
+    // (gönderim taraması e2e'de yok, #461); bağlantı taslakta da açılır. Önce
+    // taslak seçilir: akış testinin (mutabakat.spec.ts) kuyruğa aldığı ve
+    // yanıtladığı mektupla yarışılmaz.
+    const open =
+      letters.items.find((l) => l.status === "draft") ??
+      letters.items.find((l) => l.status === "queued" || l.status === "sent");
     expect(open, "yanıt bekleyen demo mektubu").toBeTruthy();
     await page.goto(`/mutabakat/${letterToken(open!.uuid)}`);
     await expect(page.getByRole("heading", { name: "Cari hesap mutabakatı" })).toBeVisible();

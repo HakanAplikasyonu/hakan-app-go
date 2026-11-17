@@ -57,6 +57,15 @@ const NONE = "__none";
  * önerileri (AI ya da başlık adlarından) müşavire gösterilir, onaylanınca
  * şablon kaydedilir ve dosya yeniden yüklenir.
  */
+/** Backend hata kodları: Türkçe ileti (ham İngilizce ileti gösterilmez). */
+const UPLOAD_ERRORS = [
+  "BANK_ACCOUNT_REQUIRED",
+  "UNKNOWN_BANK_ACCOUNT",
+  "UNSUPPORTED_FILE",
+  "SCANNED_PDF",
+  "STATEMENT_BALANCE_MISMATCH",
+] as const;
+
 export function BankStatementUpload({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -67,6 +76,13 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
   const [analysis, setAnalysis] = useState<BankStatementAnalysis | null>(null);
   const [fields, setFields] = useState<BankStatementField[]>([]);
   const [name, setName] = useState("");
+
+  const uploadError = (e: unknown) => {
+    const code = isApiError(e) ? e.code : "";
+    return (UPLOAD_ERRORS as readonly string[]).includes(code)
+      ? t(`office.bank.upload.error_${code}`)
+      : t("office.bank.upload.failed");
+  };
 
   const refresh = () => {
     for (const k of [
@@ -100,12 +116,10 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
           setFields(a.columns.map((c) => c.field));
           setName("");
         } catch (e2) {
-          toast.error(
-            isApiError(e2) ? e2.message : t("office.bank.upload.failed"),
-          );
+          toast.error(uploadError(e2));
         }
       } else {
-        toast.error(isApiError(e) ? e.message : t("office.bank.upload.failed"));
+        toast.error(uploadError(e));
       }
     } finally {
       setBusy(false);
@@ -133,7 +147,7 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
       });
       toast.success(t("office.bank.upload.template_saved"));
     } catch (e) {
-      toast.error(isApiError(e) ? e.message : t("office.bank.upload.failed"));
+      toast.error(uploadError(e));
       setBusy(false);
       return;
     }

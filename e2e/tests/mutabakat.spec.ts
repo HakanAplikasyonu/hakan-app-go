@@ -8,7 +8,7 @@ import { Api, DEMO, engagementOf, letterToken, officePath, uiLogin, uniqueEmail,
  * yanıt sayfası.
  *
  * Veri: demo ofisi, Atlas Gıda. Dosya yalnızca kendi eklediği kayıtlara
- * dokunur: 120 hesabının kararı (başka dosya okumaz), benzersiz adresli yeni
+ * dokunur: açık bir farkın kararı (açıklayıp yeniden açar), benzersiz adresli yeni
  * bir mektup ve benzersiz VKN'li bir BA/BS satırı. "Yeniden karşılaştır"
  * çalıştırılmaz (demo kararlarını sıfırlamasın).
  */
@@ -35,9 +35,11 @@ test.describe("mutabakat", () => {
     await expect(page.getByRole("tab", { name: "Hesaplar" })).toHaveAttribute("aria-selected", "true");
     const rows = page.getByRole("table").getByRole("row");
 
-    // Demo kararları: 100 açıklandı, 102 incelemede.
-    await expect(rows.filter({ hasText: /^100/ })).toContainText("Açıklandı");
-    await expect(rows.filter({ hasText: /^102/ })).toContainText("İncelemede");
+    // Demo kararları (cmd/demo-seed/reconciliation.go): bir fark
+    // açıklanmış, bir fark inceleme kuyruğunda. Hesap kodları demo verisiyle
+    // değişebildiği için duruma göre aranır.
+    await expect(rows.filter({ hasText: "Açıklandı" }).first()).toBeVisible();
+    await expect(rows.filter({ hasText: "İncelemede" }).first()).toBeVisible();
 
     // Filtre: "Yalnızca açık farklar" kapanınca eşleşen hesaplar da görünür.
     const onlyOpen = page.getByRole("checkbox", { name: "Yalnızca açık farklar" });
@@ -49,32 +51,37 @@ test.describe("mutabakat", () => {
     await onlyOpen.click();
     await expect(rows.filter({ hasText: "Eşleşti" })).toHaveCount(0);
 
+    // Karar verilecek satır: açık (açıklanmamış, incelemede olmayan) ilk fark;
+    // "Açıklama" başlığı ve "Açıklandı" durumu eşleşmez.
+    const open = rows.filter({ hasText: /Açık(?!la)/ }).filter({ hasNotText: "İncelemede" }).first();
+    const code = (await open.getByRole("cell").first().innerText()).match(/^\d+/)?.[0];
+    expect(code, "açık fark satırı").toBeTruthy();
+    const row = rows.filter({ hasText: new RegExp(`^${code}`) });
+
     // Ayrıntı: kaynak türüne göre kırılım ve fişlenmemiş kayıtlar.
-    await rows.filter({ hasText: /^191/ }).getByRole("button", { name: "Ayrıntı" }).click();
-    const detail = page.getByRole("dialog", { name: /^191/ });
+    await row.getByRole("button", { name: "Ayrıntı" }).click();
+    const detail = page.getByRole("dialog", { name: new RegExp(`^${code}`) });
     await expect(detail.getByRole("heading", { name: "Kaynaklara göre" })).toBeVisible();
-    await expect(detail.getByRole("row").filter({ hasText: "Masraf" })).toBeVisible();
     await expect(detail.getByRole("heading", { name: "Fişlenmemiş kayıtlar" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(detail).toBeHidden();
 
-    // Karar: 120 farkı açıklanır, not satırda görünür.
+    // Karar: fark açıklanır, not satırda görünür.
     const note = `e2e açıklama ${Date.now()}`;
-    await page.getByRole("button", { name: "120 için karar" }).click();
+    await page.getByRole("button", { name: `${code} için karar` }).click();
     await page.getByRole("menuitem", { name: "Açıkla" }).click();
-    const explain = page.getByRole("dialog", { name: "120: farkı açıkla" });
+    const explain = page.getByRole("dialog", { name: `${code}: farkı açıkla` });
     await explain.getByLabel("Not").fill(note);
     await explain.getByRole("button", { name: "Kaydet" }).click();
     await expect(explain).toBeHidden();
-    const row120 = rows.filter({ hasText: /^120/ });
-    await expect(row120).toContainText("Açıklandı");
-    await expect(row120).toContainText(note);
+    await expect(row).toContainText("Açıklandı");
+    await expect(row).toContainText(note);
 
     // Yeniden aç: fark tekrar açık olur.
-    await page.getByRole("button", { name: "120 için karar" }).click();
+    await page.getByRole("button", { name: `${code} için karar` }).click();
     await page.getByRole("menuitem", { name: "Yeniden aç" }).click();
-    await expect(row120).toContainText("Açık");
-    await expect(row120).not.toContainText("Açıklandı");
+    await expect(row).not.toContainText("Açıklandı");
+    await expect(row).toContainText("Açık");
   });
 
   test("BA/BS beyanı: satır ekle ve sil", async ({ page }) => {
