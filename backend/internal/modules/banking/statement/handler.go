@@ -57,6 +57,11 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
 	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
 	mux.Handle("GET "+txs+"/export", middleware.Chain(http.HandlerFunc(h.exportTransactions), authn, org, read, eng))
+	// Luca "Banka Ekstreleri" CSV (#465): file, history and mapping guide.
+	luca := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-statement-exports"
+	mux.Handle("POST "+luca, middleware.Chain(http.HandlerFunc(h.lucaExport), authn, org, read, eng))
+	mux.Handle("GET "+luca, middleware.Chain(http.HandlerFunc(h.lucaExports), authn, org, read, eng))
+	mux.Handle("GET "+luca+"/guide", middleware.Chain(http.HandlerFunc(h.lucaGuide), authn, org, read, eng))
 	// Office statement templates (#383): no engagement, the office's layouts.
 	tpl := "/v1/tenant/bank-statement-templates"
 	mux.Handle("GET "+tpl, middleware.Chain(http.HandlerFunc(h.listTemplates), authn, org, read))

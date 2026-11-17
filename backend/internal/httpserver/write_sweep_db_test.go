@@ -217,6 +217,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/credentials":            {body: `{"values":{"customer_no":"123456789","username":"atlas_ws","password":"sweep-pw"}}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":                  {body: `{"from":"2026-11-03","to":"2026-11-03"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-statements":                                         {file: "file", fileName: "ekstre.csv", fileBody: "Tarih;Açıklama;Tutar;Bakiye\n05.10.2026;Ödeme;-100,00;900,00\n"},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-statement-exports":                                  {body: `{"cash_box_uuid":"00000000-0000-0000-0000-000000000000","date_from":"2026-10-01","date_to":"2026-10-31"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases":                               {body: `{"match_type":"name","match_value":"Tarama Yazılım A.Ş.","account_code":"120.01.001"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}":                  {body: `{"account_code":"120.01.002"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}":                 {},

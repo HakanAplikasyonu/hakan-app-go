@@ -9906,6 +9906,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-statement-exports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * History of Luca bank statement (Banka Ekstreleri) CSV files
+         * @description Requires `tenant.bank.read` (#465). Newest first; `repeated_count` is how many movements of the file were exported before.
+         */
+        get: operations["listLucaBankStatementExports"];
+        put?: never;
+        /**
+         * Luca "Banka Ekstreleri" CSV of one account and date range (unverified template)
+         * @description Requires `tenant.bank.read` (#465). Columns: Evrak Tarihi
+         *     (dd.MM.yyyy), Evrak No (receipt number / bank reference), Açıklama,
+         *     Tutar (signed: money in `+`, out `−`; or `amount_layout:
+         *     two_columns` → Borç = out, Alacak = in), VKN/TCKN and IBAN of the
+         *     counterparty, Döviz. Two decimals with a decimal comma, Windows-1254,
+         *     `;` and `"` by default (`delimiter`, `quote`, `incoming_sign`
+         *     override). Defaults are the YAML template
+         *     `luca/templates/banka_ekstresi_<version>.yaml` (`verified: false`:
+         *     another team's observation of the Luca screen). Cancelled movements
+         *     are left out; at most 366 days. The file is recorded with its
+         *     movements; `X-Repeated-Count` is how many were exported before,
+         *     `X-Export-UUID` names the record. No movement in the range is
+         *     `422 NO_TRANSACTIONS`.
+         */
+        post: operations["downloadLucaBankStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-statement-exports/guide": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Mapping guide for Luca's ekstre tanımı (column → fiş sütunu, veri türü)
+         * @description Requires `tenant.bank.read` (#465). From the YAML template; `columns` per amount layout.
+         */
+        get: operations["getLucaBankStatementGuide"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions/export": {
         parameters: {
             query?: never;
@@ -16235,6 +16307,13 @@ export interface components {
             /** Format: uuid */
             cash_box_uuid: string;
             cash_box_name: string;
+            /**
+             * Format: int32
+             * @description Luca bank statement files that held the movement (#465); 2 or more = exported again
+             */
+            luca_exports?: number;
+            /** Format: date-time */
+            luca_last_exported_at?: string;
         };
         BankTransactionPage: {
             items: components["schemas"]["BankTransaction"][];
@@ -17382,6 +17461,97 @@ export interface components {
                 items: components["schemas"]["LucaPlanFile"][];
                 limit: number;
                 offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        LucaBankStatementExportInput: {
+            /** Format: uuid */
+            cash_box_uuid: string;
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            /** @description Template version; empty = default */
+            template?: string;
+            /** @enum {string} */
+            amount_layout?: "signed" | "two_columns";
+            /** @enum {string} */
+            incoming_sign?: "+" | "-";
+            /** @example ; */
+            delimiter?: string;
+            /** @description Quote character, or "none" */
+            quote?: string;
+        };
+        LucaBankStatementExport: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            cash_box_uuid: string;
+            cash_box_name: string;
+            /** Format: date */
+            date_from: string;
+            /** Format: date */
+            date_to: string;
+            template_version: string;
+            template_verified: boolean;
+            /** @enum {string} */
+            amount_layout: "signed" | "two_columns";
+            delimiter: string;
+            quote: string;
+            file_name: string;
+            sha256: string;
+            /** Format: int32 */
+            size: number;
+            /** Format: int32 */
+            line_count: number;
+            /** Format: int32 */
+            repeated_count: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        LucaBankStatementGuideColumn: {
+            /** @example Evrak Tarihi */
+            header: string;
+            /**
+             * @description Luca fiş sütunu
+             * @example Evrak Tarihi
+             */
+            program_field: string;
+            /**
+             * @description Luca veri türü (Metin, Tarih, Para)
+             * @example Tarih
+             */
+            data_type: string;
+            /** @description Go date layout of the column */
+            format?: string;
+            required: boolean;
+        };
+        EnvelopeLucaBankStatementExportList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["LucaBankStatementExport"][];
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLucaBankStatementGuide: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                template_version: string;
+                template_verified: boolean;
+                delimiter: string;
+                quote: string;
+                encoding: string;
+                header_row: boolean;
+                amount_layout: string;
+                incoming_sign: string;
+                notes: string;
+                columns: {
+                    [key: string]: components["schemas"]["LucaBankStatementGuideColumn"][];
+                };
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -35404,6 +35574,119 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+        };
+    };
+    listLucaBankStatementExports: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description History */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaBankStatementExportList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadLucaBankStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LucaBankStatementExportInput"];
+            };
+        };
+        responses: {
+            /** @description CSV file (Windows-1254) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_TRANSACTIONS` or `REQUIRED_FIELD_MISSING` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLucaBankStatementGuide: {
+        parameters: {
+            query?: {
+                template?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Guide */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaBankStatementGuide"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
         };
     };
     exportTenantBankTransactions: {

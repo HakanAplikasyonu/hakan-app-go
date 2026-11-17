@@ -43,6 +43,10 @@ type TransactionView struct {
 	PossibleDuplicate bool      `json:"possible_duplicate"`
 	CashBoxUUID       uuid.UUID `json:"cash_box_uuid"`
 	CashBoxName       string    `json:"cash_box_name"`
+	// LucaExports: how many Luca bank statement files held the movement
+	// (#465); more than one means it was exported again.
+	LucaExports      int32      `json:"luca_exports"`
+	LucaLastExportAt *time.Time `json:"luca_last_exported_at,omitempty"`
 }
 
 // TransactionSummary counts the filtered set (match status not applied).
@@ -60,6 +64,13 @@ func decimalString(n pgtype.Numeric) string {
 		return "0.00"
 	}
 	return decimal.NewFromBigInt(n.Int, n.Exp).StringFixed(2)
+}
+
+func decimalOf(n pgtype.Numeric) decimal.Decimal {
+	if !n.Valid || n.Int == nil || n.NaN {
+		return decimal.Zero
+	}
+	return decimal.NewFromBigInt(n.Int, n.Exp)
 }
 
 // direction: A (alacak) para girişi, B (borç) para çıkışı.
@@ -146,6 +157,21 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items := make([]TransactionView, len(rows))
+	ids := make([]uuid.UUID, len(rows))
+	for i, t := range rows {
+		ids[i] = t.Uuid
+	}
+	marks, err := h.q.BankTransactionExportMarks(r.Context(), db.BankTransactionExportMarksParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, Uuids: ids,
+	})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load export marks")
+		return
+	}
+	marked := make(map[uuid.UUID]db.BankTransactionExportMarksRow, len(marks))
+	for _, m := range marks {
+		marked[m.BankTransactionUuid] = m
+	}
 	for i, t := range rows {
 		items[i] = TransactionView{
 			UUID: t.Uuid, Date: t.TransactionDate.Time.Format(time.DateOnly), Direction: direction(t.DebitCredit),
@@ -153,6 +179,13 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 			CounterpartyName: textPtr(t.CounterpartyName), Kind: t.Kind, KindDetail: t.KindDetail,
 			MatchStatus: t.MatchStatus, Period: t.Period, PossibleDuplicate: t.PossibleDuplicate,
 			CashBoxUUID: t.CashBoxUuid, CashBoxName: t.CashBoxName,
+		}
+		if m, ok := marked[t.Uuid]; ok {
+			items[i].LucaExports = m.Exports
+			if m.LastExportedAt.Valid {
+				at := m.LastExportedAt.Time
+				items[i].LucaLastExportAt = &at
+			}
 		}
 	}
 	response.JSON(w, r, http.StatusOK, map[string]any{
