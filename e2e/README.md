@@ -14,6 +14,7 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 | `tests/mutabakat.spec.ts` | Mutabakat panosu (#389): hesap farkları (filtre, ayrıntı, açıkla / yeniden aç), BA/BS beyan satırı ekle / sil, cari mektubu oluştur ve gönder, karşı firmanın yanıt sayfası (itiraz), geçersiz bağlantı | Demo ofisi, Atlas Gıda; benzersiz alıcı ve VKN |
 | `tests/beyanname.spec.ts` | Beyannameler (#390): KDV1 düzeltme, kontrol listesi, hazırla, Excel, verildi kaydı; MUHSGK hazırla / Excel / taslağa geri al; Ba / Bs formları | Demo ofisi, Atlas Gıda (beyan dönemi) |
 | `tests/bordro-banka.spec.ts` | Bordro (#382, #395): dönem bordrosu, personel ve SGK listeleri, Excel'e aktar; CSV bordro önizle / içe aktar. Banka (#383): IBAN'sız dosyada Türkçe hata, MT940 yükle, hareket filtresi, Excel'e aktar | Atlas Gıda (bordro, 2025-06 dönemi); Selin Yılmaz (her koşuda yeni IBAN'lı hesap) |
+| `tests/masraf-z-rapor.spec.ts` | Masraf ve Z raporu (#384): onay ve kategori filtresi, kategoriler, süreklilik denetimi, Excel'e aktar → aynı dosyayı geri yükle (satır eklenmez, #484). Easytrade (#385): bağlantı, ödeme türü özeti, tablo araması. Rapor (#386): aylık / yıllık, PDF, e-postayla gönder, toplu gönderim | Atlas Gıda (masraf, Z, Easytrade; yalnızca okur); Selin Yılmaz (rapor, benzersiz alıcı) |
 
 `office-onboarding.spec.ts` ofis ana akışının adımları:
 
