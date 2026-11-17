@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/cache"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
@@ -463,8 +465,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			ClientSecret: cfg.Parasut.ClientSecret, RedirectURL: cfg.Parasut.RedirectURL,
 		}, nil)))
 	// Easytrade adaptörü (issue #46).
-	easytrade.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		easytrade.NewHandler(easytrade.NewService(deps.DB, sourceVault, cfg.Easytrade.BaseURL, nil)))
+	easytradeSvc := easytrade.NewService(deps.DB, sourceVault, cfg.Easytrade.BaseURL, nil)
+	easytrade.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, easytrade.NewHandler(easytradeSvc))
+	// İmzalı Easytrade webhook'u (#385): EASYTRADE_WEBHOOK_SECRET boşsa kapalı (404).
+	var easytradeEnqueue func(context.Context, int64, uuid.UUID) error
+	if deps.Queue != nil {
+		easytradeEnqueue = func(_ context.Context, taxpayerID int64, id uuid.UUID) error {
+			return queue.EnqueueEasytradeSync(deps.Queue, queue.EasytradeSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id})
+		}
+	}
+	easytrade.RegisterWebhook(mux, easytrade.NewWebhook(easytradeSvc, cfg.Easytrade.WebhookSecret, easytradeEnqueue))
 	// KolayBi adaptörü (issue #48).
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))

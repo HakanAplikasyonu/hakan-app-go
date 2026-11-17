@@ -6601,6 +6601,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/webhooks/easytrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signed change notification from Easytrade
+         * @description Public; authenticated by the signature, not a bearer token. Off
+         *     (`404`) while `EASYTRADE_WEBHOOK_SECRET` is empty: the scheduled sync
+         *     (polling) is then the only trigger. Easytrade signs
+         *     `{timestamp}.{body}` with HMAC-SHA256 and the shared secret and
+         *     sends `X-Easytrade-Timestamp` (Unix seconds, ±5 minutes) and
+         *     `X-Easytrade-Signature: sha256=<hex>`. The body carries no data: every
+         *     active connection of `company_id` has its next sync pulled to now and
+         *     enqueued (one per connection); the sync reads through the normal
+         *     API, so a replay can at most cause one extra idempotent read
+         *     (issue #385, docs/easytrade-senkron.md §2).
+         */
+        post: operations["receiveEasytradeWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync": {
         parameters: {
             query?: never;
@@ -9040,6 +9069,11 @@ export interface components {
             /** @description Consecutive failed scheduled runs. */
             sync_failures?: number;
             last_run?: components["schemas"]["EasytradeSyncRun"];
+            /**
+             * Format: date-time
+             * @description The last signed push from Easytrade.
+             */
+            last_webhook_at?: string;
             /** Format: date-time */
             created_at: string;
         };
@@ -24352,6 +24386,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    receiveEasytradeWebhook: {
+        parameters: {
+            query?: never;
+            header: {
+                "X-Easytrade-Timestamp": string;
+                "X-Easytrade-Signature": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    event_id?: string;
+                    /** @example invoice.created */
+                    event?: string;
+                    company_id: string;
+                    /** @example invoice */
+                    resource?: string;
+                    resource_id?: string;
+                    /** Format: date-time */
+                    occurred_at?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted; `accepted` connections will sync shortly */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            accepted: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description `WEBHOOK_SIGNATURE_INVALID` or `WEBHOOK_TIMESTAMP_INVALID` */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };

@@ -133,6 +133,9 @@ type KolayBiConfig struct {
 // EasytradeConfig is the Easytrade Muhasebe API (docs/kaynak 09).
 type EasytradeConfig struct {
 	BaseURL string
+	// WebhookSecret signs Easytrade's pushes (issue #385); empty turns the
+	// receiver off and the scheduled sync (polling) stays the only trigger.
+	WebhookSecret string
 }
 
 // BankConfig is the bank web-service channel (docs/kaynak 20 §4–5). The
@@ -608,7 +611,7 @@ func Load() (Config, error) {
 			InviteTTL: getDuration("TENANCY_INVITE_TTL", 168*time.Hour),
 		},
 		KolayBi:   KolayBiConfig{BaseURL: getEnv("KOLAYBI_BASE_URL", "https://ofis-api.kolaybi.com"), Channel: getEnv("KOLAYBI_CHANNEL", "")},
-		Easytrade: EasytradeConfig{BaseURL: getEnv("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api")},
+		Easytrade: EasytradeConfig{BaseURL: getEnv("EASYTRADE_API_BASE_URL", "https://pro.easytradetr.com/api"), WebhookSecret: getEnv("EASYTRADE_WEBHOOK_SECRET", "")},
 		Parasut: ParasutConfig{
 			BaseURL:      getEnv("PARASUT_BASE_URL", "https://api.parasut.com"),
 			ClientID:     getEnv("PARASUT_CLIENT_ID", ""),

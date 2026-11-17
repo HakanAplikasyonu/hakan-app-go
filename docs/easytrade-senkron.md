@@ -36,3 +36,26 @@ Kod: `backend/internal/modules/sources/easytrade`.
 Kimlik bilgisi (30 günlük Sanctum token'ı) sır kasasındadır; anahtar
 halkası (`SECRETS_KEYRING` / `ENCRYPTION_KEY`) geçersizse kasa kapalıdır,
 tarama hiçbir bağlantıyı kuyruğa koymaz. Taban adres `EASYTRADE_API_BASE_URL`.
+
+## 2. Webhook (push) — Easytrade tarafı hazır olduğunda
+
+Easytrade bugün dışarıya bildirim göndermiyor; portal alıcıyı hazır tutar
+(`POST /v1/webhooks/easytrade`). `EASYTRADE_WEBHOOK_SECRET` boşken alıcı
+kapalıdır (`404`) ve tek tetik zamanlanmış senkrondur (polling).
+
+| | |
+|---|---|
+| İmza | `X-Easytrade-Signature: sha256=<hex(HMAC-SHA256(secret, "{timestamp}.{gövde}"))>` |
+| Zaman | `X-Easytrade-Timestamp`: Unix saniye, ±5 dakika (tekrar oynatma penceresi) |
+| Gövde | `{"event_id", "event", "company_id", "resource", "resource_id", "occurred_at"}`; yalnızca `company_id` zorunlu |
+| Etki | `company_id`'ye bağlı her etkin bağlantının `next_sync_at`'i şimdiye çekilir ve senkronu kuyruğa girer (bağlantı başına tek görev). Veri webhook'la taşınmaz; senkron normal API'den okur. |
+| Yanıt | `202 {"accepted": n}`; bilinmeyen şirket de `202` ve `0` (şirket varlığı sızmaz). İmza/zaman hatası `401`. |
+
+Örnek imza (kabuk):
+
+```sh
+ts=$(date +%s); body='{"event":"invoice.created","company_id":"42","resource":"invoice","resource_id":"7"}'
+sig=$(printf '%s.%s' "$ts" "$body" | openssl dgst -sha256 -hmac "$EASYTRADE_WEBHOOK_SECRET" -hex | sed 's/^.* //')
+curl -X POST "$API/v1/webhooks/easytrade" -H "Content-Type: application/json" \
+  -H "X-Easytrade-Timestamp: $ts" -H "X-Easytrade-Signature: sha256=$sig" -d "$body"
+```

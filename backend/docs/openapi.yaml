@@ -8863,6 +8863,65 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/webhooks/easytrade:
+    post:
+      tags: [Sources]
+      operationId: receiveEasytradeWebhook
+      summary: Signed change notification from Easytrade
+      description: |
+        Public; authenticated by the signature, not a bearer token. Off
+        (`404`) while `EASYTRADE_WEBHOOK_SECRET` is empty: the scheduled sync
+        (polling) is then the only trigger. Easytrade signs
+        `{timestamp}.{body}` with HMAC-SHA256 and the shared secret and
+        sends `X-Easytrade-Timestamp` (Unix seconds, ±5 minutes) and
+        `X-Easytrade-Signature: sha256=<hex>`. The body carries no data: every
+        active connection of `company_id` has its next sync pulled to now and
+        enqueued (one per connection); the sync reads through the normal
+        API, so a replay can at most cause one extra idempotent read
+        (issue #385, docs/easytrade-senkron.md §2).
+      security: []
+      parameters:
+        - { name: X-Easytrade-Timestamp, in: header, required: true, schema: { type: string, example: "1794906000" } }
+        - { name: X-Easytrade-Signature, in: header, required: true, schema: { type: string, example: "sha256=5f1c…" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [company_id]
+              properties:
+                event_id: { type: string }
+                event: { type: string, example: invoice.created }
+                company_id: { type: string }
+                resource: { type: string, example: invoice }
+                resource_id: { type: string }
+                occurred_at: { type: string, format: date-time }
+      responses:
+        "202":
+          description: Accepted; `accepted` connections will sync shortly
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [accepted]
+                    properties:
+                      accepted: { type: integer }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401":
+          description: "`WEBHOOK_SIGNATURE_INVALID` or `WEBHOOK_TIMESTAMP_INVALID`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -12018,6 +12077,7 @@ components:
         last_success_at: { type: string, format: date-time }
         sync_failures: { type: integer, description: Consecutive failed scheduled runs. }
         last_run: { $ref: "#/components/schemas/EasytradeSyncRun" }
+        last_webhook_at: { type: string, format: date-time, description: The last signed push from Easytrade. }
         created_at: { type: string, format: date-time }
     EasytradeSyncRun:
       type: object

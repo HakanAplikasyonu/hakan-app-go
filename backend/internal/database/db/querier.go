@@ -742,6 +742,8 @@ type Querier interface {
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
+	// tenant-lint: cross-taxpayer Easytrade webhook'u şirket kimliğiyle gelir, bağlantının mükellefi bilinmez (rls.System)
+	ListSourceConnectionsByExternalCompany(ctx context.Context, arg ListSourceConnectionsByExternalCompanyParams) ([]ListSourceConnectionsByExternalCompanyRow, error)
 	ListSourceConnectionsBySystem(ctx context.Context, arg ListSourceConnectionsBySystemParams) ([]SourceConnection, error)
 	ListStorageActivity(ctx context.Context, arg ListStorageActivityParams) ([]ListStorageActivityRow, error)
 	ListStorageLinksByKey(ctx context.Context, objectKey string) ([]StorageLink, error)
@@ -881,6 +883,9 @@ type Querier interface {
 	// hatalı pencere olduğu gibi kalır.
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
+	// Webhook (issue #385): zamanlanmış bağlantının sıradaki senkronunu şimdiye
+	// çeker ve son bildirim zamanını yazar.
+	PullSourceConnectionNow(ctx context.Context, arg PullSourceConnectionNowParams) (int64, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
 	// Access tokens of an ended (or unknown) session are refused (#323).
 	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)

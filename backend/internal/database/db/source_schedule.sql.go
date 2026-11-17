@@ -54,6 +54,68 @@ func (q *Queries) ListDueSourceConnections(ctx context.Context, arg ListDueSourc
 	return items, nil
 }
 
+const listSourceConnectionsByExternalCompany = `-- name: ListSourceConnectionsByExternalCompany :many
+SELECT taxpayer_id, uuid FROM source_connections
+WHERE source_system = $1 AND external_company_id = $2
+  AND setup_state = 'active' AND status IN ('active', 'rate_limited')
+ORDER BY id
+`
+
+type ListSourceConnectionsByExternalCompanyParams struct {
+	SourceSystem      string      `json:"source_system"`
+	ExternalCompanyID pgtype.Text `json:"external_company_id"`
+}
+
+type ListSourceConnectionsByExternalCompanyRow struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+// tenant-lint: cross-taxpayer Easytrade webhook'u şirket kimliğiyle gelir, bağlantının mükellefi bilinmez (rls.System)
+func (q *Queries) ListSourceConnectionsByExternalCompany(ctx context.Context, arg ListSourceConnectionsByExternalCompanyParams) ([]ListSourceConnectionsByExternalCompanyRow, error) {
+	rows, err := q.db.Query(ctx, listSourceConnectionsByExternalCompany, arg.SourceSystem, arg.ExternalCompanyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSourceConnectionsByExternalCompanyRow{}
+	for rows.Next() {
+		var i ListSourceConnectionsByExternalCompanyRow
+		if err := rows.Scan(&i.TaxpayerID, &i.Uuid); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const pullSourceConnectionNow = `-- name: PullSourceConnectionNow :one
+UPDATE source_connections
+SET next_sync_at = CASE WHEN sync_interval_minutes IS NULL THEN next_sync_at
+                        ELSE LEAST(COALESCE(next_sync_at, $1::timestamptz), $1::timestamptz) END,
+    meta = meta || jsonb_build_object('last_webhook_at', $1::timestamptz)
+WHERE taxpayer_id = $2 AND uuid = $3
+RETURNING id
+`
+
+type PullSourceConnectionNowParams struct {
+	Now        pgtype.Timestamptz `json:"now"`
+	TaxpayerID int64              `json:"taxpayer_id"`
+	Uuid       uuid.UUID          `json:"uuid"`
+}
+
+// Webhook (issue #385): zamanlanmış bağlantının sıradaki senkronunu şimdiye
+// çeker ve son bildirim zamanını yazar.
+func (q *Queries) PullSourceConnectionNow(ctx context.Context, arg PullSourceConnectionNowParams) (int64, error) {
+	row := q.db.QueryRow(ctx, pullSourceConnectionNow, arg.Now, arg.TaxpayerID, arg.Uuid)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const setSourceConnectionSchedule = `-- name: SetSourceConnectionSchedule :one
 UPDATE source_connections
 SET sync_interval_minutes = $1, next_sync_at = $2, sync_failures = $3
