@@ -15,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	reviewrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	review "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 )
 
 // DemoBankIBAN is the demo taxpayer's bank account (valid check digits, no
@@ -29,8 +30,9 @@ const demoPayerIBAN = "TR290006200000006299001234"
 // statement of the taxpayer's Ziraat account, the mizan code of the
 // account, the alias that says the payments of "X Yazılım Teknolojileri
 // A.Ş." are Oğuz Yılmaz's cari, a supplier known from invoices (cari
-// hafızası) and the suggestions of the month in the review queue. A few are
-// approved so "Fiş taslağı oluştur" has something to book; the rest wait.
+// hafızası) and the suggestions of the month in the review queue. The
+// payments are approved, booked and exported to Luca; one collection waits
+// in the queue.
 func seedBank(ctx context.Context, pool *pgxpool.Pool, sub posting.Subject, actor int64) error {
 	q := db.New(pool)
 	box, err := q.InsertCashBox(ctx, db.InsertCashBoxParams{TaxpayerID: sub.TaxpayerID, Type: "bank_account", Name: "Ziraat TL vadesiz",
@@ -50,10 +52,13 @@ func seedBank(ctx context.Context, pool *pgxpool.Pool, sub posting.Subject, acto
 		mv("2", 2, banking.DirOut, "3250.75", "EFT GIDEN ALICI: KALEM KIRTASIYE LTD STI FATURA KRT2026000001207", "Kalem Kırtasiye Ltd. Şti.", "", "9200000035"),
 		mv("3", 2, banking.DirOut, "8.50", "EFT UCRETI", "", "", ""),
 		mv("4", 2, banking.DirOut, "0.43", "BSMV", "", "", ""),
-		mv("5", 5, banking.DirOut, "18420.00", "SGK PRIM ODEMESI 2026/09", "", "", ""),
-		mv("6", 10, banking.DirOut, "42000.00", "MAAS ODEMESI EYLUL PERSONEL", "", "", ""),
-		mv("7", 26, banking.DirOut, "9875.40", "GIB VERGI ODEMESI KDV 2026/09", "", "", ""),
+		// Eylül yükümlülükleri (ledger.go): tutar ve tarihler bordro ve
+		// beyanname ekranlarıyla aynı.
+		mv("5", 10, banking.DirOut, sepPayrollNet, "MAAS ODEMESI EYLUL PERSONEL", "", "", ""),
+		mv("6", 26, banking.DirOut, sepKDVPayable, "GIB VERGI ODEMESI KDV 2026/09", "", "", ""),
+		mv("7", 26, banking.DirOut, sepMUHSGKPayable, "GIB VERGI ODEMESI MUHSGK 2026/09", "", "", ""),
 		mv("8", 28, banking.DirIn, "4800.00", "HAVALE GELEN DENIZ YILDIRIM", "Deniz Yıldırım", "", ""),
+		mv("9", 30, banking.DirOut, sepSGKPayable, "SGK PRIM ODEMESI 2026/09", "", "", ""),
 	}); err != nil {
 		return fmt.Errorf("movements: %w", err)
 	}
@@ -76,22 +81,33 @@ func seedBank(ctx context.Context, pool *pgxpool.Pool, sub posting.Subject, acto
 	if _, err := flow.Run(ctx, sub, "2026-10"); err != nil {
 		return fmt.Errorf("suggestions: %w", err)
 	}
-	// The bank fees are approved; the rest wait in the queue.
+	// X Yazılım tahsilatı takma adla (alias) kendiliğinden onaylanır; giden
+	// ödemeler burada onaylanır. Onaylılar fişlenip Luca'ya aktarılır (Ekim
+	// mizanında yer alırlar). Deniz Yıldırım havalesi kuyrukta bekler: demoda
+	// cari seçilip onaylanır ve "Fiş taslağı oluştur" ile fişlenir.
 	page, err := flow.List(ctx, sub, "2026-10", "suggested", 50, 0)
 	if err != nil {
 		return err
 	}
-	var fees []uuid.UUID
+	var out []uuid.UUID
 	for _, it := range page.Items {
-		switch banking.Detail(it.KindDetail) {
-		case banking.DetailBankFee, banking.DetailCommission, banking.DetailBSMV:
-			fees = append(fees, it.UUID)
+		if banking.Direction(it.Direction) == banking.DirOut {
+			out = append(out, it.UUID)
 		}
 	}
-	if len(fees) > 0 {
-		if _, err := flow.Approve(ctx, sub, actor, fees); err != nil {
+	if len(out) > 0 {
+		if _, err := flow.Approve(ctx, sub, actor, out); err != nil {
 			return fmt.Errorf("approve: %w", err)
 		}
 	}
-	return nil
+	scope := engagementctx.Scope{ID: sub.EngagementID, OrganizationID: sub.OrganizationID, TaxpayerID: sub.TaxpayerID}
+	drafts, err := flow.CreateDrafts(ctx, scope, actor, "2026-10")
+	if err != nil {
+		return fmt.Errorf("bank drafts: %w", err)
+	}
+	ids := make([]uuid.UUID, 0, len(drafts.Drafts))
+	for _, d := range drafts.Drafts {
+		ids = append(ids, d.UUID)
+	}
+	return approveAndExport(ctx, pool, scope, actor, ids)
 }

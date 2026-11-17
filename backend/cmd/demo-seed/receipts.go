@@ -40,9 +40,23 @@ const demoReceiptZReports = "Tarih;ÖKC Seri No;Z No;Fiş Sayısı;Nakit;Kart;%1
 	"13.10.2026;JH20012345;0107;77;4.500,00;6.600,00;99,01;0,99;1.000,00;100,00;8.250,00;1.650,00;11.100,00\n"
 
 // seedReceipts loads the demo expenses and Z reports through the Excel
-// import, approves the first ones (journal drafts with source_kind receipt)
-// and adds one office category to the template.
+// import, approves the first ones (journal drafts with source_kind receipt;
+// the expense drafts are exported to Luca, the Z ones wait) and adds one
+// office category to the template.
 func seedReceipts(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.Scope, actor int64) error {
+	if err := seedReceiptRows(ctx, pool, scope, actor); err != nil {
+		return err
+	}
+	// Onaylı masraf fişleri Luca'ya aktarılır; Z raporu taslakları bekler
+	// (Ekim mutabakatında "aktarılmamış taslak" farkı, ledger.go).
+	ids, err := draftsWhere(ctx, pool, scope, `d.origin->>'source' = 'receipt' AND d.origin->>'target_type' = 'expense'`)
+	if err != nil {
+		return err
+	}
+	return approveAndExport(ctx, pool, scope, actor, ids)
+}
+
+func seedReceiptRows(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.Scope, actor int64) error {
 	return rls.System(ctx, pool, "demo-seed: expenses and Z reports (#384)", func(ctx context.Context, _ pgx.Tx) error {
 		q := db.New(pool)
 		warn := warningsengine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q))

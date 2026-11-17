@@ -223,7 +223,7 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedPayroll(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("payroll → %s: %w", tp.Key, err)
 			}
-			// Eylül ve Ekim 2026 mizanları, ofis mobilde mizan raporu (#393).
+			// Eylül 2026 mizanı ve Luca planı; Ekim mizanı mutabakattan önce (#393, #456).
 			if err := seedMizan(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("mizan → %s: %w", tp.Key, err)
 			}
@@ -244,6 +244,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			// Belge arşivi ve İSG evrakları (yaklaşan bitiş uyarısıyla) (#393).
 			if err := seedArchive(ctx, pool, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
 				return fmt.Errorf("archive → %s: %w", tp.Key, err)
+			}
+			// Ekim mizanı: Eylül + Luca'ya aktarılan Ekim fişleri (#456).
+			if err := seedMizanOctober(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("mizan october → %s: %w", tp.Key, err)
 			}
 			// Ekim mutabakatı: BA/BS beyanı, karşılaştırma, mektuplar (#389).
 			// Mizan, masraf ve bordrodan sonra: kaynaklar yerinde olsun.

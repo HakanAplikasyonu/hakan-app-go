@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
@@ -71,8 +72,9 @@ func demoPDF(title string) []byte {
 }
 
 // seedPayroll gives Atlas the September and October 2026 payrolls (Luca
-// format), their SGK accruals (September paid), September's journal draft
-// and the payroll PDFs shown in the mükellef panel.
+// format), their SGK accruals (September paid on the day of the bank
+// payment), both months' journal drafts exported to Luca and the payroll
+// PDFs shown in the mükellef panel.
 func seedPayroll(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.Scope, actor int64) error {
 	svc := payroll.New(database.Ambient{Pool: pool}, payrollStore{up: seedStore}, payrollSecret).
 		WithJournals(journals.New(pool, seedStore))
@@ -94,13 +96,18 @@ func seedPayroll(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.Sc
 				return fmt.Errorf("document %s: %w", d.title, err)
 			}
 		}
+		// Her ayın tahakkuk fişi Luca'ya aktarılır (Eylül ve Ekim mizanında).
+		d, err := svc.CreateJournalDraft(ctx, scope, actor, res.Run.UUID, payroll.Accounts{Expense: "770.03"})
+		if err != nil {
+			return fmt.Errorf("journal draft %s: %w", period, err)
+		}
+		if err := approveAndExport(ctx, pool, scope, actor, []uuid.UUID{d.UUID}); err != nil {
+			return fmt.Errorf("journal draft %s: %w", period, err)
+		}
 		if period == "2026-09" {
-			if _, err := svc.CreateJournalDraft(ctx, scope, actor, res.Run.UUID, payroll.Accounts{Expense: "770.03"}); err != nil {
-				return fmt.Errorf("journal draft %s: %w", period, err)
-			}
 			if res.Run.SGK != nil {
 				paid := res.Run.SGK.Payable
-				at := "2026-10-30"
+				at := sepSGKPaidOn
 				if _, err := svc.UpdatePremium(ctx, scope.TaxpayerID, res.Run.SGK.UUID, payroll.PremiumInput{Paid: &paid, PaidAt: &at}); err != nil {
 					return fmt.Errorf("sgk payment %s: %w", period, err)
 				}
