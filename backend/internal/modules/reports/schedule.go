@@ -13,6 +13,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/intconv"
 )
 
 // ScheduleQueries is the db subset of scheduled reports.
@@ -152,7 +153,7 @@ func (s *Scheduler) RunDue(ctx context.Context) (int, error) {
 	}
 	t := now().In(istanbul)
 	period := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, istanbul).AddDate(0, -1, 0).Format("2006-01")
-	rows, err := s.Q.DueReportSchedules(ctx, db.DueReportSchedulesParams{Today: int32(t.Day()), Period: period, BatchLimit: 50})
+	rows, err := s.Q.DueReportSchedules(ctx, db.DueReportSchedulesParams{Today: intconv.Int32(t.Day()), Period: period, BatchLimit: 50})
 	if err != nil {
 		return 0, fmt.Errorf("reports: due schedules: %w", err)
 	}
