@@ -38,9 +38,11 @@ import {
   receiptKeys,
   receiptsService,
 } from "../services/receipts.service";
+import { FOCUS_PARAM } from "../lib/related-href";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
 import { Money } from "./office-ui";
 import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
+import { useRelatedColumn } from "./related-column";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 const STATUS_FILTERS: StatusFilter[] = [
@@ -248,7 +250,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     refresh,
   );
 
-  const columns = useMemo<ColumnDef<Expense, unknown>[]>(
+  const baseColumns = useMemo<ColumnDef<Expense, unknown>[]>(
     () => [
       createDateColumn<Expense>({
         id: "expense_date",
@@ -335,7 +337,7 @@ function ExpensesInner({ engagement }: { engagement: string }) {
         cell: ({ row }) =>
           row.original.journal ? (
             <Link
-              href={routes.tenant.engagementJournals(slug, engagement)}
+              href={`${routes.tenant.engagementJournals(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`journal_draft:${row.original.journal.uuid}`)}`}
               className="text-brand-text font-mono text-sm hover:underline"
             >
               #{row.original.journal.entry_no}
@@ -373,6 +375,16 @@ function ExpensesInner({ engagement }: { engagement: string }) {
       }),
     ],
     [t, slug, engagement, categories, canWrite, canApprove, posting, decide],
+  );
+  // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
+  const relatedColumn = useRelatedColumn<Expense>(
+    "expense",
+    (x) => x.uuid,
+    (x) => x.vendor_name ?? x.description,
+  );
+  const columns = useMemo<ColumnDef<Expense, unknown>[]>(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
   );
 
   const sum = list.data;

@@ -49,6 +49,7 @@ import {
   type SgkPremium,
 } from "../services/payroll.service";
 import { Money } from "./office-ui";
+import { useRelatedColumn } from "./related-column";
 
 type View = "runs" | "employees" | "sgk" | "documents";
 const VIEWS: View[] = ["runs", "employees", "sgk", "documents"];
@@ -196,7 +197,7 @@ function RunsView({ engagement }: { engagement: string }) {
     onError: (e) => toast.error(errText(e, t("office.payroll.action_failed"))),
   });
 
-  const columns = useMemo<ColumnDef<PayrollRun, unknown>[]>(
+  const baseColumns = useMemo<ColumnDef<PayrollRun, unknown>[]>(
     () => [
       createColumn<PayrollRun>({
         id: "period",
@@ -258,6 +259,16 @@ function RunsView({ engagement }: { engagement: string }) {
       }),
     ],
     [t, periodLabel],
+  );
+  // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
+  const relatedColumn = useRelatedColumn<PayrollRun>(
+    "payroll_run",
+    (x) => x.uuid,
+    (x) => x.period,
+  );
+  const columns = useMemo<ColumnDef<PayrollRun, unknown>[]>(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
   );
 
   return (

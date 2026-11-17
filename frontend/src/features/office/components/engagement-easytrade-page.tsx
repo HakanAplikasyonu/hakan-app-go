@@ -43,6 +43,7 @@ import {
 } from "../hooks/use-easytrade";
 import { useOfficePeriod, usePeriodText } from "../period";
 import { Money } from "./office-ui";
+import { useRelatedColumn } from "./related-column";
 
 /** Senkron aralığı seçenekleri (dakika); "off" yalnızca elle senkron. */
 const INTERVALS = ["off", "60", "240", "720", "1440"] as const;
@@ -400,7 +401,7 @@ function PaymentSummary({ et, period }: { et: ET; period: string }) {
 function FinancialSection({ et, period }: { et: ET; period: string }) {
   const { t } = useLocale();
   const periodText = usePeriodText();
-  const columns = useMemo(
+  const baseColumns = useMemo(
     () => [
       createDateColumn<EasytradeFinancialTransaction>({
         id: "transaction_date",
@@ -484,6 +485,16 @@ function FinancialSection({ et, period }: { et: ET; period: string }) {
       }),
     ],
     [t],
+  );
+  // Hareketin ilişkili kayıtları: bağlı fatura ve uyarılar (#469).
+  const relatedColumn = useRelatedColumn<EasytradeFinancialTransaction>(
+    "financial_transaction",
+    (x) => x.uuid,
+    (x) => x.description,
+  );
+  const columns = useMemo(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
   );
   const data = et.financial.data;
   return (

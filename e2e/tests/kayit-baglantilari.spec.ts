@@ -143,6 +143,37 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await expectShell(page, "Banka");
   });
 
+  test("liste satırlarından ilişkili kayıtlar: banka, fiş, uyarı", async ({ page }) => {
+    await uiLogin(page, DEMO.owner);
+    const base = `/engagements/${engagement}`;
+
+    // Banka sekmesi: satırın bağlantısı hareketi seçili açar, süzgeç korunur.
+    await page.goto(officePath(`${base}/bank?match=matched`));
+    await expectShell(page, "Banka");
+    await page.getByRole("link", { name: /^İlişkili kayıtlar: EFT GELEN/ }).first().click();
+    await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("bank_transaction:") === true);
+    expect(new URL(page.url()).searchParams.get("match")).toBe("matched");
+    await expect(focused(page).getByRole("link", { name: /^Fatura: ATL2026000000102/ })).toBeVisible();
+
+    // Fişler sekmesi: fişin satırı → kaynağı olan hareket.
+    await tabs(page).getByRole("link", { name: "Fişler", exact: true }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/journals`));
+    // Fişler tek dönemlik: dönem şeridinden Ekim seçilir.
+    await page.getByRole("button", { name: /^Eki 26/ }).click();
+    await page.getByRole("link", { name: /^İlişkili kayıtlar: #\d+$/ }).first().click();
+    await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("journal_draft:") === true);
+    await expectShell(page, "Fişler");
+    await expect(focused(page).getByRole("link", { name: /^Banka hareketi: EFT GELEN/ })).toBeVisible();
+
+    // Uyarılar sekmesi: uyarı kartından → andığı hareket ve kural.
+    await tabs(page).getByRole("link", { name: "Uyarılar", exact: true }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/warnings`));
+    await page.getByRole("link", { name: "İlişkili kayıtlar: BNK_UNINVOICED_COLLECTION" }).first().click();
+    await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("warning:") === true);
+    await expectShell(page, "Uyarılar");
+    await expect(focused(page).getByRole("link", { name: "Kural: BNK_UNINVOICED_COLLECTION" })).toBeVisible();
+  });
+
   test("ilişkisi olmayan kayıtta boş durum metni", async ({ page }) => {
     // Hiçbir kayda bağlanmamış ücret hareketi (12,50): yalnız karşı hesabı yok.
     const api = await Api.login(DEMO.owner);

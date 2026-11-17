@@ -1,7 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { CircleAlert, Info, TriangleAlert } from "lucide-react";
+import { CircleAlert, Info, Link2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
@@ -44,6 +44,7 @@ import {
   WARNINGS_WRITE_PERMISSION,
 } from "./warning-actions";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { useFocusHref, useRelatedColumn } from "./related-column";
 import { useOfficePeriod } from "../period";
 
 const PAGE_SIZE = 25;
@@ -209,7 +210,17 @@ function WarningsTable({
   const { t } = useLocale();
   const { slug } = useTenant();
   const rules = useWarningRules(slug);
-  const columns = useWarningColumns();
+  const baseColumns = useWarningColumns();
+  // Uyarının ilişkili kayıtları: kaynak belge ve kural (#469).
+  const relatedColumn = useRelatedColumn<ApiDataWarning>(
+    "warning",
+    (w) => w.uuid,
+    (w) => w.code,
+  );
+  const columns = useMemo<ColumnDef<ApiDataWarning, unknown>[]>(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
+  );
   const code = listState.getParam("code") ?? ALL;
 
   // Üst çubuktaki dönem URL dışında değişir; liste ilk sayfaya döner.
@@ -339,6 +350,8 @@ function WarningGroupCard({
   const { t, locale } = useLocale();
   const { slug } = useTenant();
   const invoiceHref = useInvoiceHref({ carry: false });
+  const scope = useEngagementScope();
+  const focusHref = useFocusHref();
   const { can } = usePermission();
   const directory = useEngagementDirectory();
   const warningText = useApiWarningText();
@@ -449,6 +462,23 @@ function WarningGroupCard({
                         href={invoiceHref(w.entity_uuid, w.engagement_uuid)}
                       >
                         {t("office.warnings_api.open_invoice")}
+                      </Link>
+                    </Button>
+                  ) : null}
+                  {scope ? (
+                    <Button
+                      asChild
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-11 md:min-h-8"
+                    >
+                      <Link
+                        href={focusHref("warning", w.uuid)}
+                        scroll={false}
+                        aria-label={`${t("office.related.title")}: ${w.code}`}
+                      >
+                        <Link2 className="size-4" aria-hidden />
+                        {t("office.related.title")}
                       </Link>
                     </Button>
                   ) : null}
