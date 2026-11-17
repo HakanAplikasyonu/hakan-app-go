@@ -6,6 +6,14 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
 ORDER BY updated_at DESC, id DESC;
 
+-- name: ListBankCounterpartyAliasesPage :many
+-- Liste ucu (issue #453): sayfalı, toplamla.
+SELECT sqlc.embed(a), COUNT(*) OVER () AS total_count FROM bank_counterparty_aliases a
+WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+  AND (sqlc.narg(status)::text IS NULL OR a.status = sqlc.narg(status)::text)
+ORDER BY a.updated_at DESC, a.id DESC
+LIMIT @lim OFFSET @off;
+
 -- name: FindBankCounterpartyAliases :many
 -- Bir hareketin anahtarlarına uyan takma adlar: kural önce, sonra IBAN >
 -- VKN/TCKN > ad, yön tutan önce.

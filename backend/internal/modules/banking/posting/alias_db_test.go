@@ -167,6 +167,14 @@ func TestAliasManual(t *testing.T) {
 	if err != nil || len(list) != 1 {
 		t.Fatalf("list %+v %v", list, err)
 	}
+	// Paged (#453): the page and the total; past the end nothing.
+	page, total, err := f.svc.AliasesPage(ctx, f.sub, "", 1, 0)
+	if err != nil || len(page) != 1 || total != 1 {
+		t.Fatalf("page %+v total %d %v", page, total, err)
+	}
+	if page, _, err := f.svc.AliasesPage(ctx, f.sub, "", 1, 1); err != nil || len(page) != 0 {
+		t.Fatalf("page past the end %+v %v", page, err)
+	}
 	if err := f.svc.DeleteAlias(ctx, f.sub, a.UUID); err != nil {
 		t.Fatal(err)
 	}

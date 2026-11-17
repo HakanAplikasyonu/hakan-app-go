@@ -698,6 +698,8 @@ type Querier interface {
 	// Banka karşı taraf takma adları (issue #383).
 	ListBankCounterpartyAliases(ctx context.Context, arg ListBankCounterpartyAliasesParams) ([]BankCounterpartyAlias, error)
 	ListBankCounterpartyAliasesBySuggestion(ctx context.Context, arg ListBankCounterpartyAliasesBySuggestionParams) ([]BankCounterpartyAlias, error)
+	// Liste ucu (issue #453): sayfalı, toplamla.
+	ListBankCounterpartyAliasesPage(ctx context.Context, arg ListBankCounterpartyAliasesPageParams) ([]ListBankCounterpartyAliasesPageRow, error)
 	ListBankLedgerAccounts(ctx context.Context, arg ListBankLedgerAccountsParams) ([]ListBankLedgerAccountsRow, error)
 	// Ekran listesi: hareket + öneri + inceleme önerisi; durum süzgeci
 	// unassigned (önerisi yok) / suggested / approved (fişe girmedi) / drafted.

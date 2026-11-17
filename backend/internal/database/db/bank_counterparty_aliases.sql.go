@@ -393,6 +393,77 @@ func (q *Queries) ListBankCounterpartyAliasesBySuggestion(ctx context.Context, a
 	return items, nil
 }
 
+const listBankCounterpartyAliasesPage = `-- name: ListBankCounterpartyAliasesPage :many
+SELECT a.id, a.uuid, a.organization_id, a.engagement_id, a.taxpayer_id, a.match_type, a.match_value, a.display_name, a.debit_credit, a.account_code, a.account_name, a.status, a.origin, a.accepts, a.corrections, a.hits, a.suggestion_id, a.decided_by, a.last_decided_at, a.created_at, a.updated_at, COUNT(*) OVER () AS total_count FROM bank_counterparty_aliases a
+WHERE a.organization_id = $1 AND a.engagement_id = $2
+  AND ($3::text IS NULL OR a.status = $3::text)
+ORDER BY a.updated_at DESC, a.id DESC
+LIMIT $5 OFFSET $4
+`
+
+type ListBankCounterpartyAliasesPageParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	Status         pgtype.Text `json:"status"`
+	Off            int32       `json:"off"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListBankCounterpartyAliasesPageRow struct {
+	BankCounterpartyAlias BankCounterpartyAlias `json:"bank_counterparty_alias"`
+	TotalCount            int64                 `json:"total_count"`
+}
+
+// Liste ucu (issue #453): sayfalı, toplamla.
+func (q *Queries) ListBankCounterpartyAliasesPage(ctx context.Context, arg ListBankCounterpartyAliasesPageParams) ([]ListBankCounterpartyAliasesPageRow, error) {
+	rows, err := q.db.Query(ctx, listBankCounterpartyAliasesPage,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Status,
+		arg.Off,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankCounterpartyAliasesPageRow{}
+	for rows.Next() {
+		var i ListBankCounterpartyAliasesPageRow
+		if err := rows.Scan(
+			&i.BankCounterpartyAlias.ID,
+			&i.BankCounterpartyAlias.Uuid,
+			&i.BankCounterpartyAlias.OrganizationID,
+			&i.BankCounterpartyAlias.EngagementID,
+			&i.BankCounterpartyAlias.TaxpayerID,
+			&i.BankCounterpartyAlias.MatchType,
+			&i.BankCounterpartyAlias.MatchValue,
+			&i.BankCounterpartyAlias.DisplayName,
+			&i.BankCounterpartyAlias.DebitCredit,
+			&i.BankCounterpartyAlias.AccountCode,
+			&i.BankCounterpartyAlias.AccountName,
+			&i.BankCounterpartyAlias.Status,
+			&i.BankCounterpartyAlias.Origin,
+			&i.BankCounterpartyAlias.Accepts,
+			&i.BankCounterpartyAlias.Corrections,
+			&i.BankCounterpartyAlias.Hits,
+			&i.BankCounterpartyAlias.SuggestionID,
+			&i.BankCounterpartyAlias.DecidedBy,
+			&i.BankCounterpartyAlias.LastDecidedAt,
+			&i.BankCounterpartyAlias.CreatedAt,
+			&i.BankCounterpartyAlias.UpdatedAt,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateBankCounterpartyAlias = `-- name: UpdateBankCounterpartyAlias :one
 UPDATE bank_counterparty_aliases
 SET display_name = $1, account_code = $2, account_name = $3,

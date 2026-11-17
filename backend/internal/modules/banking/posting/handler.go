@@ -28,7 +28,9 @@ type Handler struct {
 }
 
 // NewHandler builds the handler. flow may be nil: only the alias routes.
-func NewHandler(aliases *Service, flow *Workflow) *Handler { return &Handler{aliases: aliases, flow: flow} }
+func NewHandler(aliases *Service, flow *Workflow) *Handler {
+	return &Handler{aliases: aliases, flow: flow}
+}
 
 // RegisterRoutes mounts the routes behind the active-engagement chain.
 func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
@@ -107,12 +109,30 @@ func (h *Handler) listAliases(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, "INVALID_STATUS", "status must be learned or rule")
 		return
 	}
-	items, err := h.aliases.Aliases(r.Context(), subjectOf(r), status)
+	limit, offset := int32(AliasPageMax), int32(0)
+	q := r.URL.Query()
+	if v := q.Get("limit"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil || n < 1 || n > AliasPageMax {
+			response.BadRequest(w, r, response.CodeValidationError, "limit must be 1..500")
+			return
+		}
+		limit = int32(n)
+	}
+	if v := q.Get("offset"); v != "" {
+		n, err := strconv.ParseInt(v, 10, 32)
+		if err != nil || n < 0 {
+			response.BadRequest(w, r, response.CodeValidationError, "offset must be 0 or more")
+			return
+		}
+		offset = int32(n)
+	}
+	items, total, err := h.aliases.AliasesPage(r.Context(), subjectOf(r), status, limit, offset)
 	if err != nil {
 		writeErr(w, r, err, "alias list")
 		return
 	}
-	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items, "total": total, "limit": limit, "offset": offset})
 }
 
 func (h *Handler) createAlias(w http.ResponseWriter, r *http.Request) {

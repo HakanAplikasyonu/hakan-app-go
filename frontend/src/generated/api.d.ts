@@ -9437,6 +9437,8 @@ export interface paths {
          *     in the trial balance: the payment from "X Yazılım Teknolojileri A.Ş."
          *     is Oğuz Yılmaz's cari. `learned` aliases come from the accountant's
          *     decisions on suggestions; `rule` aliases were defined or promoted.
+         *     Newest change first, paged (#453): at most 500 per page, `total`
+         *     counts them all.
          */
         get: operations["listTenantBankCounterpartyAliases"];
         put?: never;
@@ -15608,6 +15610,10 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["BankCounterpartyAlias"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -34161,6 +34167,8 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "learned" | "rule";
+                limit?: number;
+                offset?: number;
             };
             header: {
                 /**

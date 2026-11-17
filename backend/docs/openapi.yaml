@@ -12567,10 +12567,14 @@ paths:
         in the trial balance: the payment from "X Yazılım Teknolojileri A.Ş."
         is Oğuz Yılmaz's cari. `learned` aliases come from the accountant's
         decisions on suggestions; `rule` aliases were defined or promoted.
+        Newest change first, paged (#453): at most 500 per page, `total`
+        counts them all.
       security:
         - bearerAuth: []
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [learned, rule] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 500 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
         "200":
           description: Aliases
@@ -20079,11 +20083,14 @@ components:
         success: { type: boolean, enum: [true] }
         data:
           type: object
-          required: [items]
+          required: [items, total, limit, offset]
           properties:
             items:
               type: array
               items: { $ref: "#/components/schemas/BankCounterpartyAlias" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeBankCounterpartyAliasCandidateList:
