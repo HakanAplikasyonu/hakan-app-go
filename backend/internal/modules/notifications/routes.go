@@ -40,6 +40,10 @@ func RegisterRoutes(
 		http.HandlerFunc(h.DeletePushDevice), authn,
 	))
 
+	// One-click unsubscribe (List-Unsubscribe-Post): public, the link is signed.
+	mux.Handle("POST /v1/notifications/unsubscribe", http.HandlerFunc(h.Unsubscribe))
+	mux.Handle("GET /v1/notifications/unsubscribe", http.HandlerFunc(h.UnsubscribeLanding))
+
 	mux.Handle("GET /v1/notifications/meta", middleware.Chain(
 		http.HandlerFunc(h.Meta), authn, requirePerm(rbac.PermNotificationsRead),
 	))

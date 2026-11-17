@@ -6,7 +6,6 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
-	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mail"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/realtime"
 	"github.com/google/uuid"
 	"log/slog"
@@ -32,32 +31,6 @@ func (InappProvider) Channel() string { return model.ChannelInapp }
 
 func (InappProvider) Deliver(_ context.Context, _ db.Notification, _ *uuid.UUID) (DeliveryResult, error) {
 	return DeliveryResult{Status: model.StatusDelivered, Provider: "inapp"}, nil
-}
-
-// EmailProvider sends via SMTP.
-type EmailProvider struct {
-	Mail mail.Sender
-}
-
-func (EmailProvider) Channel() string { return model.ChannelEmail }
-
-func (p EmailProvider) Deliver(ctx context.Context, n db.Notification, _ *uuid.UUID) (DeliveryResult, error) {
-	to := ""
-	if n.Recipient.Valid {
-		to = n.Recipient.String
-	}
-	if to == "" {
-		return DeliveryResult{}, ErrNoRecipient
-	}
-	if p.Mail == nil {
-		p.Mail = mail.NoopSender{}
-	}
-	if err := p.Mail.Send(ctx, mail.Message{
-		To: []string{to}, Subject: n.Title, Body: n.Body,
-	}); err != nil {
-		return DeliveryResult{}, err
-	}
-	return DeliveryResult{Status: model.StatusSent, Provider: "smtp"}, nil
 }
 
 // RealtimeProvider publishes to Centrifugo user channel.

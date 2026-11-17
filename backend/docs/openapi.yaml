@@ -3164,6 +3164,67 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /v1/notifications/unsubscribe:
+    post:
+      tags: [Notifications]
+      operationId: postNotificationsUnsubscribe
+      summary: One-click unsubscribe from notification emails
+      description: |
+        Target of the `List-Unsubscribe` header of notification emails (RFC 8058).
+        Mail providers POST `List-Unsubscribe=One-Click` from their own servers, so
+        there is no session: the signed link (`u`, `sig`) is the authorisation.
+        Turns `email_enabled` off in the user's notification preferences. Security
+        emails (sign-in codes, invitations) keep arriving.
+      security: []
+      parameters:
+        - { name: u, in: query, required: true, schema: { type: string, format: uuid }, description: User UUID. }
+        - { name: sig, in: query, required: true, schema: { type: string }, description: HMAC-SHA256 of the user UUID (hex). }
+      requestBody:
+        required: false
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                List-Unsubscribe: { type: string, enum: [One-Click] }
+      responses:
+        "200":
+          description: Email notifications turned off.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [email_enabled]
+                    properties:
+                      email_enabled: { type: boolean, enum: [false] }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    get:
+      tags: [Notifications]
+      operationId: getNotificationsUnsubscribe
+      summary: Unsubscribe link opened in a browser
+      description: |
+        A GET never changes preferences (link scanners prefetch it). It redirects
+        to the web notification settings page.
+      security: []
+      parameters:
+        - { name: u, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: sig, in: query, required: false, schema: { type: string } }
+      responses:
+        "303":
+          description: Redirect to the notification settings page.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /v1/notifications/test:
     post:
       tags: [Notifications]

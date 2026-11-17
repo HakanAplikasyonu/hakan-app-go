@@ -1,0 +1,8 @@
+Merhaba Ayşe Yılmaz,
+
+Hesabınız oluşturuldu ve kullanıma hazır.
+
+--
+Bu e-postayı hesabınızda e-posta bildirimleri açık olduğu için aldınız.
+Bildirim tercihleri: https://app.example.com/profile
+Bu e-posta HAKAN üzerinden gönderildi.

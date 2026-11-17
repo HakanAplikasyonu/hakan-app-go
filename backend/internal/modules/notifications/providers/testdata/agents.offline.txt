@@ -1,0 +1,12 @@
+Merhaba,
+
+Muhasebe-PC adlı masaüstü ajanından 45 dakikadır haber alınamıyor. Klasör
+izleme ve yerel program okuma bu sürede durur.
+
+Ajanın durumunu görmek için:
+https://app.example.com/invite/0f3c2a1b
+
+--
+Bu e-postayı hesabınızda e-posta bildirimleri açık olduğu için aldınız.
+Bildirim tercihleri: https://app.example.com/profile
+Bu e-posta HAKAN üzerinden gönderildi.

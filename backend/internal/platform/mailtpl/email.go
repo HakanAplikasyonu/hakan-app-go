@@ -84,6 +84,10 @@ type Email struct {
 	// PreferencesURL links the footer to the notification settings; set on
 	// notification emails, which also carry List-Unsubscribe.
 	PreferencesURL string
+	// PlainText, when set, is the hand-written text body used for the text
+	// part instead of rendering Greeting, Blocks and SignOff (the footer is
+	// still added). Stored notification templates are written this way.
+	PlainText string
 }
 
 // Rendered is the output of Render.

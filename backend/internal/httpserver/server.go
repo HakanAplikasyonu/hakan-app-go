@@ -80,6 +80,7 @@ import (
 	notifmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications"
 	notifhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/unsubscribe"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	officedashmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officesetup"
@@ -241,7 +242,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	mailer := mail.NewSMTPSender(cfg.SMTP)
 	provs := []providers.Provider{
 		providers.InappProvider{},
-		providers.EmailProvider{Mail: mailer},
+		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
 		providers.RealtimeProvider{Pub: deps.Realtime},
 		providers.NoopProvider{Name: "sms", Log: log},
 		providers.NoopProvider{Name: "push", Log: log},
@@ -252,6 +253,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	notifSvc := notifusecase.New(deps.Queries, deps.Queue, provs, log)
 	notifSvc.WithActionSigner(cfg.JWT.AccessSecret, 0)
+	notifSvc.WithUnsubscribe(unsubscribe.New(cfg.Encryption.Key, cfg.Auth.FrontendURL))
 	notifSvc.WithSecretBox(secretBox)
 	notifSvc.WithVAPID(notifusecase.VAPIDConfig{
 		PublicKey:  cfg.VAPID.PublicKey,
