@@ -13,3 +13,5 @@
 petitions
 vat_carry_forwards
 export_settings
+whatsapp_chat_links
+whatsapp_captures

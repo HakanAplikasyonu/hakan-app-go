@@ -8996,6 +8996,283 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/whatsapp/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pair the WhatsApp Web extension (pairing code → session)
+         * @description Called by the browser extension. The office user creates a one-time
+         *     code in the panel (`POST /v1/tenant/whatsapp/pairings`, 10 minutes)
+         *     and types it into the extension; the extension trades it here for
+         *     the same token pair as `/v1/auth/login` (no second factor: the code
+         *     was issued to a signed-in session, as with QR sign-in). The session
+         *     is listed under `/v1/auth/sessions` as "HAKAN WhatsApp Web uzantısı"
+         *     and revoked there. Single use. Also returns the office the code was
+         *     created in (its slug is the extension's `X-Organization`).
+         *
+         *     Errors: `404 PAIRING_CODE_INVALID` (unknown, expired or used),
+         *     `403 ACCOUNT_DEACTIVATED`, `429 RATE_LIMITED`.
+         */
+        post: operations["postAuthWhatsAppPair"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/whatsapp/pairings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a pairing code for the WhatsApp Web extension
+         * @description Requires `tenant.receipts.write`. A one-time code (8 characters,
+         *     shown as `XXXX-XXXX`) valid for 10 minutes, bound to the caller and
+         *     this office. Not available while impersonating (`403`).
+         */
+        post: operations["createWhatsAppPairing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/whatsapp/chat-lookup": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which taxpayer is this WhatsApp chat?
+         * @description Requires `tenant.receipts.read`. `chat_key` is the chat's WhatsApp id
+         *     (`905551112233@c.us`, a phone number, `…@g.us` for a group, `…@lid`
+         *     for a hidden-number contact); the answer carries the normalized key.
+         *     `link` is the remembered taxpayer (null the first time, or when it
+         *     belongs to an engagement the caller cannot see). Without a link,
+         *     `suggestions` lists up to 5 taxpayers whose contact phone ends with
+         *     the chat number's last 10 digits.
+         */
+        get: operations["lookupWhatsAppChat"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/whatsapp/chat-links": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Remembered chat → taxpayer links
+         * @description Requires `tenant.receipts.read`. Newest first; links of engagements the caller cannot see are left out.
+         */
+        get: operations["listWhatsAppChatLinks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/whatsapp/chat-links/{linkUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                linkUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget a chat's taxpayer
+         * @description Requires `tenant.receipts.write`. The next save from that chat asks for the taxpayer again.
+         */
+        delete: operations["deleteWhatsAppChatLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/whatsapp/captures": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files saved from WhatsApp Web
+         * @description Requires `tenant.receipts.read`. The office's extension saves, newest
+         *     first, with the receipt capture (gider / gelir) or document task /
+         *     stored file (belge) each one produced. Only the file and its name are
+         *     kept; no message text.
+         */
+        get: operations["listWhatsAppCaptures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Remember this taxpayer for a WhatsApp chat
+         * @description Requires `tenant.receipts.write`, `tenant.engagements.read` and
+         *     engagement access. Creates the link or moves it to this engagement.
+         *     `409 CHAT_LINKED_ELSEWHERE` when the chat is linked to an engagement
+         *     the caller cannot see.
+         */
+        put: operations["setWhatsAppChatLink"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/whatsapp/captures": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save a file clicked in WhatsApp Web
+         * @description Requires `tenant.receipts.write`, `tenant.engagements.read` and
+         *     engagement access; with `task_uuid` also `tenant.doc_tasks.write`.
+         *     One file the user clicked (photo or PDF, max 20 MB); the extension
+         *     never sends message text.
+         *
+         *     - `expense` (Gider olarak kaydet): receipt capture with the AI read
+         *       (expense / fuel receipt draft). Photo only (JPEG, PNG, WebP);
+         *       `415 IMAGE_REQUIRED` for a PDF.
+         *     - `income` (Gelir olarak kaydet): receipt capture read as a Z report
+         *       (retail sale draft). Photo only.
+         *     - `document` (Belge olarak kaydet): with `task_uuid`, the upload of
+         *       that open document task (it becomes submitted, a bank task is
+         *       matched); without, a stored file of the taxpayer
+         *       (`GET …/whatsapp/captures/{captureUuid}/file`).
+         *
+         *     The same file saved again to the same target answers `200` with the
+         *     first save (`replayed: true`), without a second AI read.
+         */
+        post: operations["createWhatsAppCapture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                captureUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a document saved from WhatsApp Web
+         * @description Requires `tenant.receipts.read` and engagement access. Always a download (`Content-Disposition: attachment`).
+         */
+        get: operations["getWhatsAppCaptureFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -14284,6 +14561,128 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["VATOpening"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WhatsAppPairing: {
+            /** @example K7QM-3XPA */
+            code: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** @description Seconds */
+            expires_in: number;
+        };
+        EnvelopeWhatsAppPairing: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WhatsAppPairing"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WhatsAppPaired: components["schemas"]["Tokens"] & {
+            user: {
+                /** Format: uuid */
+                uuid: string;
+                /** Format: email */
+                email: string;
+                name: string;
+            };
+            organization: {
+                /** Format: uuid */
+                uuid: string;
+                slug: string;
+                name: string;
+            };
+        };
+        EnvelopeWhatsAppPaired: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WhatsAppPaired"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WhatsAppTaxpayer: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            title: string;
+            /** @description Empty in the capture list. */
+            tax_id: string;
+        };
+        WhatsAppChatLink: {
+            /** Format: uuid */
+            uuid: string;
+            /** @description Digits (contact), g:<id> (group) or l:<id> (hidden number). */
+            chat_key: string;
+            label: string;
+            taxpayer: components["schemas"]["WhatsAppTaxpayer"];
+            /** Format: date-time */
+            updated_at: string;
+        };
+        WhatsAppChatLookup: {
+            chat_key: string;
+            link: components["schemas"]["WhatsAppChatLink"] | null;
+            suggestions: components["schemas"]["WhatsAppTaxpayer"][];
+        };
+        EnvelopeWhatsAppChatLookup: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WhatsAppChatLookup"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeWhatsAppChatLinkPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["WhatsAppChatLink"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        WhatsAppCapture: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            target: "expense" | "income" | "document";
+            file_name: string;
+            content_type: string;
+            /** Format: int64 */
+            size_bytes: number;
+            taxpayer: components["schemas"]["WhatsAppTaxpayer"];
+            created_by_name: string;
+            /**
+             * Format: uuid
+             * @description gider / gelir: the receipt capture (GET …/receipts/{receiptUuid}).
+             */
+            receipt_uuid: string | null;
+            /** @enum {string|null} */
+            receipt_status: "draft" | "duplicate" | "failed" | "approved" | "rejected" | null;
+            /** Format: uuid */
+            task_uuid: string | null;
+            task_title: string | null;
+            /** @description A document stored here (download with …/whatsapp/captures/{captureUuid}/file). */
+            has_file: boolean;
+            /** Format: date-time */
+            created_at: string;
+            replayed: boolean;
+        };
+        EnvelopeWhatsAppCapture: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["WhatsAppCapture"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeWhatsAppCapturePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["WhatsAppCapture"][];
+                /** Format: int64 */
+                total: number;
+                limit: number;
+                offset: number;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -28475,6 +28874,356 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postAuthWhatsAppPair: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Case, spaces and dashes are ignored.
+                     * @example K7QM-3XPA
+                     */
+                    code: string;
+                    /** @description Shown in the session list (e.g. Chrome · Ofis PC). */
+                    device_name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Paired */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppPaired"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createWhatsAppPairing: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Code */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppPairing"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            429: components["responses"]["TooManyRequests"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    lookupWhatsAppChat: {
+        parameters: {
+            query: {
+                chat_key: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lookup */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppChatLookup"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listWhatsAppChatLinks: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Links */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppChatLinkPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteWhatsAppChatLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                linkUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listWhatsAppCaptures: {
+        parameters: {
+            query?: {
+                target?: "expense" | "income" | "document";
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Captures */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppCapturePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setWhatsAppChatLink: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    chat_key: string;
+                    /** @description The chat's name as shown in WhatsApp (for the link list). */
+                    label?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppChatLookup"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createWhatsAppCapture: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /** @enum {string} */
+                    target: "expense" | "income" | "document";
+                    /** @description The chat the file came from (kept for the list). */
+                    chat_key?: string;
+                    /**
+                     * Format: uuid
+                     * @description document only: the open document task this file answers.
+                     */
+                    task_uuid?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Already saved (replayed) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppCapture"];
+                };
+            };
+            /** @description Saved */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppCapture"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Gider / gelir need a photo */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            503: components["responses"]["StorageUnavailable"];
+        };
+    };
+    getWhatsAppCaptureFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                captureUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];

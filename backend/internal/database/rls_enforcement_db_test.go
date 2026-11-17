@@ -120,11 +120,27 @@ var leakFixtures = map[string]leakFixture{
 			VALUES ($1, $2, 'genel_dilekce', 1, '{}'::jsonb, true, $3)`, org, eng, user)
 		return err
 	},
+	"whatsapp_chat_links": func(ctx context.Context, q pgx.Tx, org, eng, user int64) error {
+		_, err := q.Exec(ctx, `
+			INSERT INTO whatsapp_chat_links (organization_id, engagement_id, chat_key, created_by)
+			VALUES ($1, $2, '9055' || lpad(($2::bigint)::text, 8, '0'), $3)`, org, eng, user)
+		return err
+	},
+	"whatsapp_captures": func(ctx context.Context, q pgx.Tx, org, eng, user int64) error {
+		_, err := q.Exec(ctx, `
+			INSERT INTO whatsapp_captures (organization_id, engagement_id, taxpayer_id, target, content_type, size_bytes, sha256, created_by)
+			VALUES ($1, $2, COALESCE((SELECT e.taxpayer_id FROM engagements e WHERE e.id = $2), 0),
+			        'document', 'application/pdf', 10, repeat('a', 64), $3)`, org, eng, user)
+		return err
+	},
 }
 
 // cascadesWithOffice: enforced tables whose rows go with their engagement
 // (ON DELETE CASCADE); the leak test also checks that cascade.
-var cascadesWithOffice = map[string]bool{"petitions": true, "vat_carry_forwards": true, "export_settings": true}
+var cascadesWithOffice = map[string]bool{
+	"petitions": true, "vat_carry_forwards": true, "export_settings": true,
+	"whatsapp_chat_links": true, "whatsapp_captures": true,
+}
 
 // leakTaxIDs are distinct VKNs with valid check digits, two per enforced table.
 var leakTaxIDs = validVKNs(64)

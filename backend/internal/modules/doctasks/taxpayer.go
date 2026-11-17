@@ -78,6 +78,21 @@ type UploadResult struct {
 // transaction and re-runs the control for that transaction, so the warning
 // becomes auto_resolved.
 func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID, userID int64, fileName string, data []byte) (UploadResult, error) {
+	return s.upload(ctx, taxpayerID, taskID, userID, fileName, data, true)
+}
+
+// OfficeUpload stores a file the office received on the mükellef's behalf
+// (the WhatsApp Web extension, issue #388) into an open task of the
+// engagement. It runs the same path as the mükellef's upload but does not
+// tell the office about its own upload.
+func (s *Service) OfficeUpload(ctx context.Context, scope engagementctx.Scope, taskID uuid.UUID, userID int64, fileName string, data []byte) (UploadResult, error) {
+	if _, err := s.Get(ctx, scope, taskID); err != nil {
+		return UploadResult{}, err
+	}
+	return s.upload(ctx, scope.TaxpayerID, taskID, userID, fileName, data, false)
+}
+
+func (s *Service) upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID, userID int64, fileName string, data []byte, notify bool) (UploadResult, error) {
 	var res UploadResult
 	if s.store == nil {
 		return res, errors.New("doctasks: storage is not configured")
@@ -197,7 +212,9 @@ func (s *Service) Upload(ctx context.Context, taxpayerID int64, taskID uuid.UUID
 	}
 	// The office hears about it (issue #240): who opened the task and the
 	// engagement's assignees.
-	s.notifyOffice(ctx, task.OrganizationID, task.EngagementID, taxpayerID, task.CreatedBy, res.Task)
+	if notify {
+		s.notifyOffice(ctx, task.OrganizationID, task.EngagementID, taxpayerID, task.CreatedBy, res.Task)
+	}
 	return res, nil
 }
 

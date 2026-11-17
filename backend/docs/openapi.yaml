@@ -89,6 +89,8 @@ tags:
     description: Excel / CSV import (04-excel-ice-aktarma.md)
   - name: Receipts
     description: Receipt capture (OCR drafts, vehicle list, plate check)
+  - name: WhatsApp
+    description: WhatsApp Web uzantısı (#388) — eşleştirme, sohbet → mükellef eşlemesi, tıklanan dosyayı gider / gelir / belge olarak kaydetme
   - name: Legal
     description: KVKK texts (versioned) and acceptance records
   - name: Agents
@@ -11809,6 +11811,314 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  # WhatsApp Web uzantısı (issue #388).
+  /v1/auth/whatsapp/pair:
+    post:
+      tags: [WhatsApp]
+      operationId: postAuthWhatsAppPair
+      summary: Pair the WhatsApp Web extension (pairing code → session)
+      description: |
+        Called by the browser extension. The office user creates a one-time
+        code in the panel (`POST /v1/tenant/whatsapp/pairings`, 10 minutes)
+        and types it into the extension; the extension trades it here for
+        the same token pair as `/v1/auth/login` (no second factor: the code
+        was issued to a signed-in session, as with QR sign-in). The session
+        is listed under `/v1/auth/sessions` as "HAKAN WhatsApp Web uzantısı"
+        and revoked there. Single use. Also returns the office the code was
+        created in (its slug is the extension's `X-Organization`).
+
+        Errors: `404 PAIRING_CODE_INVALID` (unknown, expired or used),
+        `403 ACCOUNT_DEACTIVATED`, `429 RATE_LIMITED`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              additionalProperties: false
+              properties:
+                code: { type: string, example: "K7QM-3XPA", description: "Case, spaces and dashes are ignored." }
+                device_name: { type: string, maxLength: 60, description: "Shown in the session list (e.g. Chrome · Ofis PC)." }
+      responses:
+        "200":
+          description: Paired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppPaired"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/whatsapp/pairings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [WhatsApp]
+      operationId: createWhatsAppPairing
+      summary: Create a pairing code for the WhatsApp Web extension
+      description: |
+        Requires `tenant.receipts.write`. A one-time code (8 characters,
+        shown as `XXXX-XXXX`) valid for 10 minutes, bound to the caller and
+        this office. Not available while impersonating (`403`).
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppPairing"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/whatsapp/chat-lookup:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [WhatsApp]
+      operationId: lookupWhatsAppChat
+      summary: Which taxpayer is this WhatsApp chat?
+      description: |
+        Requires `tenant.receipts.read`. `chat_key` is the chat's WhatsApp id
+        (`905551112233@c.us`, a phone number, `…@g.us` for a group, `…@lid`
+        for a hidden-number contact); the answer carries the normalized key.
+        `link` is the remembered taxpayer (null the first time, or when it
+        belongs to an engagement the caller cannot see). Without a link,
+        `suggestions` lists up to 5 taxpayers whose contact phone ends with
+        the chat number's last 10 digits.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: chat_key, in: query, required: true, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: Lookup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppChatLookup"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/whatsapp/chat-links:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [WhatsApp]
+      operationId: listWhatsAppChatLinks
+      summary: Remembered chat → taxpayer links
+      description: Requires `tenant.receipts.read`. Newest first; links of engagements the caller cannot see are left out.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppChatLinkPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/whatsapp/chat-links/{linkUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: linkUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [WhatsApp]
+      operationId: deleteWhatsAppChatLink
+      summary: Forget a chat's taxpayer
+      description: Requires `tenant.receipts.write`. The next save from that chat asks for the taxpayer again.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/whatsapp/captures:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [WhatsApp]
+      operationId: listWhatsAppCaptures
+      summary: Files saved from WhatsApp Web
+      description: |
+        Requires `tenant.receipts.read`. The office's extension saves, newest
+        first, with the receipt capture (gider / gelir) or document task /
+        stored file (belge) each one produced. Only the file and its name are
+        kept; no message text.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: target, in: query, required: false, schema: { type: string, enum: [expense, income, document] } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Captures
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppCapturePage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    put:
+      tags: [WhatsApp]
+      operationId: setWhatsAppChatLink
+      summary: Remember this taxpayer for a WhatsApp chat
+      description: |
+        Requires `tenant.receipts.write`, `tenant.engagements.read` and
+        engagement access. Creates the link or moves it to this engagement.
+        `409 CHAT_LINKED_ELSEWHERE` when the chat is linked to an engagement
+        the caller cannot see.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chat_key]
+              additionalProperties: false
+              properties:
+                chat_key: { type: string, maxLength: 100 }
+                label: { type: string, maxLength: 120, description: "The chat's name as shown in WhatsApp (for the link list)." }
+      responses:
+        "200":
+          description: Link
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppChatLookup"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/whatsapp/captures:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [WhatsApp]
+      operationId: createWhatsAppCapture
+      summary: Save a file clicked in WhatsApp Web
+      description: |
+        Requires `tenant.receipts.write`, `tenant.engagements.read` and
+        engagement access; with `task_uuid` also `tenant.doc_tasks.write`.
+        One file the user clicked (photo or PDF, max 20 MB); the extension
+        never sends message text.
+
+        - `expense` (Gider olarak kaydet): receipt capture with the AI read
+          (expense / fuel receipt draft). Photo only (JPEG, PNG, WebP);
+          `415 IMAGE_REQUIRED` for a PDF.
+        - `income` (Gelir olarak kaydet): receipt capture read as a Z report
+          (retail sale draft). Photo only.
+        - `document` (Belge olarak kaydet): with `task_uuid`, the upload of
+          that open document task (it becomes submitted, a bank task is
+          matched); without, a stored file of the taxpayer
+          (`GET …/whatsapp/captures/{captureUuid}/file`).
+
+        The same file saved again to the same target answers `200` with the
+        first save (`replayed: true`), without a second AI read.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, target]
+              properties:
+                file: { type: string, format: binary }
+                target: { type: string, enum: [expense, income, document] }
+                chat_key: { type: string, maxLength: 100, description: "The chat the file came from (kept for the list)." }
+                task_uuid: { type: string, format: uuid, description: "document only: the open document task this file answers." }
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppCapture"
+        "200":
+          description: Already saved (replayed)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: Gider / gelir need a photo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/StorageUnavailable" }
+
+  /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: captureUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [WhatsApp]
+      operationId: getWhatsAppCaptureFile
+      summary: Download a document saved from WhatsApp Web
+      description: "Requires `tenant.receipts.read` and engagement access. Always a download (`Content-Disposition: attachment`)."
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: File
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -18328,4 +18638,151 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/VATOpening" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    # WhatsApp Web uzantısı (issue #388).
+    WhatsAppPairing:
+      type: object
+      required: [code, expires_at, expires_in]
+      properties:
+        code: { type: string, example: "K7QM-3XPA" }
+        expires_at: { type: string, format: date-time }
+        expires_in: { type: integer, description: Seconds }
+
+    EnvelopeWhatsAppPairing:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/WhatsAppPairing" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WhatsAppPaired:
+      allOf:
+        - $ref: "#/components/schemas/Tokens"
+        - type: object
+          required: [user, organization]
+          properties:
+            user:
+              type: object
+              required: [uuid, email, name]
+              properties:
+                uuid: { type: string, format: uuid }
+                email: { type: string, format: email }
+                name: { type: string }
+            organization:
+              type: object
+              required: [uuid, slug, name]
+              properties:
+                uuid: { type: string, format: uuid }
+                slug: { type: string }
+                name: { type: string }
+
+    EnvelopeWhatsAppPaired:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/WhatsAppPaired" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WhatsAppTaxpayer:
+      type: object
+      required: [engagement_uuid, taxpayer_uuid, title, tax_id]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        title: { type: string }
+        tax_id: { type: string, description: "Empty in the capture list." }
+
+    WhatsAppChatLink:
+      type: object
+      required: [uuid, chat_key, label, taxpayer, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        chat_key: { type: string, description: "Digits (contact), g:<id> (group) or l:<id> (hidden number)." }
+        label: { type: string }
+        taxpayer: { $ref: "#/components/schemas/WhatsAppTaxpayer" }
+        updated_at: { type: string, format: date-time }
+
+    WhatsAppChatLookup:
+      type: object
+      required: [chat_key, link, suggestions]
+      properties:
+        chat_key: { type: string }
+        link:
+          oneOf:
+            - $ref: "#/components/schemas/WhatsAppChatLink"
+            - type: "null"
+        suggestions:
+          type: array
+          items: { $ref: "#/components/schemas/WhatsAppTaxpayer" }
+
+    EnvelopeWhatsAppChatLookup:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/WhatsAppChatLookup" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeWhatsAppChatLinkPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/WhatsAppChatLink" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    WhatsAppCapture:
+      type: object
+      required: [uuid, target, file_name, content_type, size_bytes, taxpayer, created_by_name, receipt_uuid, receipt_status, task_uuid, task_title, has_file, created_at, replayed]
+      properties:
+        uuid: { type: string, format: uuid }
+        target: { type: string, enum: [expense, income, document] }
+        file_name: { type: string }
+        content_type: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        taxpayer: { $ref: "#/components/schemas/WhatsAppTaxpayer" }
+        created_by_name: { type: string }
+        receipt_uuid: { type: [string, "null"], format: uuid, description: "gider / gelir: the receipt capture (GET …/receipts/{receiptUuid})." }
+        receipt_status: { type: [string, "null"], enum: [draft, duplicate, failed, approved, rejected, null] }
+        task_uuid: { type: [string, "null"], format: uuid }
+        task_title: { type: [string, "null"] }
+        has_file: { type: boolean, description: "A document stored here (download with …/whatsapp/captures/{captureUuid}/file)." }
+        created_at: { type: string, format: date-time }
+        replayed: { type: boolean }
+
+    EnvelopeWhatsAppCapture:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/WhatsAppCapture" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeWhatsAppCapturePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/WhatsAppCapture" }
+            total: { type: integer, format: int64 }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }

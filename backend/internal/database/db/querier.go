@@ -245,6 +245,8 @@ type Querier interface {
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
+	// tenant-lint: org-wide eşleme uuid ile silinir; görünmeyen engagement'ın satırı RLS ile düşer
+	DeleteWhatsAppChatLink(ctx context.Context, arg DeleteWhatsAppChatLinkParams) (int64, error)
 	// Ajanın sonucu: dosyalar klasörde (delivered) ya da hata (failed).
 	DeliverAccountingTransfer(ctx context.Context, arg DeliverAccountingTransferParams) (AccountingTransfer, error)
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
@@ -460,6 +462,14 @@ type Querier interface {
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
+	GetWhatsAppCapture(ctx context.Context, arg GetWhatsAppCaptureParams) (GetWhatsAppCaptureRow, error)
+	GetWhatsAppCaptureByFile(ctx context.Context, arg GetWhatsAppCaptureByFileParams) (uuid.UUID, error)
+	GetWhatsAppCaptureFile(ctx context.Context, arg GetWhatsAppCaptureFileParams) (GetWhatsAppCaptureFileRow, error)
+	// WhatsApp Web uzantısı (issue #388): sohbet → mükellef eşlemesi ve uzantı
+	// kayıt izi. İstekler RLS kapsamında (whatsapp_* zorlanmış, issue #166)
+	// çalışır; ofis ve engagement süzgeçleri burada da açıkça yazılır.
+	// tenant-lint: org-wide sohbet anahtarı ofis içinde tekil; görünmeyen engagement'ın satırı RLS ile düşer
+	GetWhatsAppChatLink(ctx context.Context, arg GetWhatsAppChatLinkParams) (GetWhatsAppChatLinkRow, error)
 	// tenant-lint: org-wide ofis uyarı grupları (#333); ListTenantDataWarnings ile aynı görünürlük süzgeci
 	// Kod başına sayım: en ağır seviye, uyarı ve engagement sayısı, son güncelleme.
 	GroupTenantDataWarnings(ctx context.Context, arg GroupTenantDataWarningsParams) ([]GroupTenantDataWarningsRow, error)
@@ -528,6 +538,7 @@ type Querier interface {
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
+	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
@@ -819,6 +830,10 @@ type Querier interface {
 	ListWarningRuleConfigs(ctx context.Context, arg ListWarningRuleConfigsParams) ([]ListWarningRuleConfigsRow, error)
 	ListWebAuthnCredentialsByUserID(ctx context.Context, userID int64) ([]WebauthnCredential, error)
 	ListWebAuthnCredentialsForUserIDs(ctx context.Context, userIds []int64) ([]WebauthnCredential, error)
+	// tenant-lint: org-wide ofisin son uzantı kayıtları; engagement süzgeci isteğe bağlı, görünmeyenler RLS ile düşer
+	ListWhatsAppCaptures(ctx context.Context, arg ListWhatsAppCapturesParams) ([]ListWhatsAppCapturesRow, error)
+	// tenant-lint: org-wide ofisin eşleme listesi; görünmeyen engagement'ların satırı RLS ile düşer
+	ListWhatsAppChatLinks(ctx context.Context, arg ListWhatsAppChatLinksParams) ([]ListWhatsAppChatLinksRow, error)
 	// Karar: talebi satır kilidiyle okur (eşzamanlı iki karar tek sonuç verir).
 	LockChangeRequest(ctx context.Context, arg LockChangeRequestParams) (ChangeRequest, error)
 	// tenant-lint: cross-org onay işlemi, token ile bulunan satır kilitlenir
@@ -1014,6 +1029,8 @@ type Querier interface {
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)
+	// tenant-lint: org-wide ilk eşlemede öneri: iletişim telefonunun son 10 hanesi sohbet numarasıyla aynı mükellefler
+	SuggestWhatsAppTaxpayers(ctx context.Context, arg SuggestWhatsAppTaxpayersParams) ([]SuggestWhatsAppTaxpayersRow, error)
 	// Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
 	// durumları.
 	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
@@ -1113,6 +1130,7 @@ type Querier interface {
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
+	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
 	VATForecastExcluded(ctx context.Context, arg VATForecastExcludedParams) (VATForecastExcludedRow, error)
