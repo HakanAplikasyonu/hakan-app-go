@@ -7,10 +7,13 @@
 -- görevi "aktarıldı" ya da "hata verdi" olarak kapatır. Luca / Zirve kimlik
 -- bilgisi gerekmez ve saklanmaz.
 --
+-- Numara 000095: 000094 aynı anda başka bir şeritte kullanıldı. Bu dosya
+-- 000094 olarak uygulanmış bir veritabanında da hatasız çalışır (IF NOT EXISTS).
+--
 -- Durumlar: queued → claimed (ajan üstlendi) → delivered (dosyalar
 -- klasörde) → imported | failed. cancelled: kullanıcı vazgeçti. Yeniden
 -- deneme yeni satır açar; eski hata geçmişte kalır.
-CREATE TABLE accounting_transfers (
+CREATE TABLE IF NOT EXISTS accounting_transfers (
     id                BIGSERIAL    PRIMARY KEY,
     uuid              UUID         NOT NULL DEFAULT gen_random_uuid(),
     organization_id   BIGINT       NOT NULL,
@@ -47,12 +50,13 @@ CREATE TABLE accounting_transfers (
 
 -- Bir çıktı için tek açık ya da aktarılmış görev: aynı fişler programa iki
 -- kez gitmez (Luca aynı dosyayı iki kez yükleyince iki fiş keser).
-CREATE UNIQUE INDEX uq_accounting_transfers_live ON accounting_transfers (export_batch_id)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_accounting_transfers_live ON accounting_transfers (export_batch_id)
     WHERE status IN ('queued', 'claimed', 'delivered', 'imported');
-CREATE INDEX idx_accounting_transfers_list ON accounting_transfers (organization_id, engagement_id, created_at DESC);
-CREATE INDEX idx_accounting_transfers_pending ON accounting_transfers (engagement_id, status)
+CREATE INDEX IF NOT EXISTS idx_accounting_transfers_list ON accounting_transfers (organization_id, engagement_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_accounting_transfers_pending ON accounting_transfers (engagement_id, status)
     WHERE status IN ('queued', 'claimed');
 
+DROP TRIGGER IF EXISTS trg_accounting_transfers_set_updated_at ON accounting_transfers;
 CREATE TRIGGER trg_accounting_transfers_set_updated_at
     BEFORE UPDATE ON accounting_transfers FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
