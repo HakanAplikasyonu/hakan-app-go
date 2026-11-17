@@ -11494,6 +11494,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/related/{kind}/{recordUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Kind of the source record. */
+                kind: components["schemas"]["RelatedSourceKind"];
+                recordUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Records related to one record of the engagement
+         * @description Requires `tenant.engagements.read`, engagement access and the read permission of the source kind (invoice → `tenant.invoices.read`, bank_transaction → `tenant.bank.read`, journal_draft → `tenant.journals.read`, warning → `tenant.warnings.read`, expense / retail_sale → `tenant.receipts.read`, payroll_run → `tenant.payroll.read`, financial_transaction → `tenant.invoices.read`). Items of kinds the caller may not read are left out (payroll is shown only with `tenant.payroll.read`).
+         *
+         *     No table of its own (#469); links come from existing columns: bank matches (payment ↔ invoice / payroll run), journal line sources, bank / receipt postings and `payroll_runs.journal_draft_id` (record → journal), `data_warnings.entity_type/entity_id` (warning ↔ source document; invoice line warnings belong to the invoice), `suggestions.target_type/target_id` (review), `retail_sales.invoice_id` and `source_financial_transactions.invoice_id`. A warning also lists its rule (`kind: rule`, `label` = warning code). A bank transaction lists the counterparty account of its posting (`kind: account`, no uuid). At most 200 items, ordered by relation, kind and date. 404 when the record is not in the engagement (or outside its visibility window).
+         */
+        get: operations["listRelatedRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/vat-forecast": {
         parameters: {
             query?: never;
@@ -18442,6 +18475,45 @@ export interface components {
             calendar: components["schemas"]["VATCalendar"];
             checks: components["schemas"]["VATChecks"];
             excluded: components["schemas"]["VATExcluded"];
+        };
+        /** @enum {string} */
+        RelatedSourceKind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction";
+        RelatedRecord: {
+            /** @enum {string} */
+            kind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "suggestion" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction" | "rule" | "account";
+            /**
+             * Format: uuid
+             * @description null for rule and account
+             */
+            uuid: string | null;
+            /**
+             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and review suggestions about it.
+             * @enum {string}
+             */
+            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account";
+            /** Format: date */
+            date: string | null;
+            /** @description Decimal; matched amount for payments, debit total for journals */
+            amount: string | null;
+            currency: string | null;
+            /** @description Status of the record in its own vocabulary (invoice status, bank match_status, journal status, warning status, …) */
+            status: string;
+            /** @description Invoice number, bank description, journal description, warning code, suggestion kind, Z report number, payroll period, account code */
+            label: string;
+            /** @description Counterparty, debit/credit, entry number, severity, target field, account name, … */
+            detail: string | null;
+        };
+        RelatedRecords: {
+            kind: components["schemas"]["RelatedSourceKind"];
+            /** Format: uuid */
+            uuid: string;
+            items: components["schemas"]["RelatedRecord"][];
+        };
+        EnvelopeRelatedRecords: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RelatedRecords"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeVATForecast: {
             /** @enum {boolean} */
@@ -37458,6 +37530,42 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listRelatedRecords: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description Kind of the source record. */
+                kind: components["schemas"]["RelatedSourceKind"];
+                recordUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Related records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRelatedRecords"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

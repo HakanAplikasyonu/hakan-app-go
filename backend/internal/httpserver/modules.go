@@ -30,6 +30,7 @@ import (
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	receiptsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
+	relatedmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/related"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
@@ -81,6 +82,8 @@ type moduleHandlers struct {
 	support *supportmodule.Handler
 	// whatsapp: WhatsApp Web uzantısı (issue #388).
 	whatsapp *whatsappmodule.Handler
+	// related: kayıtlar arası ilişkili kayıtlar (issue #469).
+	related *relatedmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -117,5 +120,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		supportmodule.Module{H: h.support, Taxpayers: h.taxpayers},
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
 		whatsappmodule.Module{H: h.whatsapp, Engagements: h.engagements, Scope: h.rlsScope},
+		relatedmodule.Module{H: h.related, Engagements: h.engagements, Scope: h.rlsScope},
 	}
 }

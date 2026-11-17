@@ -420,6 +420,7 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/ubl-uploads":                                                   azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/ubl-uploads":                                                  azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/ubl-uploads/{jobUuid}":                                         azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/related/{kind}/{recordUuid}":                                   azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/vat-forecast":                                                  azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns":                                                   azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                             azTenantRead,
@@ -558,6 +559,6 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/pdf":                       azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/send":                     azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                 azTenantWrite,
-	"POST /v1/public/reconciliation-letters/preview":                                                             azPublic,
-	"POST /v1/public/reconciliation-letters/respond":                                                   azPublic,
+	"POST /v1/public/reconciliation-letters/preview":                                                            azPublic,
+	"POST /v1/public/reconciliation-letters/respond":                                                            azPublic,
 }
