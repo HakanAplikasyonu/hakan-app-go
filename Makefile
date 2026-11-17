@@ -19,7 +19,7 @@ endef
 FRONTEND_PORT ?= 3000
 
 .PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo smoke demo-seed perf-seed perf-load \
-	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n check-migrations
+	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n check-migrations mail-preview
 
 infra:
 	@if [ -n "$(ENV_FILE)" ]; then \
@@ -203,6 +203,11 @@ smoke:
 # Baştan kurmak için: make demo-seed ARGS=-reset
 demo-seed: migrate-up
 	@$(load_env) $(MAKE) -C backend demo-seed ARGS="$(ARGS)"
+
+# Tüm e-postaları örnek veriyle üretir: backend/tmp/mail-preview/index.html.
+# MailHog'a göndermek için: make mail-preview ARGS="-send 127.0.0.1:1025"
+mail-preview: migrate-up
+	@$(load_env) $(MAKE) -C backend mail-preview ARGS="$(ARGS)"
 
 # Yük testi verisi (#182): 500 mükellef, 10.000 fatura. Üretimde çalışmaz.
 # Baştan kurmak için: make perf-seed ARGS=-reset

@@ -94,6 +94,15 @@ başlatın. Ana akışları `make smoke` ile denetleyin.
 Adım adım gösterim: [docs/kullanim/demo-senaryosu.md](docs/kullanim/demo-senaryosu.md).
 Demodaki sahte bağlantılar: [docs/runbook/demo-dis-bagimliliklar.md](docs/runbook/demo-dis-bagimliliklar.md).
 
+### E-posta ön izleme
+
+```bash
+make mail-preview                                # backend/tmp/mail-preview/index.html
+make mail-preview ARGS="-send 127.0.0.1:1025"    # ayrıca MailHog'a gönderir
+```
+
+Tüm e-postalar (bildirim şablonları, mutabakat mektubu, mükellef raporu) örnek veriyle `.html`, `.txt` ve `.eml` olarak üretilir. `-send` yalnızca yerel bir yakalayıcı kabul eder. Tasarım tek dosyadan gelir: `backend/internal/platform/mailtpl/theme.go`.
+
 ## Kontroller
 
 ```bash
