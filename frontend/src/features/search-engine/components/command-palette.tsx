@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -24,7 +24,14 @@ import type { PaletteItem } from "@/features/search-engine/types";
 import { useLocale } from "@/providers/locale-provider";
 import { cn } from "@/lib/utils";
 
-export function CommandPalette({ catalogs }: { catalogs: NavCatalog[] }) {
+export function CommandPalette({
+  catalogs,
+  onAsk,
+}: {
+  catalogs: NavCatalog[];
+  /** Office shell: hand the typed text to the co-pilot as a command (#392). */
+  onAsk?: (command: string) => void;
+}) {
   const { t } = useLocale();
   const router = useRouter();
   const { open, setOpen } = useCommandPalette();
@@ -90,6 +97,31 @@ export function CommandPalette({ catalogs }: { catalogs: NavCatalog[] }) {
       />
 
       <CommandList className="max-h-[min(420px,50vh)]">
+        {onAsk && data.query.trim().length >= 3 ? (
+          <CommandGroup heading={t("search.copilot_group")}>
+            <CommandItem
+              value={`copilot ${data.query}`}
+              onSelect={() => {
+                const command = data.query;
+                setOpen(false);
+                onAsk(command);
+              }}
+              className="gap-3 py-3"
+            >
+              <span className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-md border">
+                <Sparkles className="size-4" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium">
+                  {t("search.copilot_ask", { command: data.query.trim() })}
+                </span>
+                <span className="text-muted-foreground truncate text-xs">
+                  {t("search.copilot_hint")}
+                </span>
+              </span>
+            </CommandItem>
+          </CommandGroup>
+        ) : null}
         {data.loading ? (
           <div className="text-muted-foreground flex items-center justify-center gap-2 py-10 text-sm">
             <Loader2 className="size-4 animate-spin" />

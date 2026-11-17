@@ -15,5 +15,8 @@
   "specs_roles": "Roles",
   "prefix_pages": "pages",
   "prefix_users": "users",
-  "prefix_roles": "roles"
+  "prefix_roles": "roles",
+  "copilot_group": "Co-pilot",
+  "copilot_ask": "Ask the co-pilot: “{{command}}”",
+  "copilot_hint": "Turns the command into a plan; steps run with your approval."
 }

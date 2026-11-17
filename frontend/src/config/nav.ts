@@ -293,6 +293,13 @@ export function tenantNav(slug: string): NavCatalog {
             icon: LayoutDashboard,
           },
           {
+            // Co-pilot: sıradaki iş (#392).
+            id: "copilot",
+            titleKey: "office.nav_copilot",
+            href: routes.tenant.copilot(slug),
+            icon: Sparkles,
+          },
+          {
             id: "review",
             titleKey: "office.nav_review",
             href: routes.tenant.review(slug),

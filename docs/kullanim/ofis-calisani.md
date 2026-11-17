@@ -16,11 +16,13 @@ saklanır.
 
 ## Günlük akış
 
-1. **Genel bakış / Komuta merkezi:** işi geride olan mükellefleri görün.
-2. **UBL yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
-3. **İnceleme kuyruğu:** hesap kodu önerilerini karara bağlayın.
-4. **Uyarılar:** kontrollerin bulduğu sorunları kapatın.
-5. **Yevmiye ve çıktı:** fişi onaylayın, Luca / Zirve dosyasını indirin
+1. **Sıradaki iş:** her mükellefin dönem kapanışında sıradaki adımını görün
+   ve tek tıkla (onayınızla) çalıştırın.
+2. **Genel bakış / Komuta merkezi:** işi geride olan mükellefleri görün.
+3. **UBL yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
+4. **İnceleme kuyruğu:** hesap kodu önerilerini karara bağlayın.
+5. **Uyarılar:** kontrollerin bulduğu sorunları kapatın.
+6. **Yevmiye ve çıktı:** fişi onaylayın, Luca / Zirve dosyasını indirin
    (yetkiniz varsa).
 
 ## UBL yükleme
@@ -104,6 +106,42 @@ sayılmaz.
 Yevmiye fişi hazırlama, onay ve Luca / Zirve / Excel çıktısı
 [Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-ciktisi)nda
 anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
+
+## Sıradaki iş ve co-pilot
+
+Kenar menüdeki **Sıradaki iş** ekranı, üst çubukta seçili dönemin (seçim
+yoksa önceki ayın) kapanışını mükellef mükellef gösterir. Her satırda altı
+adım vardır:
+
+1. **Belgeler:** mükelleften istenen ve henüz gelmeyen belgeler.
+2. **Banka:** hesap önerisi olmayan ya da önerisi onay bekleyen hareketler.
+3. **Öneriler:** inceleme kuyruğunda bekleyen öneriler.
+4. **Fişler:** onaylı banka hareketlerinden fiş taslağı oluşturma ve
+   taslakları onaylama.
+5. **Aktarım:** onaylı fişlerin Luca'ya ya da Zirve'ye gönderilmesi.
+6. **Rapor:** aylık raporun mükellefe e-postayla gitmesi.
+
+Yeşil adım tamamdır, sarı adımda iş vardır, kırmızı adım başarısız olmuştur.
+Gri adımın o dönem karşılığı yoktur (ör. banka hareketi yok). Satırın
+sağındaki düğme sıradaki işi açar. Değişiklik yapan bir işse önce onay
+penceresi gelir; işlem siz **Onayla ve çalıştır** demeden başlamaz.
+
+- **Toplu mod:** birden fazla mükellef seçip **Seçilenlerin sıradaki işi**
+  ile hepsinin sıradaki adımını tek onay penceresinde çalıştırın. İstemediğiniz
+  adımın işaretini kaldırın.
+- **Kısayollar:** J / K satır değiştirir, Enter sıradaki işi açar, X satırı
+  seçer, B seçilenlerin sıradaki işini açar.
+- **Komut:** ekrandaki kutuya ya da her ekranda **Ctrl+K** (Mac'te ⌘K)
+  paletine bir cümle yazın. Örnek: "Atlas Gıda ekim fişlerini Luca'ya aktar",
+  "Tüm mükelleflerin ekim raporunu gönder", "Atlas ekim kapanışı". Palette
+  **Co-pilot'a sor** seçeneğini seçin. Co-pilot komutu adımlara böler ve
+  onayınıza sunar. Gerekli ön adımları kendisi ekler: fişler onaylanmadan
+  aktarım yapılamayacağı için önce onay adımını koyar.
+
+Co-pilot yalnızca uygulamadaki mevcut işlemleri önerir. Her adım sizin
+yetkinizle çalışır. Size atanmamış mükellefleri ve yetkiniz olmayan işlemleri
+plana almaz, nedenini pencerede not olarak yazar. Ofiste yapay zekâ
+tanımlıysa komutu o okur, tanımlı değilse komut kurallarla okunur.
 
 ## Mükellef raporu
 
