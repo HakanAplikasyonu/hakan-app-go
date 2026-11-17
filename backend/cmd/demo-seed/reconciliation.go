@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,9 +19,9 @@ import (
 
 // seedReconciliation (#389): Atlas Gıda'nın Ekim 2026 mutabakatı. Ekim
 // faturalarından Form BA / BS beyan satırları (biri bilerek eksik tutarlı),
-// mizan – kaynak karşılaştırması, bir hesap farkının açıklaması ve biri
-// inceleme kuyruğunda; en büyük cari farkına mektup taslağı, eşleşen bir
-// cariye yanıtlanmış (mutabık) mektup.
+// mizan – kaynak karşılaştırması (farklar ledger.go'daki iki nedenden: 120
+// açıklandı, 600 inceleme kuyruğunda); en büyük cari farkına mektup
+// taslağı, eşleşen bir cariye yanıtlanmış (mutabık) mektup.
 func seedReconciliation(ctx context.Context, pool *pgxpool.Pool, scope engagementctx.Scope, actor int64) error {
 	if err := seedBabsDeclarations(ctx, pool, scope, actor); err != nil {
 		return err
@@ -34,22 +33,20 @@ func seedReconciliation(ctx context.Context, pool *pgxpool.Pool, scope engagemen
 	if err != nil {
 		return fmt.Errorf("reconciliation run: %w", err)
 	}
-	var open []reconciliation.ItemView
+	// 120: Luca'daki elle kur farkı fişi, açıklandı. 600: Luca'ya
+	// aktarılmamış Z raporu taslakları, inceleme kuyruğunda (ledger.go).
 	for _, it := range det.Items {
-		if it.Result != reconciliation.ResultMatched {
-			open = append(open, it)
-		}
-	}
-	sort.Slice(open, func(i, j int) bool { return open[i].MainCode < open[j].MainCode })
-	if len(open) > 0 {
-		note := "Açılış fişi Luca'da; portalda karşılığı yok."
-		if _, err := svc.Decide(ctx, scope, open[0].UUID, actor, reconciliation.DecisionInput{Status: reconciliation.StatusExplained, Note: &note}); err != nil {
-			return fmt.Errorf("reconciliation decide: %w", err)
-		}
-	}
-	if len(open) > 1 {
-		if _, err := svc.SendToReview(ctx, scope, open[1].UUID, actor, nil); err != nil {
-			return fmt.Errorf("reconciliation review: %w", err)
+		switch {
+		case it.Result == reconciliation.ResultMatched:
+		case it.MainCode == "120":
+			note := lucaManualNote
+			if _, err := svc.Decide(ctx, scope, it.UUID, actor, reconciliation.DecisionInput{Status: reconciliation.StatusExplained, Note: &note}); err != nil {
+				return fmt.Errorf("reconciliation decide: %w", err)
+			}
+		case it.MainCode == "600":
+			if _, err := svc.SendToReview(ctx, scope, it.UUID, actor, nil); err != nil {
+				return fmt.Errorf("reconciliation review: %w", err)
+			}
 		}
 	}
 	page, err := svc.Counterparties(ctx, scope, det.Run.UUID.String(), "")

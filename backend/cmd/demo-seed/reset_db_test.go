@@ -126,13 +126,13 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		t.Fatalf("Z reports = %d, want 5", n)
 	}
 	// #382: Atlas'ın iki dönem bordrosu, beş personeli, Eylül SGK'sı ödenmiş,
-	// Eylül bordrosunun fiş taslağı ve mükellefe açık dört PDF, bir kez.
+	// iki ayın tahakkuk fişi (Luca'ya aktarılmış) ve mükellefe açık dört PDF.
 	for q, want := range map[string]int{
 		`SELECT count(*) FROM payroll_runs`:                                    2,
 		`SELECT count(*) FROM employees`:                                       5,
 		`SELECT count(*) FROM payroll_lines`:                                   8,
 		`SELECT count(*) FROM sgk_premiums WHERE paid_at IS NOT NULL`:          1,
-		`SELECT count(*) FROM payroll_runs WHERE journal_draft_id IS NOT NULL`: 1,
+		`SELECT count(*) FROM payroll_runs WHERE journal_draft_id IS NOT NULL`: 2,
 		`SELECT count(*) FROM payroll_documents WHERE visible_to_taxpayer`:     4,
 		`SELECT count(*) FROM employees WHERE national_id_masked LIKE '100%'`:  4,
 		// #393: Eylül ve Ekim mizanları, tutarlarıyla.
@@ -277,8 +277,8 @@ func TestSeedClickFixWidget(t *testing.T) {
 }
 
 // TestSeedBankMonth: the demo atlas engagement has a bank month to match
-// (#383): suggestions waiting, the alias answering for X Yazılım, the fees
-// approved and ready for a journal draft.
+// (#383): the alias answering for X Yazılım, the payments approved and
+// booked (#456), one collection waiting in the queue.
 func TestSeedBankMonth(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
@@ -286,7 +286,7 @@ func TestSeedBankMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	atlas := demoScope(t, d, "atlas")
-	if n := count(t, d, `SELECT count(*) FROM bank_transactions WHERE taxpayer_id = $1`, atlas.TaxpayerID); n != 8 {
+	if n := count(t, d, `SELECT count(*) FROM bank_transactions WHERE taxpayer_id = $1`, atlas.TaxpayerID); n != 9 {
 		t.Fatalf("movements = %d", n)
 	}
 	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'approved'`, atlas.ID); n < 3 {
