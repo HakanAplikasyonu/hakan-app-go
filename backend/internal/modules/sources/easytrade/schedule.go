@@ -240,6 +240,16 @@ func (s *Service) finish(ctx context.Context, row db.SourceConnection, runID int
 // connections) until the connection is set up again.
 func (s *Service) RunScheduled(ctx context.Context, taxpayerID int64, id uuid.UUID) (RunResult, error) {
 	row, c, err := s.client(ctx, taxpayerID, id)
+	if errors.Is(err, ErrBadState) && row.ID != 0 && interval(row) > 0 {
+		// Scheduled but without credentials (demo office, a half set-up
+		// connection): wait one interval instead of being picked by every
+		// sweep; not a source failure, so sync_failures stays.
+		_, _ = s.q.SetSourceConnectionSchedule(context.WithoutCancel(ctx), db.SetSourceConnectionScheduleParams{
+			SyncIntervalMinutes: row.SyncIntervalMinutes, SyncFailures: row.SyncFailures,
+			NextSyncAt: pgtype.Timestamptz{Time: s.now().Add(interval(row)), Valid: true},
+			TaxpayerID: row.TaxpayerID, ID: row.ID,
+		})
+	}
 	if err != nil {
 		return RunResult{}, err
 	}

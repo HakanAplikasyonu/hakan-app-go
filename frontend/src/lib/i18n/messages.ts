@@ -21,6 +21,7 @@ import enHelp from "@/locales/en/help.json";
 import enLegal from "@/locales/en/legal.json";
 import enNotifications from "@/locales/en/notifications.json";
 import enOffice from "@/locales/en/office.json";
+import enSources from "@/locales/en/sources.json";
 import enOnboarding from "@/locales/en/onboarding.json";
 import enOrganizations from "@/locales/en/organizations.json";
 import enPermissions from "@/locales/en/permissions.json";
@@ -59,6 +60,7 @@ import trHelp from "@/locales/tr/help.json";
 import trLegal from "@/locales/tr/legal.json";
 import trNotifications from "@/locales/tr/notifications.json";
 import trOffice from "@/locales/tr/office.json";
+import trSources from "@/locales/tr/sources.json";
 import trOnboarding from "@/locales/tr/onboarding.json";
 import trOrganizations from "@/locales/tr/organizations.json";
 import trPermissions from "@/locales/tr/permissions.json";
@@ -113,6 +115,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     taxpayer: trTaxpayer,
     organizations: trOrganizations,
     office: trOffice,
+    sources: trSources,
     onboarding: trOnboarding,
     help: trHelp,
     legal: trLegal,
@@ -153,6 +156,7 @@ const catalogs: Record<AppLocale, Record<string, MessageDictionary>> = {
     taxpayer: enTaxpayer,
     organizations: enOrganizations,
     office: enOffice,
+    sources: enSources,
     onboarding: enOnboarding,
     help: enHelp,
     legal: enLegal,

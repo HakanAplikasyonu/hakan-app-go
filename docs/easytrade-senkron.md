@@ -102,3 +102,17 @@ gereken uçlar ve bilgiler. Terimler Easytrade'in kendi terimleridir.
 | 8 | Silinen kayıtların bildirimi (webhook `*.deleted` ya da `sync/pull` içinde) | `deleted_at_source` tespiti yok |
 | 9 | Şirket API token'ı (`api_token` + `api_secret`) ile kimlik doğrulama yöntemi; kullanıcı şifresi istemeden bağlantı | Bugün kullanıcı girişi + 30 günlük token |
 | 10 | Hız sınırı (istek/dakika) ve `429` yanıtında `Retry-After` | Zamanlama 5 dk'dan başlayan geri çekilme ile deniyor |
+
+## 5. Ekran ve demo
+
+Ofis panelinde mükellefin **Easytrade** sekmesi
+(`/t/{ofis}/engagements/{uuid}/easytrade`): bağlantı durumu, son / son başarılı /
+sıradaki senkron, yeniden deneme sayısı, son webhook, senkron aralığı seçimi,
+dönemi şimdi senkronla; dönemin ödeme türü kartları (nakit, kart, havale/EFT),
+finansal işlemler tablosu (ortak tablo çekirdeği), kişi/cari toplamları, Z
+raporları ve senkron geçmişi. Dönem ofisin üst çubuğundaki seçiciden gelir.
+
+Demo (`make demo-seed`): Atlas Gıda'nın Easytrade bağlantısı (4 saatte bir,
+kimlik bilgisiz: worker Easytrade'i çağırmaz), kısmi ve başarılı çalışmalarla
+senkron geçmişi, Ekim 2026'nın masrafları, finansal işlemleri (Ahmet Yılmaz,
+Mehmet Demir, Yıldız Market …) ve beş Z raporu.

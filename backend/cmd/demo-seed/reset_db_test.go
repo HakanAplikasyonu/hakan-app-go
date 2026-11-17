@@ -112,6 +112,19 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		WHERE (a.driver = 'luca' AND a.status = 'imported') OR (a.driver = 'zirve' AND a.status = 'failed' AND a.error_message <> '')`, demo.OrgSlug); n != 2 {
 		t.Fatalf("demo transfers = %d, want 2", n)
 	}
+	// #385: the Easytrade connection, its history and October's data, once.
+	if n := count(t, d, `SELECT count(*) FROM source_connections WHERE source_system = 'easytrade' AND sync_interval_minutes = 240 AND next_sync_at > NOW()`); n != 1 {
+		t.Fatalf("easytrade connections = %d, want 1", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM sync_runs r JOIN source_connections c ON c.id = r.connection_id AND c.source_system = 'easytrade' WHERE r.status = 'partial'`); n != 1 {
+		t.Fatalf("partial runs = %d, want 1", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM source_financial_transactions WHERE source_system = 'easytrade' AND period = '2026-10'`); n != 8 {
+		t.Fatalf("financial transactions = %d, want 8", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM retail_sales WHERE source_system = 'easytrade' AND z_report_number IS NOT NULL`); n != 5 {
+		t.Fatalf("Z reports = %d, want 5", n)
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,
