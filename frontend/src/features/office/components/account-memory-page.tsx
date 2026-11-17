@@ -51,6 +51,7 @@ import type {
 } from "../services/account-memory.service";
 import type { ReviewSuggestion } from "../services/review.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import { LucaPlanPanel } from "./luca-plan-panel";
 import { Panel } from "./office-ui";
 import { RuleEditor } from "./rule-editor";
 
@@ -621,6 +622,7 @@ function AccountMemoryInner() {
       <AutoCodedPanel engagement={engagement} />
       <PlanPanel engagement={engagement} />
       <MissingPanel engagement={engagement} />
+      <LucaPlanPanel engagement={engagement} />
     </div>
   );
 }
