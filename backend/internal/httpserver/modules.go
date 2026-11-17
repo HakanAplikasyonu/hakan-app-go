@@ -28,6 +28,7 @@ import (
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	receiptsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts"
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
+	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	searchmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/search"
@@ -58,9 +59,11 @@ type moduleHandlers struct {
 	accountplan *accountplanhandler.Handler
 	periods     *periodshandler.Handler
 	summaries   *summarieshandler.Handler
-	agents      *agentshandler.Handler
-	legal       *legalhandler.Handler
-	doctasks    *doctasksmodule.Handler
+	// reports: mükellef raporu (issue #386).
+	reports  *reportsmodule.Handler
+	agents   *agentshandler.Handler
+	legal    *legalhandler.Handler
+	doctasks *doctasksmodule.Handler
 	// officedash: ofis ana panosu (issue #237).
 	officedash    *officedashmodule.Handler
 	officeClients *officedashmodule.ClientsHandler
@@ -94,6 +97,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
+		reportsmodule.Module{H: h.reports, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		agentsmodule.Module{H: h.agents},
 		legalmodule.Module{H: h.legal},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},

@@ -5284,6 +5284,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/report": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer report (month or year)
+         * @description Requires `tenant.engagements.read` (#386). Revenue, expenses by
+         *     category, VAT and the income-expense trend of one month (`period`,
+         *     trend: the 12 months up to it) or one calendar year (`year`, trend:
+         *     its months), compared with the previous month / year. Every amount
+         *     comes from portal data (active invoices net of returns, approved
+         *     expenses, approved Z reports not linked to an invoice), in TRY
+         *     excluding VAT. A monthly report carries the period's AI comment
+         *     (approved summary first, otherwise the latest draft). Give exactly
+         *     one of `period` and `year`.
+         */
+        get: operations["getEngagementReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/agents": {
         parameters: {
             query?: never;
@@ -7640,6 +7676,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/report": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My report (month or year)
+         * @description The same numbers the office sees (#386), for the mükellef's own data;
+         *     no AI comment (it reaches the mükellef with the office's report
+         *     email). Any mükellef member may read.
+         */
+        get: operations["getTaxpayerReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/document-tasks": {
         parameters: {
             query?: never;
@@ -9429,6 +9493,105 @@ export interface components {
             data: {
                 items: components["schemas"]["PeriodSummary"][];
             };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @description Sums of one range. Amounts are decimal strings (TRY, 2 places, VAT excluded). */
+        ReportTotals: {
+            /**
+             * @description Sales net of returns + Z reports
+             * @example 95250.75
+             */
+            revenue: string;
+            /**
+             * @description Purchases net of returns + approved expenses
+             * @example 31250.40
+             */
+            expenses: string;
+            net: string;
+            vat_calculated: string;
+            vat_deductible: string;
+            /** @description calculated − deductible; negative: carried forward (earlier carry-over not included) */
+            vat_payable: string;
+            /** Format: int64 */
+            sales_invoices: number;
+            /** Format: int64 */
+            purchase_invoices: number;
+            /** Format: int64 */
+            expense_records: number;
+            /** Format: int64 */
+            retail_reports: number;
+        };
+        ReportMonth: {
+            /** @example 2026-10 */
+            period: string;
+            /** @example Eki 26 */
+            label: string;
+            revenue: string;
+            expenses: string;
+            net: string;
+            vat_calculated: string;
+            vat_deductible: string;
+            vat_payable: string;
+        };
+        ReportCategory: {
+            /**
+             * @description purchase_invoices or the expense category (today the document type)
+             * @example purchase_invoices
+             */
+            key: string;
+            /** @example Alış faturaları */
+            label: string;
+            amount: string;
+            /** Format: int64 */
+            records: number;
+            /**
+             * @description Percent of all expenses
+             * @example 62.5
+             */
+            share: string;
+        };
+        TaxpayerReport: {
+            /** @enum {string} */
+            kind: "month" | "year";
+            /**
+             * @description YYYY-MM or YYYY
+             * @example 2026-10
+             */
+            period: string;
+            /** @example Ekim 2026 */
+            label: string;
+            /** @enum {string} */
+            currency: "TRY";
+            taxpayer: {
+                title: string;
+                tax_id: string;
+            };
+            totals: components["schemas"]["ReportTotals"];
+            previous: components["schemas"]["ReportTotals"];
+            /** @description Percent change against the previous month / year (1 place); null when the previous value is zero. */
+            change: {
+                revenue: string | null;
+                expenses: string | null;
+                net: string | null;
+            };
+            months: components["schemas"]["ReportMonth"][];
+            categories: components["schemas"]["ReportCategory"][];
+            commentary: null | {
+                /** Format: uuid */
+                summary_uuid: string;
+                period: string;
+                /** @enum {string} */
+                status: "approved" | "draft";
+                body: string;
+            };
+            notes: string[];
+            /** Format: date-time */
+            generated_at: string;
+        };
+        EnvelopeTaxpayerReport: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerReport"];
             meta: components["schemas"]["ResponseMeta"];
         };
         DesktopAgent: {
@@ -13297,6 +13460,10 @@ export interface components {
         BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
+        /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
+        ReportPeriod: string;
+        /** @description Yearly report (YYYY). Exactly one of period and year. */
+        ReportYear: string;
         /**
          * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
          *     forwards it on `/api/v1/taxpayer/*` only.
@@ -21540,6 +21707,44 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getEngagementReport: {
+        parameters: {
+            query?: {
+                /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
+                period?: components["parameters"]["ReportPeriod"];
+                /** @description Yearly report (YYYY). Exactly one of period and year. */
+                year?: components["parameters"]["ReportYear"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listDesktopAgents: {
         parameters: {
             query?: never;
@@ -25314,6 +25519,50 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerReport: {
+        parameters: {
+            query?: {
+                /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
+                period?: components["parameters"]["ReportPeriod"];
+                /** @description Yearly report (YYYY). Exactly one of period and year. */
+                year?: components["parameters"]["ReportYear"];
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerReport"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };

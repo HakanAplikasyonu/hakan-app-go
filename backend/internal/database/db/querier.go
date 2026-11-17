@@ -870,6 +870,25 @@ type Querier interface {
 	ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error)
 	ReplaceSecretRecord(ctx context.Context, arg ReplaceSecretRecordParams) (int64, error)
 	ReplaceUserRoles(ctx context.Context, userID int64) error
+	// Gider kategorileri: onaylı masraflar belge türüne göre. Masraf
+	// kategorileri gelince (masraf şeridi) anahtar o sütundan okunacak; usecase
+	// bilinmeyen anahtarı da gösterir.
+	ReportExpenseCategories(ctx context.Context, arg ReportExpenseCategoriesParams) ([]ReportExpenseCategoriesRow, error)
+	// Onaylı masraflar (fiş, makbuz), ay bazında. KDV hariç tutar yoksa toplam.
+	ReportExpenseMonthly(ctx context.Context, arg ReportExpenseMonthlyParams) ([]ReportExpenseMonthlyRow, error)
+	// Mükellef raporu (issue #386): dönem (ay / yıl) ciro, gider, KDV ve
+	// gelir-gider trendi. Tutarlar TL'ye çevrilir (döviz faturada kur ile).
+	// Yalnızca mükellefin kendi verisi; kapsam taxpayer_id ile.
+	// Aktif faturalar, ay ve yöne göre; iade faturaları ayrı satırda (is_return):
+	// gelen iade satışı, giden iade alışı azaltır.
+	ReportInvoiceMonthly(ctx context.Context, arg ReportInvoiceMonthlyParams) ([]ReportInvoiceMonthlyRow, error)
+	// Dönemin AI yorumu: onaylı özet öncelikli, yoksa son taslak.
+	ReportLatestSummary(ctx context.Context, arg ReportLatestSummaryParams) (ReportLatestSummaryRow, error)
+	// Onaylı Z raporları (perakende satış), faturaya bağlanmamış olanlar
+	// (bağlı olan faturada zaten sayılır).
+	ReportRetailMonthly(ctx context.Context, arg ReportRetailMonthlyParams) ([]ReportRetailMonthlyRow, error)
+	// Rapor başlığı ve gönderim adresi.
+	ReportTaxpayer(ctx context.Context, taxpayerID int64) (ReportTaxpayerRow, error)
 	// Yüklenen belge yeterli değil: görev yeniden açılır, son tarih ve
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)

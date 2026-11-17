@@ -91,6 +91,7 @@ import (
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
 	receiptsreviewlink "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/reviewlink"
 	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
+	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
@@ -618,6 +619,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		accountplan:  accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
 		periods:      periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:    summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
+		// Mükellef raporu (#386).
+		reports: reportsmodule.NewHandler(deps.Queries),
 		// Bildirimi zamanlanmış tarama (worker) gönderir; HTTP tarafına gerekmez.
 		agents:        agentshandler.New(agentsusecase.New(deps.Queries, nil, "", log)),
 		legal:         legalhandler.New(legalSvc),
