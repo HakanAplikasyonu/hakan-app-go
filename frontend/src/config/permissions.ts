@@ -87,6 +87,7 @@ export const Permission = {
   /** Receipt capture; the WhatsApp Web extension uses it too (issue #388). */
   TenantReceiptsRead: "tenant.receipts.read",
   TenantReceiptsWrite: "tenant.receipts.write",
+  TenantReceiptsApprove: "tenant.receipts.approve",
   TenantPrivacyRequest: "tenant.privacy.request",
   TenantPrivacyApprove: "tenant.privacy.approve",
 } as const;
@@ -229,6 +230,7 @@ export const permissions = {
     receipts: {
       read: Permission.TenantReceiptsRead,
       write: Permission.TenantReceiptsWrite,
+      approve: Permission.TenantReceiptsApprove,
     },
     privacy: {
       request: Permission.TenantPrivacyRequest,
