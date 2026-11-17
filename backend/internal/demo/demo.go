@@ -65,6 +65,14 @@ const (
 	TaxpayerUserRole = "owner"
 )
 
+// WhatsAppChatKey / WhatsAppChatLabel are the demo taxpayer user's WhatsApp
+// chat the office remembered (issue #388). The number is in the 0532 123
+// 45 67 style but invented.
+const (
+	WhatsAppChatKey   = "905321234567"
+	WhatsAppChatLabel = "Okan Atlas (Atlas Gıda)"
+)
+
 var Taxpayers = []Taxpayer{
 	{
 		Key: "atlas", Kind: "legal", TaxID: "9000000017", Title: "Atlas Gıda Ticaret A.Ş.", TaxOffice: "Kadıköy",

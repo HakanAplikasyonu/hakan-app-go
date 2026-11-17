@@ -40,6 +40,7 @@ import (
 	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
 	warningsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
+	whatsappmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/whatsapp"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
@@ -75,6 +76,8 @@ type moduleHandlers struct {
 	setup        *officesetup.Handler
 	// support: ClickFix destek widget'ı ayarı (issue #387).
 	support *supportmodule.Handler
+	// whatsapp: WhatsApp Web uzantısı (issue #388).
+	whatsapp *whatsappmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -109,5 +112,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		officesetup.Module{H: h.setup},
 		supportmodule.Module{H: h.support, Taxpayers: h.taxpayers},
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
+		whatsappmodule.Module{H: h.whatsapp, Engagements: h.engagements, Scope: h.rlsScope},
 	}
 }

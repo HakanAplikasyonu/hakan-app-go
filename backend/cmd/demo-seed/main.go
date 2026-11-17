@@ -197,6 +197,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedJournals(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("journals → %s: %w", tp.Key, err)
 			}
+			// WhatsApp Web uzantısı: hatırlanan sohbet ve iki kayıt (#388).
+			if err := seedWhatsApp(ctx, pool, org.ID, eng.ID); err != nil {
+				return fmt.Errorf("whatsapp → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}

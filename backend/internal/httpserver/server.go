@@ -124,6 +124,7 @@ import (
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
 	warningsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/usecase"
+	whatsappmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/whatsapp"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/appleauth"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -653,6 +654,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
+		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
+		whatsapp: whatsappmodule.NewHandler(
+			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),
+			whatsappmodule.NewPairings(deps.Redis, cfg.App.Env, uc), limiter),
 		vat: vatforecasthandler.New(vatforecastusecase.New(
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),

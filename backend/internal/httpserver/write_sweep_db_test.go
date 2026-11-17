@@ -61,8 +61,9 @@ type sweepCase struct {
 	file     string // multipart field name; the part is fileName / fileBody
 	fileName string
 	fileBody string
-	late     bool // after the others (needs rows they create, or closes one)
-	last     bool // after the late ones (ends the engagement, leaves the office)
+	fields   map[string]string // extra multipart form fields
+	late     bool              // after the others (needs rows they create, or closes one)
+	last     bool              // after the late ones (ends the engagement, leaves the office)
 }
 
 // receiptPNG is a small valid PNG: the AI fake reads it as a fuel receipt.
@@ -97,63 +98,68 @@ var taxpayerWrites = map[string]sweepCase{
 const sweepRange = `{"from":"2026-10-01","to":"2026-10-31"}`
 
 var tenantWrites = map[string]sweepCase{
-	"POST /v1/tenant/roles":                                                                       {body: `{"key":"sweep_role","name":"Tarama","permissions":["tenant.engagements.read"]}`},
-	"PATCH /v1/tenant/roles/{roleKey}":                                                            {body: `{"name":"Tarama 2"}`},
-	"DELETE /v1/tenant/roles/{roleKey}":                                                           {},
-	"PATCH /v1/tenant/members/{userUuid}":                                                         {body: `{"role_key":"member"}`},
-	"DELETE /v1/tenant/members/{userUuid}":                                                        {late: true},
-	"POST /v1/tenant/taxpayer-requests":                                                           {body: `{"kind":"legal","tax_id":"1234567890","title":"Tarama A.Ş.","contact_email":"tarama@example.test"}`},
-	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                                  {},
-	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                                    {body: `{"email":"calisan@example.test","role":"employee"}`},
-	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                           {},
-	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                              {body: `{}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/petitions":                                      {body: `{}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/end":                                            {last: true},
-	"PUT /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                          {},
-	"DELETE /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                       {},
-	"POST /v1/tenant/leave":                                                                       {last: true},
-	"POST /v1/tenant/invitations":                                                                 {body: `{"email":"yeni.uye@example.test","role_key":"member"}`},
-	"POST /v1/tenant/notifications/read-all":                                                      {},
-	"POST /v1/tenant/notifications/{uuid}/read":                                                   {},
-	"DELETE /v1/tenant/invitations/{uuid}":                                                        {},
-	"PATCH /v1/tenant/settings":                                                                   {body: `{"name":"Demir Mali Müşavirlik (demo)"}`},
-	"PUT /v1/tenant/setup":                                                                        {body: `{"steps":{"office":{"status":"done"}},"accounting_program":"luca"}`},
-	"POST /v1/tenant/taxpayer-imports":                                                            {file: "file", fileName: "liste.csv", fileBody: "VKN;Unvan;E-posta\n1234567890;Tarama A.Ş.;liste@example.test\n"},
-	"POST /v1/tenant/taxpayer-imports/{uuid}/send":                                                {},
-	"PUT /v1/tenant/warning-rules/{code}":                                                         {body: `{"enabled":false}`},
-	"DELETE /v1/tenant/warning-rules/{code}":                                                      {},
-	"PUT /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                            {body: `{"enabled":false}`},
-	"DELETE /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                         {},
-	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge":             {body: `{"note":"tarama"}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve":                 {body: `{"note":"tarama"}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk":                      {body: `{"code":"TAX_TOTAL_MISMATCH","period":"2026-10","note":"tarama"}`, late: true},
-	"POST /v1/tenant/warnings/acknowledge-bulk":                                                   {body: `{"code":"TAX_TOTAL_MISMATCH","note":"tarama"}`, late: true},
-	"PUT /v1/tenant/review/settings":                                                              {body: `{}`},
-	"DELETE /v1/tenant/review/settings/{kind}":                                                    {},
-	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept":            {late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/reject":            {body: `{"reason":"tarama"}`, late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/correct":           {body: `{"value":{"account_code":"600"},"reason":"tarama"}`, late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/revert":            {body: `{"reason":"tarama"}`, late: true},
-	"PUT /v1/tenant/engagements/{engagementUuid}/review-settings":                                 {body: `{}`},
-	"DELETE /v1/tenant/engagements/{engagementUuid}/review-settings/{kind}":                       {},
-	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports":                                  {file: "file", fileName: "satis.csv", fileBody: "Tarih;Tutar\n01.10.2026;100\n"},
-	"PUT /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/mapping":              {body: `{"data_type":"outgoing_invoices"}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/validate":            {},
-	"PATCH /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows/{rowNo}":       {body: `{}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit":              {},
-	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback":            {},
-	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                                     {},
-	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                       {file: "image", fileName: "fis.png", fileBody: officeReceiptPNG},
-	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":                 {},
-	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":                  {},
-	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                                       {body: `{"plate":"34ABC123"}`},
-	"DELETE /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}":                       {},
-	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                   {body: `{"period":"2026-10"}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries":                              {body: `{"period":"2026-10","recipient":"rapor@demo.hakan.local"}`},
-	"POST /v1/tenant/report-deliveries":                                                           {body: `{"period":"2026-10","engagement_uuids":["{engagementUuid}"]}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries":                               {body: `{"period":"2026-10"}`},
-	"PUT /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}":                  {body: `{"body":"Ekim dönemi özeti (tarama)."}`},
-	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}/approve":         {},
+	"POST /v1/tenant/roles":                                                                 {body: `{"key":"sweep_role","name":"Tarama","permissions":["tenant.engagements.read"]}`},
+	"PATCH /v1/tenant/roles/{roleKey}":                                                      {body: `{"name":"Tarama 2"}`},
+	"DELETE /v1/tenant/roles/{roleKey}":                                                     {},
+	"PATCH /v1/tenant/members/{userUuid}":                                                   {body: `{"role_key":"member"}`},
+	"DELETE /v1/tenant/members/{userUuid}":                                                  {late: true},
+	"POST /v1/tenant/taxpayer-requests":                                                     {body: `{"kind":"legal","tax_id":"1234567890","title":"Tarama A.Ş.","contact_email":"tarama@example.test"}`},
+	"DELETE /v1/tenant/taxpayer-requests/{uuid}":                                            {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invitations":                              {body: `{"email":"calisan@example.test","role":"employee"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/invitations/{uuid}":                     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/petitions/preview":                        {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/petitions":                                {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/end":                                      {last: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                    {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}":                 {},
+	"POST /v1/tenant/leave":                                                                 {last: true},
+	"POST /v1/tenant/invitations":                                                           {body: `{"email":"yeni.uye@example.test","role_key":"member"}`},
+	"POST /v1/tenant/notifications/read-all":                                                {},
+	"POST /v1/tenant/notifications/{uuid}/read":                                             {},
+	"DELETE /v1/tenant/invitations/{uuid}":                                                  {},
+	"PATCH /v1/tenant/settings":                                                             {body: `{"name":"Demir Mali Müşavirlik (demo)"}`},
+	"PUT /v1/tenant/setup":                                                                  {body: `{"steps":{"office":{"status":"done"}},"accounting_program":"luca"}`},
+	"POST /v1/tenant/taxpayer-imports":                                                      {file: "file", fileName: "liste.csv", fileBody: "VKN;Unvan;E-posta\n1234567890;Tarama A.Ş.;liste@example.test\n"},
+	"POST /v1/tenant/taxpayer-imports/{uuid}/send":                                          {},
+	"PUT /v1/tenant/warning-rules/{code}":                                                   {body: `{"enabled":false}`},
+	"DELETE /v1/tenant/warning-rules/{code}":                                                {},
+	"PUT /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                      {body: `{"enabled":false}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/warning-rules/{code}":                   {},
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/acknowledge":       {body: `{"note":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/{warningUuid}/resolve":           {body: `{"note":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/warnings/acknowledge-bulk":                {body: `{"code":"TAX_TOTAL_MISMATCH","period":"2026-10","note":"tarama"}`, late: true},
+	"POST /v1/tenant/warnings/acknowledge-bulk":                                             {body: `{"code":"TAX_TOTAL_MISMATCH","note":"tarama"}`, late: true},
+	"PUT /v1/tenant/review/settings":                                                        {body: `{}`},
+	"DELETE /v1/tenant/review/settings/{kind}":                                              {},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/accept":      {late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/reject":      {body: `{"reason":"tarama"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/correct":     {body: `{"value":{"account_code":"600"},"reason":"tarama"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/suggestions/{suggestionUuid}/revert":      {body: `{"reason":"tarama"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/review-settings":                           {body: `{}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/review-settings/{kind}":                 {},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports":                            {file: "file", fileName: "satis.csv", fileBody: "Tarih;Tutar\n01.10.2026;100\n"},
+	"PUT /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/mapping":        {body: `{"data_type":"outgoing_invoices"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/validate":      {},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows/{rowNo}": {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit":        {},
+	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback":      {},
+	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                               {},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                 {file: "image", fileName: "fis.png", fileBody: officeReceiptPNG},
+	// WhatsApp Web uzantısı (#388).
+	"POST /v1/tenant/whatsapp/pairings":                                                   {},
+	"DELETE /v1/tenant/whatsapp/chat-links/{linkUuid}":                                    {late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link":                      {body: `{"chat_key":"905551112233@c.us","label":"Atlas Muhasebe"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/whatsapp/captures":                      {file: "file", fileName: "belge.pdf", fileBody: "%PDF-1.4\n% whatsapp sweep\n", fields: map[string]string{"target": "document", "chat_key": "905551112233@c.us"}},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":         {},
+	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":          {},
+	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                               {body: `{"plate":"34ABC123"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}":               {},
+	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                           {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries":                      {body: `{"period":"2026-10","recipient":"rapor@demo.hakan.local"}`},
+	"POST /v1/tenant/report-deliveries":                                                   {body: `{"period":"2026-10","engagement_uuids":["{engagementUuid}"]}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries":                       {body: `{"period":"2026-10"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}":          {body: `{"body":"Ekim dönemi özeti (tarama)."}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}/approve": {},
 	"POST /v1/tenant/agents":                                                                      {body: `{"machine_id":"sweep-machine-01","name":"Tarama bilgisayarı","platform":"windows","version":"1.0.0"}`},
 	"DELETE /v1/tenant/agents/{agentUuid}":                                                        {},
 	"POST /v1/tenant/agents/{agentUuid}/heartbeat":                                                {body: `{}`},
@@ -536,6 +542,9 @@ func (e *sweepEnv) do(t *testing.T, method, path string, c sweepCase, taxpayer b
 		}
 		var buf bytes.Buffer
 		mw := multipart.NewWriter(&buf)
+		for k, v := range c.fields {
+			_ = mw.WriteField(k, v)
+		}
 		fw, _ := mw.CreateFormFile(c.file, c.fileName)
 		_, _ = fw.Write([]byte(data))
 		_ = mw.Close()
@@ -587,6 +596,8 @@ var paramQueries = map[string]string{
 	"connectionUuid":    `SELECT uuid::text FROM source_connections WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"templateUuid":      `SELECT uuid::text FROM excel_import_templates WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"ruleKey":           `SELECT rule_key FROM account_rules WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"linkUuid":          `SELECT uuid::text FROM whatsapp_chat_links WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"captureUuid":       `SELECT uuid::text FROM whatsapp_captures WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
 // uuidQueries fill {uuid} by the operation's path.

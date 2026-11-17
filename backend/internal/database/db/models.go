@@ -2016,3 +2016,35 @@ type WebauthnCredential struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
+
+type WhatsappCapture struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	Target           string             `json:"target"`
+	ChatKey          pgtype.Text        `json:"chat_key"`
+	FileName         string             `json:"file_name"`
+	ContentType      string             `json:"content_type"`
+	SizeBytes        int64              `json:"size_bytes"`
+	Sha256           string             `json:"sha256"`
+	AttachmentID     pgtype.Int8        `json:"attachment_id"`
+	ReceiptCaptureID pgtype.Int8        `json:"receipt_capture_id"`
+	DocumentTaskID   pgtype.Int8        `json:"document_task_id"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type WhatsappChatLink struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ChatKey        string             `json:"chat_key"`
+	Label          string             `json:"label"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
