@@ -68,6 +68,7 @@ var Columns = []Column{
 	{"expenses", "raw_payload", secrets.PurposeExpenseRawPayload},
 	{"retail_sales", "raw_payload", secrets.PurposeRetailSaleRawPayload},
 	{"entegrator_documents", "header_raw", secrets.PurposeEntegratorHeader},
+	{"source_financial_transactions", "raw_payload", secrets.PurposeFinancialTxRawPayload},
 }
 
 // Mode is what Run does to each value.

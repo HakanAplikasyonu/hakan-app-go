@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,6 +54,8 @@ type Counters struct {
 	sources.Report
 	WindowsDone   int `json:"windows_done"`
 	WindowsFailed int `json:"windows_failed"`
+	// Unsupported items: Easytrade has no endpoint for them (yet).
+	Unsupported []string `json:"unsupported,omitempty"`
 }
 
 // RunResult is one finished run.
@@ -165,10 +168,16 @@ windows:
 			}
 			_, _ = s.q.SetSyncWindowStatus(ctx, db.SetSyncWindowStatusParams{Status: "running", TaxpayerID: row.TaxpayerID, ID: win.ID})
 			b, err := c.ReadItem(ctx, item, branches, w.From, w.To.AddDate(0, 0, -1))
+			if errors.Is(err, ErrNotSupported) {
+				if !slices.Contains(cnt.Unsupported, item) {
+					cnt.Unsupported = append(cnt.Unsupported, item)
+				}
+				err = nil
+			}
 			if err == nil {
 				var rep sources.Report
 				rep, err = sources.Write(ctx, s.pool, row.TaxpayerID, SourceSystem, b)
-				add(&cnt.Report, rep)
+				cnt.Add(rep)
 			}
 			if err != nil {
 				cnt.WindowsFailed++
@@ -200,18 +209,6 @@ windows:
 		return res, runErr
 	}
 	return res, nil
-}
-
-func add(dst *sources.Report, r sources.Report) {
-	dst.InvoicesCreated += r.InvoicesCreated
-	dst.InvoicesExisting += r.InvoicesExisting
-	dst.ExpensesCreated += r.ExpensesCreated
-	dst.ExpensesUpdated += r.ExpensesUpdated
-	dst.ExpensesUnchanged += r.ExpensesUnchanged
-	dst.PossibleDuplicates += r.PossibleDuplicates
-	for k, v := range r.Excluded {
-		dst.Excluded[k] += v
-	}
 }
 
 // finish closes the run and records the last sync on the connection.

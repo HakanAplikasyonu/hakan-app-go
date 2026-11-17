@@ -5,17 +5,18 @@
 INSERT INTO expenses (
     taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
     tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, vehicle_plate,
-    raw_payload, content_hash
+    payment_method, receipt_number, raw_payload, content_hash
 ) VALUES (
     @taxpayer_id, @source_system, @source_id, 'api', @expense_date, @period, @amount, @currency, sqlc.narg(tax_rate),
     @tax_exclusive_amount, @tax_amount, @description, @receipt_type, sqlc.narg(vendor_tax_number), sqlc.narg(vendor_name),
-    sqlc.narg(vehicle_plate), @raw_payload, @content_hash
+    sqlc.narg(vehicle_plate), sqlc.narg(payment_method), sqlc.narg(receipt_number), @raw_payload, @content_hash
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO UPDATE
 SET expense_date = EXCLUDED.expense_date, period = EXCLUDED.period, amount = EXCLUDED.amount,
     currency = EXCLUDED.currency, tax_rate = EXCLUDED.tax_rate, tax_exclusive_amount = EXCLUDED.tax_exclusive_amount,
     tax_amount = EXCLUDED.tax_amount, description = EXCLUDED.description, vendor_tax_number = EXCLUDED.vendor_tax_number,
-    vendor_name = EXCLUDED.vendor_name, vehicle_plate = EXCLUDED.vehicle_plate, raw_payload = EXCLUDED.raw_payload,
+    vendor_name = EXCLUDED.vendor_name, vehicle_plate = EXCLUDED.vehicle_plate, payment_method = EXCLUDED.payment_method,
+    receipt_number = EXCLUDED.receipt_number, raw_payload = EXCLUDED.raw_payload,
     content_hash = EXCLUDED.content_hash
 WHERE expenses.content_hash IS DISTINCT FROM EXCLUDED.content_hash
 RETURNING id, (xmax = 0) AS inserted;

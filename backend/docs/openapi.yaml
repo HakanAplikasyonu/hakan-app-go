@@ -8922,6 +8922,76 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/financial-transactions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: listEasytradeFinancialTransactions
+      summary: The period's Easytrade financial transactions with payment-type and cari totals
+      description: |
+        Requires `tenant.invoices.read`. Collections, payments, income /
+        expense and retail-sale payments read from Easytrade's
+        `/company/financial-transactions` (09 §5), in Easytrade's terms:
+        `payment_method_type` (`cash`, `bank_transfer` = havale/EFT,
+        `credit_card`, `check`, `promissory_note`, `credit`, `unknown`),
+        `transaction_type`, `transaction_flow`; `direction` (`in` / `out` /
+        `unknown`) is derived. `by_customer` totals the period per kişi/cari;
+        a movement whose `referenceable_type` is `Invoice` carries
+        `invoice_uuid` when the portal has that invoice (matching input;
+        `invoice_refs` / `invoice_matched`). At most 1000 rows.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, example: "2026-10" } }
+      responses:
+        "200":
+          description: Period view
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeFinancialSummary" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/z-reports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: listEasytradeZReports
+      summary: The period's Z reports from Easytrade
+      description: |
+        Requires `tenant.invoices.read`. Z reports are written to
+        `retail_sales` (one row per report, `z_report_number`,
+        `okc_serial_number`, totals); `payments` totals them per
+        `payment_method_type`. Easytrade does not offer Z reports yet
+        (its day-end sessions are cash closings, 09 §4): the portal reads
+        the endpoint it asks Easytrade for (`GET /company/z-reports`,
+        docs/easytrade-senkron.md §4) and `supported` is false while the
+        last run found none.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, example: "2026-10" } }
+      responses:
+        "200":
+          description: Z reports
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeZReportList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -12088,7 +12158,7 @@ components:
         status: { type: string, enum: [running, success, partial, failed] }
         counters:
           type: object
-          description: The import report plus `windows_done` and `windows_failed`.
+          description: The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for).
           additionalProperties: true
         error: { type: string }
         started_at: { type: string, format: date-time }
@@ -12103,6 +12173,100 @@ components:
           required: [items]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/EasytradeSyncRun" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EasytradeFinancialTransaction:
+      type: object
+      required: [uuid, source_id, transaction_date, transaction_type, direction, payment_method_type, amount, currency, amount_try, description]
+      properties:
+        uuid: { type: string, format: uuid }
+        source_id: { type: string }
+        transaction_date: { type: string, format: date }
+        due_date: { type: string, format: date }
+        transaction_type: { type: string, description: "Easytrade value: income, expense, retail_sale, opening_balance …" }
+        transaction_flow: { type: string }
+        direction: { type: string, enum: [in, out, unknown] }
+        payment_method_type: { type: string, enum: [cash, bank_transfer, credit_card, check, promissory_note, credit, unknown] }
+        amount: { type: string }
+        currency: { type: string }
+        amount_try: { type: string }
+        description: { type: string }
+        reference_document_no: { type: string }
+        status: { type: string }
+        customer_name: { type: string }
+        customer_tax_number: { type: string }
+        cash_box_name: { type: string }
+        cash_box_type: { type: string }
+        referenceable_type: { type: string, description: "Invoice or Sale" }
+        referenceable_id: { type: string }
+        invoice_uuid: { type: string, format: uuid, description: The portal invoice the movement references. }
+    EnvelopeEasytradeFinancialSummary:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [period, items, by_payment_type, by_customer, invoice_refs, invoice_matched]
+          properties:
+            period: { type: string }
+            items: { type: array, items: { $ref: "#/components/schemas/EasytradeFinancialTransaction" } }
+            by_payment_type:
+              type: array
+              items:
+                type: object
+                required: [payment_method_type, direction, count, total]
+                properties:
+                  payment_method_type: { type: string }
+                  direction: { type: string, enum: [in, out, unknown] }
+                  count: { type: integer }
+                  total: { type: string }
+            by_customer:
+              type: array
+              items:
+                type: object
+                required: [customer_name, count, total_in, total_out]
+                properties:
+                  customer_name: { type: string }
+                  customer_tax_number: { type: string }
+                  count: { type: integer }
+                  total_in: { type: string }
+                  total_out: { type: string }
+            invoice_refs: { type: integer }
+            invoice_matched: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EasytradeZReport:
+      type: object
+      required: [uuid, source_id, report_date, subtotal_amount, tax_amount, total_amount, currency, approval_status, payments]
+      properties:
+        uuid: { type: string, format: uuid, description: The retail_sales row. }
+        source_id: { type: string }
+        report_date: { type: string, format: date }
+        z_report_number: { type: string }
+        okc_serial_number: { type: string }
+        subtotal_amount: { type: string }
+        tax_amount: { type: string }
+        total_amount: { type: string }
+        currency: { type: string }
+        approval_status: { type: string, enum: [pending, approved, rejected] }
+        payments:
+          type: object
+          description: Totals per payment_method_type.
+          additionalProperties: { type: string }
+    EnvelopeEasytradeZReportList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [period, items, total_amount, tax_amount, payments, supported]
+          properties:
+            period: { type: string }
+            items: { type: array, items: { $ref: "#/components/schemas/EasytradeZReport" } }
+            total_amount: { type: string }
+            tax_amount: { type: string }
+            payments: { type: object, additionalProperties: { type: string } }
+            supported: { type: boolean }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EasytradeVatTotals:
       type: object
@@ -12159,6 +12323,12 @@ components:
         expenses_updated: { type: integer }
         expenses_unchanged: { type: integer }
         possible_duplicates: { type: integer }
+        financial_created: { type: integer, description: "Easytrade financial transactions (issue #385)." }
+        financial_updated: { type: integer }
+        financial_unchanged: { type: integer }
+        z_reports_created: { type: integer, description: "Z reports written to retail_sales (issue #385)." }
+        z_reports_updated: { type: integer }
+        z_reports_unchanged: { type: integer }
         excluded:
           type: object
           description: "Read but not written, by reason: cancelled, not_an_invoice (estimates, recurring), no_issue_date"

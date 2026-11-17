@@ -118,6 +118,7 @@ type Querier interface {
 	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
 	CountScopedInbox(ctx context.Context, arg CountScopedInboxParams) (CountScopedInboxRow, error)
 	CountSecretRecordsByKEK(ctx context.Context) ([]CountSecretRecordsByKEKRow, error)
+	CountSourceFinancialMatches(ctx context.Context, arg CountSourceFinancialMatchesParams) (CountSourceFinancialMatchesRow, error)
 	CountStorageActivity(ctx context.Context, objectKey string) (int64, error)
 	CountStorageTrash(ctx context.Context) (int64, error)
 	// tenant-lint: cross-org mükellef kendi görevlerini sayar; taxpayer_id ve aktif engagement ile sınırlı
@@ -745,6 +746,8 @@ type Querier interface {
 	// tenant-lint: cross-taxpayer Easytrade webhook'u şirket kimliğiyle gelir, bağlantının mükellefi bilinmez (rls.System)
 	ListSourceConnectionsByExternalCompany(ctx context.Context, arg ListSourceConnectionsByExternalCompanyParams) ([]ListSourceConnectionsByExternalCompanyRow, error)
 	ListSourceConnectionsBySystem(ctx context.Context, arg ListSourceConnectionsBySystemParams) ([]SourceConnection, error)
+	ListSourceFinancialTransactions(ctx context.Context, arg ListSourceFinancialTransactionsParams) ([]ListSourceFinancialTransactionsRow, error)
+	ListSourceZReports(ctx context.Context, arg ListSourceZReportsParams) ([]ListSourceZReportsRow, error)
 	ListStorageActivity(ctx context.Context, arg ListStorageActivityParams) ([]ListStorageActivityRow, error)
 	ListStorageLinksByKey(ctx context.Context, objectKey string) ([]StorageLink, error)
 	ListStorageSharesByKey(ctx context.Context, objectKey string) ([]ListStorageSharesByKeyRow, error)
@@ -997,6 +1000,8 @@ type Querier interface {
 	// Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
 	// durumları.
 	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
+	SummarizeSourceFinancialByCustomer(ctx context.Context, arg SummarizeSourceFinancialByCustomerParams) ([]SummarizeSourceFinancialByCustomerRow, error)
+	SummarizeSourceFinancialByPayment(ctx context.Context, arg SummarizeSourceFinancialByPaymentParams) ([]SummarizeSourceFinancialByPaymentRow, error)
 	// Onaylı masraflar (beyana yalnızca onaylı masraf girer).
 	SummaryExpenseTotals(ctx context.Context, arg SummaryExpenseTotalsParams) (SummaryExpenseTotalsRow, error)
 	// AI dönem özeti (issue #35): olgu sorguları ve taslaklar.
@@ -1084,6 +1089,10 @@ type Querier interface {
 	// Ön muhasebe programlarından gelen masraflar (#47 Paraşüt): kaynak anahtarıyla
 	// tekil (uq_expenses_source); aynı kayıt tekrar gelirse tutarlar güncellenir.
 	UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpenseParams) (UpsertSourceExpenseRow, error)
+	// Kaynak finansal işlemleri ve Z raporları (issue #385).
+	UpsertSourceFinancialTransaction(ctx context.Context, arg UpsertSourceFinancialTransactionParams) (UpsertSourceFinancialTransactionRow, error)
+	// Z raporu retail_sales'e günlük toplam olarak yazılır (01 §4.7); kaynak kimliği "z:<id>".
+	UpsertSourceZReport(ctx context.Context, arg UpsertSourceZReportParams) (UpsertSourceZReportRow, error)
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)

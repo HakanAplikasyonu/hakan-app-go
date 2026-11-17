@@ -6630,6 +6630,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/financial-transactions": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The period's Easytrade financial transactions with payment-type and cari totals
+         * @description Requires `tenant.invoices.read`. Collections, payments, income /
+         *     expense and retail-sale payments read from Easytrade's
+         *     `/company/financial-transactions` (09 §5), in Easytrade's terms:
+         *     `payment_method_type` (`cash`, `bank_transfer` = havale/EFT,
+         *     `credit_card`, `check`, `promissory_note`, `credit`, `unknown`),
+         *     `transaction_type`, `transaction_flow`; `direction` (`in` / `out` /
+         *     `unknown`) is derived. `by_customer` totals the period per kişi/cari;
+         *     a movement whose `referenceable_type` is `Invoice` carries
+         *     `invoice_uuid` when the portal has that invoice (matching input;
+         *     `invoice_refs` / `invoice_matched`). At most 1000 rows.
+         */
+        get: operations["listEasytradeFinancialTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/z-reports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The period's Z reports from Easytrade
+         * @description Requires `tenant.invoices.read`. Z reports are written to
+         *     `retail_sales` (one row per report, `z_report_number`,
+         *     `okc_serial_number`, totals); `payments` totals them per
+         *     `payment_method_type`. Easytrade does not offer Z reports yet
+         *     (its day-end sessions are cash closings, 09 §4): the portal reads
+         *     the endpoint it asks Easytrade for (`GET /company/z-reports`,
+         *     docs/easytrade-senkron.md §4) and `supported` is false while the
+         *     last run found none.
+         */
+        get: operations["listEasytradeZReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync": {
         parameters: {
             query?: never;
@@ -9084,7 +9158,7 @@ export interface components {
             kind: "incremental" | "manual";
             /** @enum {string} */
             status: "running" | "success" | "partial" | "failed";
-            /** @description The import report plus `windows_done` and `windows_failed`. */
+            /** @description The import report plus `windows_done`, `windows_failed` and `unsupported` (items Easytrade offers no endpoint for). */
             counters: {
                 [key: string]: unknown;
             };
@@ -9099,6 +9173,102 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["EasytradeSyncRun"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EasytradeFinancialTransaction: {
+            /** Format: uuid */
+            uuid: string;
+            source_id: string;
+            /** Format: date */
+            transaction_date: string;
+            /** Format: date */
+            due_date?: string;
+            /** @description Easytrade value: income, expense, retail_sale, opening_balance … */
+            transaction_type: string;
+            transaction_flow?: string;
+            /** @enum {string} */
+            direction: "in" | "out" | "unknown";
+            /** @enum {string} */
+            payment_method_type: "cash" | "bank_transfer" | "credit_card" | "check" | "promissory_note" | "credit" | "unknown";
+            amount: string;
+            currency: string;
+            amount_try: string;
+            description: string;
+            reference_document_no?: string;
+            status?: string;
+            customer_name?: string;
+            customer_tax_number?: string;
+            cash_box_name?: string;
+            cash_box_type?: string;
+            /** @description Invoice or Sale */
+            referenceable_type?: string;
+            referenceable_id?: string;
+            /**
+             * Format: uuid
+             * @description The portal invoice the movement references.
+             */
+            invoice_uuid?: string;
+        };
+        EnvelopeEasytradeFinancialSummary: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                period: string;
+                items: components["schemas"]["EasytradeFinancialTransaction"][];
+                by_payment_type: {
+                    payment_method_type: string;
+                    /** @enum {string} */
+                    direction: "in" | "out" | "unknown";
+                    count: number;
+                    total: string;
+                }[];
+                by_customer: {
+                    customer_name: string;
+                    customer_tax_number?: string;
+                    count: number;
+                    total_in: string;
+                    total_out: string;
+                }[];
+                invoice_refs: number;
+                invoice_matched: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EasytradeZReport: {
+            /**
+             * Format: uuid
+             * @description The retail_sales row.
+             */
+            uuid: string;
+            source_id: string;
+            /** Format: date */
+            report_date: string;
+            z_report_number?: string;
+            okc_serial_number?: string;
+            subtotal_amount: string;
+            tax_amount: string;
+            total_amount: string;
+            currency: string;
+            /** @enum {string} */
+            approval_status: "pending" | "approved" | "rejected";
+            /** @description Totals per payment_method_type. */
+            payments: {
+                [key: string]: string;
+            };
+        };
+        EnvelopeEasytradeZReportList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                period: string;
+                items: components["schemas"]["EasytradeZReport"][];
+                total_amount: string;
+                tax_amount: string;
+                payments: {
+                    [key: string]: string;
+                };
+                supported: boolean;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -9143,6 +9313,14 @@ export interface components {
             expenses_updated: number;
             expenses_unchanged: number;
             possible_duplicates: number;
+            /** @description Easytrade financial transactions (issue #385). */
+            financial_created?: number;
+            financial_updated?: number;
+            financial_unchanged?: number;
+            /** @description Z reports written to retail_sales (issue #385). */
+            z_reports_created?: number;
+            z_reports_updated?: number;
+            z_reports_unchanged?: number;
             /** @description Read but not written, by reason: cancelled, not_an_invoice (estimates, recurring), no_issue_date */
             excluded: {
                 [key: string]: number;
@@ -24442,6 +24620,78 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEasytradeFinancialTransactions: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Period view */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeFinancialSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEasytradeZReports: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Z reports */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeZReportList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };

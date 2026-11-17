@@ -181,17 +181,18 @@ const upsertSourceExpense = `-- name: UpsertSourceExpense :one
 INSERT INTO expenses (
     taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
     tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, vehicle_plate,
-    raw_payload, content_hash
+    payment_method, receipt_number, raw_payload, content_hash
 ) VALUES (
     $1, $2, $3, 'api', $4, $5, $6, $7, $8,
     $9, $10, $11, $12, $13, $14,
-    $15, $16, $17
+    $15, $16, $17, $18, $19
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO UPDATE
 SET expense_date = EXCLUDED.expense_date, period = EXCLUDED.period, amount = EXCLUDED.amount,
     currency = EXCLUDED.currency, tax_rate = EXCLUDED.tax_rate, tax_exclusive_amount = EXCLUDED.tax_exclusive_amount,
     tax_amount = EXCLUDED.tax_amount, description = EXCLUDED.description, vendor_tax_number = EXCLUDED.vendor_tax_number,
-    vendor_name = EXCLUDED.vendor_name, vehicle_plate = EXCLUDED.vehicle_plate, raw_payload = EXCLUDED.raw_payload,
+    vendor_name = EXCLUDED.vendor_name, vehicle_plate = EXCLUDED.vehicle_plate, payment_method = EXCLUDED.payment_method,
+    receipt_number = EXCLUDED.receipt_number, raw_payload = EXCLUDED.raw_payload,
     content_hash = EXCLUDED.content_hash
 WHERE expenses.content_hash IS DISTINCT FROM EXCLUDED.content_hash
 RETURNING id, (xmax = 0) AS inserted
@@ -213,6 +214,8 @@ type UpsertSourceExpenseParams struct {
 	VendorTaxNumber    pgtype.Text    `json:"vendor_tax_number"`
 	VendorName         pgtype.Text    `json:"vendor_name"`
 	VehiclePlate       pgtype.Text    `json:"vehicle_plate"`
+	PaymentMethod      pgtype.Text    `json:"payment_method"`
+	ReceiptNumber      pgtype.Text    `json:"receipt_number"`
 	RawPayload         []byte         `json:"raw_payload"`
 	ContentHash        pgtype.Text    `json:"content_hash"`
 }
@@ -241,6 +244,8 @@ func (q *Queries) UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpen
 		arg.VendorTaxNumber,
 		arg.VendorName,
 		arg.VehiclePlate,
+		arg.PaymentMethod,
+		arg.ReceiptNumber,
 		arg.RawPayload,
 		arg.ContentHash,
 	)
