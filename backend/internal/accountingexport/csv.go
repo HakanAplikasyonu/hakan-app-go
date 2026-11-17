@@ -94,6 +94,15 @@ func LoadCSVTemplate(fsys fs.FS, path string) (CSVTemplate, error) {
 	return t, nil
 }
 
+// Check validates a template changed in code (options applied to a loaded
+// one); errors wrap ErrTemplate.
+func (t CSVTemplate) Check() error {
+	if err := t.check(); err != nil {
+		return fmt.Errorf("%w: %v", ErrTemplate, err)
+	}
+	return nil
+}
+
 func (t CSVTemplate) check() error {
 	if t.Driver == "" || t.Name == "" || t.Version == "" {
 		return errors.New("driver, template and version are required")

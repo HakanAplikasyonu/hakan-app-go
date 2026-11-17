@@ -324,6 +324,41 @@ type BankRule struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankStatementExport struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	TaxpayerID       int64              `json:"taxpayer_id"`
+	CashBoxID        int64              `json:"cash_box_id"`
+	Target           string             `json:"target"`
+	DateFrom         pgtype.Date        `json:"date_from"`
+	DateTo           pgtype.Date        `json:"date_to"`
+	TemplateVersion  string             `json:"template_version"`
+	TemplateVerified bool               `json:"template_verified"`
+	AmountLayout     string             `json:"amount_layout"`
+	Delimiter        string             `json:"delimiter"`
+	Quote            string             `json:"quote"`
+	FileName         string             `json:"file_name"`
+	Sha256           string             `json:"sha256"`
+	Size             int32              `json:"size"`
+	LineCount        int32              `json:"line_count"`
+	RepeatedCount    int32              `json:"repeated_count"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type BankStatementExportItem struct {
+	ID                    int64              `json:"id"`
+	OrganizationID        int64              `json:"organization_id"`
+	EngagementID          int64              `json:"engagement_id"`
+	BankStatementExportID int64              `json:"bank_statement_export_id"`
+	TaxpayerID            int64              `json:"taxpayer_id"`
+	BankTransactionID     int64              `json:"bank_transaction_id"`
+	PreviousExports       int32              `json:"previous_exports"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+}
+
 type BankStatementTemplate struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

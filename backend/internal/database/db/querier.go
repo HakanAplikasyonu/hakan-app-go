@@ -47,6 +47,9 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	// Banka ekranındaki "dışa aktarıldı" işareti: hareket başına çıktı sayısı
+	// ve son çıktı zamanı.
+	BankTransactionExportMarks(ctx context.Context, arg BankTransactionExportMarksParams) ([]BankTransactionExportMarksRow, error)
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
@@ -380,6 +383,8 @@ type Querier interface {
 	GetBulkJobByUUID(ctx context.Context, argUuid uuid.UUID) (BulkJob, error)
 	GetCashBox(ctx context.Context, arg GetCashBoxParams) (CashBox, error)
 	GetCashBoxByUUID(ctx context.Context, arg GetCashBoxByUUIDParams) (CashBox, error)
+	// Luca banka ekstresi CSV çıktısı (#465).
+	GetCashBoxForExport(ctx context.Context, arg GetCashBoxForExportParams) (GetCashBoxForExportRow, error)
 	GetChangeRequest(ctx context.Context, arg GetChangeRequestParams) (GetChangeRequestRow, error)
 	GetCopilotEngagement(ctx context.Context, arg GetCopilotEngagementParams) (GetCopilotEngagementRow, error)
 	GetCopilotPlan(ctx context.Context, arg GetCopilotPlanParams) (CopilotPlan, error)
@@ -584,6 +589,9 @@ type Querier interface {
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
 	InsertBankCounterpartyAlias(ctx context.Context, arg InsertBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	InsertBankStatementExport(ctx context.Context, arg InsertBankStatementExportParams) (BankStatementExport, error)
+	// Dosyaya giren hareketler. items: [{"id": 1, "previous": 0}, ...]
+	InsertBankStatementExportItems(ctx context.Context, arg InsertBankStatementExportItemsParams) (int64, error)
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
 	InsertBankTransactionDocument(ctx context.Context, arg InsertBankTransactionDocumentParams) error
 	InsertBankTransactionMatch(ctx context.Context, arg InsertBankTransactionMatchParams) (BankTransactionMatch, error)
@@ -724,6 +732,7 @@ type Querier interface {
 	// unassigned (önerisi yok) / suggested / approved (fişe girmedi) / drafted.
 	ListBankPostings(ctx context.Context, arg ListBankPostingsParams) ([]ListBankPostingsRow, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	ListBankStatementExports(ctx context.Context, arg ListBankStatementExportsParams) ([]ListBankStatementExportsRow, error)
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
@@ -731,6 +740,9 @@ type Querier interface {
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
 	ListBankTransactionsForControls(ctx context.Context, arg ListBankTransactionsForControlsParams) ([]ListBankTransactionsForControlsRow, error)
+	// Bir hesabın tarih aralığındaki iptal edilmemiş hareketleri, ekstre
+	// sırasıyla; daha önce kaç kez dışa aktarıldıkları ile.
+	ListBankTransactionsForExport(ctx context.Context, arg ListBankTransactionsForExportParams) ([]ListBankTransactionsForExportRow, error)
 	// Banka–fatura eşleme (#21). Aday üretme SQL'de, puanlama Go'da (21 §6.2).
 	ListBankTransactionsForMatching(ctx context.Context, arg ListBankTransactionsForMatchingParams) ([]BankTransaction, error)
 	// Banka hareketi → mizan hesabı (issue #383).
