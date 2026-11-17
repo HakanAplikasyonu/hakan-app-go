@@ -48,6 +48,13 @@ Aynı fatura ikinci kez eklenmez.
 
 ![Belge yükle](../../frontend/public/yardim/img/mukellef-belge-yukle.jpg)
 
+### Rapor
+
+Aylık ya da yıllık cironuzu, giderlerinizi, KDV'nizi ve gelir-gider
+trendinizi grafiklerle gösterir. Rakamlar portala kayıtlı faturalarınızdan,
+onaylı masraflarınızdan ve Z raporlarınızdan hesaplanır. Müşavirinizin
+yorumu, size e-postayla gönderdiği rapor PDF'inde yer alır.
+
 ## Mobil uygulama
 
 Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.

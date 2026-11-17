@@ -50,6 +50,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/report/pdf", read, h.PDF, eng...)
 	r.Tenant("GET "+base+"/report/deliveries", read, h.History, eng...)
 	r.Tenant("POST "+base+"/report/deliveries", write, h.Send, eng...)
+	r.Tenant("GET "+base+"/report/schedule", read, h.GetSchedule, eng...)
+	r.Tenant("PUT "+base+"/report/schedule", write, h.PutSchedule, eng...)
 	// Office-wide: history of every visible engagement, bulk sending.
 	r.Tenant("GET /v1/tenant/report-deliveries", read, h.OfficeHistory)
 	r.Tenant("POST /v1/tenant/report-deliveries", write, h.Bulk)

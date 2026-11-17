@@ -12,6 +12,7 @@ import {
   reportService,
   type PageParams,
   type ReportRange,
+  type ReportScheduleInput,
 } from "@/features/reports/services/reports.service";
 
 /** Kuyruktaki gönderim varken liste kendini tazeler. */
@@ -66,5 +67,22 @@ export function useBulkSendReports(slug: string) {
       reportService.bulk(slug, v.engagements, v.range),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: ["tenant", slug.toLowerCase()] }),
+  });
+}
+
+export function useReportSchedule(slug: string, engagement: string) {
+  return useQuery({
+    queryKey: reportKeys.schedule(slug, engagement),
+    queryFn: () => reportService.schedule(slug, engagement),
+  });
+}
+
+export function useSaveReportSchedule(slug: string, engagement: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ReportScheduleInput) =>
+      reportService.saveSchedule(slug, engagement, body),
+    onSuccess: (data) =>
+      qc.setQueryData(reportKeys.schedule(slug, engagement), data),
   });
 }

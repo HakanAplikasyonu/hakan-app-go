@@ -4,6 +4,7 @@
   "nav_invoices": "Invoices",
   "nav_review": "Review queue",
   "nav_warnings": "Warnings",
+  "nav_reports": "Reports",
   "nav_upload": "Upload UBL",
   "home_description": "Signed in as {{role}} · Period {{period}}",
   "stat_taxpayers": "Taxpayers",

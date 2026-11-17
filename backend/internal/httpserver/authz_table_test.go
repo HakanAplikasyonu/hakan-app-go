@@ -47,6 +47,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries": azTenantWrite,
 	"GET /v1/tenant/report-deliveries":                               azTenantRead,
 	"POST /v1/tenant/report-deliveries":                              azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/report/schedule":    azTenantRead,
+	"PUT /v1/tenant/engagements/{engagementUuid}/report/schedule":    azTenantWrite,
 
 	// Rule preview and rule candidate setting (#333); the setting is written by owner / admin.
 	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,

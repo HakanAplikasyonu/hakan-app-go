@@ -179,6 +179,9 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 		if err != nil {
 			return fmt.Errorf("engagement %s: %w", tp.Key, err)
 		}
+		if err := seedReportContact(ctx, pool, eng.TaxpayerID, tp.Key); err != nil {
+			return fmt.Errorf("report contact → %s: %w", tp.Key, err)
+		}
 		for _, email := range tp.Assignees {
 			if err := engSvc.Assign(ctx, org.ID, eng.ID, byEmail[email].UUID); err != nil {
 				return fmt.Errorf("assign %s → %s: %w", email, tp.Key, err)
@@ -204,6 +207,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			// Easytrade connection, sync history, financial transactions and Z (#385).
 			if err := seedEasytrade(ctx, pool, eng.TaxpayerID); err != nil {
 				return fmt.Errorf("easytrade → %s: %w", tp.Key, err)
+			}
+			// Taxpayer report: charts, comment, schedule, history (#386).
+			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
+				return fmt.Errorf("report → %s: %w", tp.Key, err)
 			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)

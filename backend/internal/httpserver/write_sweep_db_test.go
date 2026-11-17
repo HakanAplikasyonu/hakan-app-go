@@ -159,6 +159,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}":               {},
 	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                           {body: `{"period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries":                      {body: `{"period":"2026-10","recipient":"rapor@demo.hakan.local"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/report/schedule":                         {body: `{"enabled":true,"day_of_month":1,"recipient":"rapor@demo.hakan.local"}`},
 	"POST /v1/tenant/report-deliveries":                                                   {body: `{"period":"2026-10","engagement_uuids":["{engagementUuid}"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries":                       {body: `{"period":"2026-10"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}":          {body: `{"body":"Ekim dönemi özeti (tarama)."}`},

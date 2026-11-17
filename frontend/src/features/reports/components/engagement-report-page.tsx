@@ -16,6 +16,7 @@ import { usePermission } from "@/providers/permission-provider";
 
 import { EngagementDeliveryHistory } from "./delivery-history";
 import { ReportActions } from "./report-actions";
+import { ReportScheduleCard } from "./report-schedule-card";
 
 import { ReportRangePicker } from "./report-range-picker";
 import { ReportSkeleton, ReportView } from "./report-view";
@@ -79,6 +80,10 @@ export function EngagementReportPage({ engagement }: { engagement: string }) {
       ) : (
         <ReportSkeleton />
       )}
+      <ReportScheduleCard
+        engagement={engagement}
+        canWrite={can(permissions.tenant.engagements.write)}
+      />
       <Card>
         <CardHeader>
           <CardTitle className="text-base">

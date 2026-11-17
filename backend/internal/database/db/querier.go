@@ -259,6 +259,10 @@ type Querier interface {
 	// Ajanın sonucu: dosyalar klasörde (delivered) ya da hata (failed).
 	DeliverAccountingTransfer(ctx context.Context, arg DeliverAccountingTransferParams) (AccountingTransfer, error)
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
+	// tenant-lint: cross-org worker taraması (rls.System); sırası gelen zamanlanmış raporlar
+	// Etkin, engagement'ı açık, günü gelmiş ve bu dönemi henüz gönderilmemiş
+	// zamanlamalar.
+	DueReportSchedules(ctx context.Context, arg DueReportSchedulesParams) ([]DueReportSchedulesRow, error)
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
 	EndEngagementByID(ctx context.Context, id int64) error
@@ -434,6 +438,8 @@ type Querier interface {
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 	GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error)
+	// Zamanlanmış mükellef raporu (issue #386).
+	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
@@ -935,6 +941,7 @@ type Querier interface {
 	MarkReportDeliveryRetry(ctx context.Context, arg MarkReportDeliveryRetryParams) error
 	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
 	MarkReportDeliverySent(ctx context.Context, id int64) error
+	MarkReportScheduleRun(ctx context.Context, arg MarkReportScheduleRunParams) error
 	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
 	MarkScopedInboxAllRead(ctx context.Context, arg MarkScopedInboxAllReadParams) (int64, error)
 	// tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle
@@ -1185,6 +1192,7 @@ type Querier interface {
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
 	// Bordrodan gelen tahakkuk; ödeme bilgisi korunur.
 	UpsertSgkAccrual(ctx context.Context, arg UpsertSgkAccrualParams) (SgkPremium, error)
+	UpsertReportSchedule(ctx context.Context, arg UpsertReportScheduleParams) (ReportSchedule, error)
 	// Ön muhasebe programlarından gelen masraflar (#47 Paraşüt): kaynak anahtarıyla
 	// tekil (uq_expenses_source); aynı kayıt tekrar gelirse tutarlar güncellenir.
 	UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpenseParams) (UpsertSourceExpenseRow, error)
