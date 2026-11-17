@@ -310,19 +310,39 @@ func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
 func (s *Service) q() *db.Queries { return database.QueriesFor(s.pool) }
 
-// Aliases lists the engagement's aliases (status "" = all).
+// AliasPageMax is the largest alias page (issue #453); the list grows with
+// every counterparty the office teaches.
+const AliasPageMax = 500
+
+// Aliases lists the engagement's first AliasPageMax aliases (status "" = all).
 func (s *Service) Aliases(ctx context.Context, sub Subject, status string) ([]Alias, error) {
-	rows, err := s.q().ListBankCounterpartyAliases(ctx, db.ListBankCounterpartyAliasesParams{
+	out, _, err := s.AliasesPage(ctx, sub, status, AliasPageMax, 0)
+	return out, err
+}
+
+// AliasesPage is one page of the engagement's aliases, newest change
+// first, and their total.
+func (s *Service) AliasesPage(ctx context.Context, sub Subject, status string, limit, offset int32) ([]Alias, int64, error) {
+	if limit < 1 || limit > AliasPageMax {
+		limit = AliasPageMax
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows, err := s.q().ListBankCounterpartyAliasesPage(ctx, db.ListBankCounterpartyAliasesPageParams{
 		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, Status: pgtype.Text{String: status, Valid: status != ""},
+		Lim: limit, Off: offset,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	out := make([]Alias, len(rows))
+	var total int64
 	for i, r := range rows {
-		out[i] = aliasView(r)
+		out[i] = aliasView(r.BankCounterpartyAlias)
+		total = r.TotalCount
 	}
-	return out, nil
+	return out, total, nil
 }
 
 // AliasInput defines an alias by hand.
