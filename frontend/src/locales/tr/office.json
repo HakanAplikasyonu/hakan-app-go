@@ -1510,6 +1510,7 @@
   "tax_returns.group_export_registered": "İhraç kaydıyla teslim",
   "tax_returns.group_other": "Diğer istisna",
   "tax_returns.col_rate": "KDV oranı",
+  "tax_returns.col_withholding_rate": "Stopaj oranı",
   "tax_returns.col_base": "Matrah",
   "tax_returns.col_vat": "Vergi",
   "tax_returns.col_invoice_base": "Fatura",

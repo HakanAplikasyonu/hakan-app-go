@@ -665,8 +665,13 @@ function AdjustmentsForm({
 }) {
   const { t } = useLocale();
   const fields = ["carried_in", "additional_vat", "other_deductions"] as const;
+  // Sunucu tutarı "1250.50" döner; alan Türkçe yazılır ("1250,50"). Nokta
+  // olduğu gibi kalırsa kaydederken binlik ayırıcı sayılır ve tutar 100 katına
+  // çıkar (#452).
   const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((f) => [f, value[f] ?? ""])),
+    Object.fromEntries(
+      fields.map((f) => [f, (value[f] ?? "").replace(".", ",")]),
+    ),
   );
   const [error, setError] = useState("");
   return (
@@ -1065,7 +1070,7 @@ function MUHSGKView({ m }: { m: TaxReturnMUHSGK }) {
           head={[
             t("office.tax_returns.col_payment_kind"),
             t("office.tax_returns.col_base"),
-            t("office.tax_returns.col_rate"),
+            t("office.tax_returns.col_withholding_rate"),
             t("office.tax_returns.col_tax"),
             t("office.tax_returns.col_count"),
           ]}

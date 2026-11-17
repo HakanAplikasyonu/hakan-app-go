@@ -90,7 +90,7 @@ export function LetterResponsePage({ token }: { token: string }) {
     return (
       <Shell>
         <CardHeader>
-          <CardTitle>
+          <CardTitle role="heading" aria-level={1}>
             {expired
               ? t("reconciliation.expired_title")
               : t("reconciliation.not_found_title")}
@@ -108,7 +108,7 @@ export function LetterResponsePage({ token }: { token: string }) {
   return (
     <Shell>
       <CardHeader>
-        <CardTitle>{t("reconciliation.title")}</CardTitle>
+        <CardTitle role="heading" aria-level={1}>{t("reconciliation.title")}</CardTitle>
         <CardDescription>
           {t("reconciliation.from", {
             taxpayer: l.taxpayer_title,
