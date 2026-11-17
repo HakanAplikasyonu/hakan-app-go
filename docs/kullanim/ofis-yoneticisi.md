@@ -159,6 +159,28 @@ bir deneme şirketinde kontrol edin.
 **Önceki çıktılar** listesi hangi dosyada kaç fiş olduğunu ve geri alınanları
 gösterir.
 
+### Çift kayıt koruması (Luca)
+
+Luca e-faturaları entegratörden kendisi de çekebilir (İşNet NetteFatura,
+TÜRMOB e-Belge, GİB e-Belge). Aynı faturanın fişi portaldan da giderse fatura
+Luca'da iki kez işlenir. Bunu önlemek için **Çıktı al** önce bir kontrol yapar:
+
+- Fişin faturası daha önce bir dosyada dışa aktarıldıysa (aynı ETTN) ya da
+  Luca bu faturayı kendisi çekiyorsa fiş **dosyaya alınmaz** ve nedeniyle
+  listelenir: önceki dosya, fiş ve tarih ya da entegratör.
+- Belgeyi Luca'da kontrol ettiyseniz yanındaki kutuyu işaretleyip
+  **Onaylanan belgelerle dışa aktar** deyin. Onayınız kim ve ne zaman
+  bilgisiyle kayda geçer. İşaretlemezseniz uyarılı fişler dışarıda kalır,
+  diğerleri dosyaya girer.
+- **Luca e-faturaları kendisi çekiyor** bölümünde ofis geneli entegratörleri
+  ve gerekirse mükellefe özel seçimi kaydedin.
+- **Belge izi**, dışa aktarılan her faturanın hangi dosyada ve hangi fişte
+  gittiğini gösterir. ETTN ya da fatura numarasıyla arayabilirsiniz.
+
+Luca dosyasında her satır Evrak No, Evrak Tarihi ve açıklamada faturanın
+ETTN'sini taşır. Bu sütunların biçimi Luca'da doğrulanmadı; ekrandaki uyarı
+bunu hatırlatır.
+
 ### Masaüstü ajanıyla programa aktarım
 
 Dosyayı indirip elle taşımak yerine Luca ya da Zirve çıktısını ofis
