@@ -3,6 +3,7 @@ package taxreturns
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,6 +47,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("POST", "/{returnKind}/{period}/prepare", write, h.prepare)
 	route("POST", "/{returnKind}/{period}/reopen", write, h.reopen)
 	route("POST", "/{returnKind}/{period}/file", write, h.file)
+	route("GET", "/{returnKind}/{period}/export", read, h.export)
 }
 
 func userID(r *http.Request) int64 {
@@ -171,4 +173,17 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) export(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	data, name, err := h.svc.Export(r.Context(), s, r.PathValue("returnKind"), r.PathValue("period"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	_, _ = w.Write(data)
 }
