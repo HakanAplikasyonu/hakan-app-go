@@ -1,0 +1,44 @@
+# Co-pilot "Sıradaki iş" (#392, #454): panodaki karttan ofis listesi açılır
+# (dönem kapanışında her mükellefin sıradaki adımı, işi olanlar önce).
+# Demo mükellefi Atlas Gıda'ya dokununca ayrıntıdaki "Sıradaki iş" kartı
+# altı adımlık zinciri (belgeler → banka → öneriler → fişler → aktarım →
+# rapor) durumlarıyla gösterir. Dönem sunucudan gelir (önceki ay); akış
+# durumlara değil zincirin ve satırların görünmesine bakar.
+appId: app.hakan.office
+name: copilot
+tags: [smoke]
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "stat-uploads"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "open-copilot"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "open-copilot"
+- extendedWaitUntil:
+    visible:
+      id: "copilot-row"
+    timeout: 20000
+- assertVisible: "Mükellefler · .*"
+- takeScreenshot: musavir-siradaki-is
+- scrollUntilVisible:
+    element: "Atlas Gıda.*"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Atlas Gıda.*"
+- scrollUntilVisible:
+    element:
+      id: "copilot-step-report"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "copilot-card"
+- assertVisible:
+    id: "copilot-step-documents"
+- assertVisible: "Sıradaki iş · .*"
+- takeScreenshot: musavir-mukellef-siradaki-is

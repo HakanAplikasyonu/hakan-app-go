@@ -17,6 +17,7 @@ import {
 } from '@/features/clients/api';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
 import { useArchiveCounts } from '@/features/archive/api';
+import { NextWorkCard } from '@/features/copilot/next-work';
 import { expiryWarning } from '@/features/archive/format';
 import { visibleTabs } from '@/features/documents/tabs';
 import { taskTitle } from '@/features/doctasks/format';
@@ -118,6 +119,10 @@ export default function ClientDetailScreen() {
           </View>
         </View>
       ) : null}
+
+      {/* Co-pilot (#392): dönem kapanışında sıradaki iş. "Belge iste"nin altında:
+          task-create akışı düğmeyi kaydırmadan görür. */}
+      {can('tenant.engagements.read') ? <NextWorkCard engagement={engagement} title={ct?.title ?? title ?? ''} /> : null}
 
       {docTabs.length ? (
         <Card>
