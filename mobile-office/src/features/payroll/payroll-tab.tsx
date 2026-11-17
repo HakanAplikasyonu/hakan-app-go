@@ -2,9 +2,9 @@ import { BosDurum, KristalYukleyici } from '@hakan/mobile-core/hakan';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { LoadError } from '@/components/load-error';
 import { PeriodChips } from '@/components/period-chips';
 import { Card, Chip, Notice, Text } from '@/components/ui';
-import { errorMessage } from '@/core/api/envelope';
 import { money } from '@/features/clients/format';
 import { FileRow } from '@/features/files/file-row';
 import { periodLabel } from '@/features/warnings/format';
@@ -42,7 +42,10 @@ export function PayrollTab({ engagement }: { engagement: string }) {
     );
   }
   const error = runs.error ?? docs.error;
-  if (error) return <Notice>{errorMessage(error)}</Notice>;
+  if (error) {
+    const retry = () => Promise.all([runs.refetch(), docs.refetch()]);
+    return <LoadError title="Bordrolar alınamadı" error={error} retry={retry} retrying={runs.isRefetching || docs.isRefetching} />;
+  }
   if (periods.length === 0) {
     return <BosDurum baslik="Bordro yok" aciklama="Bu mükellefe henüz bordro yüklenmedi. Bordrolar ofis panelinden içe aktarılır." />;
   }

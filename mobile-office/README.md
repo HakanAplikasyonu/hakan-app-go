@@ -87,7 +87,7 @@ CI'daki `mobile-office` işi tipleri yeniden üretir (işlenmiş dosya eskiyse u
 
 ## Duman testleri ve sürüm (#242)
 
-- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro, mizan, İSG, evrak) → sıradaki iş (co-pilot) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
+- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro, mizan, İSG, evrak) → sıradaki iş (co-pilot) → çevrimdışı ve yeniden deneme (uçak modu) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
 
   ```bash
   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro
