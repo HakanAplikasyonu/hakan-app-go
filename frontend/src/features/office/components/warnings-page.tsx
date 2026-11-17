@@ -11,6 +11,7 @@ import { EntityTable, useUrlListState } from "@/components/entity";
 import { BosDurum, TacRozeti } from "@/components/hakan";
 import { createActionsColumn, createColumn } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { date } from "@/lib/utils/format";
@@ -91,6 +92,7 @@ function useEntityLabel() {
 
 function useWarningColumns() {
   const { t, locale } = useLocale();
+  const { slug } = useTenant();
   const invoiceHref = useInvoiceHref({ carry: false });
   const directory = useEngagementDirectory();
   const warningText = useApiWarningText();
@@ -131,10 +133,22 @@ function useWarningColumns() {
           return (
             <>
               <div>
-                {taxpayer?.title ??
-                  (directoryLoading
-                    ? "…"
-                    : t("office.warnings_api.unknown_taxpayer"))}
+                {taxpayer ? (
+                  // Mükellef adı mükellefin Uyarılar sekmesine (#469).
+                  <Link
+                    href={routes.tenant.engagementWarnings(
+                      slug,
+                      row.original.engagement_uuid,
+                    )}
+                    className="hover:underline"
+                  >
+                    {taxpayer.title}
+                  </Link>
+                ) : directoryLoading ? (
+                  "…"
+                ) : (
+                  t("office.warnings_api.unknown_taxpayer")
+                )}
               </div>
               {taxpayer?.taxId ? (
                 <Figure className="text-muted-foreground text-xs">
@@ -431,12 +445,25 @@ function WarningGroupCard({
                 />
                 <div className="min-w-56 flex-1">
                   <div className="text-sm">
-                    <span className="font-semibold">
-                      {tp?.title ??
-                        (directory.isLoading
-                          ? "…"
-                          : t("office.warnings_api.unknown_taxpayer"))}
-                    </span>
+                    {tp && !scope ? (
+                      // Genel listede mükellef adı mükellefin Uyarılar sekmesine (#469).
+                      <Link
+                        href={routes.tenant.engagementWarnings(
+                          slug,
+                          w.engagement_uuid,
+                        )}
+                        className="font-semibold hover:underline"
+                      >
+                        {tp.title}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold">
+                        {tp?.title ??
+                          (directory.isLoading
+                            ? "…"
+                            : t("office.warnings_api.unknown_taxpayer"))}
+                      </span>
+                    )}
                     {" · "}
                     <span className="text-text-2">
                       {entityLabel(w.entity_type)}

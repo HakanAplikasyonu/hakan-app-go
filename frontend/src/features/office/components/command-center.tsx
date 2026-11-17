@@ -2,11 +2,14 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { Lock, Search, Waypoints } from "lucide-react";
+import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { DataTable, createColumn } from "@/components/tables";
 import { Skeleton } from "@/components/ui/skeleton";
+import { routes } from "@/config/routes";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -94,6 +97,8 @@ function useMatrixColumns(
   locale: string,
   onPick: (period: string) => void,
 ) {
+  // Mükellef adı mükellef detayına (#469).
+  const { slug } = useTenant();
   return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
     () => [
       createColumn<PeriodMatrixRow>({
@@ -105,9 +110,15 @@ function useMatrixColumns(
         meta: { cellClassName: "bg-card max-w-72" },
         cell: ({ row }) => (
           <>
-            <div className="truncate font-medium">
+            <Link
+              href={routes.tenant.engagement(
+                slug,
+                row.original.engagement_uuid,
+              )}
+              className="block truncate font-medium hover:underline"
+            >
               {row.original.taxpayer_title}
-            </div>
+            </Link>
             <Figure className="text-muted-foreground text-xs">
               {row.original.taxpayer_tax_id}
             </Figure>
@@ -154,7 +165,7 @@ function useMatrixColumns(
         }),
       ),
     ],
-    [periods, focus, locale, onPick],
+    [periods, focus, locale, onPick, slug],
   );
 }
 

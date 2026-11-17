@@ -1740,5 +1740,6 @@
   "luca_plan.no_plan_imported": "içe aktarılmış plan yok",
   "luca_plan.error_NO_NEW_ACCOUNTS": "Luca'da olmayan hesap yok; dosya gerekmiyor.",
   "luca_plan.error_NO_FREE_CODE": "Ana hesabın altında boş alt hesap kodu kalmadı.",
-  "luca_plan.error_REQUIRED_FIELD_MISSING": "Bir hesabın kodu ya da adı boş; dosya üretilmedi."
+  "luca_plan.error_REQUIRED_FIELD_MISSING": "Bir hesabın kodu ya da adı boş; dosya üretilmedi.",
+  "tax_returns.related_records": "İlgili kayıtlar"
 }

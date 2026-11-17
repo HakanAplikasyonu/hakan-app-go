@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -52,6 +54,8 @@ import {
 } from "../services/tax-returns.service";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
+import { useEngagementScope } from "../engagement-scope";
+import { checklistHref } from "../lib/related-href";
 
 const statusVariants: Record<string, StatusVariant> = {
   draft: { labelKey: "office.tax_returns.status_draft", tone: "neutral" },
@@ -492,6 +496,8 @@ function Checklist({
   onToggle: (code: string, on: boolean) => void;
 }) {
   const { t } = useLocale();
+  const { slug } = useTenant();
+  const engagement = useEngagementScope();
   return (
     <section className="bg-surface border-line rounded-xl border p-4">
       <h2 className="font-display mb-3 text-base font-bold">
@@ -535,6 +541,21 @@ function Checklist({
                     </span>
                   ) : null}
                 </span>
+                {(() => {
+                  // Maddenin ilgili kayıtları: kodun sekmesi (#469).
+                  const href = engagement
+                    ? checklistHref(slug, engagement, c.code)
+                    : null;
+                  return href ? (
+                    <Link
+                      href={href}
+                      className="text-brand-text flex min-h-11 items-center text-sm hover:underline md:min-h-0"
+                      aria-label={`${t("office.tax_returns.related_records")}: ${c.message}`}
+                    >
+                      {t("office.tax_returns.related_records")}
+                    </Link>
+                  ) : null;
+                })()}
                 {warn ? (
                   <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                     <input

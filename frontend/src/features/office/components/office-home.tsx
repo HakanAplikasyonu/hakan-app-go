@@ -127,6 +127,8 @@ const cellKey: Record<TacDurumu, string> = {
  */
 function useBehindColumns(focus: string) {
   const { t } = useLocale();
+  // Mükellef adı mükellef detayına (#469).
+  const { slug } = useTenant();
   return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
     () => [
       createColumn<PeriodMatrixRow>({
@@ -137,7 +139,15 @@ function useBehindColumns(focus: string) {
         gridPrimary: true,
         cell: ({ row }) => (
           <>
-            <div className="font-medium">{row.original.taxpayer_title}</div>
+            <Link
+              href={routes.tenant.engagement(
+                slug,
+                row.original.engagement_uuid,
+              )}
+              className="block font-medium hover:underline"
+            >
+              {row.original.taxpayer_title}
+            </Link>
             <Figure className="text-text-2 text-xs">
               {row.original.taxpayer_tax_id}
             </Figure>
@@ -180,7 +190,7 @@ function useBehindColumns(focus: string) {
         cell: ({ getValue }) => <Figure>{getValue() as number}</Figure>,
       }),
     ],
-    [focus, t],
+    [focus, slug, t],
   );
 }
 
