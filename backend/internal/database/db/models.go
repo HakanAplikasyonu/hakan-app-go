@@ -40,6 +40,24 @@ type AccountPlanAccount struct {
 	IsLeaf         bool   `json:"is_leaf"`
 }
 
+type AccountPlanExport struct {
+	ID               int64              `json:"id"`
+	Uuid             uuid.UUID          `json:"uuid"`
+	OrganizationID   int64              `json:"organization_id"`
+	EngagementID     int64              `json:"engagement_id"`
+	Target           string             `json:"target"`
+	Kind             string             `json:"kind"`
+	TemplateVersion  string             `json:"template_version"`
+	TemplateVerified bool               `json:"template_verified"`
+	ComparedImportID pgtype.Int8        `json:"compared_import_id"`
+	FileName         string             `json:"file_name"`
+	Sha256           string             `json:"sha256"`
+	Size             int32              `json:"size"`
+	AccountCount     int32              `json:"account_count"`
+	CreatedBy        pgtype.Int8        `json:"created_by"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
 type AccountPlanImport struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`
@@ -982,6 +1000,23 @@ type ExportSetting struct {
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
 	LucaPullIntegrators       []string           `json:"luca_pull_integrators"`
+}
+
+type GeneratedSubaccount struct {
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	EngagementID    int64              `json:"engagement_id"`
+	TaxpayerID      int64              `json:"taxpayer_id"`
+	Target          string             `json:"target"`
+	MainCode        string             `json:"main_code"`
+	Code            string             `json:"code"`
+	ParentCode      string             `json:"parent_code"`
+	CounterpartyKey string             `json:"counterparty_key"`
+	CustomerUuid    pgtype.UUID        `json:"customer_uuid"`
+	Name            string             `json:"name"`
+	CreatedBy       pgtype.Int8        `json:"created_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
 }
 
 type GithubAppSetting struct {
