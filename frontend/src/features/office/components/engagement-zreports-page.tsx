@@ -46,9 +46,11 @@ import {
   receiptKeys,
   receiptsService,
 } from "../services/receipts.service";
+import { FOCUS_PARAM } from "../lib/related-href";
 import { approvalVariants, errText } from "./engagement-expenses-page";
 import { Money } from "./office-ui";
 import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
+import { useRelatedColumn } from "./related-column";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 const STATUS_FILTERS: StatusFilter[] = [
@@ -159,7 +161,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
   );
   const money = (v: string) => formatCellMoney(v, "TRY");
 
-  const columns = useMemo<ColumnDef<RetailSale, unknown>[]>(() => {
+  const baseColumns = useMemo<ColumnDef<RetailSale, unknown>[]>(() => {
     const money = (v: string) => formatCellMoney(v, "TRY");
     return [
       createDateColumn<RetailSale>({
@@ -290,7 +292,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
         cell: ({ row }) =>
           row.original.journal ? (
             <Link
-              href={routes.tenant.engagementJournals(slug, engagement)}
+              href={`${routes.tenant.engagementJournals(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`journal_draft:${row.original.journal.uuid}`)}`}
               className="text-brand-text font-mono text-sm hover:underline"
             >
               #{row.original.journal.entry_no}
@@ -328,6 +330,16 @@ function ZReportsInner({ engagement }: { engagement: string }) {
       }),
     ];
   }, [t, slug, engagement, canApprove, decide]);
+  // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
+  const relatedColumn = useRelatedColumn<RetailSale>(
+    "retail_sale",
+    (x) => x.uuid,
+    (x) => x.z_report_number ?? x.uuid,
+  );
+  const columns = useMemo<ColumnDef<RetailSale, unknown>[]>(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
+  );
 
   const data = list.data;
   const filters = STATUS_FILTERS.map((k) => ({

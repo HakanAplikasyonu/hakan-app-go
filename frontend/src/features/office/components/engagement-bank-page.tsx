@@ -29,6 +29,7 @@ import { BankAliasPanel } from "./bank-alias-panel";
 import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
 import { Money } from "./office-ui";
+import { useRelatedColumn } from "./related-column";
 
 type BankPage = components["schemas"]["BankTransactionPage"];
 type BankRow = components["schemas"]["BankTransaction"];
@@ -155,7 +156,17 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
   const setMatch = (m: MatchFilter) =>
     listState.setParams({ match: m === "all" ? null : m });
   const { limit, offset } = listState.params;
-  const columns = useBankColumns();
+  const baseColumns = useBankColumns();
+  // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
+  const relatedColumn = useRelatedColumn<BankRow>(
+    "bank_transaction",
+    (x) => x.uuid,
+    (x) => x.description,
+  );
+  const columns = useMemo<ColumnDef<BankRow, unknown>[]>(
+    () => [...baseColumns, ...relatedColumn],
+    [baseColumns, relatedColumn],
+  );
   const rawView = listState.getParam("view") as BankView | null;
   const view: BankView =
     rawView && VIEWS.includes(rawView) ? rawView : "movements";

@@ -63,6 +63,7 @@ import {
   TRANSFER_STATUS,
 } from "./journal-transfers-panel";
 import { FilterSelect, Figure, Money, Panel } from "./office-ui";
+import { useRelatedColumn } from "./related-column";
 import {
   ALL_PERIODS,
   isPeriod,
@@ -619,7 +620,7 @@ function JournalsInner() {
   const approving = approve.isPending;
   const reverseDraft = reverse.mutate;
   const reversing = reverse.isPending;
-  const draftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
+  const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
     () => [
       createColumn<JournalDraft>({
         id: "entry_no",
@@ -700,6 +701,16 @@ function JournalsInner() {
       }),
     ],
     [approveDraft, approving, reverseDraft, reversing, t],
+  );
+  // Fişin ilişkili kayıtları: kaynak belge ve hareketler (#469).
+  const relatedColumn = useRelatedColumn<JournalDraft>(
+    "journal_draft",
+    (d) => d.uuid,
+    (d) => `#${d.entry_no}`,
+  );
+  const draftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
+    () => [...baseDraftColumns, ...relatedColumn],
+    [baseDraftColumns, relatedColumn],
   );
 
   const header = (
