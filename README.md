@@ -80,6 +80,20 @@ make create-super-admin SA_EMAIL=sen@example.com SA_PASSWORD='Gizli1' SA_NAME=Ad
 2. **Organizasyonlar → Yeni** ile ofisin adını ve kısa adını (`slug`) gir. Sahip seçilmezse ofisi açan kullanıcı sahip olur.
 3. `/t/{slug}` adresinde ofis paneli açılır.
 
+### Pilot demosu
+
+```bash
+make demo
+```
+
+Bu komut altyapıyı başlatır ve veritabanını **sıfırlar**. Ardından
+migration'ları uygular, demo ofisini, örnek kullanıcıları ve platform
+yöneticisini kurar. Uygulamayı `make backend-dev` ve `make frontend-dev` ile
+başlatın. Ana akışları `make smoke` ile denetleyin.
+
+Adım adım gösterim: [docs/kullanim/demo-senaryosu.md](docs/kullanim/demo-senaryosu.md).
+Demodaki sahte bağlantılar: [docs/runbook/demo-dis-bagimliliklar.md](docs/runbook/demo-dis-bagimliliklar.md).
+
 ## Kontroller
 
 ```bash
