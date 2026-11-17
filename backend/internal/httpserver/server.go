@@ -43,6 +43,7 @@ import (
 	authsettingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/usecase"
 	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	bankmatching "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/matching"
+	bankposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	bankstatement "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/statement"
 	bankws "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
@@ -454,6 +455,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
+	// Banka karşı taraf takma adları (#383): ödeyen / alıcı → cari hesap.
+	bankposting.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bankposting.NewHandler(bankposting.NewService(deps.DB)))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {

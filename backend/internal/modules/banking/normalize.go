@@ -98,3 +98,25 @@ func NormalizeCurrency(s string) string {
 	}
 	return c
 }
+
+// legalWords are company-form and filler words dropped from a
+// counterparty name so "X YAZILIM TEKNOLOJILERI A.Ş." and "X Yazılım
+// Teknolojileri AŞ" are the same payer (#383).
+var legalWords = map[string]bool{
+	"A": true, "S": true, "AS": true, "AO": true, "TAS": true, "LTD": true, "STI": true, "LIMITED": true,
+	"SIRKETI": true, "SIRKET": true, "ANONIM": true, "TIC": true, "TICARET": true, "SAN": true,
+	"SANAYI": true, "VE": true, "INS": true, "PAZ": true, "DIS": true, "LTDSTI": true,
+}
+
+// NormalizeName is the counterparty name key of the alias memory: the
+// normalized description form without company-form words.
+func NormalizeName(s string) string {
+	words := strings.Fields(NormalizeDescription(s))
+	out := words[:0]
+	for _, w := range words {
+		if !legalWords[w] {
+			out = append(out, w)
+		}
+	}
+	return strings.Join(out, " ")
+}

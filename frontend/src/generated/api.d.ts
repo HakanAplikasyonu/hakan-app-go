@@ -7943,6 +7943,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The engagement's bank counterparty aliases (payer / payee → cari)
+         * @description Requires `tenant.bank.read`. A bank movement's counterparty (IBAN,
+         *     VKN / TCKN or normalized name) mapped to the account it is booked to
+         *     in the trial balance: the payment from "X Yazılım Teknolojileri A.Ş."
+         *     is Oğuz Yılmaz's cari. `learned` aliases come from the accountant's
+         *     decisions on suggestions; `rule` aliases were defined or promoted.
+         */
+        get: operations["listTenantBankCounterpartyAliases"];
+        put?: never;
+        /**
+         * Define an alias (as a rule)
+         * @description Requires `tenant.bank.write`. `match_value` is normalized by
+         *     `match_type` (IBAN check digits, 10/11-digit VKN / TCKN, name without
+         *     company-form words). `direction` `A` (incoming) / `B` (outgoing)
+         *     limits it to one side; omitted, both. The same key redefines the
+         *     existing alias.
+         */
+        post: operations["createTenantBankCounterpartyAlias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/candidates": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Learned aliases decided often enough to become a rule
+         * @description Requires `tenant.bank.read`. Same promotion logic as the account
+         *     code rules: the office's `rule_candidate_min_count` and
+         *     `rule_candidate_decisions` (account rule settings) say how many
+         *     decisions and which ones count; automatic acceptances never count.
+         */
+        get: operations["listTenantBankCounterpartyAliasCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                aliasUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Forget an alias
+         * @description Requires `tenant.bank.write`.
+         */
+        delete: operations["deleteTenantBankCounterpartyAlias"];
+        options?: never;
+        head?: never;
+        /**
+         * Change an alias's account or status
+         * @description Requires `tenant.bank.write`.
+         */
+        patch: operations["updateTenantBankCounterpartyAlias"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}/promote": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                aliasUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a learned alias a rule
+         * @description Requires `tenant.bank.write`. A rule's suggestions carry confidence 0.97.
+         */
+        post: operations["promoteTenantBankCounterpartyAlias"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
         parameters: {
             query?: never;
@@ -13005,6 +13138,68 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["BankStatementAnalysis"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankCounterpartyAlias: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            match_type: "iban" | "tax_id" | "name";
+            /** @description Normalized key */
+            match_value: string;
+            /** @description The name as the bank wrote it */
+            display_name: string;
+            /** @enum {string|null} */
+            direction: "A" | "B" | null;
+            account_code: string;
+            account_name: string;
+            /** @enum {string} */
+            status: "learned" | "rule";
+            /** @enum {string} */
+            origin: "decision" | "manual" | "candidate";
+            accepts: number;
+            corrections: number;
+            hits: number;
+            /** Format: date-time */
+            last_decided_at?: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        BankCounterpartyAliasInput: {
+            /** @enum {string} */
+            match_type: "iban" | "tax_id" | "name";
+            match_value: string;
+            display_name?: string;
+            /** @enum {string|null} */
+            direction?: "A" | "B" | null;
+            /** @example 120.01.015 */
+            account_code: string;
+            account_name?: string;
+        };
+        BankCounterpartyAliasCandidate: components["schemas"]["BankCounterpartyAlias"] & {
+            decisions: number;
+            question: string;
+        };
+        EnvelopeBankCounterpartyAlias: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankCounterpartyAlias"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankCounterpartyAliasList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankCounterpartyAlias"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankCounterpartyAliasCandidateList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankCounterpartyAliasCandidate"][];
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeBankStatementReport: {
@@ -28424,6 +28619,233 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankCounterpartyAliases: {
+        parameters: {
+            query?: {
+                status?: "learned" | "rule";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aliases */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankCounterpartyAliasList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantBankCounterpartyAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankCounterpartyAliasInput"];
+            };
+        };
+        responses: {
+            /** @description Alias */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankCounterpartyAlias"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankCounterpartyAliasCandidates: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Candidates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankCounterpartyAliasCandidateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantBankCounterpartyAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                aliasUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateTenantBankCounterpartyAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                aliasUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 120.01.015 */
+                    account_code?: string;
+                    account_name?: string;
+                    /** @enum {string} */
+                    status?: "learned" | "rule";
+                };
+            };
+        };
+        responses: {
+            /** @description Alias */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankCounterpartyAlias"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    promoteTenantBankCounterpartyAlias: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                aliasUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alias */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankCounterpartyAlias"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
