@@ -1,0 +1,38 @@
+# Luca "Excel Veri Aktarımı" muhasebe fişi şablonu, kaynak belgeli sürüm
+# (issue #466; önceki sürüm: fis_unverified-1.yaml).
+#
+# DOĞRULANMADI: Luca'nın "Şablon indir" dosyası henüz elimizde değil (D18).
+# Beş zorunlu alan (Fiş No, Fiş Tarihi, Hesap Kodu, Borç, Alacak) Luca destek
+# makalesindeki ADLARDIR. Evrak No, Evrak Tarihi ve Açıklama sütunları başka
+# bir ekibin Luca ekran gözlemine dayanır; bizde gerçek Luca'da denenmedi.
+# Gerçek başlık yazımı, sırası, tarih biçimi ve ondalık ayırıcı şablon dosyası
+# gelince yeni bir sürüm dosyasında düzeltilir. Kod değişmez.
+#
+# Çift kayıt koruması (#466): her satır kaynak belgesini taşır. Evrak No /
+# Evrak Tarihi faturanın numarası ve tarihidir (satırda yazılı değilse);
+# Açıklama satır açıklamasına faturanın ETTN'sini ekler. Luca e-faturayı
+# entegratörden kendisi de çekiyorsa müşavir aynı ETTN'yi Luca'da arayabilir.
+driver: luca
+template: fis
+version: "unverified-2"
+verified: false
+file: { format: xlsx, sheet: "", header_row: 1 }
+# Luca: bir yüklemede en fazla 50 fiş; mahsup fişinde en fazla 400 satır
+# (açılış / kapanış fişinde satır sınırı yok).
+limits: { max_entries_per_file: 50, max_lines_per_mahsup: 400 }
+columns:            # sıra = dosyadaki sıra
+  - { key: entry_no,    header: "Fiş No",      required: true }
+  # Boş biçim: tarih hücresi (Excel tarihi) olarak yazılır.
+  - { key: entry_date,  header: "Fiş Tarihi",  required: true }
+  - { key: account,     header: "Hesap Kodu",  required: true }
+  # Boş decimal: tutar sayı hücresi olarak yazılır.
+  - { key: debit,       header: "Borç",        required: true }
+  - { key: credit,      header: "Alacak",      required: true }
+  - { key: doc_no,      header: "Evrak No" }
+  - { key: doc_date,    header: "Evrak Tarihi" }
+  # {description}: satırın (yoksa fişin) açıklaması; {ettn}: kaynak faturanın
+  # ETTN'si. Boş yer tutucu ve çevresindeki metin yazılmaz.
+  - { key: description_source, header: "Açıklama", pattern: "{description} ETTN:{ettn}" }
+# Luca'daki fiş tipi değerleri şablondan teyit edilecek; şimdilik ortak adlar.
+entry_types: { mahsup: "Mahsup", acilis: "Açılış", kapanis: "Kapanış" }
+notes: "Sütunlar ve biçimler Luca şablon dosyasıyla doğrulanmadı (Evrak No, Evrak Tarihi, Açıklama ekran gözlemi)."

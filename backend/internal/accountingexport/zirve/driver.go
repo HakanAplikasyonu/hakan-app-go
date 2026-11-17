@@ -159,6 +159,9 @@ func (d *driver) Export(ctx context.Context, b ae.Batch, w ae.FileWriter) (ae.Re
 			return res, err
 		}
 		res.Files = append(res.Files, f)
+		for _, v := range g {
+			res.AddEntryFile(v.ID, f.Name)
+		}
 	}
 	return res, nil
 }

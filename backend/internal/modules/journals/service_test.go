@@ -295,7 +295,7 @@ func TestExportWithLucaDriver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if b.Driver != "luca" || b.TemplateVerified || b.TemplateVersion != "unverified-1" || len(b.Files) != 1 || b.Files[0].Name != "luca_fis_2026-10.xlsx" {
+	if b.Driver != "luca" || b.TemplateVerified || b.TemplateVersion != "unverified-2" || len(b.Files) != 1 || b.Files[0].Name != "luca_fis_2026-10.xlsx" {
 		t.Fatalf("batch: %+v", b)
 	}
 	found := false
