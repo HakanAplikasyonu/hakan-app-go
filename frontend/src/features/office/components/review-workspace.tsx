@@ -73,6 +73,7 @@ import {
   useReviewThreshold,
   valueLabel,
 } from "../hooks/use-review";
+import { invoiceTypeLabel } from "../lib/ubl-codes";
 import { periodLabel, useOfficePeriod } from "../period";
 import {
   REVIEW_PAGE_MAX,
@@ -911,7 +912,7 @@ function ReviewWorkspaceInner() {
             ) : null}
             {ctx.invoiceType ? (
               <span className="bg-brand-tint text-brand-text rounded-full px-2.5 py-0.5 font-semibold">
-                {ctx.invoiceType}
+                {invoiceTypeLabel(ctx.invoiceType, t)}
               </span>
             ) : null}
             <span className="text-muted-foreground">

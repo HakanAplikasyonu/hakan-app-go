@@ -32,6 +32,7 @@ import {
 } from "../hooks/use-office-invoices";
 import { useInvoiceHref } from "../engagement-scope";
 import { toPanelInvoice } from "../lib/from-api";
+import { invoiceKindText } from "../lib/ubl-codes";
 import { createDocumentRequest } from "../services/engagement-documents.service";
 import type { InvoiceLine } from "../types";
 import { AmountWaterfall } from "./amount-waterfall";
@@ -213,7 +214,7 @@ export function InvoiceDrawer({
             <div className="border-line space-y-2 border-b p-5 pe-12">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="bg-brand-tint text-brand-text rounded-full px-2.5 py-0.5 text-xs font-semibold">
-                  {d.profile ? `${d.type} · ${d.profile}` : d.type}
+                  {invoiceKindText(d.type, d.profile, t)}
                 </span>
                 <InvoiceStateBadge status={d.status} />
               </div>

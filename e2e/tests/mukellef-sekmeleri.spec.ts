@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+import { scan } from "./a11y";
 import {
   Api,
   consentTokenFor,
@@ -197,7 +197,6 @@ test.describe("mükellef sekmeleri", () => {
     await page.keyboard.press("Home");
     await expect(links.first()).toBeFocused();
 
-    const axe = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze();
-    expect(axe.violations.filter((v) => v.impact === "critical" || v.impact === "serious")).toEqual([]);
+    await scan(page, "mükellef sekmeleri");
   });
 });
