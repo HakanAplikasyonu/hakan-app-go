@@ -68,6 +68,9 @@ export const Permission = {
   TenantJournalsRead: "tenant.journals.read",
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
+  /** Personel, bordro ve SGK (issue #382). */
+  TenantPayrollRead: "tenant.payroll.read",
+  TenantPayrollWrite: "tenant.payroll.write",
   /** Review queue decisions (accept / correct / revert). */
   TenantReviewRead: "tenant.review.read",
   TenantReviewDecide: "tenant.review.decide",
