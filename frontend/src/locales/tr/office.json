@@ -576,7 +576,6 @@
   "review.back_to_list": "Kuyruğa dön",
   "review.bulk_action": "{{count}} öneriyi toplu onayla",
   "review.bulk_text": "{{count}} öneri güven %{{threshold}} ve üzerinde.",
-  "review.code_button": "Önerilen hesap {{code}} · düzeltmek için seçin",
   "review.correct": "Kodu düzelt",
   "review.history_none": "Bu karşı tarafla bu mükellefte onaylı karar yok.",
   "review.make_rule": "Kural yap",
@@ -999,5 +998,7 @@
   "bank.banks.ziraat_katilim": "Ziraat Katılım",
   "bank.banks.vakif_katilim": "Vakıf Katılım",
   "bank.banks.emlak_katilim": "Emlak Katılım",
-  "bank.upload.template_saved": "Şablon kaydedildi."
+  "bank.upload.template_saved": "Şablon kaydedildi.",
+  "review.code_button_prefix": "Önerilen hesap",
+  "review.code_button_hint": "düzeltmek için seçin"
 }
