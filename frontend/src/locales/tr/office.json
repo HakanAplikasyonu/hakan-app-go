@@ -760,6 +760,8 @@
   "payroll.bank_match": "Banka ile eşleştir",
   "payroll.match_done": "{{salary}} maaş ve {{sgk}} SGK ödemesi eşleşti",
   "payroll.export": "Excel indir",
+  "payroll.export_failed": "Excel dosyası indirilemedi",
+  "payroll.export_list": "Excel'e aktar",
   "payroll.download": "İndir",
   "payroll.delete": "Sil",
   "payroll.action_failed": "İşlem yapılamadı.",

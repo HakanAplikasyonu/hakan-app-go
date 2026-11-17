@@ -7532,6 +7532,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/employees/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Employee list as Excel
+         * @description Requires `tenant.payroll.read` (#395). The filtered employee list (Adı Soyadı, TC Kimlik No masked, SGK Sicil No, Görevi, Bölüm, İşe Giriş / İşten Çıkış Tarihi dd.mm.yyyy, Çıkış Nedeni, Durum) as .xlsx, at most 10 000 rows.
+         */
+        get: operations["exportPayrollEmployees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/payroll/employees/{employeeUuid}": {
         parameters: {
             query?: never;
@@ -7616,6 +7644,34 @@ export interface paths {
          * @description Requires `tenant.payroll.read` (#382). Newest period first, with the net paid through matched bank payments, the SGK accrual status and the journal draft.
          */
         get: operations["listPayrollRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/runs/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Payroll runs as Excel
+         * @description Requires `tenant.payroll.read` (#395). One row per payroll period of the year (all years without `year`): employee count, gross, net, SGK and unemployment shares, income and stamp tax, incentive, employer cost (numbers, two decimals), net paid, payment and SGK status.
+         */
+        get: operations["exportPayrollRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7776,6 +7832,34 @@ export interface paths {
          * @description Requires `tenant.payroll.write` (#382). For a period without an imported payroll. The due date defaults to the end of the next month.
          */
         post: operations["createSgkPremium"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * SGK premiums as Excel
+         * @description Requires `tenant.payroll.read` (#395). The SGK accruals of the year (all years without `year`): accrual, incentive, payable, due date, document no, paid amount and date, status.
+         */
+        get: operations["exportSgkPremiums"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -30767,6 +30851,42 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    exportPayrollEmployees: {
+        parameters: {
+            query?: {
+                status?: "active" | "exited" | "all";
+                q?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     updatePayrollEmployee: {
         parameters: {
             query?: never;
@@ -30923,6 +31043,41 @@ export interface operations {
                         data: components["schemas"]["PayrollRunPage"];
                         meta: components["schemas"]["ResponseMeta"];
                     };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportPayrollRuns: {
+        parameters: {
+            query?: {
+                year?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -31215,6 +31370,41 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportSgkPremiums: {
+        parameters: {
+            query?: {
+                year?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
