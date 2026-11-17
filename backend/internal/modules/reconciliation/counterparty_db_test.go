@@ -89,6 +89,8 @@ func TestCounterpartyReconciliationAgainstPostgres(t *testing.T) {
 	exec(`INSERT INTO bank_transaction_matches (taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method)
 		VALUES ($1, $2, 'invoice', $3, 2000, 100, 'manual')`, tp, txn, sale)
 	exec(`INSERT INTO customers (taxpayer_id, source_system, source_id, capture_method, name, tax_number, email) VALUES ($1, 'test', 'c1', 'manual', 'Alıcı A.Ş.', '1111111111', 'muhasebe@alici.example')`, tp)
+	// E-postası olmayan cari kartı: kişi listesi NULL e-posta okumamalı (#452).
+	exec(`INSERT INTO customers (taxpayer_id, source_system, source_id, capture_method, name, tax_number) VALUES ($1, 'test', 'c2', 'manual', 'Satıcı Ltd.', '2222222222')`, tp)
 
 	reviewSvc := reviewusecase.New(reviewrepository.New(pool, db.New(pool))).Register(SuggestionKind, Applier{})
 	svc := New(database.Ambient{Pool: pool}, reviewSvc).WithLetters(LetterConfig{Secret: "gizli", FrontendURL: "https://app.test"})

@@ -890,7 +890,7 @@ func (q *Queries) ReconciliationCounterpartyAccounts(ctx context.Context, arg Re
 
 const reconciliationCounterpartyContacts = `-- name: ReconciliationCounterpartyContacts :many
 SELECT COALESCE(NULLIF(c.tax_number, ''), NULLIF(c.identity_number, ''))::text AS tax_id,
-       MAX(NULLIF(c.email, ''))::text AS email, MAX(c.name)::text AS name
+       COALESCE(MAX(NULLIF(c.email, '')), '')::text AS email, COALESCE(MAX(c.name), '')::text AS name
 FROM customers c
 WHERE c.taxpayer_id = $1
   AND COALESCE(NULLIF(c.tax_number, ''), NULLIF(c.identity_number, '')) IS NOT NULL

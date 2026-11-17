@@ -51,7 +51,7 @@ ORDER BY counterparty_tax_id, main_code;
 -- name: ReconciliationCounterpartyContacts :many
 -- Karşı firmanın cari kartındaki e-posta (mektup alıcısı önerisi).
 SELECT COALESCE(NULLIF(c.tax_number, ''), NULLIF(c.identity_number, ''))::text AS tax_id,
-       MAX(NULLIF(c.email, ''))::text AS email, MAX(c.name)::text AS name
+       COALESCE(MAX(NULLIF(c.email, '')), '')::text AS email, COALESCE(MAX(c.name), '')::text AS name
 FROM customers c
 WHERE c.taxpayer_id = @taxpayer_id
   AND COALESCE(NULLIF(c.tax_number, ''), NULLIF(c.identity_number, '')) IS NOT NULL

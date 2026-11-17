@@ -2,12 +2,16 @@ import { readFileSync, statSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
-/** Yevmiye ekranında 3 satırlı dengeli bir fiş kaydeder ve onaylar. */
-export async function newApprovedEntry(page: Page, description: string) {
+/**
+ * Yevmiye ekranında 3 satırlı dengeli bir fiş kaydeder ve onaylar.
+ * `receivable`: alıcı hesabı. Demo ofisinin hesap planında 120.01 grup
+ * hesabıdır (#456), çıktı yalnızca muavine izin verir: 120.01.001.
+ */
+export async function newApprovedEntry(page: Page, description: string, receivable = "120.01") {
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
   const lines: [string, string, string, string][] = [
-    ["120.01", "Yıldız Market", "1200", ""],
+    [receivable, "Yıldız Market", "1200", ""],
     ["600.01", "Satış", "", "1000"],
     ["391.01", "Hesaplanan KDV", "", "200"],
   ];

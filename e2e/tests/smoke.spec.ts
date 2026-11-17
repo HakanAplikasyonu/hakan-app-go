@@ -218,11 +218,11 @@ test("yevmiye: taslak, onay, Luca ve Zirve dosyası indirme", async () => {
     "Zirve",
   ]);
 
-  await newApprovedEntry(office, "E2E Luca fişi");
+  await newApprovedEntry(office, "E2E Luca fişi", "120.01.001");
   await exportAndDownload(office, "luca");
   await expect(office.locator("tr", { hasText: "Aktarıldı" }).first()).toBeVisible();
 
-  await newApprovedEntry(office, "E2E Zirve fişi");
+  await newApprovedEntry(office, "E2E Zirve fişi", "120.01.001");
   await exportAndDownload(office, "zirve");
 });
 
