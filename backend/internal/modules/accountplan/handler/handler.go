@@ -50,7 +50,7 @@ func (h *Handler) Import(w http.ResponseWriter, r *http.Request) {
 	if p, ok := authctx.PrincipalFrom(r.Context()); ok {
 		uid = p.UserInternal
 	}
-	res, err := h.svc.Import(r.Context(), subject(r), uid, r.FormValue("target"), header.Filename, data)
+	res, err := h.svc.Import(r.Context(), subject(r), uid, r.FormValue("target"), header.Filename, r.FormValue("period"), data)
 	if err != nil {
 		writeError(w, r, err)
 		return
@@ -88,6 +88,42 @@ func (h *Handler) ListAccounts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, page)
+}
+
+type trialBalancesResponse struct {
+	Items []usecase.TrialBalance `json:"items"`
+}
+
+// ListTrialBalances: GET .../account-plan/trial-balances — mizan uploads
+// with amounts, newest first (#393).
+func (h *Handler) ListTrialBalances(w http.ResponseWriter, r *http.Request) {
+	items, err := h.svc.TrialBalances(r.Context(), subject(r))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, trialBalancesResponse{Items: items})
+}
+
+// TrialBalance: GET .../account-plan/trial-balances/{trialBalance}?compare=&level=
+// — one mizan ("latest" or an import uuid) with the period comparison (#393).
+func (h *Handler) TrialBalance(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	level := 0
+	if v := q.Get("level"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			response.BadRequest(w, r, response.CodeValidationError, "level must be a number")
+			return
+		}
+		level = n
+	}
+	res, err := h.svc.TrialBalanceReport(r.Context(), subject(r), r.PathValue("trialBalance"), q.Get("compare"), level)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, res)
 }
 
 type checkRequest struct {

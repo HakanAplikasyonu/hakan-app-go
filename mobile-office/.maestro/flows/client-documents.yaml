@@ -1,6 +1,7 @@
 # Mükellef belgeleri (#393): demo mükellefi Atlas Gıda'nın ayrıntısından
 # Belgeler → Bordro sekmesi açılır; dönem bordrosu ve personel bazında
-# bordro PDF'leri görünür.
+# bordro PDF'leri görünür. Mizan sekmesinde son mizan önceki dönemle
+# karşılaştırılır.
 appId: app.hakan.office
 name: client-documents
 tags: [smoke]
@@ -33,3 +34,12 @@ tags: [smoke]
 - assertVisible:
     id: "payroll-document"
 - takeScreenshot: musavir-bordro
+- tapOn:
+    id: "documents-tab-mizan"
+- extendedWaitUntil:
+    visible:
+      id: "mizan-line"
+    timeout: 15000
+- assertVisible:
+    id: "mizan-compare"
+- takeScreenshot: musavir-mizan

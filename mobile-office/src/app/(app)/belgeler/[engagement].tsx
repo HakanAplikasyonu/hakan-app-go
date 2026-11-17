@@ -6,10 +6,11 @@ import { useState } from 'react';
 import { Screen, Text } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
 import { visibleTabs, type DocumentTab } from '@/features/documents/tabs';
+import { MizanTab } from '@/features/mizan/mizan-tab';
 import { PayrollTab } from '@/features/payroll/payroll-tab';
 
 /**
- * Mükellef belgeleri (#393): sekmelerde bordro; her sekme kendi okuma
+ * Mükellef belgeleri (#393): sekmelerde bordro ve mizan; her sekme kendi okuma
  * iznine bağlı. Belgeler önizlenir ve sistem paylaş menüsüyle paylaşılır.
  */
 export default function ClientDocumentsScreen() {
@@ -35,6 +36,7 @@ export default function ClientDocumentsScreen() {
             <Segment secenekler={initial.tabs} secili={selected} onSec={setPicked} testIDOnek="documents-tab" />
           ) : null}
           {selected === 'payroll' ? <PayrollTab engagement={engagement} /> : null}
+          {selected === 'mizan' ? <MizanTab engagement={engagement} title={title} /> : null}
         </>
       )}
     </Screen>

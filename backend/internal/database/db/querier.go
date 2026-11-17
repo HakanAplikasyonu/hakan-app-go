@@ -591,6 +591,8 @@ type Querier interface {
 	InsertSuggestion(ctx context.Context, arg InsertSuggestionParams) (Suggestion, error)
 	InsertSuggestionDecision(ctx context.Context, arg InsertSuggestionDecisionParams) error
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
+	// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
+	InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
@@ -908,6 +910,11 @@ type Querier interface {
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu; read_all yoksa engagement_assignments ile süzülür
 	ListTenantSuggestions(ctx context.Context, arg ListTenantSuggestionsParams) ([]ListTenantSuggestionsRow, error)
+	// Tutarlı mizan içe aktarmaları (#393), yeni önce; toplamlar alt (yaprak)
+	// hesaplardan, ana hesaplar iki kez sayılmasın.
+	ListTrialBalanceImports(ctx context.Context, arg ListTrialBalanceImportsParams) ([]ListTrialBalanceImportsRow, error)
+	// Bir mizanın satırları; max_level verilirse o kırılıma kadar.
+	ListTrialBalanceLines(ctx context.Context, arg ListTrialBalanceLinesParams) ([]ListTrialBalanceLinesRow, error)
 	ListUBLUploadJobs(ctx context.Context, arg ListUBLUploadJobsParams) ([]UblUploadJob, error)
 	// Kritik uyarı bildirimi (issue #241). Zamanlanmış iş bütün ofisleri tarar.
 	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin bildirilmemiş açık engelleyicilerini tarar

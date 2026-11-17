@@ -8918,8 +8918,70 @@ export interface paths {
         /**
          * Import the target account plan (Luca hesap planı or mizan, .xlsx / .csv)
          * @description Requires `tenant.account_plan.write` and an active engagement. The file becomes the engagement's active plan for `target` (default `luca`); the previous version stays in the import history. The header row is detected ("Hesap Kodu", "Hesap Adı"; borç / alacak / bakiye columns mark a trial balance). Codes are normalized to the dotted form (`120 01 001` → `120.01.001`). Legacy `.xls` is rejected.
+         *
+         *     A trial balance also keeps its borç / alacak / bakiye amounts for the mizan report (#393). Its `period` is the form field, else the last date of the title rows above the header ("01.01.2026 - 30.09.2026" → `2026-09`), else a `2026-09` in the file name.
          */
         post: operations["importEngagementAccountPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Trial balances (mizan) with amounts, newest upload first
+         * @description Requires `tenant.account_plan.read` (#393). Trial balance imports that carry amounts (uploads before #393 have none and are left out), at most 120. Totals are summed over the leaf accounts.
+         */
+        get: operations["listEngagementTrialBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a trial balance import uuid */
+                trialBalance: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A trial balance (mizan report) with the period comparison
+         * @description Requires `tenant.account_plan.read` (#393). Lines are sorted by code; `balance` is signed (positive: borç bakiyesi, negative: alacak bakiyesi).
+         *
+         *     `compare`: `previous` (default) is the latest trial balance of an earlier period, or the upload before it when periods are unknown; `none` turns the comparison off; an import uuid compares with that one. `change` = balance − previous balance (an account missing from the compared file counts as 0). 404 when the engagement has no trial balance with amounts.
+         */
+        get: operations["getEngagementTrialBalance"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15944,8 +16006,49 @@ export interface components {
             sha256: string;
             account_count: number;
             skipped_rows: number;
+            /**
+             * @description Trial balance period (YYYY-MM); null when unknown or for an account plan
+             * @example 2026-09
+             */
+            period: string | null;
             /** Format: date-time */
             created_at: string;
+        };
+        TrialBalance: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example 2026-10 */
+            period: string | null;
+            file_name: string;
+            /** @enum {string} */
+            source_format: "xlsx" | "csv";
+            account_count: number;
+            /** @description Decimal string, sum over leaf accounts */
+            debit_total: string;
+            /** @description Decimal string, sum over leaf accounts */
+            credit_total: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        TrialBalanceLine: {
+            /** @example 100.01 */
+            code: string;
+            name: string;
+            /** @example 100 */
+            main_code: string;
+            level: number;
+            is_leaf: boolean;
+            debit: string;
+            credit: string;
+            /** @description Signed: positive borç, negative alacak bakiyesi */
+            balance: string;
+            previous_balance: string | null;
+            change: string | null;
+        };
+        TrialBalanceReport: {
+            trial_balance: components["schemas"]["TrialBalance"];
+            compared_to: components["schemas"]["TrialBalance"] | null;
+            lines: components["schemas"]["TrialBalanceLine"][];
         };
         AccountPlanAccount: {
             /** @example 120.01.001 */
@@ -31197,6 +31300,8 @@ export interface operations {
                     file: string;
                     /** @default luca */
                     target?: string;
+                    /** @description Trial balance period (ignored for an account plan) */
+                    period?: string;
                 };
             };
         };
@@ -31231,6 +31336,88 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementTrialBalances: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trial balances */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["TrialBalance"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementTrialBalance: {
+        parameters: {
+            query?: {
+                compare?: string;
+                /** @description Deepest level returned (1: main accounts); 0 or omitted: all */
+                level?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a trial balance import uuid */
+                trialBalance: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["TrialBalanceReport"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

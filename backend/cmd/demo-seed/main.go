@@ -223,6 +223,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedPayroll(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("payroll → %s: %w", tp.Key, err)
 			}
+			// Eylül ve Ekim 2026 mizanları, ofis mobilde mizan raporu (#393).
+			if err := seedMizan(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("mizan → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}

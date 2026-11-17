@@ -40,8 +40,9 @@ Mükellef ayrıntısındaki **Belgeler** kartı `belgeler/[engagement]` ekranın
 | Sekme | İzin | Uç |
 |---|---|---|
 | Bordro | `tenant.payroll.read` | `GET .../payroll/runs`, `GET .../payroll/documents` (personel bazında PDF) |
+| Mizan | `tenant.account_plan.read` | `GET .../account-plan/trial-balances`, `GET .../account-plan/trial-balances/{latest\|uuid}?compare=previous&level=1` (son mizan, önceki dönemle karşılaştırma) |
 
-Satıra dokununca belge önizlenir (Android'de varsayılan PDF görüntüleyici, iOS'ta sistem önizlemesi); sağdaki düğme sistem paylaş menüsünü açar (`expo-sharing`). Dosya `X-Organization` ve oturum belirteciyle önbelleğe indirilir (`src/features/files/open.ts`).
+Mizan özeti (toplamlar ve ana hesap bakiyeleri) sistem paylaş menüsüyle metin olarak paylaşılır. Satıra dokununca belge önizlenir (Android'de varsayılan PDF görüntüleyici, iOS'ta sistem önizlemesi); sağdaki düğme sistem paylaş menüsünü açar (`expo-sharing`). Dosya `X-Organization` ve oturum belirteciyle önbelleğe indirilir (`src/features/files/open.ts`).
 
 ## Bildirimler ve derin bağlantılar (#241)
 
@@ -78,7 +79,7 @@ CI'daki `mobile-office` işi tipleri yeniden üretir (işlenmiş dosya eskiyse u
 
 ## Duman testleri ve sürüm (#242)
 
-- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
+- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro, mizan) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
 
   ```bash
   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro

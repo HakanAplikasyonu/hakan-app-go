@@ -135,6 +135,9 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM payroll_runs WHERE journal_draft_id IS NOT NULL`: 1,
 		`SELECT count(*) FROM payroll_documents WHERE visible_to_taxpayer`:     4,
 		`SELECT count(*) FROM employees WHERE national_id_masked LIKE '100%'`:  4,
+		// #393: Eylül ve Ekim mizanları, tutarlarıyla.
+		`SELECT count(*) FROM account_plan_imports WHERE source_kind = 'trial_balance' AND period IN ('2026-09', '2026-10')`: 2,
+		`SELECT count(DISTINCT import_id) FROM trial_balance_lines WHERE code = '600.01' AND balance < 0`:                    2,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)

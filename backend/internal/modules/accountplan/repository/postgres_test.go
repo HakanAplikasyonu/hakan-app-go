@@ -43,7 +43,7 @@ func TestGateBlocksMissingCodePerSetting(t *testing.T) {
 		t.Fatalf("no plan: %+v %v", v, err)
 	}
 
-	res, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", []byte(planCSV))
+	res, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", "", []byte(planCSV))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestGateBlocksMissingCodePerSetting(t *testing.T) {
 	}
 
 	// A new import replaces the active plan; history keeps both versions.
-	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan2.csv",
+	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan2.csv", "",
 		[]byte("Hesap Kodu;Hesap Adı\n770;GENEL YÖNETİM\n770.01;Kira\n")); err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestExportGateNormalizesAndRejectsGroupAccounts(t *testing.T) {
 	if is, err := check(ctx, scope, "luca", entries(), true); err != nil || len(is) != 0 {
 		t.Fatalf("no plan: %v %v", is, err)
 	}
-	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", []byte(planCSV)); err != nil {
+	if _, err := svc.Import(ctx, usecase.Subject{OrganizationID: org, EngagementID: eng}, 0, "", "plan.csv", "", []byte(planCSV)); err != nil {
 		t.Fatal(err)
 	}
 	es := entries()
@@ -195,5 +195,79 @@ func TestExportGateNormalizesAndRejectsGroupAccounts(t *testing.T) {
 	// Another target program with no plan: nothing checked.
 	if is, _ := check(ctx, scope, "zirve", entries(), true); len(is) != 0 {
 		t.Fatalf("zirve without a plan: %+v", is)
+	}
+}
+
+// TestTrialBalanceReport (#393): mizan uploads keep their amounts per
+// import; the report compares the latest mizan with the previous period,
+// down to the main accounts, and another engagement sees none of it.
+func TestTrialBalanceReport(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	org := d.Organization(t)
+	tp := d.Taxpayer(t, "legal", "1234567892")
+	eng := d.Engagement(t, org, tp)
+	other := d.Engagement(t, org, d.Taxpayer(t, "legal", "1234567893"))
+	svc := usecase.New(New(d.Pool, db.New(d.Pool)))
+	sub := usecase.Subject{OrganizationID: org, EngagementID: eng}
+
+	const head = "Hesap Kodu;Hesap Adı;Borç;Alacak;Borç Bakiye;Alacak Bakiye\n"
+	sep := "MİZAN 01.01.2026 - 30.09.2026\n" + head +
+		"100;KASA;1.000,00;400,00;600,00;\n100.01;MERKEZ KASA;1.000,00;400,00;600,00;\n" +
+		"320;SATICILAR;0,00;250,00;;250,00\n320.01;SATICI A;0,00;250,00;;250,00\n"
+	oct := head +
+		"100;KASA;1.500,00;500,00;1.000,00;\n100.01;MERKEZ KASA;1.500,00;500,00;1.000,00;\n" +
+		"600;SATIŞLAR;0,00;900,00;;900,00\n600.01;YURTİÇİ;0,00;900,00;;900,00\n"
+
+	// A plain account plan is not a trial balance.
+	if _, err := svc.Import(ctx, sub, 0, "", "plan.csv", "", []byte(planCSV)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.TrialBalanceReport(ctx, sub, "latest", "", 0); err != usecase.ErrNotFound {
+		t.Fatalf("no mizan yet: %v", err)
+	}
+	res, err := svc.Import(ctx, sub, 0, "", "eylul.csv", "", []byte(sep))
+	if err != nil || res.Import.Period == nil || *res.Import.Period != "2026-09" {
+		t.Fatalf("eylül import = %+v %v", res.Import, err)
+	}
+	if _, err := svc.Import(ctx, sub, 0, "", "ekim.csv", "2026-13", []byte(oct)); err == nil {
+		t.Fatal("invalid period accepted")
+	}
+	if _, err := svc.Import(ctx, sub, 0, "", "ekim.csv", "2026-10", []byte(oct)); err != nil {
+		t.Fatal(err)
+	}
+
+	list, err := svc.TrialBalances(ctx, sub)
+	if err != nil || len(list) != 2 || *list[0].Period != "2026-10" || list[0].DebitTotal != "1500.00" || list[0].CreditTotal != "1400.00" {
+		t.Fatalf("list = %+v %v", list, err)
+	}
+	rep, err := svc.TrialBalanceReport(ctx, sub, "latest", "", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep.ComparedTo == nil || rep.ComparedTo.UUID != list[1].UUID || len(rep.Lines) != 2 {
+		t.Fatalf("report = %+v", rep)
+	}
+	byCode := map[string]usecase.TrialBalanceLine{}
+	for _, l := range rep.Lines {
+		byCode[l.Code] = l
+	}
+	if l := byCode["100"]; l.Balance != "1000.00" || *l.PreviousBalance != "600.00" || *l.Change != "400.00" {
+		t.Fatalf("100 = %+v", l)
+	}
+	if l := byCode["600"]; l.Balance != "-900.00" || l.PreviousBalance != nil || *l.Change != "-900.00" {
+		t.Fatalf("600 = %+v", l)
+	}
+	if rep, err := svc.TrialBalanceReport(ctx, sub, list[1].UUID.String(), usecase.CompareNone, 0); err != nil || rep.ComparedTo != nil || len(rep.Lines) != 4 {
+		t.Fatalf("eylül without comparison = %+v %v", rep, err)
+	}
+
+	// The other engagement sees nothing, not even by uuid.
+	osub := usecase.Subject{OrganizationID: org, EngagementID: other}
+	if l, err := svc.TrialBalances(ctx, osub); err != nil || len(l) != 0 {
+		t.Fatalf("other engagement list = %+v %v", l, err)
+	}
+	if _, err := svc.TrialBalanceReport(ctx, osub, list[0].UUID.String(), "", 0); err != usecase.ErrNotFound {
+		t.Fatalf("other engagement by uuid: %v", err)
 	}
 }

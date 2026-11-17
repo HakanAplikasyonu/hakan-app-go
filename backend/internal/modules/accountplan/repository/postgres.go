@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/shopspring/decimal"
 )
 
 // Postgres implements usecase.Store.
@@ -38,11 +39,24 @@ type accountRow struct {
 func (p *Postgres) Replace(ctx context.Context, s usecase.Subject, imp usecase.NewImport) (usecase.Import, error) {
 	rows := make([]accountRow, 0, len(imp.Accounts))
 	for _, a := range imp.Accounts {
-		rows = append(rows, accountRow(a))
+		rows = append(rows, accountRow{Code: a.Code, Name: a.Name, MainCode: a.MainCode, Level: a.Level, IsLeaf: a.IsLeaf})
 	}
 	payload, err := json.Marshal(rows)
 	if err != nil {
 		return usecase.Import{}, err
+	}
+	var linePayload []byte
+	if imp.Kind == usecase.KindTrialBalance {
+		lines := make([]lineRow, 0, len(imp.Accounts))
+		for _, a := range imp.Accounts {
+			lines = append(lines, lineRow{
+				accountRow: accountRow{Code: a.Code, Name: a.Name, MainCode: a.MainCode, Level: a.Level, IsLeaf: a.IsLeaf},
+				Debit:      a.Debit.StringFixed(2), Credit: a.Credit.StringFixed(2), Balance: a.Balance.StringFixed(2),
+			})
+		}
+		if linePayload, err = json.Marshal(lines); err != nil {
+			return usecase.Import{}, err
+		}
 	}
 	tx, err := database.Begin(ctx, p.pool)
 	if err != nil {
@@ -58,7 +72,7 @@ func (p *Postgres) Replace(ctx context.Context, s usecase.Subject, imp usecase.N
 		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Target: imp.Target,
 		SourceFormat: imp.Format, SourceKind: imp.Kind, FileName: imp.FileName, Sha256: imp.SHA256,
 		AccountCount: int32(len(imp.Accounts)), SkippedRows: int32(imp.Skipped), //nolint:gosec // bounded by MaxAccounts
-		ImportedBy: by,
+		ImportedBy: by, Period: text(imp.Period),
 	})
 	if err != nil {
 		return usecase.Import{}, fmt.Errorf("insert import: %w", err)
@@ -73,6 +87,13 @@ func (p *Postgres) Replace(ctx context.Context, s usecase.Subject, imp usecase.N
 		Target: imp.Target, Rows: payload,
 	}); err != nil {
 		return usecase.Import{}, fmt.Errorf("insert accounts: %w", err)
+	}
+	if linePayload != nil {
+		if _, err := q.InsertTrialBalanceLines(ctx, db.InsertTrialBalanceLinesParams{
+			OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, ImportID: row.ID, Rows: linePayload,
+		}); err != nil {
+			return usecase.Import{}, fmt.Errorf("insert trial balance lines: %w", err)
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return usecase.Import{}, fmt.Errorf("commit: %w", err)
@@ -169,8 +190,79 @@ func fromImport(r db.AccountPlanImport) usecase.Import {
 	return usecase.Import{
 		ID: r.ID, UUID: r.Uuid, Target: r.Target, SourceFormat: r.SourceFormat, SourceKind: r.SourceKind,
 		FileName: r.FileName, SHA256: r.Sha256, AccountCount: int(r.AccountCount), SkippedRows: int(r.SkippedRows),
-		CreatedAt: r.CreatedAt.Time,
+		Period: period(r.Period), CreatedAt: r.CreatedAt.Time,
 	}
+}
+
+func period(t pgtype.Text) *string {
+	if !t.Valid {
+		return nil
+	}
+	p := t.String
+	return &p
+}
+
+func text(s string) pgtype.Text {
+	if s == "" {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: s, Valid: true}
+}
+
+func dec(n pgtype.Numeric) decimal.Decimal {
+	if !n.Valid || n.Int == nil {
+		return decimal.Zero
+	}
+	return decimal.NewFromBigInt(n.Int, n.Exp)
+}
+
+// lineRow is a trial balance line for InsertTrialBalanceLines.
+type lineRow struct {
+	accountRow
+	Debit   string `json:"debit"`
+	Credit  string `json:"credit"`
+	Balance string `json:"balance"`
+}
+
+// TrialBalances implements usecase.Store.
+func (p *Postgres) TrialBalances(ctx context.Context, s usecase.Subject, limit int32) ([]usecase.TrialBalance, error) {
+	rows, err := p.q.ListTrialBalanceImports(ctx, db.ListTrialBalanceImportsParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Lim: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list trial balances: %w", err)
+	}
+	out := make([]usecase.TrialBalance, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.TrialBalance{
+			ID: r.ID, UUID: r.Uuid, Period: period(r.Period), FileName: r.FileName, SourceFormat: r.SourceFormat,
+			AccountCount: int(r.AccountCount), DebitTotal: dec(r.DebitTotal).StringFixed(2),
+			CreditTotal: dec(r.CreditTotal).StringFixed(2), CreatedAt: r.CreatedAt.Time,
+		})
+	}
+	return out, nil
+}
+
+// TrialBalanceLines implements usecase.Store.
+func (p *Postgres) TrialBalanceLines(ctx context.Context, s usecase.Subject, importID int64, maxLevel int) ([]usecase.Account, error) {
+	var lvl pgtype.Int2
+	if maxLevel > 0 {
+		lvl = pgtype.Int2{Int16: int16(maxLevel), Valid: true} //nolint:gosec // bounded by the use case (≤ 10)
+	}
+	rows, err := p.q.ListTrialBalanceLines(ctx, db.ListTrialBalanceLinesParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, ImportID: importID, MaxLevel: lvl,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("trial balance lines: %w", err)
+	}
+	out := make([]usecase.Account, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.Account{
+			Code: r.Code, Name: r.Name, MainCode: r.MainCode, Level: int(r.Level), IsLeaf: r.IsLeaf,
+			Debit: dec(r.Debit), Credit: dec(r.Credit), Balance: dec(r.Balance),
+		})
+	}
+	return out, nil
 }
 
 // MissingAssigned implements usecase.Store.
