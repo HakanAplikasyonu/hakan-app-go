@@ -82,7 +82,10 @@ func TestDeliveryQueueSendRetry(t *testing.T) {
 	if m.To[0] != "muhasebe@ornek.com.tr" || !strings.Contains(m.Subject, "Ekim 2026") || !strings.Contains(m.Body, "₺1.000,00") {
 		t.Fatalf("mail: %+v", m)
 	}
-	if strings.Contains(m.Body, "Gizli taslak") {
+	if m.HTML == "" || !strings.Contains(m.HTML, "₺1.000,00") {
+		t.Fatal("report email without the HTML alternative")
+	}
+	if strings.Contains(m.Body+m.HTML, "Gizli taslak") {
 		t.Fatal("a draft comment must not be emailed")
 	}
 	if len(m.Attachments) != 1 || !strings.HasPrefix(string(m.Attachments[0].Data), "%PDF") || !strings.HasSuffix(m.Attachments[0].Name, ".pdf") {

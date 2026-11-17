@@ -1,0 +1,20 @@
+Sayın Öz Şeker Ltd. Şti.,
+
+31.10.2026 tarihi itibarıyla firmamız kayıtlarında cari hesabınız 12.345,60
+TL alacak bakiyesi vermektedir.
+
+Mutabakat mektubu ektedir (PDF). Kayıtlarınızla mutabık olup olmadığınızı
+aşağıdaki bağlantıdan tek tıkla bildirebilirsiniz.
+
+Mutabakatı yanıtla:
+https://app.example.com/mutabakat/tok3n
+
+Not:
+Ekstre ektedir.
+
+Saygılarımızla,
+Atlas Gıda A.Ş.
+(Mali müşavir: Demo Müşavirlik)
+
+--
+Bu e-posta HAKAN üzerinden gönderildi.

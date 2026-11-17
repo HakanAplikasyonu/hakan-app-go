@@ -17,6 +17,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mail"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/mailtpl"
 )
 
 // Delivery errors.
@@ -234,6 +235,8 @@ type Sender struct {
 	Q    DeliveryQueries
 	Mail mail.Sender
 	Log  *slog.Logger
+	// FrontendURL is the public web origin (email logo); empty = no logo.
+	FrontendURL string
 	// Now is the clock (tests); nil = time.Now.
 	Now func() time.Time
 	// Batch is how many deliveries one sweep claims (default 20).
@@ -298,7 +301,10 @@ func (s *Sender) send(ctx context.Context, d db.ReportDelivery, now time.Time) e
 	if err != nil {
 		return fmt.Errorf("pdf: %w", err)
 	}
-	msg := Email(rep, d.OfficeName)
+	msg, err := Email(rep, d.OfficeName, mailtpl.New(s.FrontendURL))
+	if err != nil {
+		return fmt.Errorf("email: %w", err)
+	}
 	msg.To = []string{d.Recipient}
 	msg.Attachments = []mail.Attachment{{Name: FileName(rep), ContentType: "application/pdf", Data: body}}
 	return s.Mail.Send(ctx, msg)
@@ -334,34 +340,51 @@ func slug(s string) string {
 	return out
 }
 
-// Email is the report email (without recipient and attachment): a short
-// Turkish summary; the PDF carries the charts.
-func Email(r Report, office string) mail.Message {
+// Content is the report email's content: a short Turkish summary; the PDF
+// carries the charts.
+func Content(r Report, office string) mailtpl.Email {
 	office = strings.TrimSpace(office)
 	if office == "" {
 		office = "Mali müşaviriniz"
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Sayın %s,\n\n", r.Taxpayer.Title)
-	fmt.Fprintf(&b, "%s dönemine ait raporunuz ektedir (PDF).\n\n", r.Label)
-	b.WriteString("Özet (KDV hariç):\n")
-	fmt.Fprintf(&b, "  Ciro:   %s\n", TRMoney(r.Totals.Revenue))
-	fmt.Fprintf(&b, "  Gider:  %s\n", TRMoney(r.Totals.Expenses))
-	fmt.Fprintf(&b, "  Net:    %s\n", TRMoney(r.Totals.Net))
+	facts := []mailtpl.Fact{
+		{Label: "Ciro", Value: TRMoney(r.Totals.Revenue)},
+		{Label: "Gider", Value: TRMoney(r.Totals.Expenses)},
+		{Label: "Net", Value: TRMoney(r.Totals.Net)},
+	}
 	vat := dec0(r.Totals.VATPayable)
 	if vat.IsNegative() {
-		fmt.Fprintf(&b, "  Devreden KDV (tahmini): %s\n", TRMoney(vat.Abs().StringFixed(2)))
+		facts = append(facts, mailtpl.Fact{Label: "Devreden KDV (tahmini)", Value: TRMoney(vat.Abs().StringFixed(2))})
 	} else {
-		fmt.Fprintf(&b, "  Ödenecek KDV (tahmini): %s\n", TRMoney(vat.StringFixed(2)))
+		facts = append(facts, mailtpl.Fact{Label: "Ödenecek KDV (tahmini)", Value: TRMoney(vat.StringFixed(2))})
+	}
+	intro := fmt.Sprintf("%s dönemine ait raporunuz ektedir (PDF).", r.Label)
+	e := mailtpl.Email{
+		Subject:   fmt.Sprintf("%s — %s raporu", r.Taxpayer.Title, r.Label),
+		Preheader: fmt.Sprintf("%s Net: %s", intro, TRMoney(r.Totals.Net)),
+		Greeting:  fmt.Sprintf("Sayın %s,", r.Taxpayer.Title),
+		Blocks: []mailtpl.Block{
+			{Kind: mailtpl.Paragraph, Text: intro},
+			{Kind: mailtpl.Facts, Label: "Özet (KDV hariç)", Facts: facts},
+		},
+		SignOff: []string{"Saygılarımızla,", office},
+		Reason:  "Rakamlar portala kayıtlı verilerden hesaplanmıştır; KDV tutarı tahminidir ve önceki dönem devrini içermez.",
 	}
 	if r.Commentary != nil && r.Commentary.Status == "approved" && strings.TrimSpace(r.Commentary.Body) != "" {
-		b.WriteString("\nMüşavir yorumu:\n")
-		b.WriteString(strings.TrimSpace(r.Commentary.Body))
-		b.WriteString("\n")
+		e.Blocks = append(e.Blocks, mailtpl.Block{Kind: mailtpl.Note, Label: "Müşavir yorumu", Text: strings.TrimSpace(r.Commentary.Body)})
 	}
-	fmt.Fprintf(&b, "\nSaygılarımızla,\n%s\n\n", office)
-	b.WriteString("Bu e-posta HAKAN üzerinden gönderildi. Rakamlar portala kayıtlı verilerden hesaplanmıştır; KDV tutarı tahminidir ve önceki dönem devrini içermez.\n")
-	return mail.Message{Subject: fmt.Sprintf("%s — %s raporu", r.Taxpayer.Title, r.Label), Body: b.String()}
+	return e
+}
+
+// Email renders the report email (without recipient and attachment):
+// readable text and the themed HTML alternative.
+func Email(r Report, office string, rnd mailtpl.Renderer) (mail.Message, error) {
+	e := Content(r, office)
+	out, err := rnd.RenderSafe(e)
+	if err != nil {
+		return mail.Message{}, err
+	}
+	return mail.Message{Subject: e.Subject, Body: out.Text, HTML: out.HTML}, nil
 }
 
 func truncate(s string, n int) string {

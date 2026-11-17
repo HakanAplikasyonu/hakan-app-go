@@ -269,7 +269,7 @@ func main() {
 		// kuyruk gönderilir.
 		// Mutabakat mektupları (#389) aynı dakikalık taramada gönderilir.
 		WithReportDeliveries(systemCount(pool, "reports and reconciliation letters: deliveries across offices",
-			mailSweeps(reportSweep(database.NewQueries(pool), mailer, log),
+			mailSweeps(reportSweep(database.NewQueries(pool), mailer, cfg.Auth.FrontendURL, log),
 				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
 					Config: reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}}).SendDue))).
 		WithEgressCheck(egressChecker.Run).
@@ -376,9 +376,9 @@ func main() {
 // systemCount runs a cross-office sweep in one rls.System transaction; the
 // sweep's queries (database.NewQueries) join it.
 // reportSweep queues the due scheduled reports, then sends the queue (#386).
-func reportSweep(q *db.Queries, m mail.Sender, log *slog.Logger) func(context.Context) (int, error) {
+func reportSweep(q *db.Queries, m mail.Sender, frontendURL string, log *slog.Logger) func(context.Context) (int, error) {
 	sched := &reportsmodule.Scheduler{Q: q, Log: log}
-	send := &reportsmodule.Sender{Q: q, Mail: m, Log: log}
+	send := &reportsmodule.Sender{Q: q, Mail: m, Log: log, FrontendURL: frontendURL}
 	return func(ctx context.Context) (int, error) {
 		if n, err := sched.RunDue(ctx); err != nil {
 			return 0, err

@@ -368,3 +368,21 @@ func luminance(hex string) float64 {
 	}
 	return 0.2126*ch(v>>16&0xff) + 0.7152*ch(v>>8&0xff) + 0.0722*ch(v&0xff)
 }
+
+func TestRenderSafeDegradesInsecureLinks(t *testing.T) {
+	e := Email{Blocks: []Block{{Kind: Button, Label: "Yanıtla", URL: "http://staging.example/m/x"}}, PreferencesURL: "http://staging.example/profile"}
+	out, err := New("http://staging.example").RenderSafe(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out.HTML, `href="http://staging`) {
+		t.Fatal("insecure link rendered as a link")
+	}
+	if !strings.Contains(out.Text, "Yanıtla:\nhttp://staging.example/m/x") {
+		t.Fatalf("text lost the address:\n%s", out.Text)
+	}
+	// Other errors are not swallowed.
+	if _, err := New("").RenderSafe(Email{Blocks: []Block{{Kind: Paragraph, Text: strings.Repeat("x ", 60000)}}}); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("err = %v", err)
+	}
+}
