@@ -637,9 +637,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if deps.Storage != nil {
 		payrollStore = deps.Storage
 	}
-	payrollH := payrollmodule.NewHandler(payrollmodule.New(database.Ambient{Pool: deps.DB}, payrollStore, cfg.Encryption.Key).
+	payrollSvc := payrollmodule.New(database.Ambient{Pool: deps.DB}, payrollStore, cfg.Encryption.Key).
 		WithJournals(journalsmodule.New(deps.DB, deps.Storage)).
-		WithAI(excelmapping.NewAIMapper(aiSvc)))
+		WithAI(excelmapping.NewAIMapper(aiSvc))
+	payrollH := payrollmodule.NewHandler(payrollSvc)
 	payrollmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, payrollH)
 	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
 	// Belge arşivi ve İSG evrakları (#393).
@@ -655,7 +656,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		activity: activityhandler.New(activityusecase.New(deps.Queries)),
 		logs:     logshandler.New(logsSvc),
 		ai:       aihandler.New(aiSvc),
-		excel:    excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log)),
+		// Bordro, masraf, Z raporu ve banka hareketi de ortak Excel akışından
+		// içe aktarılır; satırları sahibi olan modül yazar (#395).
+		excel: excelimporthandler.New(excelimportusecase.New(deps.DB, deps.Storage, aiSvc, log).
+			WithTarget(excelmapping.Payroll, payrollSvc.ExcelTarget()).
+			WithTarget(excelmapping.Expenses, receiptsSvc.ExpenseTarget()).
+			WithTarget(excelmapping.RetailSales, receiptsSvc.RetailSaleTarget()).
+			WithTarget(excelmapping.BankTransactions, bankImporter.ExcelTarget())),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
 			WithControls(warningscontrols.New(deps.Queries, warningEngine)).

@@ -170,6 +170,12 @@ func (h *Handler) Templates(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
 }
 
+// DataTypes: GET /v1/tenant/excel-import-data-types. The importable data
+// types with their target fields (#395).
+func (h *Handler) DataTypes(w http.ResponseWriter, r *http.Request) {
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": h.svc.DataTypes()})
+}
+
 // DeleteTemplate: DELETE /v1/tenant/excel-import-templates/{templateUuid}.
 func (h *Handler) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("templateUuid"))
@@ -199,7 +205,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.NotFound(w, r, "Import or template not found")
 	case errors.Is(err, usecase.ErrInvalid):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
-	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrIdempotency):
+	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrIdempotency), errors.Is(err, usecase.ErrNoRollback):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
 	default:
 		response.InternalErr(w, r, err, "Unexpected server error")

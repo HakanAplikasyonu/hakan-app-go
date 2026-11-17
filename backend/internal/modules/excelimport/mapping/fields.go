@@ -7,15 +7,15 @@ import (
 	"sort"
 )
 
-// Data types (04 §1). Only the invoice types are committed in this version;
-// the rest are recognised so a mapping can be stored and reviewed.
+// Data types (04 §1). Invoices are committed by this module; payroll,
+// expenses, Z reports and bank movements by their own modules (#395).
 const (
 	OutgoingInvoices = "outgoing_invoices"
 	IncomingInvoices = "incoming_invoices"
 )
 
 // SupportedDataTypes can be committed.
-var SupportedDataTypes = []string{OutgoingInvoices, IncomingInvoices}
+var SupportedDataTypes = []string{OutgoingInvoices, IncomingInvoices, Payroll, Expenses, RetailSales, BankTransactions}
 
 // Supported reports whether dt can be imported.
 func Supported(dt string) bool {
@@ -31,26 +31,27 @@ func Supported(dt string) bool {
 type Field struct {
 	Key         string `json:"key"`
 	Description string `json:"description"`
+	Kind        string `json:"kind,omitempty"`
 }
 
 // Invoice fields (01 §4.4 names; tax_summary[<rate>].base|vat per 04 §4.3).
 var InvoiceFields = []Field{
-	{"issue_date", "fatura tarihi"},
-	{"invoice_number", "fatura / belge numarası"},
-	{"ettn", "ETTN (UUID)"},
-	{"customer_name", "karşı taraf adı / unvanı"},
-	{"customer_tax_number", "karşı taraf VKN veya TCKN"},
-	{"customer_tax_office", "karşı taraf vergi dairesi"},
-	{"invoice_type", "fatura türü metni (Satış, Alış, İade, Tevkifatlı)"},
-	{"profile", "e-belge türü (e-Fatura, e-Arşiv, Kağıt)"},
-	{"currency", "para birimi"},
-	{"due_date", "vade tarihi"},
-	{"amounts.tax_exclusive_amount", "KDV hariç tutar (matrah)"},
-	{"amounts.tax_amount", "toplam KDV"},
-	{"amounts.withholding_amount", "tevkifat tutarı"},
-	{"amounts.payable_amount", "genel toplam / ödenecek"},
-	{"notes", "açıklama"},
-	{"source_record_id", "kaynak programın kayıt kimliği"},
+	{Key: "issue_date", Description: "fatura tarihi"},
+	{Key: "invoice_number", Description: "fatura / belge numarası"},
+	{Key: "ettn", Description: "ETTN (UUID)"},
+	{Key: "customer_name", Description: "karşı taraf adı / unvanı"},
+	{Key: "customer_tax_number", Description: "karşı taraf VKN veya TCKN"},
+	{Key: "customer_tax_office", Description: "karşı taraf vergi dairesi"},
+	{Key: "invoice_type", Description: "fatura türü metni (Satış, Alış, İade, Tevkifatlı)"},
+	{Key: "profile", Description: "e-belge türü (e-Fatura, e-Arşiv, Kağıt)"},
+	{Key: "currency", Description: "para birimi"},
+	{Key: "due_date", Description: "vade tarihi"},
+	{Key: "amounts.tax_exclusive_amount", Description: "KDV hariç tutar (matrah)"},
+	{Key: "amounts.tax_amount", Description: "toplam KDV"},
+	{Key: "amounts.withholding_amount", Description: "tevkifat tutarı"},
+	{Key: "amounts.payable_amount", Description: "genel toplam / ödenecek"},
+	{Key: "notes", Description: "açıklama"},
+	{Key: "source_record_id", Description: "kaynak programın kayıt kimliği"},
 }
 
 var taxSummaryRe = regexp.MustCompile(`^tax_summary\[(\d{1,2}(?:\.\d{1,2})?)\]\.(base|vat)$`)
@@ -68,6 +69,10 @@ func TaxSummaryField(f string) (rate, part string, ok bool) {
 func ValidField(dt, f string) bool {
 	if !Supported(dt) {
 		return false
+	}
+	if !IsInvoice(dt) {
+		c, _ := CatalogFor(dt)
+		return c.Has(f)
 	}
 	if _, _, ok := TaxSummaryField(f); ok {
 		return true
@@ -96,8 +101,12 @@ func MissingRequired(dt string, m Mapping) [][]string {
 			mapped[c.Field] = true
 		}
 	}
+	required := invoiceRequired
+	if c, ok := CatalogFor(dt); ok {
+		required = c.Required
+	}
 	var out [][]string
-	for _, g := range invoiceRequired {
+	for _, g := range required {
 		hit := false
 		for _, f := range g {
 			if mapped[f] {

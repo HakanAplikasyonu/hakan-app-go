@@ -53,11 +53,14 @@ type Message struct {
 
 // Row is one data row after conversion.
 type Row struct {
-	RowNo    int               `json:"row_no"` // 1-based sheet row
-	Raw      map[string]string `json:"raw"`
-	Invoice  *model.Invoice    `json:"invoice,omitempty"`
+	RowNo   int               `json:"row_no"` // 1-based sheet row
+	Raw     map[string]string `json:"raw"`
+	Invoice *model.Invoice    `json:"invoice,omitempty"`
+	// Record is the normalised row of a non-invoice data type (#395).
+	Record   map[string]string `json:"record,omitempty"`
 	Result   string            `json:"result"`
 	Messages []Message         `json:"messages"`
+	amount   *decimal.Decimal
 }
 
 // Options of a build.
@@ -404,6 +407,9 @@ func Summarize(rows []Row) Summary {
 			s.Warnings++
 		default:
 			s.OK++
+		}
+		if r.amount != nil {
+			total = total.Add(*r.amount)
 		}
 		if r.Invoice == nil {
 			continue

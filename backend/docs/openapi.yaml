@@ -6626,6 +6626,7 @@ paths:
       summary: Upload an Excel / CSV export
       description: |
         Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
+        Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
       security:
         - bearerAuth: []
       requestBody:
@@ -6637,7 +6638,7 @@ paths:
               required: [file]
               properties:
                 file: { type: string, format: binary }
-                data_type: { type: string, enum: [outgoing_invoices, incoming_invoices] }
+                data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
                 source_system: { type: string, example: bizimhesap }
                 period: { type: string, example: "2026-10" }
                 sheet: { type: string }
@@ -6834,6 +6835,7 @@ paths:
       summary: Write the import to the common model
       description: |
         Requires `tenant.excel_imports.commit` (accountant). Only from preview. Rows already in the database (same source key or ETTN) are not duplicated. The same Idempotency-Key returns the committed import; another key gets 409.
+        Non-invoice data types (#395) are written by their module: payroll as the run of the period (a re-import replaces it), expenses and Z reports with the sheet row key (an exported list re-imports without duplicates), bank movements per account IBAN through the statement importer (no account column: the taxpayer's only bank account). Rows the module refuses are counted in `summary.rejected` with `summary.row_errors`; a refusal of the whole file (no period, unknown account) is 400.
       security:
         - bearerAuth: []
       responses:
@@ -6859,7 +6861,7 @@ paths:
       operationId: rollbackExcelImport
       summary: Remove the invoices this import created
       description: |
-        Requires `tenant.excel_imports.commit`. Invoices that existed before are left alone.
+        Requires `tenant.excel_imports.commit`. Invoices that existed before are left alone. Only invoice imports roll back; other data types get 409 and are corrected in their own screens (#395).
       security:
         - bearerAuth: []
       responses:
@@ -6893,6 +6895,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeExcelImportTemplates"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/excel-import-data-types:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [ExcelImports]
+      operationId: listExcelImportDataTypes
+      summary: Importable data types and their fields
+      description: |
+        Requires `tenant.excel_imports.read`. Invoices, payroll, expenses, Z reports and bank movements (#395) with their target fields, field kinds and required groups (each group needs one mapped field). `available` is false when the server has no writer for the type.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeExcelImportDataTypes"
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
@@ -15696,7 +15719,7 @@ components:
         header: { type: string }
         field: { type: string, description: "Target field; empty = unmapped (kept in raw_payload)" }
         confidence: { type: number, minimum: 0, maximum: 1 }
-        origin: { type: string, enum: [template, ai, user] }
+        origin: { type: string, enum: [template, ai, user, header] }
         needs_review: { type: boolean }
 
     ExcelImport:
@@ -15751,7 +15774,17 @@ components:
             added: { type: integer }
             duplicates: { type: integer }
             rolled_back: { type: integer }
-            total_payable: { type: string }
+            rejected: { type: integer, description: "Rows the owning module refused (#395)" }
+            row_errors:
+              type: array
+              items:
+                type: object
+                required: [row_no, reason]
+                properties:
+                  row_no: { type: integer }
+                  reason: { type: string }
+            note: { type: string, description: "What the owning module wrote (#395)" }
+            total_payable: { type: string, description: "Invoices: payable total; payroll: net; expenses / Z: total; bank: 0" }
             vat_by_rate:
               type: array
               items:
@@ -15791,7 +15824,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices] }
+        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
         source_system: { type: string }
         columns:
           type: array
@@ -15823,6 +15856,41 @@ components:
           type: array
           items: { $ref: "#/components/schemas/ExcelImportColumnMap" }
         updated_at: { type: string, format: date-time }
+
+    ExcelImportDataType:
+      type: object
+      required: [data_type, label, fields, required, available]
+      properties:
+        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
+        label: { type: string, example: Banka hareketleri }
+        fields:
+          type: array
+          items:
+            type: object
+            required: [key, description]
+            properties:
+              key: { type: string }
+              description: { type: string }
+              kind: { type: string, enum: [text, date, money, rate, int] }
+        required:
+          type: array
+          items: { type: array, items: { type: string } }
+        total_field: { type: string }
+        available: { type: boolean }
+
+    EnvelopeExcelImportDataTypes:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/ExcelImportDataType" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeExcelImport:
       type: object

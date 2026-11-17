@@ -457,6 +457,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/bank-statement-templates/analyze":                                                          azTenantWrite,
 	"DELETE /v1/tenant/bank-statement-templates/{templateUuid}":                                                 azTenantWrite,
 	"GET /v1/tenant/excel-import-templates":                                                                     azTenantRead,
+	"GET /v1/tenant/excel-import-data-types":                                                                    azTenantRead,
 	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                                                   azTenantWrite,
 	"GET /v1/tenant/export-drivers":                                                                             azTenantRead,
 	"GET /v1/tenant/invitations":                                                                                azTenantRead,

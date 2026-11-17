@@ -27,6 +27,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/build"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/target"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -59,6 +60,9 @@ var (
 	ErrInvalid     = errors.New("excelimport: invalid input")
 	ErrState       = errors.New("excelimport: not allowed in the import's status")
 	ErrIdempotency = errors.New("excelimport: import already committed with another Idempotency-Key")
+	// ErrNoRollback: only invoice imports are rolled back here; the other
+	// data types are corrected in their own screens (#395).
+	ErrNoRollback = errors.New("excelimport: bu veri türünün içe aktarması geri alınamaz; kayıtları kendi ekranından düzeltin")
 )
 
 // DB is the Postgres pool subset.
@@ -80,6 +84,8 @@ type Service struct {
 	store ObjectStore
 	ai    *mapping.AIMapper
 	log   *slog.Logger
+	// targets write the non-invoice data types (#395).
+	targets map[string]target.Target
 }
 
 // New builds the service; ai may be nil (mapping is then manual).
@@ -91,7 +97,41 @@ func New(pool DB, store ObjectStore, ai mapping.Completer, log *slog.Logger) *Se
 	if ai != nil {
 		m = mapping.NewAIMapper(ai)
 	}
-	return &Service{pool: pool, q: database.QueriesFor(pool), store: store, ai: m, log: log}
+	return &Service{pool: pool, q: database.QueriesFor(pool), store: store, ai: m, log: log, targets: map[string]target.Target{}}
+}
+
+// WithTarget registers the module that writes dataType (payroll, expenses,
+// retail_sales, bank_transactions).
+func (s *Service) WithTarget(dataType string, t target.Target) *Service {
+	if mapping.Supported(dataType) && !mapping.IsInvoice(dataType) && t != nil {
+		s.targets[dataType] = t
+	}
+	return s
+}
+
+// Available reports whether dataType can be committed by this server.
+func (s *Service) Available(dataType string) bool {
+	if mapping.IsInvoice(dataType) {
+		return true
+	}
+	_, ok := s.targets[dataType]
+	return ok
+}
+
+// DataType is one data type of the catalog endpoint.
+type DataType struct {
+	mapping.Catalog
+	Available bool `json:"available"`
+}
+
+// DataTypes lists the importable data types with their fields.
+func (s *Service) DataTypes() []DataType {
+	cats := mapping.Catalogs()
+	out := make([]DataType, 0, len(cats))
+	for _, c := range cats {
+		out = append(out, DataType{Catalog: c, Available: s.Available(c.DataType)})
+	}
+	return out
 }
 
 // UploadOptions are the optional upload fields (04 §7).
@@ -112,6 +152,9 @@ var (
 func (s *Service) Upload(ctx context.Context, sc engagementctx.Scope, userID int64, fileName string, data []byte, opt UploadOptions) (View, error) {
 	if opt.DataType != "" && !mapping.Supported(opt.DataType) {
 		return View{}, fmt.Errorf("%w: data_type must be one of %v", ErrInvalid, mapping.SupportedDataTypes)
+	}
+	if opt.DataType != "" && !s.Available(opt.DataType) {
+		return View{}, fmt.Errorf("%w: data_type %s is not enabled on this server", ErrInvalid, opt.DataType)
 	}
 	if opt.Period != "" && !periodRe.MatchString(opt.Period) {
 		return View{}, fmt.Errorf("%w: period must be YYYY-MM", ErrInvalid)
@@ -181,7 +224,19 @@ func (s *Service) analyze(ctx context.Context, row db.ExcelImport, sheets []pars
 			template = nil
 		}
 	}
-	if template == nil {
+	// The owning module's header names come before AI: its own export and
+	// the common program layouts map without a model call (#395).
+	var heuristic *mapping.Mapping
+	if t, ok := s.targets[dataType]; ok && template == nil {
+		h := t.Heuristic(layout)
+		h.DataType = dataType
+		heuristic = &h
+	}
+	switch {
+	case template != nil:
+	case heuristic != nil && len(mapping.MissingRequired(dataType, *heuristic)) == 0:
+		mp = *heuristic
+	default:
 		mp, err = s.ai.Map(ctx, mapping.AIRequest{
 			OrganizationID: row.OrganizationID, TaxpayerID: row.TaxpayerID, UserID: userID,
 			DataType: dataType, Sheet: sheet, Layout: layout,
@@ -194,6 +249,15 @@ func (s *Service) analyze(ctx context.Context, row db.ExcelImport, sheets []pars
 			mp = mapping.Unmapped(dataType, layout, "AI çağrısı başarısız; kolonları müşavir eşler")
 		default:
 			aiUsed = true
+		}
+		if !aiUsed && heuristic != nil {
+			// Keep what the headers told; the accountant maps the rest.
+			w := append(mp.Warnings, "Kolonların bir kısmı başlıklardan eşlendi; eksik alanları müşavir eşler")
+			mp = *heuristic
+			mp.Warnings = w
+			for i := range mp.Columns {
+				mp.Columns[i].NeedsReview = mp.Columns[i].Field == ""
+			}
 		}
 	}
 	if opt.SourceSystem != "" {
@@ -281,6 +345,9 @@ func (s *Service) SetMapping(ctx context.Context, sc engagementctx.Scope, id uui
 	}
 	if err := mp.Validate(); err != nil {
 		return View{}, fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	if !s.Available(mp.DataType) {
+		return View{}, fmt.Errorf("%w: data_type %s is not enabled on this server", ErrInvalid, mp.DataType)
 	}
 	if missing := mapping.MissingRequired(mp.DataType, mp); len(missing) > 0 {
 		return View{}, fmt.Errorf("%w: required fields not mapped: %v", ErrInvalid, missing)
@@ -374,7 +441,13 @@ func (s *Service) validate(ctx context.Context, row db.ExcelImport, sheet parse.
 			skipped[n] = true
 		}
 	}
-	rows := build.Invoices(sheet, layout, mp, build.Options{Period: row.Period.String})
+	invoice := mapping.IsInvoice(mp.DataType)
+	var rows []build.Row
+	if invoice {
+		rows = build.Invoices(sheet, layout, mp, build.Options{Period: row.Period.String})
+	} else {
+		rows = build.Records(sheet, layout, mp, build.Options{Period: row.Period.String})
+	}
 	existing := 0
 	for i := range rows {
 		if skipped[int32(rows[i].RowNo)] { //nolint:gosec // row numbers are bounded by MaxRows
@@ -382,7 +455,7 @@ func (s *Service) validate(ctx context.Context, row db.ExcelImport, sheet parse.
 			continue
 		}
 		inv := rows[i].Invoice
-		if inv == nil || rows[i].Result == build.ResultError {
+		if !invoice || inv == nil || rows[i].Result == build.ResultError {
 			continue
 		}
 		if _, err := s.q.GetInvoiceBySource(ctx, db.GetInvoiceBySourceParams{TaxpayerID: row.TaxpayerID, SourceSystem: inv.SourceSystem, SourceID: inv.SourceID}); err == nil {
@@ -416,8 +489,11 @@ func (s *Service) validate(ctx context.Context, row db.ExcelImport, sheet parse.
 		raw, _ := json.Marshal(r.Raw)
 		msgs, _ := json.Marshal(r.Messages)
 		var rec []byte
-		if r.Invoice != nil {
+		switch {
+		case r.Invoice != nil:
 			rec, _ = json.Marshal(r.Invoice)
+		case r.Record != nil:
+			rec, _ = json.Marshal(r.Record)
 		}
 		if err := q.InsertExcelImportRow(ctx, db.InsertExcelImportRowParams{
 			OrganizationID: row.OrganizationID, EngagementID: row.EngagementID, ImportID: row.ID,
@@ -478,6 +554,12 @@ func (s *Service) Commit(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	var summary Summary
 	_ = json.Unmarshal(row.Summary, &summary)
 	summary.Added, summary.Duplicates = 0, 0
+	if dt := row.DataType.String; !mapping.IsInvoice(dt) {
+		if err := s.commitRecords(ctx, sc, userID, row, rows, &summary); err != nil {
+			return View{}, err
+		}
+		rows = nil
+	}
 	for _, r := range rows {
 		if r.Skipped || (r.Result != build.ResultOK && r.Result != build.ResultWarning) || len(r.Record) == 0 {
 			continue
@@ -534,6 +616,9 @@ func (s *Service) Rollback(ctx context.Context, sc engagementctx.Scope, id uuid.
 	}
 	if row.Status != StatusCommitted {
 		return View{}, ErrState
+	}
+	if !mapping.IsInvoice(row.DataType.String) {
+		return View{}, ErrNoRollback
 	}
 	ids, err := q.ListExcelImportCreatedInvoices(ctx, db.ListExcelImportCreatedInvoicesParams{OrganizationID: row.OrganizationID, EngagementID: row.EngagementID, ImportID: row.ID})
 	if err != nil {
@@ -783,4 +868,41 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// commitRecords hands the accepted rows of a non-invoice import to the
+// module that owns the data type (#395). The module writes in its own
+// transaction while the import row stays locked; its duplicate rules make a
+// retry after a failure safe.
+func (s *Service) commitRecords(ctx context.Context, sc engagementctx.Scope, userID int64, row db.ExcelImport, rows []db.ExcelImportRow, summary *Summary) error {
+	t, ok := s.targets[row.DataType.String]
+	if !ok {
+		return fmt.Errorf("%w: data_type %s is not enabled on this server", ErrInvalid, row.DataType.String)
+	}
+	var mp mapping.Mapping
+	_ = json.Unmarshal(row.Mapping, &mp)
+	in := target.Input{Scope: sc, UserID: userID, FileName: row.FileName, Period: row.Period.String, SourceSystem: mp.SourceSystem}
+	for _, r := range rows {
+		if r.Skipped || (r.Result != build.ResultOK && r.Result != build.ResultWarning) || len(r.Record) == 0 {
+			continue
+		}
+		var vals map[string]string
+		if err := json.Unmarshal(r.Record, &vals); err != nil {
+			return fmt.Errorf("excelimport: row %d: %w", r.RowNo, err)
+		}
+		in.Rows = append(in.Rows, target.Row{RowNo: int(r.RowNo), Values: vals})
+	}
+	if len(in.Rows) == 0 {
+		return fmt.Errorf("%w: no importable rows", ErrInvalid)
+	}
+	res, err := t.Commit(ctx, in)
+	if errors.Is(err, target.ErrRejected) {
+		return fmt.Errorf("%w: %v", ErrInvalid, err)
+	}
+	if err != nil {
+		return err
+	}
+	summary.Added, summary.Duplicates, summary.Rejected = res.Added, res.Duplicates, len(res.Errors)
+	summary.RowErrors, summary.Note = res.Errors, res.Note
+	return nil
 }

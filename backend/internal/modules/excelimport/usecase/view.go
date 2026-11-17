@@ -10,6 +10,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/build"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/target"
 )
 
 // Summary is the preview (04 §5) plus the commit / rollback outcome.
@@ -20,6 +21,11 @@ type Summary struct {
 	Added      int `json:"added"`
 	Duplicates int `json:"duplicates"`
 	RolledBack int `json:"rolled_back"`
+	// Rejected rows were refused by the owning module (#395); RowErrors says
+	// why and Note sums up what it wrote.
+	Rejected  int               `json:"rejected,omitempty"`
+	RowErrors []target.RowError `json:"row_errors,omitempty"`
+	Note      string            `json:"note,omitempty"`
 }
 
 // View is the API view of an import.

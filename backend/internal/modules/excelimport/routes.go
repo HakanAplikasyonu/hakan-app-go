@@ -32,6 +32,7 @@ func (m Module) Routes(r *module.Router) {
 	}
 	read, write, commit := rbac.PermTenantExcelImportsRead, rbac.PermTenantExcelImportsWrite, rbac.PermTenantExcelImportsCommit
 	r.Tenant("GET /v1/tenant/excel-import-templates", read, h.Templates)
+	r.Tenant("GET /v1/tenant/excel-import-data-types", read, h.DataTypes)
 	r.Tenant("DELETE /v1/tenant/excel-import-templates/{templateUuid}", write, h.DeleteTemplate)
 	if m.Engagements == nil {
 		return
