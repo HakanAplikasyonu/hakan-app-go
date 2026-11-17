@@ -5212,6 +5212,268 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/expense-categories": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office expense category template
+         * @description Requires `tenant.receipts.read`. The office template laid over the
+         *     platform defaults by code (scope platform | office). Inactive rows are
+         *     listed with is_active=false.
+         */
+        get: operations["listOfficeExpenseCategories"];
+        /**
+         * Create or replace an office template category
+         * @description Requires `tenant.receipts.approve`. Keyed by code: the same code
+         *     replaces the office row and overrides the platform default; is_active
+         *     false hides the default.
+         */
+        put: operations["saveOfficeExpenseCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/expense-categories/{categoryUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                categoryUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove an office template category
+         * @description Requires `tenant.receipts.approve`. The platform default with the same
+         *     code (if any) shows again.
+         */
+        delete: operations["deleteOfficeExpenseCategory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expense-categories": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Effective expense categories of a taxpayer
+         * @description Requires `tenant.receipts.read` and engagement access. Taxpayer rows
+         *     over the office template over the platform defaults (scope taxpayer |
+         *     office | platform; overrides names the layer replaced).
+         */
+        get: operations["listEngagementExpenseCategories"];
+        /**
+         * Create or replace a taxpayer's own category
+         * @description Requires `tenant.receipts.approve` and engagement access. Keyed by code
+         *     within the taxpayer.
+         */
+        put: operations["saveEngagementExpenseCategory"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expense-categories/{categoryUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                categoryUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove a taxpayer's own category
+         * @description Requires `tenant.receipts.approve` and engagement access. Only the
+         *     taxpayer's rows; the office template shows again.
+         */
+        delete: operations["deleteEngagementExpenseCategory"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer expenses with category and account
+         * @description Requires `tenant.receipts.read` and engagement access. Every expense of
+         *     the taxpayer (receipt capture, Excel, integrations). Pending rows
+         *     without an office choice carry the suggestion (suggested=true): the
+         *     vendor's last approved account (vendor_memory), else the category's
+         *     account matched to the imported plan (plan) or as written (category).
+         *     Totals are over the whole filter.
+         */
+        get: operations["listEngagementExpenses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One expense
+         * @description Requires `tenant.receipts.read` and engagement access.
+         */
+        get: operations["getEngagementExpense"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Choose the category / account of a pending expense
+         * @description Requires `tenant.receipts.write` and engagement access. A category
+         *     alone takes the category's account matched to the plan; an
+         *     account_code is stored as manual. 409 when the expense is decided.
+         */
+        patch: operations["setEngagementExpensePosting"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve an expense and create its journal draft
+         * @description Requires `tenant.receipts.approve` and engagement access. Fixes the
+         *     category and account (the suggestion when none was chosen) and creates
+         *     a journal draft (source_kind receipt): expense account (net) and
+         *     191 İndirilecek KDV debit, the payment method's account credit (cash
+         *     100, transfer 102, card 309, check 103, note 321, credit 320 with the
+         *     vendor's cari). Non-deductible VAT is added to the expense. The
+         *     receipt capture, if any, becomes approved. 422 RECORD_INCOMPLETE
+         *     without a date or amount; 409 when already decided.
+         */
+        post: operations["approveEngagementExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/reject": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject an expense
+         * @description Requires `tenant.receipts.approve` and engagement access. 409 when
+         *     already decided.
+         */
+        post: operations["rejectEngagementExpense"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/controls/run": {
         parameters: {
             query?: never;
@@ -11369,6 +11631,137 @@ export interface components {
             valid_from?: string | null;
             /** Format: date */
             valid_to?: string | null;
+        };
+        ExpenseCategory: {
+            /**
+             * Format: uuid
+             * @description null for platform defaults
+             */
+            uuid: string | null;
+            /** @example akaryakit */
+            code: string;
+            name: string;
+            /** @example 770 */
+            account_code: string;
+            /** @example 191 */
+            vat_account_code: string;
+            /**
+             * @description no: VAT is added to the expense
+             * @enum {string}
+             */
+            deductible: "yes" | "no";
+            receipt_types: string[];
+            keywords: string[];
+            is_active: boolean;
+            /** @enum {string} */
+            scope: "platform" | "office" | "taxpayer";
+            /** @enum {string} */
+            overrides?: "platform" | "office";
+        };
+        ExpenseCategoryInput: {
+            code: string;
+            name: string;
+            account_code: string;
+            /** @default 191 */
+            vat_account_code: string;
+            /**
+             * @default yes
+             * @enum {string}
+             */
+            deductible: "yes" | "no";
+            receipt_types?: ("okc_receipt" | "fuel_receipt" | "expense_voucher" | "smm" | "bank_fee" | "salary" | "tax_payment" | "other")[];
+            keywords?: string[];
+            /** @default true */
+            is_active: boolean;
+        };
+        EnvelopeExpenseCategory: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ExpenseCategory"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeExpenseCategoryList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ExpenseCategory"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReceiptJournalRef: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: int32 */
+            entry_no: number;
+            /** @enum {string} */
+            status: "draft" | "approved" | "exported";
+        };
+        Expense: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            expense_date: string | null;
+            period: string | null;
+            /** @description Decimal, total incl. VAT */
+            amount: string | null;
+            tax_amount: string | null;
+            tax_rate?: string | null;
+            tax_exclusive_amount?: string | null;
+            currency: string;
+            description: string;
+            receipt_type: string;
+            vendor_name?: string | null;
+            vendor_tax_number?: string | null;
+            receipt_number?: string | null;
+            vehicle_plate?: string | null;
+            payment_method?: string | null;
+            source_system: string;
+            capture_method: string;
+            /** @enum {string} */
+            approval_status: "pending" | "approved" | "rejected";
+            ocr_confidence?: string | null;
+            has_attachment: boolean;
+            category_code: string | null;
+            category_name?: string | null;
+            account_code: string | null;
+            /** @enum {string|null} */
+            account_source?: "category" | "vendor_memory" | "plan" | "manual" | null;
+            account_confidence?: string | null;
+            /** @description category / account are a proposal nobody chose yet */
+            suggested: boolean;
+            journal: components["schemas"]["ReceiptJournalRef"] | null;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ExpensePostingInput: {
+            category_code?: string;
+            account_code?: string;
+        };
+        EnvelopeExpense: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["Expense"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeExpensePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["Expense"][];
+                /** Format: int64 */
+                total: number;
+                /** Format: int64 */
+                pending: number;
+                amount: string;
+                tax_amount: string;
+                /** Format: int32 */
+                limit: number;
+                /** Format: int32 */
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeReceiptCapture: {
             /** @enum {boolean} */
@@ -24406,6 +24799,395 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeExpenseCategories: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpenseCategoryList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveOfficeExpenseCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseCategoryInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpenseCategory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteOfficeExpenseCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                categoryUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementExpenseCategories: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpenseCategoryList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveEngagementExpenseCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseCategoryInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpenseCategory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteEngagementExpenseCategory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                categoryUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementExpenses: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "pending" | "approved" | "rejected";
+                /** @description Category code; `-` = none chosen */
+                category?: string;
+                /** @description Vendor name / description (contains), receipt number or VKN (exact) */
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpensePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementExpense: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementExpensePosting: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpensePostingInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveEngagementExpense: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `RECORD_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rejectEngagementExpense: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                expenseUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

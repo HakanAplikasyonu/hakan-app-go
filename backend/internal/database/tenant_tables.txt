@@ -63,3 +63,5 @@ report_deliveries engagement
 whatsapp_chat_links engagement
 whatsapp_captures engagement
 report_schedules engagement
+expense_categories
+receipt_postings engagement

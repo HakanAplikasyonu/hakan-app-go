@@ -823,6 +823,24 @@ type Expense struct {
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
+type ExpenseCategory struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Code           string             `json:"code"`
+	Name           string             `json:"name"`
+	AccountCode    string             `json:"account_code"`
+	VatAccountCode string             `json:"vat_account_code"`
+	Deductible     string             `json:"deductible"`
+	ReceiptTypes   []string           `json:"receipt_types"`
+	Keywords       []string           `json:"keywords"`
+	IsActive       bool               `json:"is_active"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ExportBatch struct {
 	ID               int64              `json:"id"`
 	Uuid             uuid.UUID          `json:"uuid"`
@@ -1541,6 +1559,23 @@ type ReceiptCapture struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 	ClientKey      pgtype.Text        `json:"client_key"`
+}
+
+type ReceiptPosting struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	TargetType     string             `json:"target_type"`
+	TargetID       int64              `json:"target_id"`
+	CategoryCode   pgtype.Text        `json:"category_code"`
+	AccountCode    pgtype.Text        `json:"account_code"`
+	AccountSource  pgtype.Text        `json:"account_source"`
+	Confidence     pgtype.Numeric     `json:"confidence"`
+	JournalDraftID pgtype.Int8        `json:"journal_draft_id"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RefreshToken struct {

@@ -165,6 +165,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrNotFound):
 		response.NotFound(w, r, "Receipt or vehicle not found")
+	case incomplete(err):
+		response.Error(w, r, http.StatusUnprocessableEntity, "RECORD_INCOMPLETE", err.Error())
 	case errors.Is(err, usecase.ErrInvalid):
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrConflict):

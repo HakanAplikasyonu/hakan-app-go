@@ -29,6 +29,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/secrets"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
@@ -112,6 +113,7 @@ type Service struct {
 	reader   Reader
 	reviewer Reviewer
 	warnings WarningEngine
+	journals JournalWriter
 	log      *slog.Logger
 }
 
@@ -398,8 +400,15 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	q := s.q.WithTx(tx)
 	switch {
 	case c.ExpenseID.Valid:
-		if _, err := q.SetExpenseApproval(ctx, db.SetExpenseApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.ExpenseID.Int64}); err != nil {
+		e, err := q.SetExpenseApproval(ctx, db.SetExpenseApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.ExpenseID.Int64})
+		if err != nil {
 			return View{}, fmt.Errorf("receipts: approve expense: %w", err)
+		}
+		// #384: the approved expense gets its account and journal draft.
+		if approve {
+			if err := s.postExpense(dbtx.WithTx(ctx, tx), q, sc, e, userID); err != nil {
+				return View{}, err
+			}
 		}
 	case c.RetailSaleID.Valid:
 		if _, err := q.SetRetailSaleApproval(ctx, db.SetRetailSaleApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.RetailSaleID.Int64}); err != nil {

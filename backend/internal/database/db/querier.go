@@ -219,6 +219,7 @@ type Querier interface {
 	DeleteExcelImportTemplate(ctx context.Context, arg DeleteExcelImportTemplateParams) (int64, error)
 	// Rollback: yalnızca bu içe aktarmanın yazdığı fatura (capture_method ile korunur).
 	DeleteExcelImportedInvoice(ctx context.Context, arg DeleteExcelImportedInvoiceParams) (int64, error)
+	DeleteExpenseCategory(ctx context.Context, arg DeleteExpenseCategoryParams) (int64, error)
 	// Yeniden işlemede (ör. kaynak önceliği daha yüksek bir sürüm geldi) satırlar ve özet baştan yazılır.
 	DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceChildrenParams) error
 	DeleteLogPurgeRule(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -376,6 +377,8 @@ type Querier interface {
 	GetExcelImport(ctx context.Context, arg GetExcelImportParams) (ExcelImport, error)
 	GetExcelImportForUpdate(ctx context.Context, arg GetExcelImportForUpdateParams) (ExcelImport, error)
 	GetExpense(ctx context.Context, arg GetExpenseParams) (Expense, error)
+	GetExpenseByUUID(ctx context.Context, arg GetExpenseByUUIDParams) (Expense, error)
+	GetExpenseCategory(ctx context.Context, arg GetExpenseCategoryParams) (ExpenseCategory, error)
 	GetExportBatch(ctx context.Context, arg GetExportBatchParams) (ExportBatch, error)
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
@@ -390,6 +393,7 @@ type Querier interface {
 	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
+	GetJournalDraftByID(ctx context.Context, arg GetJournalDraftByIDParams) (JournalDraft, error)
 	GetJournalDraftIDByUUID(ctx context.Context, arg GetJournalDraftIDByUUIDParams) (int64, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
@@ -443,6 +447,7 @@ type Querier interface {
 	GetReceiptCapture(ctx context.Context, arg GetReceiptCaptureParams) (ReceiptCapture, error)
 	// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 	GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error)
+	GetReceiptPosting(ctx context.Context, arg GetReceiptPostingParams) (ReceiptPosting, error)
 	// Zamanlanmış mükellef raporu (issue #386).
 	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
@@ -698,6 +703,8 @@ type Querier interface {
 	// Atanan ofis üyeleri (hâlâ üye olanlar); atanan yoksa ofis sahipleri.
 	ListEngagementAlertRecipients(ctx context.Context, arg ListEngagementAlertRecipientsParams) ([]int64, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
+	// Ofis panelinde mükellefin masrafları; kategori ve hesap ofis tarafından.
+	ListEngagementExpenses(ctx context.Context, arg ListEngagementExpensesParams) ([]ListEngagementExpensesRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 	// görür (engagement_document_visible, issue #8).
@@ -723,6 +730,10 @@ type Querier interface {
 	// tenant-lint: cross-org ofis görür: kendi şablonları ve global olanlar
 	ListExcelImportTemplates(ctx context.Context, organizationID pgtype.Int8) ([]ExcelImportTemplate, error)
 	ListExcelImports(ctx context.Context, arg ListExcelImportsParams) ([]ExcelImport, error)
+	// Masraf kategorileri, masraf listesi ve fiş muhasebeleştirme (issue #384).
+	// Ofis şablonu (engagement_id NULL) ve mükellefe özel satırlar; @engagement_id
+	// 0 iken yalnızca şablon.
+	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
@@ -804,6 +815,8 @@ type Querier interface {
 	ListPermissionSlugsByRoleSlug(ctx context.Context, slug string) ([]string, error)
 	ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error)
 	ListPetitions(ctx context.Context, arg ListPetitionsParams) ([]ListPetitionsRow, error)
+	// Mizan hafızası: etkin planın verilen ana hesaplar altındaki satırları.
+	ListPlanAccountsForMains(ctx context.Context, arg ListPlanAccountsForMainsParams) ([]ListPlanAccountsForMainsRow, error)
 	ListPlatformNotifications(ctx context.Context, arg ListPlatformNotificationsParams) ([]Notification, error)
 	ListPlatformNotificationsForExport(ctx context.Context, arg ListPlatformNotificationsForExportParams) ([]Notification, error)
 	ListPrivacyAcceptancesForTaxpayer(ctx context.Context, taxpayerID pgtype.Int8) ([]ListPrivacyAcceptancesForTaxpayerRow, error)
@@ -1077,6 +1090,8 @@ type Querier interface {
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
 	SetBillingStatementStatus(ctx context.Context, arg SetBillingStatementStatusParams) (BillingStatement, error)
+	// Masraf ekranından verilen karar fiş yakalama kaydına da yansır.
+	SetCaptureStatusForExpense(ctx context.Context, arg SetCaptureStatusForExpenseParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
@@ -1084,6 +1099,8 @@ type Querier interface {
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
 	SetExpenseApproval(ctx context.Context, arg SetExpenseApprovalParams) (Expense, error)
+	// Ofis masraf ekranından onay / ret (yalnızca bekleyen).
+	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
 	// Entegratör durumu (30 §8) faturaya işlenir.
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
@@ -1091,6 +1108,7 @@ type Querier interface {
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
 	SetPayrollRunJournalDraft(ctx context.Context, arg SetPayrollRunJournalDraftParams) error
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
+	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
 	SetSourceConnectionCapabilities(ctx context.Context, arg SetSourceConnectionCapabilitiesParams) (int64, error)
@@ -1113,6 +1131,7 @@ type Querier interface {
 	// Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
 	// durumları.
 	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
+	SummarizeEngagementExpenses(ctx context.Context, arg SummarizeEngagementExpensesParams) (SummarizeEngagementExpensesRow, error)
 	SummarizeSourceFinancialByCustomer(ctx context.Context, arg SummarizeSourceFinancialByCustomerParams) ([]SummarizeSourceFinancialByCustomerRow, error)
 	SummarizeSourceFinancialByPayment(ctx context.Context, arg SummarizeSourceFinancialByPaymentParams) ([]SummarizeSourceFinancialByPaymentRow, error)
 	// Onaylı masraflar (beyana yalnızca onaylı masraf girer).
@@ -1195,6 +1214,7 @@ type Querier interface {
 	UpsertEntegratorDocument(ctx context.Context, arg UpsertEntegratorDocumentParams) (UpsertEntegratorDocumentRow, error)
 	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
 	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
+	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
@@ -1211,9 +1231,10 @@ type Querier interface {
 	// re-enabled on every registration.
 	UpsertPushDevice(ctx context.Context, arg UpsertPushDeviceParams) (PushDevice, error)
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
+	UpsertReceiptPosting(ctx context.Context, arg UpsertReceiptPostingParams) (ReceiptPosting, error)
+	UpsertReportSchedule(ctx context.Context, arg UpsertReportScheduleParams) (ReportSchedule, error)
 	// Bordrodan gelen tahakkuk; ödeme bilgisi korunur.
 	UpsertSgkAccrual(ctx context.Context, arg UpsertSgkAccrualParams) (SgkPremium, error)
-	UpsertReportSchedule(ctx context.Context, arg UpsertReportScheduleParams) (ReportSchedule, error)
 	// Ön muhasebe programlarından gelen masraflar (#47 Paraşüt): kaynak anahtarıyla
 	// tekil (uq_expenses_source); aynı kayıt tekrar gelirse tutarlar güncellenir.
 	UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpenseParams) (UpsertSourceExpenseRow, error)
@@ -1244,6 +1265,9 @@ type Querier interface {
 	VATForecastLines(ctx context.Context, arg VATForecastLinesParams) ([]VATForecastLinesRow, error)
 	// Plaka mükellefin listesinde ve fiş tarihi geçerlilik aralığında mı (T8).
 	VehicleRegisteredOn(ctx context.Context, arg VehicleRegisteredOnParams) (bool, error)
+	// Satıcı hafızası: bu satıcının (VKN) son onaylı masrafında kullanılan
+	// kategori ve hesap.
+	VendorExpenseMemory(ctx context.Context, arg VendorExpenseMemoryParams) (VendorExpenseMemoryRow, error)
 	WithdrawLegalAcceptancesBySubject(ctx context.Context, subjectUuid pgtype.UUID) (int64, error)
 }
 

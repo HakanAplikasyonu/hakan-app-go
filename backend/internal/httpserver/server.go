@@ -624,6 +624,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")})))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
+	if deps.Storage != nil {
+		// #384: onaylanan masraf / Z raporu yevmiye taslağına dönüşür.
+		receiptsSvc.WithJournals(journalsmodule.New(deps.DB, deps.Storage))
+	}
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
 	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.
