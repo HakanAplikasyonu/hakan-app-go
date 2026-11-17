@@ -40,7 +40,9 @@ import (
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/password"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
 // defaultPassword is for local demo accounts only (the command refuses
@@ -74,6 +76,12 @@ func main() {
 		fatal("database: %v", err)
 	}
 	defer pool.Close()
+
+	if st, err := storage.NewFromConfig(ctx, cfg.Storage); err == nil {
+		seedStore = fallbackStore{primary: st, memory: storage.NewMemory()}
+	} else {
+		fmt.Printf("object store unavailable (%v); demo export files are not stored\n", err)
+	}
 
 	if *reset {
 		if err := dropDemo(ctx, pool); err != nil {
@@ -164,6 +172,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 			// Pending low-confidence receipt fields in the review queue (#318).
 			if err := seedReview(ctx, pool, org.ID, eng.ID, identity.UUID.String()); err != nil {
 				return fmt.Errorf("review queue → %s: %w", tp.Key, err)
+			}
+			// Vouchers, Luca / Zirve exports and their transfers (#391).
+			scope := engagementctx.Scope{ID: eng.ID, OrganizationID: org.ID, TaxpayerID: eng.TaxpayerID}
+			if err := seedJournals(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("journals → %s: %w", tp.Key, err)
 			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)

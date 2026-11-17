@@ -6020,6 +6020,255 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}/transfers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send an export to the accounting program through the desktop agent
+         * @description Requires `tenant.journals.export` (issue #391). Queues a transfer
+         *     (`method: agent_folder`): the office's desktop agent writes the
+         *     export's files to the taxpayer's import folder and reports the
+         *     outcome. Only Luca and Zirve exports (`422 TRANSFER_UNSUPPORTED`);
+         *     an export whose entries were all reversed cannot be sent
+         *     (`422 TRANSFER_REVERSED`). An export has at most one open or
+         *     imported transfer (`409 TRANSFER_EXISTS`). No Luca / Zirve
+         *     credential is needed or stored.
+         */
+        post: operations["createJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Transfers to the accounting program, newest first
+         * @description Requires `tenant.journals.read` (issue #391). The history and error
+         *     screen of the journals page; the desktop agent polls
+         *     `status=queued`.
+         */
+        get: operations["listJournalTransfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One transfer to the accounting program
+         * @description Requires `tenant.journals.read`.
+         */
+        get: operations["getJournalTransfer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/claim": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Desktop agent takes a queued transfer
+         * @description Requires `tenant.agents.write`. The agent (`agent_uuid`, registered
+         *     to the office and not revoked) takes a queued transfer, or one
+         *     another agent claimed more than 15 minutes ago without reporting.
+         */
+        post: operations["claimJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/delivery": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Desktop agent reports the outcome
+         * @description Requires `tenant.agents.write`. Only the agent that claimed the
+         *     transfer reports. `delivered` lists the files written to the folder
+         *     (name, SHA-256, size); `failed` gives an error code and a Turkish
+         *     message shown on the journals page.
+         */
+        post: operations["deliverJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/complete": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a delivered transfer
+         * @description Requires `tenant.journals.export`. The user imported the files in
+         *     the program (`imported`) or the program rejected them (`failed`,
+         *     with the program's message).
+         */
+        post: operations["completeJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/cancel": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an open transfer
+         * @description Requires `tenant.journals.export`. Queued, claimed or delivered
+         *     transfers only.
+         */
+        post: operations["cancelJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/retry": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a failed or cancelled transfer's export again
+         * @description Requires `tenant.journals.export`. Opens a new queued transfer for
+         *     the same export; the old one stays in the history.
+         */
+        post: operations["retryJournalTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/privacy-requests": {
         parameters: {
             query?: never;
@@ -12100,6 +12349,94 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["JournalExportDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /** @enum {string} */
+        JournalTransferStatus: "queued" | "claimed" | "delivered" | "imported" | "failed" | "cancelled";
+        JournalTransferInput: {
+            /**
+             * @default agent_folder
+             * @enum {string}
+             */
+            method: "agent_folder";
+        };
+        JournalTransferClaimInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+        };
+        JournalTransferFile: {
+            name: string;
+            sha256: string;
+            /** Format: int64 */
+            size: number;
+        };
+        JournalTransferDeliveryInput: {
+            /** Format: uuid */
+            agent_uuid: string;
+            /** @enum {string} */
+            outcome: "delivered" | "failed";
+            files?: components["schemas"]["JournalTransferFile"][];
+            /** @description Folder name shown to the user (not the full path) */
+            folder_label?: string;
+            /** @example FOLDER_MISSING */
+            error_code?: string;
+            error_message?: string;
+        };
+        JournalTransferCompleteInput: {
+            /** @enum {string} */
+            outcome: "imported" | "failed";
+            /** @description Required for failed; the program's error message */
+            message?: string;
+        };
+        JournalTransfer: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            batch_uuid: string;
+            period?: string;
+            /** @example luca */
+            driver: string;
+            /** @enum {string} */
+            method: "agent_folder";
+            status: components["schemas"]["JournalTransferStatus"];
+            agent?: {
+                /** Format: uuid */
+                uuid: string;
+                name: string;
+            };
+            files: components["schemas"]["ExportFile"][];
+            delivered_files: components["schemas"]["JournalTransferFile"][];
+            folder_label?: string;
+            error_code?: string;
+            error_message?: string;
+            /** Format: date-time */
+            claimed_at?: string;
+            /** Format: date-time */
+            delivered_at?: string;
+            /** Format: date-time */
+            completed_at?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        JournalTransferPage: {
+            items: components["schemas"]["JournalTransfer"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EnvelopeJournalTransfer: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalTransfer"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeJournalTransferPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalTransferPage"];
             meta: components["schemas"]["ResponseMeta"];
         };
         PrivacyRequestInput: {
@@ -22988,6 +23325,374 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                batchUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JournalTransferInput"];
+            };
+        };
+        responses: {
+            /** @description Transfer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The export already has an open or imported transfer (`TRANSFER_EXISTS`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a Luca / Zirve export (`TRANSFER_UNSUPPORTED`) or every entry reversed (`TRANSFER_REVERSED`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listJournalTransfers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["JournalTransferStatus"];
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transfers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransferPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    claimJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JournalTransferClaimInput"];
+            };
+        };
+        responses: {
+            /** @description Transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The transfer is not in a state that allows this (`TRANSFER_STATE`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The desktop agent is unknown or revoked (`AGENT_UNKNOWN`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deliverJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JournalTransferDeliveryInput"];
+            };
+        };
+        responses: {
+            /** @description Transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The transfer is not in a state that allows this (`TRANSFER_STATE`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The desktop agent is unknown or revoked (`AGENT_UNKNOWN`) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    completeJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JournalTransferCompleteInput"];
+            };
+        };
+        responses: {
+            /** @description Transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The transfer is not in a state that allows this (`TRANSFER_STATE`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transfer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The transfer is not in a state that allows this (`TRANSFER_STATE`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    retryJournalTransfer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transferUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transfer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalTransfer"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The transfer is not in a state that allows this (`TRANSFER_STATE`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
