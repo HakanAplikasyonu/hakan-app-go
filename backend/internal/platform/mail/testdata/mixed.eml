@@ -1,0 +1,40 @@
+From: "Bildirim Merkezi" <noreply@posta.example.com>
+To: muhasebe@ornek.com.tr
+Reply-To: =?utf-8?q?=C3=96rnek_M=C3=BC=C5=9Favirlik?= <ofis@ornek.com.tr>
+Subject: Ekim 2026 raporu
+Date: Tue, 17 Nov 2026 09:30:00 +0300
+Message-ID: <0123456789abcdef@posta.example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="sinir-0-0123456789"
+
+--sinir-0-0123456789
+Content-Type: multipart/alternative; boundary="sinir-1-0123456789"
+
+--sinir-1-0123456789
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset=UTF-8
+
+Merhaba Ay=C5=9Fe,
+
+Giri=C5=9F kodunuz: 482913
+Kod 10 dakika ge=C3=A7erlidir.
+
+--sinir-1-0123456789
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html><html lang=3D"tr"><body><p>Merhaba Ay=C5=9Fe,</p><p>Giri=C5=
+=9F kodunuz: <strong>482913</strong></p></body></html>
+--sinir-1-0123456789--
+
+--sinir-0-0123456789
+Content-Disposition: attachment; filename*=utf-8''rapor-ekim-2026-%C5%9Firket.pdf
+Content-Transfer-Encoding: base64
+Content-Type: application/pdf; name*=utf-8''rapor-ekim-2026-%C5%9Firket.pdf
+
+JVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFw
+b3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQg
+cmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0xLjQgcmFwb3IgJVBERi0x
+LjQgcmFwb3Ig
+
+--sinir-0-0123456789--

@@ -1,18 +1,14 @@
 package mail
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"fmt"
-	"mime"
-	"mime/multipart"
 	"net"
 	"net/smtp"
-	"net/textproto"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
@@ -25,8 +21,20 @@ const defaultTimeout = 10 * time.Second
 type Message struct {
 	To      []string
 	Subject string
-	Body    string
-	// Attachments are sent as multipart/mixed parts after the text body
+	// Body is the text/plain part. It is written to be read as is (not
+	// derived from HTML): every message carries it.
+	Body string
+	// HTML is the optional text/html alternative (see package mailtpl).
+	// When set, the message is multipart/alternative.
+	HTML string
+	// ReplyTo overrides the configured MAIL_REPLY_TO (e.g. the office that
+	// sent a letter).
+	ReplyTo string
+	// ListUnsubscribe is the one-click unsubscribe URL of a notification
+	// email (RFC 2369 / RFC 8058). Empty for transactional mail: sign-in
+	// codes, invitations, letters.
+	ListUnsubscribe string
+	// Attachments are sent as multipart/mixed parts after the readable body
 	// (issue #386: the taxpayer report PDF).
 	Attachments []Attachment
 }
@@ -52,6 +60,7 @@ type SMTPSender struct {
 	password string
 	from     string
 	fromName string
+	replyTo  string
 	timeout  time.Duration
 	// tlsMode is one of auto|starttls|implicit|none (see config.SMTPConfig).
 	tlsMode  string
@@ -75,59 +84,37 @@ func NewSMTPSender(cfg config.SMTPConfig) *SMTPSender {
 		password: cfg.Password,
 		from:     cfg.From,
 		fromName: cfg.FromName,
+		replyTo:  cfg.ReplyTo,
 		timeout:  timeout,
 		tlsMode:  mode,
 		insecure: cfg.TLSInsecureSkipVerify,
 	}
 }
 
-// Send delivers a plain-text email.
+// Send composes msg (see Compose) and delivers it.
 func (s *SMTPSender) Send(ctx context.Context, msg Message) error {
 	if s == nil {
 		return fmt.Errorf("mail: sender is nil")
 	}
-	if len(msg.To) == 0 {
-		return fmt.Errorf("mail: recipient required")
+	payload, err := Compose(msg, s.options())
+	if err != nil {
+		return err
 	}
-	from := s.from
-	if from == "" {
-		from = "noreply@localhost"
-	}
-	fromHeader := from
-	if s.fromName != "" {
-		fromHeader = fmt.Sprintf("%s <%s>", s.fromName, from)
-	}
-	// Header values must not carry CR/LF: subjects interpolate user-chosen
-	// names and a newline would inject extra headers (Bcc, etc.).
-	for _, to := range msg.To {
-		if strings.ContainsAny(to, "\r\n") {
-			return fmt.Errorf("mail: invalid recipient")
-		}
-	}
-	subject := mime.QEncoding.Encode("utf-8", stripHeaderBreaks(msg.Subject))
-	payload := strings.Builder{}
-	payload.WriteString("From: ")
-	payload.WriteString(fromHeader)
-	payload.WriteString("\r\n")
-	payload.WriteString("To: ")
-	payload.WriteString(strings.Join(msg.To, ", "))
-	payload.WriteString("\r\n")
-	payload.WriteString("Subject: ")
-	payload.WriteString(subject)
-	payload.WriteString("\r\n")
-	payload.WriteString("MIME-Version: 1.0\r\n")
-	if len(msg.Attachments) == 0 {
-		payload.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-		payload.WriteString("\r\n")
-		payload.WriteString(msg.Body)
-	} else if err := writeMultipart(&payload, msg); err != nil {
-		return fmt.Errorf("mail: %w", err)
-	}
-
-	if err := s.deliver(ctx, from, msg.To, []byte(payload.String())); err != nil {
+	if err := s.deliver(ctx, s.envelopeFrom(), msg.To, payload); err != nil {
 		return fmt.Errorf("mail: send: %w", err)
 	}
 	return nil
+}
+
+func (s *SMTPSender) envelopeFrom() string {
+	if s.from == "" {
+		return "noreply@localhost"
+	}
+	return s.from
+}
+
+func (s *SMTPSender) options() ComposeOptions {
+	return ComposeOptions{From: s.envelopeFrom(), FromName: s.fromName, ReplyTo: s.replyTo}
 }
 
 // deliver opens an SMTP connection (with timeout and the configured transport
@@ -231,61 +218,6 @@ func (s *SMTPSender) deliver(ctx context.Context, from string, to []string, payl
 	return nil
 }
 
-// writeMultipart writes a multipart/mixed body: the text part, then each
-// attachment base64-encoded in 76-character lines.
-func writeMultipart(b *strings.Builder, msg Message) error {
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-	b.WriteString("Content-Type: multipart/mixed; boundary=\"" + w.Boundary() + "\"\r\n\r\n")
-	text, err := w.CreatePart(textproto.MIMEHeader{
-		"Content-Type":              {"text/plain; charset=UTF-8"},
-		"Content-Transfer-Encoding": {"8bit"},
-	})
-	if err != nil {
-		return err
-	}
-	if _, err := text.Write([]byte(msg.Body)); err != nil {
-		return err
-	}
-	for _, a := range msg.Attachments {
-		ct := a.ContentType
-		if ct == "" {
-			ct = "application/octet-stream"
-		}
-		name := stripHeaderBreaks(a.Name)
-		if name == "" {
-			name = "attachment"
-		}
-		disp := mime.FormatMediaType("attachment", map[string]string{"filename": name})
-		if disp == "" {
-			disp = `attachment; filename="attachment"`
-		}
-		part, err := w.CreatePart(textproto.MIMEHeader{
-			"Content-Type":              {mime.FormatMediaType(ct, map[string]string{"name": name})},
-			"Content-Disposition":       {disp},
-			"Content-Transfer-Encoding": {"base64"},
-		})
-		if err != nil {
-			return err
-		}
-		enc := base64.StdEncoding.EncodeToString(a.Data)
-		for len(enc) > 76 {
-			if _, err := part.Write([]byte(enc[:76] + "\r\n")); err != nil {
-				return err
-			}
-			enc = enc[76:]
-		}
-		if _, err := part.Write([]byte(enc + "\r\n")); err != nil {
-			return err
-		}
-	}
-	if err := w.Close(); err != nil {
-		return err
-	}
-	b.Write(buf.Bytes())
-	return nil
-}
-
 func stripHeaderBreaks(v string) string {
 	return strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ").Replace(v)
 }
@@ -296,7 +228,36 @@ type NoopSender struct{}
 // Send implements Sender.
 func (NoopSender) Send(context.Context, Message) error { return nil }
 
+// Recorder keeps every message in memory instead of sending it: tests and
+// the template preview use it so nothing reaches a real mailbox.
+type Recorder struct {
+	mu   sync.Mutex
+	sent []Message
+}
+
+// Send implements Sender.
+func (r *Recorder) Send(_ context.Context, msg Message) error {
+	if len(msg.To) == 0 {
+		return fmt.Errorf("mail: recipient required")
+	}
+	if _, err := Compose(msg, ComposeOptions{}); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sent = append(r.sent, msg)
+	return nil
+}
+
+// Sent returns a copy of the recorded messages, oldest first.
+func (r *Recorder) Sent() []Message {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]Message(nil), r.sent...)
+}
+
 var (
 	_ Sender = (*SMTPSender)(nil)
 	_ Sender = NoopSender{}
+	_ Sender = (*Recorder)(nil)
 )
