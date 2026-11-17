@@ -47,6 +47,8 @@ tags:
     description: Mükellef belge arşivi ve İSG evrakları (#393)
   - name: Privacy
     description: KVKK veri sahibi talepleri (#193)
+  - name: Reconciliation
+    description: Mutabakat, mizan – kaynak ve cari mutabakat (#389)
   - name: Billing
     description: Ofis faturalama (D9, D14)
   - name: Sources
@@ -10443,6 +10445,222 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/runs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reconciliation]
+      operationId: listReconciliationRuns
+      summary: Reconciliation runs
+      description: |
+        Requires `tenant.reconciliation.read` (#389). Newest period first, then newest run; at most 100. `period` narrows to one month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/ReconciliationRun" } }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Reconciliation]
+      operationId: runReconciliation
+      summary: Compare the period's trial balance with the sources
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Takes the newest trial balance (mizan) with amounts uploaded for `period`
+        (or `trial_balance_uuid`) and compares it per main account (3 digits) with the journal draft lines of the portal's sources
+        (invoices, bank, expenses, Z reports, payroll, manual entries).
+
+        - **Ledger side:** the trial balance's leaf totals. When a trial balance of an earlier month of the same year exists, its totals
+          are subtracted (the movement since then) and the sources are read from the month after it; otherwise both sides run from January
+          (`summary.cumulative`: the opening entry is in the ledger only).
+        - **Sources:** journal draft lines of the window's `mahsup` drafts. When the export settings say invoices reach the accounting program
+          directly, invoices that are in no draft count as sources (120 / 600 / 391, 191 / 320).
+        - **Missing entries:** source records in no journal draft (bank movements, invoices, expenses, Z reports, payroll runs), with what each
+          would post per account.
+        - **Explanation:** a rule based suggestion per difference (drafts not exported, unposted records, a single record, rounding, opening
+          balance, missing source, not exported, timing).
+        - `summary.bank`: the trial balance's 102 balance against the bank statements' last closing balances (TRY).
+
+        Decisions and notes of the period's previous run carry over to an account whose difference did not change.
+        `422 RECONCILIATION_NO_TRIAL_BALANCE` when the period has no trial balance with amounts.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period]
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+                trial_balance_uuid: { type: [string, "null"], format: uuid }
+                tolerance: { type: [string, "null"], description: "TL; a difference up to it counts as none (default 1)", example: "1.00" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationRunDetail" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`RECONCILIATION_NO_TRIAL_BALANCE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: runRef, in: path, required: true, description: "`latest` or a run uuid", schema: { type: string, example: latest } }
+    get:
+      tags: [Reconciliation]
+      operationId: getReconciliationRun
+      summary: A reconciliation run with its account items
+      description: |
+        Requires `tenant.reconciliation.read` (#389). `latest` is the newest run (of `period` when given). Items are sorted by main account.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationRunDetail" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: itemUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Reconciliation]
+      operationId: decideReconciliationItem
+      summary: Decide an account difference
+      description: |
+        Requires `tenant.reconciliation.write` (#389). `explained` needs a note. Refused (409 `RECONCILIATION_IN_REVIEW`) while the item's
+        suggestion waits in the review queue.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [open, explained, resolved, ignored] }
+                note: { type: [string, "null"], maxLength: 2000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationItem" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}/review:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: itemUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Reconciliation]
+      operationId: sendReconciliationItemToReview
+      summary: Send an account difference to the review queue
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Submits a `reconciliation` suggestion (#14) whose value is
+        `{"status":"resolved","note":…}`: the note given here, else the engine's explanation. Accepting it in the queue resolves the item with
+        the note; rejecting reopens it; reverting puts the previous status back. The confidence is capped at 0.50 so a person decides.
+        409 `RECONCILIATION_NO_DIFFERENCE` for a matched account, 409 `RECONCILIATION_IN_REVIEW` when a suggestion is already pending.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: [string, "null"], maxLength: 2000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationItem" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`RECONCILIATION_UNAVAILABLE`: the review queue is not configured"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /v1/tenant/engagements/{engagementUuid}/journal-export-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22124,3 +22342,130 @@ components:
             limit: { type: integer }
             offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ReconciliationKindCount:
+      type: object
+      required: [count, amount]
+      properties:
+        count: { type: integer }
+        amount: { type: string, example: "1500.00" }
+    ReconciliationSummary:
+      type: object
+      required: [accounts, matched, differences, missing_in_ledger, missing_in_sources, difference_total, unposted_count, unposted, cumulative, invoices_direct, bank, counterparties, counterparty_differences, babs_issues]
+      properties:
+        accounts: { type: integer }
+        matched: { type: integer }
+        differences: { type: integer }
+        missing_in_ledger: { type: integer }
+        missing_in_sources: { type: integer }
+        difference_total: { type: string, description: "Sum of the absolute differences (TL)" }
+        unposted_count: { type: integer }
+        unposted:
+          type: object
+          description: "Unposted source records by kind (invoice, bank, expense, zreport, payroll)"
+          additionalProperties: { $ref: "#/components/schemas/ReconciliationKindCount" }
+        cumulative: { type: boolean, description: "No earlier trial balance of the year: compared from January" }
+        invoices_direct: { type: boolean, description: "Invoices reach the accounting program directly (export settings)" }
+        bank:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [ledger_balance, statement_balance, difference, accounts, matched]
+              properties:
+                ledger_balance: { type: string }
+                statement_balance: { type: string }
+                difference: { type: string }
+                accounts: { type: integer }
+                matched: { type: boolean }
+        counterparties: { type: integer }
+        counterparty_differences: { type: integer }
+        babs_issues: { type: integer }
+    ReconciliationRun:
+      type: object
+      required: [uuid, period, window_from, window_to, tolerance, trial_balance, summary, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string, example: "2026-10" }
+        window_from: { type: string, example: "2026-10" }
+        window_to: { type: string, example: "2026-10" }
+        tolerance: { type: string, example: "1.00" }
+        trial_balance:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [uuid, file_name]
+              properties:
+                uuid: { type: string, format: uuid }
+                file_name: { type: string }
+        summary: { $ref: "#/components/schemas/ReconciliationSummary" }
+        created_at: { type: string, format: date-time }
+    ReconciliationItem:
+      type: object
+      required: [uuid, main_code, account_name, ledger_debit, ledger_credit, ledger_net, source_debit, source_credit, source_net, difference, result, status, sources, unposted, sub_accounts, suggestion, suggestion_code, suggestion_confidence, note, review, decided_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        main_code: { type: string, example: "102" }
+        account_name: { type: string }
+        ledger_debit: { type: string }
+        ledger_credit: { type: string }
+        ledger_net: { type: string }
+        source_debit: { type: string }
+        source_credit: { type: string }
+        source_net: { type: string }
+        difference: { type: string, description: "ledger_net − source_net" }
+        result: { type: string, enum: [matched, difference, missing_in_ledger, missing_in_sources] }
+        status: { type: string, enum: [open, explained, in_review, resolved, ignored] }
+        sources:
+          type: array
+          items:
+            type: object
+            required: [kind, debit, credit, lines, draft_net]
+            properties:
+              kind: { type: string, enum: [invoice, bank, expense, zreport, payroll, manual] }
+              debit: { type: string }
+              credit: { type: string }
+              lines: { type: integer }
+              draft_net: { type: string, description: "Net of lines whose draft is not approved yet" }
+        unposted:
+          type: array
+          description: Source records in no journal draft that would post to the account (at most 50)
+          items:
+            type: object
+            required: [kind, id, date, label, amount, effect]
+            properties:
+              kind: { type: string, enum: [invoice, bank, expense, zreport, payroll] }
+              id: { type: string, description: "The record's uuid" }
+              date: { type: string }
+              label: { type: string }
+              amount: { type: string }
+              effect: { type: string, description: "debit − credit on this account" }
+        sub_accounts:
+          type: array
+          items:
+            type: object
+            required: [code, name, ledger_net, source_net]
+            properties:
+              code: { type: string }
+              name: { type: string }
+              ledger_net: { type: string }
+              source_net: { type: string }
+        suggestion: { type: [string, "null"] }
+        suggestion_code:
+          type: [string, "null"]
+          enum: [draft_not_exported, unposted_sources, single_unposted, rounding, opening_balance, missing_source, not_in_ledger, timing_or_missing_document, null]
+        suggestion_confidence: { type: [string, "null"] }
+        note: { type: [string, "null"] }
+        review:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [uuid, status]
+              properties:
+                uuid: { type: string, format: uuid }
+                status: { type: string }
+        decided_at: { type: [string, "null"], format: date-time }
+    ReconciliationRunDetail:
+      type: object
+      required: [run, items]
+      properties:
+        run: { $ref: "#/components/schemas/ReconciliationRun" }
+        items: { type: array, items: { $ref: "#/components/schemas/ReconciliationItem" } }

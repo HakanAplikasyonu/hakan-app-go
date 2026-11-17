@@ -67,3 +67,8 @@ report_schedules engagement
 expense_categories
 receipt_postings engagement
 copilot_plans
+reconciliation_runs engagement
+reconciliation_items engagement
+counterparty_reconciliations engagement
+babs_declarations engagement
+reconciliation_letters engagement

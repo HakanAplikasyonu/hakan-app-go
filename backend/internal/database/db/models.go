@@ -207,6 +207,24 @@ type AuthSetting struct {
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BabsDeclaration struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Period            string             `json:"period"`
+	FormType          string             `json:"form_type"`
+	CounterpartyTaxID string             `json:"counterparty_tax_id"`
+	CounterpartyName  string             `json:"counterparty_name"`
+	DocumentCount     int32              `json:"document_count"`
+	Amount            pgtype.Numeric     `json:"amount"`
+	Source            string             `json:"source"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankBalanceSnapshot struct {
 	ID                  int64              `json:"id"`
 	TaxpayerID          int64              `json:"taxpayer_id"`
@@ -548,6 +566,38 @@ type CounterpartyAccount struct {
 	DecidedBy         pgtype.Int8        `json:"decided_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CounterpartyReconciliation struct {
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	OrganizationID     int64              `json:"organization_id"`
+	EngagementID       int64              `json:"engagement_id"`
+	RunID              int64              `json:"run_id"`
+	CounterpartyTaxID  string             `json:"counterparty_tax_id"`
+	CounterpartyName   string             `json:"counterparty_name"`
+	AccountCode        pgtype.Text        `json:"account_code"`
+	LedgerBalance      pgtype.Numeric     `json:"ledger_balance"`
+	SourceBalance      pgtype.Numeric     `json:"source_balance"`
+	Difference         pgtype.Numeric     `json:"difference"`
+	Result             string             `json:"result"`
+	BaAmount           pgtype.Numeric     `json:"ba_amount"`
+	BaCount            int32              `json:"ba_count"`
+	BsAmount           pgtype.Numeric     `json:"bs_amount"`
+	BsCount            int32              `json:"bs_count"`
+	DeclaredBaAmount   pgtype.Numeric     `json:"declared_ba_amount"`
+	DeclaredBaCount    pgtype.Int4        `json:"declared_ba_count"`
+	DeclaredBsAmount   pgtype.Numeric     `json:"declared_bs_amount"`
+	DeclaredBsCount    pgtype.Int4        `json:"declared_bs_count"`
+	BaResult           string             `json:"ba_result"`
+	BsResult           string             `json:"bs_result"`
+	Status             string             `json:"status"`
+	Note               pgtype.Text        `json:"note"`
+	ReviewSuggestionID pgtype.Int8        `json:"review_suggestion_id"`
+	DecidedBy          pgtype.Int8        `json:"decided_by"`
+	DecidedAt          pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Customer struct {
@@ -1593,6 +1643,85 @@ type ReceiptPosting struct {
 	DecidedBy      pgtype.Int8        `json:"decided_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReconciliationItem struct {
+	ID                   int64              `json:"id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	OrganizationID       int64              `json:"organization_id"`
+	EngagementID         int64              `json:"engagement_id"`
+	RunID                int64              `json:"run_id"`
+	MainCode             string             `json:"main_code"`
+	AccountName          string             `json:"account_name"`
+	LedgerDebit          pgtype.Numeric     `json:"ledger_debit"`
+	LedgerCredit         pgtype.Numeric     `json:"ledger_credit"`
+	SourceDebit          pgtype.Numeric     `json:"source_debit"`
+	SourceCredit         pgtype.Numeric     `json:"source_credit"`
+	Difference           pgtype.Numeric     `json:"difference"`
+	Result               string             `json:"result"`
+	Status               string             `json:"status"`
+	Sources              []byte             `json:"sources"`
+	Unposted             []byte             `json:"unposted"`
+	SubAccounts          []byte             `json:"sub_accounts"`
+	Suggestion           pgtype.Text        `json:"suggestion"`
+	SuggestionCode       pgtype.Text        `json:"suggestion_code"`
+	SuggestionConfidence pgtype.Numeric     `json:"suggestion_confidence"`
+	Note                 pgtype.Text        `json:"note"`
+	ReviewSuggestionID   pgtype.Int8        `json:"review_suggestion_id"`
+	DecidedBy            pgtype.Int8        `json:"decided_by"`
+	DecidedAt            pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReconciliationLetter struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	CounterpartyTaxID string             `json:"counterparty_tax_id"`
+	CounterpartyName  string             `json:"counterparty_name"`
+	RecipientEmail    pgtype.Text        `json:"recipient_email"`
+	AccountCode       pgtype.Text        `json:"account_code"`
+	AsOfDate          pgtype.Date        `json:"as_of_date"`
+	Balance           pgtype.Numeric     `json:"balance"`
+	Currency          string             `json:"currency"`
+	Snapshot          []byte             `json:"snapshot"`
+	Status            string             `json:"status"`
+	TokenDigest       pgtype.Text        `json:"token_digest"`
+	TokenExpiresAt    pgtype.Timestamptz `json:"token_expires_at"`
+	Attempts          int32              `json:"attempts"`
+	NextAttemptAt     pgtype.Timestamptz `json:"next_attempt_at"`
+	LastError         pgtype.Text        `json:"last_error"`
+	SentAt            pgtype.Timestamptz `json:"sent_at"`
+	Response          pgtype.Text        `json:"response"`
+	ResponseBalance   pgtype.Numeric     `json:"response_balance"`
+	ResponseNote      pgtype.Text        `json:"response_note"`
+	ResponderName     pgtype.Text        `json:"responder_name"`
+	ResponseChannel   pgtype.Text        `json:"response_channel"`
+	RespondedAt       pgtype.Timestamptz `json:"responded_at"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ReconciliationRun struct {
+	ID                   int64              `json:"id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	OrganizationID       int64              `json:"organization_id"`
+	EngagementID         int64              `json:"engagement_id"`
+	TaxpayerID           int64              `json:"taxpayer_id"`
+	Period               string             `json:"period"`
+	TrialBalanceImportID pgtype.Int8        `json:"trial_balance_import_id"`
+	PreviousImportID     pgtype.Int8        `json:"previous_import_id"`
+	WindowFrom           string             `json:"window_from"`
+	WindowTo             string             `json:"window_to"`
+	Tolerance            pgtype.Numeric     `json:"tolerance"`
+	Summary              []byte             `json:"summary"`
+	CreatedBy            pgtype.Int8        `json:"created_by"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RefreshToken struct {

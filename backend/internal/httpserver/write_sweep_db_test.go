@@ -232,6 +232,9 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}/journal-draft":           {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/bank-match":                             {body: `{"period":"2026-10"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums":                           {body: `{"period":"2026-09","accrual_amount":"1000.00"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/runs":                            {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}/review":         {body: `{"note":"Tarama incelemesi"}`, late: true},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}":               {body: `{"status":"explained","note":"Tarama açıklaması"}`, late: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/{premiumUuid}":            {body: `{"paid_amount":"1000.00","paid_at":"2026-10-28"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/documents":                              {file: "file", fileName: "bordro.pdf", fileBody: "%PDF-1.4\n% bordro taramasi\n"},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}":             {last: true},
@@ -638,6 +641,7 @@ var paramQueries = map[string]string{
 	"linkUuid":            `SELECT uuid::text FROM whatsapp_chat_links WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"captureUuid":         `SELECT uuid::text FROM whatsapp_captures WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"archiveDocumentUuid": `SELECT uuid::text FROM taxpayer_documents WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
+	"itemUuid":            `SELECT uuid::text FROM reconciliation_items WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 AND result <> 'matched' ORDER BY id DESC LIMIT 1`,
 }
 
 // uuidQueries fill {uuid} by the operation's path.

@@ -471,6 +471,9 @@ type Querier interface {
 	// Mükellef yüklemesinin tekrarı (#199): aynı Idempotency-Key ilk kaydı döner.
 	GetReceiptCaptureByClientKey(ctx context.Context, arg GetReceiptCaptureByClientKeyParams) (ReceiptCapture, error)
 	GetReceiptPosting(ctx context.Context, arg GetReceiptPostingParams) (ReceiptPosting, error)
+	GetReconciliationItem(ctx context.Context, arg GetReconciliationItemParams) (GetReconciliationItemRow, error)
+	GetReconciliationItemByID(ctx context.Context, arg GetReconciliationItemByIDParams) (ReconciliationItem, error)
+	GetReconciliationRun(ctx context.Context, arg GetReconciliationRunParams) (GetReconciliationRunRow, error)
 	// Zamanlanmış mükellef raporu (issue #386).
 	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
@@ -602,6 +605,9 @@ type Querier interface {
 	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
+	// rows: [{"main_code","account_name","ledger_debit",...,"status","note"}]
+	InsertReconciliationItems(ctx context.Context, arg InsertReconciliationItemsParams) (int64, error)
+	InsertReconciliationRun(ctx context.Context, arg InsertReconciliationRunParams) (ReconciliationRun, error)
 	// Mükellef raporu gönderimleri (issue #386).
 	InsertReportDelivery(ctx context.Context, arg InsertReportDeliveryParams) (ReportDelivery, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
@@ -632,6 +638,8 @@ type Querier interface {
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
+	// Dönemin en son çalıştırması (önceki karar ve notları taşımak için).
+	LatestReconciliationRun(ctx context.Context, arg LatestReconciliationRunParams) (ReconciliationRun, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
 	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
@@ -872,6 +880,9 @@ type Querier interface {
 	ListPrivacyTaxpayerMembers(ctx context.Context, taxpayerID int64) ([]ListPrivacyTaxpayerMembersRow, error)
 	ListPushSubscriptionsByUser(ctx context.Context, userID int64) ([]PushSubscription, error)
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
+	// Bir çalıştırmanın kalemleri; inceleme kuyruğundaki önerinin durumuyla.
+	ListReconciliationItems(ctx context.Context, arg ListReconciliationItemsParams) ([]ListReconciliationItemsRow, error)
+	ListReconciliationRuns(ctx context.Context, arg ListReconciliationRunsParams) ([]ListReconciliationRunsRow, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
@@ -1065,6 +1076,25 @@ type Querier interface {
 	// çeker ve son bildirim zamanını yazar.
 	PullSourceConnectionNow(ctx context.Context, arg PullSourceConnectionNowParams) (int64, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	// Her banka hesabının (cash box) dönem sonuna kadarki son hareketinin
+	// bakiyesi; bakiyesi okunmamış hesap sayılmaz.
+	ReconciliationBankClosingBalances(ctx context.Context, arg ReconciliationBankClosingBalancesParams) ([]ReconciliationBankClosingBalancesRow, error)
+	// Mutabakat (#389): mizan – kaynak çifte mutabakatı. Çalıştırma, kalem ve
+	// cari tabloları engagement kapsamlı (tenant_tables.txt); kaynak tablolar
+	// (fatura, banka, masraf, Z, bordro) mükellef kapsamlı.
+	// Dönem aralığındaki mahsup fişlerinin satır toplamları; hesap, kaynak türü
+	// ve taslak (aktarılmamış) olup olmadığına göre.
+	ReconciliationJournalTotals(ctx context.Context, arg ReconciliationJournalTotalsParams) ([]ReconciliationJournalTotalsRow, error)
+	// Fişe girmemiş banka hareketleri (iptal edilenler hariç).
+	ReconciliationUnpostedBank(ctx context.Context, arg ReconciliationUnpostedBankParams) ([]ReconciliationUnpostedBankRow, error)
+	// Reddedilmemiş, yevmiye taslağı olmayan masraflar (Z raporu değil).
+	ReconciliationUnpostedExpenses(ctx context.Context, arg ReconciliationUnpostedExpensesParams) ([]ReconciliationUnpostedExpensesRow, error)
+	// Fişe girmemiş (ne faturanın ne kaleminin satırı olan) etkin faturalar.
+	ReconciliationUnpostedInvoices(ctx context.Context, arg ReconciliationUnpostedInvoicesParams) ([]ReconciliationUnpostedInvoicesRow, error)
+	// Fiş taslağı olmayan bordrolar.
+	ReconciliationUnpostedPayrollRuns(ctx context.Context, arg ReconciliationUnpostedPayrollRunsParams) ([]ReconciliationUnpostedPayrollRunsRow, error)
+	// Reddedilmemiş, yevmiye taslağı olmayan Z raporları.
+	ReconciliationUnpostedRetailSales(ctx context.Context, arg ReconciliationUnpostedRetailSalesParams) ([]ReconciliationUnpostedRetailSalesRow, error)
 	// Access tokens of an ended (or unknown) session are refused (#323).
 	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
@@ -1164,6 +1194,7 @@ type Querier interface {
 	SetPayrollRunJournalDraft(ctx context.Context, arg SetPayrollRunJournalDraftParams) error
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
+	SetReconciliationItemReview(ctx context.Context, arg SetReconciliationItemReviewParams) error
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	// Z raporu yönetimi (issue #384): KDV / ödeme kırılımı, ÖKC bazında liste,
 	// süreklilik denetimi, onay ve satış fişi.
@@ -1235,6 +1266,7 @@ type Querier interface {
 	UpdateOrganizationMemberRole(ctx context.Context, arg UpdateOrganizationMemberRoleParams) (OrganizationMember, error)
 	UpdateOrganizationRole(ctx context.Context, arg UpdateOrganizationRoleParams) (Role, error)
 	UpdatePeriodSummaryBody(ctx context.Context, arg UpdatePeriodSummaryBodyParams) (PeriodSummary, error)
+	UpdateReconciliationItemDecision(ctx context.Context, arg UpdateReconciliationItemDecisionParams) (ReconciliationItem, error)
 	UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSaleFieldParams) (RetailSale, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateSgkPremium(ctx context.Context, arg UpdateSgkPremiumParams) (SgkPremium, error)

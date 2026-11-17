@@ -98,6 +98,7 @@ import (
 	receiptshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/handler"
 	receiptsreviewlink "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/reviewlink"
 	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
+	reconciliationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reconciliation"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
@@ -606,7 +607,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).
 		Register(bankmatching.SuggestionKind, bankmatching.Applier{}).
 		Register(bankposting.SuggestionKind, bankposting.Applier{}).
-		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{})
+		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{}).
+		Register(reconciliationmodule.SuggestionKind, reconciliationmodule.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
 	// Hesap kodu önerileri (#25); yükleme sonrası kendiliğinden (#319).
 	accountRulesSvc := accountrulesusecase.New(accountrulesrepository.New(deps.DB, deps.Queries), reviewSvc)
@@ -649,6 +651,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore)))
+	// Mutabakat (#389): mizan – kaynak çifte mutabakatı ve cari mutabakat.
+	reconciliationmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		reconciliationmodule.NewHandler(reconciliationmodule.New(database.Ambient{Pool: deps.DB}, reviewSvc)))
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),
