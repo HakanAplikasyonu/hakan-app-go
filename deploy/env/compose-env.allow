@@ -29,4 +29,5 @@ SA_PASSWORD | omit | one-off input to cmd/create-super-admin, passed at exec tim
 TESTDB_REQUIRED | omit | yalnızca testler (internal/testdb): CI'da veritabanı testlerinin atlanmasını engeller, üretimde okunmaz
 CONTRACT_ | omit | yalnızca sözleşme testleri (internal/testutil/contract, #196): CONTRACT_LIVE ve CONTRACT_<AD>_* canlı sandbox anahtarları, üretimde okunmaz
 DEMO_PASSWORD | omit | yalnızca cmd/demo-seed okur; demo verisi üretim yığınında çalışmaz
+DEMO_CLICKFIX_WIDGET_ID | omit | yalnızca cmd/demo-seed okur (#387): demo ofisin ClickFix widget kimliği; üretim yığınında çalışmaz
 PERF_PASSWORD | omit | yalnızca cmd/perf-seed okur (#182); yük testi verisi üretim yığınında çalışmaz

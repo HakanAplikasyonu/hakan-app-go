@@ -24,6 +24,11 @@ function runtimeClickFixEnv(): ClickFixRuntimeEnv | null {
 
 const noSubscribe = () => () => {};
 
+/** ClickFix runtime config (/api/client-env); null on the server. */
+export function useClickFixEnv(): ClickFixRuntimeEnv | null {
+  return useSyncExternalStore(noSubscribe, runtimeClickFixEnv, () => null);
+}
+
 /**
  * Loads the ClickFix web widget for one channel (#387). Renders nothing and
  * loads nothing when the channel has no widget id. The launcher bubble is

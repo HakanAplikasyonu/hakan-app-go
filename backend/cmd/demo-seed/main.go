@@ -32,6 +32,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/config"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
 	authmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	authrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
@@ -39,6 +40,7 @@ import (
 	orgmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/model"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/support"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/password"
@@ -52,7 +54,14 @@ const defaultPassword = "Demo1234!"
 func main() {
 	reset := flag.Bool("reset", false, "drop the demo office (and its taxpayers) before seeding")
 	pass := flag.String("password", "", "password for every demo account (default DEMO_PASSWORD or "+defaultPassword+")")
+	// Ofisin ClickFix widget kimliği (#387): verilirse demo ofisin destek
+	// ayarına yazılır ve mükellef portalında Destek düğmesi görünür. Boş
+	// varsayılan: e2e / görsel testler dış betik yüklemez.
+	widget := flag.String("clickfix-widget-id", "", "ClickFix widget id of the demo office (support channel of its taxpayers; default DEMO_CLICKFIX_WIDGET_ID)")
 	flag.Parse()
+	if *widget == "" {
+		*widget = os.Getenv("DEMO_CLICKFIX_WIDGET_ID")
+	}
 
 	if *pass == "" {
 		*pass = os.Getenv("DEMO_PASSWORD")
@@ -99,7 +108,7 @@ func main() {
 		printSummary()
 		return
 	}
-	if err := seed(ctx, pool, *pass); err != nil {
+	if err := seed(ctx, pool, *pass, *widget); err != nil {
 		// The steps run through the services, each in its own transaction;
 		// undo a half-built office so the next run starts clean.
 		if derr := dropDemo(ctx, pool); derr != nil {
@@ -110,7 +119,7 @@ func main() {
 	printSummary()
 }
 
-func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
+func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string) error {
 	queries := database.NewQueries(pool)
 	users := authrepo.NewPostgres(pool, queries)
 	hash, err := password.Hash(pass)
@@ -137,6 +146,16 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass string) error {
 	}
 	if org.Slug != demo.OrgSlug {
 		return fmt.Errorf("organization slug %q was taken; got %q", demo.OrgSlug, org.Slug)
+	}
+	if id, err := support.NormalizeWidgetID(clickfixWidgetID); err != nil {
+		return fmt.Errorf("clickfix widget id: %w", err)
+	} else if id != "" {
+		if _, err := queries.UpsertOfficeSupportSettings(ctx, db.UpsertOfficeSupportSettingsParams{
+			OrganizationID: org.ID, ClickfixWidgetID: id,
+		}); err != nil {
+			return fmt.Errorf("support settings: %w", err)
+		}
+		fmt.Printf("demo office ClickFix widget %s\n", id)
 	}
 	for _, m := range demo.Members[1:] {
 		if _, err := orgSvc.AddMember(ctx, org.UUID, byEmail[m.Email].UUID, m.RoleKey); err != nil {

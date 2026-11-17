@@ -366,6 +366,8 @@ type Querier interface {
 	GetOAuthAccountByProviderAccount(ctx context.Context, arg GetOAuthAccountByProviderAccountParams) (GetOAuthAccountByProviderAccountRow, error)
 	GetOAuthAccountByUserProvider(ctx context.Context, arg GetOAuthAccountByUserProviderParams) (GetOAuthAccountByUserProviderRow, error)
 	GetOAuthProviderSettings(ctx context.Context, provider string) (OauthProviderSetting, error)
+	// Destek widget'ı ofis ayarı (issue #387).
+	GetOfficeSupportSettings(ctx context.Context, organizationID int64) (OfficeSupportSetting, error)
 	// The consent link carries only the token: the mükellef is not an office
 	// member, so the lookup cannot be organization-scoped.
 	// tenant-lint: cross-org onay bağlantısı, yalnızca token özetiyle tek satır
@@ -1064,6 +1066,7 @@ type Querier interface {
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
 	UpsertOfficeReviewSetting(ctx context.Context, arg UpsertOfficeReviewSettingParams) error
+	UpsertOfficeSupportSettings(ctx context.Context, arg UpsertOfficeSupportSettingsParams) (OfficeSupportSetting, error)
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.
 	UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataWarningParams) (DataWarning, error)

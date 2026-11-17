@@ -8195,6 +8195,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/support": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Support channel of the company's office (#387)
+         * @description The ClickFix widget of the taxpayer's current office: requests from
+         *     the mükellef portal go to their own office. `office` is null without
+         *     an active office; an empty `clickfix_widget_id` means the office has
+         *     none and the portal uses the platform default.
+         */
+        get: operations["getTaxpayerSupport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/support-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's support widget setting (#387)
+         * @description Requires `tenant.settings.read`. The office's own ClickFix widget id;
+         *     the office's taxpayers write to it from the mükellef portal. Empty =
+         *     the platform default.
+         */
+        get: operations["getSupportSettings"];
+        /**
+         * Set the office's support widget id (#387)
+         * @description Requires `tenant.settings.write` (office owner / admin). Empty string clears it.
+         */
+        put: operations["putSupportSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/support/clickfix-identity": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verified ClickFix identity of the member (#387)
+         * @description Requires `tenant.settings.read`. For the office panel's support
+         *     widget (software provider channel): `user_hash` is
+         *     hex(HMAC-SHA256(CLICKFIX_IDENTITY_SECRET, user_id + "\n" + company_id))
+         *     with the user uuid and office uuid. Without the secret
+         *     `available` is false and the visitor stays unverified.
+         */
+        get: operations["getClickFixIdentity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rule-settings": {
         parameters: {
             query?: never;
@@ -13425,6 +13516,48 @@ export interface components {
             rule_candidate_min_count: number;
             /** @enum {string} */
             rule_candidate_decisions: "corrections_only" | "corrections_and_accepts";
+        };
+        SupportSettings: {
+            /** @description Office's ClickFix widget id; empty = platform default */
+            clickfix_widget_id: string;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        SupportSettingsInput: {
+            clickfix_widget_id: string;
+        };
+        EnvelopeSupportSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["SupportSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ClickFixIdentity: {
+            available: boolean;
+            user_id?: string;
+            user_hash?: string;
+            company_id?: string;
+        };
+        EnvelopeClickFixIdentity: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ClickFixIdentity"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        TaxpayerSupport: {
+            /** @description The current office; null without an active office */
+            office: components["schemas"]["TaxpayerSupportOffice"] | null;
+        };
+        TaxpayerSupportOffice: {
+            name: string;
+            /** @description Empty = platform default */
+            clickfix_widget_id: string;
+        };
+        EnvelopeTaxpayerSupport: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerSupport"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         AccountRuleSettings: {
             rule_candidate_min_count: number;
@@ -26731,6 +26864,135 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerSupport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Support channel */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerSupport"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getSupportSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSupportSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putSupportSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupportSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeSupportSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getClickFixIdentity: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Identity */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeClickFixIdentity"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

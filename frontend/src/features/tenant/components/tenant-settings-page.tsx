@@ -20,11 +20,12 @@ import {
   useTenantSettings,
 } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-type SectionId = "office" | "ai" | "agents" | "appearance";
+type SectionId = "office" | "support" | "ai" | "agents" | "appearance";
 
 /** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
 function SettingsNav({
@@ -118,6 +119,7 @@ export function TenantSettingsPage() {
   const showAgents = can(permissions.tenant.agents.read);
   const sections: { id: SectionId; label: string }[] = [
     { id: "office", label: t("tenant.settings_section_office") },
+    { id: "support", label: t("tenant.settings_section_support") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
       : []),
@@ -202,6 +204,14 @@ export function TenantSettingsPage() {
               </EntitySectionCard>
             ) : null}
             <OfficeDpaCard slug={tenant.slug} />
+          </Section>
+          {/* Destek (#387): ofisin ClickFix widget kimliği. */}
+          <Section
+            id="support"
+            title={t("tenant.settings_section_support")}
+            description={t("tenant.settings_section_support_description")}
+          >
+            <SupportSettingsCard slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {showAi ? (
             <Section

@@ -1,9 +1,14 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { ClickFixWidget } from "@/components/support";
-import type { TaxpayerContextResponse } from "@/features/taxpayer/services/taxpayer.service";
+import {
+  fetchTaxpayerSupport,
+  taxpayerSupportKeys,
+  type TaxpayerContextResponse,
+} from "@/features/taxpayer/services/taxpayer.service";
 import { compactAttributes } from "@/lib/support/clickfix";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -19,6 +24,14 @@ export function TaxpayerSupportWidget({
 }) {
   const { user } = useAuth();
   const { taxpayer } = context;
+  const support = useQuery({
+    queryKey: taxpayerSupportKeys.support(taxpayer.uuid),
+    queryFn: () => fetchTaxpayerSupport(taxpayer.uuid),
+    staleTime: 5 * 60_000,
+    retry: false,
+    meta: { silent: true },
+  });
+  const office = support.data?.office ?? null;
   const visitor = useMemo(
     () => ({
       name: user?.fullName || undefined,
@@ -27,11 +40,20 @@ export function TaxpayerSupportWidget({
         portal: "mukellef",
         mukellef: taxpayer.title,
         mukellef_id: taxpayer.uuid,
+        ofis: office?.name,
         rol: context.role,
       }),
     }),
-    [user?.fullName, user?.email, taxpayer, context.role],
+    [user?.fullName, user?.email, taxpayer, office?.name, context.role],
   );
-  if (!user) return null;
-  return <ClickFixWidget channel="taxpayer" visitor={visitor} />;
+  // Ofis kimliği gelmeden platform varsayılanıyla açıp kapatmamak için
+  // sorgunun bitmesi beklenir (hata olursa varsayılan kullanılır).
+  if (!user || support.isPending) return null;
+  return (
+    <ClickFixWidget
+      channel="taxpayer"
+      officeWidgetId={office?.clickfix_widget_id}
+      visitor={visitor}
+    />
+  );
 }
