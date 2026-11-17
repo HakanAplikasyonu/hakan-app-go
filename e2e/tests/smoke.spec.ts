@@ -136,6 +136,41 @@ test("inceleme: fatura detayından öneri, kuyruktan onay", async () => {
   expect(accepted.total).toBeGreaterThanOrEqual(1);
 });
 
+test("inceleme ızgarası: Excel'den yapıştır, satırı kaydet (#394)", async () => {
+  const acceptedTotal = async () =>
+    (
+      await api.json<{ total: number }>(
+        await api.get("/v1/tenant/review/suggestions?status=accepted"),
+      )
+    ).total;
+  const before = await acceptedTotal();
+
+  await office.goto(officePath("/review?view=grid"));
+  const grid = office.getByRole("grid", { name: "Hesap kodu önerileri" });
+  // İlk veri satırının "Karar" hücresi (1: satır başlığı, 8: karar).
+  const decision = grid.locator(
+    '[role=row][aria-rowindex="2"] [role=gridcell][aria-colindex="8"]',
+  );
+  await expect(decision).toBeVisible();
+  await decision.click();
+  await expect(decision).toBeFocused();
+  // Excel panosundan tek hücre: etiket seçeneğe çözülür.
+  await decision.evaluate((el) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "Onayla\r\n");
+    el.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(decision).toContainText("Onayla");
+  await office.keyboard.press("Control+s");
+  await expect.poll(acceptedTotal).toBe(before + 1);
+});
+
 test("banka eşleme: hesap, MT940 ve BNK uyarısı (API + uyarılar ekranı)", async () => {
   await api.json(
     await api.post(`/v1/tenant/engagements/${atlas}/cash-boxes`, {

@@ -747,5 +747,21 @@
   "review_api.line_type_service": "Service",
   "review_api.line_type_fixed_asset_candidate": "Fixed asset candidate",
   "review_api.line_type_discount": "Discount",
-  "review_api.line_type_expense": "Expense"
+  "review_api.line_type_expense": "Expense",
+  "review_grid.view_label": "View",
+  "review_grid.view_queue": "Queue",
+  "review_grid.view_grid": "Table",
+  "review_grid.label": "Account code suggestions",
+  "review_grid.hint": "Type an account code or paste a column from Excel. A changed code is saved as a correction; set the decision to “Approve” to accept the suggested code or “Reject” to reject it. Rows are saved one by one.",
+  "review_grid.col_taxpayer": "Taxpayer",
+  "review_grid.col_counterparty": "Counterparty",
+  "review_grid.col_item": "Line",
+  "review_grid.col_proposed": "Suggested",
+  "review_grid.col_confidence": "Confidence",
+  "review_grid.col_code": "Account code",
+  "review_grid.col_decision": "Decision",
+  "review_grid.decision_accept": "Approve",
+  "review_grid.decision_reject": "Reject",
+  "review_grid.decision_auto": "By code",
+  "review_grid.plan_hint": "Pick a taxpayer to get account plan suggestions."
 }
