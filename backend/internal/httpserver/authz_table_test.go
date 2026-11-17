@@ -139,6 +139,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/notifications/read-all":                                            azSelf,
 	"POST /v1/notifications/send":                                                azSelf,
 	"POST /v1/notifications/test":                                                azSelf,
+	"POST /v1/notifications/unsubscribe":                                         azPublic,
+	"GET /v1/notifications/unsubscribe":                                          azPublic,
 	"GET /v1/notifications/unread-count":                                         azSelf,
 	"GET /v1/notifications/{uuid}":                                               azSelf,
 	"GET /v1/notifications/{uuid}/action":                                        azSelf,

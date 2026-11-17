@@ -1,0 +1,9 @@
+Merhaba,
+
+Bu bir test e-postasıdır. Bu e-postayı görüyorsanız e-posta bildirimleriniz
+çalışıyor.
+
+--
+Bu e-postayı hesabınızda e-posta bildirimleri açık olduğu için aldınız.
+Bildirim tercihleri: https://app.example.com/profile
+Bu e-posta HAKAN üzerinden gönderildi.

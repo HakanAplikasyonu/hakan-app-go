@@ -1846,6 +1846,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Unsubscribe link opened in a browser
+         * @description A GET never changes preferences (link scanners prefetch it). It redirects
+         *     to the web notification settings page.
+         */
+        get: operations["getNotificationsUnsubscribe"];
+        put?: never;
+        /**
+         * One-click unsubscribe from notification emails
+         * @description Target of the `List-Unsubscribe` header of notification emails (RFC 8058).
+         *     Mail providers POST `List-Unsubscribe=One-Click` from their own servers, so
+         *     there is no session: the signed link (`u`, `sig`) is the authorisation.
+         *     Turns `email_enabled` off in the user's notification preferences. Security
+         *     emails (sign-in codes, invitations) keep arriving.
+         */
+        post: operations["postNotificationsUnsubscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications/test": {
         parameters: {
             query?: never;
@@ -22423,6 +22452,73 @@ export interface operations {
             };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getNotificationsUnsubscribe: {
+        parameters: {
+            query?: {
+                u?: string;
+                sig?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the notification settings page. */
+            303: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    postNotificationsUnsubscribe: {
+        parameters: {
+            query: {
+                /** @description User UUID. */
+                u: string;
+                /** @description HMAC-SHA256 of the user UUID (hex). */
+                sig: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": {
+                    /** @enum {string} */
+                    "List-Unsubscribe"?: "One-Click";
+                };
+            };
+        };
+        responses: {
+            /** @description Email notifications turned off. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** @enum {boolean} */
+                            email_enabled: false;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
     postNotificationsTest: {

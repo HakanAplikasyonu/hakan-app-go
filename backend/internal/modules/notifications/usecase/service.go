@@ -15,6 +15,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/templates"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/unsubscribe"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/crypto"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
@@ -79,6 +80,7 @@ type Service struct {
 	pushQueue    Enqueuer
 	actionSecret []byte
 	actionTTL    time.Duration
+	unsubscribe  unsubscribe.Links
 	box          *crypto.SecretBox
 }
 
@@ -174,6 +176,7 @@ func (s *Service) enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			continue
 		}
 		title, body := in.Title, in.Body
+		emailLang := lang
 		if in.TemplateCode != "" {
 			tpl, err := s.q.GetTemplateByCodeChannelLang(ctx, db.GetTemplateByCodeChannelLangParams{
 				Code: in.TemplateCode, Channel: ch, Language: lang,
@@ -184,6 +187,9 @@ func (s *Service) enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 				})
 			}
 			if err == nil {
+				if tpl.Language != "" {
+					emailLang = tpl.Language
+				}
 				title = templates.Render(tpl.Subject, in.TemplateVars)
 				body = templates.Render(tpl.Body, in.TemplateVars)
 			} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -200,7 +206,12 @@ func (s *Service) enqueue(ctx context.Context, in model.EnqueueInput) ([]model.N
 			}
 			title, body = redactedTitle(in.TemplateCode), RedactedBody
 		}
-		payload, err := json.Marshal(withPushVars(ch, in.Payload, in.TemplateVars))
+		fields := withPushVars(ch, in.Payload, in.TemplateVars)
+		if ch == model.ChannelEmail {
+			// The email layout speaks the template's language.
+			fields[providers.PayloadLang] = emailLang
+		}
+		payload, err := json.Marshal(fields)
 		if err != nil {
 			payload = []byte("{}")
 		}
@@ -588,6 +599,35 @@ func (s *Service) GetPreferences(ctx context.Context, userID int64) (model.Prefe
 		PushEnabled: row.PushEnabled,
 	}, nil
 }
+
+// WithUnsubscribe enables the one-click unsubscribe endpoint.
+func (s *Service) WithUnsubscribe(l unsubscribe.Links) *Service {
+	s.unsubscribe = l
+	return s
+}
+
+// Unsubscribe turns email notifications off for the user a signed
+// List-Unsubscribe link names. Security emails (codes, invitations) still
+// arrive: they ignore preferences.
+func (s *Service) Unsubscribe(ctx context.Context, user uuid.UUID, sig string) error {
+	if !s.unsubscribe.Verify(user, sig) {
+		return fmt.Errorf("%w: invalid unsubscribe link", ErrForbidden)
+	}
+	id, err := s.ResolveUserID(ctx, user)
+	if err != nil {
+		return err
+	}
+	prefs, err := s.GetPreferences(ctx, id)
+	if err != nil {
+		return err
+	}
+	prefs.EmailEnabled = false
+	_, err = s.UpsertPreferences(ctx, id, prefs)
+	return err
+}
+
+// PreferencesURL is the web page for notification settings ("" if unset).
+func (s *Service) PreferencesURL() string { return s.unsubscribe.PreferencesURL() }
 
 // UpsertPreferences stores preferences.
 func (s *Service) UpsertPreferences(ctx context.Context, userID int64, p model.Preferences) (model.Preferences, error) {

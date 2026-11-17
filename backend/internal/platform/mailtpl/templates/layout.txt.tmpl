@@ -1,3 +1,6 @@
+{{- if .PlainText}}{{.PlainText}}
+
+{{else}}
 {{- if .Heading}}{{.Heading}}
 
 {{end}}
@@ -22,6 +25,7 @@
 {{- end}}
 {{- range .SignOff}}{{.}}
 {{end}}
+{{- end}}
 
 --
 {{if .Reason}}{{.Reason}}

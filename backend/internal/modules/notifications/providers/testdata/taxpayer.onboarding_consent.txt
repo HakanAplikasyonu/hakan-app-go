@@ -1,0 +1,13 @@
+Merhaba,
+
+Örnek Müşavirlik mali müşavirlik ofisi Ekim 2026 kira faturası (1234567890)
+için mükellef kaydı açmak istiyor.
+
+Onaylamak ya da reddetmek için:
+https://app.example.com/invite/0f3c2a1b
+
+Bağlantı 7 gün geçerlidir. Bu talebi beklemiyorsanız e-postayı yok
+sayabilirsiniz.
+
+--
+Bu e-posta HAKAN üzerinden gönderildi.

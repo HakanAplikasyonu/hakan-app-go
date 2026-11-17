@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -202,6 +203,37 @@ func (h *Handler) PutPreferences(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, prefs)
+}
+
+// Unsubscribe is the one-click target of List-Unsubscribe (RFC 8058). The
+// mail provider POSTs "List-Unsubscribe=One-Click" from its own servers, so
+// there is no session: the signed link (u, sig) is the authorisation.
+func (h *Handler) Unsubscribe(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	user, err := uuid.Parse(strings.TrimSpace(q.Get("u")))
+	if err != nil {
+		response.ValidationError(w, r, []response.Detail{{Field: "u", Message: "u must be a user uuid", Code: "invalid"}})
+		return
+	}
+	// The form body ("List-Unsubscribe=One-Click") carries nothing else.
+	_, _ = io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, 1<<10))
+	if err := h.svc.Unsubscribe(r.Context(), user, q.Get("sig")); err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]bool{"email_enabled": false})
+}
+
+// UnsubscribeLanding answers a person who opened the unsubscribe link in a
+// browser: a GET must not change anything (link scanners prefetch), so it
+// sends them to the notification settings page.
+func (h *Handler) UnsubscribeLanding(w http.ResponseWriter, r *http.Request) {
+	dest := h.svc.PreferencesURL()
+	if dest == "" {
+		response.NotFound(w, r, "Notification settings page is not configured")
+		return
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 func (h *Handler) Test(w http.ResponseWriter, r *http.Request) {

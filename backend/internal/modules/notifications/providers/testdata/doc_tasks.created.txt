@@ -1,0 +1,13 @@
+Merhaba,
+
+Örnek Müşavirlik, Örnek Gıda A.Ş. için 3 banka hareketinin belgesini
+(fatura, fiş, dekont) istiyor. Fotoğrafını ya da PDF'ini uygulamadan
+yükleyebilirsiniz.
+
+Belgeleri yüklemek için:
+https://app.example.com/invite/0f3c2a1b
+
+--
+Bu e-postayı hesabınızda e-posta bildirimleri açık olduğu için aldınız.
+Bildirim tercihleri: https://app.example.com/profile
+Bu e-posta HAKAN üzerinden gönderildi.
