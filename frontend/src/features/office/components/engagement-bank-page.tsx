@@ -15,6 +15,7 @@ import {
 } from "@/components/tables";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { components } from "@/generated/api";
+import { EngagementNextWork } from "@/features/copilot";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
@@ -228,6 +229,7 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
         <BankStatementUpload engagement={engagement} />
       </div>
       <EngagementTabs engagement={engagement} />
+      <EngagementNextWork engagement={engagement} />
       <div
         role="tablist"
         aria-label={t("office.bank.view_label")}

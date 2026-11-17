@@ -1264,5 +1264,14 @@
   "copilot.command.example_transfer": "Atlas Gıda ekim fişlerini Luca'ya aktar",
   "copilot.command.example_close": "Atlas Gıda ekim kapanışı",
   "copilot.command.example_reports": "Tüm mükelleflerin ekim raporunu gönder",
-  "copilot.command.hint": "The co-pilot only proposes existing actions and asks for your approval on each step."
+  "copilot.command.hint": "The co-pilot only proposes existing actions and asks for your approval on each step.",
+  "copilot.engagement_title": "Next work · {{period}}",
+  "copilot.all_taxpayers": "All taxpayers",
+  "copilot.recent.title": "Your latest commands",
+  "copilot.recent.steps": "{{done}} of {{total}} steps done",
+  "copilot.recent.status_proposed": "Awaiting approval",
+  "copilot.recent.status_running": "Unfinished",
+  "copilot.recent.status_done": "Done",
+  "copilot.recent.status_cancelled": "Cancelled",
+  "copilot.recent.resume": "Back to approval"
 }

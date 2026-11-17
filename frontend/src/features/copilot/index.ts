@@ -6,3 +6,4 @@ export {
 } from "./components/copilot-provider";
 export { StepChain } from "./components/step-chain";
 export { CommandBar } from "./components/command-bar";
+export { EngagementNextWork } from "./components/engagement-next-work";

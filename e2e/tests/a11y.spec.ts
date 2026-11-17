@@ -70,6 +70,9 @@ test.describe("@a11y ofis paneli", () => {
       "/warnings",
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,
+      // Co-pilot çubuğu mükellef ekranlarında (#392).
+      `/engagements/${atlas}/bank`,
+      `/engagements/${atlas}/report`,
       `/engagements/${atlas}/expenses`,
       `/engagements/${atlas}/z-reports`,
       "/agents",

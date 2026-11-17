@@ -24,6 +24,8 @@ type CopilotContextValue = {
   ask: (command: string) => void;
   /** Shows steps picked on a screen (one row, a bulk selection). */
   review: (steps: Omit<RunnableStep, "index">[]) => void;
+  /** Reopens a stored plan whose steps still wait for approval. */
+  resume: (plan: CopilotPlan) => void;
 };
 
 const CopilotContext = createContext<CopilotContextValue | null>(null);
@@ -93,7 +95,14 @@ export function CopilotProvider({ children }: { children: ReactNode }) {
     setOpen(true);
   }, []);
 
-  const value = useMemo(() => ({ ask, review }), [ask, review]);
+  const resume = useCallback((p: CopilotPlan) => {
+    setError(null);
+    setVersion((v) => v + 1);
+    setPlan(planView(p));
+    setOpen(true);
+  }, []);
+
+  const value = useMemo(() => ({ ask, review, resume }), [ask, review, resume]);
 
   return (
     <CopilotContext.Provider value={value}>

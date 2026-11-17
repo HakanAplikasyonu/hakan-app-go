@@ -13,6 +13,7 @@ import type { ReportRange } from "@/features/reports/services/reports.service";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
+import { EngagementNextWork } from "@/features/copilot";
 
 import { EngagementDeliveryHistory } from "./delivery-history";
 import { ReportActions } from "./report-actions";
@@ -49,6 +50,7 @@ export function EngagementReportPage({ engagement }: { engagement: string }) {
         <p className="text-text-2 text-sm">{t("reports.description")}</p>
       </div>
       <EngagementTabs engagement={engagement} />
+      <EngagementNextWork engagement={engagement} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ReportRangePicker value={range} onChange={setRange} />
         {report.data ? (

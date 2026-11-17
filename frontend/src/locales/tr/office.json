@@ -1264,5 +1264,14 @@
   "copilot.command.example_transfer": "Atlas Gıda ekim fişlerini Luca'ya aktar",
   "copilot.command.example_close": "Atlas Gıda ekim kapanışı",
   "copilot.command.example_reports": "Tüm mükelleflerin ekim raporunu gönder",
-  "copilot.command.hint": "Co-pilot yalnızca mevcut işlemleri önerir ve her adım için onayınızı ister."
+  "copilot.command.hint": "Co-pilot yalnızca mevcut işlemleri önerir ve her adım için onayınızı ister.",
+  "copilot.engagement_title": "Sıradaki iş · {{period}}",
+  "copilot.all_taxpayers": "Bütün mükellefler",
+  "copilot.recent.title": "Son komutlarınız",
+  "copilot.recent.steps": "{{total}} adımdan {{done}} tanesi tamamlandı",
+  "copilot.recent.status_proposed": "Onay bekliyor",
+  "copilot.recent.status_running": "Yarım kaldı",
+  "copilot.recent.status_done": "Tamamlandı",
+  "copilot.recent.status_cancelled": "Vazgeçildi",
+  "copilot.recent.resume": "Onaya dön"
 }

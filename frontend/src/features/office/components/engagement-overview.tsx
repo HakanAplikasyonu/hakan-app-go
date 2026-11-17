@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { ErrorState } from "@/components/common/error-state";
 import { BosDurum, TacRozeti, type TacDurumu } from "@/components/hakan";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EngagementNextWork } from "@/features/copilot";
 import { Permission } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -348,6 +349,8 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
       <EngagementTabs engagement={engagement} />
 
       <PeriodStrip cells={cells} focus={period} onPick={setPeriod} />
+
+      <EngagementNextWork engagement={engagement} variant="card" />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <section

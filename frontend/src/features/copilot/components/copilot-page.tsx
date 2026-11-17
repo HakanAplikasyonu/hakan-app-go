@@ -24,6 +24,7 @@ import { actionLabel, periodLabel, stepDetail, stepLabel } from "../lib/labels";
 import { bulkSteps, fromTextField, nextStepOf } from "../lib/next-steps";
 import type { CopilotWorkflowRow } from "../services/copilot.service";
 import { CommandBar } from "./command-bar";
+import { RecentPlans } from "./recent-plans";
 import { useCopilot } from "./copilot-provider";
 import { StepChain } from "./step-chain";
 
@@ -230,8 +231,9 @@ export function CopilotPage() {
         </p>
       </div>
       <Card>
-        <CardContent>
+        <CardContent className="space-y-5">
           <CommandBar />
+          <RecentPlans />
         </CardContent>
       </Card>
       <Card>
