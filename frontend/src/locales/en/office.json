@@ -576,7 +576,6 @@
   "review.back_to_list": "Back to queue",
   "review.bulk_action": "Approve {{count}} in bulk",
   "review.bulk_text": "{{count}} suggestions at {{threshold}}% confidence or above.",
-  "review.code_button": "Suggested account {{code}} · select to correct",
   "review.correct": "Correct code",
   "review.history_none": "No approved decision for this counterparty at this taxpayer.",
   "review.make_rule": "Make rule",
@@ -999,5 +998,7 @@
   "bank.banks.ziraat_katilim": "Ziraat Katılım",
   "bank.banks.vakif_katilim": "Vakıf Katılım",
   "bank.banks.emlak_katilim": "Emlak Katılım",
-  "bank.upload.template_saved": "Template saved."
+  "bank.upload.template_saved": "Template saved.",
+  "review.code_button_prefix": "Suggested account",
+  "review.code_button_hint": "select to correct"
 }

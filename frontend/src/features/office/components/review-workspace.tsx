@@ -1038,18 +1038,17 @@ function ReviewWorkspaceInner() {
                 <button
                   type="button"
                   onClick={() => canCorrect && setPicking(true)}
-                  // Erişilebilir ad görünen metni (kod + hesap adı) içermeli (axe
-                  // label-content-name-mismatch; banka önerileri adı taşır, #383).
-                  aria-label={t("office.review.code_button", {
-                    code: currentValue.name
-                      ? `${valueLabel(current.proposed_value)} ${currentValue.name}`
-                      : valueLabel(current.proposed_value),
-                  })}
                   className={cn(
                     "group flex w-full flex-wrap items-baseline gap-x-3 rounded-[10px] border border-dashed p-3 text-start transition-colors",
                     canCorrect && "hover:border-brand",
                   )}
                 >
+                  {/* Erişilebilir ad görünen metinden (kod + hesap adı) oluşur;
+                      ipucu yalnızca ekran okuyucuya (axe
+                      label-content-name-mismatch, #383). */}
+                  <span className="sr-only">
+                    {t("office.review.code_button_prefix")}
+                  </span>
                   <Figure className="text-2xl font-semibold break-all">
                     {valueLabel(current.proposed_value)}
                   </Figure>
@@ -1059,10 +1058,15 @@ function ReviewWorkspaceInner() {
                     </span>
                   ) : null}
                   {canCorrect ? (
-                    <Pencil
-                      className="text-muted-foreground ms-auto size-3.5"
-                      aria-hidden
-                    />
+                    <>
+                      <span className="sr-only">
+                        {t("office.review.code_button_hint")}
+                      </span>
+                      <Pencil
+                        className="text-muted-foreground ms-auto size-3.5"
+                        aria-hidden
+                      />
+                    </>
                   ) : null}
                 </button>
               </CodePicker>
