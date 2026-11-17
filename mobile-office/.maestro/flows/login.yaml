@@ -6,7 +6,10 @@ tags: [smoke]
 ---
 - launchApp:
     clearState: true
-- assertVisible: "Giriş yap"
+# Sürüm derlemesinin soğuk açılışı yavaş emülatörde birkaç saniye sürer (#454).
+- extendedWaitUntil:
+    visible: "Giriş yap"
+    timeout: 30000
 # Ekran görüntüleri (#332): CI'da maestro-<uygulama> artefaktının screenshots/ klasörü.
 - takeScreenshot: musavir-giris
 - tapOn:

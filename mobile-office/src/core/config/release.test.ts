@@ -105,3 +105,10 @@ test('store metadata draft is Turkish and within limits', () => {
   assert.ok(play('full-description.txt').length <= 4000, 'Play full ≤ 4000');
   assert.ok(play('release-notes.txt').length <= 500, 'Play release notes ≤ 500');
 });
+
+test('Android manifest turns GWP-ASan off (#454: Hermes start-up crash on Android 14)', () => {
+  const cfg = appConfig({ config: app });
+  assert.equal(typeof cfg.mods?.android?.manifest, 'function');
+  const src = readFileSync(new URL('../../../app.config.js', import.meta.url), 'utf8');
+  assert.match(src, /'android:gwpAsanMode'\] = 'never'/);
+});

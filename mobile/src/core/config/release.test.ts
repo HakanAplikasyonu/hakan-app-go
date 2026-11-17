@@ -98,3 +98,10 @@ test('Play listing drafts fit Google Play limits', () => {
   assert.ok(play('short-description.txt').length <= 80, 'short ≤ 80');
   assert.ok(play('full-description.txt').length <= 4000, 'full ≤ 4000');
 });
+
+test('Android manifest turns GWP-ASan off (#454: Hermes start-up crash on Android 14)', () => {
+  const cfg = appConfig({ config: app });
+  assert.equal(typeof cfg.mods?.android?.manifest, 'function');
+  const src = readFileSync(new URL('../../../app.config.js', import.meta.url), 'utf8');
+  assert.match(src, /'android:gwpAsanMode'\] = 'never'/);
+});

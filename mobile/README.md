@@ -97,6 +97,11 @@ Diğer profiller: `development-simulator`, `preview`, `production`.
   - uygulama `expo prebuild` ve `assembleRelease` (x86_64) ile derlenir; API adresi `http://10.0.2.2:8080`, yalnızca bu işte cleartext açılır;
   - akışlar `scripts/maestro-ci.sh` ile koşar.
 
+  **Bilinen kırmızılar ve kök nedenleri (#454):**
+  - *Uygulama açılışta kapanıyor, `login` akışı "Giriş yap"ı göremiyor:* Android 14'te GWP-ASan, Hermes'in `realloc` çağrısını örnekleyince yığın izini toplarken SIGSEGV ile düşüyordu (logcat: `gwp_asan` + `libhermesvm.so`, `android_unsafe_frame_pointer_chase`). Örnekleme rastgele olduğu için aralıklıydı. `app.config.js` manifest'e `android:gwpAsanMode="never"` yazar (iki uygulamada). Soğuk açılış için `login` "Giriş yap"ı 30 sn bekler.
+  - *"Pixel Launcher isn't responding" penceresi:* yeni açılan emülatörün sistem uygulaması; `scripts/maestro-ci.sh` hata pencerelerini gizler ve sistemin oturmasını bekler.
+  - *Gradle (`assembleRelease`) eklenti çözümlemesi:* `plugins.gradle.org` ara sıra eklenti işaretçisini ya da POM'u bulamıyor (`foojay-resolver-convention`, `kotlin-gradle-plugin` … `was not found` / `Could not parse POM`). Kod hatası değil, ağ/ayna kaynaklı. İş bir kez yeniden dener; ancak Gradle "bulunamadı" sonucunu önbelleğe aldığından (büyük olasılıkla) aynı işteki ikinci deneme de aynı hatayla düşüyor (ör. 17 Kasım, mobile işinde iki deneme de `foojay-resolver-convention`). Bu durumda işi Actions'tan yeniden çalıştırmak yeterli (yeni makine, boş önbellek). Kalıcı çözüm için yeniden denemenin `--refresh-dependencies` ile yapılması gerekir; CI akışı bu şeritte değiştirilmediği için ayrı issue'da.
+
   Sonuç iş özetinde akış başına tablo olarak görünür. `maestro-<uygulama>` artifact'ında JUnit raporu, hata anı ekran görüntüleri, ekran kaydı, logcat ve API logu var. İş zorunlu kontrol değil, yalnızca rapor üretir. Her push'taki mobil işte ayrıca şunlar koşar:
   - `npm test` (`src/core/config/maestro.test.ts`): akışların YAML'ı, `appId`, komutları, sırası ve kullandığı env değişkenleri denetlenir.
   - `expo prebuild` (Android): yerel proje yapılandırması üretilir. Eklentiler (expo-updates, Sentry, bildirim, bağlantılar) burada bozulursa iş düşer.
