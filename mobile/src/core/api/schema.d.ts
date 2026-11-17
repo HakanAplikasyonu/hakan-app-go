@@ -8041,6 +8041,344 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}/counterparties": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a run uuid */
+                runRef: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Counterparty (cari) reconciliation of a run
+         * @description Requires `tenant.reconciliation.read` (#389). Per counterparty (VKN/TCKN): the trial balance balance of its 120 / 320 account from the counterparty account memory, the portal balance (invoices up to the period end, sales +, purchases −, minus bank payments matched to them, TL) and the period's Form BA (purchases) / BS (sales) totals (KDV hariç, invoice count) against the declared form lines. A counterparty reaching 5.000 TL must be on the form. Each row has the contact email of its customer card and its newest letter.
+         */
+        get: operations["listReconciliationCounterparties"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/counterparties/{counterpartyUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                counterpartyUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Decide a counterparty reconciliation
+         * @description Requires `tenant.reconciliation.write` (#389). `explained` needs a note; 409 `RECONCILIATION_IN_REVIEW` while its suggestion is pending.
+         */
+        patch: operations["decideReconciliationCounterparty"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/counterparties/{counterpartyUuid}/review": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                counterpartyUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a counterparty reconciliation to the review queue
+         * @description Requires `tenant.reconciliation.write` (#389). Like an account item: a `reconciliation` suggestion (target `counterparty_reconciliation`) whose explanation is the note given, else one built from the balance and BA/BS results. 409 `RECONCILIATION_NO_DIFFERENCE` when the balance matches and BA/BS has no issue.
+         */
+        post: operations["sendReconciliationCounterpartyToReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/babs": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Declared Form BA / BS lines of a period
+         * @description Requires `tenant.reconciliation.read` (#389). `form`: ba or bs (default both).
+         */
+        get: operations["listBabsDeclarations"];
+        put?: never;
+        /**
+         * Add or replace a declared form line
+         * @description Requires `tenant.reconciliation.write` (#389). The line of the same period, form and counterparty is replaced. Amount in TL (KDV hariç).
+         */
+        post: operations["saveBabsDeclaration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/babs/imports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a Form BA / BS listing (Excel / CSV)
+         * @description Requires `tenant.reconciliation.write` (#389). The header row is found by its columns: VKN/TCKN and Tutar (Mal ve Hizmet Bedeli) are required, Unvan, Belge Sayısı, Form (Ba/Bs) and Dönem optional. `period` and `form` apply to rows that do not name their own. Amounts without a clear decimal style are read the Turkish way (5.000 = five thousand). Bad rows are reported, the others stored. 422 `BABS_HEADER_NOT_FOUND`.
+         */
+        post: operations["importBabsDeclarations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/babs/{declarationUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                declarationUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a declared form line
+         * @description Requires `tenant.reconciliation.write` (#389).
+         */
+        delete: operations["deleteBabsDeclaration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/letters": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Reconciliation letters
+         * @description Requires `tenant.reconciliation.read` (#389). Newest first, at most 200.
+         */
+        get: operations["listReconciliationLetters"];
+        put?: never;
+        /**
+         * Create a reconciliation letter for a counterparty
+         * @description Requires `tenant.reconciliation.write` (#389). Freezes the letter (office, taxpayer, counterparty, balance as of the date: the trial balance's, else the portal's, unless `balance` is given; positive = the counterparty owes). `send: true` queues the email (PDF attached, with the response link); the worker sends it within a minute and retries on failure. The response link works for 60 days.
+         */
+        post: operations["createReconciliationLetter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/pdf": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The letter as PDF
+         * @description Requires `tenant.reconciliation.read` (#389).
+         */
+        get: operations["getReconciliationLetterPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/send": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue a letter's email (again)
+         * @description Requires `tenant.reconciliation.write` (#389). Optionally to another address. 409 `RECONCILIATION_LETTER_ANSWERED` for an answered letter.
+         */
+        post: operations["sendReconciliationLetter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record an answer received another way
+         * @description Requires `tenant.reconciliation.write` (#389). Phone, signed paper. `agreed` resolves the counterparty's open row in the newest run.
+         */
+        post: operations["recordReconciliationLetterResponse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/reconciliation-letters/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The letter behind a response link (no sign in)
+         * @description #389. The token from the letter's link (`/mutabakat/{token}`), sent in the body so it stays out of API URLs and logs, opens this
+         *     one letter for 60 days (410 `RECONCILIATION_LETTER_EXPIRED` after).
+         */
+        post: operations["previewPublicReconciliationLetter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/reconciliation-letters/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer a reconciliation letter (no sign in)
+         * @description #389. `agreed` or `disputed` (a dispute needs the balance in the counterparty's books or a note). Answered once:
+         *     409 `RECONCILIATION_LETTER_ANSWERED`. `agreed` resolves the counterparty's open row in the newest run.
+         */
+        post: operations["respondPublicReconciliationLetter"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-export-settings": {
         parameters: {
             query?: never;
@@ -18307,6 +18645,162 @@ export interface components {
         ReconciliationRunDetail: {
             run: components["schemas"]["ReconciliationRun"];
             items: components["schemas"]["ReconciliationItem"][];
+        };
+        ReconciliationCounterparty: {
+            /** Format: uuid */
+            uuid: string;
+            counterparty_tax_id: string;
+            counterparty_name: string;
+            /** @description The counterparty's account codes, comma separated */
+            account_code: string | null;
+            /** @description Signed: positive = the counterparty owes */
+            ledger_balance: string | null;
+            source_balance: string;
+            difference: string | null;
+            /** @enum {string} */
+            result: "matched" | "difference" | "no_ledger_account";
+            ba_amount: string;
+            ba_count: number;
+            bs_amount: string;
+            bs_count: number;
+            declared_ba_amount: string | null;
+            declared_ba_count: number | null;
+            declared_bs_amount: string | null;
+            declared_bs_count: number | null;
+            ba_result: components["schemas"]["BabsResult"];
+            bs_result: components["schemas"]["BabsResult"];
+            /** @enum {string} */
+            status: "open" | "explained" | "in_review" | "resolved" | "ignored";
+            note: string | null;
+            review: null | {
+                /** Format: uuid */
+                uuid: string;
+                status: string;
+            };
+            /** Format: date-time */
+            decided_at: string | null;
+            email: string | null;
+            last_letter: null | {
+                /** Format: uuid */
+                uuid: string;
+                /** @enum {string} */
+                status: "draft" | "queued" | "sent" | "failed" | "responded";
+                /** @enum {string|null} */
+                response: "agreed" | "disputed" | null;
+                /** Format: date-time */
+                sent_at: string | null;
+            };
+        };
+        /** @enum {string} */
+        BabsResult: "not_required" | "ok" | "missing_in_form" | "extra_in_form" | "amount_mismatch" | "count_mismatch" | "no_declaration";
+        ReconciliationCounterpartyPage: {
+            run: components["schemas"]["ReconciliationRun"];
+            items: components["schemas"]["ReconciliationCounterparty"][];
+        };
+        BabsDeclaration: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            form_type: "ba" | "bs";
+            counterparty_tax_id: string;
+            counterparty_name: string;
+            document_count: number;
+            amount: string;
+            /** @enum {string} */
+            source: "import" | "manual" | "demo";
+            /** Format: date-time */
+            created_at: string;
+        };
+        BabsDeclarationInput: {
+            period: string;
+            /** @enum {string} */
+            form_type: "ba" | "bs";
+            counterparty_tax_id: string;
+            counterparty_name?: string;
+            document_count?: number;
+            /** @example 12500 */
+            amount: string;
+        };
+        BabsImportResult: {
+            imported: number;
+            errors: {
+                line: number;
+                message: string;
+            }[];
+        };
+        ReconciliationLetterSnapshot: {
+            office: string;
+            taxpayer_title: string;
+            taxpayer_tax_id: string;
+            counterparty_name: string;
+            counterparty_tax_id: string;
+            account_code: string;
+            /** Format: date */
+            as_of_date: string;
+            balance: string;
+            currency: string;
+            period: string;
+            note: string;
+        };
+        ReconciliationLetter: {
+            /** Format: uuid */
+            uuid: string;
+            counterparty_tax_id: string;
+            counterparty_name: string;
+            recipient_email: string | null;
+            account_code: string | null;
+            /** Format: date */
+            as_of_date: string;
+            balance: string;
+            currency: string;
+            /** @enum {string} */
+            status: "draft" | "queued" | "sent" | "failed" | "responded";
+            attempts: number;
+            last_error: string | null;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** @enum {string|null} */
+            response: "agreed" | "disputed" | null;
+            response_balance: string | null;
+            response_note: string | null;
+            responder_name: string | null;
+            /** @enum {string|null} */
+            response_channel: "link" | "manual" | null;
+            /** Format: date-time */
+            responded_at: string | null;
+            /** Format: date-time */
+            expires_at: string | null;
+            snapshot: components["schemas"]["ReconciliationLetterSnapshot"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReconciliationLetterResponseInput: {
+            /** @enum {string} */
+            response: "agreed" | "disputed";
+            /** @description The balance in the counterparty's books (signed like the letter's) */
+            balance?: string | null;
+            note?: string | null;
+            responder_name?: string | null;
+        };
+        PublicReconciliationLetter: {
+            office: string;
+            taxpayer_title: string;
+            taxpayer_tax_id: string;
+            counterparty_name: string;
+            counterparty_tax_id: string;
+            /** Format: date */
+            as_of_date: string;
+            balance: string;
+            currency: string;
+            note: string;
+            /** @enum {string|null} */
+            response: "agreed" | "disputed" | null;
+            response_balance: string | null;
+            /** Format: date-time */
+            responded_at: string | null;
+            /** Format: date-time */
+            expires_at: string | null;
         };
     };
     responses: {
@@ -31110,6 +31604,648 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listReconciliationCounterparties: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a run uuid */
+                runRef: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationCounterpartyPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideReconciliationCounterparty: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                counterpartyUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "open" | "explained" | "resolved" | "ignored";
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationCounterparty"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendReconciliationCounterpartyToReview: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                counterpartyUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationCounterparty"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECONCILIATION_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listBabsDeclarations: {
+        parameters: {
+            query: {
+                period: string;
+                form?: "ba" | "bs";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["BabsDeclaration"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveBabsDeclaration: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BabsDeclarationInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["BabsDeclaration"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    importBabsDeclarations: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    period?: string;
+                    /** @enum {string} */
+                    form?: "ba" | "bs";
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["BabsImportResult"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `BABS_HEADER_NOT_FOUND` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteBabsDeclaration: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                declarationUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listReconciliationLetters: {
+        parameters: {
+            query?: {
+                counterparty_tax_id?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["ReconciliationLetter"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createReconciliationLetter: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    counterparty_uuid: string;
+                    /** Format: email */
+                    email?: string | null;
+                    /** Format: date */
+                    as_of_date?: string | null;
+                    balance?: string | null;
+                    note?: string | null;
+                    /** @default false */
+                    send?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationLetter"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECONCILIATION_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getReconciliationLetterPdf: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendReconciliationLetter: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationLetter"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECONCILIATION_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    recordReconciliationLetterResponse: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                letterUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationLetterResponseInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationLetter"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewPublicReconciliationLetter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PublicReconciliationLetter"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            /** @description `RECONCILIATION_LETTER_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    respondPublicReconciliationLetter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationLetterResponseInput"] & {
+                    token: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PublicReconciliationLetter"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `RECONCILIATION_LETTER_EXPIRED` */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
         };
     };
     getJournalExportSettings: {

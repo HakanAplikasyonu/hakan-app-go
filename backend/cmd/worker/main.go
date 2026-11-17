@@ -33,6 +33,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/providers"
 	notifusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/notifications/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/officedash"
+	reconciliationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reconciliation"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
@@ -266,8 +267,11 @@ func main() {
 		// bütün ofisler (gerekçeli satır güvenliği atlaması).
 		// Önce günü gelen zamanlanmış raporlar kuyruğa yazılır, sonra
 		// kuyruk gönderilir.
-		WithReportDeliveries(systemCount(pool, "reports: schedules and deliveries across offices",
-			reportSweep(database.NewQueries(pool), mailer, log))).
+		// Mutabakat mektupları (#389) aynı dakikalık taramada gönderilir.
+		WithReportDeliveries(systemCount(pool, "reports and reconciliation letters: deliveries across offices",
+			mailSweeps(reportSweep(database.NewQueries(pool), mailer, log),
+				(&reconciliationmodule.LetterSender{Q: database.NewQueries(pool), Mail: mailer, Log: log,
+					Config: reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}}).SendDue))).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -382,6 +386,22 @@ func reportSweep(q *db.Queries, m mail.Sender, log *slog.Logger) func(context.Co
 			log.Info("report_schedules_queued", "queued", n)
 		}
 		return send.SendDue(ctx)
+	}
+}
+
+// mailSweeps runs the email sweeps one after the other and adds up what
+// they sent.
+func mailSweeps(fns ...func(context.Context) (int, error)) func(context.Context) (int, error) {
+	return func(ctx context.Context) (int, error) {
+		total := 0
+		for _, fn := range fns {
+			n, err := fn(ctx)
+			total += n
+			if err != nil {
+				return total, err
+			}
+		}
+		return total, nil
 	}
 }
 
