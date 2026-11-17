@@ -46,6 +46,12 @@ Mükellef ayrıntısındaki **Belgeler** kartı `belgeler/[engagement]` ekranın
 
 Mükellef ayrıntısındaki İSG satırı süresi dolan ve 30 gün içinde biten İSG evrakını sayıyla gösterir. Mizan özeti (toplamlar ve ana hesap bakiyeleri) sistem paylaş menüsüyle metin olarak paylaşılır. Satıra dokununca belge önizlenir (Android'de varsayılan PDF görüntüleyici, iOS'ta sistem önizlemesi); sağdaki düğme sistem paylaş menüsünü açar (`expo-sharing`). Dosya `X-Organization` ve oturum belirteciyle önbelleğe indirilir (`src/features/files/open.ts`).
 
+## Sıradaki iş (co-pilot, #392)
+
+Panodaki **Sıradaki iş** satırı ofisin mükelleflerini dönem kapanışının sıradaki adımıyla listeler (`GET /v1/tenant/copilot/workflow`, `tenant.engagements.read`). İşi olanlar önce gelir. Dönem sunucudan gelir: önceki ay, ofis paneliyle aynı. Mükellef ayrıntısındaki **Sıradaki iş** kartı o mükellefin altı adımlık zincirini durumlarıyla gösterir (`GET .../engagements/{uuid}/copilot/workflow`): belgeler → banka → öneriler → fişler → aktarım → rapor.
+
+Mobil salt okumadır. Ekran açan adımlar uygulamadaki ekrana gider: "Önerileri incele" onay kuyruğunu, "Eksik belgelere bak" görevleri açar. Onay isteyen adımlar (banka eşleştirme, fiş oluşturma ve onayı, aktarım, rapor) ofis panelinde çalışır. Metinler ofis panelinin çevirisiyle aynıdır (`src/features/copilot/format.ts`).
+
 ## Bildirimler ve derin bağlantılar (#241)
 
 Push kaydı oturum açılınca yapılır; izin yalnızca ana sayfadaki “Bildirimleri aç” ile istenir. Bildirime dokununca `data.url` (ofis panelinin yolu) uygulama ekranına eşlenir (`src/core/push/links.ts`); bağlantı başka bir ofise aitse önce o ofis seçilir.
@@ -81,7 +87,7 @@ CI'daki `mobile-office` işi tipleri yeniden üretir (işlenmiş dosya eskiyse u
 
 ## Duman testleri ve sürüm (#242)
 
-- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro, mizan, İSG, evrak) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
+- **Maestro** (`.maestro/`): giriş → ofis seçimi → pano (derin bağlantı dahil) → inceleme onayı → belge talebi → mükellef belgeleri (bordro, mizan, İSG, evrak) → sıradaki iş (co-pilot) → çıkış. Geliştirme ya da preview derlemesi kurulu bir emülatörde, demo verisi olan bir backend'e karşı:
 
   ```bash
   maestro test -e MAESTRO_EMAIL=... -e MAESTRO_PASSWORD=... .maestro

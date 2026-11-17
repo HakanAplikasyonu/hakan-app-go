@@ -151,6 +151,21 @@ export default function HomeScreen() {
                 />
                 <Stat testID="stat-uploads" label="Bugün" value={d.uploads.total} />
               </View>
+
+              {/* Co-pilot (#392): dönem kapanışında her mükellefin sıradaki işi. */}
+              {can('tenant.engagements.read') ? (
+                <Kart>
+                  <Satir
+                    testID="open-copilot"
+                    ilk
+                    sol={<Ikon ad="gorev" renk={c.text2} />}
+                    baslik="Sıradaki iş"
+                    alt="Dönem kapanışında mükelleflerin sıradaki adımı"
+                    sag={<Ikon ad="ileri" renk={c.text3} />}
+                    onPress={() => router.push('/siradaki-is')}
+                  />
+                </Kart>
+              ) : null}
             </View>
 
             <Kart style={genis ? { flex: 1 } : undefined}>
