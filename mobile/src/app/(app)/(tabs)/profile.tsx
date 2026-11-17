@@ -20,7 +20,7 @@ import { useSupportChannel } from '@/features/support/use-support';
  * muhasebe kayıtları müşavirde kalır (yasal saklama).
  */
 export default function ProfileScreen() {
-  const { me, signOut, taxpayers, switchTaxpayer } = useAuth();
+  const { me, signOut, taxpayers, taxpayer, switchTaxpayer } = useAuth();
   const [step, setStep] = useState<'idle' | 'code'>('idle');
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -71,8 +71,9 @@ export default function ProfileScreen() {
         <Text tone="muted">{me?.user.email}</Text>
       </Card>
 
-      {env.privacyUrl || hasSupport ? (
+      {env.privacyUrl || hasSupport || taxpayer?.role === 'owner' ? (
         <Card>
+          {taxpayer?.role === 'owner' ? <Button title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}
           {env.privacyUrl ? <Button title="Gizlilik ve KVKK aydınlatma metni" variant="ghost" onPress={() => open(env.privacyUrl)} /> : null}
           {support.widgetId ? (
             <Button title="Destek" variant="ghost" onPress={() => router.push('/destek')} />

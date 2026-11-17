@@ -77,6 +77,7 @@ func main() {
 	if cfg.App.Env == "production" {
 		fatal("refusing to seed demo data with APP_ENV=production")
 	}
+	payrollSecret = cfg.Encryption.Key
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -211,6 +212,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			// Taxpayer report: charts, comment, schedule, history (#386).
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)
+			}
+			// Personel, Eylül ve Ekim bordroları, SGK ve bordro PDF'leri (#382).
+			if err := seedPayroll(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("payroll → %s: %w", tp.Key, err)
 			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)

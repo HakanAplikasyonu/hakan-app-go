@@ -120,7 +120,10 @@ export function TaxpayerShell({
             <MarkaLogosu varyant="tam" boyut={24} />
           </Link>
           <div className="hidden h-full min-w-0 flex-1 md:flex">
-            <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
+            <TaxpayerNav
+              taxpayer={context.data.taxpayer.uuid}
+              owner={context.data.role === "owner"}
+            />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
             <SupportButton />
@@ -132,7 +135,10 @@ export function TaxpayerShell({
           </div>
         </div>
         <div className="border-line h-12 border-t px-2 md:hidden">
-          <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
+          <TaxpayerNav
+            taxpayer={context.data.taxpayer.uuid}
+            owner={context.data.role === "owner"}
+          />
         </div>
       </header>
       <main

@@ -59,7 +59,7 @@ func TestPayrollFlow(t *testing.T) {
 		}
 	}
 
-	csv := "LUCA BORDRO DÖKÜMÜ\nDönem: 2026/10\n\n" +
+	csv := "LUCA BORDRO DÖKÜMÜ\nDönem: 2026/07\n\n" +
 		"Adı Soyadı;TC Kimlik No;Brüt Ücret;SGK İşçi Payı;İşsizlik İşçi Payı;Ödenecek Gelir Vergisi;Damga Vergisi;Net Ücret;SGK İşveren Payı;İşsizlik İşveren Payı;SGK Teşvik\n" +
 		"Ayşe Yılmaz;10000000146;40.000,00;5.600,00;400,00;2.100,00;153,60;31.746,40;8.200,00;800,00;2.000,00\n" +
 		"Mehmet Demir;12345678950;26.005,50;3.640,77;260,06;0,00;0,00;22.104,67;5.331,13;520,11;1.300,28\n"
@@ -77,7 +77,7 @@ func TestPayrollFlow(t *testing.T) {
 		Committed    bool     `json:"committed"`
 	}
 	decode(t, rec, &prev)
-	if prev.Period != "2026-10" || prev.SourceSystem != "luca" || len(prev.Missing) != 0 || prev.LineCount != 2 || prev.Committed {
+	if prev.Period != "2026-07" || prev.SourceSystem != "luca" || len(prev.Missing) != 0 || prev.LineCount != 2 || prev.Committed {
 		t.Fatalf("preview %+v", prev)
 	}
 	var runs struct {
@@ -95,8 +95,17 @@ func TestPayrollFlow(t *testing.T) {
 			JournalDraftUUID *string `json:"journal_draft_uuid"`
 		} `json:"items"`
 	}
+	// Demo seed has its own runs (2026-09, 2026-10); this test uses July.
+	july := func() int {
+		for i, r := range runs.Items {
+			if r.Period == "2026-07" {
+				return i
+			}
+		}
+		return -1
+	}
 	get(t, base+"/runs", &runs)
-	if len(runs.Items) != 0 {
+	if july() >= 0 {
 		t.Fatalf("preview wrote a run: %+v", runs.Items)
 	}
 
@@ -115,11 +124,12 @@ func TestPayrollFlow(t *testing.T) {
 		t.Fatalf("re-import: %d %s", rec.Code, rec.Body)
 	}
 	get(t, base+"/runs?year=2026", &runs)
-	if len(runs.Items) != 1 || runs.Items[0].Period != "2026-10" || runs.Items[0].Totals.Net != "53851.07" ||
-		runs.Items[0].SGK == nil || runs.Items[0].SGK.Payable != "21451.79" || runs.Items[0].PaymentStatus != "unpaid" {
+	j := july()
+	if j < 0 || runs.Items[j].Totals.Net != "53851.07" ||
+		runs.Items[j].SGK == nil || runs.Items[j].SGK.Payable != "21451.79" || runs.Items[j].PaymentStatus != "unpaid" {
 		t.Fatalf("runs %+v", runs.Items)
 	}
-	run := runs.Items[0].UUID
+	run := runs.Items[j].UUID
 
 	var emps struct {
 		Items []struct {
@@ -128,8 +138,8 @@ func TestPayrollFlow(t *testing.T) {
 		} `json:"items"`
 		Active int64 `json:"active"`
 	}
-	get(t, base+"/employees", &emps)
-	if len(emps.Items) != 2 || emps.Active != 2 || emps.Items[0].Masked == nil || *emps.Items[0].Masked != "100******46" {
+	get(t, base+"/employees?q=Ayşe", &emps)
+	if len(emps.Items) != 1 || emps.Items[0].Masked == nil || *emps.Items[0].Masked != "100******46" {
 		t.Fatalf("employees %+v", emps)
 	}
 	if strings.Contains(e.do(t, http.MethodGet, base+"/employees", sweepCase{}, false).Body.String(), "10000000146") {
@@ -191,11 +201,11 @@ func TestPayrollFlow(t *testing.T) {
 		UUID string `json:"uuid"`
 	}
 	decode(t, rec, &box)
-	sta := "Tarih;Açıklama;Tutar;Bakiye\n05.11.2026;EKİM MAAŞ ÖDEMESİ;-53.851,07;100.000,00\n28.11.2026;SGK PRİM ÖDEMESİ 2026/10;-21.451,79;78.548,21\n"
+	sta := "Tarih;Açıklama;Tutar;Bakiye\n05.08.2026;TEMMUZ MAAŞ ÖDEMESİ;-53.851,07;100.000,00\n28.08.2026;SGK PRİM ÖDEMESİ 2026/07;-21.451,79;78.548,21\n"
 	if rec := form(t, "/v1/tenant/engagements/"+eng+"/bank-statements", map[string]string{"cash_box_uuid": box.UUID}, "ekstre.csv", sta, false); rec.Code >= 300 {
 		t.Fatalf("statement: %d %s", rec.Code, rec.Body)
 	}
-	rec = e.do(t, http.MethodPost, base+"/bank-match", sweepCase{body: `{"period":"2026-10"}`}, false)
+	rec = e.do(t, http.MethodPost, base+"/bank-match", sweepCase{body: `{"period":"2026-07"}`}, false)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("bank match: %d %s", rec.Code, rec.Body)
 	}
@@ -208,32 +218,32 @@ func TestPayrollFlow(t *testing.T) {
 		t.Fatalf("match %+v (%s)", m, rec.Body)
 	}
 	get(t, base+"/runs", &runs)
-	if runs.Items[0].PaymentStatus != "paid" || runs.Items[0].SGK.Status != "paid" || runs.Items[0].JournalDraftUUID == nil {
-		t.Fatalf("after match %+v", runs.Items[0])
+	if j := july(); runs.Items[j].PaymentStatus != "paid" || runs.Items[j].SGK.Status != "paid" || runs.Items[j].JournalDraftUUID == nil {
+		t.Fatalf("after match %+v", runs.Items[j])
 	}
 	var bank struct {
 		Summary struct {
 			Matched int64 `json:"matched"`
 		} `json:"summary"`
 	}
-	get(t, "/v1/tenant/engagements/"+eng+"/bank-transactions?period=2026-11", &bank)
+	get(t, "/v1/tenant/engagements/"+eng+"/bank-transactions?period=2026-08", &bank)
 	if bank.Summary.Matched != 2 {
 		t.Fatalf("bank summary %+v", bank.Summary)
 	}
 
 	// Bordro PDF'i: ofis yükler, mükellef görür ve indirir; gizli olan görünmez.
 	pdf := "%PDF-1.4\n% ekim bordrosu\n"
-	if rec := form(t, base+"/documents", map[string]string{"period": "2026-10"}, "ekim.txt", "not a pdf", false); rec.Code != http.StatusUnsupportedMediaType {
+	if rec := form(t, base+"/documents", map[string]string{"period": "2026-07"}, "ekim.txt", "not a pdf", false); rec.Code != http.StatusUnsupportedMediaType {
 		t.Fatalf("non-pdf: %d %s", rec.Code, rec.Body)
 	}
-	rec = form(t, base+"/documents", map[string]string{"period": "2026-10", "title": "Ekim bordrosu"}, "ekim-bordro.pdf", pdf, false)
+	rec = form(t, base+"/documents", map[string]string{"period": "2026-07", "title": "Temmuz bordrosu"}, "ekim-bordro.pdf", pdf, false)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("document: %d %s", rec.Code, rec.Body)
 	}
-	if rec := form(t, base+"/documents", map[string]string{"period": "2026-10"}, "ekim-bordro.pdf", pdf, false); rec.Code != http.StatusConflict {
+	if rec := form(t, base+"/documents", map[string]string{"period": "2026-07"}, "ekim-bordro.pdf", pdf, false); rec.Code != http.StatusConflict {
 		t.Fatalf("duplicate document: %d", rec.Code)
 	}
-	if rec := form(t, base+"/documents", map[string]string{"period": "2026-10", "visible_to_taxpayer": "false"}, "ic.pdf", pdf+"% ic\n", false); rec.Code != http.StatusCreated {
+	if rec := form(t, base+"/documents", map[string]string{"period": "2026-07", "visible_to_taxpayer": "false"}, "ic.pdf", pdf+"% ic\n", false); rec.Code != http.StatusCreated {
 		t.Fatalf("hidden document: %d %s", rec.Code, rec.Body)
 	}
 	var docs struct {
@@ -243,16 +253,16 @@ func TestPayrollFlow(t *testing.T) {
 		} `json:"items"`
 		Total int64 `json:"total"`
 	}
-	get(t, base+"/documents?period=2026-10", &docs)
+	get(t, base+"/documents?period=2026-07", &docs)
 	if docs.Total != 2 {
 		t.Fatalf("office documents %+v", docs)
 	}
-	rec = e.do(t, http.MethodGet, "/v1/taxpayer/payroll/documents", sweepCase{}, true)
+	rec = e.do(t, http.MethodGet, "/v1/taxpayer/payroll/documents?period=2026-07", sweepCase{}, true)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("taxpayer documents: %d %s", rec.Code, rec.Body)
 	}
 	decode(t, rec, &docs)
-	if docs.Total != 1 || docs.Items[0].Title != "Ekim bordrosu" {
+	if docs.Total != 1 || docs.Items[0].Title != "Temmuz bordrosu" {
 		t.Fatalf("taxpayer documents %+v", docs)
 	}
 	frec := e.do(t, http.MethodGet, "/v1/taxpayer/payroll/documents/"+docs.Items[0].UUID+"/file", sweepCase{}, true)
