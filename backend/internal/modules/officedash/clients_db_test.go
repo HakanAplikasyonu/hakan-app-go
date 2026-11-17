@@ -182,8 +182,9 @@ func TestContactsAndReceiptImage(t *testing.T) {
 	if c.Phone == nil || *c.Phone != "+90 212 555 01 01" || c.Email != nil || len(c.Members) != 1 || c.Members[0].Role != "owner" {
 		t.Fatalf("contacts = %+v", c)
 	}
-	// Another taxpayer's engagement has no members and no phone.
-	if w := e.engagement(t, e.h.Contacts, 1, nil); w.Code != http.StatusOK || bytes.Contains(w.Body.Bytes(), []byte("555")) {
+	// Another taxpayer's engagement has no members and no phone. The whole
+	// number is searched: a random taxpayer uuid may contain "555".
+	if w := e.engagement(t, e.h.Contacts, 1, nil); w.Code != http.StatusOK || bytes.Contains(w.Body.Bytes(), []byte("555 01 01")) {
 		t.Fatalf("contacts of engagement 2 leaked: %s", w.Body)
 	}
 
