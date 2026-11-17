@@ -1510,6 +1510,7 @@
   "tax_returns.group_export_registered": "Supply for export",
   "tax_returns.group_other": "Other exemption",
   "tax_returns.col_rate": "VAT rate",
+  "tax_returns.col_withholding_rate": "Withholding rate",
   "tax_returns.col_base": "Tax base",
   "tax_returns.col_vat": "Tax",
   "tax_returns.col_invoice_base": "Invoices",

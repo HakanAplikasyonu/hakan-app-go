@@ -10,6 +10,8 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 | `tests/taxpayer-invite.spec.ts` | Mükellef paneli daveti: davet e-postası → kayıt → kabul; yalnızca kendi şirketini görür | Demo ofisi, Selin Yılmaz'a yeni çalışan |
 | `tests/a11y.spec.ts` | Erişilebilirlik (#194): misafir, ofis ve mükellef ana sayfalarında axe-core (WCAG 2.1 A/AA); kritik ve ciddi ihlal testi kırar. Komut paleti klavyeyle (Ctrl+K / Esc) | Yalnızca okur |
 | `tests/access.spec.ts` | Rol bazlı erişim reddi: giriş yapmamış kullanıcı, stajyer (roller, davet, ayar, platform, atanmadığı mükellef; arayüz ve API), mükellef kullanıcısının ofis paneli | Yalnızca okur |
+| `tests/mutabakat.spec.ts` | Mutabakat panosu (#389): hesap farkları (filtre, ayrıntı, açıkla / yeniden aç), BA/BS beyan satırı ekle / sil, cari mektubu oluştur ve gönder, karşı firmanın yanıt sayfası (itiraz), geçersiz bağlantı | Demo ofisi, Atlas Gıda; benzersiz alıcı ve VKN |
+| `tests/beyanname.spec.ts` | Beyannameler (#390): KDV1 düzeltme, kontrol listesi, hazırla, Excel, verildi kaydı; MUHSGK hazırla / Excel / taslağa geri al; Ba / Bs formları | Demo ofisi, Atlas Gıda (beyan dönemi) |
 
 `office-onboarding.spec.ts` ofis ana akışının adımları:
 
