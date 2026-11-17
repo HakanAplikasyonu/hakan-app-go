@@ -836,6 +836,8 @@
   "payroll.field_employer_cost": "İşverene maliyet",
   "bank.title": "Banka hareketleri",
   "bank.description": "Ekstrelerden ve banka bağlantılarından gelen hareketler. Dönem üst çubuktan.",
+  "bank.export": "Excel'e aktar",
+  "bank.export_failed": "Excel dosyası indirilemedi",
   "bank.in_total": "Giriş",
   "bank.out_total": "Çıkış",
   "bank.unmatched_count": "Eşleşmemiş hareket",

@@ -56,6 +56,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.renameCashBox), authn, org, write, eng))
 	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
 	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
+	mux.Handle("GET "+txs+"/export", middleware.Chain(http.HandlerFunc(h.exportTransactions), authn, org, read, eng))
 	// Office statement templates (#383): no engagement, the office's layouts.
 	tpl := "/v1/tenant/bank-statement-templates"
 	mux.Handle("GET "+tpl, middleware.Chain(http.HandlerFunc(h.listTemplates), authn, org, read))

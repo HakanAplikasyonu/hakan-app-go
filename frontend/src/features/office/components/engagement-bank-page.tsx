@@ -2,8 +2,9 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowDownLeft, ArrowUpRight, Link2Off } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Download, Link2Off } from "lucide-react";
 import { Suspense, useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
@@ -13,6 +14,7 @@ import {
   MoneyCell,
   type StatusVariant,
 } from "@/components/tables";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { components } from "@/generated/api";
 import { EngagementNextWork } from "@/features/copilot";
@@ -22,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
+import { downloadFile } from "../services/download";
 import { useOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
 import { BankPostingPanel } from "./bank-posting-panel";
@@ -226,7 +229,29 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
           </h1>
           <p className="text-text-2 text-sm">{t("office.bank.description")}</p>
         </div>
-        <BankStatementUpload engagement={engagement} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* #395: süzgece (dönem, eşleşme) uyan hareketler .xlsx olarak. */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-md:min-h-11"
+            onClick={() =>
+              void downloadFile(
+                slug,
+                `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-transactions/export`,
+                {
+                  period,
+                  match_status: match === "all" ? undefined : match,
+                },
+                "banka-hareketleri.xlsx",
+              ).catch(() => toast.error(t("office.bank.export_failed")))
+            }
+          >
+            <Download className="size-4" aria-hidden />
+            {t("office.bank.export")}
+          </Button>
+          <BankStatementUpload engagement={engagement} />
+        </div>
       </div>
       <EngagementTabs engagement={engagement} />
       <EngagementNextWork engagement={engagement} />

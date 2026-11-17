@@ -9685,6 +9685,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Bank transactions as Excel
+         * @description Requires `tenant.bank.read` (#395). The transactions of the list filter
+         *     (Hesap Adı, Hesap IBAN, Tarih, Valör Tarihi, Açıklama, Karşı Taraf,
+         *     Karşı Taraf IBAN, Karşı Taraf VKN, Borç, Alacak, Bakiye, Para Birimi,
+         *     Dekont No, Referans No, Kanal, Hareket Türü, Eşleşme) as .xlsx, oldest
+         *     first per account, at most 20 000 rows; dates dd.mm.yyyy, amounts as
+         *     numbers with two decimals. The headers are the statement reader's: the
+         *     file uploads back (statement upload or the common Excel import as
+         *     `bank_transactions`) without duplicating movements.
+         */
+        get: operations["exportTenantBankTransactions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
         parameters: {
             query?: never;
@@ -34468,6 +34503,43 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportTenantBankTransactions: {
+        parameters: {
+            query?: {
+                period?: string;
+                match_status?: "unmatched" | "suggested" | "matched" | "ignored" | "all";
+                cash_box_uuid?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

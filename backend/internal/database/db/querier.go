@@ -300,6 +300,9 @@ type Querier interface {
 	// First device registration opts the user into push (the OS permission
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
+	// Banka hareketleri Excel dışa aktarımı (#395): listeyle aynı süzgeç, ekstre
+	// kolonları ve hesabın IBAN'ı; eskiden yeniye.
+	ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error)
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
 	FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (TaxReturn, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
