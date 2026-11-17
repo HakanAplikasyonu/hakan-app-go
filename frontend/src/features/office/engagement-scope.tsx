@@ -42,15 +42,23 @@ export function useEngagementScope(): string | null {
  * Fatura ayrıntısının bağlantısı: mükellef bağlamında (ve fatura o mükellefin
  * ise) sekme içindeki rota, liste durumu taşınarak; değilse genel rota.
  */
-export function useInvoiceHref() {
+export function useInvoiceHref({
+  carry = true,
+}: {
+  /**
+   * Fatura listesinden açılınca liste durumu taşınır; başka bir ekrandan
+   * (uyarı, inceleme, yükleme) açılınca o ekranın parametreleri taşınmaz.
+   */
+  carry?: boolean;
+} = {}) {
   const scope = useEngagementScope();
   const { slug } = useTenant();
   const params = useSearchParams();
   return useCallback(
     (id: string, engagement?: string | null) =>
       scope && (!engagement || engagement === scope)
-        ? `${routes.tenant.engagementInvoice(slug, scope, id)}${carryListParams(params)}`
+        ? `${routes.tenant.engagementInvoice(slug, scope, id)}${carry ? carryListParams(params) : ""}`
         : routes.tenant.invoice(slug, id, engagement ?? undefined),
-    [scope, slug, params],
+    [carry, scope, slug, params],
   );
 }

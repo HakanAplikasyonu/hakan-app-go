@@ -10,6 +10,7 @@ import {
 } from "@/components/tables";
 import { useLocale } from "@/providers/locale-provider";
 
+import { useEngagementScope } from "../engagement-scope";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
 import {
   ACCOUNT_CODE_RE,
@@ -42,7 +43,9 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
   const { t } = useLocale();
   const directory = useEngagementDirectory();
   const { period } = useOfficePeriod();
-  const [engagement, setEngagement] = useState("all");
+  // Mükellef detayının İnceleme sekmesinde mükellef sabit (#468).
+  const scope = useEngagementScope();
+  const [engagement, setEngagement] = useState(() => scope ?? "all");
   const query = useReviewSuggestions({
     status: "pending",
     engagement: engagement === "all" ? undefined : engagement,
@@ -199,9 +202,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          {t("office.review_title")}
-        </h1>
+        <ReviewHeading scoped={!!scope} />
         <span className="bg-surface-2 rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
           {t("office.review_pending", { count: query.data?.total ?? 0 })}
         </span>
@@ -230,18 +231,20 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
           maxHeight="calc(100svh - 18rem)"
           toolbar={
             <>
-              <FilterSelect
-                label={t("office.col_taxpayer")}
-                value={engagement}
-                onChange={setEngagement}
-                options={[
-                  { value: "all", label: t("office.filter_all") },
-                  ...directory.list.map((x) => ({
-                    value: x.engagementUuid,
-                    label: x.title,
-                  })),
-                ]}
-              />
+              {scope ? null : (
+                <FilterSelect
+                  label={t("office.col_taxpayer")}
+                  value={engagement}
+                  onChange={setEngagement}
+                  options={[
+                    { value: "all", label: t("office.filter_all") },
+                    ...directory.list.map((x) => ({
+                      value: x.engagementUuid,
+                      label: x.title,
+                    })),
+                  ]}
+                />
+              )}
               {engagement === "all" ? (
                 <span className="text-muted-foreground text-xs">
                   {t("office.review_grid.plan_hint")}
@@ -257,4 +260,15 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
 
 function getSuggestionId(s: ReviewSuggestion) {
   return s.uuid;
+}
+
+/** Sayfa başlığı: mükellef detayında (#468) h2, genel sayfada h1. */
+export function ReviewHeading({ scoped }: { scoped: boolean }) {
+  const { t } = useLocale();
+  const Heading = scoped ? "h2" : "h1";
+  return (
+    <Heading className="font-display text-2xl font-semibold tracking-tight">
+      {t("office.review_title")}
+    </Heading>
+  );
 }

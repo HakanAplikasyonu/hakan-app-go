@@ -67,6 +67,14 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.nav_invoices"),
     },
     {
+      href: routes.tenant.engagementWarnings(slug, engagement),
+      label: t("office.engagement.tab_warnings"),
+    },
+    {
+      href: routes.tenant.engagementReview(slug, engagement),
+      label: t("office.engagement.tab_review"),
+    },
+    {
       href: routes.tenant.engagementBank(slug, engagement),
       label: t("office.engagement.tab_bank"),
     },
@@ -95,9 +103,21 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementReconciliation(slug, engagement),
       label: t("office.engagement.tab_reconciliation"),
     },
+    ...(can(Permission.TenantJournalsRead)
+      ? [
+          {
+            href: routes.tenant.engagementJournals(slug, engagement),
+            label: t("office.engagement.tab_journals"),
+          },
+        ]
+      : []),
     {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
+    },
+    {
+      href: routes.tenant.engagementUpload(slug, engagement),
+      label: t("office.engagement.tab_upload"),
     },
     // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
     ...(can(Permission.TenantTaxReturnsRead)

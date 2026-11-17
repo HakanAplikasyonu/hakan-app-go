@@ -176,12 +176,12 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
               label={t("office.engagement.stat_blockers")}
               value={cell?.open_blockers ?? 0}
               tone={cell?.open_blockers ? "danger" : "ok"}
-              href={routes.tenant.warnings(slug)}
+              href={routes.tenant.engagementWarnings(slug, engagement)}
             />
             <Stat
               label={t("office.engagement.stat_warnings")}
               value={warnings.isLoading ? "–" : openWarnings}
-              href={routes.tenant.warnings(slug)}
+              href={routes.tenant.engagementWarnings(slug, engagement)}
             />
             <Stat
               label={t("office.engagement.stat_changes")}
