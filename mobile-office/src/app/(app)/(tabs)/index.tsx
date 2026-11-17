@@ -13,6 +13,7 @@ import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { initials } from '@/features/clients/format';
+import { providerWidgetId } from '@/features/support/use-support';
 import { useDashboard, usePeriodCrown, type DashboardUpload } from '@/features/dashboard/api';
 import {
   clock,
@@ -174,6 +175,8 @@ export default function HomeScreen() {
         <Kart style={{ padding: 16 }}>
           <GorunumAyari />
         </Kart>
+        {/* Destek (#387): yazılım sağlayıcısının ClickFix widget'ı tanımlıysa. */}
+        {providerWidgetId ? <Button title="Destek" variant="secondary" onPress={() => router.push('/destek')} /> : null}
         {offices.length > 1 ? <Button title="Ofis değiştir" variant="secondary" onPress={switchOffice} /> : null}
         <Button title="Çıkış yap" variant="ghost" onPress={signOut} />
       </ScrollView>

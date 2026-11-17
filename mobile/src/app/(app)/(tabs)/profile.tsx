@@ -1,4 +1,5 @@
 import { GorunumAyari, Kart } from '@hakan/mobile-core/ui/parcalar';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 
@@ -8,6 +9,7 @@ import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { env } from '@/core/config/env';
 import { versionLabel } from '@/core/config/version';
+import { useSupportChannel } from '@/features/support/use-support';
 
 /**
  * Profil ve hesap (#202): gizlilik ve destek bağlantıları (yapılandırmadan),
@@ -23,6 +25,10 @@ export default function ProfileScreen() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Destek (#387): ClickFix widget'ı tanımlıysa uygulama içi ekran, yoksa
+  // yapılandırmadaki destek bağlantısı.
+  const support = useSupportChannel();
+  const hasSupport = !!support.widgetId || !!env.supportUrl;
 
   async function run(fn: () => Promise<void>) {
     if (busy) return;
@@ -65,10 +71,14 @@ export default function ProfileScreen() {
         <Text tone="muted">{me?.user.email}</Text>
       </Card>
 
-      {env.privacyUrl || env.supportUrl ? (
+      {env.privacyUrl || hasSupport ? (
         <Card>
           {env.privacyUrl ? <Button title="Gizlilik ve KVKK aydınlatma metni" variant="ghost" onPress={() => open(env.privacyUrl)} /> : null}
-          {env.supportUrl ? <Button title="Destek" variant="ghost" onPress={() => open(env.supportUrl)} /> : null}
+          {support.widgetId ? (
+            <Button title="Destek" variant="ghost" onPress={() => router.push('/destek')} />
+          ) : env.supportUrl ? (
+            <Button title="Destek" variant="ghost" onPress={() => open(env.supportUrl)} />
+          ) : null}
         </Card>
       ) : null}
 

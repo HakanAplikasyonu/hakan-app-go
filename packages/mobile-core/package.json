@@ -10,6 +10,7 @@
     "./ui/ikon": "./src/ui/ikon.tsx",
     "./ui/sekme-cubugu": "./src/ui/sekme-cubugu.tsx",
     "./ui/parcalar": "./src/ui/parcalar.tsx",
+    "./ui/destek": "./src/ui/destek.tsx",
     "./*": "./src/*.ts"
   },
   "scripts": {
@@ -27,6 +28,7 @@
     "react": ">=19",
     "react-native": "*",
     "react-native-safe-area-context": "*",
-    "react-native-svg": "*"
+    "react-native-svg": "*",
+    "react-native-webview": ">=13"
   }
 }
