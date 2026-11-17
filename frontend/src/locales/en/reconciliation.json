@@ -1,0 +1,23 @@
+{
+  "title": "Balance confirmation",
+  "from": "From {{taxpayer}} to {{counterparty}}",
+  "balance_debit": "As of {{date}}, our books show a debit balance of {{amount}} on your account.",
+  "balance_credit": "As of {{date}}, our books show a credit balance of {{amount}} on your account.",
+  "balance_zero": "As of {{date}}, our books show no balance on your account.",
+  "question": "Did you compare it with your books?",
+  "choice_agreed": "We agree",
+  "choice_disputed": "We do not agree",
+  "your_balance": "Balance in our books (TL)",
+  "your_balance_hint": "Positive for a debit balance, negative for a credit balance. If unsure, write a note.",
+  "name": "Your name",
+  "note": "Note",
+  "submit": "Send answer",
+  "failed": "The answer could not be sent.",
+  "answered_agreed": "Thank you, the balance is confirmed.",
+  "answered_disputed": "Thank you, your objection was sent.",
+  "footer": "This page was sent by {{office}} through HAKAN.",
+  "not_found_title": "Invalid link",
+  "not_found": "This reconciliation link was not found. Make sure you copied the whole link from the email.",
+  "expired_title": "The link has expired",
+  "expired": "This reconciliation link is no longer valid. Ask for a new letter."
+}

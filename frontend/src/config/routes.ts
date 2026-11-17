@@ -160,6 +160,9 @@ export const routes = {
     /** Expenses (masraf) of one engagement (#384). */
     engagementExpenses: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/expenses`,
+    /** Mutabakat panosu: mizan – kaynak ve cari mutabakat (#389). */
+    engagementReconciliation: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/reconciliation`,
     /** Z reports (ÖKC gün sonu) of one engagement (#384). */
     engagementZReports: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/z-reports`,
@@ -190,6 +193,9 @@ export const routes = {
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,
   /** Mükellef invitation link sent by an office (public). */
   inviteTaxpayer: (token: string) => `/invite/m/${encodeURIComponent(token)}`,
+  /** Cari mutabakat mektubu yanıt bağlantısı (#389, public). */
+  reconciliationResponse: (token: string) =>
+    `/mutabakat/${encodeURIComponent(token)}`,
   /** Consent link an office's add-mükellef request emails (public). */
   consent: (token: string) => `/consent/${encodeURIComponent(token)}`,
   /**

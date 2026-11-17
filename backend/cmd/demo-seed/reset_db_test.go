@@ -141,9 +141,15 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		// #393: yedi arşiv evrakı; üçü İSG, biri 30 gün içinde bitiyor, birinin süresi dolmuş.
 		`SELECT count(*) FROM taxpayer_documents`: 7,
 		// #395: başka programın masraf raporu ortak Excel akışından, ofis şablonuyla.
-		`SELECT count(*) FROM excel_imports WHERE data_type = 'expenses' AND status = 'committed'`:                                  1,
-		`SELECT count(*) FROM excel_import_templates WHERE data_type = 'expenses' AND scope = 'tenant'`:                             1,
-		`SELECT count(*) FROM expenses WHERE capture_method = 'excel_import' AND period = '2026-11'`:                                3,
+		`SELECT count(*) FROM excel_imports WHERE data_type = 'expenses' AND status = 'committed'`:      1,
+		`SELECT count(*) FROM excel_import_templates WHERE data_type = 'expenses' AND scope = 'tenant'`: 1,
+		`SELECT count(*) FROM expenses WHERE capture_method = 'excel_import' AND period = '2026-11'`:    3,
+		// #389: Ekim mutabakatı, mektuplar (biri yanıtlanmış), bir kalem inceleme kuyruğunda.
+		`SELECT count(*) FROM reconciliation_runs WHERE period = '2026-10'`:                                                         1,
+		`SELECT count(*) FROM reconciliation_letters`:                                                                               2,
+		`SELECT count(*) FROM reconciliation_letters WHERE response = 'agreed'`:                                                     1,
+		`SELECT count(*) FROM reconciliation_items WHERE status = 'in_review'`:                                                      1,
+		`SELECT count(*) FROM reconciliation_items WHERE status = 'explained' AND note IS NOT NULL`:                                 1,
 		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until BETWEEN CURRENT_DATE AND CURRENT_DATE + 30`: 1,
 		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until < CURRENT_DATE`:                             1,
 	} {

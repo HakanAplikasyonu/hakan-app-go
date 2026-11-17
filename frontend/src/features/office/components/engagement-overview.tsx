@@ -91,6 +91,10 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
       label: t("office.engagement.tab_zreports"),
     },
     {
+      href: routes.tenant.engagementReconciliation(slug, engagement),
+      label: t("office.engagement.tab_reconciliation"),
+    },
+    {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
     },

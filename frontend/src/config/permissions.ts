@@ -71,6 +71,9 @@ export const Permission = {
   /** Personel, bordro ve SGK (issue #382). */
   TenantPayrollRead: "tenant.payroll.read",
   TenantPayrollWrite: "tenant.payroll.write",
+  /** Mutabakat: mizan – kaynak ve cari mutabakat (#389). */
+  TenantReconciliationRead: "tenant.reconciliation.read",
+  TenantReconciliationWrite: "tenant.reconciliation.write",
   /** Belge arşivi ve İSG evrakları (issue #393). */
   TenantDocumentsRead: "tenant.documents.read",
   TenantDocumentsWrite: "tenant.documents.write",
@@ -229,6 +232,10 @@ export const permissions = {
     agents: {
       read: Permission.TenantAgentsRead,
       write: Permission.TenantAgentsWrite,
+    },
+    reconciliation: {
+      read: Permission.TenantReconciliationRead,
+      write: Permission.TenantReconciliationWrite,
     },
     receipts: {
       read: Permission.TenantReceiptsRead,
