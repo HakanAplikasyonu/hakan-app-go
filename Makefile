@@ -18,7 +18,7 @@ endef
 
 FRONTEND_PORT ?= 3000
 
-.PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo-seed perf-seed perf-load \
+.PHONY: api-types api-types-check infra infra-down infra-logs infra-ps migrate-up backend-dev frontend-dev local-dev demo demo-seed perf-seed perf-load \
 	e2e-up e2e-test e2e-down free-dev-ports prod-env-init prod-env-upgrade prod-env-check env-check compose-env-check prod-config prod-up prod-down host-up host-down prod-smoke tools create-super-admin search-reindex check-i18n check-migrations
 
 infra:
@@ -187,6 +187,12 @@ SA_EMAIL    ?= admin@example.com
 SA_PASSWORD ?= Password1
 SA_NAME     ?= Platform
 SA_SURNAME  ?= Admin
+
+# Pilot demosu tek komutla (#456): compose altyapısı, veritabanını SIFIRLAR,
+# migration, demo seed ve platform yöneticisi. Altyapı zaten çalışıyorsa:
+# make demo ARGS=--no-infra. Senaryo: docs/kullanim/demo-senaryosu.md
+demo:
+	@ENV_FILE="$(ENV_FILE)" scripts/demo.sh $(ARGS)
 
 # Temiz veritabanında tek komutla demo (#17): göçler + demo ofisi.
 # Baştan kurmak için: make demo-seed ARGS=-reset
