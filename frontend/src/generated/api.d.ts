@@ -7901,6 +7901,146 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/runs": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Reconciliation runs
+         * @description Requires `tenant.reconciliation.read` (#389). Newest period first, then newest run; at most 100. `period` narrows to one month.
+         */
+        get: operations["listReconciliationRuns"];
+        put?: never;
+        /**
+         * Compare the period's trial balance with the sources
+         * @description Requires `tenant.reconciliation.write` (#389). Takes the newest trial balance (mizan) with amounts uploaded for `period`
+         *     (or `trial_balance_uuid`) and compares it per main account (3 digits) with the journal draft lines of the portal's sources
+         *     (invoices, bank, expenses, Z reports, payroll, manual entries).
+         *
+         *     - **Ledger side:** the trial balance's leaf totals. When a trial balance of an earlier month of the same year exists, its totals
+         *       are subtracted (the movement since then) and the sources are read from the month after it; otherwise both sides run from January
+         *       (`summary.cumulative`: the opening entry is in the ledger only).
+         *     - **Sources:** journal draft lines of the window's `mahsup` drafts. When the export settings say invoices reach the accounting program
+         *       directly, invoices that are in no draft count as sources (120 / 600 / 391, 191 / 320).
+         *     - **Missing entries:** source records in no journal draft (bank movements, invoices, expenses, Z reports, payroll runs), with what each
+         *       would post per account.
+         *     - **Explanation:** a rule based suggestion per difference (drafts not exported, unposted records, a single record, rounding, opening
+         *       balance, missing source, not exported, timing).
+         *     - `summary.bank`: the trial balance's 102 balance against the bank statements' last closing balances (TRY).
+         *
+         *     Decisions and notes of the period's previous run carry over to an account whose difference did not change.
+         *     `422 RECONCILIATION_NO_TRIAL_BALANCE` when the period has no trial balance with amounts.
+         */
+        post: operations["runReconciliation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a run uuid */
+                runRef: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A reconciliation run with its account items
+         * @description Requires `tenant.reconciliation.read` (#389). `latest` is the newest run (of `period` when given). Items are sorted by main account.
+         */
+        get: operations["getReconciliationRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                itemUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Decide an account difference
+         * @description Requires `tenant.reconciliation.write` (#389). `explained` needs a note. Refused (409 `RECONCILIATION_IN_REVIEW`) while the item's
+         *     suggestion waits in the review queue.
+         */
+        patch: operations["decideReconciliationItem"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}/review": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                itemUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send an account difference to the review queue
+         * @description Requires `tenant.reconciliation.write` (#389). Submits a `reconciliation` suggestion (#14) whose value is
+         *     `{"status":"resolved","note":…}`: the note given here, else the engine's explanation. Accepting it in the queue resolves the item with
+         *     the note; rejecting reopens it; reverting puts the previous status back. The confidence is capped at 0.50 so a person decides.
+         *     409 `RECONCILIATION_NO_DIFFERENCE` for a matched account, 409 `RECONCILIATION_IN_REVIEW` when a suggestion is already pending.
+         */
+        post: operations["sendReconciliationItemToReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-export-settings": {
         parameters: {
             query?: never;
@@ -17589,6 +17729,121 @@ export interface components {
                 offset: number;
             };
             meta: components["schemas"]["ResponseMeta"];
+        };
+        ReconciliationKindCount: {
+            count: number;
+            /** @example 1500.00 */
+            amount: string;
+        };
+        ReconciliationSummary: {
+            accounts: number;
+            matched: number;
+            differences: number;
+            missing_in_ledger: number;
+            missing_in_sources: number;
+            /** @description Sum of the absolute differences (TL) */
+            difference_total: string;
+            unposted_count: number;
+            /** @description Unposted source records by kind (invoice, bank, expense, zreport, payroll) */
+            unposted: {
+                [key: string]: components["schemas"]["ReconciliationKindCount"];
+            };
+            /** @description No earlier trial balance of the year: compared from January */
+            cumulative: boolean;
+            /** @description Invoices reach the accounting program directly (export settings) */
+            invoices_direct: boolean;
+            bank: null | {
+                ledger_balance: string;
+                statement_balance: string;
+                difference: string;
+                accounts: number;
+                matched: boolean;
+            };
+            counterparties: number;
+            counterparty_differences: number;
+            babs_issues: number;
+        };
+        ReconciliationRun: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example 2026-10 */
+            period: string;
+            /** @example 2026-10 */
+            window_from: string;
+            /** @example 2026-10 */
+            window_to: string;
+            /** @example 1.00 */
+            tolerance: string;
+            trial_balance: null | {
+                /** Format: uuid */
+                uuid: string;
+                file_name: string;
+            };
+            summary: components["schemas"]["ReconciliationSummary"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ReconciliationItem: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example 102 */
+            main_code: string;
+            account_name: string;
+            ledger_debit: string;
+            ledger_credit: string;
+            ledger_net: string;
+            source_debit: string;
+            source_credit: string;
+            source_net: string;
+            /** @description ledger_net − source_net */
+            difference: string;
+            /** @enum {string} */
+            result: "matched" | "difference" | "missing_in_ledger" | "missing_in_sources";
+            /** @enum {string} */
+            status: "open" | "explained" | "in_review" | "resolved" | "ignored";
+            sources: {
+                /** @enum {string} */
+                kind: "invoice" | "bank" | "expense" | "zreport" | "payroll" | "manual";
+                debit: string;
+                credit: string;
+                lines: number;
+                /** @description Net of lines whose draft is not approved yet */
+                draft_net: string;
+            }[];
+            /** @description Source records in no journal draft that would post to the account (at most 50) */
+            unposted: {
+                /** @enum {string} */
+                kind: "invoice" | "bank" | "expense" | "zreport" | "payroll";
+                /** @description The record's uuid */
+                id: string;
+                date: string;
+                label: string;
+                amount: string;
+                /** @description debit − credit on this account */
+                effect: string;
+            }[];
+            sub_accounts: {
+                code: string;
+                name: string;
+                ledger_net: string;
+                source_net: string;
+            }[];
+            suggestion: string | null;
+            /** @enum {string|null} */
+            suggestion_code: "draft_not_exported" | "unposted_sources" | "single_unposted" | "rounding" | "opening_balance" | "missing_source" | "not_in_ledger" | "timing_or_missing_document" | null;
+            suggestion_confidence: string | null;
+            note: string | null;
+            review: null | {
+                /** Format: uuid */
+                uuid: string;
+                status: string;
+            };
+            /** Format: date-time */
+            decided_at: string | null;
+        };
+        ReconciliationRunDetail: {
+            run: components["schemas"]["ReconciliationRun"];
+            items: components["schemas"]["ReconciliationItem"][];
         };
     };
     responses: {
@@ -30142,6 +30397,254 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    listReconciliationRuns: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["ReconciliationRun"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    runReconciliation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                    /** Format: uuid */
+                    trial_balance_uuid?: string | null;
+                    /**
+                     * @description TL; a difference up to it counts as none (default 1)
+                     * @example 1.00
+                     */
+                    tolerance?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationRunDetail"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `RECONCILIATION_NO_TRIAL_BALANCE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getReconciliationRun: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a run uuid */
+                runRef: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationRunDetail"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideReconciliationItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                itemUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "open" | "explained" | "resolved" | "ignored";
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationItem"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendReconciliationItemToReview: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                itemUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ReconciliationItem"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `RECONCILIATION_UNAVAILABLE`: the review queue is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     getJournalExportSettings: {

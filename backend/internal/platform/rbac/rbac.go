@@ -121,6 +121,9 @@ const (
 	// Belge arşivi ve İSG evrakları (issue #393).
 	PermTenantDocumentsRead  = "tenant.documents.read"
 	PermTenantDocumentsWrite = "tenant.documents.write"
+	// Mutabakat: mizan – kaynak ve cari mutabakat (issue #389).
+	PermTenantReconciliationRead  = "tenant.reconciliation.read"
+	PermTenantReconciliationWrite = "tenant.reconciliation.write"
 
 	// KVKK data subject requests (issue #193).
 	PermTenantPrivacyRequest = "tenant.privacy.request"
