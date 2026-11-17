@@ -66,7 +66,8 @@ func TestBankTransactionsList(t *testing.T) {
 	}
 	var in, out int
 	for _, it := range all.Data.Items {
-		if it.Period != "2026-10" || it.CashBoxName != "Ziraat TL" {
+		// "Ziraat TL vadesiz": the demo seed's own bank month (#383).
+		if it.Period != "2026-10" || (it.CashBoxName != "Ziraat TL" && it.CashBoxName != "Ziraat TL vadesiz") {
 			t.Fatalf("row: %+v", it)
 		}
 		switch it.Direction {

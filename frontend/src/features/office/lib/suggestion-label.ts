@@ -139,6 +139,9 @@ export function suggestionTitle(s: SuggestionLike, t: Translate) {
   const cp = str("counterparty_name");
   if (cp)
     return tr(t, "office.review_api.counterparty_account", cp, { name: cp });
+  // Banka hareketinin karşı hesabı (#383): karşı tarafsız harekette açıklama.
+  const desc = s.kind === "bank_account" ? str("description") : undefined;
+  if (desc) return desc;
   return fieldTitle(s.target_field, t);
 }
 
