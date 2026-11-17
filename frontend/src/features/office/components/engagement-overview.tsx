@@ -78,6 +78,10 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
         ]
       : []),
     {
+      href: routes.tenant.engagementEasytrade(slug, engagement),
+      label: t("sources.easytrade.tab"),
+    },
+    {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
     },

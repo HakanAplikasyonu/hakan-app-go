@@ -201,6 +201,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedWhatsApp(ctx, pool, org.ID, eng.ID); err != nil {
 				return fmt.Errorf("whatsapp → %s: %w", tp.Key, err)
 			}
+			// Easytrade connection, sync history, financial transactions and Z (#385).
+			if err := seedEasytrade(ctx, pool, eng.TaxpayerID); err != nil {
+				return fmt.Errorf("easytrade → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}

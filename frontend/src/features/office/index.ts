@@ -13,3 +13,4 @@ export { AccountMemoryPage } from "./components/account-memory-page";
 export { EngagementOverviewPage } from "./components/engagement-overview";
 export { EngagementBankPage } from "./components/engagement-bank-page";
 export { EngagementPayrollPage } from "./components/engagement-payroll-page";
+export { EngagementEasytradePage } from "./components/engagement-easytrade-page";

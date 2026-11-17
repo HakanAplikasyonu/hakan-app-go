@@ -148,6 +148,9 @@ export const routes = {
     /** Personel, bordro ve SGK of one engagement (#382). */
     engagementPayroll: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/payroll`,
+    /** Easytrade sync, financial transactions and Z reports (#385). */
+    engagementEasytrade: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/easytrade`,
     /** Template-based petitions of one engagement (issue #56). */
     engagementPetitions: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,

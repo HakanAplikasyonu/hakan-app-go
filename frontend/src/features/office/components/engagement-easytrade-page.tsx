@@ -1,0 +1,751 @@
+"use client";
+
+import { Banknote, CreditCard, Landmark, RefreshCw } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { toast } from "sonner";
+
+import { ErrorState } from "@/components/common/error-state";
+import { BosDurum } from "@/components/hakan";
+import {
+  DataTable,
+  StatusPill,
+  createColumn,
+  createDateColumn,
+  createMoneyColumn,
+  createStatusColumn,
+  formatCellDate,
+  type StatusVariant,
+} from "@/components/tables";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Permission } from "@/config/permissions";
+import { isApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
+
+import { usePeriodMatrix } from "../hooks/use-office-data";
+import {
+  periodRange,
+  useEasytrade,
+  type EasytradeConnection,
+  type EasytradeFinancialTransaction,
+  type EasytradeSyncRun,
+  type EasytradeZReport,
+} from "../hooks/use-easytrade";
+import { useOfficePeriod } from "../period";
+import { EngagementTabs } from "./engagement-overview";
+import { Money } from "./office-ui";
+
+/** Senkron aralığı seçenekleri (dakika); "off" yalnızca elle senkron. */
+const INTERVALS = ["off", "60", "240", "720", "1440"] as const;
+
+const runVariants: Record<string, StatusVariant> = {
+  success: { labelKey: "sources.easytrade.run_success", tone: "ok" },
+  partial: { labelKey: "sources.easytrade.run_partial", tone: "warn" },
+  failed: { labelKey: "sources.easytrade.run_failed", tone: "danger" },
+  running: { labelKey: "sources.easytrade.run_running", tone: "info" },
+};
+
+const connTone: Record<string, "ok" | "warn" | "danger" | "neutral"> = {
+  active: "ok",
+  rate_limited: "warn",
+  auth_failed: "danger",
+  disabled: "danger",
+  pending: "neutral",
+};
+
+const KNOWN_TYPES = new Set([
+  "income",
+  "expense",
+  "retail_sale",
+  "opening_balance",
+]);
+
+const payIcon: Record<string, typeof Banknote> = {
+  cash: Banknote,
+  credit_card: CreditCard,
+  bank_transfer: Landmark,
+};
+
+function errText(err: unknown, fallback: string) {
+  return isApiError(err) ? err.message : fallback;
+}
+
+/**
+ * `/t/{slug}/engagements/{uuid}/easytrade` (#385): Easytrade bağlantısı,
+ * zamanlanmış senkron (son / sıradaki senkron, aralık, hata ve yeniden
+ * deneme), dönemin finansal işlemleri (ödeme türü, kişi/cari) ve Z
+ * raporları. Dönem ofisin global seçicisinden.
+ */
+export function EngagementEasytradePage({
+  engagement,
+}: {
+  engagement: string;
+}) {
+  const { t } = useLocale();
+  const { focus } = useOfficePeriod();
+  const matrix = usePeriodMatrix(1);
+  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
+  const et = useEasytrade(engagement, focus);
+
+  return (
+    <div className="space-y-5">
+      <div className="min-w-0">
+        <h1 className="font-display truncate text-2xl font-bold">
+          {row?.taxpayer_title ?? t("sources.easytrade.title")}
+        </h1>
+        <p className="text-text-2 text-sm">
+          {t("sources.easytrade.description")}
+        </p>
+      </div>
+      <EngagementTabs engagement={engagement} />
+
+      {et.connections.isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      ) : et.connections.isError ? (
+        <ErrorState
+          title={t("office.api.load_error")}
+          description={et.connections.error.message}
+          onRetry={() => void et.connections.refetch()}
+          retryLabel={t("common.retry")}
+        />
+      ) : !et.conn ? (
+        <ConnectCard et={et} />
+      ) : (
+        <>
+          <ConnectionCard conn={et.conn} et={et} period={focus} />
+          <PaymentSummary et={et} period={focus} />
+          <FinancialSection et={et} period={focus} />
+          <ZSection et={et} period={focus} />
+          <RunsSection runs={et.runs.data?.items} loading={et.runs.isLoading} />
+        </>
+      )}
+    </div>
+  );
+}
+
+type ET = ReturnType<typeof useEasytrade>;
+
+function ConnectCard({ et }: { et: ET }) {
+  const { t } = useLocale();
+  const { can } = usePermission();
+  const [form, setForm] = useState({ email: "", password: "", company_id: "" });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    et.connect.mutate(form, {
+      onSuccess: () => toast.success(t("sources.easytrade.connected")),
+      onError: (err) =>
+        toast.error(errText(err, t("sources.easytrade.connect_failed"))),
+    });
+  };
+  return (
+    <section className="space-y-4">
+      <BosDurum
+        baslik={t("sources.easytrade.empty_title")}
+        aciklama={t("sources.easytrade.empty")}
+      />
+      {can(Permission.TenantInvoicesWrite) ? (
+        <form
+          onSubmit={submit}
+          className="bg-surface border-line grid gap-3 rounded-xl border p-4 sm:grid-cols-4 sm:items-end"
+        >
+          {(["email", "password", "company_id"] as const).map((f) => (
+            <div key={f} className="space-y-1.5">
+              <Label htmlFor={`et-${f}`}>{t(`sources.easytrade.f_${f}`)}</Label>
+              <Input
+                id={`et-${f}`}
+                type={
+                  f === "password"
+                    ? "password"
+                    : f === "email"
+                      ? "email"
+                      : "text"
+                }
+                autoComplete={f === "password" ? "current-password" : "off"}
+                required
+                value={form[f]}
+                onChange={(e) => setForm({ ...form, [f]: e.target.value })}
+              />
+            </div>
+          ))}
+          <Button type="submit" disabled={et.connect.isPending}>
+            {t("sources.easytrade.connect")}
+          </Button>
+          <p className="text-text-3 text-xs sm:col-span-4">
+            {t("sources.easytrade.connect_hint")}
+          </p>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
+function ConnectionCard({
+  conn,
+  et,
+  period,
+}: {
+  conn: EasytradeConnection;
+  et: ET;
+  period: string;
+}) {
+  const { t, locale } = useLocale();
+  const { can } = usePermission();
+  const canWrite = can(Permission.TenantInvoicesWrite);
+  const dt = (v?: string | null) =>
+    v ? formatCellDate(v, locale, "datetime") : t("sources.easytrade.never");
+  const failures = conn.sync_failures ?? 0;
+  const interval =
+    conn.sync_interval_minutes == null
+      ? "off"
+      : String(conn.sync_interval_minutes);
+  const facts: { label: string; value: string; tone?: string }[] = [
+    { label: t("sources.easytrade.last_sync"), value: dt(conn.last_sync_at) },
+    {
+      label: t("sources.easytrade.last_success"),
+      value: dt(conn.last_success_at),
+    },
+    {
+      label: t("sources.easytrade.next_sync"),
+      value:
+        conn.sync_interval_minutes == null
+          ? t("sources.easytrade.manual_only")
+          : dt(conn.next_sync_at),
+    },
+    {
+      label: t("sources.easytrade.failures"),
+      value:
+        failures > 0
+          ? t("sources.easytrade.failures_n", { n: failures })
+          : t("sources.easytrade.failures_none"),
+      tone: failures > 0 ? "text-warn" : undefined,
+    },
+  ];
+  return (
+    <section
+      aria-labelledby="et-conn"
+      className="bg-surface border-line space-y-4 rounded-xl border p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 id="et-conn" className="font-display text-lg font-semibold">
+            {t("sources.easytrade.connection")}
+          </h2>
+          <StatusPill tone={connTone[conn.status] ?? "neutral"} dot>
+            {t(`sources.easytrade.status_${conn.status}`)}
+          </StatusPill>
+          <span className="text-text-3 truncate text-sm">
+            {t("sources.easytrade.company", {
+              id: conn.company_id,
+              branches: conn.branches.length,
+            })}
+          </span>
+        </div>
+        {canWrite ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select
+              value={interval}
+              onValueChange={(v) =>
+                et.schedule.mutate(v === "off" ? null : Number(v), {
+                  onSuccess: () =>
+                    toast.success(t("sources.easytrade.schedule_saved")),
+                  onError: (err) =>
+                    toast.error(
+                      errText(err, t("sources.easytrade.schedule_failed")),
+                    ),
+                })
+              }
+            >
+              <SelectTrigger
+                className="w-44"
+                aria-label={t("sources.easytrade.interval")}
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {INTERVALS.map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {t(`sources.easytrade.interval_${v}`)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              disabled={et.syncNow.isPending || conn.status === "disabled"}
+              onClick={() =>
+                et.syncNow.mutate(periodRange(period), {
+                  onSuccess: () => toast.success(t("sources.easytrade.synced")),
+                  onError: (err) =>
+                    toast.error(
+                      errText(err, t("sources.easytrade.sync_failed")),
+                    ),
+                })
+              }
+            >
+              <RefreshCw
+                aria-hidden
+                className={cn("size-4", et.syncNow.isPending && "animate-spin")}
+              />
+              {t("sources.easytrade.sync_now", { period })}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      {conn.error ? (
+        <p
+          role="alert"
+          className="bg-danger-tint text-danger rounded-lg px-3 py-2 text-sm"
+        >
+          {conn.error}
+        </p>
+      ) : null}
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {facts.map((f) => (
+          <div key={f.label} className="min-w-0">
+            <dt className="text-text-3 text-xs">{f.label}</dt>
+            <dd
+              className={cn(
+                "truncate text-sm font-medium tabular-nums",
+                f.tone,
+              )}
+            >
+              {f.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-text-3 text-xs">
+        {conn.last_webhook_at
+          ? t("sources.easytrade.webhook_last", {
+              at: dt(conn.last_webhook_at),
+            })
+          : t("sources.easytrade.webhook_none")}
+      </p>
+    </section>
+  );
+}
+
+function PaymentSummary({ et, period }: { et: ET; period: string }) {
+  const { t } = useLocale();
+  const sum = et.financial.data;
+  const cards = useMemo(() => {
+    const by: Record<string, { in: number; out: number; count: number }> = {};
+    for (const p of sum?.by_payment_type ?? []) {
+      const c = (by[p.payment_method_type] ??= { in: 0, out: 0, count: 0 });
+      if (p.direction === "out") c.out += Number(p.total);
+      else c.in += Number(p.total);
+      c.count += p.count;
+    }
+    return ["cash", "credit_card", "bank_transfer"].map((k) => ({
+      key: k,
+      ...(by[k] ?? { in: 0, out: 0, count: 0 }),
+    }));
+  }, [sum]);
+  return (
+    <section aria-labelledby="et-pay" className="space-y-2">
+      <h2 id="et-pay" className="font-display text-lg font-semibold">
+        {t("sources.easytrade.payments_title", { period })}
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {cards.map((c) => {
+          const Icon = payIcon[c.key];
+          return (
+            <div
+              key={c.key}
+              className="bg-surface border-line flex items-center gap-3.5 rounded-xl border p-4"
+            >
+              <span
+                aria-hidden
+                className="bg-brand-tint text-brand-text flex size-10 shrink-0 items-center justify-center rounded-lg"
+              >
+                <Icon className="size-5" />
+              </span>
+              <span className="flex min-w-0 flex-col">
+                <span className="text-text-2 text-sm">
+                  {t(`sources.payment.${c.key}`)}
+                </span>
+                {et.financial.isLoading ? (
+                  <Skeleton className="h-6 w-24" />
+                ) : (
+                  <span className="font-display text-xl font-bold tabular-nums">
+                    <Money value={c.in.toFixed(2)} />
+                  </span>
+                )}
+                <span className="text-text-3 text-xs">
+                  {t("sources.easytrade.payments_out", {
+                    count: c.count,
+                  })}{" "}
+                  <Money value={c.out.toFixed(2)} />
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function FinancialSection({ et, period }: { et: ET; period: string }) {
+  const { t } = useLocale();
+  const columns = useMemo(
+    () => [
+      createDateColumn<EasytradeFinancialTransaction>({
+        id: "transaction_date",
+        labelKey: "sources.col_date",
+        accessor: (r) => r.transaction_date,
+      }),
+      createColumn<EasytradeFinancialTransaction>({
+        id: "customer_name",
+        labelKey: "sources.col_customer",
+        accessorFn: (r) => r.customer_name ?? "",
+        cell: ({ row }) => (
+          <div className="min-w-40">
+            <div className="truncate">{row.original.customer_name || "—"}</div>
+            <div className="text-text-3 truncate text-xs">
+              {row.original.description}
+            </div>
+          </div>
+        ),
+        gridPrimary: true,
+      }),
+      createColumn<EasytradeFinancialTransaction>({
+        id: "transaction_type",
+        labelKey: "sources.col_type",
+        accessorFn: (r) => r.transaction_type,
+        cell: ({ row }) =>
+          KNOWN_TYPES.has(row.original.transaction_type)
+            ? t(`sources.type.${row.original.transaction_type}`)
+            : row.original.transaction_type || "—",
+        filterVariant: "faceted",
+      }),
+      createColumn<EasytradeFinancialTransaction>({
+        id: "payment_method_type",
+        labelKey: "sources.col_payment",
+        accessorFn: (r) => r.payment_method_type,
+        cell: ({ row }) =>
+          t(`sources.payment.${row.original.payment_method_type}`),
+        filterVariant: "faceted",
+        filterOptions: [
+          "cash",
+          "bank_transfer",
+          "credit_card",
+          "check",
+          "promissory_note",
+          "credit",
+          "unknown",
+        ].map((v) => ({
+          label: v,
+          labelKey: `sources.payment.${v}`,
+          value: v,
+        })),
+      }),
+      createColumn<EasytradeFinancialTransaction>({
+        id: "cash_box_name",
+        labelKey: "sources.col_cash_box",
+        accessorFn: (r) => r.cash_box_name ?? "",
+        defaultHidden: true,
+      }),
+      createMoneyColumn<EasytradeFinancialTransaction>({
+        id: "amount",
+        labelKey: "sources.col_amount",
+        accessor: (r) => (r.direction === "out" ? `-${r.amount}` : r.amount),
+        currency: (r) => r.currency,
+      }),
+      createStatusColumn<EasytradeFinancialTransaction>({
+        id: "invoice",
+        labelKey: "sources.col_invoice",
+        accessor: (r) =>
+          r.referenceable_type !== "Invoice"
+            ? "none"
+            : r.invoice_uuid
+              ? "matched"
+              : "unmatched",
+        variants: {
+          none: { labelKey: "sources.easytrade.ref_none", tone: "neutral" },
+          matched: { labelKey: "sources.easytrade.ref_matched", tone: "ok" },
+          unmatched: {
+            labelKey: "sources.easytrade.ref_unmatched",
+            tone: "warn",
+          },
+        },
+      }),
+    ],
+    [t],
+  );
+  const data = et.financial.data;
+  return (
+    <section aria-labelledby="et-fin" className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="et-fin" className="font-display text-lg font-semibold">
+          {t("sources.easytrade.financial_title", { period })}
+        </h2>
+        {data && data.invoice_refs > 0 ? (
+          <span className="text-text-2 text-sm">
+            {t("sources.easytrade.invoice_matched", {
+              matched: data.invoice_matched,
+              refs: data.invoice_refs,
+            })}
+          </span>
+        ) : null}
+      </div>
+      {et.financial.isError ? (
+        <ErrorState
+          title={t("office.api.load_error")}
+          description={et.financial.error.message}
+          onRetry={() => void et.financial.refetch()}
+          retryLabel={t("common.retry")}
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={data?.items ?? []}
+          getRowId={(r) => r.uuid}
+          isLoading={et.financial.isLoading}
+          emptyTitle={t("sources.easytrade.financial_empty_title")}
+          emptyDescription={t("sources.easytrade.financial_empty")}
+          initialState={{ pagination: { pageIndex: 0, pageSize: 20 } }}
+          features={{ persistKey: "easytrade-financial" }}
+        />
+      )}
+      {data && data.by_customer.length > 0 ? (
+        <CustomerTotals rows={data.by_customer} />
+      ) : null}
+    </section>
+  );
+}
+
+function CustomerTotals({
+  rows,
+}: {
+  rows: NonNullable<ET["financial"]["data"]>["by_customer"];
+}) {
+  const columns = useMemo(
+    () => [
+      createColumn<(typeof rows)[number]>({
+        id: "customer_name",
+        labelKey: "sources.col_customer",
+        accessorFn: (r) => r.customer_name || "—",
+        gridPrimary: true,
+      }),
+      createColumn<(typeof rows)[number]>({
+        id: "customer_tax_number",
+        labelKey: "sources.col_tax_number",
+        accessorFn: (r) => r.customer_tax_number ?? "",
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">
+            {row.original.customer_tax_number || "—"}
+          </span>
+        ),
+      }),
+      createColumn<(typeof rows)[number]>({
+        id: "count",
+        labelKey: "sources.col_count",
+        accessorFn: (r) => r.count,
+        meta: { align: "end" },
+      }),
+      createMoneyColumn<(typeof rows)[number]>({
+        id: "total_in",
+        labelKey: "sources.col_in",
+        accessor: (r) => r.total_in,
+      }),
+      createMoneyColumn<(typeof rows)[number]>({
+        id: "total_out",
+        labelKey: "sources.col_out",
+        accessor: (r) => r.total_out,
+      }),
+    ],
+    [],
+  );
+  const { t } = useLocale();
+  return (
+    <div className="space-y-2 pt-2">
+      <h3 className="text-sm font-semibold">
+        {t("sources.easytrade.by_customer")}
+      </h3>
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowId={(r) => `${r.customer_name}|${r.customer_tax_number ?? ""}`}
+        features={{ toolbar: false, pagination: false }}
+      />
+    </div>
+  );
+}
+
+function ZSection({ et, period }: { et: ET; period: string }) {
+  const { t } = useLocale();
+  const z = et.zReports.data;
+  const columns = useMemo(
+    () => [
+      createDateColumn<EasytradeZReport>({
+        id: "report_date",
+        labelKey: "sources.col_date",
+        accessor: (r) => r.report_date,
+      }),
+      createColumn<EasytradeZReport>({
+        id: "z_report_number",
+        labelKey: "sources.col_z_number",
+        accessorFn: (r) => r.z_report_number ?? "",
+        cell: ({ row }) => (
+          <span className="font-mono text-sm">
+            {row.original.z_report_number || "—"}
+          </span>
+        ),
+        gridPrimary: true,
+      }),
+      createColumn<EasytradeZReport>({
+        id: "okc_serial_number",
+        labelKey: "sources.col_okc",
+        accessorFn: (r) => r.okc_serial_number ?? "",
+        defaultHidden: true,
+      }),
+      createMoneyColumn<EasytradeZReport>({
+        id: "cash",
+        labelKey: "sources.payment.cash",
+        accessor: (r) => r.payments.cash ?? "0.00",
+      }),
+      createMoneyColumn<EasytradeZReport>({
+        id: "credit_card",
+        labelKey: "sources.payment.credit_card",
+        accessor: (r) => r.payments.credit_card ?? "0.00",
+      }),
+      createMoneyColumn<EasytradeZReport>({
+        id: "tax_amount",
+        labelKey: "sources.col_vat",
+        accessor: (r) => r.tax_amount,
+      }),
+      createMoneyColumn<EasytradeZReport>({
+        id: "total_amount",
+        labelKey: "sources.col_total",
+        accessor: (r) => r.total_amount,
+        className: "font-semibold",
+      }),
+    ],
+    [],
+  );
+  return (
+    <section aria-labelledby="et-z" className="space-y-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="et-z" className="font-display text-lg font-semibold">
+          {t("sources.easytrade.z_title", { period })}
+        </h2>
+        {z && z.items.length > 0 ? (
+          <span className="text-text-2 text-sm">
+            {t("sources.easytrade.z_total")} <Money value={z.total_amount} />
+          </span>
+        ) : null}
+      </div>
+      {z && !z.supported ? (
+        <p className="bg-warn-tint text-warn rounded-lg px-3 py-2 text-sm">
+          {t("sources.easytrade.z_unsupported")}
+        </p>
+      ) : null}
+      <DataTable
+        columns={columns}
+        data={z?.items ?? []}
+        getRowId={(r) => r.uuid}
+        isLoading={et.zReports.isLoading}
+        emptyTitle={t("sources.easytrade.z_empty_title")}
+        emptyDescription={t("sources.easytrade.z_empty")}
+        features={{ pagination: false }}
+      />
+    </section>
+  );
+}
+
+function RunsSection({
+  runs,
+  loading,
+}: {
+  runs?: EasytradeSyncRun[];
+  loading: boolean;
+}) {
+  const { t } = useLocale();
+  const columns = useMemo(
+    () => [
+      createDateColumn<EasytradeSyncRun>({
+        id: "started_at",
+        labelKey: "sources.col_started",
+        accessor: (r) => r.started_at,
+        style: "datetime",
+      }),
+      createColumn<EasytradeSyncRun>({
+        id: "kind",
+        labelKey: "sources.col_kind",
+        accessorFn: (r) => r.kind,
+        cell: ({ row }) => t(`sources.easytrade.kind_${row.original.kind}`),
+      }),
+      createStatusColumn<EasytradeSyncRun>({
+        id: "status",
+        labelKey: "sources.col_status",
+        accessor: (r) => r.status,
+        variants: runVariants,
+      }),
+      createColumn<EasytradeSyncRun>({
+        id: "summary",
+        labelKey: "sources.col_result",
+        accessorFn: (r) => JSON.stringify(r.counters),
+        enableSorting: false,
+        cell: ({ row }) => {
+          const c = row.original.counters as Record<string, unknown>;
+          const n = (k: string) => Number(c[k] ?? 0);
+          return (
+            <div className="min-w-56 text-sm">
+              <div>
+                {t("sources.easytrade.run_counts", {
+                  invoices: n("invoices_created"),
+                  expenses: n("expenses_created") + n("expenses_updated"),
+                  financial: n("financial_created") + n("financial_updated"),
+                  z: n("z_reports_created") + n("z_reports_updated"),
+                })}
+              </div>
+              {row.original.error ? (
+                <div className="text-danger truncate text-xs">
+                  {row.original.error}
+                </div>
+              ) : n("windows_failed") > 0 ? (
+                <div className="text-warn text-xs">
+                  {t("sources.easytrade.windows_failed", {
+                    n: n("windows_failed"),
+                  })}
+                </div>
+              ) : null}
+            </div>
+          );
+        },
+      }),
+    ],
+    [t],
+  );
+  return (
+    <section aria-labelledby="et-runs" className="space-y-2">
+      <h2 id="et-runs" className="font-display text-lg font-semibold">
+        {t("sources.easytrade.runs_title")}
+      </h2>
+      <DataTable
+        columns={columns}
+        data={runs ?? []}
+        getRowId={(r) => r.uuid}
+        isLoading={loading}
+        emptyTitle={t("sources.easytrade.runs_empty_title")}
+        emptyDescription={t("sources.easytrade.runs_empty")}
+        features={{ pagination: false, toolbar: false }}
+      />
+    </section>
+  );
+}
