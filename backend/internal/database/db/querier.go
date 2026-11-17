@@ -41,6 +41,7 @@ type Querier interface {
 	// The row stays (foreign keys, audit trail); every personal field is replaced
 	// and the account can never sign in again.
 	AnonymizePrivacyUser(ctx context.Context, arg AnonymizePrivacyUserParams) error
+	ApproveBankPosting(ctx context.Context, arg ApproveBankPostingParams) (BankTransactionPosting, error)
 	ApproveJournalDraft(ctx context.Context, arg ApproveJournalDraftParams) (int64, error)
 	ApprovePeriodSummary(ctx context.Context, arg ApprovePeriodSummaryParams) (PeriodSummary, error)
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
@@ -79,6 +80,7 @@ type Querier interface {
 	CountAppLogs(ctx context.Context, arg CountAppLogsParams) (int64, error)
 	CountAppLogsByLevel(ctx context.Context) ([]CountAppLogsByLevelRow, error)
 	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
+	CountBankPostings(ctx context.Context, arg CountBankPostingsParams) (CountBankPostingsRow, error)
 	CountBankTransactionMatches(ctx context.Context, arg CountBankTransactionMatchesParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
@@ -335,7 +337,10 @@ type Querier interface {
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
 	GetBankCounterpartyAlias(ctx context.Context, arg GetBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
 	GetBankCounterpartyAliasByKey(ctx context.Context, arg GetBankCounterpartyAliasByKeyParams) (BankCounterpartyAlias, error)
+	GetBankPosting(ctx context.Context, arg GetBankPostingParams) (BankTransactionPosting, error)
+	GetBankPostingView(ctx context.Context, arg GetBankPostingViewParams) (GetBankPostingViewRow, error)
 	GetBankTransaction(ctx context.Context, arg GetBankTransactionParams) (BankTransaction, error)
+	GetBankTransactionForPosting(ctx context.Context, arg GetBankTransactionForPostingParams) (GetBankTransactionForPostingRow, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
 	GetBillingPlanByCode(ctx context.Context, code string) (BillingPlan, error)
 	GetBillingStatement(ctx context.Context, arg GetBillingStatementParams) (BillingStatement, error)
@@ -610,6 +615,7 @@ type Querier interface {
 	ListAllPermissionSlugs(ctx context.Context) ([]string, error)
 	ListAppLogSources(ctx context.Context) ([]string, error)
 	ListAppLogs(ctx context.Context, arg ListAppLogsParams) ([]AppLog, error)
+	ListApprovedBankPostingsWithoutDraft(ctx context.Context, arg ListApprovedBankPostingsWithoutDraftParams) ([]ListApprovedBankPostingsWithoutDraftRow, error)
 	// "Açılmalı" hesaplar (#319): mükellefe uygulanmış ama etkin planda
 	// olmayan hesap kodları; ad, cari hafızasından ya da önerinin önerdiği
 	// addan. Eksik hesap şablonunu (Luca) besler.
@@ -621,6 +627,10 @@ type Querier interface {
 	// Banka karşı taraf takma adları (issue #383).
 	ListBankCounterpartyAliases(ctx context.Context, arg ListBankCounterpartyAliasesParams) ([]BankCounterpartyAlias, error)
 	ListBankCounterpartyAliasesBySuggestion(ctx context.Context, arg ListBankCounterpartyAliasesBySuggestionParams) ([]BankCounterpartyAlias, error)
+	ListBankLedgerAccounts(ctx context.Context, arg ListBankLedgerAccountsParams) ([]ListBankLedgerAccountsRow, error)
+	// Ekran listesi: hareket + öneri + inceleme önerisi; durum süzgeci
+	// unassigned (önerisi yok) / suggested / approved (fişe girmedi) / drafted.
+	ListBankPostings(ctx context.Context, arg ListBankPostingsParams) ([]ListBankPostingsRow, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
@@ -631,6 +641,10 @@ type Querier interface {
 	ListBankTransactionsForControls(ctx context.Context, arg ListBankTransactionsForControlsParams) ([]ListBankTransactionsForControlsRow, error)
 	// Banka–fatura eşleme (#21). Aday üretme SQL'de, puanlama Go'da (21 §6.2).
 	ListBankTransactionsForMatching(ctx context.Context, arg ListBankTransactionsForMatchingParams) ([]BankTransaction, error)
+	// Banka hareketi → mizan hesabı (issue #383).
+	// Dönemin iptal edilmemiş hareketleri, varsa önerileri ve eşleşen faturanın
+	// karşı taraf vergi numarası ile.
+	ListBankTransactionsForPosting(ctx context.Context, arg ListBankTransactionsForPostingParams) ([]ListBankTransactionsForPostingRow, error)
 	// Güveni eşiğin altındaki sınıflandırmalar: müşavire "kontrol et" (21 §4).
 	ListBankTransactionsNeedingReview(ctx context.Context, arg ListBankTransactionsNeedingReviewParams) ([]BankTransaction, error)
 	// Banka hareketleri sekmesi (#329): mükellefin hareketleri, yeniden eskiye.
@@ -1049,6 +1063,8 @@ type Querier interface {
 	RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
+	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
@@ -1105,6 +1121,8 @@ type Querier interface {
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
+	// Geri alınan karar: öneri incelemeye döner; fişe girmiş hareket fişte kalır.
+	UnapproveBankPosting(ctx context.Context, arg UnapproveBankPostingParams) (int64, error)
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
@@ -1150,6 +1168,9 @@ type Querier interface {
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
+	UpsertBankLedgerAccount(ctx context.Context, arg UpsertBankLedgerAccountParams) error
+	// Öneri yazılır; onaylanmış bir hareketin önerisi değişmez.
+	UpsertBankPosting(ctx context.Context, arg UpsertBankPostingParams) (BankTransactionPosting, error)
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
 	UpsertBankStatementTemplate(ctx context.Context, arg UpsertBankStatementTemplateParams) (BankStatementTemplate, error)
 	UpsertBillingPlan(ctx context.Context, arg UpsertBillingPlanParams) (BillingPlan, error)
