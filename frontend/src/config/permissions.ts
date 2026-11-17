@@ -71,6 +71,9 @@ export const Permission = {
   /** Personel, bordro ve SGK (issue #382). */
   TenantPayrollRead: "tenant.payroll.read",
   TenantPayrollWrite: "tenant.payroll.write",
+  /** Belge arşivi ve İSG evrakları (issue #393). */
+  TenantDocumentsRead: "tenant.documents.read",
+  TenantDocumentsWrite: "tenant.documents.write",
   /** Review queue decisions (accept / correct / revert). */
   TenantReviewRead: "tenant.review.read",
   TenantReviewDecide: "tenant.review.decide",

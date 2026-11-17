@@ -16,6 +16,8 @@ import {
   useRecentReceipts,
 } from '@/features/clients/api';
 import { mailHref, money, recentPeriods, telHref } from '@/features/clients/format';
+import { useArchiveCounts } from '@/features/archive/api';
+import { expiryWarning } from '@/features/archive/format';
 import { visibleTabs } from '@/features/documents/tabs';
 import { taskTitle } from '@/features/doctasks/format';
 import { periodLabel } from '@/features/warnings/format';
@@ -37,6 +39,9 @@ export default function ClientDetailScreen() {
   const tasks = useOpenTasks(engagement, can('tenant.doc_tasks.read'));
 
   const docTabs = visibleTabs(can).tabs;
+  const archiveCounts = useArchiveCounts(engagement, can('tenant.documents.read'));
+  const ac = archiveCounts.data;
+  const isgWarning = ac ? expiryWarning(ac.isg_expired, ac.isg_expiring, ac.expiringDays) : null;
 
   const ct = contacts.data;
   const phone = telHref(ct?.phone);
@@ -122,7 +127,13 @@ export default function ClientDetailScreen() {
               <View key={t.key} testID={`client-documents-${t.key}`}>
                 <Row
                   title={t.label}
-                  accessibilityLabel={`${t.label} belgelerini aç`}
+                  subtitle={t.key === 'isg' && isgWarning ? isgWarning : undefined}
+                  trailing={
+                    t.key === 'isg' && ac && ac.isg_expired + ac.isg_expiring > 0 ? (
+                      <Chip tone={ac.isg_expired > 0 ? 'danger' : 'warning'} label={String(ac.isg_expired + ac.isg_expiring)} />
+                    ) : undefined
+                  }
+                  accessibilityLabel={`${t.label} belgelerini aç${t.key === 'isg' && isgWarning ? `. ${isgWarning}` : ''}`}
                   onPress={() => router.push({ pathname: '/belgeler/[engagement]', params: { engagement, title: ct?.title ?? title ?? '', tab: t.key } })}
                 />
               </View>

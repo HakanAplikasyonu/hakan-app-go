@@ -118,6 +118,9 @@ const (
 	// Personel, bordro ve SGK (issue #382).
 	PermTenantPayrollRead  = "tenant.payroll.read"
 	PermTenantPayrollWrite = "tenant.payroll.write"
+	// Belge arşivi ve İSG evrakları (issue #393).
+	PermTenantDocumentsRead  = "tenant.documents.read"
+	PermTenantDocumentsWrite = "tenant.documents.write"
 
 	// KVKK data subject requests (issue #193).
 	PermTenantPrivacyRequest = "tenant.privacy.request"

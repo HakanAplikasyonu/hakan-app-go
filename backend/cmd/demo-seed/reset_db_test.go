@@ -138,6 +138,10 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		// #393: Eylül ve Ekim mizanları, tutarlarıyla.
 		`SELECT count(*) FROM account_plan_imports WHERE source_kind = 'trial_balance' AND period IN ('2026-09', '2026-10')`: 2,
 		`SELECT count(DISTINCT import_id) FROM trial_balance_lines WHERE code = '600.01' AND balance < 0`:                    2,
+		// #393: yedi arşiv evrakı; üçü İSG, biri 30 gün içinde bitiyor, birinin süresi dolmuş.
+		`SELECT count(*) FROM taxpayer_documents`: 7,
+		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until BETWEEN CURRENT_DATE AND CURRENT_DATE + 30`: 1,
+		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until < CURRENT_DATE`:                             1,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)

@@ -1,0 +1,197 @@
+package archive
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
+)
+
+// Handler serves the archive routes.
+type Handler struct{ svc *Service }
+
+// NewHandler builds the handler.
+func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+
+// RegisterRoutes mounts /v1/tenant/engagements/{engagementUuid}/archive-documents
+// behind the active-engagement chain. A nil resolver registers nothing.
+func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
+	orgResolver orgctx.Resolver, engResolver engagementctx.Resolver, h *Handler,
+) {
+	if orgResolver == nil || engResolver == nil || h == nil {
+		return
+	}
+	authn := middleware.Authenticate(tokens, loader)
+	org := middleware.RequireOrganization(orgResolver)
+	eng := middleware.RequireEngagement(engResolver)
+	route := func(method, path, perm string, fn http.HandlerFunc) {
+		mux.Handle(method+" /v1/tenant/engagements/{"+engagementctx.PathParam+"}/archive-documents"+path,
+			middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng))
+	}
+	read, write := rbac.PermTenantDocumentsRead, rbac.PermTenantDocumentsWrite
+	route("GET", "", read, h.list)
+	route("POST", "", write, h.upload)
+	route("GET", "/{archiveDocumentUuid}/file", read, h.file)
+	route("DELETE", "/{archiveDocumentUuid}", write, h.remove)
+}
+
+func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		response.NotFound(w, r, "not found")
+	case errors.Is(err, ErrInvalid):
+		response.BadRequest(w, r, response.CodeValidationError, err.Error())
+	case errors.Is(err, ErrExists):
+		response.Conflict(w, r, "DOCUMENT_EXISTS", err.Error())
+	case errors.Is(err, ErrUnsupported):
+		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", err.Error())
+	case errors.Is(err, ErrStorageMissing):
+		response.ServiceUnavailable(w, r, "ARCHIVE_UNAVAILABLE", err.Error())
+	default:
+		response.InternalErr(w, r, err, "document archive request failed")
+	}
+}
+
+func intParam(w http.ResponseWriter, r *http.Request, name string, def, lo, hi int) (int, bool) {
+	v := r.URL.Query().Get(name)
+	if v == "" {
+		return def, true
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < lo || n > hi {
+		response.BadRequest(w, r, response.CodeValidationError, fmt.Sprintf("%s must be %d..%d", name, lo, hi))
+		return 0, false
+	}
+	return n, true
+}
+
+// list: GET ?category=&isg_kind=&q=&expiring=true&limit=&offset=.
+func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
+	limit, ok := intParam(w, r, "limit", 50, 1, 200)
+	if !ok {
+		return
+	}
+	offset, ok := intParam(w, r, "offset", 0, 0, 1_000_000)
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	search := strings.TrimSpace(q.Get("q"))
+	if len([]rune(search)) > 100 {
+		response.BadRequest(w, r, response.CodeValidationError, "q is too long")
+		return
+	}
+	expiring := false
+	switch q.Get("expiring") {
+	case "", "false":
+	case "true":
+		expiring = true
+	default:
+		response.BadRequest(w, r, response.CodeValidationError, "expiring must be true or false")
+		return
+	}
+	p, err := h.svc.List(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, Filter{
+		Category: strings.TrimSpace(q.Get("category")), ISGKind: strings.TrimSpace(q.Get("isg_kind")), Q: search, ExpiringOnly: expiring,
+		Limit: int32(limit), Offset: int32(offset), //nolint:gosec // bounded above
+	})
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+// upload: multipart "file" (PDF / JPEG / PNG), "category", "isg_kind",
+// "title", "note", "document_date", "valid_until", "visible_to_taxpayer".
+func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, MaxFileBytes+(1<<20))
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large or the form is invalid")
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		response.Error(w, r, http.StatusBadRequest, "FILE_REQUIRED", "multipart field \"file\" is required")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(io.LimitReader(file, MaxFileBytes+1))
+	if err != nil {
+		response.Error(w, r, http.StatusBadRequest, "FILE_UNREADABLE", "could not read the file")
+		return
+	}
+	var uid int64
+	if p, ok := authctx.PrincipalFrom(r.Context()); ok {
+		uid = p.UserInternal
+	}
+	f := func(k string) string { return strings.TrimSpace(r.FormValue(k)) }
+	d, err := h.svc.Upload(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, uid, header.Filename, data, Input{
+		Category: f("category"), ISGKind: f("isg_kind"), Title: f("title"), Note: f("note"),
+		DocumentDate: f("document_date"), ValidUntil: f("valid_until"), VisibleToTaxpayer: f("visible_to_taxpayer") == "true",
+	})
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, d)
+}
+
+func pathUUID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	id, err := uuid.Parse(r.PathValue("archiveDocumentUuid"))
+	if err != nil {
+		response.NotFound(w, r, "not found")
+		return uuid.UUID{}, false
+	}
+	return id, true
+}
+
+func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r)
+	if !ok {
+		return
+	}
+	f, err := h.svc.Open(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	defer func() { _ = f.Body.Close() }()
+	w.Header().Set("Content-Type", f.ContentType)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if f.Size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(f.Size, 10))
+	}
+	safe := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
+			return r
+		}
+		return '_'
+	}, f.Name)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, safe, url.PathEscape(f.Name)))
+	_, _ = io.Copy(w, f.Body)
+}
+
+func (h *Handler) remove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.Delete(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, id); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

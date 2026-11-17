@@ -1969,6 +1969,27 @@ type Taxpayer struct {
 	ContactEmail pgtype.Text        `json:"contact_email"`
 }
 
+type TaxpayerDocument struct {
+	ID                int64              `json:"id"`
+	Uuid              uuid.UUID          `json:"uuid"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	Category          string             `json:"category"`
+	IsgKind           pgtype.Text        `json:"isg_kind"`
+	Title             string             `json:"title"`
+	Note              string             `json:"note"`
+	DocumentDate      pgtype.Date        `json:"document_date"`
+	ValidUntil        pgtype.Date        `json:"valid_until"`
+	StorageKey        string             `json:"storage_key"`
+	Sha256            string             `json:"sha256"`
+	SizeBytes         int64              `json:"size_bytes"`
+	ContentType       string             `json:"content_type"`
+	FileName          string             `json:"file_name"`
+	VisibleToTaxpayer bool               `json:"visible_to_taxpayer"`
+	CreatedBy         pgtype.Int8        `json:"created_by"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type TaxpayerHistoryShare struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

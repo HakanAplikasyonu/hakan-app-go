@@ -148,6 +148,9 @@ type Querier interface {
 	CountStorageTrash(ctx context.Context) (int64, error)
 	// tenant-lint: cross-org mükellef kendi görevlerini sayar; taxpayer_id ve aktif engagement ile sınırlı
 	CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error)
+	// Sekme sayaçları ve bitiş uyarısı: kategori başına sayı, süresi dolan ve
+	// soon tarihine kadar bitecek evrak (bütün arşiv ve yalnızca İSG).
+	CountTaxpayerDocuments(ctx context.Context, arg CountTaxpayerDocumentsParams) (CountTaxpayerDocumentsRow, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
 	CountTaxpayerReceiptCaptures(ctx context.Context, arg CountTaxpayerReceiptCapturesParams) (int64, error)
@@ -268,6 +271,7 @@ type Querier interface {
 	DeleteStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) error
 	// Bordro ya da SGK tahakkuku silinince eşleşmeleri de silinir.
 	DeleteTargetMatches(ctx context.Context, arg DeleteTargetMatchesParams) ([]int64, error)
+	DeleteTaxpayerDocument(ctx context.Context, arg DeleteTaxpayerDocumentParams) error
 	DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerVehicleParams) (int64, error)
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
@@ -493,6 +497,7 @@ type Querier interface {
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
 	GetTaxpayerByUUID(ctx context.Context, argUuid uuid.UUID) (Taxpayer, error)
+	GetTaxpayerDocument(ctx context.Context, arg GetTaxpayerDocumentParams) (TaxpayerDocument, error)
 	// tenant-lint: cross-org mükellef kendi görevini okur; taxpayer_id ve aktif engagement ile sınırlı
 	GetTaxpayerDocumentTask(ctx context.Context, arg GetTaxpayerDocumentTaskParams) (GetTaxpayerDocumentTaskRow, error)
 	// tenant-lint: cross-org mükellef tarafı yükleme indirme; taxpayer_id ve aktif engagement ile sınırlı
@@ -613,6 +618,8 @@ type Querier interface {
 	InsertStorageTrash(ctx context.Context, arg InsertStorageTrashParams) (StorageTrash, error)
 	InsertSuggestion(ctx context.Context, arg InsertSuggestionParams) (Suggestion, error)
 	InsertSuggestionDecision(ctx context.Context, arg InsertSuggestionDecisionParams) error
+	// Belge arşivi ve İSG evrakları (#393). taxpayer_id kapsamlı.
+	InsertTaxpayerDocument(ctx context.Context, arg InsertTaxpayerDocumentParams) (TaxpayerDocument, error)
 	InsertTaxpayerVehicle(ctx context.Context, arg InsertTaxpayerVehicleParams) (TaxpayerVehicle, error)
 	// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
 	InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error)
@@ -912,6 +919,9 @@ type Querier interface {
 	// ---------------------------------------------------------------------------
 	// tenant-lint: cross-org mükellef kendi görevlerini görür; taxpayer_id ve aktif engagement ile sınırlı
 	ListTaxpayerDocumentTasks(ctx context.Context, arg ListTaxpayerDocumentTasksParams) ([]ListTaxpayerDocumentTasksRow, error)
+	// Arama başlık, dosya adı ve notta; expires_before verilirse yalnızca o
+	// tarihte ya da önce biten evraklar, bitişi yakın olan önce.
+	ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDocumentsParams) ([]ListTaxpayerDocumentsRow, error)
 	ListTaxpayerImportBatches(ctx context.Context, arg ListTaxpayerImportBatchesParams) ([]ListTaxpayerImportBatchesRow, error)
 	ListTaxpayerInvitationsByEngagement(ctx context.Context, arg ListTaxpayerInvitationsByEngagementParams) ([]ListTaxpayerInvitationsByEngagementRow, error)
 	// Mükellef web paneli (issue #39). Her sorgu X-Taxpayer ile çözülen
