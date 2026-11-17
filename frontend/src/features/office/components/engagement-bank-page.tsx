@@ -22,12 +22,18 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod } from "../period";
+import { BankAliasPanel } from "./bank-alias-panel";
+import { BankPostingPanel } from "./bank-posting-panel";
+import { BankStatementUpload } from "./bank-statement-upload";
 import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 
 type BankPage = components["schemas"]["BankTransactionPage"];
 type BankRow = components["schemas"]["BankTransaction"];
 type MatchFilter = "all" | "unmatched" | "suggested" | "matched";
+// #383: hareketler, hareket → mizan hesabı eşleştirme, karşı taraf takma adları.
+type BankView = "movements" | "posting" | "aliases";
+const VIEWS: BankView[] = ["movements", "posting", "aliases"];
 const MATCH_FILTERS: MatchFilter[] = [
   "all",
   "unmatched",
@@ -150,6 +156,9 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     listState.setParams({ match: m === "all" ? null : m });
   const { limit, offset } = listState.params;
   const columns = useBankColumns();
+  const rawView = listState.getParam("view") as BankView | null;
+  const view: BankView =
+    rawView && VIEWS.includes(rawView) ? rawView : "movements";
 
   // Üst çubuktaki dönem URL dışında değişir; liste ilk sayfaya döner.
   const lastPeriod = useRef(period);
@@ -207,15 +216,62 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     },
   ];
 
-  return (
-    <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="font-display truncate text-2xl font-bold">
-          {row?.taxpayer_title ?? t("office.bank.title")}
-        </h1>
-        <p className="text-text-2 text-sm">{t("office.bank.description")}</p>
+  const header = (
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display truncate text-2xl font-bold">
+            {row?.taxpayer_title ?? t("office.bank.title")}
+          </h1>
+          <p className="text-text-2 text-sm">{t("office.bank.description")}</p>
+        </div>
+        <BankStatementUpload engagement={engagement} />
       </div>
       <EngagementTabs engagement={engagement} />
+      <div
+        role="tablist"
+        aria-label={t("office.bank.view_label")}
+        className="border-line flex gap-1 overflow-x-auto border-b"
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={view === v}
+            onClick={() =>
+              listState.setParams({ view: v === "movements" ? null : v })
+            }
+            className={cn(
+              "focus-visible:ring-ring -mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
+              view === v
+                ? "border-brand text-foreground"
+                : "text-text-2 hover:text-foreground border-transparent",
+            )}
+          >
+            {t(`office.bank.view_${v}`)}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
+  if (view !== "movements") {
+    return (
+      <div className="space-y-5">
+        {header}
+        {view === "posting" ? (
+          <BankPostingPanel engagement={engagement} period={period} />
+        ) : (
+          <BankAliasPanel engagement={engagement} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {header}
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[

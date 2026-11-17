@@ -36,6 +36,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
 	authmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/model"
 	authrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/repository"
+	bankposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	orgmodel "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/model"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
@@ -200,6 +201,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			scope := engagementctx.Scope{ID: eng.ID, OrganizationID: org.ID, TaxpayerID: eng.TaxpayerID}
 			if err := seedJournals(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("journals → %s: %w", tp.Key, err)
+			}
+			// Bank month to match to the trial balance (#383).
+			if err := seedBank(ctx, pool, bankposting.Subject{OrganizationID: org.ID, EngagementID: eng.ID,
+				TaxpayerID: eng.TaxpayerID}, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("bank → %s: %w", tp.Key, err)
 			}
 			// WhatsApp Web uzantısı: hatırlanan sohbet ve iki kayıt (#388).
 			if err := seedWhatsApp(ctx, pool, org.ID, eng.ID); err != nil {

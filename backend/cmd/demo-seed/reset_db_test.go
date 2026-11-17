@@ -242,3 +242,30 @@ func TestSeedClickFixWidget(t *testing.T) {
 		t.Fatalf("widget id = %q", id)
 	}
 }
+
+// TestSeedBankMonth: the demo atlas engagement has a bank month to match
+// (#383): suggestions waiting, the alias answering for X Yazılım, the fees
+// approved and ready for a journal draft.
+func TestSeedBankMonth(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
+		t.Fatal(err)
+	}
+	atlas := demoScope(t, d, "atlas")
+	if n := count(t, d, `SELECT count(*) FROM bank_transactions WHERE taxpayer_id = $1`, atlas.TaxpayerID); n != 8 {
+		t.Fatalf("movements = %d", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'approved'`, atlas.ID); n < 3 {
+		t.Fatalf("approved = %d (alias rule auto-approved + fees)", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'suggested'`, atlas.ID); n == 0 {
+		t.Fatal("nothing waits in the queue")
+	}
+	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND account_code = '120.01.015' AND source = 'alias'`, atlas.ID); n != 1 {
+		t.Fatalf("alias suggestion = %d", n)
+	}
+	if err := dropDemo(ctx, d.Pool); err != nil {
+		t.Fatalf("reset: %v", err)
+	}
+}
