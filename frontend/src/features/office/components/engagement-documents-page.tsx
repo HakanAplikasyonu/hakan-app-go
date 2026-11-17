@@ -116,11 +116,10 @@ function DocumentsSection({
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  // Sayfa URL'de (#381). Liste toplam vermiyor: çekirdeğin sayfalaması
-  // "x–y / toplam" gösterdiği için kapalı, önceki/sonraki düğmeleri kalıyor.
+  // Sayfa URL'de (#381). Liste toplam vermiyor: dolu sayfa "sonraki
+  // olabilir" demek; çekirdek sayfalaması toplamsız (hasNextPage) çalışır.
   const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
   const { limit, offset } = listState.params;
-  const { pageIndex, pageSize } = listState.pagination;
   const query = useEngagementDocuments(
     slug,
     engagement,
@@ -129,10 +128,6 @@ function DocumentsSection({
   );
   const columns = useDocumentColumns();
   const items = query.data?.items ?? [];
-  // The list has no total: a full page means there may be more.
-  const hasNext = items.length >= limit;
-  const goTo = (next: number) =>
-    listState.onPaginationChange({ pageIndex: next, pageSize });
 
   return (
     <EntitySectionCard title={t("office.engagement_documents_title")}>
@@ -147,8 +142,14 @@ function DocumentsSection({
         emptyTitle={t("office.engagement_documents_empty")}
         emptyDescription=""
         bordered={false}
-        // Kart içinde gömülü liste: araç çubuğu, seçim ve çekirdek
-        // sayfalaması yok; sunucu sıralama sunmuyor.
+        state={{
+          pagination: listState.pagination,
+          onPaginationChange: listState.onPaginationChange,
+        }}
+        hasNextPage={!query.isFetching && items.length >= limit}
+        pageSizeOptions={[25, 50, 100]}
+        // Kart içinde gömülü liste: araç çubuğu ve seçim yok; sunucu
+        // sıralama sunmuyor.
         features={{
           toolbar: false,
           sorting: false,
@@ -156,7 +157,6 @@ function DocumentsSection({
           columnFilters: false,
           facetedFilters: false,
           rowSelection: false,
-          pagination: false,
           viewMode: false,
           columnVisibility: false,
           columnResizing: false,
@@ -165,28 +165,6 @@ function DocumentsSection({
           density: false,
         }}
       />
-      {offset > 0 || hasNext ? (
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={offset === 0 || query.isFetching}
-            onClick={() => goTo(Math.max(0, pageIndex - 1))}
-          >
-            {t("office.engagement_prev")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!hasNext || query.isFetching}
-            onClick={() => goTo(pageIndex + 1)}
-          >
-            {t("office.engagement_next")}
-          </Button>
-        </div>
-      ) : null}
     </EntitySectionCard>
   );
 }

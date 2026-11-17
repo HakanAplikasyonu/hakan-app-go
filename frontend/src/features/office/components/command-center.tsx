@@ -88,7 +88,12 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
  * dönem başlıkta ve hücrede vurgulanır; sıra ilerlemeye göre olduğundan
  * tablo sıralaması kapalı.
  */
-function useMatrixColumns(periods: string[], focus: string, locale: string) {
+function useMatrixColumns(
+  periods: string[],
+  focus: string,
+  locale: string,
+  onPick: (period: string) => void,
+) {
   return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
     () => [
       createColumn<PeriodMatrixRow>({
@@ -120,9 +125,26 @@ function useMatrixColumns(periods: string[], focus: string, locale: string) {
             return c ? statusOf(c) : "";
           },
           enableHiding: false,
+          // Başlık dönemi seçen düğme (sıralama menüsü yerine).
+          header: () => (
+            <button
+              type="button"
+              onClick={() => onPick(p)}
+              aria-pressed={p === focus}
+              className={cn(
+                "min-h-6 w-full rounded px-2 py-0.5 text-xs font-medium max-md:min-h-11",
+                p === focus
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {monthLabel(p, locale)}
+            </button>
+          ),
           meta: {
             align: "center",
-            headerClassName: p === focus ? "text-foreground" : undefined,
+            customHeader: true,
+            headerClassName: "px-1",
             cellClassName: cn("px-1", p === focus && "bg-muted/30"),
           },
           cell: ({ row }) => {
@@ -132,7 +154,7 @@ function useMatrixColumns(periods: string[], focus: string, locale: string) {
         }),
       ),
     ],
-    [periods, focus, locale],
+    [periods, focus, locale, onPick],
   );
 }
 
@@ -159,7 +181,7 @@ export function CommandCenterPage() {
     () => sortByProgress(filterRows(rows, { ...filter, query }, focus), focus),
     [rows, filter, query, focus],
   );
-  const columns = useMatrixColumns(periods, focus, locale);
+  const columns = useMatrixColumns(periods, focus, locale, setPicked);
 
   return (
     <div className="space-y-4">

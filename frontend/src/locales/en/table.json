@@ -41,6 +41,7 @@
   "false": "No",
   "all": "All",
   "showing": "{{from}}–{{to}} of {{total}}",
+  "showing_open": "{{from}}–{{to}}",
   "mobile_cards": "Mobile view: card list",
   "view_cards": "Cards",
   "reorder": "Order",

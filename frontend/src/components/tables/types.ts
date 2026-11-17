@@ -67,6 +67,11 @@ export type DataTableColumnMeta = {
   srOnlyHeader?: boolean;
   /** Mobil/ızgara kartında bu kolonu gösterme. */
   cardHidden?: boolean;
+  /**
+   * Başlıkta standart sıralama menüsü yerine kolonun kendi `header`
+   * çizimi (ör. dönem seçen düğme). Kart görünümünde etiket yine `label`.
+   */
+  customHeader?: boolean;
 };
 
 declare module "@tanstack/react-table" {
@@ -87,6 +92,7 @@ declare module "@tanstack/react-table" {
     align?: ColumnAlign;
     srOnlyHeader?: boolean;
     cardHidden?: boolean;
+    customHeader?: boolean;
   }
 }
 
@@ -254,6 +260,11 @@ export type DataTableProps<TData> = {
    * bundan hesaplanır ve sayfalama "x–y / toplam" doğru gösterir.
    */
   rowCount?: number;
+  /**
+   * Toplamı bilinmeyen sunucu sayfalaması (API `total` dönmüyorsa):
+   * sayfalama "x–y" ve sonraki sayfa var mı bilgisiyle çalışır.
+   */
+  hasNextPage?: boolean;
   /** Tablo kabının kenarlığı. Panel içine gömülü tablolarda false. Default: true */
   bordered?: boolean;
   /** Tablo kabının en yüksek boyu (stickyHeader ile kap içi kaydırma). */

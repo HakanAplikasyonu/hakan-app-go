@@ -4,7 +4,7 @@ import { AlertTriangle, Eye, FileDown, FileText, Save } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, PaginationState } from "@tanstack/react-table";
 
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
@@ -484,16 +484,21 @@ function PetitionsList({
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
-  const [offset, setOffset] = useState(0);
+  // Toplam yok: çekirdek sayfalaması toplamsız (hasNextPage) çalışır.
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: PAGE_SIZE,
+  });
+  const offset = pagination.pageIndex * pagination.pageSize;
   const [opening, setOpening] = useState<string | null>(null);
   const query = usePetitions(
     slug,
     engagement,
-    { limit: PAGE_SIZE, offset },
+    { limit: pagination.pageSize, offset },
     enabled,
   );
   const items = query.data?.items ?? [];
-  const hasNext = items.length >= PAGE_SIZE;
+  const hasNext = items.length >= pagination.pageSize;
 
   async function openPdf(petition: Petition) {
     const pending = openPendingTab();
@@ -586,8 +591,10 @@ function PetitionsList({
         emptyTitle={t("petitions.list_empty")}
         emptyDescription=""
         bordered={false}
-        // Sunucu toplam, sıralama ve arama vermiyor: sayfalama aşağıdaki
-        // önceki/sonraki düğmeleriyle (limit/offset) kalır.
+        state={{ pagination, onPaginationChange: setPagination }}
+        hasNextPage={!query.isFetching && hasNext}
+        pageSizeOptions={[20, 50, 100]}
+        // Sunucu toplam, sıralama ve arama vermiyor.
         features={{
           toolbar: false,
           sorting: false,
@@ -595,7 +602,6 @@ function PetitionsList({
           columnFilters: false,
           facetedFilters: false,
           rowSelection: false,
-          pagination: false,
           viewMode: false,
           columnVisibility: false,
           columnResizing: false,
@@ -604,28 +610,6 @@ function PetitionsList({
           density: false,
         }}
       />
-      {offset > 0 || hasNext ? (
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={offset === 0 || query.isFetching}
-            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-          >
-            {t("petitions.prev")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!hasNext || query.isFetching}
-            onClick={() => setOffset((o) => o + PAGE_SIZE)}
-          >
-            {t("petitions.next")}
-          </Button>
-        </div>
-      ) : null}
     </EntitySectionCard>
   );
 }

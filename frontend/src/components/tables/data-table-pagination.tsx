@@ -23,19 +23,29 @@ type DataTablePaginationProps<TData> = {
   table: Table<TData>;
   pageSizeOptions?: number[];
   compact?: boolean;
+  /**
+   * Toplamı bilinmeyen sunucu sayfalaması: verilirse toplam ve son sayfa
+   * gösterilmez, "sonraki" bu değere göre açılır.
+   */
+  hasNextPage?: boolean;
 };
 
 export function DataTablePagination<TData>({
   table,
   pageSizeOptions = [10, 20, 30, 50, 100],
   compact,
+  hasNextPage,
 }: DataTablePaginationProps<TData>) {
+  const openEnded = hasNextPage !== undefined;
   const { t } = useLocale();
   const { pageIndex, pageSize } = table.getState().pagination;
   // Sunucu sayfalamasında `rowCount` toplamı verir; yoksa süzülmüş satırlar.
   const total = table.getRowCount();
   const from = total === 0 ? 0 : pageIndex * pageSize + 1;
-  const to = Math.min(total, (pageIndex + 1) * pageSize);
+  const to = openEnded
+    ? pageIndex * pageSize + table.getRowModel().rows.length
+    : Math.min(total, (pageIndex + 1) * pageSize);
+  const canNext = openEnded ? hasNextPage : table.getCanNextPage();
 
   return (
     <div
@@ -47,7 +57,9 @@ export function DataTablePagination<TData>({
       )}
     >
       <p className="text-muted-foreground text-xs">
-        {t("table.showing", { from, to, total })}
+        {openEnded
+          ? t("table.showing_open", { from: pageIndex * pageSize + 1, to })
+          : t("table.showing", { from, to, total })}
       </p>
 
       <div
@@ -63,7 +75,7 @@ export function DataTablePagination<TData>({
             value={String(pageSize)}
             onValueChange={(value) => table.setPageSize(Number(value))}
           >
-            <SelectTrigger className="h-8 w-[72px]">
+            <SelectTrigger className="h-8 w-[72px] max-md:h-11">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -77,7 +89,9 @@ export function DataTablePagination<TData>({
         </div>
 
         <span className="text-muted-foreground text-xs">
-          {pageIndex + 1}/{Math.max(table.getPageCount(), 1)}
+          {openEnded
+            ? pageIndex + 1
+            : `${pageIndex + 1}/${Math.max(table.getPageCount(), 1)}`}
         </span>
 
         <div className="flex items-center gap-1">
@@ -86,7 +100,7 @@ export function DataTablePagination<TData>({
               type="button"
               variant="outline"
               size="icon"
-              className="size-8"
+              className="size-8 max-md:size-11"
               onClick={() => table.setPageIndex(0)}
               disabled={!table.getCanPreviousPage()}
               aria-label={t("table.go_first")}
@@ -98,7 +112,7 @@ export function DataTablePagination<TData>({
             type="button"
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-8 max-md:size-11"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
             aria-label={t("table.go_prev")}
@@ -109,19 +123,19 @@ export function DataTablePagination<TData>({
             type="button"
             variant="outline"
             size="icon"
-            className="size-8"
+            className="size-8 max-md:size-11"
             onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
+            disabled={!canNext}
             aria-label={t("table.go_next")}
           >
             <ChevronRight className="size-4" />
           </Button>
-          {!compact ? (
+          {!compact && !openEnded ? (
             <Button
               type="button"
               variant="outline"
               size="icon"
-              className="size-8"
+              className="size-8 max-md:size-11"
               onClick={() => table.setPageIndex(table.getPageCount() - 1)}
               disabled={!table.getCanNextPage()}
               aria-label={t("table.go_last")}
