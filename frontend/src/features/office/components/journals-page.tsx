@@ -160,7 +160,7 @@ function NewDraft({ engagement }: { engagement: string }) {
         meta: { align: "end" },
         cell: ({ row }) => (
           <Input
-            className="h-8 w-32 text-right font-mono"
+            className="ms-auto h-8 w-32 text-right font-mono"
             inputMode="decimal"
             aria-label={`${t("office.journals.debit")} ${row.index + 1}`}
             value={row.original.debit}
@@ -174,7 +174,7 @@ function NewDraft({ engagement }: { engagement: string }) {
         meta: { align: "end" },
         cell: ({ row }) => (
           <Input
-            className="h-8 w-32 text-right font-mono"
+            className="ms-auto h-8 w-32 text-right font-mono"
             inputMode="decimal"
             aria-label={`${t("office.journals.credit")} ${row.index + 1}`}
             value={row.original.credit}
