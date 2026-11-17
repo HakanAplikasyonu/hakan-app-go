@@ -455,9 +455,6 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
-	// Banka karşı taraf takma adları (#383): ödeyen / alıcı → cari hesap.
-	bankposting.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankposting.NewHandler(bankposting.NewService(deps.DB)))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -606,6 +603,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
 		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).
 		Register(bankmatching.SuggestionKind, bankmatching.Applier{}).
+		Register(bankposting.SuggestionKind, bankposting.Applier{}).
 		Register(accountrulesusecase.Kind, accountrulesrepository.Applier{})
 	warningEngine := warningsengine.New(warningsrepository.NewWarnings(deps.Queries), warningsrepository.NewConfig(deps.Queries))
 	// Hesap kodu önerileri (#25); yükleme sonrası kendiliğinden (#319).
@@ -615,6 +613,11 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if s.worker != nil {
 		s.worker.WithAccountSuggest(autoSuggest)
 	}
+	// Banka hareketi → mizan hesabı (#383): takma ad hafızası, hesap önerisi,
+	// inceleme ve onaylananlardan yevmiye taslağı (Luca / Zirve çıktısına girer).
+	bankposting.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		bankposting.NewHandler(bankposting.NewService(deps.DB),
+			bankposting.NewWorkflow(deps.DB, reviewSvc, journalsmodule.New(deps.DB, deps.Storage))))
 	// Banka–fatura eşleme ve BNK kontrolleri (#21).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,

@@ -8114,6 +8114,227 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Bank movements with their counter-account suggestion (matching screen)
+         * @description Requires `tenant.bank.read`. Every movement of the taxpayer with the
+         *     proposed counter account of the bank account (120 / 320 / 335 / 360 /
+         *     770 ...), its confidence, source (`alias`, `invoice_match`,
+         *     `counterparty_account`, `kind_default`, `manual`) and reason, the
+         *     pending review suggestion and the journal draft it went into.
+         *     `status`: `unassigned` (no suggestion), `suggested`, `approved` (not
+         *     in a draft yet), `drafted`. `summary` counts the period by status.
+         */
+        get: operations["listTenantBankPostings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/suggest": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose the counter account of a period's movements
+         * @description Requires `tenant.bank.write`. For every movement not approved yet:
+         *     the counterparty alias first (IBAN > VKN / TCKN > name), then the
+         *     cari of the matched invoice or of the movement's VKN / TCKN
+         *     (counterparty accounts), then the usual account of its type. Each
+         *     proposal goes to the review queue as `bank_account`; the
+         *     engagement's threshold may approve it at once (revertible).
+         *     Automatic approvals never teach the alias memory.
+         */
+        post: operations["suggestTenantBankPostings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve the pending suggestions of movements as proposed (bulk)
+         * @description Requires `tenant.bank.write`. 1 to 500 movements. A movement
+         *     without a pending suggestion is skipped. Each approval teaches the
+         *     alias memory and counts towards the rule candidate.
+         */
+        post: operations["approveTenantBankPostings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/drafts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Journal drafts from the approved movements
+         * @description Requires `tenant.bank.write` and `tenant.journals.write`. Approved
+         *     movements in no draft yet become mahsup drafts, one per bank account
+         *     and day: two lines per movement (the bank account's ledger code, see
+         *     `bank-ledger-accounts`, against the counter account), `source_kind
+         *     bank_transaction`. The drafts follow the journals flow (approval,
+         *     Luca / Zirve export). Foreign-currency movements are left out
+         *     (`skipped_foreign_currency`).
+         */
+        post: operations["createTenantBankPostingDrafts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Book one movement to the chosen account
+         * @description Requires `tenant.bank.write`. A pending suggestion is corrected;
+         *     otherwise a manual one is recorded and approved. The decision
+         *     teaches the alias memory (and, with a VKN / TCKN, the cari memory).
+         *     A movement already in a journal draft answers `BANK_POSTING_DRAFTED`.
+         */
+        put: operations["setTenantBankPostingAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's bank accounts and their trial-balance account
+         * @description Requires `tenant.bank.read`. Without a code a bank account is booked to `102` (`default`).
+         */
+        get: operations["listTenantBankLedgerAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts/{cashBoxUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                cashBoxUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a bank account's trial-balance account (102.01 ...)
+         * @description Requires `tenant.bank.write`.
+         */
+        put: operations["setTenantBankLedgerAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
         parameters: {
             query?: never;
@@ -13256,6 +13477,123 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["BankCounterpartyAliasCandidate"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankPosting: {
+            /**
+             * Format: uuid
+             * @description The bank transaction
+             */
+            uuid: string;
+            /** Format: date */
+            transaction_date: string;
+            /** @enum {string} */
+            direction: "A" | "B";
+            /** @example 12500.00 */
+            amount: string;
+            currency: string;
+            description: string;
+            counterparty_name: string;
+            counterparty_iban?: string;
+            kind: string;
+            kind_detail: string;
+            match_status: string;
+            /** Format: uuid */
+            cash_box_uuid: string;
+            cash_box_name: string;
+            /** @enum {string} */
+            status: "unassigned" | "suggested" | "approved" | "drafted";
+            account_code?: string;
+            account_name?: string;
+            /** @example 0.85 */
+            confidence?: string;
+            /** @enum {string} */
+            source?: "alias" | "counterparty_account" | "invoice_match" | "kind_default" | "manual";
+            reason?: string;
+            /** Format: uuid */
+            suggestion_uuid?: string;
+            suggestion_status?: string;
+            /** Format: uuid */
+            journal_draft_uuid?: string;
+        };
+        BankPostingSummary: {
+            unassigned: number;
+            suggested: number;
+            approved: number;
+            drafted: number;
+            total: number;
+        };
+        BankLedgerAccount: {
+            /** Format: uuid */
+            cash_box_uuid: string;
+            name: string;
+            iban?: string;
+            bank_id?: string;
+            currency: string;
+            account_code: string;
+            default: boolean;
+        };
+        EnvelopeBankPostingPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankPosting"][];
+                summary: components["schemas"]["BankPostingSummary"];
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankPostingRun: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                movements: number;
+                suggested: number;
+                auto_approved: number;
+                unchanged: number;
+                already_approved: number;
+                no_suggestion: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankPostingApproval: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                approved: number;
+                skipped: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankPostingDrafts: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                drafts: {
+                    /** Format: uuid */
+                    uuid: string;
+                    period: string;
+                    entry_no: number;
+                    entry_type: string;
+                    /** Format: date-time */
+                    entry_date: string;
+                    status: string;
+                    debit: string;
+                    credit: string;
+                    lines: number;
+                }[];
+                transactions: number;
+                skipped_foreign_currency: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankLedgerAccountList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankLedgerAccount"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -28986,6 +29324,318 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankPostings: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "unassigned" | "suggested" | "approved" | "drafted";
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Movements */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankPostingPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    suggestTenantBankPostings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Run result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankPostingRun"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveTenantBankPostings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    transaction_uuids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankPostingApproval"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `SUGGESTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantBankPostingDrafts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @description Omitted: every period
+                     * @example 2026-10
+                     */
+                    period?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Drafts */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankPostingDrafts"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankPostingAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 120.01.015 */
+                    account_code: string;
+                    /** @example Oğuz Yılmaz */
+                    account_name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Booked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `BANK_POSTING_DRAFTED` or `SUGGESTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankLedgerAccounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bank accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankLedgerAccountList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankLedgerAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                cashBoxUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 102.01 */
+                    account_code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

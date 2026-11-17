@@ -260,6 +260,18 @@ type BankDailySummary struct {
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankLedgerAccount struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	CashBoxID      int64              `json:"cash_box_id"`
+	AccountCode    string             `json:"account_code"`
+	UpdatedBy      pgtype.Int8        `json:"updated_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankRule struct {
 	ID          int64              `json:"id"`
 	Uuid        uuid.UUID          `json:"uuid"`
@@ -364,6 +376,26 @@ type BankTransactionMatch struct {
 	Evidence          []byte             `json:"evidence"`
 	MatchedBy         pgtype.Int8        `json:"matched_by"`
 	MatchedAt         pgtype.Timestamptz `json:"matched_at"`
+}
+
+type BankTransactionPosting struct {
+	ID                int64              `json:"id"`
+	OrganizationID    int64              `json:"organization_id"`
+	EngagementID      int64              `json:"engagement_id"`
+	TaxpayerID        int64              `json:"taxpayer_id"`
+	BankTransactionID int64              `json:"bank_transaction_id"`
+	AccountCode       string             `json:"account_code"`
+	AccountName       string             `json:"account_name"`
+	Status            string             `json:"status"`
+	Confidence        pgtype.Numeric     `json:"confidence"`
+	Source            string             `json:"source"`
+	Reason            string             `json:"reason"`
+	SuggestionID      pgtype.Int8        `json:"suggestion_id"`
+	JournalDraftUuid  pgtype.UUID        `json:"journal_draft_uuid"`
+	ApprovedBy        pgtype.Int8        `json:"approved_by"`
+	ApprovedAt        pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type BankTransactionSource struct {
