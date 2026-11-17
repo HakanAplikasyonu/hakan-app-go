@@ -7,6 +7,8 @@ import * as React from "react";
 import { cn } from "@/lib/utils/index";
 import { useLocale } from "@/providers/locale-provider";
 
+import { useReturnFocus } from "./return-focus";
+
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogPortal = DialogPrimitive.Portal;
@@ -30,25 +32,34 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 export const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "border-border bg-background fixed top-1/2 left-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:outline-none">
-        <X className="h-4 w-4" />
-        <CloseLabel />
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+>(
+  (
+    { className, children, onOpenAutoFocus, onCloseAutoFocus, ...props },
+    ref,
+  ) => {
+    const returnFocus = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
+    return (
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          ref={ref}
+          {...returnFocus}
+          className={cn(
+            "border-border bg-background fixed top-1/2 left-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border p-6 shadow-lg duration-200 sm:rounded-lg",
+            className,
+          )}
+          {...props}
+        >
+          {children}
+          <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:outline-none">
+            <X className="h-4 w-4" />
+            <CloseLabel />
+          </DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    );
+  },
+);
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 export function DialogHeader({

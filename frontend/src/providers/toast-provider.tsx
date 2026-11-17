@@ -1,11 +1,31 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import { Toaster, toast } from "sonner";
 
 import { ApiError, setGlobalApiErrorHandler } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
+
+/**
+ * Zengin renkli bildirimler tasarım token'larıyla (#455): sonner'ın kendi
+ * renkleri (ör. hata #e60000 / #fff0f0, 4.34:1) 4.5:1 metin kontrastını
+ * karşılamıyordu. tint zemin + aynı ailenin metin token'ı dört temada 4.5:1.
+ */
+const toastColors = {
+  "--success-bg": "var(--ok-tint)",
+  "--success-border": "color-mix(in srgb, var(--ok) 35%, transparent)",
+  "--success-text": "var(--ok)",
+  "--error-bg": "var(--danger-tint)",
+  "--error-border": "color-mix(in srgb, var(--danger) 35%, transparent)",
+  "--error-text": "var(--danger)",
+  "--warning-bg": "var(--warn-tint)",
+  "--warning-border": "color-mix(in srgb, var(--warn) 35%, transparent)",
+  "--warning-text": "var(--warn)",
+  "--info-bg": "var(--info-tint)",
+  "--info-border": "color-mix(in srgb, var(--info) 35%, transparent)",
+  "--info-text": "var(--info)",
+} as CSSProperties;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const { theme } = useTheme();
@@ -50,6 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         richColors
         position="top-right"
         theme={theme === "dark" ? "dark" : "light"}
+        style={toastColors}
       />
     </>
   );

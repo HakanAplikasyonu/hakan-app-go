@@ -296,6 +296,9 @@ function AccountsView({
     [detail.items, onlyOpen],
   );
 
+  // `mutate` kararlı; mutasyon nesnesi her durumda değişir ve sütunları
+  // (dolayısıyla satır düğmelerini) yeniden kurup odağı kaybettiriyordu.
+  const decideItem = decide.mutate;
   const columns = useMemo<ColumnDef<ReconciliationItem, unknown>[]>(
     () => [
       createColumn<ReconciliationItem>({
@@ -406,14 +409,14 @@ function AccountsView({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      decide.mutate({ uuid: x.uuid, status: "resolved" })
+                      decideItem({ uuid: x.uuid, status: "resolved" })
                     }
                   >
                     {t("office.reconciliation.resolve")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      decide.mutate({ uuid: x.uuid, status: "ignored" })
+                      decideItem({ uuid: x.uuid, status: "ignored" })
                     }
                   >
                     {t("office.reconciliation.ignore")}
@@ -426,7 +429,7 @@ function AccountsView({
                   {x.status !== "open" ? (
                     <DropdownMenuItem
                       onSelect={() =>
-                        decide.mutate({ uuid: x.uuid, status: "open" })
+                        decideItem({ uuid: x.uuid, status: "open" })
                       }
                     >
                       {t("office.reconciliation.reopen")}
@@ -439,7 +442,7 @@ function AccountsView({
         ),
       }),
     ],
-    [t, canWrite, decide],
+    [t, canWrite, decideItem],
   );
 
   const unpostedAmount = Object.values(sum.unposted).reduce(

@@ -182,6 +182,9 @@ export function CounterpartiesView({
       : items;
   }, [list.data, onlyIssues]);
 
+  // `mutate` kararlı: sütunlar her mutasyon durumunda yeniden kurulmaz,
+  // satır düğmeleri (ve klavye odağı) korunur.
+  const decideItem = decide.mutate;
   const columns = useMemo<ColumnDef<ReconciliationCounterparty, unknown>[]>(
     () => [
       createColumn<ReconciliationCounterparty>({
@@ -320,14 +323,14 @@ export function CounterpartiesView({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      decide.mutate({ uuid: x.uuid, status: "resolved" })
+                      decideItem({ uuid: x.uuid, status: "resolved" })
                     }
                   >
                     {t("office.reconciliation.resolve")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      decide.mutate({ uuid: x.uuid, status: "ignored" })
+                      decideItem({ uuid: x.uuid, status: "ignored" })
                     }
                   >
                     {t("office.reconciliation.ignore")}
@@ -345,7 +348,7 @@ export function CounterpartiesView({
           ) : null,
       }),
     ],
-    [t, canWrite, decide],
+    [t, canWrite, decideItem],
   );
 
   const sum = list.data?.run.summary;
