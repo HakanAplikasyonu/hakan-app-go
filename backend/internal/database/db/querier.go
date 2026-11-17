@@ -588,6 +588,9 @@ type Querier interface {
 	// Hatırlatması gelen açık görevler, engagement başına toplanır.
 	ListDueDocumentTaskReminders(ctx context.Context, arg ListDueDocumentTaskRemindersParams) ([]ListDueDocumentTaskRemindersRow, error)
 	ListDuePushTickets(ctx context.Context, arg ListDuePushTicketsParams) ([]ListDuePushTicketsRow, error)
+	// Zamanlanmış kaynak senkronu (issue #385).
+	// tenant-lint: cross-taxpayer worker taraması (rls.System) zamanı gelmiş bağlantıları ofisler arası seçer
+	ListDueSourceConnections(ctx context.Context, arg ListDueSourceConnectionsParams) ([]ListDueSourceConnectionsRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Atanan ofis üyeleri (hâlâ üye olanlar); atanan yoksa ofis sahipleri.
 	ListEngagementAlertRecipients(ctx context.Context, arg ListEngagementAlertRecipientsParams) ([]int64, error)
@@ -937,6 +940,7 @@ type Querier interface {
 	SetSourceConnectionCapabilities(ctx context.Context, arg SetSourceConnectionCapabilitiesParams) (int64, error)
 	SetSourceConnectionCompany(ctx context.Context, arg SetSourceConnectionCompanyParams) (SourceConnection, error)
 	SetSourceConnectionCredentialsRef(ctx context.Context, arg SetSourceConnectionCredentialsRefParams) (int64, error)
+	SetSourceConnectionSchedule(ctx context.Context, arg SetSourceConnectionScheduleParams) (SourceConnection, error)
 	SetSourceConnectionState(ctx context.Context, arg SetSourceConnectionStateParams) (SourceConnection, error)
 	SetSourceConnectionStatus(ctx context.Context, arg SetSourceConnectionStatusParams) (int64, error)
 	// Sayfa sonrası ilerleme; yarıda kalan pencere buradan sürer (deneme sayısı artmaz).

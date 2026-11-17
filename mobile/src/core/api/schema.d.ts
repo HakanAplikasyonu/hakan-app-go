@@ -6249,6 +6249,73 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set the connection's sync schedule
+         * @description Requires `tenant.invoices.write`. `sync_interval_minutes` (15–10080)
+         *     turns the scheduled sync on: the worker sweep (every 5 minutes)
+         *     enqueues the connection when `next_sync_at` has come and reads the
+         *     open periods (previous and current month). After a success the next
+         *     run is one interval later; after a failure it is retried in 5, 10,
+         *     20 … minutes, never later than the interval (`sync_failures`).
+         *     `null` or `0` turns the schedule off (manual sync only). New
+         *     connections are scheduled every 240 minutes (issue #385).
+         */
+        patch: operations["scheduleEasytradeConnection"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync-runs": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The connection's last 20 sync runs
+         * @description Requires `tenant.invoices.read`. Scheduled (`incremental`) and
+         *     manual runs, newest first. `partial`: some month/item windows failed
+         *     and are retried by the next run; `failed`: nothing was written.
+         */
+        get: operations["listEasytradeSyncRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync": {
         parameters: {
             query?: never;
@@ -6274,7 +6341,9 @@ export interface paths {
          *     detail and written with the common duplicate rules. Cancelled and
          *     draft invoices, recurring expense templates and rejected expenses are
          *     counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
-         *     answer disables the connection.
+         *     answer disables the connection. The run is recorded in `sync-runs`
+         *     (kind `manual`); `409 SYNC_RUNNING` while a scheduled run of the
+         *     connection is in progress.
          */
         post: operations["syncEasytradeConnection"];
         delete?: never;
@@ -8558,8 +8627,42 @@ export interface components {
             /** Format: date-time */
             last_sync_at?: string;
             last_report?: components["schemas"]["ParasutReport"];
+            /** @description Scheduled sync interval; null = manual only (issue */
+            sync_interval_minutes?: number | null;
+            /** Format: date-time */
+            next_sync_at?: string;
+            /** Format: date-time */
+            last_success_at?: string;
+            /** @description Consecutive failed scheduled runs. */
+            sync_failures?: number;
+            last_run?: components["schemas"]["EasytradeSyncRun"];
             /** Format: date-time */
             created_at: string;
+        };
+        EasytradeSyncRun: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "incremental" | "manual";
+            /** @enum {string} */
+            status: "running" | "success" | "partial" | "failed";
+            /** @description The import report plus `windows_done` and `windows_failed`. */
+            counters: {
+                [key: string]: unknown;
+            };
+            error?: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        EnvelopeEasytradeSyncRunList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["EasytradeSyncRun"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EasytradeVatTotals: {
             invoice_count: number;
@@ -23126,6 +23229,88 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    scheduleEasytradeConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sync_interval_minutes?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Connection with its schedule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `INVALID_INTERVAL` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEasytradeSyncRuns: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEasytradeSyncRunList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
         };
     };
     syncEasytradeConnection: {

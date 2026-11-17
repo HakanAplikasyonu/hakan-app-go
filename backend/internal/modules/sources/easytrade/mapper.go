@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -86,68 +87,133 @@ func hash(o obj) string {
 	return hex.EncodeToString(s[:])
 }
 
+// Items the adapter reads; each is one sync_windows.item (issue #385).
+const (
+	ItemInvoices = "invoices"
+	ItemExpenses = "expenses"
+)
+
+// Items lists what a sync reads, in order.
+var Items = []string{ItemInvoices, ItemExpenses}
+
+// DateField is the sync_windows.date_field of an item.
+func DateField(item string) string {
+	if item == ItemExpenses {
+		return "expense"
+	}
+	return "issue"
+}
+
 // Read fetches sales and purchase invoices and expenses of [from, to] for
 // every branch and maps them (09 §3, §6).
 func (c *Client) Read(ctx context.Context, from, to time.Time) (sources.Batch, error) {
+	branches, err := c.ActiveBranches(ctx)
+	if err != nil {
+		return sources.Batch{Excluded: sources.Excluded{}}, err
+	}
 	b := sources.Batch{Excluded: sources.Excluded{}}
+	for _, item := range Items {
+		part, err := c.ReadItem(ctx, item, branches, from, to)
+		if err != nil {
+			return b, err
+		}
+		b.Invoices = append(b.Invoices, part.Invoices...)
+		b.Expenses = append(b.Expenses, part.Expenses...)
+		for k, v := range part.Excluded {
+			b.Excluded[k] += v
+		}
+	}
+	return b, nil
+}
+
+// ActiveBranches lists the branches; a company without any is read once
+// without X-Branch-ID.
+func (c *Client) ActiveBranches(ctx context.Context) ([]Branch, error) {
 	branches, err := c.Branches(ctx)
 	if err != nil {
-		return b, err
+		return nil, err
 	}
 	if len(branches) == 0 {
 		branches = []Branch{{}}
 	}
+	return branches, nil
+}
+
+// ReadItem reads one item of [from, to] over branches.
+func (c *Client) ReadItem(ctx context.Context, item string, branches []Branch, from, to time.Time) (sources.Batch, error) {
+	b := sources.Batch{Excluded: sources.Excluded{}}
 	seen := map[string]bool{}
+	defer func() { c.BranchID = "" }()
 	for _, br := range branches {
 		c.BranchID = br.ID
-		for _, path := range []string{"/company/invoices/sales", "/company/invoices/purchases"} {
-			ids, err := c.listIDs(ctx, path, "issue_date", from, to)
-			if err != nil {
-				return b, err
-			}
-			for _, id := range ids {
-				if seen["inv:"+id] {
-					continue
-				}
-				seen["inv:"+id] = true
-				var d struct {
-					Data obj `json:"data"`
-				}
-				if err := c.get(ctx, "/company/invoices/"+id, nil, &d); err != nil {
-					return b, err
-				}
-				inv, skip := mapInvoice(d.Data)
-				if skip != "" {
-					b.Excluded[skip]++
-					continue
-				}
-				b.Invoices = append(b.Invoices, inv)
-			}
+		var err error
+		switch item {
+		case ItemInvoices:
+			err = c.readInvoices(ctx, &b, seen, from, to)
+		case ItemExpenses:
+			err = c.readExpenses(ctx, &b, seen, from, to)
+		default:
+			err = fmt.Errorf("easytrade: unknown item %q", item)
 		}
-		ids, err := c.listIDs(ctx, "/company/expenses", "expense_date", from, to)
 		if err != nil {
 			return b, err
 		}
+	}
+	return b, nil
+}
+
+func (c *Client) readInvoices(ctx context.Context, b *sources.Batch, seen map[string]bool, from, to time.Time) error {
+	for _, path := range []string{"/company/invoices/sales", "/company/invoices/purchases"} {
+		ids, err := c.listIDs(ctx, path, "issue_date", from, to)
+		if err != nil {
+			return err
+		}
 		for _, id := range ids {
-			if seen["exp:"+id] {
+			if seen[id] {
 				continue
 			}
-			seen["exp:"+id] = true
+			seen[id] = true
 			var d struct {
 				Data obj `json:"data"`
 			}
-			if err := c.get(ctx, "/company/expenses/"+id, nil, &d); err != nil {
-				return b, err
+			if err := c.get(ctx, "/company/invoices/"+id, nil, &d); err != nil {
+				return err
 			}
-			e, skip := mapExpense(d.Data)
+			inv, skip := mapInvoice(d.Data)
 			if skip != "" {
 				b.Excluded[skip]++
 				continue
 			}
-			b.Expenses = append(b.Expenses, e)
+			b.Invoices = append(b.Invoices, inv)
 		}
 	}
-	return b, nil
+	return nil
+}
+
+func (c *Client) readExpenses(ctx context.Context, b *sources.Batch, seen map[string]bool, from, to time.Time) error {
+	ids, err := c.listIDs(ctx, "/company/expenses", "expense_date", from, to)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		var d struct {
+			Data obj `json:"data"`
+		}
+		if err := c.get(ctx, "/company/expenses/"+id, nil, &d); err != nil {
+			return err
+		}
+		e, skip := mapExpense(d.Data)
+		if skip != "" {
+			b.Excluded[skip]++
+			continue
+		}
+		b.Expenses = append(b.Expenses, e)
+	}
+	return nil
 }
 
 // cancelled: status value or the "Fatura İptal Edildi" movement (09 §3.2).

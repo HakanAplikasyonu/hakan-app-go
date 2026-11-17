@@ -32,6 +32,8 @@ var (
 	ErrAuth = errors.New("easytrade: authorization failed")
 	// ErrLicense: 403 LICENSE_EXPIRED; the connection is disabled, not retried.
 	ErrLicense = errors.New("easytrade: taxpayer's Easytrade license expired")
+	// ErrUpstream: any other non-2xx answer (429, 5xx …); the schedule retries.
+	ErrUpstream = errors.New("easytrade: request failed")
 	// ErrNoBranch: 400 "Aktif şube bulunamadı".
 	ErrNoBranch = errors.New("easytrade: no active branch")
 )
@@ -177,7 +179,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	case res.StatusCode == http.StatusBadRequest && bytes.Contains(raw, []byte("Aktif şube")):
 		return ErrNoBranch
 	case res.StatusCode >= 300:
-		return fmt.Errorf("easytrade: %s %s: HTTP %d", method, path, res.StatusCode)
+		return fmt.Errorf("%w: %s %s: HTTP %d", ErrUpstream, method, path, res.StatusCode)
 	}
 	if out == nil {
 		return nil

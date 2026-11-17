@@ -69,7 +69,23 @@ type Connection struct {
 	Error      string          `json:"error,omitempty"`
 	LastSyncAt *time.Time      `json:"last_sync_at,omitempty"`
 	LastReport *sources.Report `json:"last_report,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	// Schedule (issue #385): nil interval = manual only.
+	SyncIntervalMinutes *int32     `json:"sync_interval_minutes"`
+	NextSyncAt          *time.Time `json:"next_sync_at,omitempty"`
+	LastSuccessAt       *time.Time `json:"last_success_at,omitempty"`
+	SyncFailures        int32      `json:"sync_failures"`
+	LastRun             *Run       `json:"last_run,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+}
+
+// view adds the last run to the row's view.
+func (s *Service) view(ctx context.Context, row db.SourceConnection) Connection {
+	c := view(row)
+	if rs, err := s.q.ListSyncRuns(ctx, db.ListSyncRunsParams{TaxpayerID: row.TaxpayerID, ConnectionID: row.ID, Lim: 1}); err == nil && len(rs) > 0 {
+		r := runView(rs[0])
+		c.LastRun = &r
+	}
+	return c
 }
 
 func view(row db.SourceConnection) Connection {
@@ -80,6 +96,19 @@ func view(row db.SourceConnection) Connection {
 	if c.Branches == nil {
 		c.Branches = []Branch{}
 	}
+	if row.SyncIntervalMinutes.Valid {
+		v := row.SyncIntervalMinutes.Int32
+		c.SyncIntervalMinutes = &v
+	}
+	if row.NextSyncAt.Valid {
+		t := row.NextSyncAt.Time
+		c.NextSyncAt = &t
+	}
+	if row.LastSuccessAt.Valid {
+		t := row.LastSuccessAt.Time
+		c.LastSuccessAt = &t
+	}
+	c.SyncFailures = row.SyncFailures
 	var le struct {
 		Message string `json:"message"`
 	}
@@ -127,7 +156,15 @@ func (s *Service) Connect(ctx context.Context, taxpayerID int64, email, password
 	if err != nil {
 		return Connection{}, err
 	}
-	return view(row), nil
+	// Scheduled by default (issue #385): the first sweep reads the open periods.
+	row, err = s.q.SetSourceConnectionSchedule(ctx, db.SetSourceConnectionScheduleParams{
+		SyncIntervalMinutes: pgtype.Int4{Int32: int32(DefaultSyncInterval / time.Minute), Valid: true},
+		NextSyncAt:          pgtype.Timestamptz{Time: s.now(), Valid: true}, TaxpayerID: taxpayerID, ID: row.ID,
+	})
+	if err != nil {
+		return Connection{}, err
+	}
+	return s.view(ctx, row), nil
 }
 
 // List returns the taxpayer's Easytrade connections.
@@ -138,19 +175,25 @@ func (s *Service) List(ctx context.Context, taxpayerID int64) ([]Connection, err
 	}
 	out := make([]Connection, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, view(r))
+		out = append(out, s.view(ctx, r))
 	}
 	return out, nil
+}
+
+// row loads the taxpayer's Easytrade connection.
+func (s *Service) row(ctx context.Context, taxpayerID int64, id uuid.UUID) (db.SourceConnection, error) {
+	row, err := s.q.GetSourceConnection(ctx, db.GetSourceConnectionParams{TaxpayerID: taxpayerID, Uuid: id})
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.SourceSystem != SourceSystem) {
+		return row, ErrNotFound
+	}
+	return row, err
 }
 
 func (s *Service) client(ctx context.Context, taxpayerID int64, id uuid.UUID) (db.SourceConnection, *Client, error) {
 	if s.vault == nil {
 		return db.SourceConnection{}, nil, ErrNoVault
 	}
-	row, err := s.q.GetSourceConnection(ctx, db.GetSourceConnectionParams{TaxpayerID: taxpayerID, Uuid: id})
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && row.SourceSystem != SourceSystem) {
-		return row, nil, ErrNotFound
-	}
+	row, err := s.row(ctx, taxpayerID, id)
 	if err != nil {
 		return row, nil, err
 	}
@@ -214,20 +257,8 @@ func (s *Service) Sync(ctx context.Context, taxpayerID int64, id uuid.UUID, from
 	}); err != nil {
 		return sources.Report{}, err
 	}
-	b, err := c.Read(ctx, from, to)
-	if err != nil {
-		s.fail(ctx, row, err)
-		return sources.Report{}, err
-	}
-	rep, err := sources.Write(ctx, s.pool, taxpayerID, SourceSystem, b)
-	if err != nil {
-		return rep, err
-	}
-	p, _ = json.Marshal(map[string]any{"last_sync_at": s.now(), "last_report": rep})
-	_, err = s.q.SetSourceConnectionState(ctx, db.SetSourceConnectionStateParams{
-		SetupState: "active", Status: "active", MetaPatch: p, MarkSuccess: true, TaxpayerID: taxpayerID, ID: row.ID,
-	})
-	return rep, err
+	res, err := s.run(ctx, row, c, RunManual, from, to)
+	return res.Counters.Report, err
 }
 
 // Reconcile compares Easytrade's VAT report of period with the portal (09 §8).

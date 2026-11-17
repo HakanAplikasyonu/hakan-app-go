@@ -8467,6 +8467,77 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    patch:
+      tags: [Sources]
+      operationId: scheduleEasytradeConnection
+      summary: Set the connection's sync schedule
+      description: |
+        Requires `tenant.invoices.write`. `sync_interval_minutes` (15–10080)
+        turns the scheduled sync on: the worker sweep (every 5 minutes)
+        enqueues the connection when `next_sync_at` has come and reads the
+        open periods (previous and current month). After a success the next
+        run is one interval later; after a failure it is retried in 5, 10,
+        20 … minutes, never later than the interval (`sync_failures`).
+        `null` or `0` turns the schedule off (manual sync only). New
+        connections are scheduled every 240 minutes (issue #385).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sync_interval_minutes: { type: [integer, "null"], minimum: 0, maximum: 10080 }
+      responses:
+        "200":
+          description: Connection with its schedule
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`INVALID_INTERVAL`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync-runs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: listEasytradeSyncRuns
+      summary: The connection's last 20 sync runs
+      description: |
+        Requires `tenant.invoices.read`. Scheduled (`incremental`) and
+        manual runs, newest first. `partial`: some month/item windows failed
+        and are retried by the next run; `failed`: nothing was written.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Runs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEasytradeSyncRunList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -8482,7 +8553,9 @@ paths:
         detail and written with the common duplicate rules. Cancelled and
         draft invoices, recurring expense templates and rejected expenses are
         counted in `excluded`. Once per 5 minutes; a `LICENSE_EXPIRED`
-        answer disables the connection.
+        answer disables the connection. The run is recorded in `sync-runs`
+        (kind `manual`); `409 SYNC_RUNNING` while a scheduled run of the
+        connection is in progress.
       security:
         - bearerAuth: []
       requestBody:
@@ -11470,7 +11543,39 @@ components:
         error: { type: string }
         last_sync_at: { type: string, format: date-time }
         last_report: { $ref: "#/components/schemas/ParasutReport" }
+        sync_interval_minutes:
+          type: [integer, "null"]
+          description: Scheduled sync interval; null = manual only (issue #385).
+        next_sync_at: { type: string, format: date-time }
+        last_success_at: { type: string, format: date-time }
+        sync_failures: { type: integer, description: Consecutive failed scheduled runs. }
+        last_run: { $ref: "#/components/schemas/EasytradeSyncRun" }
         created_at: { type: string, format: date-time }
+    EasytradeSyncRun:
+      type: object
+      required: [uuid, kind, status, counters, started_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [incremental, manual] }
+        status: { type: string, enum: [running, success, partial, failed] }
+        counters:
+          type: object
+          description: The import report plus `windows_done` and `windows_failed`.
+          additionalProperties: true
+        error: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+    EnvelopeEasytradeSyncRunList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/EasytradeSyncRun" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EasytradeVatTotals:
       type: object
       required: [invoice_count, base, vat]

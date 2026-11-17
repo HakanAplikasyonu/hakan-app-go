@@ -15,7 +15,7 @@ import (
 const createSourceConnection = `-- name: CreateSourceConnection :one
 INSERT INTO source_connections (taxpayer_id, source_system, external_company_id, credentials_ref, setup_state, meta, consent_text, consent_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures
 `
 
 type CreateSourceConnectionParams struct {
@@ -61,12 +61,15 @@ func (q *Queries) CreateSourceConnection(ctx context.Context, arg CreateSourceCo
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }
 
 const getSourceConnection = `-- name: GetSourceConnection :one
-SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at FROM source_connections
+SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1 AND uuid = $2
 `
 
@@ -98,12 +101,15 @@ func (q *Queries) GetSourceConnection(ctx context.Context, arg GetSourceConnecti
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }
 
 const getSourceConnectionBySystem = `-- name: GetSourceConnectionBySystem :one
-SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at FROM source_connections
+SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1 AND source_system = $2
 ORDER BY id
 LIMIT 1
@@ -137,12 +143,15 @@ func (q *Queries) GetSourceConnectionBySystem(ctx context.Context, arg GetSource
 		&i.LastSuccessAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SyncIntervalMinutes,
+		&i.NextSyncAt,
+		&i.SyncFailures,
 	)
 	return i, err
 }
 
 const listSourceConnections = `-- name: ListSourceConnections :many
-SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at FROM source_connections
+SELECT id, uuid, taxpayer_id, source_system, external_company_id, external_branch_ids, credentials_ref, setup_state, status, last_error, meta, consent_text, consent_at, sync_cursor, capabilities, last_full_sync_at, last_success_at, created_at, updated_at, sync_interval_minutes, next_sync_at, sync_failures FROM source_connections
 WHERE taxpayer_id = $1
 ORDER BY source_system, id
 `
@@ -176,6 +185,9 @@ func (q *Queries) ListSourceConnections(ctx context.Context, taxpayerID int64) (
 			&i.LastSuccessAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SyncIntervalMinutes,
+			&i.NextSyncAt,
+			&i.SyncFailures,
 		); err != nil {
 			return nil, err
 		}
