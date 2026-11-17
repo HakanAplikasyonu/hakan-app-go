@@ -226,3 +226,21 @@ JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
 WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled
   AND (sqlc.narg(period)::text IS NULL OR bt.period = sqlc.narg(period)::text)
   AND (sqlc.narg(cash_box_uuid)::uuid IS NULL OR cb.uuid = sqlc.narg(cash_box_uuid)::uuid);
+
+-- name: ExportBankTransactions :many
+-- Banka hareketleri Excel dışa aktarımı (#395): listeyle aynı süzgeç, ekstre
+-- kolonları ve hesabın IBAN'ı; eskiden yeniye.
+SELECT bt.transaction_date, bt.value_date, bt.debit_credit, bt.amount, bt.currency, bt.balance_after,
+       bt.description, bt.bank_reference, bt.receipt_number, bt.channel,
+       bt.counterparty_name, bt.counterparty_iban,
+       COALESCE(bt.counterparty_tax_number, bt.counterparty_identity_number, '')::text AS counterparty_tax_id,
+       bt.kind, bt.kind_detail, bt.match_status,
+       cb.name AS cash_box_name, cb.iban AS cash_box_iban
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled
+  AND (sqlc.narg(period)::text IS NULL OR bt.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(match_status)::text IS NULL OR bt.match_status = sqlc.narg(match_status)::text)
+  AND (sqlc.narg(cash_box_uuid)::uuid IS NULL OR cb.uuid = sqlc.narg(cash_box_uuid)::uuid)
+ORDER BY cb.id, bt.transaction_date, bt.booked_at, bt.id
+LIMIT @lim;

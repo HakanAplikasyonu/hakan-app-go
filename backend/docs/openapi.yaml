@@ -12405,6 +12405,46 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: exportTenantBankTransactions
+      summary: Bank transactions as Excel
+      description: |
+        Requires `tenant.bank.read` (#395). The transactions of the list filter
+        (Hesap Adı, Hesap IBAN, Tarih, Valör Tarihi, Açıklama, Karşı Taraf,
+        Karşı Taraf IBAN, Karşı Taraf VKN, Borç, Alacak, Bakiye, Para Birimi,
+        Dekont No, Referans No, Kanal, Hareket Türü, Eşleşme) as .xlsx, oldest
+        first per account, at most 20 000 rows; dates dd.mm.yyyy, amounts as
+        numbers with two decimals. The headers are the statement reader's: the
+        file uploads back (statement upload or the common Excel import as
+        `bank_transactions`) without duplicating movements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+        - name: match_status
+          in: query
+          schema: { type: string, enum: [unmatched, suggested, matched, ignored, all] }
+        - name: cash_box_uuid
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/bank-transactions:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

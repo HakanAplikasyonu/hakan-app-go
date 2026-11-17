@@ -87,6 +87,99 @@ func (q *Queries) DeleteBankTransactionSourcesByImport(ctx context.Context, arg 
 	return items, nil
 }
 
+const exportBankTransactions = `-- name: ExportBankTransactions :many
+SELECT bt.transaction_date, bt.value_date, bt.debit_credit, bt.amount, bt.currency, bt.balance_after,
+       bt.description, bt.bank_reference, bt.receipt_number, bt.channel,
+       bt.counterparty_name, bt.counterparty_iban,
+       COALESCE(bt.counterparty_tax_number, bt.counterparty_identity_number, '')::text AS counterparty_tax_id,
+       bt.kind, bt.kind_detail, bt.match_status,
+       cb.name AS cash_box_name, cb.iban AS cash_box_iban
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = $1 AND NOT bt.is_cancelled
+  AND ($2::text IS NULL OR bt.period = $2::text)
+  AND ($3::text IS NULL OR bt.match_status = $3::text)
+  AND ($4::uuid IS NULL OR cb.uuid = $4::uuid)
+ORDER BY cb.id, bt.transaction_date, bt.booked_at, bt.id
+LIMIT $5
+`
+
+type ExportBankTransactionsParams struct {
+	TaxpayerID  int64       `json:"taxpayer_id"`
+	Period      pgtype.Text `json:"period"`
+	MatchStatus pgtype.Text `json:"match_status"`
+	CashBoxUuid pgtype.UUID `json:"cash_box_uuid"`
+	Lim         int32       `json:"lim"`
+}
+
+type ExportBankTransactionsRow struct {
+	TransactionDate   pgtype.Date    `json:"transaction_date"`
+	ValueDate         pgtype.Date    `json:"value_date"`
+	DebitCredit       string         `json:"debit_credit"`
+	Amount            pgtype.Numeric `json:"amount"`
+	Currency          string         `json:"currency"`
+	BalanceAfter      pgtype.Numeric `json:"balance_after"`
+	Description       string         `json:"description"`
+	BankReference     pgtype.Text    `json:"bank_reference"`
+	ReceiptNumber     pgtype.Text    `json:"receipt_number"`
+	Channel           pgtype.Text    `json:"channel"`
+	CounterpartyName  pgtype.Text    `json:"counterparty_name"`
+	CounterpartyIban  pgtype.Text    `json:"counterparty_iban"`
+	CounterpartyTaxID string         `json:"counterparty_tax_id"`
+	Kind              string         `json:"kind"`
+	KindDetail        string         `json:"kind_detail"`
+	MatchStatus       string         `json:"match_status"`
+	CashBoxName       string         `json:"cash_box_name"`
+	CashBoxIban       pgtype.Text    `json:"cash_box_iban"`
+}
+
+// Banka hareketleri Excel dışa aktarımı (#395): listeyle aynı süzgeç, ekstre
+// kolonları ve hesabın IBAN'ı; eskiden yeniye.
+func (q *Queries) ExportBankTransactions(ctx context.Context, arg ExportBankTransactionsParams) ([]ExportBankTransactionsRow, error) {
+	rows, err := q.db.Query(ctx, exportBankTransactions,
+		arg.TaxpayerID,
+		arg.Period,
+		arg.MatchStatus,
+		arg.CashBoxUuid,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ExportBankTransactionsRow{}
+	for rows.Next() {
+		var i ExportBankTransactionsRow
+		if err := rows.Scan(
+			&i.TransactionDate,
+			&i.ValueDate,
+			&i.DebitCredit,
+			&i.Amount,
+			&i.Currency,
+			&i.BalanceAfter,
+			&i.Description,
+			&i.BankReference,
+			&i.ReceiptNumber,
+			&i.Channel,
+			&i.CounterpartyName,
+			&i.CounterpartyIban,
+			&i.CounterpartyTaxID,
+			&i.Kind,
+			&i.KindDetail,
+			&i.MatchStatus,
+			&i.CashBoxName,
+			&i.CashBoxIban,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const fillBankTransactionGaps = `-- name: FillBankTransactionGaps :exec
 UPDATE bank_transactions SET
     description_extra = COALESCE(description_extra, $1),

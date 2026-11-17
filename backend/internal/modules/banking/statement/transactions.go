@@ -70,34 +70,49 @@ func direction(dc string) string {
 	return "out"
 }
 
-// listTransactions: GET .../bank-transactions?period=&match_status=&cash_box_uuid=&limit=&offset=.
-func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
-	scope := engagementctx.Must(r.Context())
+// txFilter is the list / export filter.
+type txFilter struct {
+	period, status pgtype.Text
+	box            pgtype.UUID
+}
+
+func parseTxFilter(w http.ResponseWriter, r *http.Request) (txFilter, bool) {
 	q := r.URL.Query()
-	var period, status pgtype.Text
-	var box pgtype.UUID
+	var f txFilter
 	if v := q.Get("period"); v != "" {
 		if !periodRe.MatchString(v) {
 			response.BadRequest(w, r, response.CodeValidationError, "period must be YYYY-MM")
-			return
+			return f, false
 		}
-		period = pgtype.Text{String: v, Valid: true}
+		f.period = pgtype.Text{String: v, Valid: true}
 	}
 	if v := q.Get("match_status"); v != "" && v != "all" {
 		if !matchStatuses[v] {
 			response.BadRequest(w, r, response.CodeValidationError, "match_status must be unmatched, suggested, matched, ignored or all")
-			return
+			return f, false
 		}
-		status = pgtype.Text{String: v, Valid: true}
+		f.status = pgtype.Text{String: v, Valid: true}
 	}
 	if v := q.Get("cash_box_uuid"); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
 			response.BadRequest(w, r, response.CodeValidationError, "cash_box_uuid is not a uuid")
-			return
+			return f, false
 		}
-		box = pgtype.UUID{Bytes: id, Valid: true}
+		f.box = pgtype.UUID{Bytes: id, Valid: true}
 	}
+	return f, true
+}
+
+// listTransactions: GET .../bank-transactions?period=&match_status=&cash_box_uuid=&limit=&offset=.
+func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
+	scope := engagementctx.Must(r.Context())
+	q := r.URL.Query()
+	f, ok := parseTxFilter(w, r)
+	if !ok {
+		return
+	}
+	period, status, box := f.period, f.status, f.box
 	limit, offset := int32(txDefaultLimit), int32(0)
 	if v := q.Get("limit"); v != "" {
 		n, err := strconv.ParseInt(v, 10, 32)

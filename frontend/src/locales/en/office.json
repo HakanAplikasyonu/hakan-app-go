@@ -836,6 +836,8 @@
   "payroll.field_employer_cost": "Employer cost",
   "bank.title": "Bank transactions",
   "bank.description": "Transactions from statements and bank connections. Period from the top bar.",
+  "bank.export": "Export to Excel",
+  "bank.export_failed": "Could not download the Excel file",
   "bank.in_total": "In",
   "bank.out_total": "Out",
   "bank.unmatched_count": "Unmatched transactions",
