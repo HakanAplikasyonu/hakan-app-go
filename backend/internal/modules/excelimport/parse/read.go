@@ -98,7 +98,9 @@ func Read(name string, data []byte) (Format, []Sheet, error) {
 func readXLSX(data []byte) ([]Sheet, error) {
 	book, err := excelize.OpenReader(bytes.NewReader(data))
 	if err != nil {
-		return nil, fmt.Errorf("parse: xlsx: %w", err)
+		// Not a workbook (a zip of something else, a damaged file): the
+		// caller's input, not a server fault (#453).
+		return nil, fmt.Errorf("%w: xlsx: %v", ErrUnsupported, err)
 	}
 	defer func() { _ = book.Close() }()
 	var out []Sheet
@@ -106,7 +108,7 @@ func readXLSX(data []byte) ([]Sheet, error) {
 		// Raw values: dates stay Excel serials, numbers keep their digits.
 		rows, err := book.GetRows(name, excelize.Options{RawCellValue: true})
 		if err != nil {
-			return nil, fmt.Errorf("parse: sheet %q: %w", name, err)
+			return nil, fmt.Errorf("%w: sheet %q: %v", ErrUnsupported, name, err)
 		}
 		if len(rows) > MaxRows {
 			return nil, ErrTooManyRows

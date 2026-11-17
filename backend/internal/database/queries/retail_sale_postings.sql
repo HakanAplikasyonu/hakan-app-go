@@ -112,15 +112,24 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
 ORDER BY code;
 
 -- name: InsertImportedRetailSale :one
+-- Aynı gün, aynı ÖKC (ya da ikisi de boş) ve aynı Z numarasıyla başka kaynaktan (Easytrade, fiş
+-- fotoğrafı) gelmiş bir Z raporu varsa eklenmez (#453): dışa aktarılan
+-- dosya yeniden yüklenince yalnızca yeni satırlar girer.
 INSERT INTO retail_sales (
     taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number,
     subtotal_amount, tax_amount, total_amount, currency, cash_amount, card_amount, other_payment_amount, receipt_count,
     content_hash
-) VALUES (
-    @taxpayer_id, 'excel_import', @source_id, 'excel_import', @sale_date, @period, sqlc.narg(z_report_number),
-    sqlc.narg(okc_serial_number), sqlc.narg(subtotal_amount), sqlc.narg(tax_amount), @total_amount, 'TRY',
+)
+SELECT
+    @taxpayer_id, 'excel_import', @source_id, 'excel_import', @sale_date, @period, sqlc.narg(z_report_number)::text,
+    sqlc.narg(okc_serial_number)::text, sqlc.narg(subtotal_amount), sqlc.narg(tax_amount), @total_amount, 'TRY',
     sqlc.narg(cash_amount), sqlc.narg(card_amount), sqlc.narg(other_payment_amount), sqlc.narg(receipt_count),
     @content_hash
+WHERE sqlc.narg(z_report_number)::text IS NULL OR NOT EXISTS (
+    SELECT 1 FROM retail_sales x
+    WHERE x.taxpayer_id = @taxpayer_id AND x.sale_date = @sale_date
+      AND COALESCE(btrim(x.okc_serial_number), '') = COALESCE(btrim(sqlc.narg(okc_serial_number)::text), '')
+      AND btrim(x.z_report_number) = btrim(sqlc.narg(z_report_number)::text)
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
 RETURNING *;
