@@ -1,7 +1,13 @@
 "use client";
 
 import type { Cell, Table } from "@tanstack/react-table";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import type {
   ColumnEditVariant,
@@ -199,5 +205,144 @@ function CellEditor({
         }
       }}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Düzenlenebilir ızgara (#394) hücre düzenleyicisi
+
+/** Izgara düzenleyici türleri. `money` ondalık metin (kuruş hassasiyeti). */
+export type GridEditorKind = "text" | "number" | "money" | "select";
+
+export type GridCommitNav = {
+  key: "Enter" | "Tab";
+  shift: boolean;
+};
+
+type GridCellEditorProps = {
+  kind: GridEditorKind;
+  /** Düzenleyicinin açılış metni (yazmaya başlanan karakter ya da değer). */
+  initialText: string;
+  /** Yazmaya başlanarak açıldıysa imleç sona, aksi halde metin seçili. */
+  seeded?: boolean;
+  options?: { label: string; value: string }[];
+  /** Metin düzenleyicide öneri listesi (datalist). */
+  suggestions?: string[];
+  listId?: string;
+  label: string;
+  placeholder?: string;
+  invalid?: boolean;
+  onCommit: (text: string, nav?: GridCommitNav) => void;
+  onCancel: () => void;
+};
+
+/**
+ * Izgara hücresi düzenleyicisi. Enter/Tab kaydedip gezinmeyi ızgaraya
+ * bırakır (Shift ile ters yön), Escape vazgeçer, odak kaybı kaydeder.
+ */
+export function GridCellEditor({
+  kind,
+  initialText,
+  seeded,
+  options,
+  suggestions,
+  listId,
+  label,
+  placeholder,
+  invalid,
+  onCommit,
+  onCancel,
+}: GridCellEditorProps) {
+  const [text, setText] = useState(initialText);
+  const ref = useRef<HTMLInputElement & HTMLSelectElement>(null);
+  const done = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    if (el instanceof HTMLInputElement) {
+      if (seeded) {
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      } else {
+        el.select();
+      }
+    }
+  }, [seeded]);
+
+  const finish = (nav?: GridCommitNav) => {
+    if (done.current) return;
+    done.current = true;
+    onCommit(text, nav);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      e.stopPropagation();
+      finish({ key: e.key, shift: e.shiftKey });
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      done.current = true;
+      onCancel();
+    } else {
+      // Ok tuşları vb. düzenleyicinin içinde kalsın, ızgara gezinmesin.
+      e.stopPropagation();
+    }
+  };
+
+  const common = {
+    "aria-label": label,
+    "aria-invalid": invalid || undefined,
+    className: cn(
+      "border-primary bg-background h-8 w-full min-w-0 rounded-sm border px-1.5 text-sm outline-none",
+      (kind === "number" || kind === "money") && "text-end tabular-nums",
+    ),
+    onKeyDown,
+    onBlur: () => finish(),
+  };
+
+  if (kind === "select") {
+    return (
+      <select
+        ref={ref}
+        {...common}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      >
+        <option value="">—</option>
+        {(options ?? []).map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <>
+      <input
+        ref={ref}
+        {...common}
+        type="text"
+        inputMode={kind === "text" ? undefined : "decimal"}
+        autoComplete="off"
+        spellCheck={false}
+        placeholder={placeholder}
+        list={suggestions?.length ? listId : undefined}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      {suggestions?.length && listId ? (
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      ) : null}
+    </>
   );
 }
