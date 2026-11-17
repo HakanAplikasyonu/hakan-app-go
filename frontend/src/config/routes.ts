@@ -145,6 +145,9 @@ export const routes = {
     /** Bank transactions of one engagement (#329). */
     engagementBank: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/bank`,
+    /** Personel, bordro ve SGK of one engagement (#382). */
+    engagementPayroll: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/payroll`,
     /** Template-based petitions of one engagement (issue #56). */
     engagementPetitions: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,

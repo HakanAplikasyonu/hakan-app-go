@@ -8,11 +8,13 @@ import type { ReactNode } from "react";
 import { ErrorState } from "@/components/common/error-state";
 import { BosDurum, TacRozeti, type TacDurumu } from "@/components/hakan";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Permission } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
@@ -52,6 +54,7 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const pathname = usePathname();
+  const { can } = usePermission();
   const tabs = [
     {
       href: routes.tenant.engagement(slug, engagement),
@@ -65,6 +68,15 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
       href: routes.tenant.engagementBank(slug, engagement),
       label: t("office.engagement.tab_bank"),
     },
+    // Maaş verisi hassas: izni olmayan (stajyer) sekmeyi görmez (#382).
+    ...(can(Permission.TenantPayrollRead)
+      ? [
+          {
+            href: routes.tenant.engagementPayroll(slug, engagement),
+            label: t("office.engagement.tab_payroll"),
+          },
+        ]
+      : []),
     {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
