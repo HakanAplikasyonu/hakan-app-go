@@ -174,6 +174,32 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await expect(focused(page).getByRole("link", { name: "Kural: BNK_UNINVOICED_COLLECTION" })).toBeVisible();
   });
 
+  test("genel listelerden mükellef sekmesine; beyanname kontrol listesinden ilgili kayıtlara", async ({ page }) => {
+    await uiLogin(page, DEMO.owner);
+
+    // Ofis geneli uyarılar: mükellef adı mükellefin Uyarılar sekmesini açar.
+    await page.goto(officePath("/warnings?view=list"));
+    await page.getByRole("link", { name: taxpayer.title }).first().click();
+    await page.waitForURL((u) => u.pathname.endsWith(`/engagements/${engagement}/warnings`));
+    await expectShell(page, "Uyarılar");
+
+    // Komuta merkezi: mükellef adı mükellef detayına (Özet).
+    await page.goto(officePath("/command"));
+    await page.getByRole("link", { name: taxpayer.title }).first().click();
+    await page.waitForURL((u) => u.pathname.endsWith(`/engagements/${engagement}`));
+    await expectShell(page, "Özet");
+
+    // MUHSGK kontrol listesi: bordro maddesi Personel ve bordro sekmesine.
+    await page.getByRole("button", { name: /^Eki 26/ }).click();
+    await page.goto(officePath(`/engagements/${engagement}/tax-returns?kind=muhsgk`));
+    await expectShell(page, "Beyannameler");
+    const item = page.getByRole("link", { name: /^İlgili kayıtlar: / }).first();
+    await expect(item).toBeVisible();
+    await item.click();
+    await page.waitForURL((u) => u.pathname.endsWith(`/engagements/${engagement}/payroll`));
+    await expectShell(page, "Personel ve bordro");
+  });
+
   test("ilişkisi olmayan kayıtta boş durum metni", async ({ page }) => {
     // Hiçbir kayda bağlanmamış ücret hareketi (12,50): yalnız karşı hesabı yok.
     const api = await Api.login(DEMO.owner);

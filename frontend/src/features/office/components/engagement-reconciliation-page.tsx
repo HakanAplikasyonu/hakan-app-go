@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -65,6 +67,8 @@ import {
   Pill,
   resultTone,
 } from "./reconciliation-ui";
+import { useEngagementScope } from "../engagement-scope";
+import { reconciliationItemHref } from "../lib/related-href";
 
 const VIEWS = ["accounts", "counterparties", "babs", "letters"] as const;
 type View = (typeof VIEWS)[number];
@@ -610,6 +614,8 @@ function ItemDetailDialog({
   onClose: () => void;
 }) {
   const { t } = useLocale();
+  const { slug } = useTenant();
+  const engagement = useEngagementScope();
   return (
     <Dialog open={item !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[85svh] overflow-y-auto sm:max-w-2xl">
@@ -697,7 +703,22 @@ function ItemDetailDialog({
                           {u.date}
                         </span>
                         {t(`office.reconciliation.kind_${u.kind}`)} ·{" "}
-                        <span className="truncate">{u.label}</span>
+                        {(() => {
+                          // Farkı oluşturan kayıt, mükellef sekmesinde seçili (#469).
+                          const href = engagement
+                            ? reconciliationItemHref(slug, engagement, u)
+                            : null;
+                          return href ? (
+                            <Link
+                              href={href}
+                              className="text-brand-text truncate hover:underline"
+                            >
+                              {u.label}
+                            </Link>
+                          ) : (
+                            <span className="truncate">{u.label}</span>
+                          );
+                        })()}
                       </span>
                       <Money value={u.effect} />
                     </li>

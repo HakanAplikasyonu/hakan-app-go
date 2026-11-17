@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { permissions } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -946,13 +947,20 @@ function ReviewWorkspaceInner() {
                   suggestionTitle(current, t)}
               </h2>
               <p className="text-text-2 text-sm">
-                {[
-                  taxpayer
-                    ? t("office.review.taxpayer", { name: taxpayer.title })
-                    : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
+                {taxpayer && current.engagement_uuid && !scope ? (
+                  // Genel kuyrukta mükellef adı mükellefin İnceleme sekmesine (#469).
+                  <Link
+                    href={routes.tenant.engagementReview(
+                      slug,
+                      current.engagement_uuid,
+                    )}
+                    className="hover:underline"
+                  >
+                    {t("office.review.taxpayer", { name: taxpayer.title })}
+                  </Link>
+                ) : taxpayer ? (
+                  t("office.review.taxpayer", { name: taxpayer.title })
+                ) : null}
                 {ctx.invoiceUuid ? (
                   <>
                     {taxpayer ? " · " : null}

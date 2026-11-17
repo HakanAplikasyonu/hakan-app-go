@@ -1740,5 +1740,6 @@
   "luca_plan.no_plan_imported": "no plan imported",
   "luca_plan.error_NO_NEW_ACCOUNTS": "Luca has every account; no file needed.",
   "luca_plan.error_NO_FREE_CODE": "No free sub account code left under the main account.",
-  "luca_plan.error_REQUIRED_FIELD_MISSING": "An account has no code or name; no file was made."
+  "luca_plan.error_REQUIRED_FIELD_MISSING": "An account has no code or name; no file was made.",
+  "tax_returns.related_records": "Related records"
 }

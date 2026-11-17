@@ -97,3 +97,68 @@ export function relatedHref(
       return null;
   }
 }
+
+/** Mutabakat farkının kalem türü (reconciliation `unposted.kind`) → kayıt türü. */
+const RECONCILIATION_KIND: Record<string, RelatedSourceKind> = {
+  invoice: "invoice",
+  bank: "bank_transaction",
+  expense: "expense",
+  zreport: "retail_sale",
+  payroll: "payroll_run",
+};
+
+/**
+ * Mutabakat farkını oluşturan kaydın adresi (#469); elle girilen kalemin
+ * (`manual`) ya da uuid'siz kalemin bağlantısı yok.
+ */
+export function reconciliationItemHref(
+  slug: string,
+  engagement: string,
+  item: { kind: string; id: string; label: string },
+): string | null {
+  const kind = RECONCILIATION_KIND[item.kind];
+  if (!kind || !item.id) return null;
+  return relatedHref(slug, engagement, {
+    kind,
+    uuid: item.id,
+    label: item.label,
+  });
+}
+
+/** Beyanname kontrol listesi maddesi → ilgili kayıtların sekmesi. */
+const CHECKLIST_TAB: [RegExp, keyof typeof CHECKLIST_ROUTES][] = [
+  [
+    /^(PENDING_EXPENSES|FOREIGN_CURRENCY_EXPENSES|NOT_DEDUCTIBLE_EXPENSES)$/,
+    "expenses",
+  ],
+  [/^(PENDING_Z_REPORTS|Z_WITHOUT_BREAKDOWN)$/, "zreports"],
+  [
+    /^(NO_PAYROLL|PAYROLL_ISSUES|SGK_ACCRUAL_MISSING|SGK_ACCRUAL_MISMATCH|MISSING_SGK_NO|MISSING_DAYS|MASKED_NATIONAL_IDS|INCOME_WITHHOLDING)$/,
+    "payroll",
+  ],
+  [
+    /^(MISSING_COUNTERPARTY_.*|INVALID_COUNTERPARTY_ID|MISSING_EXCHANGE_RATE|DRAFT_INVOICES|HEADER_ESTIMATE|EXPORT_REGISTERED|RESPONSIBLE_VAT|BELOW_THRESHOLD)$/,
+    "invoices",
+  ],
+];
+
+const CHECKLIST_ROUTES = {
+  invoices: routes.tenant.engagementInvoices,
+  expenses: routes.tenant.engagementExpenses,
+  zreports: routes.tenant.engagementZReports,
+  payroll: routes.tenant.engagementPayroll,
+};
+
+/**
+ * Beyanname kontrol listesi maddesinin ilgili kayıtları (#469). Maddeler
+ * kayıt kimliği taşımaz; kod, kayıtların bulunduğu sekmeyi belirler.
+ * Eşlemesi olmayan madde (ör. NO_DATA, CARRY_UNKNOWN) için null.
+ */
+export function checklistHref(
+  slug: string,
+  engagement: string,
+  code: string,
+): string | null {
+  const hit = CHECKLIST_TAB.find(([re]) => re.test(code));
+  return hit ? CHECKLIST_ROUTES[hit[1]](slug, engagement) : null;
+}

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { parseFocus, relatedHref } from "./related-href";
+import {
+  checklistHref,
+  parseFocus,
+  reconciliationItemHref,
+  relatedHref,
+} from "./related-href";
 
 const U = "0b5e2c1a-8f0e-4c3b-9d2a-1e2f3a4b5c6d";
 const base = "/t/demo/engagements/e1";
@@ -44,5 +49,48 @@ describe("parseFocus", () => {
     expect(parseFocus(`rule:${U}`)).toBeNull();
     expect(parseFocus("invoice:x")).toBeNull();
     expect(parseFocus(null)).toBeNull();
+  });
+});
+
+describe("reconciliationItemHref", () => {
+  it("fark kalemi kaynağına; elle girilen kalemin bağlantısı yok", () => {
+    expect(
+      reconciliationItemHref("demo", "e1", { kind: "bank", id: U, label: "" }),
+    ).toBe(`${base}/bank?kayit=bank_transaction%3A${U}`);
+    expect(
+      reconciliationItemHref("demo", "e1", {
+        kind: "zreport",
+        id: U,
+        label: "",
+      }),
+    ).toBe(`${base}/z-reports?kayit=retail_sale%3A${U}`);
+    expect(
+      reconciliationItemHref("demo", "e1", {
+        kind: "manual",
+        id: U,
+        label: "",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("checklistHref", () => {
+  it("madde kodu ilgili sekmeye", () => {
+    expect(checklistHref("demo", "e1", "DRAFT_INVOICES")).toBe(
+      `${base}/invoices`,
+    );
+    expect(checklistHref("demo", "e1", "MISSING_COUNTERPARTY_VKN")).toBe(
+      `${base}/invoices`,
+    );
+    expect(checklistHref("demo", "e1", "PENDING_EXPENSES")).toBe(
+      `${base}/expenses`,
+    );
+    expect(checklistHref("demo", "e1", "PENDING_Z_REPORTS")).toBe(
+      `${base}/z-reports`,
+    );
+    expect(checklistHref("demo", "e1", "SGK_ACCRUAL_MISMATCH")).toBe(
+      `${base}/payroll`,
+    );
+    expect(checklistHref("demo", "e1", "NO_DATA")).toBeNull();
   });
 });
