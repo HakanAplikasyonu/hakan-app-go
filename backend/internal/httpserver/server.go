@@ -20,6 +20,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/planexport"
 	accountplanrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/repository"
 	accountplanusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/usecase"
 	accountrulesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules"
@@ -685,6 +686,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		receipts:     receiptshandler.New(receiptsSvc),
 		accountrules: accountruleshandler.New(accountRulesSvc),
 		accountplan:  accountplanhandler.New(accountplanusecase.New(accountplanrepository.New(deps.DB, deps.Queries))),
+		planexport:   planexport.NewHandler(planexport.New(deps.DB)),
 		periods:      periodshandler.New(periodsusecase.New(periodsrepository.New(deps.DB))),
 		summaries:    summarieshandler.New(summariesusecase.New(deps.Queries, aiSvc, log)),
 		// Mükellef raporu (#386).

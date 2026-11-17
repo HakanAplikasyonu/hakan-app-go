@@ -258,6 +258,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedCopilot(ctx, pool, org.ID, eng.ID); err != nil {
 				return fmt.Errorf("copilot → %s: %w", tp.Key, err)
 			}
+			// Luca hesap planı: yeni tedarikçinin alt hesabı ve indirme (#464).
+			if err := seedPlanExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("plan export → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
