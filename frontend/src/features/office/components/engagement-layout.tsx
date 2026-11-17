@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { KeyboardEvent, ReactNode } from "react";
+import { Suspense, type KeyboardEvent, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
 import { TacRozeti, type TacDurumu } from "@/components/hakan";
@@ -17,6 +17,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { EngagementScopeProvider } from "../engagement-scope";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
+import { FocusedRecord } from "./related-records";
 import { useOfficePeriod } from "../period";
 import type { PeriodMatrixRow } from "../services/periods.service";
 
@@ -47,7 +48,6 @@ function initials(title: string) {
     "tr-TR",
   );
 }
-
 
 type EngagementTab = { href: string; label: string; exact?: boolean };
 
@@ -274,7 +274,6 @@ function PeriodStrip({
   );
 }
 
-
 /**
  * Mükellef detayının ortak düzeni (#468): başlık (unvan, VKN), sekme çubuğu
  * ve dönem şeridi her alt sayfada tek kaynaktan çizilir; alt sayfalar
@@ -337,11 +336,11 @@ export function EngagementLayout({
           </div>
         </div>
         <EngagementTabs engagement={engagement} />
-        <PeriodStrip
-          cells={cells}
-          focus={period ?? focus}
-          onPick={setPeriod}
-        />
+        <PeriodStrip cells={cells} focus={period ?? focus} onPick={setPeriod} />
+        {/* Seçili kayıt (?kayit=tür:uuid) ve ilişkili kayıtları (#469). */}
+        <Suspense fallback={null}>
+          <FocusedRecord engagement={engagement} />
+        </Suspense>
         {children}
       </div>
     </EngagementScopeProvider>

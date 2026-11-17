@@ -6,6 +6,7 @@ import {
   expect,
   request as pwRequest,
   type APIRequestContext,
+  type Browser,
   type Page,
 } from "@playwright/test";
 
@@ -64,6 +65,10 @@ export class Api {
 
   async post(path: string, data: unknown = {}, headers?: Record<string, string>) {
     return this.ctx.post(path, { headers: this.headers(headers), data });
+  }
+
+  async put(path: string, data: unknown = {}, headers?: Record<string, string>) {
+    return this.ctx.put(path, { headers: this.headers(headers), data });
   }
 
   async upload(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
@@ -230,4 +235,45 @@ export function letterToken(letterUuid: string): string {
   }
   const id = Buffer.from(letterUuid.replace(/-/g, ""), "hex");
   return createHmac("sha256", `reconciliation-letter:${key}`).update(id).digest("hex");
+}
+
+/**
+ * Demo ofisine yeni bir mükellef: ofis onay ister, mükellef kaydolup onaylar.
+ * Engagement uuid'ini döner. Dosyalar kendi mükellefine dokunur (#468, #469).
+ */
+export async function addConsentedTaxpayer(
+  browser: Browser,
+  api: Api,
+  taxpayer: { vkn: string; title: string },
+  tag: string,
+): Promise<string> {
+  const contact = uniqueEmail(tag);
+  const office = await (await browser.newContext()).newPage();
+  try {
+    await uiLogin(office, DEMO.owner);
+    await office.goto(officePath("/taxpayer-requests"));
+    await office.locator('input[name="tax_id"]').fill(taxpayer.vkn);
+    await office.locator('input[name="title"]').fill(taxpayer.title);
+    await office.locator('input[name="contact_email"]').fill(contact);
+    await office.getByRole("button", { name: "Onay iste" }).click();
+    await expect(office.getByText(contact).first()).toBeVisible();
+  } finally {
+    await office.context().close();
+  }
+  const token = await consentTokenFor(contact);
+  const tp = await (await browser.newContext()).newPage();
+  try {
+    await registerWithToken(tp, token, `/consent/${token}`, {
+      name: "E2E",
+      surname: "Mükellef",
+      password: "E2e-Parola-123!",
+    });
+    await expect(tp.getByRole("checkbox").first()).toBeVisible();
+    for (const box of await tp.getByRole("checkbox").all()) await box.check();
+    await tp.getByRole("button", { name: "Onayla" }).click();
+    await tp.waitForURL(/\/m\/[0-9a-f-]{36}/);
+  } finally {
+    await tp.context().close();
+  }
+  return engagementOf(api, taxpayer.title);
 }
