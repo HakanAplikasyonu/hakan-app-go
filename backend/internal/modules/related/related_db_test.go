@@ -138,6 +138,25 @@ func TestRelatedChain(t *testing.T) {
 		t.Errorf("warning: %+v", res.Items)
 	}
 
+	// Banka kontrolünün dönem uyarısı hareketi params içinde uuid ile anar.
+	var bnkUUID uuid.UUID
+	must(d.Pool.QueryRow(ctx, `INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type,
+			code, severity, params, producer, status)
+		VALUES ($1, $2, $3, to_char($5::date, 'YYYY-MM'), 'period', 'BNK_UNINVOICED_COLLECTION', 'warning',
+			jsonb_build_object('groups', jsonb_build_array(jsonb_build_object('transactions', jsonb_build_array($4::text)))),
+			'control:bank', 'open') RETURNING uuid`,
+		org, eng, tp, btUUID.String(), today).Scan(&bnkUUID))
+	res, err = svc.List(ctx, sub, "bank_transaction", btUUID, all)
+	must(err)
+	if !has(res, "warning", "warning", bnkUUID.String()) {
+		t.Errorf("bank warning: %+v", res.Items)
+	}
+	res, err = svc.List(ctx, sub, "warning", bnkUUID, all)
+	must(err)
+	if !has(res, "bank_transaction", "source", btUUID.String()) {
+		t.Errorf("warning → bank: %+v", res.Items)
+	}
+
 	// Banka izni olmayan hareketi görmez.
 	res, err = svc.List(ctx, sub, "invoice", invUUID, func(p string) bool { return p != rbac.PermTenantBankRead })
 	must(err)

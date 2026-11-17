@@ -146,7 +146,12 @@ FROM (
       AND $1::text IN ('invoice', 'bank_transaction', 'expense', 'retail_sale', 'financial_transaction')
       AND ((w.entity_type = $1::text AND w.entity_id = $3)
         OR ($1::text = 'invoice' AND w.entity_type = 'invoice_item' AND w.entity_id IN (
-            SELECT ii.id FROM invoice_items ii WHERE ii.taxpayer_id = $2 AND ii.invoice_id = $3)))
+            SELECT ii.id FROM invoice_items ii WHERE ii.taxpayer_id = $2 AND ii.invoice_id = $3))
+        -- Banka kontrolünün dönem uyarıları (BNK_*) hareketleri
+        -- params.groups[].transactions içinde uuid ile taşır.
+        OR ($1::text = 'bank_transaction' AND w.entity_type = 'period' AND w.producer = 'control:bank'
+            AND position((SELECT b.uuid::text FROM bank_transactions b
+                          WHERE b.taxpayer_id = $2 AND b.id = $3) IN w.params::text) > 0))
 
     UNION ALL
     -- Kayıt → inceleme kaydı (öneri).
@@ -180,6 +185,21 @@ FROM (
     JOIN bank_transactions b ON b.taxpayer_id = w.taxpayer_id AND b.id = w.entity_id
     WHERE $1::text = 'warning' AND w.organization_id = $5 AND w.engagement_id = $4 AND w.id = $3
       AND w.entity_type = 'bank_transaction'
+
+    UNION ALL
+    -- Banka kontrolünün dönem uyarısı → andığı hareketler.
+    SELECT 'bank_transaction', b.uuid::text, 'source',
+           COALESCE(to_char(b.transaction_date, 'YYYY-MM-DD'), ''), COALESCE(b.amount::text, ''), b.currency,
+           b.match_status, b.description, b.debit_credit
+    FROM data_warnings w
+    JOIN bank_transactions b ON b.taxpayer_id = w.taxpayer_id
+    WHERE $1::text = 'warning' AND w.organization_id = $5 AND w.engagement_id = $4
+      AND w.id = $3 AND w.entity_type = 'period' AND w.producer = 'control:bank'
+      AND b.uuid::text IN (
+        SELECT jsonb_array_elements_text(g -> 'transactions')
+        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(w.params -> 'groups') = 'array'
+                                       THEN w.params -> 'groups' ELSE '[]'::jsonb END) g
+        WHERE jsonb_typeof(g -> 'transactions') = 'array')
 
     UNION ALL
     SELECT 'expense', e.uuid::text, 'source',
