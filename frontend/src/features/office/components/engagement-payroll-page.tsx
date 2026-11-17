@@ -360,6 +360,9 @@ function RunsView({ engagement }: { engagement: string }) {
           />
         </section>
       ) : null}
+      <ListExportButton
+        onExport={() => payrollService.exportRuns(slug, engagement)}
+      />
       <EntityTable<PayrollRun>
         columns={columns}
         data={items}
@@ -374,6 +377,28 @@ function RunsView({ engagement }: { engagement: string }) {
         onRowClick={(r) => setPicked(r.uuid)}
         features={{ ...tableFeatures, persistKey: "office.payroll.runs" }}
       />
+    </div>
+  );
+}
+
+/** #395: listenin üstünde "Excel'e aktar" (ekrandaki süzgeçle). */
+function ListExportButton({ onExport }: { onExport: () => Promise<void> }) {
+  const { t } = useLocale();
+  return (
+    <div className="flex justify-end">
+      <Button
+        size="sm"
+        variant="outline"
+        className="max-md:min-h-11"
+        onClick={() =>
+          void onExport().catch(() =>
+            toast.error(t("office.payroll.export_failed")),
+          )
+        }
+      >
+        <Download aria-hidden className="size-4" />
+        {t("office.payroll.export_list")}
+      </Button>
     </div>
   );
 }
@@ -729,6 +754,13 @@ function EmployeesView({ engagement }: { engagement: string }) {
           </Button>
         ))}
       </div>
+      <ListExportButton
+        onExport={() =>
+          payrollService.exportEmployees(slug, engagement, {
+            status: status === "all" ? undefined : status,
+          })
+        }
+      />
       <EntityTable<PayrollEmployee>
         columns={columns}
         data={data?.items ?? []}
@@ -862,19 +894,24 @@ function SgkView({ engagement }: { engagement: string }) {
     [t, periodLabel, canWrite, pay],
   );
   return (
-    <EntityTable<SgkPremium>
-      columns={columns}
-      data={list.data?.items ?? []}
-      getRowId={(p) => p.uuid}
-      isLoading={list.isLoading}
-      isError={list.isError}
-      errorTitle={t("office.api.load_error")}
-      errorDescription={list.error?.message}
-      onRetry={() => void list.refetch()}
-      emptyTitle={t("office.payroll.sgk_empty_title")}
-      emptyDescription={t("office.payroll.sgk_empty")}
-      features={{ ...tableFeatures, persistKey: "office.payroll.sgk" }}
-    />
+    <div className="space-y-3">
+      <ListExportButton
+        onExport={() => payrollService.exportPremiums(slug, engagement)}
+      />
+      <EntityTable<SgkPremium>
+        columns={columns}
+        data={list.data?.items ?? []}
+        getRowId={(p) => p.uuid}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        errorTitle={t("office.api.load_error")}
+        errorDescription={list.error?.message}
+        onRetry={() => void list.refetch()}
+        emptyTitle={t("office.payroll.sgk_empty_title")}
+        emptyDescription={t("office.payroll.sgk_empty")}
+        features={{ ...tableFeatures, persistKey: "office.payroll.sgk" }}
+      />
+    </div>
   );
 }
 

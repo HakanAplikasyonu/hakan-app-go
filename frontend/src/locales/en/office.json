@@ -760,6 +760,8 @@
   "payroll.bank_match": "Match with bank",
   "payroll.match_done": "{{salary}} salary and {{sgk}} SGK payments matched",
   "payroll.export": "Download Excel",
+  "payroll.export_failed": "Could not download the Excel file",
+  "payroll.export_list": "Export to Excel",
   "payroll.download": "Download",
   "payroll.delete": "Delete",
   "payroll.action_failed": "The action failed.",

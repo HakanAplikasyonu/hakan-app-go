@@ -9968,6 +9968,32 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/employees/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: exportPayrollEmployees
+      summary: Employee list as Excel
+      description: |
+        Requires `tenant.payroll.read` (#395). The filtered employee list (Adı Soyadı, TC Kimlik No masked, SGK Sicil No, Görevi, Bölüm, İşe Giriş / İşten Çıkış Tarihi dd.mm.yyyy, Çıkış Nedeni, Durum) as .xlsx, at most 10 000 rows.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [active, exited, all] } }
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/payroll/employees/{employeeUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -10095,6 +10121,31 @@ paths:
                   success: { type: boolean, enum: [true] }
                   data: { $ref: "#/components/schemas/PayrollRunPage" }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/runs/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: exportPayrollRuns
+      summary: Payroll runs as Excel
+      description: |
+        Requires `tenant.payroll.read` (#395). One row per payroll period of the year (all years without `year`): employee count, gross, net, SGK and unemployment shares, income and stamp tax, incentive, employer cost (numbers, two decimals), net paid, payment and SGK status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}$", example: "2026" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -10316,6 +10367,31 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
         "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Payroll]
+      operationId: exportSgkPremiums
+      summary: SGK premiums as Excel
+      description: |
+        Requires `tenant.payroll.read` (#395). The SGK accruals of the year (all years without `year`): accrual, incentive, payable, due date, document no, paid amount and date, status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}$", example: "2026" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/{premiumUuid}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -48,16 +49,19 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	}
 	read, write := rbac.PermTenantPayrollRead, rbac.PermTenantPayrollWrite
 	route("GET", "/employees", read, h.listEmployees)
+	route("GET", "/employees/export", read, h.exportEmployees)
 	route("POST", "/employees", write, h.createEmployee)
 	route("PATCH", "/employees/{employeeUuid}", write, h.updateEmployee)
 	route("POST", "/imports", write, h.importFile)
 	route("GET", "/runs", read, h.listRuns)
+	route("GET", "/runs/export", read, h.exportRuns)
 	route("GET", "/runs/{runUuid}", read, h.getRun)
 	route("DELETE", "/runs/{runUuid}", write, h.deleteRun)
 	route("GET", "/runs/{runUuid}/export", read, h.exportRun)
 	route("POST", "/runs/{runUuid}/journal-draft", write, h.journalDraft)
 	route("POST", "/bank-match", write, h.bankMatch)
 	route("GET", "/sgk-premiums", read, h.listPremiums)
+	route("GET", "/sgk-premiums/export", read, h.exportPremiums)
 	route("POST", "/sgk-premiums", write, h.createPremium)
 	route("PATCH", "/sgk-premiums/{premiumUuid}", write, h.updatePremium)
 	route("GET", "/documents", read, h.listDocuments)
@@ -174,12 +178,8 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 
 // ---- employees ----
 
-func (h *Handler) listEmployees(w http.ResponseWriter, r *http.Request) {
-	s := engagementctx.Must(r.Context())
-	limit, offset, ok := paging(w, r)
-	if !ok {
-		return
-	}
+// employeeFilter reads status (active, exited, all) and q.
+func employeeFilter(w http.ResponseWriter, r *http.Request) (EmployeeFilter, bool) {
 	status := r.URL.Query().Get("status")
 	switch status {
 	case "", "all":
@@ -187,14 +187,28 @@ func (h *Handler) listEmployees(w http.ResponseWriter, r *http.Request) {
 	case "active", "exited":
 	default:
 		response.BadRequest(w, r, response.CodeValidationError, "status must be active, exited or all")
-		return
+		return EmployeeFilter{}, false
 	}
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len(q) > 100 {
 		response.BadRequest(w, r, response.CodeValidationError, "q is too long")
+		return EmployeeFilter{}, false
+	}
+	return EmployeeFilter{Status: status, Q: q}, true
+}
+
+func (h *Handler) listEmployees(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	limit, offset, ok := paging(w, r)
+	if !ok {
 		return
 	}
-	p, err := h.svc.ListEmployees(r.Context(), s.TaxpayerID, EmployeeFilter{Status: status, Q: q, Limit: limit, Offset: offset})
+	f, ok := employeeFilter(w, r)
+	if !ok {
+		return
+	}
+	f.Limit, f.Offset = limit, offset
+	p, err := h.svc.ListEmployees(r.Context(), s.TaxpayerID, f)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -585,4 +599,55 @@ func (h *Handler) myFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.file(w, r, s.ID, true)
+}
+
+// ---- list exports (#395) ----
+
+func (h *Handler) writeSheet(w http.ResponseWriter, r *http.Request, name string, data []byte, err error) {
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.xlsx"`, name))
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	_, _ = w.Write(data)
+}
+
+func exportSuffix(year string) string {
+	if year != "" {
+		return year
+	}
+	return time.Now().Format(time.DateOnly)
+}
+
+// exportEmployees: GET .../payroll/employees/export?status=&q= (.xlsx).
+func (h *Handler) exportEmployees(w http.ResponseWriter, r *http.Request) {
+	f, ok := employeeFilter(w, r)
+	if !ok {
+		return
+	}
+	data, err := h.svc.ExportEmployees(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, f)
+	h.writeSheet(w, r, "personel-"+time.Now().Format(time.DateOnly), data, err)
+}
+
+// exportRuns: GET .../payroll/runs/export?year= (.xlsx).
+func (h *Handler) exportRuns(w http.ResponseWriter, r *http.Request) {
+	year, ok := yearParam(w, r)
+	if !ok {
+		return
+	}
+	data, err := h.svc.ExportRuns(r.Context(), engagementctx.Must(r.Context()), year)
+	h.writeSheet(w, r, "bordro-donemleri-"+exportSuffix(year), data, err)
+}
+
+// exportPremiums: GET .../payroll/sgk-premiums/export?year= (.xlsx).
+func (h *Handler) exportPremiums(w http.ResponseWriter, r *http.Request) {
+	year, ok := yearParam(w, r)
+	if !ok {
+		return
+	}
+	data, err := h.svc.ExportPremiums(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, year)
+	h.writeSheet(w, r, "sgk-primleri-"+exportSuffix(year), data, err)
 }

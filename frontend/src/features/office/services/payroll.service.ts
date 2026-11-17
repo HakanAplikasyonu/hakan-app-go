@@ -3,6 +3,8 @@ import type { components } from "@/generated/api";
 import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
+import { downloadFile } from "./download";
+
 export type PayrollEmployee = components["schemas"]["PayrollEmployee"];
 export type PayrollEmployeePage = components["schemas"]["PayrollEmployeePage"];
 export type PayrollEmployeeInput =
@@ -143,6 +145,35 @@ export const payrollService = {
       slug,
       `${root(engagement)}/runs/${encodeURIComponent(run.uuid)}/export`,
       `bordro-${run.period}.xlsx`,
+    );
+  },
+  /** #395: ekrandaki listeler Excel olarak (personel süzgeciyle). */
+  exportEmployees(
+    slug: string,
+    engagement: string,
+    q: { status?: string; q?: string },
+  ) {
+    return downloadFile(
+      slug,
+      `${root(engagement)}/employees/export`,
+      q,
+      "personel.xlsx",
+    );
+  },
+  exportRuns(slug: string, engagement: string, year?: string) {
+    return downloadFile(
+      slug,
+      `${root(engagement)}/runs/export`,
+      { year },
+      "bordro-donemleri.xlsx",
+    );
+  },
+  exportPremiums(slug: string, engagement: string, year?: string) {
+    return downloadFile(
+      slug,
+      `${root(engagement)}/sgk-premiums/export`,
+      { year },
+      "sgk-primleri.xlsx",
     );
   },
   premiums(slug: string, engagement: string, year?: string) {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
 	excelusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
@@ -84,5 +85,49 @@ func TestCommonExcelImportOfPayrollAgainstPostgres(t *testing.T) {
 	if len(page.Items) != 1 || page.Items[0].Period != "2026-10" || page.Items[0].Totals.EmployeeCount != 2 ||
 		page.Items[0].Totals.Net.StringFixed(2) != "55850.00" {
 		t.Fatalf("runs %+v", page.Items)
+	}
+}
+
+// #395: bordro ekranlarının listeleri Excel'e aktarılır (TC maskeli, tr-TR
+// tarih, tutarlar sayı).
+func TestPayrollListExportsAgainstPostgres(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	tp := d.Taxpayer(t, "legal", "9000000017")
+	org := d.Organization(t)
+	eng := d.Engagement(t, org, tp)
+	user := d.User(t)
+	sc := engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
+	svc := New(database.Ambient{Pool: d.Pool}, nil, "test-secret")
+	file := "Adı Soyadı;TC Kimlik No;İşe Giriş;Gün;Brüt Ücret;SGK İşçi Payı;İşsizlik İşçi Payı;SGK İşveren Payı;Net Ücret\n" +
+		"Ayşe Yılmaz;10000000146;01.03.2024;30;30.000,00;4.200,00;300,00;6.150,00;24.150,00\n"
+	if _, err := svc.Import(ctx, sc, user, "bordro.csv", []byte(file), ImportOptions{Period: "2026-10"}); err != nil {
+		t.Fatal(err)
+	}
+	read := func(data []byte, err error) [][]string {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, sheets, err := parse.Read("x.xlsx", data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return sheets[0].Rows
+	}
+	emp := read(svc.ExportEmployees(ctx, tp, EmployeeFilter{}))
+	if len(emp) != 2 || emp[0][0] != "Adı Soyadı" || emp[1][0] != "Ayşe Yılmaz" || emp[1][1] == "10000000146" || emp[1][8] != "Çalışıyor" {
+		t.Fatalf("employees %q", emp)
+	}
+	runs := read(svc.ExportRuns(ctx, sc, "2026"))
+	if len(runs) != 2 || runs[1][0] != "2026-10" || runs[1][1] != "1" || runs[1][3] != "24150" {
+		t.Fatalf("runs %q", runs)
+	}
+	if none := read(svc.ExportRuns(ctx, sc, "2025")); len(none) != 1 {
+		t.Fatalf("2025 runs %q", none)
+	}
+	prem := read(svc.ExportPremiums(ctx, tp, ""))
+	if len(prem) < 1 || prem[0][0] != "Dönem" {
+		t.Fatalf("premiums %q", prem)
 	}
 }
