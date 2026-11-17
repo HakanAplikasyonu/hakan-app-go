@@ -54,3 +54,39 @@ export type {
   ColumnEditVariant,
   UseDataTableOptions,
 } from "./types";
+
+// Düzenlenebilir ızgara (#394)
+export {
+  EditableGrid,
+  type EditableGridProps,
+  type GridRowSaveInput,
+} from "./editable-grid";
+export {
+  GridCellEditor,
+  type GridEditorKind,
+  type GridCommitNav,
+} from "./editable-cell";
+export {
+  defaultParse,
+  defaultToText,
+  displayText,
+  validateCell,
+  isColumnEditable,
+  type EditableGridColumn,
+  type GridMessages,
+} from "./grid-columns";
+export {
+  parseTsv,
+  toTsv,
+  parseLocaleDecimal,
+  moveCoord,
+  pasteChanges,
+  fillChanges,
+  fillDownChanges,
+  fillRightChanges,
+  applyChanges,
+  type CellChange,
+  type CellCoord,
+  type CellRange,
+  type GridDrafts,
+} from "./grid-model";
