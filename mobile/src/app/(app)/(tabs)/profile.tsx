@@ -71,20 +71,15 @@ export default function ProfileScreen() {
         <Text tone="muted">{me?.user.email}</Text>
       </Card>
 
-      {env.privacyUrl || hasSupport ? (
+      {env.privacyUrl || hasSupport || taxpayer?.role === 'owner' ? (
         <Card>
+          {taxpayer?.role === 'owner' ? <Button title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}
           {env.privacyUrl ? <Button title="Gizlilik ve KVKK aydınlatma metni" variant="ghost" onPress={() => open(env.privacyUrl)} /> : null}
           {support.widgetId ? (
             <Button title="Destek" variant="ghost" onPress={() => router.push('/destek')} />
           ) : env.supportUrl ? (
             <Button title="Destek" variant="ghost" onPress={() => open(env.supportUrl)} />
           ) : null}
-        </Card>
-      ) : null}
-
-      {taxpayer?.role === 'owner' ? (
-        <Card>
-          <Button title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} />
         </Card>
       ) : null}
 

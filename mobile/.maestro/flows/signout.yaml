@@ -6,6 +6,10 @@ tags: [smoke]
 - launchApp
 - tapOn:
     id: "tab-profile"
+# Profil uzun olabilir (destek, bordro belgeleri): sürüm etiketi en altta.
+- scrollUntilVisible:
+    element:
+      id: "app-version"
 - assertVisible:
     id: "app-version"
 - takeScreenshot: mukellef-profil
