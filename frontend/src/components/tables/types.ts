@@ -21,6 +21,9 @@ export type TableDensity = "compact" | "comfortable" | "spacious";
 /** Primary presentation mode */
 export type TableViewMode = "table" | "grid";
 
+/** Column horizontal alignment */
+export type ColumnAlign = "start" | "center" | "end";
+
 /** Column filter UI kinds */
 export type ColumnFilterVariant =
   | "text"
@@ -58,6 +61,12 @@ export type DataTableColumnMeta = {
   /** Class overrides */
   headerClassName?: string;
   cellClassName?: string;
+  /** Yatay hizalama (tutar/sayı kolonları için "end"). Başlık + hücre + alt toplam. */
+  align?: ColumnAlign;
+  /** Başlık görsel olarak gizli, yalnızca ekran okuyucuya okunur. */
+  srOnlyHeader?: boolean;
+  /** Mobil/ızgara kartında bu kolonu gösterme. */
+  cardHidden?: boolean;
 };
 
 declare module "@tanstack/react-table" {
@@ -75,6 +84,9 @@ declare module "@tanstack/react-table" {
     gridSecondary?: boolean;
     headerClassName?: string;
     cellClassName?: string;
+    align?: ColumnAlign;
+    srOnlyHeader?: boolean;
+    cardHidden?: boolean;
   }
 }
 
@@ -151,6 +163,18 @@ export type DataTableFeatures = {
    * Default: true
    */
   facetedFilters?: boolean;
+  /**
+   * Araç çubuğu (arama, kolonlar, sıklık, sıfırla). Kapalıyken yalnızca
+   * `toolbar` slotu ve seçim varsa toplu işlemler çizilir. Gömülü küçük
+   * tablolar (fatura kalemleri) için kapatın. Default: true
+   */
+  toolbar?: boolean;
+  /**
+   * Başlık satırı dikey kaydırmada yapışık kalır. Tablo kabı `maxHeight`
+   * ile sınırlanırsa kap içinde, aksi halde sayfa kaydırmasında çalışır.
+   * Default: false
+   */
+  stickyHeader?: boolean;
   /** Persist table UI state to localStorage under this key */
   persistKey?: string;
 };
@@ -218,6 +242,24 @@ export type DataTableProps<TData> = {
    * (checkboxes, action buttons, links, inline editors).
    */
   onRowClick?: (row: TData) => void;
+  /**
+   * Etkin satır (ör. çekmecede açık olan kayıt): vurgulanır ve
+   * `aria-selected` taşır.
+   */
+  isRowActive?: (row: TData) => boolean;
+  /** Satıra ek sınıf (ör. uyarılı satır). */
+  getRowClassName?: (row: TData) => string | undefined;
+  /**
+   * Sunucu sayfalamasında toplam kayıt sayısı. Verilirse `pageCount`
+   * bundan hesaplanır ve sayfalama "x–y / toplam" doğru gösterir.
+   */
+  rowCount?: number;
+  /** Tablo kabının kenarlığı. Panel içine gömülü tablolarda false. Default: true */
+  bordered?: boolean;
+  /** Tablo kabının en yüksek boyu (stickyHeader ile kap içi kaydırma). */
+  maxHeight?: number | string;
+  /** Erişilebilir tablo başlığı (görünmez caption). */
+  caption?: string;
   className?: string;
 };
 
@@ -231,4 +273,5 @@ export type UseDataTableOptions<TData> = Pick<
   | "state"
   | "initialState"
   | "pageCount"
+  | "rowCount"
 >;

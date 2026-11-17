@@ -31,8 +31,12 @@ import {
   type CellEditPayload,
 } from "@/components/tables/editable-cell";
 import { RowDragProvider } from "@/components/tables/reorder-column";
-import { isRowClickIgnored } from "@/components/tables/row-click";
+import {
+  isRowClickIgnored,
+  isRowKeyActivation,
+} from "@/components/tables/row-click";
 import type {
+  ColumnAlign,
   DataTableColumnMeta,
   TableDensity,
 } from "@/components/tables/types";
@@ -42,6 +46,18 @@ const densityCell: Record<TableDensity, string> = {
   compact: "px-2 py-1.5",
   comfortable: "px-3 py-2.5",
   spacious: "px-4 py-3.5",
+};
+
+const alignClass: Record<ColumnAlign, string> = {
+  start: "text-start",
+  center: "text-center",
+  end: "text-end",
+};
+
+const headerAlignClass: Record<ColumnAlign, string> = {
+  start: "",
+  center: "justify-center",
+  end: "justify-end",
 };
 
 type EditingCell = { rowId: string; columnId: string } | null;
@@ -64,6 +80,12 @@ type TableViewProps<TData> = {
   onEditingCellChange?: (cell: EditingCell) => void;
   onCellEdit?: (payload: CellEditPayload<TData>) => void;
   onRowClick?: (row: TData) => void;
+  isRowActive?: (row: TData) => boolean;
+  getRowClassName?: (row: TData) => string | undefined;
+  stickyHeader?: boolean;
+  bordered?: boolean;
+  maxHeight?: number | string;
+  caption?: string;
 };
 
 export function TableView<TData>({
@@ -79,6 +101,12 @@ export function TableView<TData>({
   onEditingCellChange,
   onCellEdit,
   onRowClick,
+  isRowActive,
+  getRowClassName,
+  stickyHeader,
+  bordered = true,
+  maxHeight,
+  caption,
 }: TableViewProps<TData>) {
   const cellPad = densityCell[density];
   const leafColumns = table.getVisibleLeafColumns();
@@ -86,6 +114,8 @@ export function TableView<TData>({
     table.getHeaderGroups()[table.getHeaderGroups().length - 1]?.headers ?? [];
   const rows = table.getRowModel().rows;
   const colSpan = columnCount ?? leafColumns.length;
+  const footerGroup = table.getFooterGroups()[0];
+  const hasFooter = leafColumns.some((c) => c.columnDef.footer != null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -101,12 +131,22 @@ export function TableView<TData>({
   };
 
   const tableNode = (
-    <div className="border-border w-full overflow-x-auto rounded-lg border">
+    // relative: içteki sr-only (absolute) öğeler kaydırma kutusundan taşıp
+    // sayfayı yatay kaydırmasın (#367).
+    <div
+      className={cn(
+        "relative w-full overflow-x-auto",
+        bordered && "border-border rounded-lg border",
+        maxHeight != null && "overflow-y-auto",
+      )}
+      style={maxHeight != null ? { maxHeight } : undefined}
+    >
       {/*
         table-auto so the actions column can grow with icon buttons.
         Explicit widths still apply for select/reorder and user-resized cols.
       */}
       <table className="w-full caption-bottom text-sm">
+        {caption ? <caption className="sr-only">{caption}</caption> : null}
         <colgroup>
           {leafColumns.map((column) => {
             const sizing = table.getState().columnSizing;
@@ -132,7 +172,13 @@ export function TableView<TData>({
           })}
         </colgroup>
 
-        <thead className="bg-muted/40">
+        <thead
+          className={cn(
+            stickyHeader
+              ? "bg-muted sticky top-0 z-30 shadow-[0_1px_0_var(--border)]"
+              : "bg-muted/40",
+          )}
+        >
           <tr className="border-border border-b">
             {leafHeaders.map((header) => {
               const meta = header.column.columnDef.meta as
@@ -141,9 +187,18 @@ export function TableView<TData>({
               return (
                 <th
                   key={header.id}
+                  scope="col"
+                  aria-sort={
+                    header.column.getIsSorted() === "asc"
+                      ? "ascending"
+                      : header.column.getIsSorted() === "desc"
+                        ? "descending"
+                        : undefined
+                  }
                   className={cn(
                     "text-muted-foreground relative text-start align-middle font-medium",
                     cellPad,
+                    meta?.align && alignClass[meta.align],
                     meta?.headerClassName,
                     header.column.id === "actions" && "whitespace-nowrap",
                     pinned === "left" && "bg-muted/95 sticky start-0 z-20",
@@ -166,11 +221,22 @@ export function TableView<TData>({
                       header.column.columnDef.header,
                       header.getContext(),
                     )
+                  ) : meta?.srOnlyHeader ? (
+                    <span className="sr-only">
+                      <ColumnHeader
+                        column={header.column}
+                        table={table}
+                        disableSort
+                      />
+                    </span>
                   ) : (
                     <ColumnHeader
                       column={header.column}
                       table={table}
                       disableSort={reorderMode}
+                      className={
+                        meta?.align ? headerAlignClass[meta.align] : undefined
+                      }
                     />
                   )}
                   {header.column.getCanResize() && !reorderMode ? (
@@ -264,11 +330,42 @@ export function TableView<TData>({
                   onEditingCellChange={onEditingCellChange}
                   onCellEdit={onCellEdit}
                   onRowClick={onRowClick}
+                  active={isRowActive?.(row.original)}
+                  rowClassName={getRowClassName?.(row.original)}
                 />
               ),
             )
           )}
         </tbody>
+
+        {hasFooter && footerGroup && rows.length > 0 ? (
+          <tfoot className="bg-muted/30 border-border border-t font-medium">
+            <tr>
+              {footerGroup.headers.map((header) => {
+                const meta = header.column.columnDef.meta as
+                  DataTableColumnMeta | undefined;
+                return (
+                  <td
+                    key={header.id}
+                    className={cn(
+                      "align-middle",
+                      cellPad,
+                      meta?.align && alignClass[meta.align],
+                      meta?.cellClassName,
+                    )}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.footer,
+                          header.getContext(),
+                        )}
+                  </td>
+                );
+              })}
+            </tr>
+          </tfoot>
+        ) : null}
       </table>
     </div>
   );
@@ -303,6 +400,8 @@ type RowProps<TData> = {
   onEditingCellChange?: (cell: EditingCell) => void;
   onCellEdit?: (payload: CellEditPayload<TData>) => void;
   onRowClick?: (row: TData) => void;
+  active?: boolean;
+  rowClassName?: string;
 };
 
 function StaticTableRow<TData>({
@@ -314,14 +413,32 @@ function StaticTableRow<TData>({
   onEditingCellChange,
   onCellEdit,
   onRowClick,
+  active,
+  rowClassName,
 }: RowProps<TData>) {
   return (
     <tr
       className={cn(
         "border-border hover:bg-muted/30 data-[state=selected]:bg-muted/50 border-b last:border-0",
-        onRowClick && "cursor-pointer",
+        onRowClick &&
+          "focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset",
+        active && "bg-brand-tint hover:bg-brand-tint",
+        rowClassName,
       )}
       data-state={row.getIsSelected() ? "selected" : undefined}
+      aria-selected={active ? true : undefined}
+      // Satır tıklanabiliyorsa klavyeyle de açılır (Enter / Boşluk); içteki
+      // düğme ve bağlantılar kendi odak sırasını korur.
+      tabIndex={onRowClick ? 0 : undefined}
+      onKeyDown={
+        onRowClick
+          ? (event) => {
+              if (!isRowKeyActivation(event)) return;
+              event.preventDefault();
+              onRowClick(row.original);
+            }
+          : undefined
+      }
       onClick={
         onRowClick
           ? (event) => {
@@ -423,6 +540,7 @@ function TableCell<TData>({
       className={cn(
         "align-middle",
         cellPad,
+        meta?.align && alignClass[meta.align],
         meta?.cellClassName,
         cell.column.id === "actions" && "whitespace-nowrap",
         pinned === "left" && "bg-background sticky start-0 z-10",

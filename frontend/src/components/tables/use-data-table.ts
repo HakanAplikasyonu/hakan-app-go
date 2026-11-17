@@ -33,6 +33,8 @@ const DEFAULT_FEATURES: Required<Omit<DataTableFeatures, "persistKey">> & {
 } = {
   sorting: true,
   multiSort: true,
+  toolbar: true,
+  stickyHeader: false,
   globalFilter: true,
   columnFilters: true,
   columnVisibility: true,
@@ -98,6 +100,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
     state: controlled,
     initialState,
     pageCount,
+    rowCount,
   } = options;
 
   const features = { ...DEFAULT_FEATURES, ...featuresProp };
@@ -215,6 +218,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
     data,
     columns,
     pageCount,
+    rowCount,
     getRowId,
     state: {
       sorting: controlled?.sorting ?? sorting,

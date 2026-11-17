@@ -14,6 +14,10 @@ import type {
   SortingState,
 } from "@tanstack/react-table";
 
+import {
+  sortingToSortParam,
+  sortParamToSorting,
+} from "@/components/entity/list-search-params";
 import { useDebounce } from "@/hooks/use-debounce";
 
 export type ServerListParams = {
@@ -29,27 +33,10 @@ export type UseServerListStateOptions = {
   searchDebounceMs?: number;
 };
 
-function sortingToSortParam(sorting: SortingState): string | undefined {
-  if (!sorting.length) return undefined;
-  return sorting.map((item) => (item.desc ? `-${item.id}` : item.id)).join(",");
-}
-
-function sortParamToSorting(sort?: string): SortingState {
-  if (!sort) return [];
-  return sort
-    .split(",")
-    .filter(Boolean)
-    .map((token) => {
-      if (token.startsWith("-")) {
-        return { id: token.slice(1), desc: true };
-      }
-      return { id: token, desc: false };
-    });
-}
-
 /**
  * Controlled server-list state for DataTable + OpenAPI list endpoints
- * (`limit` / `offset` / `sort` / `q`).
+ * (`limit` / `offset` / `sort` / `q`). Durum bellekte; filtre/sıralama
+ * URL'de kalmalıysa `useUrlListState` kullanın.
  */
 export function useServerListState(options: UseServerListStateOptions = {}) {
   const {

@@ -94,6 +94,7 @@ Media: never assemble S3 URLs in the browser. Use `assertServiceMediaURL` in `sr
 | `pnpm build`        | Production build                |
 | `pnpm typecheck`    | `tsc --noEmit`                  |
 | `pnpm lint`         | ESLint                          |
+| `pnpm test`         | Vitest birim testleri           |
 | `pnpm api:generate` | Regenerate OpenAPI client types |
 
 `src/generated/api.d.ts` is generated. If it still lists deleted product paths, ignore unused ones and regenerate after the OpenAPI spec is trimmed.

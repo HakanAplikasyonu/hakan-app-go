@@ -20,6 +20,7 @@ type GridViewProps<TData> = {
   /** Tighter single-column cards for phone layouts */
   mobile?: boolean;
   onRowClick?: (row: TData) => void;
+  isRowActive?: (row: TData) => boolean;
 };
 
 function isUtilityColumn(id: string) {
@@ -33,7 +34,9 @@ function CardShell({
   onToggleSelect,
   selectable,
   onClick,
+  active,
 }: {
+  active?: boolean;
   selected: boolean;
   mobile?: boolean;
   children: ReactNode;
@@ -48,10 +51,12 @@ function CardShell({
         "border-border bg-card text-card-foreground relative overflow-hidden rounded-xl border shadow-sm transition-colors",
         "hover:border-primary/25",
         selected && "border-primary/50 bg-primary/5 shadow-md",
+        active && "border-primary/50 bg-brand-tint",
         mobile ? "p-4" : "p-4",
         onClick && "cursor-pointer",
       )}
       onClick={onClick}
+      aria-current={active ? "true" : undefined}
     >
       {selectable ? (
         <div className="absolute end-3 top-3 z-10">
@@ -73,16 +78,23 @@ function DefaultCard<TData>({
   table,
   mobile,
   onRowClick,
+  active,
 }: {
   row: Row<TData>;
   table: Table<TData>;
   mobile?: boolean;
   onRowClick?: (row: TData) => void;
+  active?: boolean;
 }) {
   const { t } = useLocale();
   const cells = row
     .getVisibleCells()
-    .filter((c) => !isUtilityColumn(c.column.id));
+    .filter(
+      (c) =>
+        !isUtilityColumn(c.column.id) &&
+        !(c.column.columnDef.meta as DataTableColumnMeta | undefined)
+          ?.cardHidden,
+    );
   const actionsCell = row
     .getVisibleCells()
     .find((c) => c.column.id === "actions");
@@ -102,6 +114,7 @@ function DefaultCard<TData>({
 
   return (
     <CardShell
+      active={active}
       selected={row.getIsSelected()}
       mobile={mobile}
       selectable={Boolean(table.options.enableRowSelection)}
@@ -181,6 +194,7 @@ export function GridView<TData>({
   renderGridItem,
   mobile,
   onRowClick,
+  isRowActive,
 }: GridViewProps<TData>) {
   const rows = table.getRowModel().rows;
 
@@ -196,6 +210,7 @@ export function GridView<TData>({
           return (
             <CardShell
               key={row.id}
+              active={isRowActive?.(row.original)}
               selected={row.getIsSelected()}
               mobile={mobile}
               selectable={Boolean(table.options.enableRowSelection)}
@@ -223,6 +238,7 @@ export function GridView<TData>({
             table={table}
             mobile={mobile}
             onRowClick={onRowClick}
+            active={isRowActive?.(row.original)}
           />
         );
       })}
