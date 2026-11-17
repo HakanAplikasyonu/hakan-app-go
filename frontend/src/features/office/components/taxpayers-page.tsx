@@ -3,7 +3,10 @@
 import { Building2, Check, Plus, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
+import { EntityTable } from "@/components/entity";
+import { createColumn } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +29,7 @@ import {
 } from "../hooks/use-office-data";
 import type { PeriodMatrixRow } from "../services/periods.service";
 import { CellBadge } from "./command-center";
-import { Figure, Panel, TableBox } from "./office-ui";
+import { Figure } from "./office-ui";
 
 type Member = { uuid: string; name: string; role: string };
 
@@ -125,6 +128,73 @@ function Assignees({
   );
 }
 
+type TaxpayerRow = PeriodMatrixRow;
+
+function useTaxpayerColumns(members: Member[], canWrite: boolean) {
+  const { slug } = useTenant();
+  return useMemo<ColumnDef<TaxpayerRow, unknown>[]>(
+    () => [
+      createColumn<TaxpayerRow>({
+        id: "taxpayer_title",
+        labelKey: "office.col_taxpayer",
+        accessorKey: "taxpayer_title",
+        gridPrimary: true,
+        sortingFn: (a, b) =>
+          a.original.taxpayer_title.localeCompare(
+            b.original.taxpayer_title,
+            "tr",
+          ),
+        cell: ({ row }) => (
+          <Link
+            className="font-medium hover:underline"
+            href={routes.tenant.engagement(slug, row.original.engagement_uuid)}
+          >
+            {row.original.taxpayer_title}
+          </Link>
+        ),
+      }),
+      createColumn<TaxpayerRow>({
+        id: "taxpayer_tax_id",
+        labelKey: "office.col_tax_id",
+        accessorKey: "taxpayer_tax_id",
+        gridSecondary: true,
+        cell: ({ row }) => (
+          <>
+            <Figure>{row.original.taxpayer_tax_id}</Figure>
+            <span className="text-muted-foreground ml-1.5 text-xs">
+              {row.original.taxpayer_tax_id.length === 11 ? "TCKN" : "VKN"}
+            </span>
+          </>
+        ),
+      }),
+      createColumn<TaxpayerRow>({
+        id: "current_period",
+        labelKey: "office.col_current_period",
+        enableSorting: false,
+        // Beyan dönemi: bir önceki ay.
+        cell: ({ row }) => {
+          const cell = row.original.cells[0];
+          return cell ? <CellBadge cell={cell} /> : null;
+        },
+      }),
+      createColumn<TaxpayerRow>({
+        id: "assignees",
+        labelKey: "office.col_assignees",
+        enableSorting: false,
+        meta: { cellClassName: "min-w-56" },
+        cell: ({ row }) => (
+          <Assignees
+            engagement={row.original.engagement_uuid}
+            members={members}
+            canWrite={canWrite}
+          />
+        ),
+      }),
+    ],
+    [canWrite, members, slug],
+  );
+}
+
 /**
  * Office taxpayers (active engagements). Rows come from the period matrix
  * (issue #32), which also gives the current period's state; assignments are
@@ -137,7 +207,9 @@ export function TaxpayersPage() {
   const members = useAssignableMembers();
   const canWrite = perms.includes(permissions.tenant.engagements.write);
   const [query, setQuery] = useState("");
+  const columns = useTaxpayerColumns(members, canWrite);
 
+  // Arama Türkçe küçük harfle ve VKN/TCKN üzerinde; istemci tarafı liste.
   const rows = useMemo(() => {
     const q = query.trim().toLocaleLowerCase("tr");
     return (matrix.data?.items ?? [])
@@ -172,65 +244,29 @@ export function TaxpayersPage() {
         onChange={(e) => setQuery(e.target.value)}
         aria-label={t("office.command.search")}
       />
-      <Panel>
-        {matrix.isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : matrix.isError ? (
-          <p className="text-destructive p-4 text-sm">
-            {t("office.load_failed")}
-          </p>
-        ) : rows.length === 0 ? (
-          <p className="text-muted-foreground p-6 text-center text-sm">
-            {t("office.taxpayers_empty")}
-          </p>
-        ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th>{t("office.col_taxpayer")}</th>
-                <th>{t("office.col_tax_id")}</th>
-                <th>{t("office.col_current_period")}</th>
-                <th>{t("office.col_assignees")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                // Beyan dönemi: bir önceki ay.
-                const cell = r.cells[0];
-                return (
-                  <tr key={r.engagement_uuid}>
-                    <td>
-                      <Link
-                        className="font-medium hover:underline"
-                        href={routes.tenant.engagement(slug, r.engagement_uuid)}
-                      >
-                        {r.taxpayer_title}
-                      </Link>
-                    </td>
-                    <td>
-                      <Figure>{r.taxpayer_tax_id}</Figure>
-                      <span className="text-muted-foreground ml-1.5 text-xs">
-                        {r.taxpayer_tax_id.length === 11 ? "TCKN" : "VKN"}
-                      </span>
-                    </td>
-                    <td>{cell ? <CellBadge cell={cell} /> : null}</td>
-                    <td className="min-w-56">
-                      <Assignees
-                        engagement={r.engagement_uuid}
-                        members={members}
-                        canWrite={canWrite}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </TableBox>
-        )}
-      </Panel>
+      <EntityTable<TaxpayerRow>
+        columns={columns}
+        data={rows}
+        getRowId={(r) => r.engagement_uuid}
+        isLoading={matrix.isLoading}
+        isError={matrix.isError}
+        errorTitle={t("office.load_failed")}
+        onRetry={() => void matrix.refetch()}
+        emptyTitle={t("office.taxpayers_empty")}
+        emptyDescription=""
+        manual={{ sorting: false, filtering: false, pagination: false }}
+        initialState={{ pagination: { pageIndex: 0, pageSize: 50 } }}
+        pageSizeOptions={[25, 50, 100]}
+        // Arama yukarıdaki kutuda (Türkçe harf ve VKN); seçim/toplu işlem yok.
+        features={{
+          globalFilter: false,
+          columnFilters: false,
+          facetedFilters: false,
+          rowSelection: false,
+          viewMode: false,
+          persistKey: "office.taxpayers.table",
+        }}
+      />
       <p className="text-muted-foreground text-xs">
         {t("office.taxpayers_footnote_api")}
       </p>

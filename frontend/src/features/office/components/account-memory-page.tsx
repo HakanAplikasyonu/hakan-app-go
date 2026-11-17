@@ -8,11 +8,18 @@ import {
   Undo2,
   Wand2,
 } from "lucide-react";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { StatusChip } from "@/components/common/status-chip";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  createActionsColumn,
+  createColumn,
+  DataTable,
+  type DataTableFeatures,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/config/permissions";
@@ -38,10 +45,13 @@ import {
 } from "../hooks/use-review";
 import type {
   AccountPlanImportResult,
+  AccountRule,
   AccountRuleCandidate,
+  MissingPlanAccount,
 } from "../services/account-memory.service";
+import type { ReviewSuggestion } from "../services/review.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
-import { Panel, TableBox } from "./office-ui";
+import { Panel } from "./office-ui";
 import { RuleEditor } from "./rule-editor";
 
 type Translate = (
@@ -64,6 +74,23 @@ function errorText(t: Translate, err: unknown) {
   }
   return t("office.api.load_error");
 }
+
+// Panel içine gömülü istemci tarafı listeler: araç çubuğu ve sayfalama yok
+// (tüm kayıtlar görünür), sıralama açık; mobilde kartlar.
+const panelTable: DataTableFeatures = {
+  toolbar: false,
+  pagination: false,
+  rowSelection: false,
+  columnFilters: false,
+  facetedFilters: false,
+  globalFilter: false,
+  viewMode: false,
+  columnVisibility: false,
+  columnResizing: false,
+  columnPinning: false,
+  columnOrdering: false,
+  density: false,
+};
 
 /** Hesap planı (Luca mizanı) içe aktarma ve etkin planın özeti. */
 function PlanPanel({ engagement }: { engagement: string }) {
@@ -166,6 +193,29 @@ function MissingPanel({ engagement }: { engagement: string }) {
   const missing = useMissingPlanAccounts(slug, engagement);
   const { downloadTemplate } = useAccountMemoryActions(slug, engagement);
   const items = missing.data?.items ?? [];
+  const missingColumns = useMemo<ColumnDef<MissingPlanAccount, unknown>[]>(
+    () => [
+      createColumn<MissingPlanAccount>({
+        id: "code",
+        labelKey: "office.memory.col_code",
+        accessorKey: "code",
+        gridPrimary: true,
+        meta: { cellClassName: "font-mono" },
+      }),
+      createColumn<MissingPlanAccount>({
+        id: "name",
+        labelKey: "office.memory.col_account_name",
+        accessorFn: (a) => a.name || "—",
+      }),
+      createColumn<MissingPlanAccount>({
+        id: "uses",
+        labelKey: "office.memory.col_uses",
+        accessorKey: "uses",
+        meta: { cellClassName: "tabular-nums" },
+      }),
+    ],
+    [],
+  );
   return (
     <Panel
       title={t("office.memory.missing_title")}
@@ -179,28 +229,12 @@ function MissingPanel({ engagement }: { engagement: string }) {
         </p>
       ) : (
         <div className="space-y-3 p-4">
-          <TableBox>
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left">{t("office.memory.col_code")}</th>
-                  <th className="text-left">
-                    {t("office.memory.col_account_name")}
-                  </th>
-                  <th className="text-left">{t("office.memory.col_uses")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((a) => (
-                  <tr key={a.code}>
-                    <td className="font-mono">{a.code}</td>
-                    <td>{a.name || "—"}</td>
-                    <td className="tabular-nums">{a.uses}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </TableBox>
+          <DataTable<MissingPlanAccount>
+            columns={missingColumns}
+            data={items}
+            getRowId={(a) => a.code}
+            features={panelTable}
+          />
           <Button
             size="sm"
             disabled={downloadTemplate.isPending}
@@ -224,7 +258,11 @@ function MissingPanel({ engagement }: { engagement: string }) {
   );
 }
 
-function CandidateRow({
+const candidateId = (c: AccountRuleCandidate) =>
+  `${c.counterparty_key}|${c.direction}|${c.account_code}`;
+
+/** Adayı kurala terfi ettiren satır düğmesi (yazma yetkisi varsa). */
+function PromoteButton({
   c,
   engagement,
 }: {
@@ -235,40 +273,26 @@ function CandidateRow({
   const { slug } = useTenant();
   const { can } = usePermission();
   const { promote } = useAccountMemoryActions(slug, engagement);
+  if (!can(permissions.tenant.accountRules.write)) return null;
   return (
-    <tr>
-      <td>
-        <div className="font-medium">{c.counterparty_name || "—"}</div>
-        <div className="text-muted-foreground text-xs">
-          {c.counterparty_key?.startsWith("name:") ? "" : c.counterparty_key}
-        </div>
-      </td>
-      <td>{t(directionKey(c.direction))}</td>
-      <td className="font-mono">{c.account_code}</td>
-      <td className="tabular-nums">{c.decisions}</td>
-      <td className="text-right">
-        {can(permissions.tenant.accountRules.write) ? (
-          <Button
-            size="sm"
-            disabled={promote.isPending}
-            onClick={() =>
-              promote.mutate({
-                counterparty_key: c.counterparty_key ?? "",
-                counterparty_name: c.counterparty_name,
-                direction:
-                  c.direction === "incoming" || c.direction === "outgoing"
-                    ? c.direction
-                    : undefined,
-                account_code: c.account_code ?? "",
-              })
-            }
-          >
-            <Wand2 className="size-4" />
-            {t("office.memory.promote")}
-          </Button>
-        ) : null}
-      </td>
-    </tr>
+    <Button
+      size="sm"
+      disabled={promote.isPending}
+      onClick={() =>
+        promote.mutate({
+          counterparty_key: c.counterparty_key ?? "",
+          counterparty_name: c.counterparty_name,
+          direction:
+            c.direction === "incoming" || c.direction === "outgoing"
+              ? c.direction
+              : undefined,
+          account_code: c.account_code ?? "",
+        })
+      }
+    >
+      <Wand2 className="size-4" />
+      {t("office.memory.promote")}
+    </Button>
   );
 }
 
@@ -278,6 +302,53 @@ function CandidatesPanel({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const candidates = useRuleCandidates(slug, engagement);
   const items = candidates.data?.items ?? [];
+  const candidateColumns = useMemo<
+    ColumnDef<AccountRuleCandidate, unknown>[]
+  >(
+    () => [
+      createColumn<AccountRuleCandidate>({
+        id: "counterparty",
+        labelKey: "office.memory.col_counterparty",
+        accessorFn: (c) => c.counterparty_name || "—",
+        gridPrimary: true,
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <>
+              <div className="font-medium">{c.counterparty_name || "—"}</div>
+              <div className="text-muted-foreground text-xs">
+                {c.counterparty_key?.startsWith("name:")
+                  ? ""
+                  : c.counterparty_key}
+              </div>
+            </>
+          );
+        },
+      }),
+      createColumn<AccountRuleCandidate>({
+        id: "direction",
+        labelKey: "office.memory.col_direction",
+        accessorFn: (c) => t(directionKey(c.direction)),
+      }),
+      createColumn<AccountRuleCandidate>({
+        id: "account_code",
+        labelKey: "office.memory.col_code",
+        accessorFn: (c) => c.account_code ?? "",
+        meta: { cellClassName: "font-mono" },
+      }),
+      createColumn<AccountRuleCandidate>({
+        id: "decisions",
+        labelKey: "office.memory.col_decisions",
+        accessorKey: "decisions",
+        meta: { cellClassName: "tabular-nums" },
+      }),
+      createActionsColumn<AccountRuleCandidate>({
+        labelKey: "office.memory.col_action",
+        cell: (c) => <PromoteButton c={c} engagement={engagement} />,
+      }),
+    ],
+    [engagement, t],
+  );
   return (
     <Panel
       title={t("office.memory.candidates_title", { count: items.length })}
@@ -290,28 +361,13 @@ function CandidatesPanel({ engagement }: { engagement: string }) {
           {t("office.memory.candidates_empty")}
         </p>
       ) : (
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.memory.col_counterparty")}</th>
-              <th>{t("office.memory.col_direction")}</th>
-              <th>{t("office.memory.col_code")}</th>
-              <th>{t("office.memory.col_decisions")}</th>
-              <th>
-                <span className="sr-only">{t("office.memory.col_action")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <CandidateRow
-                key={`${c.counterparty_key}|${c.direction}|${c.account_code}`}
-                c={c}
-                engagement={engagement}
-              />
-            ))}
-          </tbody>
-        </TableBox>
+        <DataTable<AccountRuleCandidate>
+          columns={candidateColumns}
+          data={items}
+          getRowId={candidateId}
+          bordered={false}
+          features={panelTable}
+        />
       )}
     </Panel>
   );
@@ -332,6 +388,66 @@ function RulesPanel({ engagement }: { engagement: string }) {
   const canWrite = can(permissions.tenant.accountRules.write);
   const rules = useEngagementRules(slug, engagement);
   const items = (rules.data?.items ?? []).filter((r) => r.status === "active");
+  const retire = retireRule.mutate;
+  const retiring = retireRule.isPending;
+  const ruleColumns = useMemo<ColumnDef<AccountRule, unknown>[]>(
+    () => [
+      createColumn<AccountRule>({
+        id: "name",
+        labelKey: "office.memory.col_rule",
+        accessorKey: "name",
+        gridPrimary: true,
+        meta: { cellClassName: "font-medium" },
+      }),
+      createColumn<AccountRule>({
+        id: "account_code",
+        labelKey: "office.memory.col_code",
+        accessorKey: "account_code",
+        meta: { cellClassName: "font-mono" },
+      }),
+      createColumn<AccountRule>({
+        id: "origin",
+        labelKey: "office.memory.col_origin",
+        accessorFn: (r) =>
+          t(originKey[r.origin] ?? "office.memory.origin_manual"),
+      }),
+      // Biçim aynen korunur (dd.MM.yyyy HH:mm); ISO değer sıralanır.
+      createColumn<AccountRule>({
+        id: "created_at",
+        labelKey: "office.memory.col_created",
+        accessorKey: "created_at",
+        cell: ({ row }) => datetime(row.original.created_at, undefined, locale),
+      }),
+      ...(canWrite
+        ? [
+            createActionsColumn<AccountRule>({
+              labelKey: "office.memory.col_action",
+              cell: (r) =>
+                r.scope === "engagement" ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={retiring}
+                    onClick={async () => {
+                      const ok = await confirmDelete({
+                        title: t("office.memory.retire_title", {
+                          name: r.name,
+                        }),
+                        description: t("office.memory.retire_description"),
+                        confirmLabel: t("office.memory.retire"),
+                      });
+                      if (ok) retire(r.rule_key);
+                    }}
+                  >
+                    {t("office.memory.retire")}
+                  </Button>
+                ) : null,
+            }),
+          ]
+        : []),
+    ],
+    [canWrite, confirmDelete, locale, retire, retiring, t],
+  );
   return (
     <Panel
       title={t("office.memory.rules_title", { count: items.length })}
@@ -345,58 +461,13 @@ function RulesPanel({ engagement }: { engagement: string }) {
           {t("office.memory.rules_empty")}
         </p>
       ) : (
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.memory.col_rule")}</th>
-              <th>{t("office.memory.col_code")}</th>
-              <th>{t("office.memory.col_origin")}</th>
-              <th>{t("office.memory.col_created")}</th>
-              {canWrite ? (
-                <th>
-                  <span className="sr-only">
-                    {t("office.memory.col_action")}
-                  </span>
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((r) => (
-              <tr key={r.uuid}>
-                <td className="font-medium">{r.name}</td>
-                <td className="font-mono">{r.account_code}</td>
-                <td>
-                  {t(originKey[r.origin] ?? "office.memory.origin_manual")}
-                </td>
-                <td>{datetime(r.created_at, undefined, locale)}</td>
-                {canWrite ? (
-                  <td className="text-right">
-                    {r.scope === "engagement" ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={retireRule.isPending}
-                        onClick={async () => {
-                          const ok = await confirmDelete({
-                            title: t("office.memory.retire_title", {
-                              name: r.name,
-                            }),
-                            description: t("office.memory.retire_description"),
-                            confirmLabel: t("office.memory.retire"),
-                          });
-                          if (ok) retireRule.mutate(r.rule_key);
-                        }}
-                      >
-                        {t("office.memory.retire")}
-                      </Button>
-                    ) : null}
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </TableBox>
+        <DataTable<AccountRule>
+          columns={ruleColumns}
+          data={items}
+          getRowId={(r) => r.uuid}
+          bordered={false}
+          features={panelTable}
+        />
       )}
     </Panel>
   );
@@ -419,6 +490,66 @@ function AutoCodedPanel({ engagement }: { engagement: string }) {
     (s) =>
       s.target_type === "invoice_item" && s.target_field === "account_code",
   );
+  const decide = decision.mutate;
+  const deciding = decision.isPending;
+  const autoColumns = useMemo<ColumnDef<ReviewSuggestion, unknown>[]>(
+    () => [
+      createColumn<ReviewSuggestion>({
+        id: "item",
+        labelKey: "office.memory.col_item",
+        accessorFn: (s) => suggestionContext(s).itemName ?? "—",
+        gridPrimary: true,
+      }),
+      createColumn<ReviewSuggestion>({
+        id: "counterparty",
+        labelKey: "office.memory.col_counterparty",
+        accessorFn: (s) => suggestionContext(s).counterparty ?? "—",
+      }),
+      createColumn<ReviewSuggestion>({
+        id: "code",
+        labelKey: "office.memory.col_code",
+        accessorFn: (s) =>
+          accountValue(s.applied_value ?? s.proposed_value).code,
+        meta: { cellClassName: "font-mono" },
+      }),
+      createColumn<ReviewSuggestion>({
+        id: "source",
+        labelKey: "office.memory.col_source",
+        accessorFn: (s) =>
+          s.provenance.rule_ref?.startsWith("account_rule:")
+            ? t("office.memory.source_rule")
+            : t("office.memory.source_auto"),
+        cell: ({ getValue }) => (
+          <StatusChip tone="success" label={String(getValue())} />
+        ),
+      }),
+      ...(canRevert
+        ? [
+            createActionsColumn<ReviewSuggestion>({
+              labelKey: "office.memory.col_action",
+              cell: (s) => (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={deciding}
+                  onClick={() =>
+                    decide({
+                      suggestion: s,
+                      action: "revert",
+                      reason: t("office.memory.revert_reason"),
+                    })
+                  }
+                >
+                  <Undo2 className="size-4" />
+                  {t("office.memory.revert")}
+                </Button>
+              ),
+            }),
+          ]
+        : []),
+    ],
+    [canRevert, decide, deciding, t],
+  );
   return (
     <Panel
       title={t("office.memory.auto_title", { count: items.length })}
@@ -431,67 +562,13 @@ function AutoCodedPanel({ engagement }: { engagement: string }) {
           {t("office.memory.auto_empty")}
         </p>
       ) : (
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.memory.col_item")}</th>
-              <th>{t("office.memory.col_counterparty")}</th>
-              <th>{t("office.memory.col_code")}</th>
-              <th>{t("office.memory.col_source")}</th>
-              {canRevert ? (
-                <th>
-                  <span className="sr-only">
-                    {t("office.memory.col_action")}
-                  </span>
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((s) => {
-              const ctx = suggestionContext(s);
-              const byRule = s.provenance.rule_ref?.startsWith("account_rule:");
-              return (
-                <tr key={s.uuid}>
-                  <td>{ctx.itemName ?? "—"}</td>
-                  <td>{ctx.counterparty ?? "—"}</td>
-                  <td className="font-mono">
-                    {accountValue(s.applied_value ?? s.proposed_value).code}
-                  </td>
-                  <td>
-                    <StatusChip
-                      tone="success"
-                      label={
-                        byRule
-                          ? t("office.memory.source_rule")
-                          : t("office.memory.source_auto")
-                      }
-                    />
-                  </td>
-                  {canRevert ? (
-                    <td className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={decision.isPending}
-                        onClick={() =>
-                          decision.mutate({
-                            suggestion: s,
-                            action: "revert",
-                            reason: t("office.memory.revert_reason"),
-                          })
-                        }
-                      >
-                        <Undo2 className="size-4" />
-                        {t("office.memory.revert")}
-                      </Button>
-                    </td>
-                  ) : null}
-                </tr>
-              );
-            })}
-          </tbody>
-        </TableBox>
+        <DataTable<ReviewSuggestion>
+          columns={autoColumns}
+          data={items}
+          getRowId={(s) => s.uuid}
+          bordered={false}
+          features={panelTable}
+        />
       )}
     </Panel>
   );

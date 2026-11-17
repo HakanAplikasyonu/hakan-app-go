@@ -1,12 +1,12 @@
 "use client";
 
-import { quantity } from "@/lib/utils/format";
 import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { DataTable } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,7 +27,12 @@ import {
 } from "../hooks/use-review";
 import { toPanelInvoice } from "../lib/from-api";
 import { AmountWaterfall } from "./amount-waterfall";
+import type { InvoiceLine } from "../types";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import {
+  LINE_TABLE_FEATURES,
+  useInvoiceLineColumns,
+} from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
 import { InvoiceStateBadge } from "./invoices-page";
 import {
@@ -35,7 +40,6 @@ import {
   Money,
   Panel,
   SeverityBadge,
-  TableBox,
   WarningStatusLabel,
   useWarningText,
 } from "./office-ui";
@@ -77,6 +81,10 @@ function InvoiceDetailInner({ id }: { id: string }) {
     () =>
       detail.data ? toPanelInvoice(detail.data, engagement, ubl.data) : null,
     [detail.data, engagement, ubl.data],
+  );
+  const lineColumns = useInvoiceLineColumns(
+    detail.data?.currency ?? "TRY",
+    true,
   );
 
   if (detail.isLoading) {
@@ -239,34 +247,14 @@ function InvoiceDetailInner({ id }: { id: string }) {
           </Panel>
 
           <Panel title={t("office.lines")}>
-            <TableBox>
-              <thead>
-                <tr>
-                  <th>{t("office.col_item")}</th>
-                  <th className="text-right">{t("office.col_quantity")}</th>
-                  <th className="text-right">{t("office.col_line_total")}</th>
-                  <th className="text-right">KDV</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.lines.map((l) => (
-                  <tr key={l.id}>
-                    <td>{l.name}</td>
-                    <td className="text-right whitespace-nowrap">
-                      <Figure>
-                        {quantity(l.quantity)} {l.unit}
-                      </Figure>
-                    </td>
-                    <td className="text-right">
-                      <Money value={l.lineTotal} currency={d.currency} />
-                    </td>
-                    <td className="text-right">
-                      <Figure>%{l.vatPercent}</Figure>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </TableBox>
+            <DataTable<InvoiceLine>
+              columns={lineColumns}
+              data={invoice.lines}
+              getRowId={(l) => l.id}
+              features={LINE_TABLE_FEATURES}
+              bordered={false}
+              emptyDescription=""
+            />
           </Panel>
 
           <Panel

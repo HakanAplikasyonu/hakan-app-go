@@ -2,11 +2,18 @@
 
 import { quantity } from "@/lib/utils/format";
 import { useMutation } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { toast } from "sonner";
 
+import {
+  DataTable,
+  createColumn,
+  createMoneyColumn,
+  type DataTableFeatures,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -26,11 +33,79 @@ import {
 } from "../hooks/use-office-invoices";
 import { toPanelInvoice } from "../lib/from-api";
 import { createDocumentRequest } from "../services/engagement-documents.service";
+import type { InvoiceLine } from "../types";
 import { AmountWaterfall } from "./amount-waterfall";
 import { InvoiceStateBadge } from "./invoices-page";
-import { Figure, Money, useWarningText } from "./office-ui";
+import { Figure, useWarningText } from "./office-ui";
 
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
+
+/**
+ * Gömülü kalem tablosu (#381): araç çubuğu, sayfalama, seçim ve kolon
+ * yönetimi kapalı; sıra belgedeki kalem sırası olduğundan sıralama da kapalı.
+ */
+export const LINE_TABLE_FEATURES: DataTableFeatures = {
+  toolbar: false,
+  sorting: false,
+  pagination: false,
+  rowSelection: false,
+  columnFilters: false,
+  globalFilter: false,
+  facetedFilters: false,
+  viewMode: false,
+  columnVisibility: false,
+  columnResizing: false,
+  columnPinning: false,
+  columnOrdering: false,
+  density: false,
+};
+
+/** Fatura kalemi kolonları; `vat` açıkken KDV oranı kolonu da eklenir. */
+export function useInvoiceLineColumns(currency: string, vat = false) {
+  return useMemo<ColumnDef<InvoiceLine, unknown>[]>(() => {
+    const cols: ColumnDef<InvoiceLine, unknown>[] = [
+      createColumn<InvoiceLine>({
+        id: "name",
+        labelKey: "office.col_item",
+        accessorKey: "name",
+        enableHiding: false,
+        gridPrimary: true,
+      }),
+      createColumn<InvoiceLine>({
+        id: "quantity",
+        labelKey: "office.col_quantity",
+        accessorKey: "quantity",
+        enableHiding: false,
+        meta: { align: "end", cellClassName: "whitespace-nowrap" },
+        cell: ({ row }) => (
+          <Figure>
+            {quantity(row.original.quantity)} {row.original.unit}
+          </Figure>
+        ),
+      }),
+      createMoneyColumn<InvoiceLine>({
+        id: "line_total",
+        labelKey: "office.col_line_total",
+        accessor: (l) => l.lineTotal,
+        currency,
+        enableHiding: false,
+      }),
+    ];
+    if (vat) {
+      cols.push(
+        createColumn<InvoiceLine>({
+          id: "vat_percent",
+          labelKey: "office.col_vat",
+          accessorKey: "vatPercent",
+          enableHiding: false,
+          meta: { align: "end" },
+          cell: ({ row }) => <Figure>%{row.original.vatPercent}</Figure>,
+        }),
+      );
+    }
+    return cols;
+  }, [currency, vat]);
+}
 const SEVERITY_RANK = { blocker: 0, warning: 1, info: 2 } as const;
 
 /** "7c1e…a90f": uzun ETTN'nin baş ve sonu. */
@@ -68,6 +143,7 @@ export function InvoiceDrawer({
   );
   const warningText = useWarningText();
   const d = id ? detail.data : undefined;
+  const lineColumns = useInvoiceLineColumns(d?.currency ?? "TRY");
   const invoice = useMemo(
     () => (d ? toPanelInvoice(d, engagement, ubl.data) : null),
     [d, engagement, ubl.data],
@@ -207,38 +283,13 @@ export function InvoiceDrawer({
                 >
                   {t("office.lines")}
                 </h3>
-                <div className="border-line overflow-x-auto rounded-lg border">
-                  <table className="w-full text-sm">
-                    <thead className="bg-surface-2 text-text-2 text-xs">
-                      <tr>
-                        <th className="px-3 py-2 text-start font-medium">
-                          {t("office.col_item")}
-                        </th>
-                        <th className="px-3 py-2 text-end font-medium">
-                          {t("office.col_quantity")}
-                        </th>
-                        <th className="px-3 py-2 text-end font-medium">
-                          {t("office.col_line_total")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-line divide-y">
-                      {invoice.lines.map((l) => (
-                        <tr key={l.id}>
-                          <td className="px-3 py-2">{l.name}</td>
-                          <td className="px-3 py-2 text-end whitespace-nowrap">
-                            <Figure>
-                              {quantity(l.quantity)} {l.unit}
-                            </Figure>
-                          </td>
-                          <td className="px-3 py-2 text-end">
-                            <Money value={l.lineTotal} currency={d.currency} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DataTable<InvoiceLine>
+                  columns={lineColumns}
+                  data={invoice.lines}
+                  getRowId={(l) => l.id}
+                  features={LINE_TABLE_FEATURES}
+                  emptyDescription=""
+                />
               </section>
             </div>
 

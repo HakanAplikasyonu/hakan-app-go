@@ -122,50 +122,16 @@ export function TaxpayerInvoiceDetailPage({
         <CardHeader>
           <CardTitle>{t("taxpayer.lines_title")}</CardTitle>
         </CardHeader>
-        <CardContent className="relative overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-muted-foreground text-left">
-              <tr className="border-b">
-                <th className="py-2 pr-3 font-medium">#</th>
-                <th className="py-2 pr-3 font-medium">
-                  {t("taxpayer.col_item")}
-                </th>
-                <th className="py-2 pr-3 text-right font-medium">
-                  {t("taxpayer.col_quantity")}
-                </th>
-                <th className="py-2 pr-3 text-right font-medium">
-                  {t("taxpayer.col_rate")}
-                </th>
-                <th className="py-2 pr-3 text-right font-medium">
-                  {t("taxpayer.amount_base")}
-                </th>
-                <th className="py-2 text-right font-medium">
-                  {t("taxpayer.col_vat")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {inv.items.map((it) => (
-                <tr key={it.line_no} className="border-b last:border-0">
-                  <td className="py-2 pr-3">{it.line_no}</td>
-                  <td className="py-2 pr-3">{it.name}</td>
-                  <td className="figure py-2 pr-3 text-right">
-                    {quantity(it.quantity, locale === "en" ? "en" : "tr")}{" "}
-                    {it.unit_name || it.unit_code}
-                  </td>
-                  <td className="figure py-2 pr-3 text-right">
-                    %{it.tax_rate}
-                  </td>
-                  <td className="figure py-2 pr-3 text-right">
-                    {money(it.tax_exclusive_amount)}
-                  </td>
-                  <td className="figure py-2 text-right">
-                    {money(it.tax_amount)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <CardContent>
+          <DataTable<LineRow>
+            columns={lineColumns}
+            data={inv.items}
+            getRowId={(it) => String(it.line_no)}
+            emptyTitle={t("taxpayer.lines_title")}
+            emptyDescription=""
+            bordered={false}
+            features={EMBEDDED_FEATURES}
+          />
         </CardContent>
       </Card>
 
@@ -175,19 +141,14 @@ export function TaxpayerInvoiceDetailPage({
             <CardTitle>{t("taxpayer.vat_summary_title")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <tbody>
-                {inv.tax_summary.map((s, i) => (
-                  <tr key={i} className="border-b last:border-0">
-                    <td className="figure py-1.5">%{s.tax_rate}</td>
-                    <td className="figure py-1.5 text-right">
-                      {money(s.base)}
-                    </td>
-                    <td className="figure py-1.5 text-right">{money(s.vat)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable<SummaryRow>
+              columns={summaryColumns}
+              data={inv.tax_summary}
+              emptyTitle={t("taxpayer.vat_summary_title")}
+              emptyDescription=""
+              bordered={false}
+              features={{ ...EMBEDDED_FEATURES, sorting: false }}
+            />
           </CardContent>
         </Card>
         <Card>
