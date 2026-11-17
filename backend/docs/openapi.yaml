@@ -10712,6 +10712,168 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankCounterpartyAliases
+      summary: The engagement's bank counterparty aliases (payer / payee → cari)
+      description: |
+        Requires `tenant.bank.read`. A bank movement's counterparty (IBAN,
+        VKN / TCKN or normalized name) mapped to the account it is booked to
+        in the trial balance: the payment from "X Yazılım Teknolojileri A.Ş."
+        is Oğuz Yılmaz's cari. `learned` aliases come from the accountant's
+        decisions on suggestions; `rule` aliases were defined or promoted.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [learned, rule] } }
+      responses:
+        "200":
+          description: Aliases
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankCounterpartyAliasList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Bank]
+      operationId: createTenantBankCounterpartyAlias
+      summary: Define an alias (as a rule)
+      description: |
+        Requires `tenant.bank.write`. `match_value` is normalized by
+        `match_type` (IBAN check digits, 10/11-digit VKN / TCKN, name without
+        company-form words). `direction` `A` (incoming) / `B` (outgoing)
+        limits it to one side; omitted, both. The same key redefines the
+        existing alias.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankCounterpartyAliasInput" }
+      responses:
+        "201":
+          description: Alias
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankCounterpartyAlias" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "422":
+          description: "`VALIDATION_ERROR`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/candidates:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankCounterpartyAliasCandidates
+      summary: Learned aliases decided often enough to become a rule
+      description: |
+        Requires `tenant.bank.read`. Same promotion logic as the account
+        code rules: the office's `rule_candidate_min_count` and
+        `rule_candidate_decisions` (account rule settings) say how many
+        decisions and which ones count; automatic acceptances never count.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Candidates
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankCounterpartyAliasCandidateList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: aliasUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Bank]
+      operationId: updateTenantBankCounterpartyAlias
+      summary: Change an alias's account or status
+      description: Requires `tenant.bank.write`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                account_code: { type: string, example: "120.01.015" }
+                account_name: { type: string }
+                status: { type: string, enum: [learned, rule] }
+      responses:
+        "200":
+          description: Alias
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankCounterpartyAlias" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`VALIDATION_ERROR`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Bank]
+      operationId: deleteTenantBankCounterpartyAlias
+      summary: Forget an alias
+      description: Requires `tenant.bank.write`.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-counterparty-aliases/{aliasUuid}/promote:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: aliasUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Bank]
+      operationId: promoteTenantBankCounterpartyAlias
+      summary: Make a learned alias a rule
+      description: Requires `tenant.bank.write`. A rule's suggestions carry confidence 0.97.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Alias
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankCounterpartyAlias" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-transactions:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16972,6 +17134,82 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/BankStatementAnalysis" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    BankCounterpartyAlias:
+      type: object
+      required: [uuid, match_type, match_value, display_name, direction, account_code, account_name, status, origin, accepts, corrections, hits, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        match_type: { type: string, enum: [iban, tax_id, name] }
+        match_value: { type: string, description: Normalized key }
+        display_name: { type: string, description: The name as the bank wrote it }
+        direction: { type: [string, "null"], enum: [A, B, null] }
+        account_code: { type: string }
+        account_name: { type: string }
+        status: { type: string, enum: [learned, rule] }
+        origin: { type: string, enum: [decision, manual, candidate] }
+        accepts: { type: integer }
+        corrections: { type: integer }
+        hits: { type: integer }
+        last_decided_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    BankCounterpartyAliasInput:
+      type: object
+      required: [match_type, match_value, account_code]
+      additionalProperties: false
+      properties:
+        match_type: { type: string, enum: [iban, tax_id, name] }
+        match_value: { type: string }
+        display_name: { type: string }
+        direction: { type: [string, "null"], enum: [A, B, null] }
+        account_code: { type: string, example: "120.01.015" }
+        account_name: { type: string }
+
+    BankCounterpartyAliasCandidate:
+      allOf:
+        - $ref: "#/components/schemas/BankCounterpartyAlias"
+        - type: object
+          required: [decisions, question]
+          properties:
+            decisions: { type: integer }
+            question: { type: string }
+
+    EnvelopeBankCounterpartyAlias:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankCounterpartyAlias" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeBankCounterpartyAliasList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/BankCounterpartyAlias" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeBankCounterpartyAliasCandidateList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/BankCounterpartyAliasCandidate" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeBankStatementReport:

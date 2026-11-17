@@ -45,6 +45,7 @@ document_task_uploads engagement
 account_rules
 account_assignments engagement
 counterparty_accounts engagement
+bank_counterparty_aliases engagement
 bank_statement_templates
 vat_carry_forwards engagement
 desktop_agents

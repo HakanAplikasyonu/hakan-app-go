@@ -201,6 +201,7 @@ type Querier interface {
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
 	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
+	DeleteBankCounterpartyAlias(ctx context.Context, arg DeleteBankCounterpartyAliasParams) (int64, error)
 	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
 	DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error
@@ -276,6 +277,9 @@ type Querier interface {
 	FillEmployeeFromImport(ctx context.Context, arg FillEmployeeFromImportParams) error
 	// Verilen kodlardan planda olanlar (denetim).
 	FindAccountPlanCodes(ctx context.Context, arg FindAccountPlanCodesParams) ([]FindAccountPlanCodesRow, error)
+	// Bir hareketin anahtarlarına uyan takma adlar: kural önce, sonra IBAN >
+	// VKN/TCKN > ad, yön tutan önce.
+	FindBankCounterpartyAliases(ctx context.Context, arg FindBankCounterpartyAliasesParams) ([]BankCounterpartyAlias, error)
 	// 21 §5 kural 2: aynı hesap + tarih + yön + tutar + işlem sonrası bakiye.
 	FindBankTransactionByBalance(ctx context.Context, arg FindBankTransactionByBalanceParams) (BankTransaction, error)
 	FindBankTransactionBySource(ctx context.Context, arg FindBankTransactionBySourceParams) (int64, error)
@@ -329,6 +333,8 @@ type Querier interface {
 	GetAppSettings(ctx context.Context) (AppSetting, error)
 	GetAttachmentBySHA256(ctx context.Context, arg GetAttachmentBySHA256Params) (Attachment, error)
 	GetAuthSettings(ctx context.Context) (GetAuthSettingsRow, error)
+	GetBankCounterpartyAlias(ctx context.Context, arg GetBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	GetBankCounterpartyAliasByKey(ctx context.Context, arg GetBankCounterpartyAliasByKeyParams) (BankCounterpartyAlias, error)
 	GetBankTransaction(ctx context.Context, arg GetBankTransactionParams) (BankTransaction, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
 	GetBillingPlanByCode(ctx context.Context, code string) (BillingPlan, error)
@@ -499,6 +505,7 @@ type Querier interface {
 	HasPendingOwnerOrganizationInvitationForEmail(ctx context.Context, arg HasPendingOwnerOrganizationInvitationForEmailParams) (bool, error)
 	// Önceki durumu da döner: offline → online geçişi kayda değer.
 	HeartbeatDesktopAgent(ctx context.Context, arg HeartbeatDesktopAgentParams) (HeartbeatDesktopAgentRow, error)
+	IncrementBankCounterpartyAliasHits(ctx context.Context, arg IncrementBankCounterpartyAliasHitsParams) error
 	IncrementBankRuleHits(ctx context.Context, arg IncrementBankRuleHitsParams) error
 	IncrementOTPAttempts(ctx context.Context, id int64) (OtpCode, error)
 	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
@@ -513,6 +520,7 @@ type Querier interface {
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
+	InsertBankCounterpartyAlias(ctx context.Context, arg InsertBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
 	InsertBankTransaction(ctx context.Context, arg InsertBankTransactionParams) (BankTransaction, error)
 	InsertBankTransactionDocument(ctx context.Context, arg InsertBankTransactionDocumentParams) error
 	InsertBankTransactionMatch(ctx context.Context, arg InsertBankTransactionMatchParams) (BankTransactionMatch, error)
@@ -610,6 +618,9 @@ type Querier interface {
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
+	// Banka karşı taraf takma adları (issue #383).
+	ListBankCounterpartyAliases(ctx context.Context, arg ListBankCounterpartyAliasesParams) ([]BankCounterpartyAlias, error)
+	ListBankCounterpartyAliasesBySuggestion(ctx context.Context, arg ListBankCounterpartyAliasesBySuggestionParams) ([]BankCounterpartyAlias, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
@@ -1097,6 +1108,7 @@ type Querier interface {
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
+	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
 	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
 	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)

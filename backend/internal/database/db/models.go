@@ -221,6 +221,30 @@ type BankBalanceSnapshot struct {
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 }
 
+type BankCounterpartyAlias struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	MatchType      string             `json:"match_type"`
+	MatchValue     string             `json:"match_value"`
+	DisplayName    string             `json:"display_name"`
+	DebitCredit    pgtype.Text        `json:"debit_credit"`
+	AccountCode    string             `json:"account_code"`
+	AccountName    string             `json:"account_name"`
+	Status         string             `json:"status"`
+	Origin         string             `json:"origin"`
+	Accepts        int32              `json:"accepts"`
+	Corrections    int32              `json:"corrections"`
+	Hits           int32              `json:"hits"`
+	SuggestionID   pgtype.Int8        `json:"suggestion_id"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	LastDecidedAt  pgtype.Timestamptz `json:"last_decided_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankDailySummary struct {
 	ID               int64              `json:"id"`
 	TaxpayerID       int64              `json:"taxpayer_id"`

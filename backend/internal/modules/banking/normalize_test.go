@@ -46,3 +46,18 @@ func TestNormalizeCurrency(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeName(t *testing.T) {
+	cases := map[string]string{
+		"X Yazılım Teknolojileri A.Ş.":           "X YAZILIM TEKNOLOJILERI",
+		"X YAZILIM TEKNOLOJILERI AS":             "X YAZILIM TEKNOLOJILERI",
+		"Kalem Kırtasiye San. ve Tic. Ltd. Şti.": "KALEM KIRTASIYE",
+		"Oğuz Yılmaz":                            "OGUZ YILMAZ",
+		"  ":                                     "",
+	}
+	for in, want := range cases {
+		if got := NormalizeName(in); got != want {
+			t.Fatalf("%q → %q, want %q", in, got, want)
+		}
+	}
+}
