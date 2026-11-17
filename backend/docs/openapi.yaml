@@ -7120,6 +7120,294 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/expense-categories:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Receipts]
+      operationId: listOfficeExpenseCategories
+      summary: Office expense category template
+      description: |
+        Requires `tenant.receipts.read`. The office template laid over the
+        platform defaults by code (scope platform | office). Inactive rows are
+        listed with is_active=false.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpenseCategoryList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Receipts]
+      operationId: saveOfficeExpenseCategory
+      summary: Create or replace an office template category
+      description: |
+        Requires `tenant.receipts.approve`. Keyed by code: the same code
+        replaces the office row and overrides the platform default; is_active
+        false hides the default.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExpenseCategoryInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpenseCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/expense-categories/{categoryUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: categoryUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Receipts]
+      operationId: deleteOfficeExpenseCategory
+      summary: Remove an office template category
+      description: |
+        Requires `tenant.receipts.approve`. The platform default with the same
+        code (if any) shows again.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: OK
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expense-categories:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: listEngagementExpenseCategories
+      summary: Effective expense categories of a taxpayer
+      description: |
+        Requires `tenant.receipts.read` and engagement access. Taxpayer rows
+        over the office template over the platform defaults (scope taxpayer |
+        office | platform; overrides names the layer replaced).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpenseCategoryList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Receipts]
+      operationId: saveEngagementExpenseCategory
+      summary: Create or replace a taxpayer's own category
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. Keyed by code
+        within the taxpayer.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExpenseCategoryInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpenseCategory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expense-categories/{categoryUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: categoryUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Receipts]
+      operationId: deleteEngagementExpenseCategory
+      summary: Remove a taxpayer's own category
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. Only the
+        taxpayer's rows; the office template shows again.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: OK
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: listEngagementExpenses
+      summary: Taxpayer expenses with category and account
+      description: |
+        Requires `tenant.receipts.read` and engagement access. Every expense of
+        the taxpayer (receipt capture, Excel, integrations). Pending rows
+        without an office choice carry the suggestion (suggested=true): the
+        vendor's last approved account (vendor_memory), else the category's
+        account matched to the imported plan (plan) or as written (category).
+        Totals are over the whole filter.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, rejected] } }
+        - { name: category, in: query, required: false, description: "Category code; `-` = none chosen", schema: { type: string } }
+        - { name: q, in: query, required: false, description: "Vendor name / description (contains), receipt number or VKN (exact)", schema: { type: string } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpensePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: expenseUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Receipts]
+      operationId: getEngagementExpense
+      summary: One expense
+      description: |
+        Requires `tenant.receipts.read` and engagement access.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [Receipts]
+      operationId: setEngagementExpensePosting
+      summary: Choose the category / account of a pending expense
+      description: |
+        Requires `tenant.receipts.write` and engagement access. A category
+        alone takes the category's account matched to the plan; an
+        account_code is stored as manual. 409 when the expense is decided.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExpensePostingInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: expenseUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: approveEngagementExpense
+      summary: Approve an expense and create its journal draft
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. Fixes the
+        category and account (the suggestion when none was chosen) and creates
+        a journal draft (source_kind receipt): expense account (net) and
+        191 İndirilecek KDV debit, the payment method's account credit (cash
+        100, transfer 102, card 309, check 103, note 321, credit 320 with the
+        vendor's cari). Non-deductible VAT is added to the expense. The
+        receipt capture, if any, becomes approved. 422 RECORD_INCOMPLETE
+        without a date or amount; 409 when already decided.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`RECORD_INCOMPLETE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/expenses/{expenseUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: expenseUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: rejectEngagementExpense
+      summary: Reject an expense
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. 409 when
+        already decided.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeExpense" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/controls/run:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -14894,6 +15182,129 @@ components:
         description: { type: string }
         valid_from: { type: [string, "null"], format: date }
         valid_to: { type: [string, "null"], format: date }
+
+    ExpenseCategory:
+      type: object
+      required: [uuid, code, name, account_code, vat_account_code, deductible, receipt_types, keywords, is_active, scope]
+      properties:
+        uuid: { type: [string, "null"], format: uuid, description: null for platform defaults }
+        code: { type: string, example: akaryakit }
+        name: { type: string }
+        account_code: { type: string, example: "770" }
+        vat_account_code: { type: string, example: "191" }
+        deductible: { type: string, enum: ["yes", "no"], description: "no: VAT is added to the expense" }
+        receipt_types: { type: array, items: { type: string } }
+        keywords: { type: array, items: { type: string } }
+        is_active: { type: boolean }
+        scope: { type: string, enum: [platform, office, taxpayer] }
+        overrides: { type: string, enum: [platform, office] }
+    ExpenseCategoryInput:
+      type: object
+      additionalProperties: false
+      required: [code, name, account_code]
+      properties:
+        code: { type: string, pattern: "^[a-z0-9_]{1,48}$" }
+        name: { type: string, maxLength: 120 }
+        account_code: { type: string, pattern: "^[0-9]{3}(\\.[0-9A-Za-z]+)*$" }
+        vat_account_code: { type: string, pattern: "^[0-9]{3}(\\.[0-9A-Za-z]+)*$", default: "191" }
+        deductible: { type: string, enum: ["yes", "no"], default: "yes" }
+        receipt_types:
+          type: array
+          items: { type: string, enum: [okc_receipt, fuel_receipt, expense_voucher, smm, bank_fee, salary, tax_payment, other] }
+        keywords: { type: array, maxItems: 30, items: { type: string } }
+        is_active: { type: boolean, default: true }
+    EnvelopeExpenseCategory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ExpenseCategory" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeExpenseCategoryList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/ExpenseCategory" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    ReceiptJournalRef:
+      type: object
+      required: [uuid, entry_no, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        entry_no: { type: integer, format: int32 }
+        status: { type: string, enum: [draft, approved, exported] }
+    Expense:
+      type: object
+      required: [uuid, expense_date, period, amount, tax_amount, currency, description, receipt_type, source_system,
+                 capture_method, approval_status, has_attachment, category_code, account_code, suggested, journal, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        expense_date: { type: [string, "null"], format: date }
+        period: { type: [string, "null"] }
+        amount: { type: [string, "null"], description: "Decimal, total incl. VAT" }
+        tax_amount: { type: [string, "null"] }
+        tax_rate: { type: [string, "null"] }
+        tax_exclusive_amount: { type: [string, "null"] }
+        currency: { type: string }
+        description: { type: string }
+        receipt_type: { type: string }
+        vendor_name: { type: [string, "null"] }
+        vendor_tax_number: { type: [string, "null"] }
+        receipt_number: { type: [string, "null"] }
+        vehicle_plate: { type: [string, "null"] }
+        payment_method: { type: [string, "null"] }
+        source_system: { type: string }
+        capture_method: { type: string }
+        approval_status: { type: string, enum: [pending, approved, rejected] }
+        ocr_confidence: { type: [string, "null"] }
+        has_attachment: { type: boolean }
+        category_code: { type: [string, "null"] }
+        category_name: { type: [string, "null"] }
+        account_code: { type: [string, "null"] }
+        account_source: { type: [string, "null"], enum: [category, vendor_memory, plan, manual, null] }
+        account_confidence: { type: [string, "null"] }
+        suggested: { type: boolean, description: category / account are a proposal nobody chose yet }
+        journal:
+          oneOf:
+            - $ref: "#/components/schemas/ReceiptJournalRef"
+            - type: "null"
+        approved_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    ExpensePostingInput:
+      type: object
+      additionalProperties: false
+      properties:
+        category_code: { type: string }
+        account_code: { type: string, pattern: "^[0-9]{3}(\\.[0-9A-Za-z]+)*$" }
+    EnvelopeExpense:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/Expense" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeExpensePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, pending, amount, tax_amount, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/Expense" } }
+            total: { type: integer, format: int64 }
+            pending: { type: integer, format: int64 }
+            amount: { type: string }
+            tax_amount: { type: string }
+            limit: { type: integer, format: int32 }
+            offset: { type: integer, format: int32 }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeReceiptCapture:
       type: object
