@@ -110,6 +110,40 @@ func RegisterAgent(s *rpc.Server, rt *agent.Runtime) {
 		}
 		return rt.Status(), nil
 	})
+	// Luca / Zirve aktarım klasörleri (#391).
+	s.Handle("transfer.add_target", func(_ context.Context, params json.RawMessage) (any, error) {
+		var p struct {
+			Path           string `json:"path"`
+			EngagementUUID string `json:"engagement_uuid"`
+			Driver         string `json:"driver"`
+			TaxpayerTitle  string `json:"taxpayer_title"`
+		}
+		if err := rpc.Decode(params, &p); err != nil {
+			return nil, err
+		}
+		t, err := rt.AddTarget(p.Path, p.EngagementUUID, p.Driver, p.TaxpayerTitle)
+		if err != nil {
+			return nil, rpc.Errorf(rpc.CodeInvalidParams, "%v", err)
+		}
+		return t, nil
+	})
+	s.Handle("transfer.remove_target", func(_ context.Context, params json.RawMessage) (any, error) {
+		var p struct {
+			EngagementUUID string `json:"engagement_uuid"`
+			Driver         string `json:"driver"`
+		}
+		if err := rpc.Decode(params, &p); err != nil {
+			return nil, err
+		}
+		if err := rt.RemoveTarget(p.EngagementUUID, p.Driver); err != nil {
+			return nil, err
+		}
+		return rt.Status(), nil
+	})
+	s.Handle("transfer.run", func(context.Context, json.RawMessage) (any, error) {
+		rt.RunTransfers()
+		return rt.Status(), nil
+	})
 	s.Handle("watch.clear_errors", func(_ context.Context, params json.RawMessage) (any, error) {
 		var p struct {
 			Path string `json:"path"`

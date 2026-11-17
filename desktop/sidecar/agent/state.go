@@ -47,13 +47,15 @@ type OrgRef struct {
 // stateData diske yazılan biçim. Sır içermez: oturum belirteci kabuğun
 // anahtar zincirindedir.
 type stateData struct {
-	BaseURL      string              `json:"base_url"`
-	Organization *OrgRef             `json:"organization,omitempty"`
-	MachineID    string              `json:"machine_id"`
-	AgentUUID    string              `json:"agent_uuid,omitempty"`
-	AgentName    string              `json:"agent_name,omitempty"`
-	Watches      []Watch             `json:"watches"`
-	Uploaded     map[string]Uploaded `json:"uploaded"`
+	BaseURL      string  `json:"base_url"`
+	Organization *OrgRef `json:"organization,omitempty"`
+	MachineID    string  `json:"machine_id"`
+	AgentUUID    string  `json:"agent_uuid,omitempty"`
+	AgentName    string  `json:"agent_name,omitempty"`
+	Watches      []Watch `json:"watches"`
+	// Targets Luca / Zirve aktarım klasörleri (#391).
+	Targets  []TransferTarget    `json:"transfer_targets,omitempty"`
+	Uploaded map[string]Uploaded `json:"uploaded"`
 }
 
 // State, ajanın kalıcı durumu (`<veri dizini>/agent-state.json`, 0600).
@@ -121,6 +123,7 @@ func (s *State) Snapshot() stateData {
 	defer s.mu.Unlock()
 	d := s.d
 	d.Watches = append([]Watch(nil), s.d.Watches...)
+	d.Targets = append([]TransferTarget(nil), s.d.Targets...)
 	d.Uploaded = nil
 	return d
 }

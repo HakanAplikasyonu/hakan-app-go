@@ -276,6 +276,7 @@ async function refresh() {
     ["Son eşitleme", relTime(st.last_heartbeat)],
   ]);
   renderWatches(st.watches);
+  renderTargets(st);
   renderProblems(st);
   notify(st);
 }
@@ -886,7 +887,7 @@ listen("sidecar://event", (e) => {
     engagements = [];
     organizations = [];
   }
-  if (["agent.heartbeat", "auth.signed_out", "agent.revoked", "upload"].includes(event)) refresh();
+  if (["agent.heartbeat", "auth.signed_out", "agent.revoked", "upload", "transfer"].includes(event)) refresh();
 });
 listen("sidecar://exit", () => {
   setAgent("wait", "Yerel ajan yeniden başlatılıyor…");
@@ -895,6 +896,101 @@ listen("sidecar://exit", () => {
 });
 
 // --- Muhasebe programı ------------------------------------------------------
+
+// Luca / Zirve aktarım klasörleri (#391). Sidecar dosyaları bırakır ve
+// sonucu sunucuya bildirir; ekranda yalnızca mükellef, program, klasör ve
+// Türkçe sonuç görünür.
+const XFER_PROGRAM = { luca: "Luca", zirve: "Zirve" };
+const XFER_OUTCOME = {
+  delivered: { state: "ok", label: "Klasöre bırakıldı" },
+  failed: { state: "down", label: "Bırakılamadı" },
+  retry: { state: "warn", label: "Yeniden denenecek" },
+};
+let xferFolder = "";
+
+function setXferPicked(path) {
+  xferFolder = path || "";
+  $("xfer-picked").textContent = xferFolder || "Aktarım klasörünü seç…";
+  $("xfer-picked").className = xferFolder ? "grow mono t-xs" : "grow t-sm t-2";
+}
+
+function renderXferEngagements() {
+  const sel = $("xfer-engagement");
+  const keep = sel.value;
+  sel.replaceChildren(...engagements.map((e) => el("option", { value: e.id }, e.title)));
+  if (keep) sel.value = keep;
+}
+
+async function removeTarget(t) {
+  const name = `${taxpayerOf(t)} · ${XFER_PROGRAM[t.driver] || t.driver}`;
+  if (!(await confirmBox(`${name} aktarım klasörü kaldırılsın mı? Klasördeki dosyalara dokunulmaz.`, "Kaldır"))) return;
+  await call("transfer.remove_target", { engagement_uuid: t.engagement_uuid, driver: t.driver }).catch(() => {});
+  refresh();
+}
+
+function renderTargets(st) {
+  const targets = st.transfer_targets || [];
+  if ($("xfer-engagement").options.length !== engagements.length) renderXferEngagements();
+  $("xfer-empty").hidden = !!targets.length;
+  $("xfer-list").replaceChildren(
+    ...targets.map((t) =>
+      el(
+        "div",
+        { class: "fl", role: "listitem" },
+        el("span", { class: "fl-ic" }, icon(IC.folder)),
+        el(
+          "div",
+          { class: "col grow" },
+          el("span", { class: "fl-title" }, `${taxpayerOf(t)} · ${XFER_PROGRAM[t.driver] || t.driver}`),
+          el("span", { class: "fl-path", title: t.path }, t.path),
+        ),
+        el("button", { type: "button", class: "btn btn-sm btn-ghost danger-text", onclick: () => removeTarget(t) }, "Kaldır"),
+      ),
+    ),
+  );
+  const tr = st.transfer || {};
+  const recent = tr.recent || [];
+  $("xfer-recent-box").hidden = !recent.length && !tr.last_error;
+  const rows = recent.map((ev) => {
+    const o = XFER_OUTCOME[ev.outcome] || XFER_OUTCOME.retry;
+    const what = [taxpayerOf(ev), XFER_PROGRAM[ev.driver] || ev.driver, ev.period].filter(Boolean).join(" · ");
+    const detail = ev.outcome === "delivered" ? `${ev.folder} klasörüne: ${(ev.files || []).join(", ")}` : ev.reason || "";
+    return el(
+      "div",
+      { class: "row gap-8", role: "listitem" },
+      el("span", { class: "pill", dataset: { state: o.state } }, o.label),
+      el("div", { class: "col grow" }, el("span", { class: "t-sm" }, what), el("span", { class: "t-xs t-2" }, detail)),
+      el("span", { class: "t-xs t-3 num" }, relTime(ev.at)),
+    );
+  });
+  if (tr.last_error) rows.unshift(el("p", { class: "warn-text" }, tr.last_error));
+  $("xfer-recent").replaceChildren(...rows);
+}
+
+$("xfer-pick").addEventListener("click", async () => {
+  try {
+    const p = await invoke("pick_folder");
+    if (p) setXferPicked(p);
+  } catch (e) {
+    show($("xfer-msg"), errText(e));
+  }
+});
+
+$("xfer-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const id = $("xfer-engagement").value;
+  const driver = document.querySelector("input[name=xfer-driver]:checked")?.value || "luca";
+  if (!id) return show($("xfer-msg"), "Bir mükellef seçin.");
+  if (!xferFolder) return show($("xfer-msg"), "Aktarım klasörünü seçin.");
+  try {
+    await call("transfer.add_target", { path: xferFolder, engagement_uuid: id, driver, taxpayer_title: engagementTitles.get(id) || "" });
+    setXferPicked("");
+    show($("xfer-msg"), "");
+  } catch (e) {
+    show($("xfer-msg"), errText(e));
+  }
+  refresh();
+});
 
 const srcKind = () => document.querySelector("input[name=src-kind]:checked")?.value || "logo_tiger";
 

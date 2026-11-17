@@ -253,9 +253,46 @@
             <header class="view-head">
               <div class="col grow">
                 <h1 id="program-title">Muhasebe programı</h1>
-                <span class="t-sm t-2">Programın veritabanına salt okunur bir kullanıcıyla bağlanır, yalnızca fatura başlıklarını okur. Veri şimdilik sunucuya gönderilmez.</span>
+                <span class="t-sm t-2">Luca ve Zirve'ye aktarılacak fiş dosyaları ile Logo ve Mikro'dan fatura okuma.</span>
               </div>
             </header>
+            <section id="xfer" class="card pad col gap-12" aria-labelledby="xfer-title">
+              <div class="col gap-6">
+                <h2 id="xfer-title">Luca / Zirve aktarım klasörleri</h2>
+                <span class="t-sm t-2">Ofis panelinde “Masaüstü ajanına gönder” denen fiş dosyaları seçtiğiniz klasöre bırakılır. İçe aktarmayı programda siz yaparsınız; Luca ya da Zirve parolası istenmez.</span>
+              </div>
+              <div id="xfer-list" class="col gap-8" role="list" aria-label="Aktarım klasörleri"></div>
+              <p id="xfer-empty" class="t-sm t-3">Henüz aktarım klasörü yok.</p>
+              <form id="xfer-form" class="col gap-12" aria-label="Aktarım klasörü ekle">
+                <div class="grid-2">
+                  <div class="field">
+                    <label for="xfer-engagement">Mükellef</label>
+                    <select id="xfer-engagement" required></select>
+                  </div>
+                  <div class="field">
+                    <span class="label">Program</span>
+                    <div class="segmented" role="radiogroup" aria-label="Aktarım programı">
+                      <label><input type="radio" name="xfer-driver" value="luca" checked /><span>Luca</span></label>
+                      <label><input type="radio" name="xfer-driver" value="zirve" /><span>Zirve</span></label>
+                    </div>
+                  </div>
+                </div>
+                <button id="xfer-pick" type="button" class="drop">
+                  <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 2h10v11H3z" /></svg>
+                  <span id="xfer-picked" class="grow t-sm t-2">Aktarım klasörünü seç…</span>
+                </button>
+                <p id="xfer-msg" class="msg" role="alert" hidden></p>
+                <div class="row end"><button type="submit" class="btn btn-pri">Klasörü kaydet</button></div>
+              </form>
+              <div id="xfer-recent-box" class="col gap-8" hidden>
+                <h3 class="t-sm">Son aktarımlar</h3>
+                <div id="xfer-recent" class="col gap-6" role="list" aria-label="Son aktarımlar"></div>
+              </div>
+            </section>
+            <div class="col gap-6">
+              <h2>Logo / Mikro fatura okuma</h2>
+              <span class="t-sm t-2">Programın veritabanına salt okunur bir kullanıcıyla bağlanır, yalnızca fatura başlıklarını okur. Veri şimdilik sunucuya gönderilmez.</span>
+            </div>
             <form id="src-form" class="col gap-14">
               <div class="segmented" role="radiogroup" aria-label="Program">
                 <label><input type="radio" name="src-kind" value="logo_tiger" checked /><span>Logo Tiger</span></label>
