@@ -94,6 +94,26 @@ yükleyin: hesap listeden düşer.
 ![Luca'da açılacak hesaplar](../../frontend/public/yardim/img/mizan-acilacak-hesaplar.jpg) Şablonun sütun düzeni Luca'nın kendi
 şablonuyla henüz doğrulanmadı; dosyadaki "Bilgi" sayfası bunu belirtir.
 
+### Luca hesap planı dosyası (CSV)
+
+**Luca hesap planı dosyası** bölümü, Luca'nın "Hesap Planı Aktar" ekranına
+yüklenecek CSV'yi üretir. Böylece yeni cariler Luca'da elle açılmaz.
+
+1. **Carilere alt hesap aç:** müşteri kartlarına 120, satıcı kartlarına 320
+   altında kod verilir. Kodun seviyesi ve hane sayısı yüklediğiniz Luca
+   planından çıkarılır (ör. `120.01.001` düzenindeyse sıradaki `120.01.0xx`).
+   Luca'daki bir kodla ya da başka bir cariyle çakışmaz. Aynı cari ikinci kez
+   yeni kod almaz.
+2. **Yeni hesaplar (CSV):** yalnızca son yüklediğiniz Luca planında olmayan
+   hesaplar. **Tüm hesap planı (CSV):** planın tamamı ve yeni hesaplar.
+3. Dosyayı Luca'da içe aktarın, sonra güncel planı ya da mizanı yeniden
+   yükleyin: hesaplar "Luca'da var" olur.
+
+Dosya Windows-1254 kodludur, sütunlar `;` ile ayrılır. **İndirme geçmişi**
+hangi dosyanın ne zaman, kaç hesapla ve hangi planla karşılaştırılarak
+indirildiğini gösterir. Biçim Luca'da doğrulanmadı; ekrandaki uyarı bunu
+hatırlatır. İlk yüklemeyi bir deneme mükellefinde yapın.
+
 ## 4. Kural adayı: "Kural yapılsın mı?"
 
 Aynı firmanın kalemleri **en az 3 kez** aynı hesap koduna işlendiğinde
