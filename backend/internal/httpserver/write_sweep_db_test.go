@@ -272,6 +272,10 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate":                      {body: `{}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":              {body: `{"amount":"100.00"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":           {},
+	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":           {body: `{"adjustments":{"additional_vat":"0.00"},"acknowledged":["CARRY_UNKNOWN"]}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare":  {body: `{"acknowledged":["PENDING_EXPENSES","PENDING_Z_REPORTS","Z_WITHOUT_BREAKDOWN","HEADER_ESTIMATE","MISSING_EXCHANGE_RATE"]}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/file":     {body: `{"filed_on":"2026-11-10","accrual_number":"TARAMA-1"}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen":   {late: true},
 }
 
 type sweepEnv struct {
@@ -668,6 +672,8 @@ func (e *sweepEnv) param(t *testing.T, name, path string) string {
 		return "2026-10"
 	case "rowNo":
 		return "1"
+	case "returnKind":
+		return "kdv1"
 	case "kind":
 		return "receipt_field"
 	case "importId":
