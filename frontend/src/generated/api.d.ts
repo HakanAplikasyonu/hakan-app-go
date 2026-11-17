@@ -7382,6 +7382,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/archive-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's document archive and İSG documents
+         * @description Requires `tenant.documents.read` (#393). Newest document date first. `q` searches the title, file name and note. `expiring=true` lists documents that expired or end within `expiring_days` (30), the soonest first. `counts` cover the whole archive (tab counters and the expiry warning). Validity is judged by the Türkiye date.
+         */
+        get: operations["listArchiveDocuments"];
+        put?: never;
+        /**
+         * Add a document to the archive
+         * @description Requires `tenant.documents.write` (#393). PDF, JPEG or PNG (content checked), up to 20 MB. `category=isg` needs `isg_kind`; `isg_kind` is only for İSG documents. `valid_until` (YYYY-MM-DD) feeds the expiry warning. The same file twice is refused (409 `DOCUMENT_EXISTS`).
+         */
+        post: operations["uploadArchiveDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete an archived document
+         * @description Requires `tenant.documents.write` (#393).
+         */
+        delete: operations["deleteArchiveDocument"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download an archived document
+         * @description Requires `tenant.documents.read` (#393). Always an attachment, with the stored content type.
+         */
+        get: operations["downloadArchiveDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/payroll/employees": {
         parameters: {
             query?: never;
@@ -15227,6 +15317,58 @@ export interface components {
             items: components["schemas"]["SgkPremium"][];
             limit: number;
             offset: number;
+        };
+        ArchiveDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            category: "general" | "contract" | "tax" | "sgk" | "trade_registry" | "isg" | "other";
+            /** @enum {string|null} */
+            isg_kind: "isg_training" | "risk_assessment" | "health_report" | "other" | null;
+            title: string;
+            note: string;
+            /** Format: date */
+            document_date: string | null;
+            /** Format: date */
+            valid_until: string | null;
+            /**
+             * @description `expiring`: ends within 30 days
+             * @enum {string}
+             */
+            expiry_status: "none" | "valid" | "expiring" | "expired";
+            /** @description Days until valid_until (negative when expired) */
+            days_left: number | null;
+            file_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            content_type: string;
+            visible_to_taxpayer: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ArchiveDocumentCounts: {
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            isg: number;
+            /** Format: int64 */
+            expired: number;
+            /** Format: int64 */
+            expiring: number;
+            /** Format: int64 */
+            isg_expired: number;
+            /** Format: int64 */
+            isg_expiring: number;
+        };
+        ArchiveDocumentPage: {
+            items: components["schemas"]["ArchiveDocument"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+            counts: components["schemas"]["ArchiveDocumentCounts"];
+            /** @example 30 */
+            expiring_days: number;
         };
         PayrollDocument: {
             /** Format: uuid */
@@ -28955,6 +29097,206 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalError"];
+        };
+    };
+    listArchiveDocuments: {
+        parameters: {
+            query?: {
+                category?: "general" | "contract" | "tax" | "sgk" | "trade_registry" | "isg" | "other";
+                isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
+                q?: string;
+                expiring?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ArchiveDocumentPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    /**
+                     * @default general
+                     * @enum {string}
+                     */
+                    category?: "general" | "contract" | "tax" | "sgk" | "trade_registry" | "isg" | "other";
+                    /** @enum {string} */
+                    isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
+                    title?: string;
+                    note?: string;
+                    /** Format: date */
+                    document_date?: string;
+                    /** Format: date */
+                    valid_until?: string;
+                    /** @default false */
+                    visible_to_taxpayer?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ArchiveDocument"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `UPLOAD_TOO_LARGE` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `UNSUPPORTED_FILE`: not a PDF, JPEG or PNG */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `ARCHIVE_UNAVAILABLE`: storage is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deleteArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `ARCHIVE_UNAVAILABLE`: storage is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listPayrollEmployees: {

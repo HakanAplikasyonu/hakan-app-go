@@ -43,6 +43,8 @@ tags:
     description: Sıradaki iş akışı ve onaylı aksiyon komut çubuğu (#392)
   - name: Payroll
     description: Personel, bordro ve SGK primleri (#382)
+  - name: DocumentArchive
+    description: Mükellef belge arşivi ve İSG evrakları (#393)
   - name: Privacy
     description: KVKK veri sahibi talepleri (#193)
   - name: Billing
@@ -9748,6 +9750,132 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/archive-documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [DocumentArchive]
+      operationId: listArchiveDocuments
+      summary: The taxpayer's document archive and İSG documents
+      description: |
+        Requires `tenant.documents.read` (#393). Newest document date first. `q` searches the title, file name and note. `expiring=true` lists documents that expired or end within `expiring_days` (30), the soonest first. `counts` cover the whole archive (tab counters and the expiry warning). Validity is judged by the Türkiye date.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: category, in: query, schema: { type: string, enum: [general, contract, tax, sgk, trade_registry, isg, other] } }
+        - { name: isg_kind, in: query, schema: { type: string, enum: [isg_training, risk_assessment, health_report, other] } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: expiring, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ArchiveDocumentPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [DocumentArchive]
+      operationId: uploadArchiveDocument
+      summary: Add a document to the archive
+      description: |
+        Requires `tenant.documents.write` (#393). PDF, JPEG or PNG (content checked), up to 20 MB. `category=isg` needs `isg_kind`; `isg_kind` is only for İSG documents. `valid_until` (YYYY-MM-DD) feeds the expiry warning. The same file twice is refused (409 `DOCUMENT_EXISTS`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                category: { type: string, enum: [general, contract, tax, sgk, trade_registry, isg, other], default: general }
+                isg_kind: { type: string, enum: [isg_training, risk_assessment, health_report, other] }
+                title: { type: string, maxLength: 200 }
+                note: { type: string, maxLength: 1000 }
+                document_date: { type: string, format: date }
+                valid_until: { type: string, format: date }
+                visible_to_taxpayer: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ArchiveDocument" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { description: "`UPLOAD_TOO_LARGE`" }
+        "415": { description: "`UNSUPPORTED_FILE`: not a PDF, JPEG or PNG" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { description: "`ARCHIVE_UNAVAILABLE`: storage is not configured" }
+  /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: archiveDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [DocumentArchive]
+      operationId: deleteArchiveDocument
+      summary: Delete an archived document
+      description: Requires `tenant.documents.write` (#393).
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: archiveDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [DocumentArchive]
+      operationId: downloadArchiveDocument
+      summary: Download an archived document
+      description: Requires `tenant.documents.read` (#393). Always an attachment, with the stored content type.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { description: "`ARCHIVE_UNAVAILABLE`: storage is not configured" }
   /v1/tenant/engagements/{engagementUuid}/payroll/employees:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -19470,6 +19598,46 @@ components:
           items: { $ref: "#/components/schemas/SgkPremium" }
         limit: { type: integer }
         offset: { type: integer }
+    ArchiveDocument:
+      type: object
+      required: [uuid, category, isg_kind, title, note, document_date, valid_until, expiry_status, days_left, file_name, size_bytes, content_type, visible_to_taxpayer, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        category: { type: string, enum: [general, contract, tax, sgk, trade_registry, isg, other] }
+        isg_kind: { type: [string, "null"], enum: [isg_training, risk_assessment, health_report, other, null] }
+        title: { type: string }
+        note: { type: string }
+        document_date: { type: [string, "null"], format: date }
+        valid_until: { type: [string, "null"], format: date }
+        expiry_status: { type: string, enum: [none, valid, expiring, expired], description: "`expiring`: ends within 30 days" }
+        days_left: { type: [integer, "null"], description: Days until valid_until (negative when expired) }
+        file_name: { type: string }
+        size_bytes: { type: integer, format: int64 }
+        content_type: { type: string }
+        visible_to_taxpayer: { type: boolean }
+        created_at: { type: string, format: date-time }
+    ArchiveDocumentCounts:
+      type: object
+      required: [total, isg, expired, expiring, isg_expired, isg_expiring]
+      properties:
+        total: { type: integer, format: int64 }
+        isg: { type: integer, format: int64 }
+        expired: { type: integer, format: int64 }
+        expiring: { type: integer, format: int64 }
+        isg_expired: { type: integer, format: int64 }
+        isg_expiring: { type: integer, format: int64 }
+    ArchiveDocumentPage:
+      type: object
+      required: [items, total, limit, offset, counts, expiring_days]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ArchiveDocument" }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+        counts: { $ref: "#/components/schemas/ArchiveDocumentCounts" }
+        expiring_days: { type: integer, examples: [30] }
     PayrollDocument:
       type: object
       required: [uuid, period, kind, title, file_name, size_bytes, content_type, visible_to_taxpayer, employee_uuid, employee_name, created_at]

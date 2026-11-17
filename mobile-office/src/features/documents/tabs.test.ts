@@ -11,7 +11,8 @@ test('visibleTabs hides tabs without permission and falls back to the first', ()
   assert.equal(none.selected, undefined);
   assert.equal(visibleTabs((p) => p === 'tenant.payroll.read', 'payroll').selected, 'payroll');
   // Stajyer: bordro yok, mizan var.
-  const intern = visibleTabs((p) => p === 'tenant.account_plan.read', 'payroll');
-  assert.deepEqual(intern.tabs.map((t) => t.key), ['mizan']);
+  const intern = visibleTabs((p) => p === 'tenant.account_plan.read' || p === 'tenant.documents.read', 'payroll');
+  assert.deepEqual(intern.tabs.map((t) => t.key), ['mizan', 'archive', 'isg']);
   assert.equal(intern.selected, 'mizan');
+  assert.equal(visibleTabs(() => true, 'isg').selected, 'isg');
 });

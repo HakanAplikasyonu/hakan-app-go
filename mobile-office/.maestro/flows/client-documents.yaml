@@ -1,7 +1,8 @@
 # Mükellef belgeleri (#393): demo mükellefi Atlas Gıda'nın ayrıntısından
 # Belgeler → Bordro sekmesi açılır; dönem bordrosu ve personel bazında
 # bordro PDF'leri görünür. Mizan sekmesinde son mizan önceki dönemle
-# karşılaştırılır.
+# karşılaştırılır. İSG sekmesi yaklaşan bitiş uyarısını gösterir; Evrak
+# sekmesinde arama çalışır.
 appId: app.hakan.office
 name: client-documents
 tags: [smoke]
@@ -43,3 +44,26 @@ tags: [smoke]
 - assertVisible:
     id: "mizan-compare"
 - takeScreenshot: musavir-mizan
+- tapOn:
+    id: "documents-tab-isg"
+- extendedWaitUntil:
+    visible:
+      id: "isg-warning"
+    timeout: 15000
+- assertVisible:
+    id: "archive-document"
+- takeScreenshot: musavir-isg
+- tapOn:
+    id: "documents-tab-archive"
+- extendedWaitUntil:
+    visible:
+      id: "archive-tab"
+    timeout: 15000
+- tapOn:
+    id: "archive-search"
+- inputText: "kira"
+- hideKeyboard
+- extendedWaitUntil:
+    visible: "Depo kira sözleşmesi"
+    timeout: 15000
+- takeScreenshot: musavir-evrak

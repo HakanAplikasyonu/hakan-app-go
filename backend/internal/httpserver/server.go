@@ -33,6 +33,7 @@ import (
 	aimodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai"
 	aihandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/handler"
 	airepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/repository"
+	archivemodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/archive"
 	authmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth"
 	authhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/handler"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/auth/identity"
@@ -641,6 +642,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		WithAI(excelmapping.NewAIMapper(aiSvc)))
 	payrollmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, payrollH)
 	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
+	// Belge arşivi ve İSG evrakları (#393).
+	var archiveStore archivemodule.ObjectStore
+	if deps.Storage != nil {
+		archiveStore = deps.Storage
+	}
+	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore)))
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),

@@ -6,11 +6,13 @@ import { useState } from 'react';
 import { Screen, Text } from '@/components/ui';
 import { useAuth } from '@/core/auth/auth-provider';
 import { visibleTabs, type DocumentTab } from '@/features/documents/tabs';
+import { ArchiveTab } from '@/features/archive/archive-tab';
+import { ISGTab } from '@/features/archive/isg-tab';
 import { MizanTab } from '@/features/mizan/mizan-tab';
 import { PayrollTab } from '@/features/payroll/payroll-tab';
 
 /**
- * Mükellef belgeleri (#393): sekmelerde bordro ve mizan; her sekme kendi okuma
+ * Mükellef belgeleri (#393): bordro, mizan, evrak arşivi ve İSG sekmeleri; her sekme kendi okuma
  * iznine bağlı. Belgeler önizlenir ve sistem paylaş menüsüyle paylaşılır.
  */
 export default function ClientDocumentsScreen() {
@@ -37,6 +39,8 @@ export default function ClientDocumentsScreen() {
           ) : null}
           {selected === 'payroll' ? <PayrollTab engagement={engagement} /> : null}
           {selected === 'mizan' ? <MizanTab engagement={engagement} title={title} /> : null}
+          {selected === 'archive' ? <ArchiveTab engagement={engagement} /> : null}
+          {selected === 'isg' ? <ISGTab engagement={engagement} /> : null}
         </>
       )}
     </Screen>
