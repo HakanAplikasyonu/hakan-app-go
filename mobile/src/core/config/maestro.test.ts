@@ -16,7 +16,7 @@ const COMMANDS = new Set([
   'launchApp', 'stopApp', 'clearState', 'tapOn', 'longPressOn', 'doubleTapOn', 'inputText', 'eraseText',
   'hideKeyboard', 'pressKey', 'back', 'scroll', 'scrollUntilVisible', 'swipe', 'assertVisible',
   'assertNotVisible', 'assertTrue', 'extendedWaitUntil', 'waitForAnimationToEnd', 'runFlow', 'openLink',
-  'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat',
+  'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat', 'setAirplaneMode',
 ]);
 const ALLOWED_ENV = new Set(['MAESTRO_EMAIL', 'MAESTRO_PASSWORD']);
 
@@ -45,7 +45,7 @@ function checkSteps(file: string, steps: unknown) {
 
 test('every flow is valid Maestro YAML for this app', () => {
   const all = flows();
-  assert.ok(all.length >= 5, 'login, select-taxpayer, capture, tasks, signout');
+  assert.ok(all.length >= 6, 'login, select-taxpayer, capture, tasks, payroll, signout');
   for (const f of all) {
     assert.equal(f.header?.appId, app.ios.bundleIdentifier, `${f.file}: appId`);
     assert.equal(f.header?.appId, app.android.package, `${f.file}: appId`);
@@ -58,7 +58,7 @@ test('every flow is valid Maestro YAML for this app', () => {
 test('config runs the smoke flows in order and they all exist', () => {
   const cfg = parse(readFileSync(new URL('config.yaml', dir), 'utf8'));
   const names = new Set(flows().map((f) => f.header.name));
-  assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'tasks', 'signout']);
+  assert.deepEqual(cfg.executionOrder.flowsOrder, ['login', 'select-taxpayer', 'capture', 'tasks', 'payroll', 'signout']);
   for (const n of cfg.executionOrder.flowsOrder) assert.ok(names.has(n), `missing flow ${n}`);
 });
 

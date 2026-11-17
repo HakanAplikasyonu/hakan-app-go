@@ -50,12 +50,15 @@ export function Button({
   loading,
   disabled,
   variant = 'primary',
+  testID,
 }: {
   title: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost';
+  /** Maestro akışlarının dokunduğu kimlik (#454). */
+  testID?: string;
 }) {
   const c = useColors();
   const bg = variant === 'primary' ? c.primary : variant === 'secondary' ? c.surface : 'transparent';
@@ -63,6 +66,7 @@ export function Button({
   const off = disabled || loading;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled: !!off, busy: !!loading }}
       onPress={onPress}
