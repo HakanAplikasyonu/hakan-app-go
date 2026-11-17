@@ -1,6 +1,29 @@
 export { DataTable } from "./data-table";
 export { useDataTable } from "./use-data-table";
 export { createColumn } from "./create-column";
+export {
+  createMoneyColumn,
+  createDateColumn,
+  createStatusColumn,
+  createActionsColumn,
+  type StatusVariant,
+} from "./column-helpers";
+export {
+  MoneyCell,
+  DateCell,
+  StatusPill,
+  statusToneClass,
+  type StatusTone,
+} from "./cells";
+export {
+  formatCellDate,
+  formatCellMoney,
+  compareDate,
+  compareDecimal,
+  intlLocale,
+  type CellDateStyle,
+} from "./cell-format";
+export { isRowClickIgnored, isRowKeyActivation } from "./row-click";
 export { createSelectColumnDef } from "./select-column";
 export { createReorderColumnDef, REORDER_COLUMN_ID } from "./reorder-column";
 export { reorderRowsById } from "./reorder-rows";
@@ -26,6 +49,7 @@ export type {
   DataTableControlledState,
   TableDensity,
   TableViewMode,
+  ColumnAlign,
   ColumnFilterVariant,
   ColumnEditVariant,
   UseDataTableOptions,

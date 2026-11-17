@@ -28,3 +28,19 @@ export function isRowClickIgnored(event: {
 
   return false;
 }
+
+/**
+ * Tıklanabilir satırın klavye etkinleştirmesi: satırın kendisi odaktayken
+ * Enter veya Boşluk. İçteki denetimlerden (düğme, bağlantı, giriş) gelen
+ * tuşlar satırı açmaz.
+ */
+export function isRowKeyActivation(event: {
+  key: string;
+  target: EventTarget | null;
+  currentTarget: EventTarget | null;
+  defaultPrevented?: boolean;
+}): boolean {
+  if (event.defaultPrevented) return false;
+  if (event.key !== "Enter" && event.key !== " ") return false;
+  return event.target === event.currentTarget;
+}

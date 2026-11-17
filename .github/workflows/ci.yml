@@ -396,6 +396,8 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
+      - name: Birim testleri (#381)
+        run: pnpm test
       - name: i18n
         working-directory: .
         run: node scripts/check-i18n.mjs

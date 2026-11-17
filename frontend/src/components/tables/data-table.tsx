@@ -36,6 +36,12 @@ export function DataTable<TData>({
   onCellEdit,
   onExportReady,
   onRowClick,
+  isRowActive,
+  getRowClassName,
+  rowCount,
+  bordered,
+  maxHeight,
+  caption,
   className,
 }: DataTableProps<TData>) {
   const { t } = useLocale();
@@ -83,6 +89,7 @@ export function DataTable<TData>({
     state,
     initialState,
     pageCount,
+    rowCount,
   });
 
   const forceMobileCards =
@@ -102,7 +109,9 @@ export function DataTable<TData>({
   if (isLoading) {
     return (
       <div className={cn("space-y-3", className)}>
-        <Skeleton className="h-9 w-full max-w-sm" />
+        {features?.toolbar === false ? null : (
+          <Skeleton className="h-9 w-full max-w-sm" />
+        )}
         {forceMobileCards || displayMode === "grid" ? (
           <div className="grid grid-cols-1 gap-3">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -136,42 +145,52 @@ export function DataTable<TData>({
         }
       : null;
 
+  const showToolbar =
+    resolvedFeatures.toolbar !== false ||
+    table.getFilteredSelectedRowModel().rows.length > 0;
+
   return (
     <div className={cn("space-y-3", className)}>
-      <DataTableToolbar
-        table={table}
-        features={resolvedFeatures}
-        density={density}
-        setDensity={setDensity}
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        resetAll={resetAll}
-        toolbar={toolbarNode}
-        bulkActions={bulkActions}
-        forceMobileCards={forceMobileCards}
-        reorderMode={reorderMode}
-        onReorderModeChange={
-          canReorder
-            ? (next) => {
-                if (next) {
-                  setViewMode("table");
-                  table.resetSorting();
-                  setEditingCell(null);
+      {!showToolbar ? (
+        toolbarNode ? (
+          <div className="flex flex-wrap items-center gap-2">{toolbarNode}</div>
+        ) : null
+      ) : (
+        <DataTableToolbar
+          table={table}
+          features={resolvedFeatures}
+          density={density}
+          setDensity={setDensity}
+          viewMode={viewMode}
+          setViewMode={setViewMode}
+          resetAll={resetAll}
+          toolbar={toolbarNode}
+          bulkActions={bulkActions}
+          forceMobileCards={forceMobileCards}
+          reorderMode={reorderMode}
+          onReorderModeChange={
+            canReorder
+              ? (next) => {
+                  if (next) {
+                    setViewMode("table");
+                    table.resetSorting();
+                    setEditingCell(null);
+                  }
+                  setReorderModeRequested(next);
                 }
-                setReorderModeRequested(next);
-              }
-            : undefined
-        }
-        onExport={
-          onExportReady
-            ? () =>
-                onExportReady(
-                  table.getFilteredRowModel().rows.map((r) => r.original),
-                  table,
-                )
-            : undefined
-        }
-      />
+              : undefined
+          }
+          onExport={
+            onExportReady
+              ? () =>
+                  onExportReady(
+                    table.getFilteredRowModel().rows.map((r) => r.original),
+                    table,
+                  )
+              : undefined
+          }
+        />
+      )}
 
       {reorderMode ? (
         <p className="text-muted-foreground text-xs">
@@ -193,6 +212,7 @@ export function DataTable<TData>({
             renderGridItem={renderGridItem}
             mobile={forceMobileCards}
             onRowClick={reorderMode ? undefined : onRowClick}
+            isRowActive={isRowActive}
           />
         )
       ) : (
@@ -220,6 +240,12 @@ export function DataTable<TData>({
           onEditingCellChange={setEditingCell}
           onCellEdit={onCellEdit}
           onRowClick={reorderMode ? undefined : onRowClick}
+          isRowActive={isRowActive}
+          getRowClassName={getRowClassName}
+          stickyHeader={resolvedFeatures.stickyHeader}
+          bordered={bordered}
+          maxHeight={maxHeight}
+          caption={caption}
         />
       )}
 
