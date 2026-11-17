@@ -1,0 +1,46 @@
+name: Migration numaraları
+
+# Hafif bekçi (000094 çakışması): iki PR aynı migration numarasıyla ayrı ayrı
+# yeşil geçip art arda main'e girebiliyor; ci.yml'deki check-migrations adımı
+# her PR'ı birleşme anındaki değil, push anındaki main'e karşı denetliyor.
+# Bu iş yalnızca checkout + bash; ağır backend işini beklemeden main'de
+# saniyeler içinde kırmızı verir. pull_request birleşme ref'i (refs/pull/N/merge)
+# o anki main'i içerdiği için PR'da da güncel main'e karşı denetler;
+# merge_group, merge queue açılırsa birleşmeden önceki son kapıdır.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/migrations/**"
+      - "scripts/check-migrations.sh"
+      - ".github/workflows/migration-numbers.yml"
+  pull_request:
+    paths:
+      - "backend/migrations/**"
+      - "scripts/check-migrations.sh"
+      - ".github/workflows/migration-numbers.yml"
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  duplicate-numbers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v7
+      - name: Aynı numaralı migration dosyası yok
+        run: |
+          set -euo pipefail
+          dups=$(ls backend/migrations | sed -nE 's/^([0-9]{6})_([a-z0-9_]+)\.up\.sql$/\1/p' | sort | uniq -d)
+          if [ -n "$dups" ]; then
+            for n in $dups; do
+              echo "::error title=Migration numara çakışması::$n numarası birden çok migration'da: $(ls backend/migrations | grep "^${n}_" | grep '\.up\.sql$' | tr '\n' ' ')"
+            done
+            echo "Yeni olanı main'in en yüksek numarası +1'e taşıyın (git mv)." >&2
+            exit 1
+          fi
+      - name: check-migrations (up/down eşi, ad kalıbı)
+        run: scripts/check-migrations.sh
