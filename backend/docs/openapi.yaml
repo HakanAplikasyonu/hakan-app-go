@@ -7677,8 +7677,9 @@ paths:
         excel_import); a Kategori (code or name) or Hesap Kodu cell becomes
         the office's choice; only KDV Oranı computes the VAT from the
         total. A row with the same date, vendor, VKN, receipt number and
-        total is skipped. Bad rows are listed with their line, the others
-        are imported.
+        total is skipped, whatever source the existing expense came from
+        (photo, Easytrade, an earlier import). Bad rows are listed with
+        their line, the others are imported.
       security:
         - bearerAuth: []
       requestBody:
@@ -7743,7 +7744,9 @@ paths:
         with the export's columns; Tarih and Toplam are required. Rows become
         pending Z reports with the payment and VAT rate breakdown; the
         continuity check of every ÖKC touched runs afterwards. A row with the
-        same date, ÖKC, Z number and total is skipped.
+        same date, ÖKC, Z number and total is skipped, and so is a row whose
+        date, ÖKC and Z number match a Z report from another source
+        (Easytrade, photo): the export uploaded again adds only new rows.
       security:
         - bearerAuth: []
       requestBody:

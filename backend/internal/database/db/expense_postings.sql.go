@@ -193,10 +193,17 @@ INSERT INTO expenses (
     taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
     tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number,
     vehicle_plate, payment_method, content_hash
-) VALUES (
+)
+SELECT
     $1, 'excel_import', $2, 'excel_import', $3, $4, $5, 'TRY', $6,
-    $7, $8, $9, $10, $11,
-    $12, $13, $14, $15, $16
+    $7, $8, $9, $10, $11::text,
+    $12::text, $13::text, $14, $15, $16
+WHERE NOT EXISTS (
+    SELECT 1 FROM expenses x
+    WHERE x.taxpayer_id = $1 AND x.expense_date = $3 AND x.amount = $5
+      AND x.vendor_tax_number::text IS NOT DISTINCT FROM $11::text
+      AND COALESCE(btrim(x.vendor_name), '') = COALESCE(btrim($12::text), '')
+      AND COALESCE(btrim(x.receipt_number), '') = COALESCE(btrim($13::text), '')
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
 RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number, z_report_number, okc_serial_number, vehicle_plate, payment_method, is_deductible, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
@@ -222,7 +229,10 @@ type InsertImportedExpenseParams struct {
 }
 
 // Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
-// ikinci kez gelirse eklenmez.
+// ikinci kez gelirse eklenmez. Tarihi, satıcısı, VKN'si, fiş numarası ve
+// toplamı aynı bir masraf başka kaynaktan (fiş fotoğrafı, Easytrade) zaten
+// varsa da eklenmez (#453): dışa aktarılan dosya yeniden yüklenince
+// yalnızca yeni satırlar girer.
 func (q *Queries) InsertImportedExpense(ctx context.Context, arg InsertImportedExpenseParams) (Expense, error) {
 	row := q.db.QueryRow(ctx, insertImportedExpense,
 		arg.TaxpayerID,

@@ -70,3 +70,33 @@ Keşif aracı: `AUTHZ_DISCOVER=1 go test ./internal/httpserver -run 'TestAuthz.*
 3. **Başka kullanıcının bildirimi 403 dönüyordu.** Bu, bildirim kimliğinin geçerli olduğunu söylüyordu. Artık 404 dönüyor (`GET /v1/notifications/{uuid}`, `/action`).
 
 Taramada A'nın kayıt kimliğiyle B'ye 2xx dönen bir uç, başka kapsamın içeriğini taşıyan bir liste ya da dışa aktarım bulunmadı.
+
+## M15 uçları (#453)
+
+M15'te eklenen uçlar (bordro, banka, masraf/Z, Easytrade, rapor, ClickFix, WhatsApp, mutabakat, beyanname, Luca/Zirve aktarımı, co-pilot, ofis mobil, Excel içe/dışa aktarma) `authzTable`'da sınıflandırılmış ve matristen geçiyor. Eksik rol denetimi bulunmadı. Ek testler:
+
+- **Dosya uçları:** `TestAuthzFileExports`, engagement altındaki bütün `.../export`, `.../pdf` ve `.../file` uçları için.
+  - Ofis B kendi engagement'ında A'nın kayıt kimlikleriyle 404 alır.
+  - Excel ve PDF yanıtları çözülüp aranır; hiçbirinde A'nın verisi (vergi no, unvan, personel, satıcı, ÖKC, banka açıklaması) yoktur.
+  - A'nın kendi dosyalarında bu işaretler görünür, yani arama boşa geçmez.
+- **Sıkıştırılmış yanıtlar:** `assertNoLeak` Excel (zip) ve PDF gövdelerini çözerek arar. Bu, IDOR ve liste testlerini de kapsar. Önceden sıkıştırılmış içerikte düz metin araması hiçbir şey göremiyordu.
+- **Co-pilot planları:** `TestCopilotPlansPerUser`, plan yazanınındır. Aynı ofisin yazma yetkili başka bir üyesi planı okuyamaz, adımını işaretleyemez, iptal edemez (404) ve listesinde görmez. Adımlar istemcide asıl uç çağrılarak çalışır; her uç kendi iznini denetler.
+- **Liste sınırları:** `TestListsBounded`, her liste için:
+  - `limit=1`'e uyar ya da `boundedLists`'te gerekçesiyle (katalog, sunucu tarafı sınır, dönem başına) anılır;
+  - en çok 500 kayıt döner;
+  - hatalı `limit` ya da `offset` 5xx vermez.
+
+  Banka karşı taraf takma adları listesi bu kapsamda sayfalı yapıldı.
+- **İçe aktarma:** `TestM15ImportsHostileFiles`, masraf, Z, bordro, BA/BS, banka ekstresi ve genel Excel içe aktarma için bozuk ve sınır değerli dosyalar dener:
+  - Excel olmayan, boş, Excel olmayan zip, boş çalışma kitabı, başlıksız, yalnız başlık, hatalı değerler, BOM'lu CSV, 5 001 satır, 21 MB.
+  - Hiçbiri 5xx vermez; reddedilen dosya satır yazmaz.
+
+  `TestExpenseImportRoundTrip` ve `TestRetailSaleImportRoundTrip`: dışa aktarılan dosya yeniden yüklenince satır eklenmez, hatalı satır numarasıyla bildirilir, ofis B'nin içe aktarması A'yı etkilemez.
+- **Migration:** `TestMigrationsUpDownUp` (bütün migration'lar up, down, up; şema birebir) ve `TestM15ForeignKeysIndexed` (M15 yabancı anahtarlarının indeksi; migration 000115).
+
+Bulunan ve düzeltilenler:
+
+1. **Excel dışa aktarımı yeniden yüklenince kayıtlar ikileniyordu.** Masraf ve Z raporu içe aktarması yinelemeyi yalnızca daha önce Excel'den gelmiş satırlarda tanıyordu. Fiş fotoğrafından, Easytrade'den ya da demo verisinden gelen kayıtlar, dışa aktarılan dosya geri yüklendiğinde ikinci kez ekleniyordu. Artık eşleşen kayıt hangi kaynaktan gelmiş olursa olsun atlanıyor:
+   - masrafta tarih, satıcı, VKN, fiş no ve toplam;
+   - Z raporunda tarih, ÖKC ve Z no.
+2. **Excel olmayan bir zip bordro ve BA/BS içe aktarmasında 500 veriyordu.** Artık okunamayan dosya 4xx dönüyor.

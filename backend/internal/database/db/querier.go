@@ -601,8 +601,14 @@ type Querier interface {
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	// Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
-	// ikinci kez gelirse eklenmez.
+	// ikinci kez gelirse eklenmez. Tarihi, satıcısı, VKN'si, fiş numarası ve
+	// toplamı aynı bir masraf başka kaynaktan (fiş fotoğrafı, Easytrade) zaten
+	// varsa da eklenmez (#453): dışa aktarılan dosya yeniden yüklenince
+	// yalnızca yeni satırlar girer.
 	InsertImportedExpense(ctx context.Context, arg InsertImportedExpenseParams) (Expense, error)
+	// Aynı gün, aynı ÖKC (ya da ikisi de boş) ve aynı Z numarasıyla başka kaynaktan (Easytrade, fiş
+	// fotoğrafı) gelmiş bir Z raporu varsa eklenmez (#453): dışa aktarılan
+	// dosya yeniden yüklenince yalnızca yeni satırlar girer.
 	InsertImportedRetailSale(ctx context.Context, arg InsertImportedRetailSaleParams) (RetailSale, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)

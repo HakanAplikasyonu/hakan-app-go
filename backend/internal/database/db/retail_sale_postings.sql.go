@@ -77,11 +77,17 @@ INSERT INTO retail_sales (
     taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number,
     subtotal_amount, tax_amount, total_amount, currency, cash_amount, card_amount, other_payment_amount, receipt_count,
     content_hash
-) VALUES (
-    $1, 'excel_import', $2, 'excel_import', $3, $4, $5,
-    $6, $7, $8, $9, 'TRY',
+)
+SELECT
+    $1, 'excel_import', $2, 'excel_import', $3, $4, $5::text,
+    $6::text, $7, $8, $9, 'TRY',
     $10, $11, $12, $13,
     $14
+WHERE $5::text IS NULL OR NOT EXISTS (
+    SELECT 1 FROM retail_sales x
+    WHERE x.taxpayer_id = $1 AND x.sale_date = $3
+      AND COALESCE(btrim(x.okc_serial_number), '') = COALESCE(btrim($6::text), '')
+      AND btrim(x.z_report_number) = btrim($5::text)
 )
 ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
 RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count
@@ -104,6 +110,9 @@ type InsertImportedRetailSaleParams struct {
 	ContentHash        pgtype.Text    `json:"content_hash"`
 }
 
+// Aynı gün, aynı ÖKC (ya da ikisi de boş) ve aynı Z numarasıyla başka kaynaktan (Easytrade, fiş
+// fotoğrafı) gelmiş bir Z raporu varsa eklenmez (#453): dışa aktarılan
+// dosya yeniden yüklenince yalnızca yeni satırlar girer.
 func (q *Queries) InsertImportedRetailSale(ctx context.Context, arg InsertImportedRetailSaleParams) (RetailSale, error) {
 	row := q.db.QueryRow(ctx, insertImportedRetailSale,
 		arg.TaxpayerID,
