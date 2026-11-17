@@ -39,6 +39,8 @@ servers:
     description: Local development
 
 tags:
+  - name: Copilot
+    description: Sıradaki iş akışı ve onaylı aksiyon komut çubuğu (#392)
   - name: Payroll
     description: Personel, bordro ve SGK primleri (#382)
   - name: Privacy
@@ -7973,6 +7975,224 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/copilot/workflow:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Copilot]
+      operationId: getCopilotWorkflow
+      summary: Next work of every engagement for a period (period close chain)
+      description: |
+        Requires `tenant.engagements.read` (#392). One row per active
+        engagement the caller reaches (assigned, or every one with
+        `tenant.engagements.read_all`). Each row walks the period close
+        chain: `documents` (open document requests) → `bank` (movements
+        to propose / approve) → `review` (pending suggestions, bank ones
+        excluded) → `journals` (approved movements to draft, drafts to
+        approve) → `transfer` (approved entries to Luca / Zirve) →
+        `report` (monthly report email). A step is `done`, `todo`,
+        `waiting` (queued, outcome not back), `blocked` (failed) or `na`
+        (nothing of that kind in the period); `action` is the catalog
+        action that runs it now. `next_step` is the first `todo` /
+        `blocked` step.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }, description: "Omitted: the previous month" }
+        - { name: q, in: query, schema: { type: string }, description: Title contains or tax id equals }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Rows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotWorkflowPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/copilot/workflow:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Copilot]
+      operationId: getCopilotEngagementWorkflow
+      summary: Period close chain of one engagement
+      description: Requires `tenant.engagements.read` (#392). Same row as in the office list.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }, description: "Omitted: the previous month" }
+      responses:
+        "200":
+          description: Chain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotWorkflowRow" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/copilot/plans:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Copilot]
+      operationId: listCopilotPlans
+      summary: The caller's latest command bar plans
+      description: Requires `tenant.engagements.read` (#392). Only the caller's own plans, newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotPlanList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Copilot]
+      operationId: createCopilotPlan
+      summary: Turn a natural language command into an action plan (nothing runs)
+      description: |
+        Requires `tenant.engagements.write` (#392). The command ("Atlas Gıda
+        ekim fişlerini Luca'ya aktar") is planned by the office's AI
+        provider with tool calling (read tools only; the plan is handed in
+        with a recording tool) or, without a provider or when it fails, by
+        keyword rules (`planner: rules`, note `AI_UNAVAILABLE` after a
+        failure). Each step is a catalog action on one engagement and
+        period. Steps on engagements the caller does not reach and actions
+        the caller has no permission for are dropped with a note. The plan
+        is stored as `proposed`: the client shows it, the user approves
+        steps, the client runs each through its existing endpoint and
+        reports the outcome (`.../steps/{stepIndex}`). A plan without steps
+        is stored as `done`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [command]
+              properties:
+                command: { type: string, minLength: 1, maxLength: 500 }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: Period on screen; the command's month wins }
+      responses:
+        "201":
+          description: Proposed plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotPlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/copilot/plans/{planUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: planUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Copilot]
+      operationId: getCopilotPlan
+      summary: One of the caller's plans
+      description: Requires `tenant.engagements.read` (#392).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotPlan" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/copilot/plans/{planUuid}/steps/{stepIndex}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: planUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: stepIndex, in: path, required: true, schema: { type: integer, minimum: 0 } }
+    post:
+      tags: [Copilot]
+      operationId: recordCopilotPlanStep
+      summary: Record the outcome of an approved (or skipped) step
+      description: |
+        Requires `tenant.engagements.write` (#392). The client ran the step
+        through its own endpoint (or the user skipped it). `error_code` is
+        the API error code of a failed step. A settled step cannot change
+        (`409 PLAN_STATE`); the plan is `running` until every step is
+        settled, then `done`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { type: string, enum: [done, failed, skipped] }
+                error_code: { type: string, maxLength: 64 }
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotPlan" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`PLAN_STATE`: the plan or the step is already settled"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/copilot/plans/{planUuid}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: planUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Copilot]
+      operationId: cancelCopilotPlan
+      summary: Give up a plan (pending steps are skipped)
+      description: Requires `tenant.engagements.write` (#392).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCopilotPlan" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`PLAN_STATE`: the plan is already settled"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/report-deliveries:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -15985,6 +16205,115 @@ components:
         next_run: { type: [string, "null"], format: date }
         next_period: { type: [string, "null"], example: "2026-11" }
 
+    CopilotAction:
+      type: string
+      description: |
+        Catalog action (#392). Write actions (plan steps, need approval):
+        `bank_suggest`, `bank_approve`, `bank_drafts`, `journals_approve`,
+        `export_transfer`, `report_send`. Screens: `open_documents`,
+        `open_review`, `open_journals`.
+      enum: [bank_suggest, bank_approve, bank_drafts, journals_approve, export_transfer, report_send, open_documents, open_review, open_journals]
+    CopilotStep:
+      type: object
+      required: [key, status, count, action]
+      properties:
+        key: { type: string, enum: [documents, bank, review, journals, transfer, report] }
+        status: { type: string, enum: [done, todo, waiting, blocked, na] }
+        count: { type: integer, format: int64 }
+        action:
+          oneOf:
+            - $ref: "#/components/schemas/CopilotAction"
+            - type: "null"
+    CopilotWorkflowRow:
+      type: object
+      required: [engagement_uuid, taxpayer_uuid, taxpayer_title, taxpayer_tax_id, period, steps, next_step, done_steps, active_steps]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        taxpayer_tax_id: { type: string }
+        period: { type: string }
+        steps: { type: array, items: { $ref: "#/components/schemas/CopilotStep" } }
+        next_step: { type: [string, "null"], enum: [documents, bank, review, journals, transfer, report, null] }
+        done_steps: { type: integer }
+        active_steps: { type: integer }
+    CopilotWorkflowPage:
+      type: object
+      required: [period, items, total, limit, offset]
+      properties:
+        period: { type: string }
+        items: { type: array, items: { $ref: "#/components/schemas/CopilotWorkflowRow" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer }
+        offset: { type: integer }
+    CopilotPlanStep:
+      type: object
+      required: [index, action, engagement_uuid, taxpayer_title, period, status]
+      properties:
+        index: { type: integer }
+        action: { $ref: "#/components/schemas/CopilotAction" }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        period: { type: string }
+        driver: { type: string, enum: [luca, zirve], description: "export_transfer: the program; omitted = the engagement's export setting" }
+        status: { type: string, enum: [pending, done, failed, skipped] }
+        error_code: { type: string }
+        finished_at: { type: string, format: date-time }
+    CopilotNote:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [ENGAGEMENT_NOT_FOUND, AMBIGUOUS_ENGAGEMENT, ACTION_NOT_UNDERSTOOD, NO_PERMISSION, NOTHING_TO_DO, ALREADY_DONE, PREREQUISITE_ADDED, TOO_MANY_STEPS, AI_UNAVAILABLE, ASSISTANT_MESSAGE]
+        action: { type: string }
+        taxpayer_title: { type: string }
+        text: { type: string, description: "ASSISTANT_MESSAGE: the assistant's sentence" }
+    CopilotPlan:
+      type: object
+      required: [uuid, command, period, status, planner, steps, notes, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        command: { type: string }
+        period: { type: [string, "null"] }
+        status: { type: string, enum: [proposed, running, done, cancelled] }
+        planner: { type: string, enum: [ai, rules] }
+        steps: { type: array, items: { $ref: "#/components/schemas/CopilotPlanStep" } }
+        notes: { type: array, items: { $ref: "#/components/schemas/CopilotNote" } }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    EnvelopeCopilotWorkflowPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/CopilotWorkflowPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeCopilotWorkflowRow:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/CopilotWorkflowRow" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeCopilotPlan:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/CopilotPlan" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeCopilotPlanList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/CopilotPlan" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeReportSchedule:
       type: object
       required: [success, data, meta]

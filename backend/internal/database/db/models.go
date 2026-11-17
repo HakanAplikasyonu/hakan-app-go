@@ -519,6 +519,22 @@ type ChangeRequest struct {
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
 
+type CopilotPlan struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	CreatedBy      int64              `json:"created_by"`
+	Command        string             `json:"command"`
+	Period         pgtype.Text        `json:"period"`
+	Status         string             `json:"status"`
+	Planner        string             `json:"planner"`
+	Model          pgtype.Text        `json:"model"`
+	Steps          []byte             `json:"steps"`
+	Notes          []byte             `json:"notes"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type CounterpartyAccount struct {
 	ID                int64              `json:"id"`
 	OrganizationID    int64              `json:"organization_id"`

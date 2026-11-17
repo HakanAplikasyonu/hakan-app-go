@@ -5911,6 +5911,201 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/copilot/workflow": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next work of every engagement for a period (period close chain)
+         * @description Requires `tenant.engagements.read` (#392). One row per active
+         *     engagement the caller reaches (assigned, or every one with
+         *     `tenant.engagements.read_all`). Each row walks the period close
+         *     chain: `documents` (open document requests) → `bank` (movements
+         *     to propose / approve) → `review` (pending suggestions, bank ones
+         *     excluded) → `journals` (approved movements to draft, drafts to
+         *     approve) → `transfer` (approved entries to Luca / Zirve) →
+         *     `report` (monthly report email). A step is `done`, `todo`,
+         *     `waiting` (queued, outcome not back), `blocked` (failed) or `na`
+         *     (nothing of that kind in the period); `action` is the catalog
+         *     action that runs it now. `next_step` is the first `todo` /
+         *     `blocked` step.
+         */
+        get: operations["getCopilotWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/copilot/workflow": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Period close chain of one engagement
+         * @description Requires `tenant.engagements.read` (#392). Same row as in the office list.
+         */
+        get: operations["getCopilotEngagementWorkflow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/copilot/plans": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's latest command bar plans
+         * @description Requires `tenant.engagements.read` (#392). Only the caller's own plans, newest first.
+         */
+        get: operations["listCopilotPlans"];
+        put?: never;
+        /**
+         * Turn a natural language command into an action plan (nothing runs)
+         * @description Requires `tenant.engagements.write` (#392). The command ("Atlas Gıda
+         *     ekim fişlerini Luca'ya aktar") is planned by the office's AI
+         *     provider with tool calling (read tools only; the plan is handed in
+         *     with a recording tool) or, without a provider or when it fails, by
+         *     keyword rules (`planner: rules`, note `AI_UNAVAILABLE` after a
+         *     failure). Each step is a catalog action on one engagement and
+         *     period. Steps on engagements the caller does not reach and actions
+         *     the caller has no permission for are dropped with a note. The plan
+         *     is stored as `proposed`: the client shows it, the user approves
+         *     steps, the client runs each through its existing endpoint and
+         *     reports the outcome (`.../steps/{stepIndex}`). A plan without steps
+         *     is stored as `done`.
+         */
+        post: operations["createCopilotPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/copilot/plans/{planUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One of the caller's plans
+         * @description Requires `tenant.engagements.read` (#392).
+         */
+        get: operations["getCopilotPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/copilot/plans/{planUuid}/steps/{stepIndex}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+                stepIndex: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the outcome of an approved (or skipped) step
+         * @description Requires `tenant.engagements.write` (#392). The client ran the step
+         *     through its own endpoint (or the user skipped it). `error_code` is
+         *     the API error code of a failed step. A settled step cannot change
+         *     (`409 PLAN_STATE`); the plan is `running` until every step is
+         *     settled, then `done`.
+         */
+        post: operations["recordCopilotPlanStep"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/copilot/plans/{planUuid}/cancel": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give up a plan (pending steps are skipped)
+         * @description Requires `tenant.engagements.write` (#392).
+         */
+        post: operations["cancelCopilotPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/report-deliveries": {
         parameters: {
             query?: never;
@@ -12368,6 +12563,113 @@ export interface components {
             next_run: string | null;
             /** @example 2026-11 */
             next_period: string | null;
+        };
+        /**
+         * @description Catalog action (#392). Write actions (plan steps, need approval):
+         *     `bank_suggest`, `bank_approve`, `bank_drafts`, `journals_approve`,
+         *     `export_transfer`, `report_send`. Screens: `open_documents`,
+         *     `open_review`, `open_journals`.
+         * @enum {string}
+         */
+        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals";
+        CopilotStep: {
+            /** @enum {string} */
+            key: "documents" | "bank" | "review" | "journals" | "transfer" | "report";
+            /** @enum {string} */
+            status: "done" | "todo" | "waiting" | "blocked" | "na";
+            /** Format: int64 */
+            count: number;
+            action: components["schemas"]["CopilotAction"] | null;
+        };
+        CopilotWorkflowRow: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** Format: uuid */
+            taxpayer_uuid: string;
+            taxpayer_title: string;
+            taxpayer_tax_id: string;
+            period: string;
+            steps: components["schemas"]["CopilotStep"][];
+            /** @enum {string|null} */
+            next_step: "documents" | "bank" | "review" | "journals" | "transfer" | "report" | null;
+            done_steps: number;
+            active_steps: number;
+        };
+        CopilotWorkflowPage: {
+            period: string;
+            items: components["schemas"]["CopilotWorkflowRow"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+        };
+        CopilotPlanStep: {
+            index: number;
+            action: components["schemas"]["CopilotAction"];
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            period: string;
+            /**
+             * @description export_transfer: the program; omitted = the engagement's export setting
+             * @enum {string}
+             */
+            driver?: "luca" | "zirve";
+            /** @enum {string} */
+            status: "pending" | "done" | "failed" | "skipped";
+            error_code?: string;
+            /** Format: date-time */
+            finished_at?: string;
+        };
+        CopilotNote: {
+            /** @enum {string} */
+            code: "ENGAGEMENT_NOT_FOUND" | "AMBIGUOUS_ENGAGEMENT" | "ACTION_NOT_UNDERSTOOD" | "NO_PERMISSION" | "NOTHING_TO_DO" | "ALREADY_DONE" | "PREREQUISITE_ADDED" | "TOO_MANY_STEPS" | "AI_UNAVAILABLE" | "ASSISTANT_MESSAGE";
+            action?: string;
+            taxpayer_title?: string;
+            /** @description ASSISTANT_MESSAGE: the assistant's sentence */
+            text?: string;
+        };
+        CopilotPlan: {
+            /** Format: uuid */
+            uuid: string;
+            command: string;
+            period: string | null;
+            /** @enum {string} */
+            status: "proposed" | "running" | "done" | "cancelled";
+            /** @enum {string} */
+            planner: "ai" | "rules";
+            steps: components["schemas"]["CopilotPlanStep"][];
+            notes: components["schemas"]["CopilotNote"][];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        EnvelopeCopilotWorkflowPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CopilotWorkflowPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCopilotWorkflowRow: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CopilotWorkflowRow"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCopilotPlan: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CopilotPlan"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCopilotPlanList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["CopilotPlan"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeReportSchedule: {
             /** @enum {boolean} */
@@ -26265,6 +26567,271 @@ export interface operations {
             404: components["responses"]["NotFound"];
             /** @description `NO_RECIPIENT`: the taxpayer has no contact email */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCopilotWorkflow: {
+        parameters: {
+            query?: {
+                /** @description Omitted: the previous month */
+                period?: string;
+                /** @description Title contains or tax id equals */
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rows */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotWorkflowPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCopilotEngagementWorkflow: {
+        parameters: {
+            query?: {
+                /** @description Omitted: the previous month */
+                period?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chain */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotWorkflowRow"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCopilotPlans: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotPlanList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createCopilotPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    command: string;
+                    /** @description Period on screen; the command's month wins */
+                    period?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Proposed plan */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCopilotPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotPlan"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    recordCopilotPlanStep: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+                stepIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status: "done" | "failed" | "skipped";
+                    error_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotPlan"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `PLAN_STATE`: the plan or the step is already settled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelCopilotPlan: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                planUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCopilotPlan"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `PLAN_STATE`: the plan is already settled */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
