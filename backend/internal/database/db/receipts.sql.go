@@ -328,7 +328,7 @@ func (q *Queries) GetReceiptCaptureByClientKey(ctx context.Context, arg GetRecei
 }
 
 const getRetailSale = `-- name: GetRetailSale :one
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at FROM retail_sales WHERE taxpayer_id = $1 AND id = $2
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count FROM retail_sales WHERE taxpayer_id = $1 AND id = $2
 `
 
 type GetRetailSaleParams struct {
@@ -365,6 +365,10 @@ func (q *Queries) GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (R
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CashAmount,
+		&i.CardAmount,
+		&i.OtherPaymentAmount,
+		&i.ReceiptCount,
 	)
 	return i, err
 }
@@ -554,7 +558,7 @@ INSERT INTO retail_sales (
     $6, $7, $8, $9, 'TRY',
     $10, $11, $12, $13, $14
 )
-RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count
 `
 
 type InsertRetailSaleDraftParams struct {
@@ -618,6 +622,10 @@ func (q *Queries) InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSal
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CashAmount,
+		&i.CardAmount,
+		&i.OtherPaymentAmount,
+		&i.ReceiptCount,
 	)
 	return i, err
 }
@@ -871,7 +879,7 @@ func (q *Queries) SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCap
 const setRetailSaleApproval = `-- name: SetRetailSaleApproval :one
 UPDATE retail_sales SET approval_status = $1, approved_by = $2, approved_at = NOW()
 WHERE taxpayer_id = $3 AND id = $4 AND approval_status = 'pending'
-RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count
 `
 
 type SetRetailSaleApprovalParams struct {
@@ -915,6 +923,10 @@ func (q *Queries) SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleAp
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CashAmount,
+		&i.CardAmount,
+		&i.OtherPaymentAmount,
+		&i.ReceiptCount,
 	)
 	return i, err
 }
@@ -1016,7 +1028,7 @@ UPDATE retail_sales SET
         ELSE subtotal_amount END,
     ocr_fields = jsonb_set(ocr_fields, ARRAY[$1::text, 'reviewed'], 'true'::jsonb, true)
 WHERE taxpayer_id = $5 AND id = $6 AND approval_status = 'pending'
-RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count
 `
 
 type UpdateRetailSaleFieldParams struct {
@@ -1064,6 +1076,10 @@ func (q *Queries) UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSal
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CashAmount,
+		&i.CardAmount,
+		&i.OtherPaymentAmount,
+		&i.ReceiptCount,
 	)
 	return i, err
 }

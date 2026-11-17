@@ -53,6 +53,9 @@ export const warningText: Record<string, string> = {
   UNUSUAL_RECORD_TYPE: "Olağandışı kayıt türü",
   UUID_MISMATCH: "ETTN uyuşmuyor",
   VAT_DEADLINE_NEAR: "KDV beyan son günü yaklaşıyor",
+  Z_NUMBER_GAP: "Z numarası atlanmış",
+  Z_NUMBER_DUPLICATE: "Z numarası tekrar ediyor",
+  Z_DAY_GAP: "Z raporu olmayan gün var",
   VAT_PAYABLE_THRESHOLD: "Ödenecek KDV eşiği aşıldı",
   VAT_REPORT_MISMATCH: "KDV raporu kaynakla tutmuyor",
 };

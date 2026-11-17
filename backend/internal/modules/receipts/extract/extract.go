@@ -46,6 +46,49 @@ const (
 var Fields = []string{FieldDate, FieldVendorTaxNumber, FieldVendorName, FieldReceiptNumber, FieldTotal,
 	FieldTax, FieldTaxRate, FieldPlate, FieldZNumber, FieldOKCSerial, FieldPaymentMethod}
 
+// Z report breakdown (#384): payment types and, per VAT rate, the total
+// including VAT (vat_<rate>_total) and the VAT (vat_<rate>_tax). They are
+// stored with the draft but not sent to the review queue one by one: the
+// office corrects the breakdown on the Z report screen.
+const (
+	FieldCashAmount   = "cash_amount"
+	FieldCardAmount   = "card_amount"
+	FieldReceiptCount = "receipt_count"
+)
+
+// ZRates are the VAT rates read from a Z report (8 / 18: before 07.2023).
+var ZRates = []string{"0", "1", "8", "10", "18", "20"}
+
+// ZFields lists the breakdown fields.
+var ZFields = func() []string {
+	out := []string{FieldCashAmount, FieldCardAmount, FieldReceiptCount}
+	for _, r := range ZRates {
+		out = append(out, "vat_"+r+"_total", "vat_"+r+"_tax")
+	}
+	return out
+}()
+
+// ZVat is one VAT rate line of a Z report.
+type ZVat struct {
+	Rate  decimal.Decimal
+	Total decimal.Decimal // incl. VAT
+	Tax   decimal.Decimal
+}
+
+// ZVatLines returns the rate lines read from a Z report (rates with a total).
+func (r Result) ZVatLines() []ZVat {
+	var out []ZVat
+	for _, rate := range ZRates {
+		total, ok := r.Decimal("vat_" + rate + "_total")
+		if !ok || !total.IsPositive() {
+			continue
+		}
+		tax, _ := r.Decimal("vat_" + rate + "_tax")
+		out = append(out, ZVat{Rate: decimal.RequireFromString(rate), Total: total, Tax: tax})
+	}
+	return out
+}
+
 // Value is one extracted field: the normalized text and its confidence.
 // Valid=false means the model gave a value we could not normalize.
 type Value struct {
@@ -126,7 +169,8 @@ func New(ai Completer) *Extractor { return &Extractor{ai: ai} }
 
 const systemPrompt = `Türkiye'deki bir fiş, yakıt fişi veya Z raporu fotoğrafını okursun. Yalnızca görselde açıkça yazanı aktar; tahmin etme, hesap yapma. Okuyamadığın alanı boş ("") bırak ve confidence 0 ver. Yalnızca şu JSON nesnesini döndür:
 {"kind":"expense_receipt|fuel_receipt|z_report|other","kind_confidence":0.0,"fields":{"date":{"value":"GG.AA.YYYY","confidence":0.0},"vendor_tax_number":{...},"vendor_name":{...},"receipt_number":{...},"total_amount":{...},"tax_amount":{...},"tax_rate":{...},"vehicle_plate":{...},"z_report_number":{...},"okc_serial_number":{...},"payment_method":{...}}}
-total_amount KDV dahil toplamdır (TOPLAM). tax_amount toplam KDV'dir (TOPKDV). tax_rate tek oranlıysa yüzde olarak (20). payment_method: cash, credit_card veya boş. Z raporunda total_amount günlük toplam satış, tax_amount toplam KDV'dir.`
+total_amount KDV dahil toplamdır (TOPLAM). tax_amount toplam KDV'dir (TOPKDV). tax_rate tek oranlıysa yüzde olarak (20). payment_method: cash, credit_card veya boş. Z raporunda total_amount günlük toplam satış, tax_amount toplam KDV'dir.
+Z raporunda ayrıca fields içine şunları ekle (yoksa boş): "cash_amount" (NAKİT), "card_amount" (KREDİ KARTI / BANKA KARTI toplamı), "receipt_count" (FİŞ SAYISI), her KDV oranı için "vat_<oran>_total" (o oranın KDV dahil toplamı) ve "vat_<oran>_tax" (o oranın KDV'si); oran 0, 1, 8, 10, 18 veya 20 (ör. "vat_20_total", "vat_20_tax").`
 
 type answer struct {
 	Kind           string  `json:"kind"`
@@ -164,7 +208,7 @@ func (e *Extractor) Read(ctx context.Context, req Request) (Result, error) {
 				provider.ImageBlock(req.MediaType, base64.StdEncoding.EncodeToString(req.Image)),
 				provider.TextBlock(text),
 			}}},
-			MaxTokens: 1024,
+			MaxTokens: 1536,
 		})
 		if err != nil {
 			return Result{}, fmt.Errorf("extract: ai call: %w", err)
@@ -198,7 +242,11 @@ func Parse(text string) (Result, error) {
 		return Result{}, fmt.Errorf("unknown kind %q", a.Kind)
 	}
 	r := Result{Kind: a.Kind, KindConfidence: clamp(a.KindConfidence), Fields: map[string]Value{}}
-	for _, f := range Fields {
+	all := Fields
+	if a.Kind == KindZReport {
+		all = append(append([]string{}, Fields...), ZFields...)
+	}
+	for _, f := range all {
 		raw, ok := a.Fields[f]
 		if !ok {
 			continue
@@ -236,7 +284,13 @@ func Normalize(field, raw string) (string, bool) {
 			return "", false
 		}
 		return d.Format("2006-01-02"), true
-	case FieldTotal, FieldTax:
+	case FieldReceiptCount:
+		d, ok := parseAmount(raw)
+		if !ok || !d.IsInteger() {
+			return "", false
+		}
+		return d.String(), true
+	case FieldTotal, FieldTax, FieldCashAmount, FieldCardAmount:
 		d, ok := parseAmount(raw)
 		if !ok {
 			return "", false
@@ -262,6 +316,13 @@ func Normalize(field, raw string) (string, bool) {
 		}
 		return "", false
 	default:
+		if strings.HasPrefix(field, "vat_") {
+			d, ok := parseAmount(raw)
+			if !ok {
+				return "", false
+			}
+			return d.StringFixed(2), true
+		}
 		return strings.Join(strings.Fields(raw), " "), true
 	}
 }

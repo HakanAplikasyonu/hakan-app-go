@@ -1630,31 +1630,45 @@ type ReportSchedule struct {
 }
 
 type RetailSale struct {
-	ID              int64              `json:"id"`
-	Uuid            uuid.UUID          `json:"uuid"`
-	TaxpayerID      int64              `json:"taxpayer_id"`
-	SourceSystem    string             `json:"source_system"`
-	SourceID        string             `json:"source_id"`
-	CaptureMethod   string             `json:"capture_method"`
-	SaleDate        pgtype.Date        `json:"sale_date"`
-	Period          pgtype.Text        `json:"period"`
-	ZReportNumber   pgtype.Text        `json:"z_report_number"`
-	OkcSerialNumber pgtype.Text        `json:"okc_serial_number"`
-	SubtotalAmount  pgtype.Numeric     `json:"subtotal_amount"`
-	TaxAmount       pgtype.Numeric     `json:"tax_amount"`
-	TotalAmount     pgtype.Numeric     `json:"total_amount"`
-	Currency        string             `json:"currency"`
-	InvoiceID       pgtype.Int8        `json:"invoice_id"`
-	ApprovalStatus  string             `json:"approval_status"`
-	OcrConfidence   pgtype.Numeric     `json:"ocr_confidence"`
-	OcrFields       []byte             `json:"ocr_fields"`
-	AttachmentID    pgtype.Int8        `json:"attachment_id"`
-	RawPayload      []byte             `json:"raw_payload"`
-	ContentHash     pgtype.Text        `json:"content_hash"`
-	ApprovedBy      pgtype.Int8        `json:"approved_by"`
-	ApprovedAt      pgtype.Timestamptz `json:"approved_at"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	ID                 int64              `json:"id"`
+	Uuid               uuid.UUID          `json:"uuid"`
+	TaxpayerID         int64              `json:"taxpayer_id"`
+	SourceSystem       string             `json:"source_system"`
+	SourceID           string             `json:"source_id"`
+	CaptureMethod      string             `json:"capture_method"`
+	SaleDate           pgtype.Date        `json:"sale_date"`
+	Period             pgtype.Text        `json:"period"`
+	ZReportNumber      pgtype.Text        `json:"z_report_number"`
+	OkcSerialNumber    pgtype.Text        `json:"okc_serial_number"`
+	SubtotalAmount     pgtype.Numeric     `json:"subtotal_amount"`
+	TaxAmount          pgtype.Numeric     `json:"tax_amount"`
+	TotalAmount        pgtype.Numeric     `json:"total_amount"`
+	Currency           string             `json:"currency"`
+	InvoiceID          pgtype.Int8        `json:"invoice_id"`
+	ApprovalStatus     string             `json:"approval_status"`
+	OcrConfidence      pgtype.Numeric     `json:"ocr_confidence"`
+	OcrFields          []byte             `json:"ocr_fields"`
+	AttachmentID       pgtype.Int8        `json:"attachment_id"`
+	RawPayload         []byte             `json:"raw_payload"`
+	ContentHash        pgtype.Text        `json:"content_hash"`
+	ApprovedBy         pgtype.Int8        `json:"approved_by"`
+	ApprovedAt         pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	CashAmount         pgtype.Numeric     `json:"cash_amount"`
+	CardAmount         pgtype.Numeric     `json:"card_amount"`
+	OtherPaymentAmount pgtype.Numeric     `json:"other_payment_amount"`
+	ReceiptCount       pgtype.Int4        `json:"receipt_count"`
+}
+
+type RetailSaleVatLine struct {
+	ID           int64              `json:"id"`
+	TaxpayerID   int64              `json:"taxpayer_id"`
+	RetailSaleID int64              `json:"retail_sale_id"`
+	TaxRate      pgtype.Numeric     `json:"tax_rate"`
+	TaxBase      pgtype.Numeric     `json:"tax_base"`
+	TaxAmount    pgtype.Numeric     `json:"tax_amount"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 }
 
 type ReviewSetting struct {

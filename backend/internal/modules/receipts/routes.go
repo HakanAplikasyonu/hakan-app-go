@@ -55,6 +55,13 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/expense-categories", read, h.EngagementCategories, eng...)
 	r.Tenant("PUT "+base+"/expense-categories", approve, h.SaveEngagementCategory, eng...)
 	r.Tenant("DELETE "+base+"/expense-categories/{categoryUuid}", approve, h.DeleteEngagementCategory, eng...)
+	// Z raporları: ÖKC bazında liste, kırılım, süreklilik, onay (#384).
+	r.Tenant("GET "+base+"/retail-sales", read, h.RetailSales, eng...)
+	r.Tenant("POST "+base+"/retail-sales/continuity", write, h.RunZContinuity, eng...)
+	r.Tenant("GET "+base+"/retail-sales/{retailSaleUuid}", read, h.RetailSale, eng...)
+	r.Tenant("PATCH "+base+"/retail-sales/{retailSaleUuid}", write, h.UpdateRetailSale, eng...)
+	r.Tenant("POST "+base+"/retail-sales/{retailSaleUuid}/approve", approve, h.ApproveRetailSale, eng...)
+	r.Tenant("POST "+base+"/retail-sales/{retailSaleUuid}/reject", approve, h.RejectRetailSale, eng...)
 	r.Tenant("GET "+base+"/vehicles", read, h.Vehicles, eng...)
 	r.Tenant("POST "+base+"/vehicles", write, h.AddVehicle, eng...)
 	r.Tenant("DELETE "+base+"/vehicles/{vehicleUuid}", write, h.DeleteVehicle, eng...)

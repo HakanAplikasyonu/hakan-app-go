@@ -268,6 +268,10 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 		if err != nil {
 			return View{}, fmt.Errorf("receipts: retail sale: %w", err)
 		}
+		// #384: KDV oranı ve ödeme tipi kırılımı.
+		if err := storeZBreakdown(dbtx.WithTx(ctx, tx), q, sc.TaxpayerID, row.ID, res); err != nil {
+			return View{}, fmt.Errorf("receipts: z breakdown: %w", err)
+		}
 		draft = Draft{Type: "retail_sale", ID: row.ID, UUID: row.Uuid}
 		base.RetailSaleID = pgtype.Int8{Int64: row.ID, Valid: true}
 	} else {
@@ -310,6 +314,9 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	// After the commit: checks that only add information.
 	if draft.Type == "expense" {
 		v.PlateCheck = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate)
+	}
+	if draft.Type == "retail_sale" {
+		s.CheckZContinuity(ctx, sc, res.Get(extract.FieldOKCSerial))
 	}
 	v.InReview = s.sendLowConfidence(ctx, sc, draft, res, period.String, att.ID)
 	return v, nil
@@ -411,8 +418,15 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 			}
 		}
 	case c.RetailSaleID.Valid:
-		if _, err := q.SetRetailSaleApproval(ctx, db.SetRetailSaleApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.RetailSaleID.Int64}); err != nil {
+		rs, err := q.SetRetailSaleApproval(ctx, db.SetRetailSaleApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.RetailSaleID.Int64})
+		if err != nil {
 			return View{}, fmt.Errorf("receipts: approve retail sale: %w", err)
+		}
+		// #384: the approved Z report gets its sales journal draft.
+		if approve {
+			if err := s.postRetailSale(dbtx.WithTx(ctx, tx), q, sc, rs, userID); err != nil {
+				return View{}, err
+			}
 		}
 	default:
 		return View{}, ErrState

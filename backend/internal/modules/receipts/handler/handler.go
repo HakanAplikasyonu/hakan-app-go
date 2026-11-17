@@ -171,6 +171,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		response.BadRequest(w, r, response.CodeValidationError, err.Error())
 	case errors.Is(err, usecase.ErrState), errors.Is(err, usecase.ErrConflict):
 		response.Conflict(w, r, response.CodeConflict, err.Error())
+	case errors.Is(err, usecase.ErrNoWarnings):
+		response.Error(w, r, http.StatusServiceUnavailable, "WARNINGS_UNAVAILABLE", "the warning engine is not available")
 	case errors.Is(err, usecase.ErrNoReviewQueue):
 		response.Error(w, r, http.StatusServiceUnavailable, "REVIEW_UNAVAILABLE", "the review queue is not available")
 	case errors.Is(err, extract.ErrAIUnavailable):

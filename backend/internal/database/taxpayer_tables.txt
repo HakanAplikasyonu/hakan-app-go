@@ -35,3 +35,4 @@ payroll_runs
 payroll_lines
 sgk_premiums
 payroll_documents
+retail_sale_vat_lines

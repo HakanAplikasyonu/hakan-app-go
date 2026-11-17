@@ -7408,6 +7408,197 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Receipts]
+      operationId: listEngagementRetailSales
+      summary: Z reports by ÖKC and day
+      description: |
+        Requires `tenant.receipts.read` and engagement access. Daily Z reports
+        (receipt capture, Excel, integrations) sorted by ÖKC serial and date,
+        with the VAT rate and payment breakdown, the open continuity warnings
+        (Z_NUMBER_GAP, Z_NUMBER_DUPLICATE, Z_DAY_GAP) and the journal draft of
+        approved reports. Totals, the VAT rate summary and the device list are
+        over the whole filter.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [pending, approved, rejected] } }
+        - { name: okc, in: query, required: false, description: "ÖKC serial number; `-` = none", schema: { type: string } }
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeRetailSalePage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/continuity:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Receipts]
+      operationId: runZContinuity
+      summary: Re-run the Z continuity check
+      description: |
+        Requires `tenant.receipts.write` and engagement access. Checks every
+        ÖKC of the taxpayer: a Z number skipped between two consecutive
+        reports (Z_NUMBER_GAP), the same number on another day
+        (Z_NUMBER_DUPLICATE), more than one day without a report (Z_DAY_GAP,
+        info: the device may be closed). Rejected reports are left out.
+        Warnings no longer found are resolved. The check also runs after every
+        Z capture and correction.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [reports_with_findings]
+                    properties:
+                      reports_with_findings: { type: integer }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`WARNINGS_UNAVAILABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: retailSaleUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Receipts]
+      operationId: getEngagementRetailSale
+      summary: One Z report
+      description: |
+        Requires `tenant.receipts.read` and engagement access.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeRetailSale" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    patch:
+      tags: [Receipts]
+      operationId: updateEngagementRetailSale
+      summary: Correct a pending Z report and its breakdown
+      description: |
+        Requires `tenant.receipts.write` and engagement access. Omitted fields
+        stay; vat_lines, when given, replace the rate breakdown. The ÖKC's
+        continuity check runs again. 409 when the report is decided.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RetailSaleInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeRetailSale" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/approve:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: retailSaleUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: approveEngagementRetailSale
+      summary: Approve a Z report and create its sales journal draft
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. Creates a
+        journal draft (source_kind receipt): 100 Kasa (cash) and 108 Diğer
+        hazır değerler (card) debit; per VAT rate 600 Yurt içi satışlar (base)
+        and 391 Hesaplanan KDV credit, matched to the imported plan's rate
+        sub-accounts. Without a payment breakdown the total is cash; without
+        rate lines the total VAT is one line. A difference up to 0.10 TL goes
+        to the largest base. 422 RECORD_INCOMPLETE without a date / total or
+        when the breakdown does not add up; 409 when already decided.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeRetailSale" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`RECORD_INCOMPLETE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: retailSaleUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Receipts]
+      operationId: rejectEngagementRetailSale
+      summary: Reject a Z report
+      description: |
+        Requires `tenant.receipts.approve` and engagement access. The report
+        leaves the continuity check. 409 when already decided.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeRetailSale" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/controls/run:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -15302,6 +15493,97 @@ components:
             pending: { type: integer, format: int64 }
             amount: { type: string }
             tax_amount: { type: string }
+            limit: { type: integer, format: int32 }
+            offset: { type: integer, format: int32 }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    RetailSaleVatLine:
+      type: object
+      required: [tax_rate, tax_base, tax_amount]
+      properties:
+        tax_rate: { type: string, description: "Decimal, percent", example: "20" }
+        tax_base: { type: string, description: "Decimal, excl. VAT" }
+        tax_amount: { type: string }
+    RetailSale:
+      type: object
+      required: [uuid, sale_date, period, z_report_number, okc_serial_number, total_amount, tax_amount, currency,
+                 vat_lines, source_system, capture_method, approval_status, has_attachment, warnings, journal,
+                 breakdown_mismatch, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        sale_date: { type: [string, "null"], format: date }
+        period: { type: [string, "null"] }
+        z_report_number: { type: [string, "null"] }
+        okc_serial_number: { type: [string, "null"] }
+        subtotal_amount: { type: [string, "null"] }
+        tax_amount: { type: [string, "null"] }
+        total_amount: { type: [string, "null"] }
+        currency: { type: string }
+        cash_amount: { type: [string, "null"] }
+        card_amount: { type: [string, "null"] }
+        other_payment_amount: { type: [string, "null"] }
+        receipt_count: { type: [integer, "null"], format: int32 }
+        vat_lines: { type: array, items: { $ref: "#/components/schemas/RetailSaleVatLine" } }
+        source_system: { type: string }
+        capture_method: { type: string }
+        approval_status: { type: string, enum: [pending, approved, rejected] }
+        ocr_confidence: { type: [string, "null"] }
+        has_attachment: { type: boolean }
+        warnings: { type: array, items: { type: string }, description: Open warning codes on the report }
+        journal:
+          oneOf:
+            - $ref: "#/components/schemas/ReceiptJournalRef"
+            - type: "null"
+        breakdown_mismatch: { type: boolean, description: the rate lines differ from the total by more than 0.10 }
+        approved_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    RetailSaleInput:
+      type: object
+      additionalProperties: false
+      properties:
+        sale_date: { type: string, format: date }
+        z_report_number: { type: string }
+        okc_serial_number: { type: string }
+        total_amount: { type: string }
+        tax_amount: { type: string }
+        cash_amount: { type: string }
+        card_amount: { type: string }
+        other_payment_amount: { type: string }
+        receipt_count: { type: integer, format: int32, minimum: 0 }
+        vat_lines: { type: array, items: { $ref: "#/components/schemas/RetailSaleVatLine" } }
+    EnvelopeRetailSale:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/RetailSale" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeRetailSalePage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, pending, total_amount, tax_amount, cash_amount, card_amount, vat_rates, devices, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/RetailSale" } }
+            total: { type: integer, format: int64 }
+            pending: { type: integer, format: int64 }
+            total_amount: { type: string }
+            tax_amount: { type: string }
+            cash_amount: { type: string }
+            card_amount: { type: string }
+            vat_rates: { type: array, items: { $ref: "#/components/schemas/RetailSaleVatLine" } }
+            devices:
+              type: array
+              items:
+                type: object
+                required: [okc_serial_number, reports, last_date]
+                properties:
+                  okc_serial_number: { type: string, description: empty for reports without a serial }
+                  reports: { type: integer, format: int64 }
+                  last_date: { type: [string, "null"], format: date }
             limit: { type: integer, format: int32 }
             offset: { type: integer, format: int32 }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
