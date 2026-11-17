@@ -1,4 +1,4 @@
-import { BosDurum, KristalYukleyici } from '@hakan/mobile-core/hakan';
+import { BosDurum, HataDurumu, KristalYukleyici } from '@hakan/mobile-core/hakan';
 import { Ikon } from '@hakan/mobile-core/ui/ikon';
 import { metin, Satir } from '@hakan/mobile-core/ui/parcalar';
 import { useTheme } from '@hakan/mobile-core/ui/theme';
@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { RefreshControl, SectionList, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Notice } from '@/components/ui';
+import { Button, Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
 import { groupByPeriod, openDocument, periodLabel, usePayrollDocuments, type PayrollDocument } from '@/features/payroll/api';
@@ -41,7 +41,7 @@ export default function PayrollScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }} edges={['left', 'right', 'bottom']}>
-      {docs.error || error ? (
+      {error || (docs.error && docs.items.length > 0) ? (
         <View style={{ padding: 16 }}>
           <Notice>{error ?? errorMessage(docs.error)}</Notice>
         </View>
@@ -61,6 +61,13 @@ export default function PayrollScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <KristalYukleyici etiket="Bordro belgeleri yükleniyor" />
             </View>
+          ) : docs.error ? (
+            // Liste hiç gelmediyse (çevrimdışı, sunucu hatası) "henüz yok" denmez (#454).
+            <HataDurumu
+              baslik="Bordro belgeleri alınamadı"
+              aciklama={errorMessage(docs.error)}
+              eylem={<Button testID="payroll-retry" title="Tekrar dene" loading={docs.isRefetching} onPress={() => void docs.refetch()} />}
+            />
           ) : (
             <BosDurum
               baslik={docs.owner ? 'Henüz bordro belgesi yok' : 'Bordro belgeleri şirket sahibine açık'}

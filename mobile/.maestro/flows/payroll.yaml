@@ -1,0 +1,58 @@
+# Bordro belgeleri (#382, #454): şirket sahibi Profil → "Bordro belgeleri"
+# ile müşavirin paylaştığı bordro PDF'lerini döneme göre gruplu görür (demo:
+# Atlas Gıda, Eylül ve Ekim 2026 bordro dökümü ve SGK tahakkuk fişi).
+# Çevrimdışı açılışta "henüz yok" değil hata ve "Tekrar dene" görünür;
+# bağlantı gelince yeniden deneme listeyi getirir.
+appId: app.hakan.mukellef
+name: payroll
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-profile"
+- tapOn:
+    id: "open-payroll"
+- extendedWaitUntil:
+    visible:
+      id: "payroll-row"
+    timeout: 20000
+- assertVisible: "Ekim 2026"
+- assertVisible: "2026-10 bordro dökümü"
+- assertVisible: ".*SGK tahakkuk fişi.*"
+- takeScreenshot: mukellef-bordro
+- back
+# Çevrimdışı ve yeniden deneme. Sorgu ekran kapanınca önbellekte kalır:
+# uygulama yeniden açılıp ekran bağlantısız açılır.
+- launchApp
+- tapOn:
+    id: "tab-profile"
+- setAirplaneMode: enabled
+- tapOn:
+    id: "open-payroll"
+- extendedWaitUntil:
+    visible:
+      id: "payroll-retry"
+    timeout: 30000
+- assertVisible: "Bordro belgeleri alınamadı"
+- assertNotVisible: "Henüz bordro belgesi yok"
+- takeScreenshot: mukellef-bordro-cevrimdisi
+- setAirplaneMode: disabled
+# Bağlantının geri gelmesi birkaç saniye sürer: "Tekrar dene" liste gelene
+# kadar (en çok 5 kez) denenir.
+- repeat:
+    while:
+      notVisible:
+        id: "payroll-row"
+    times: 5
+    commands:
+      - tapOn:
+          id: "payroll-retry"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "payroll-row"
+          timeout: 5000
+          optional: true
+- assertVisible:
+    id: "payroll-row"
+- back

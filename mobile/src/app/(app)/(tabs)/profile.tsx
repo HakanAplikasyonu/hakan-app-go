@@ -73,7 +73,7 @@ export default function ProfileScreen() {
 
       {env.privacyUrl || hasSupport || taxpayer?.role === 'owner' ? (
         <Card>
-          {taxpayer?.role === 'owner' ? <Button title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}
+          {taxpayer?.role === 'owner' ? <Button testID="open-payroll" title="Bordro belgeleri" variant="ghost" onPress={() => router.push('/payroll')} /> : null}
           {env.privacyUrl ? <Button title="Gizlilik ve KVKK aydınlatma metni" variant="ghost" onPress={() => open(env.privacyUrl)} /> : null}
           {support.widgetId ? (
             <Button title="Destek" variant="ghost" onPress={() => router.push('/destek')} />
