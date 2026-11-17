@@ -124,3 +124,14 @@ Masaüstü ajanının Logo Tiger/GO ve Mikro SQL okuyucusu (`14` §9, `15` §2) 
 | `FIELD_MISSING` | `info` | Yapılandırılmış kolon satırda yok (tablo/kolon adı doğrulanmadı) |
 | `VALUE_INVALID` | `warning` | Tutar ya da tarih çözülemedi |
 | `ROW_LIMIT_REACHED` | `warning` | Pencere satır sınırını aştı; daha küçük pencereyle okunmalı |
+
+## 6. Muhasebe programına çıktı (`data_warning`'e yazılmaz)
+
+Çıktı ön kontrolünün (`POST …/journal-exports/check`) ve çıktının ürettiği kodlar. Yalnızca o çıktının sonucunda görünür, `data_warning` tablosuna yazılmaz. Çift kayıt koruması (#466): uyarılı fiş müşavir belgeyi onaylayana kadar dosyaya girmez. Onay (kod, kim, ne zaman) `export_batch_documents`'ta tutulur.
+
+| Kod | Seviye | Varlık | Ne zaman |
+|---|---|---|---|
+| `DOCUMENT_ALREADY_EXPORTED` | `warning` (onaylanınca `info`) | fiş + belge (ETTN) | Aynı belge aynı programa giden canlı (geri alınmamış) bir çıktıda ya da aynı paketin önceki bir fişinde var |
+| `PROGRAM_PULLS_DOCUMENT` | `warning` (onaylanınca `info`) | fiş + belge (ETTN) | Program Luca ve ofis/mükellef ayarına göre Luca bu faturanın entegratöründen (İşNet NetteFatura, TÜRMOB e-Belge, GİB e-Belge) e-faturayı kendisi çekiyor |
+| `INVOICE_ENTRY_EXCLUDED` | `info` | fiş | `invoices_reach_luca_directly` açık; fatura kaynaklı fiş çıktıya girmedi |
+| `TEMPLATE_UNVERIFIED` | `warning` | çıktı | Programın şablonu gerçek dosyayla doğrulanmadı |

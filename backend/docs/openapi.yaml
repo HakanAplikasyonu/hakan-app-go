@@ -9064,6 +9064,55 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
 
+  /v1/tenant/journal-export-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Journals]
+      operationId: getOfficeJournalExportSettings
+      summary: Office-wide export settings (integrators Luca fetches itself)
+      description: |
+        Requires `tenant.journals.read`. `luca_pull_integrators` lists the
+        integrators Luca fetches e-invoices from itself for the office's
+        taxpayers (`isnet` İşNet NetteFatura, `turmob` TÜRMOB e-Belge, `gib`
+        GİB e-Belge). A taxpayer's own setting
+        (`journal-export-settings` of the engagement) overrides it (#466).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeJournalExportSettings"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Journals]
+      operationId: putOfficeJournalExportSettings
+      summary: Save the office-wide export settings
+      description: Requires `tenant.journals.export`. An unknown integrator is `400 INVALID_INTEGRATOR`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OfficeJournalExportSettings" }
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeJournalExportSettings"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-drafts:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -9265,6 +9314,84 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-exports/check:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Journals]
+      operationId: checkJournalExport
+      summary: Pre-export check (nothing is written)
+      description: |
+        Requires `tenant.journals.export`. Same body as `POST journal-exports`;
+        returns what the export would report and leave out. Double booking
+        guard (#466): an entry whose source document (invoice ETTN) is already
+        in a live export of the same program (`DOCUMENT_ALREADY_EXPORTED`), or
+        that Luca fetches from the integrator itself per office / taxpayer
+        setting (`PROGRAM_PULLS_DOCUMENT`), is listed in `excluded` and stays
+        out of the files until its documents are sent in `confirm_documents`.
+        Issue params: `document_key`, `ettn`, `document_no`, `excluded`,
+        `confirmed`, and `previous_batch`, `previous_file`, `previous_entry`,
+        `previous_exported_at` / `same_export_entry` / `integrator`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalExportInput" }
+      responses:
+        "200":
+          description: Check result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportCheck"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: Nothing to export (`NOTHING_TO_EXPORT`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-export-documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Journals]
+      operationId: listJournalExportDocuments
+      summary: Document → file trail of the export history
+      description: |
+        Requires `tenant.journals.read`. Every source document (invoice)
+        that went into an export, the file it is in, and the accountant's
+        confirmation when it was a repeat or fetched by Luca itself (#466).
+        Newest first. `batch` narrows to one export; `q` searches the ETTN
+        and the document number.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: batch, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalExportDocumentList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
@@ -21281,6 +21408,10 @@ components:
         period: { type: string, example: "2026-10" }
         drafts: { type: array, items: { type: string, format: uuid } }
         include_invoice_entries: { type: boolean, description: Overrides invoices_reach_luca_directly for this run }
+        confirm_documents:
+          type: array
+          items: { type: string }
+          description: Document keys (invoice ETTN) confirmed for this export although already exported or fetched by Luca itself (#466)
 
     JournalExport:
       type: object
@@ -21293,6 +21424,60 @@ components:
         files: { type: array, items: { $ref: "#/components/schemas/ExportFile" } }
         issues: { type: array, items: { $ref: "#/components/schemas/ExportIssue" } }
         entries: { type: integer }
+        excluded:
+          type: array
+          description: Entries left out by the double booking guard (#466)
+          items: { $ref: "#/components/schemas/JournalExportExcludedEntry" }
+
+    JournalExportExcludedEntry:
+      type: object
+      required: [journal_draft_uuid, entry_no, period, documents]
+      properties:
+        journal_draft_uuid: { type: string, format: uuid }
+        entry_no: { type: string }
+        period: { type: string }
+        documents: { type: array, items: { type: string }, description: Document keys to confirm }
+
+    JournalExportCheck:
+      type: object
+      required: [driver, template_version, template_verified, issues, entries, excluded, blocked]
+      properties:
+        driver: { type: string }
+        template_version: { type: string }
+        template_verified: { type: boolean }
+        issues: { type: array, items: { $ref: "#/components/schemas/ExportIssue" } }
+        entries: { type: integer, description: Entries that would go into the files }
+        excluded: { type: array, items: { $ref: "#/components/schemas/JournalExportExcludedEntry" } }
+        blocked: { type: boolean, description: "A blocker, or nothing left to export" }
+
+    JournalExportDocument:
+      type: object
+      required: [document_key, file_name, batch_uuid, driver, journal_draft_uuid, period, entry_no, confirmed_codes, exported_at]
+      properties:
+        document_key: { type: string, description: "Invoice ETTN, or inv:<invoice uuid> without one" }
+        ettn: { type: string }
+        invoice_uuid: { type: string, format: uuid }
+        document_no: { type: string }
+        document_date: { type: string, format: date-time }
+        file_name: { type: string }
+        batch_uuid: { type: string, format: uuid }
+        driver: { type: string }
+        journal_draft_uuid: { type: string, format: uuid }
+        period: { type: string }
+        entry_no: { type: integer, format: int32 }
+        confirmed_codes: { type: array, items: { type: string, enum: [DOCUMENT_ALREADY_EXPORTED, PROGRAM_PULLS_DOCUMENT] } }
+        confirmed_at: { type: string, format: date-time }
+        exported_at: { type: string, format: date-time }
+        reversed_at: { type: string, format: date-time }
+
+    OfficeJournalExportSettings:
+      type: object
+      required: [luca_pull_integrators]
+      properties:
+        luca_pull_integrators:
+          type: array
+          items: { type: string, enum: [isnet, turmob, gib] }
+          description: Integrators Luca fetches e-invoices from itself
 
     JournalExportSummary:
       type: object
@@ -21333,6 +21518,18 @@ components:
       properties:
         invoices_reach_luca_directly: { type: boolean, description: Invoices reach the program through the integrator; invoice entries are left out }
         block_on_unknown_account: { type: boolean, description: An account missing from the target plan blocks the export }
+        luca_pull_integrators:
+          type: [array, "null"]
+          items: { type: string, enum: [isnet, turmob, gib] }
+          description: |
+            Integrators Luca fetches this taxpayer's e-invoices from itself
+            (#466). `null` = the office setting applies. On PUT: omitted keeps
+            the saved value, `null` returns to the office setting.
+        effective_luca_pull_integrators:
+          type: array
+          readOnly: true
+          items: { type: string }
+          description: The list in force (own or office)
 
     EnvelopeExportDriverList:
       type: object
@@ -21532,6 +21729,36 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/PrivacyRequest" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeOfficeJournalExportSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeJournalExportSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExportCheck:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalExportCheck" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalExportDocumentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/JournalExportDocument" } }
+            limit: { type: integer }
+            offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeJournalExportSettings:

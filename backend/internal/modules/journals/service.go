@@ -231,6 +231,10 @@ type ExportInput struct {
 	Drafts   []uuid.UUID `json:"drafts,omitempty"`
 	// IncludeInvoiceEntries overrides invoices_reach_luca_directly for this run.
 	IncludeInvoiceEntries bool `json:"include_invoice_entries,omitempty"`
+	// ConfirmDocuments are document keys (invoice ETTN) the accountant
+	// confirmed for this export although they were already exported or the
+	// program fetches them itself (#466). Their entries go into the files.
+	ConfirmDocuments []string `json:"confirm_documents,omitempty"`
 }
 
 // BatchView is the result of an export.
@@ -242,6 +246,8 @@ type BatchView struct {
 	Files            []BatchFile              `json:"files"`
 	Issues           []accountingexport.Issue `json:"issues"`
 	Entries          int                      `json:"entries"`
+	// Excluded are the entries the double booking guard left out (#466).
+	Excluded []ExcludedEntry `json:"excluded"`
 }
 
 // BatchFile is a stored export file.
@@ -256,38 +262,145 @@ type BlockedError struct{ Issues []accountingexport.Issue }
 func (e *BlockedError) Error() string { return ErrBlocked.Error() }
 func (e *BlockedError) Unwrap() error { return ErrBlocked }
 
-// Export runs a driver over approved drafts, stores the files and records the
-// batch. Each draft can be in one live batch only: a second export of the same
-// draft fails with ErrAlreadyExported until it is reversed (docs/02 §4).
-func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID int64, in ExportInput) (BatchView, error) {
+// CheckView is the pre-export check (#466): what an export with the same
+// input would report and leave out, without writing anything.
+type CheckView struct {
+	Driver           string                   `json:"driver"`
+	TemplateVersion  string                   `json:"template_version"`
+	TemplateVerified bool                     `json:"template_verified"`
+	Issues           []accountingexport.Issue `json:"issues"`
+	// Entries is the number of entries that would go into the files.
+	Entries int `json:"entries"`
+	// Excluded lists the entries left out by the double booking guard
+	// until their documents are confirmed.
+	Excluded []ExcludedEntry `json:"excluded"`
+	Blocked  bool            `json:"blocked"`
+}
+
+// ExcludedEntry is an entry the double booking guard leaves out.
+type ExcludedEntry struct {
+	Draft   uuid.UUID `json:"journal_draft_uuid"`
+	EntryNo string    `json:"entry_no"`
+	Period  string    `json:"period"`
+	// Documents are the document keys (ETTN) to confirm to include it.
+	Documents []string `json:"documents"`
+}
+
+// prepared is an export worked out up to the driver run.
+type prepared struct {
+	drv      accountingexport.Driver
+	rows     []db.JournalDraft
+	batch    accountingexport.Batch
+	docs     map[string][]docRef
+	guard    guardResult
+	pre      []accountingexport.Issue // guard + plan gate
+	issues   []accountingexport.Issue // pre + driver validation
+	excluded []ExcludedEntry
+}
+
+func (s *Service) prepare(ctx context.Context, scope engagementctx.Scope, in ExportInput) (*prepared, error) {
 	drv, err := accountingexport.Open(in.Driver, accountingexport.Config{Template: in.Template})
 	if err != nil {
-		return BatchView{}, err
+		return nil, err
 	}
 	rows, err := s.selectDrafts(ctx, scope, in)
 	if err != nil {
-		return BatchView{}, err
+		return nil, err
 	}
-	batch, err := s.buildBatch(ctx, scope, rows, in)
+	batch, settings, err := s.buildBatch(ctx, scope, rows, in)
 	if err != nil {
-		return BatchView{}, err
+		return nil, err
+	}
+	p := &prepared{drv: drv, rows: rows}
+	if p.docs, err = s.resolveDocuments(ctx, scope, &batch); err != nil {
+		return nil, err
+	}
+	pull := []string{}
+	if in.Driver == lucaDriver {
+		if pull, err = s.lucaPull(ctx, scope, settings); err != nil {
+			return nil, err
+		}
+	}
+	selected, _ := accountingexport.SelectEntries(batch)
+	if p.guard, err = s.guard(ctx, scope, in.Driver, selected, p.docs, pull, in.ConfirmDocuments); err != nil {
+		return nil, err
+	}
+	if len(p.guard.Excluded) > 0 {
+		byID := map[string]db.JournalDraft{}
+		for _, r := range rows {
+			byID[r.Uuid.String()] = r
+		}
+		kept := batch.Entries[:0:0]
+		for _, e := range batch.Entries {
+			if !p.guard.Excluded[e.ID] {
+				kept = append(kept, e)
+				continue
+			}
+			x := ExcludedEntry{EntryNo: e.No, Documents: []string{}}
+			if r, ok := byID[e.ID]; ok {
+				x.Draft, x.Period = r.Uuid, r.Period
+			}
+			for _, d := range p.docs[e.ID] {
+				x.Documents = append(x.Documents, d.Key)
+			}
+			p.excluded = append(p.excluded, x)
+		}
+		batch.Entries = kept
 	}
 	var gateIssues []accountingexport.Issue
 	switch {
 	case s.gate != nil:
 		entries, _ := accountingexport.SelectEntries(batch)
 		if gateIssues, err = s.gate(ctx, scope, in.Driver, entries, batch.Settings.BlockOnUnknownAccount); err != nil {
-			return BatchView{}, err
+			return nil, err
 		}
 	case s.plan != nil:
 		if batch.TargetPlan, err = s.plan(ctx, scope, in.Driver); err != nil {
-			return BatchView{}, err
+			return nil, err
 		}
 	}
-	issues := append(gateIssues, drv.Validate(ctx, batch)...)
-	if accountingexport.HasBlocker(issues) {
-		return BatchView{}, &BlockedError{Issues: issues}
+	p.batch = batch
+	p.pre = append(append([]accountingexport.Issue{}, p.guard.Issues...), gateIssues...)
+	p.issues = append(append([]accountingexport.Issue{}, p.pre...), drv.Validate(ctx, batch)...)
+	return p, nil
+}
+
+// Check runs the pre-export check (#466) for an export input: the same
+// validation and double booking guard as Export, nothing is written.
+func (s *Service) Check(ctx context.Context, scope engagementctx.Scope, in ExportInput) (CheckView, error) {
+	p, err := s.prepare(ctx, scope, in)
+	if err != nil {
+		return CheckView{}, err
 	}
+	info := p.drv.Info()
+	entries, _ := accountingexport.SelectEntries(p.batch)
+	return CheckView{
+		Driver: info.Name, TemplateVersion: info.TemplateVer, TemplateVerified: info.Verified,
+		Issues: nonNilIssues(p.issues), Entries: len(entries), Excluded: nonNilExcluded(p.excluded),
+		Blocked: accountingexport.HasBlocker(p.issues) || len(entries) == 0,
+	}, nil
+}
+
+// Export runs a driver over approved drafts, stores the files and records the
+// batch. Each draft can be in one live batch only: a second export of the same
+// draft fails with ErrAlreadyExported until it is reversed (docs/02 §4).
+// Entries whose source documents were already exported or are fetched by
+// the program itself stay out unless confirmed (#466); every document and
+// the file it went into is recorded.
+func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID int64, in ExportInput) (BatchView, error) {
+	p, err := s.prepare(ctx, scope, in)
+	if err != nil {
+		return BatchView{}, err
+	}
+	drv, rows, batch := p.drv, p.rows, p.batch
+	if accountingexport.HasBlocker(p.issues) {
+		return BatchView{}, &BlockedError{Issues: p.issues}
+	}
+	if len(batch.Entries) == 0 && len(p.excluded) > 0 {
+		// Everything was left out by the double booking guard: show why.
+		return BatchView{}, &BlockedError{Issues: p.issues}
+	}
+	gateIssues := p.pre
 	mem := accountingexport.NewMemoryWriter()
 	res, err := drv.Export(ctx, batch, mem)
 	if err != nil {
@@ -297,6 +410,9 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 		return BatchView{}, &BlockedError{Issues: res.Issues}
 	}
 	if len(res.EntryIDs) == 0 {
+		if len(p.excluded) > 0 {
+			return BatchView{}, &BlockedError{Issues: append(gateIssues, res.Issues...)}
+		}
 		return BatchView{}, ErrNothingToExport
 	}
 	batchUUID := uuid.New()
@@ -314,7 +430,8 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 		byUUID[r.Uuid.String()] = r.ID
 	}
 	info := drv.Info()
-	view := BatchView{Driver: info.Name, TemplateVersion: info.TemplateVer, TemplateVerified: info.Verified, Files: files, Issues: nonNilIssues(append(gateIssues, res.Issues...)), Entries: len(res.EntryIDs)}
+	view := BatchView{Driver: info.Name, TemplateVersion: info.TemplateVer, TemplateVerified: info.Verified, Files: files,
+		Issues: nonNilIssues(append(gateIssues, res.Issues...)), Entries: len(res.EntryIDs), Excluded: nonNilExcluded(p.excluded)}
 	filesJSON, _ := json.Marshal(files)
 	issuesJSON, _ := json.Marshal(view.Issues)
 
@@ -349,12 +466,46 @@ func (s *Service) Export(ctx context.Context, scope engagementctx.Scope, actorID
 		} else if n == 0 {
 			return BatchView{}, ErrAlreadyExported
 		}
+		for _, d := range p.docs[id] {
+			codes := p.guard.Confirmed[id][d.Key]
+			doc := db.InsertExportBatchDocumentParams{
+				OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ExportBatchID: b.ID, JournalDraftID: draftID,
+				SourceKind: "invoice", DocumentKey: d.Key, InvoiceUuid: pgtype.UUID{Bytes: d.InvoiceUUID, Valid: true},
+				DocumentNo: repository.Text(d.No), DocumentDate: repository.Date(d.Date), FileName: entryFile(res, id),
+				ConfirmedCodes: nonNilStrings(codes),
+			}
+			if len(codes) > 0 {
+				doc.ConfirmedBy = actor(actorID)
+			}
+			if err := q.InsertExportBatchDocument(ctx, doc); err != nil {
+				return BatchView{}, fmt.Errorf("journals: record document %s: %w", d.Key, err)
+			}
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return BatchView{}, err
 	}
 	view.UUID = batchUUID
 	return view, nil
+}
+
+// entryFile is the file an entry went into; a driver that does not report
+// it (one file) gives its first file.
+func entryFile(res accountingexport.Result, id string) string {
+	if n := res.EntryFiles[id]; n != "" {
+		return n
+	}
+	if len(res.Files) > 0 {
+		return res.Files[0].Name
+	}
+	return ""
+}
+
+func nonNilExcluded(v []ExcludedEntry) []ExcludedEntry {
+	if v == nil {
+		return []ExcludedEntry{}
+	}
+	return v
 }
 
 // Reverse takes a draft out of its live batch so it can be exported again.
@@ -412,15 +563,19 @@ func (s *Service) selectDrafts(ctx context.Context, scope engagementctx.Scope, i
 	return rows, nil
 }
 
-func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, rows []db.JournalDraft, in ExportInput) (accountingexport.Batch, error) {
+// buildBatch reads the drafts into a driver batch. It also returns the
+// engagement's saved export settings (nil when none).
+func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, rows []db.JournalDraft, in ExportInput) (accountingexport.Batch, *db.ExportSetting, error) {
 	b := accountingexport.Batch{Period: in.Period, GeneratedAt: s.now()}
+	var saved *db.ExportSetting
 	settings, err := s.q.GetExportSettings(ctx, db.GetExportSettingsParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID})
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		b.Settings.BlockOnUnknownAccount = true // column default
 	case err != nil:
-		return b, err
+		return b, nil, err
 	default:
+		saved = &settings
 		b.Settings.BlockOnUnknownAccount = settings.BlockOnUnknownAccount
 		b.Settings.InvoicesReachLucaDirectly = settings.InvoicesReachLucaDirectly
 	}
@@ -430,7 +585,7 @@ func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, row
 	if in.Period != "" {
 		vat, err := s.q.PeriodVATSummary(ctx, db.PeriodVATSummaryParams{TaxpayerID: scope.TaxpayerID, Period: in.Period})
 		if err != nil {
-			return b, err
+			return b, nil, err
 		}
 		for _, v := range vat {
 			b.VATSummary = append(b.VATSummary, accountingexport.VATRow{
@@ -441,7 +596,7 @@ func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, row
 	for _, r := range rows {
 		lines, err := s.q.ListJournalDraftLines(ctx, db.ListJournalDraftLinesParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, JournalDraftID: r.ID})
 		if err != nil {
-			return b, err
+			return b, nil, err
 		}
 		e := accountingexport.Entry{
 			ID: r.Uuid.String(), No: strconv.Itoa(int(r.EntryNo)), Date: r.EntryDate.Time, Type: accountingexport.EntryType(r.EntryType),
@@ -462,7 +617,7 @@ func (s *Service) buildBatch(ctx context.Context, scope engagementctx.Scope, row
 		}
 		b.Entries = append(b.Entries, e)
 	}
-	return b, nil
+	return b, saved, nil
 }
 
 func decPtr(n pgtype.Numeric) *decimal.Decimal {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -273,29 +275,77 @@ type Settings struct {
 	// BlockOnUnknownAccount: an account missing from the target plan blocks
 	// the export instead of warning.
 	BlockOnUnknownAccount bool `json:"block_on_unknown_account"`
+	// LucaPullIntegrators: integrators Luca fetches this taxpayer's
+	// e-invoices from itself (#466); nil = the office setting applies.
+	LucaPullIntegrators *[]string `json:"luca_pull_integrators"`
+	// EffectiveLucaPullIntegrators is the list in force (own or office);
+	// read only.
+	EffectiveLucaPullIntegrators []string `json:"effective_luca_pull_integrators"`
+}
+
+// SettingsInput saves the settings. LucaPullIntegrators: omitted keeps the
+// saved value, null returns to the office setting, a list (possibly empty)
+// is the taxpayer's own setting.
+type SettingsInput struct {
+	InvoicesReachLucaDirectly bool            `json:"invoices_reach_luca_directly"`
+	BlockOnUnknownAccount     bool            `json:"block_on_unknown_account"`
+	LucaPullIntegrators       json.RawMessage `json:"luca_pull_integrators,omitempty"`
 }
 
 // GetSettings returns the settings, or the column defaults when none saved.
 func (s *Service) GetSettings(ctx context.Context, scope engagementctx.Scope) (Settings, error) {
 	row, err := s.q.GetExportSettings(ctx, db.GetExportSettingsParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Settings{BlockOnUnknownAccount: true}, nil
+		return s.settingsView(ctx, scope, db.ExportSetting{BlockOnUnknownAccount: true})
 	}
 	if err != nil {
 		return Settings{}, err
 	}
-	return Settings{InvoicesReachLucaDirectly: row.InvoicesReachLucaDirectly, BlockOnUnknownAccount: row.BlockOnUnknownAccount}, nil
+	return s.settingsView(ctx, scope, row)
+}
+
+func (s *Service) settingsView(ctx context.Context, scope engagementctx.Scope, row db.ExportSetting) (Settings, error) {
+	out := Settings{InvoicesReachLucaDirectly: row.InvoicesReachLucaDirectly, BlockOnUnknownAccount: row.BlockOnUnknownAccount}
+	if row.LucaPullIntegrators != nil {
+		own := nonNilStrings(row.LucaPullIntegrators)
+		out.LucaPullIntegrators = &own
+	}
+	eff, err := s.lucaPull(ctx, scope, &row)
+	if err != nil {
+		return Settings{}, err
+	}
+	out.EffectiveLucaPullIntegrators = nonNilStrings(eff)
+	return out, nil
 }
 
 // SaveSettings stores the settings.
-func (s *Service) SaveSettings(ctx context.Context, scope engagementctx.Scope, actorID int64, in Settings) (Settings, error) {
+func (s *Service) SaveSettings(ctx context.Context, scope engagementctx.Scope, actorID int64, in SettingsInput) (Settings, error) {
+	var pull []string // nil = NULL (office setting)
+	switch raw := strings.TrimSpace(string(in.LucaPullIntegrators)); raw {
+	case "":
+		cur, err := s.q.GetExportSettings(ctx, db.GetExportSettingsParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return Settings{}, err
+		}
+		pull = cur.LucaPullIntegrators
+	case "null":
+	default:
+		var list []string
+		if err := json.Unmarshal(in.LucaPullIntegrators, &list); err != nil {
+			return Settings{}, fmt.Errorf("%w: luca_pull_integrators must be a list or null", ErrInvalidIntegrator)
+		}
+		var err error
+		if pull, err = normalizeIntegrators(list); err != nil {
+			return Settings{}, err
+		}
+	}
 	row, err := s.q.UpsertExportSettings(ctx, db.UpsertExportSettingsParams{
 		OrganizationID: scope.OrganizationID, EngagementID: scope.ID,
 		InvoicesReachLucaDirectly: in.InvoicesReachLucaDirectly, BlockOnUnknownAccount: in.BlockOnUnknownAccount,
-		UpdatedBy: actor(actorID),
+		LucaPullIntegrators: pull, UpdatedBy: actor(actorID),
 	})
 	if err != nil {
 		return Settings{}, err
 	}
-	return Settings{InvoicesReachLucaDirectly: row.InvoicesReachLucaDirectly, BlockOnUnknownAccount: row.BlockOnUnknownAccount}, nil
+	return s.settingsView(ctx, scope, row)
 }
