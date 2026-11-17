@@ -80,9 +80,13 @@ export function OfficePalette() {
     >
       <CommandInput
         ref={inputRef}
+        aria-label={t("office.palette.placeholder")}
         placeholder={t("office.palette.placeholder")}
       />
-      <CommandList className="max-h-[60vh]">
+      <CommandList
+        className="max-h-[60vh]"
+        label={t("search.results_label")}
+      >
         <CommandEmpty>{t("office.palette.empty")}</CommandEmpty>
         <CommandGroup heading={t("office.palette.actions")}>
           <CommandItem

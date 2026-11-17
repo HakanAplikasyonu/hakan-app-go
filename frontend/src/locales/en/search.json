@@ -2,6 +2,8 @@
   "title": "Command palette",
   "description": "Search pages and records, then jump directly.",
   "trigger_label": "Search…",
+  "input_label": "Search pages and records",
+  "results_label": "Results",
   "placeholder": "Search pages and records…",
   "empty": "No results found.",
   "footer_hint": "Tip: type {{prefix}} {{example}} to scope search",

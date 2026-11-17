@@ -2,6 +2,8 @@
   "title": "Komut paleti",
   "description": "Sayfaları ve kayıtları arayın, doğrudan gidin.",
   "trigger_label": "Ara…",
+  "input_label": "Sayfa ve kayıt ara",
+  "results_label": "Sonuçlar",
   "placeholder": "Sayfa ve kayıt ara…",
   "empty": "Sonuç bulunamadı.",
   "footer_hint": "İpucu: {{prefix}} {{example}} yazarak aramayı daraltın",

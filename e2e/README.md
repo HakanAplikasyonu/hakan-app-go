@@ -15,6 +15,8 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 | `tests/beyanname.spec.ts` | Beyannameler (#390): KDV1 düzeltme, kontrol listesi, hazırla, Excel, verildi kaydı; MUHSGK hazırla / Excel / taslağa geri al; Ba / Bs formları | Demo ofisi, Atlas Gıda (beyan dönemi) |
 | `tests/bordro-banka.spec.ts` | Bordro (#382, #395): dönem bordrosu, personel ve SGK listeleri, Excel'e aktar; CSV bordro önizle / içe aktar. Banka (#383): IBAN'sız dosyada Türkçe hata, MT940 yükle, hareket filtresi, Excel'e aktar | Atlas Gıda (bordro, 2025-06 dönemi); Selin Yılmaz (her koşuda yeni IBAN'lı hesap) |
 | `tests/masraf-z-rapor.spec.ts` | Masraf ve Z raporu (#384): onay ve kategori filtresi, kategoriler, süreklilik denetimi, Excel'e aktar → aynı dosyayı geri yükle (satır eklenmez, #484). Easytrade (#385): bağlantı, ödeme türü özeti, tablo araması. Rapor (#386): aylık / yıllık, PDF, e-postayla gönder, toplu gönderim | Atlas Gıda (masraf, Z, Easytrade; yalnızca okur); Selin Yılmaz (rapor, benzersiz alıcı) |
+| `tests/copilot-izgara.spec.ts` | Co-pilot (#392): Sıradaki iş, ⌘K ile aç / kapat, paletten ekrana git, komuttan plan → onayla ve çalıştır. Düzenlenebilir ızgara (#394): ok tuşlarıyla gezinti, yazarak düzenle, geri al / yinele (düğme, Ctrl+Z / Ctrl+Y), Esc ile vazgeç, Ctrl+S ile kaydet | Selin Yılmaz: aylık rapor (yalnızca bu dosya gönderir), her koşuda yeni ETTN'li fatura ve hesap kodu önerisi |
+| `tests/whatsapp-aktarim.spec.ts` | WhatsApp uzantısı (#388): eşleştirme kodu, kayıt türü filtresi. Programa aktarım (#391): yevmiyede aktarım geçmişi ve klasör hatası ekranı | Demo ofisi, Atlas Gıda; yalnızca okur |
 
 `office-onboarding.spec.ts` ofis ana akışının adımları:
 
@@ -33,6 +35,8 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 - Başarısız testte iz (trace), ekran görüntüsü ve video `test-results/` altına yazılır.
 
 Ortam her koşudan önce sıfırdan kurulmalıdır: duman akışı demo verisinin taze olmasına dayanır.
+
+M15 ekranlarının dosyaları (#452) paylaşılan demo verisini bölüşür: Atlas'ın banka verisi ve Ekim fişleri duman testinin, Selin'in aylık raporu co-pilot testinin, Selin'in banka hareketleri bordro-banka testinindir. Dosyanın başındaki not hangi kayda dokunduğunu yazar; yeni bir senaryo başka dosyanın kaydını değiştirmemelidir. Gece e2e (#397, `--grep-invert "@docs|@visual"`) bu dosyaları kendiliğinden koşar.
 
 ## Yerelde
 
