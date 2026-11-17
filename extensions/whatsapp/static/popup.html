@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HAKAN · WhatsApp'tan kaydet</title>
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/32.png" alt="" width="24" height="24">
+    <h1>WhatsApp'tan kaydet</h1>
+  </header>
+
+  <section id="paired" hidden>
+    <p class="ok">Bağlı</p>
+    <dl>
+      <dt>Ofis</dt><dd id="org"></dd>
+      <dt>Kullanıcı</dt><dd id="user"></dd>
+      <dt>Sunucu</dt><dd id="server"></dd>
+    </dl>
+    <p class="hint">WhatsApp Web'de bir görselin ya da PDF'in altındaki düğmelerle kaydedin. Yalnızca tıkladığınız dosya gönderilir; mesajlar okunmaz.</p>
+    <button id="unpair" type="button">Bağlantıyı kes</button>
+  </section>
+
+  <form id="pair" hidden>
+    <p class="hint">Panelde <strong>Ayarlar → WhatsApp uzantısı → Eşleştirme kodu al</strong> ile kodu alın ve buraya yazın.</p>
+    <label for="base">Sunucu adresi</label>
+    <input id="base" type="url" required placeholder="https://api.ofisiniz.com" autocomplete="url">
+    <label for="code">Eşleştirme kodu</label>
+    <input id="code" type="text" required placeholder="XXXX-XXXX" maxlength="12" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false">
+    <label for="device">Bu bilgisayarın adı</label>
+    <input id="device" type="text" maxlength="60" placeholder="Örn. Ofis · Chrome">
+    <button id="submit" type="submit" class="primary">Bağla</button>
+  </form>
+
+  <p id="error" role="alert" hidden></p>
+</main>
+<script src="popup.js"></script>
+</body>
+</html>

@@ -52,6 +52,7 @@ jobs:
       mobile: ${{ steps.f.outputs.mobile }}
       mobile_office: ${{ steps.f.outputs.mobile_office }}
       desktop: ${{ steps.f.outputs.desktop }}
+      extension: ${{ steps.f.outputs.extension }}
       full: ${{ steps.f.outputs.full }}
       mobile_release: ${{ steps.f.outputs.mobile_release }}
       images: ${{ steps.f.outputs.images }}
@@ -151,9 +152,20 @@ jobs:
             done <<< "$files"
           fi
 
+          # HAKAN (#388): WhatsApp Web uzantısı (extensions/whatsapp).
+          extension=false
+          if [ "$full" != "true" ] && [ -n "$files" ]; then
+            while IFS= read -r file; do
+              case "$file" in
+                *.md) ;;
+                extensions/whatsapp/*) extension=true ;;
+              esac
+            done <<< "$files"
+          fi
+
           if [ "$full" = "true" ] || [ "$REF" = "refs/heads/main" ]; then
             backend=true; frontend=true; contracts=true; infra=true; mobile=true; desktop=true
-            mobile_office=true
+            mobile_office=true; extension=true
           fi
 
           # HAKAN (#170): uçtan uca duman testi. Backend ya da frontend
@@ -191,13 +203,14 @@ jobs:
             echo "mobile=$mobile"
             echo "mobile_office=$mobile_office"
             echo "desktop=$desktop"
+            echo "extension=$extension"
             echo "full=$full"
             echo "mobile_release=$mobile_release"
             echo "images=$images"
             echo "e2e=$e2e"
           } >> "$GITHUB_OUTPUT"
 
-          echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile desktop=$desktop full=$full mobile_release=$mobile_release"
+          echo "backend=$backend frontend=$frontend contracts=$contracts infra=$infra mobile=$mobile desktop=$desktop extension=$extension full=$full mobile_release=$mobile_release"
 
   backend:
     needs: changes
@@ -362,10 +375,10 @@ jobs:
         if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.full == 'true'
         working-directory: frontend
         run: pnpm audit --audit-level high
-      - name: npm audit (mobile, mobile-office, desktop, e2e; high+)
+      - name: npm audit (mobile, mobile-office, desktop, e2e, extensions/whatsapp; high+)
         run: |
           set -euo pipefail
-          for d in mobile mobile-office desktop e2e; do
+          for d in mobile mobile-office desktop e2e extensions/whatsapp; do
             echo "::group::npm audit $d"
             (cd "$d" && npm audit --audit-level=high)
             echo "::endgroup::"
@@ -920,6 +933,31 @@ jobs:
 
   # HAKAN (#50): masaüstü (Tauri v2 kabuk + Go sidecar). Linux'ta derlenir
   # ve test edilir; imzalı macOS/Windows paketleri desktop-release.yml'de.
+  # HAKAN (#388): WhatsApp Web uzantısı (Manifest V3, TypeScript). Seçiciler
+  # fixture HTML'leriyle (tests/fixtures) test edilir; build dist/'i üretir.
+  extension-whatsapp:
+    needs: changes
+    if: needs.changes.outputs.extension == 'true'
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: extensions/whatsapp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: extensions/whatsapp/.nvmrc
+          cache: npm
+          cache-dependency-path: extensions/whatsapp/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test (vitest + jsdom, WhatsApp Web fixture'ları)
+        run: npm test
+      - name: Build
+        run: npm run build
+
   desktop:
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
@@ -1115,7 +1153,7 @@ jobs:
 
   ci:
     if: always()
-    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
+    needs: [changes, backend, backend-owner, frontend, env, security, api-types, mobile, mobile-office, desktop, extension-whatsapp, image-build, prod-smoke, backup-drill, e2e, release-meta, publish-images, release-tag, mobile-release]
     runs-on: ubuntu-24.04
     steps:
       - name: Gate
