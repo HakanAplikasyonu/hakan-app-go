@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { OfficePalette } from "@/features/office/components/office-palette";
 import { OfficeShell } from "@/features/office/shell";
+import { OfficeSupportWidget } from "@/features/tenant/components/office-support-widget";
 import { TenantProvider } from "@/features/tenant/providers/tenant-provider";
 
 /**
@@ -21,6 +22,7 @@ export function TenantShell({
     <TenantProvider slug={slug}>
       <OfficeShell slug={slug}>{children}</OfficeShell>
       <OfficePalette />
+      <OfficeSupportWidget />
     </TenantProvider>
   );
 }

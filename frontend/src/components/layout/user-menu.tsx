@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/config/routes";
 import { isPlatformUser } from "@/lib/auth/types";
+import { resetClickFix } from "@/lib/support/clickfix";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -37,6 +38,8 @@ export function UserMenu() {
     : routes.cms.profile.root;
 
   const onLogout = async () => {
+    // Destek widget'ı (#387) bu tarayıcıdaki ziyaretçiyi unutsun.
+    resetClickFix();
     try {
       await logout();
     } finally {

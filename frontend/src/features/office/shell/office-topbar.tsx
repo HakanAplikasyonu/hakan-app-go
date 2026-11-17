@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { MarkaLogosu } from "@/components/hakan";
 import { UserMenu } from "@/components/layout/user-menu";
+import { SupportButton } from "@/components/support";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { NotificationInbox } from "@/features/notifications";
@@ -37,6 +38,7 @@ export function OfficeTopbar() {
         <SearchTrigger compact className="md:hidden pointer-coarse:size-11" />
         <PeriodPicker className="hidden sm:flex" />
         <PeriodPicker compact className="sm:hidden" />
+        <SupportButton />
         <NotificationInbox />
         <Button
           asChild

@@ -5,6 +5,11 @@ import type { NextConfig } from "next";
  * Baseline security headers for every route. A full script CSP is not set
  * here (Next inline bootstrap scripts would need nonces); `frame-ancestors`
  * and `base-uri` restrictions are safe to enforce globally.
+ *
+ * ClickFix support widget (#387) loads `NEXT_PUBLIC_CLICKFIX_SCRIPT_URL`
+ * (getclickfix.com) and talks to that origin; a future script-src /
+ * connect-src / frame-src policy must allow it. `frame-ancestors` only
+ * limits who may frame this app, so the widget is unaffected.
  */
 const securityHeaders = [
   {

@@ -3,14 +3,27 @@
  * Loaded before hydration by the root layout so instrumentation-client.ts can
  * read the Sentry DSN from the container env (SENTRY_DSN) instead of a
  * build-time NEXT_PUBLIC_* variable. A DSN is public by design.
+ *
+ * ClickFix widget ids (#387) come the same way: the image is prebuilt by CI,
+ * so a `process.env.NEXT_PUBLIC_*` member access would be inlined (empty) at
+ * build time. `runtimeEnv` reads by computed key, which Next leaves alone.
  */
 export const dynamic = "force-dynamic";
 
+function runtimeEnv(key: string): string {
+  return process.env[key]?.trim() || "";
+}
+
 export function GET() {
   const payload = {
-    sentryDsn: process.env.SENTRY_DSN?.trim() || "",
+    sentryDsn: runtimeEnv("SENTRY_DSN"),
     sentryEnvironment:
-      process.env.SENTRY_ENVIRONMENT?.trim() || process.env.NODE_ENV || "",
+      runtimeEnv("SENTRY_ENVIRONMENT") || process.env.NODE_ENV || "",
+    clickfix: {
+      scriptUrl: runtimeEnv("NEXT_PUBLIC_CLICKFIX_SCRIPT_URL"),
+      widgetId: runtimeEnv("NEXT_PUBLIC_CLICKFIX_WIDGET_ID"),
+      taxpayerWidgetId: runtimeEnv("NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID"),
+    },
   };
   const json = JSON.stringify(payload).replace(/</g, "\\u003c");
   // instrumentation-client.ts registers __onAppEnv before this runs.

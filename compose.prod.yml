@@ -560,6 +560,11 @@ services:
       NEXT_PUBLIC_CENTRIFUGO_URL: ${NEXT_PUBLIC_CENTRIFUGO_URL:-}
       NEXT_PUBLIC_DEFAULT_LOCALE: ${NEXT_PUBLIC_DEFAULT_LOCALE:-tr}
       NEXT_PUBLIC_FALLBACK_LOCALE: ${NEXT_PUBLIC_FALLBACK_LOCALE:-en}
+      # ClickFix destek widget'ı (#387): çalışma anında /api/client-env ile
+      # tarayıcıya gider. Kimlik boş = widget yüklenmez.
+      NEXT_PUBLIC_CLICKFIX_WIDGET_ID: ${NEXT_PUBLIC_CLICKFIX_WIDGET_ID:-}
+      NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID: ${NEXT_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID:-}
+      NEXT_PUBLIC_CLICKFIX_SCRIPT_URL: ${NEXT_PUBLIC_CLICKFIX_SCRIPT_URL:-https://getclickfix.com/widget.js}
       # Error tracking, read at runtime by the Next.js server/edge and served
       # to the browser by /api/client-env (no build arg). Empty = off.
       SENTRY_DSN: ${FRONTEND_SENTRY_DSN:-}
