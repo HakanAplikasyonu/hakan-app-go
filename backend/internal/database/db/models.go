@@ -54,6 +54,7 @@ type AccountPlanImport struct {
 	SkippedRows    int32              `json:"skipped_rows"`
 	ImportedBy     pgtype.Int8        `json:"imported_by"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Period         pgtype.Text        `json:"period"`
 }
 
 type AccountRule struct {
@@ -2036,6 +2037,21 @@ type TaxpayerVehicle struct {
 	CreatedBy   pgtype.Int8        `json:"created_by"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type TrialBalanceLine struct {
+	ID             int64          `json:"id"`
+	OrganizationID int64          `json:"organization_id"`
+	EngagementID   int64          `json:"engagement_id"`
+	ImportID       int64          `json:"import_id"`
+	Code           string         `json:"code"`
+	Name           string         `json:"name"`
+	MainCode       string         `json:"main_code"`
+	Level          int16          `json:"level"`
+	IsLeaf         bool           `json:"is_leaf"`
+	Debit          pgtype.Numeric `json:"debit"`
+	Credit         pgtype.Numeric `json:"credit"`
+	Balance        pgtype.Numeric `json:"balance"`
 }
 
 type UblUploadJob struct {

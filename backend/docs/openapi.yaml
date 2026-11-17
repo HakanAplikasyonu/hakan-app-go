@@ -11883,6 +11883,8 @@ paths:
       summary: Import the target account plan (Luca hesap planı or mizan, .xlsx / .csv)
       description: |
         Requires `tenant.account_plan.write` and an active engagement. The file becomes the engagement's active plan for `target` (default `luca`); the previous version stays in the import history. The header row is detected ("Hesap Kodu", "Hesap Adı"; borç / alacak / bakiye columns mark a trial balance). Codes are normalized to the dotted form (`120 01 001` → `120.01.001`). Legacy `.xls` is rejected.
+
+        A trial balance also keeps its borç / alacak / bakiye amounts for the mizan report (#393). Its `period` is the form field, else the last date of the title rows above the header ("01.01.2026 - 30.09.2026" → `2026-09`), else a `2026-09` in the file name.
       security:
         - bearerAuth: []
       requestBody:
@@ -11895,6 +11897,7 @@ paths:
               properties:
                 file: { type: string, format: binary }
                 target: { type: string, default: luca }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", description: "Trial balance period (ignored for an account plan)" }
       responses:
         "201":
           description: Imported
@@ -11932,6 +11935,80 @@ paths:
                 $ref: "#/components/schemas/EnvelopeAccountPlanImportList"
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: listEngagementTrialBalances
+      summary: Trial balances (mizan) with amounts, newest upload first
+      description: |
+        Requires `tenant.account_plan.read` (#393). Trial balance imports that carry amounts (uploads before #393 have none and are left out), at most 120. Totals are summed over the leaf accounts.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Trial balances
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/TrialBalance" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - name: trialBalance
+        in: path
+        required: true
+        description: "`latest` or a trial balance import uuid"
+        schema: { type: string, examples: [latest] }
+    get:
+      tags: [AccountPlan]
+      operationId: getEngagementTrialBalance
+      summary: A trial balance (mizan report) with the period comparison
+      description: |
+        Requires `tenant.account_plan.read` (#393). Lines are sorted by code; `balance` is signed (positive: borç bakiyesi, negative: alacak bakiyesi).
+
+        `compare`: `previous` (default) is the latest trial balance of an earlier period, or the upload before it when periods are unknown; `none` turns the comparison off; an import uuid compares with that one. `change` = balance − previous balance (an account missing from the compared file counts as 0). 404 when the engagement has no trial balance with amounts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: compare, in: query, schema: { type: string, default: previous, examples: [previous, none] } }
+        - { name: level, in: query, description: "Deepest level returned (1: main accounts); 0 or omitted: all", schema: { type: integer, minimum: 0, maximum: 10 } }
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/TrialBalanceReport" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/account-plan/accounts:
@@ -20302,7 +20379,7 @@ components:
         uses: { type: integer, format: int64, description: "Applied codes (lines, cari) pointing at it" }
     AccountPlanImport:
       type: object
-      required: [uuid, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, created_at]
+      required: [uuid, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, period, created_at]
       properties:
         uuid: { type: string, format: uuid }
         target: { type: string, examples: [luca] }
@@ -20312,7 +20389,49 @@ components:
         sha256: { type: string }
         account_count: { type: integer }
         skipped_rows: { type: integer }
+        period: { type: [string, "null"], description: "Trial balance period (YYYY-MM); null when unknown or for an account plan", examples: ["2026-09"] }
         created_at: { type: string, format: date-time }
+
+    TrialBalance:
+      type: object
+      required: [uuid, period, file_name, source_format, account_count, debit_total, credit_total, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: [string, "null"], examples: ["2026-10"] }
+        file_name: { type: string }
+        source_format: { type: string, enum: [xlsx, csv] }
+        account_count: { type: integer }
+        debit_total: { type: string, description: "Decimal string, sum over leaf accounts" }
+        credit_total: { type: string, description: "Decimal string, sum over leaf accounts" }
+        created_at: { type: string, format: date-time }
+
+    TrialBalanceLine:
+      type: object
+      required: [code, name, main_code, level, is_leaf, debit, credit, balance, previous_balance, change]
+      properties:
+        code: { type: string, examples: ["100.01"] }
+        name: { type: string }
+        main_code: { type: string, examples: ["100"] }
+        level: { type: integer }
+        is_leaf: { type: boolean }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string, description: "Signed: positive borç, negative alacak bakiyesi" }
+        previous_balance: { type: [string, "null"] }
+        change: { type: [string, "null"] }
+
+    TrialBalanceReport:
+      type: object
+      required: [trial_balance, compared_to, lines]
+      properties:
+        trial_balance: { $ref: "#/components/schemas/TrialBalance" }
+        compared_to:
+          oneOf:
+            - $ref: "#/components/schemas/TrialBalance"
+            - type: "null"
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/TrialBalanceLine" }
 
     AccountPlanAccount:
       type: object

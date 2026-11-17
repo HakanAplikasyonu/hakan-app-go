@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -101,7 +102,7 @@ func (q *Queries) FindAccountPlanCodes(ctx context.Context, arg FindAccountPlanC
 }
 
 const getActiveAccountPlanImport = `-- name: GetActiveAccountPlanImport :one
-SELECT id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at FROM account_plan_imports
+SELECT id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at, period FROM account_plan_imports
 WHERE organization_id = $1 AND engagement_id = $2 AND target = $3
 ORDER BY id DESC
 LIMIT 1
@@ -130,6 +131,7 @@ func (q *Queries) GetActiveAccountPlanImport(ctx context.Context, arg GetActiveA
 		&i.SkippedRows,
 		&i.ImportedBy,
 		&i.CreatedAt,
+		&i.Period,
 	)
 	return i, err
 }
@@ -164,9 +166,9 @@ func (q *Queries) InsertAccountPlanAccounts(ctx context.Context, arg InsertAccou
 }
 
 const insertAccountPlanImport = `-- name: InsertAccountPlanImport :one
-INSERT INTO account_plan_imports (organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at
+INSERT INTO account_plan_imports (organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, period)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at, period
 `
 
 type InsertAccountPlanImportParams struct {
@@ -180,6 +182,7 @@ type InsertAccountPlanImportParams struct {
 	AccountCount   int32       `json:"account_count"`
 	SkippedRows    int32       `json:"skipped_rows"`
 	ImportedBy     pgtype.Int8 `json:"imported_by"`
+	Period         pgtype.Text `json:"period"`
 }
 
 func (q *Queries) InsertAccountPlanImport(ctx context.Context, arg InsertAccountPlanImportParams) (AccountPlanImport, error) {
@@ -194,6 +197,7 @@ func (q *Queries) InsertAccountPlanImport(ctx context.Context, arg InsertAccount
 		arg.AccountCount,
 		arg.SkippedRows,
 		arg.ImportedBy,
+		arg.Period,
 	)
 	var i AccountPlanImport
 	err := row.Scan(
@@ -210,8 +214,37 @@ func (q *Queries) InsertAccountPlanImport(ctx context.Context, arg InsertAccount
 		&i.SkippedRows,
 		&i.ImportedBy,
 		&i.CreatedAt,
+		&i.Period,
 	)
 	return i, err
+}
+
+const insertTrialBalanceLines = `-- name: InsertTrialBalanceLines :execrows
+INSERT INTO trial_balance_lines (organization_id, engagement_id, import_id, code, name, main_code, level, is_leaf, debit, credit, balance)
+SELECT $1, $2, $3, a.code, a.name, a.main_code, a.level, a.is_leaf, a.debit, a.credit, a.balance
+FROM jsonb_to_recordset($4::jsonb) AS a(code text, name text, main_code text, level smallint, is_leaf boolean,
+                                           debit numeric, credit numeric, balance numeric)
+`
+
+type InsertTrialBalanceLinesParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	ImportID       int64  `json:"import_id"`
+	Rows           []byte `json:"rows"`
+}
+
+// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
+func (q *Queries) InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertTrialBalanceLines,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ImportID,
+		arg.Rows,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const listAccountPlanAccounts = `-- name: ListAccountPlanAccounts :many
@@ -302,7 +335,7 @@ func (q *Queries) ListAccountPlanCodeSet(ctx context.Context, arg ListAccountPla
 }
 
 const listAccountPlanImports = `-- name: ListAccountPlanImports :many
-SELECT id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at FROM account_plan_imports
+SELECT id, uuid, organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, created_at, period FROM account_plan_imports
 WHERE organization_id = $1 AND engagement_id = $2
 ORDER BY id DESC
 LIMIT $3
@@ -337,6 +370,7 @@ func (q *Queries) ListAccountPlanImports(ctx context.Context, arg ListAccountPla
 			&i.SkippedRows,
 			&i.ImportedBy,
 			&i.CreatedAt,
+			&i.Period,
 		); err != nil {
 			return nil, err
 		}
@@ -390,6 +424,149 @@ func (q *Queries) ListAssignedCodesMissingFromPlan(ctx context.Context, arg List
 	for rows.Next() {
 		var i ListAssignedCodesMissingFromPlanRow
 		if err := rows.Scan(&i.Code, &i.Name, &i.Uses); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrialBalanceImports = `-- name: ListTrialBalanceImports :many
+SELECT i.id, i.uuid, i.organization_id, i.engagement_id, i.target, i.source_format, i.source_kind, i.file_name, i.sha256, i.account_count, i.skipped_rows, i.imported_by, i.created_at, i.period,
+       t.debit_total::numeric AS debit_total,
+       t.credit_total::numeric AS credit_total
+FROM account_plan_imports i
+CROSS JOIN LATERAL (
+    SELECT COALESCE(SUM(l.debit) FILTER (WHERE l.is_leaf), 0) AS debit_total,
+           COALESCE(SUM(l.credit) FILTER (WHERE l.is_leaf), 0) AS credit_total,
+           COUNT(*) AS line_count
+    FROM trial_balance_lines l
+    WHERE l.organization_id = i.organization_id AND l.engagement_id = i.engagement_id AND l.import_id = i.id
+) t
+WHERE i.organization_id = $1 AND i.engagement_id = $2
+  AND i.source_kind = 'trial_balance' AND t.line_count > 0
+ORDER BY i.id DESC
+LIMIT $3
+`
+
+type ListTrialBalanceImportsParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	EngagementID   int64 `json:"engagement_id"`
+	Lim            int32 `json:"lim"`
+}
+
+type ListTrialBalanceImportsRow struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Target         string             `json:"target"`
+	SourceFormat   string             `json:"source_format"`
+	SourceKind     string             `json:"source_kind"`
+	FileName       string             `json:"file_name"`
+	Sha256         string             `json:"sha256"`
+	AccountCount   int32              `json:"account_count"`
+	SkippedRows    int32              `json:"skipped_rows"`
+	ImportedBy     pgtype.Int8        `json:"imported_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Period         pgtype.Text        `json:"period"`
+	DebitTotal     pgtype.Numeric     `json:"debit_total"`
+	CreditTotal    pgtype.Numeric     `json:"credit_total"`
+}
+
+// Tutarlı mizan içe aktarmaları (#393), yeni önce; toplamlar alt (yaprak)
+// hesaplardan, ana hesaplar iki kez sayılmasın.
+func (q *Queries) ListTrialBalanceImports(ctx context.Context, arg ListTrialBalanceImportsParams) ([]ListTrialBalanceImportsRow, error) {
+	rows, err := q.db.Query(ctx, listTrialBalanceImports, arg.OrganizationID, arg.EngagementID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrialBalanceImportsRow{}
+	for rows.Next() {
+		var i ListTrialBalanceImportsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.Target,
+			&i.SourceFormat,
+			&i.SourceKind,
+			&i.FileName,
+			&i.Sha256,
+			&i.AccountCount,
+			&i.SkippedRows,
+			&i.ImportedBy,
+			&i.CreatedAt,
+			&i.Period,
+			&i.DebitTotal,
+			&i.CreditTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrialBalanceLines = `-- name: ListTrialBalanceLines :many
+SELECT code, name, main_code, level, is_leaf, debit, credit, balance
+FROM trial_balance_lines
+WHERE organization_id = $1 AND engagement_id = $2 AND import_id = $3
+  AND ($4::smallint IS NULL OR level <= $4)
+ORDER BY code
+`
+
+type ListTrialBalanceLinesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ImportID       int64       `json:"import_id"`
+	MaxLevel       pgtype.Int2 `json:"max_level"`
+}
+
+type ListTrialBalanceLinesRow struct {
+	Code     string         `json:"code"`
+	Name     string         `json:"name"`
+	MainCode string         `json:"main_code"`
+	Level    int16          `json:"level"`
+	IsLeaf   bool           `json:"is_leaf"`
+	Debit    pgtype.Numeric `json:"debit"`
+	Credit   pgtype.Numeric `json:"credit"`
+	Balance  pgtype.Numeric `json:"balance"`
+}
+
+// Bir mizanın satırları; max_level verilirse o kırılıma kadar.
+func (q *Queries) ListTrialBalanceLines(ctx context.Context, arg ListTrialBalanceLinesParams) ([]ListTrialBalanceLinesRow, error) {
+	rows, err := q.db.Query(ctx, listTrialBalanceLines,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ImportID,
+		arg.MaxLevel,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListTrialBalanceLinesRow{}
+	for rows.Next() {
+		var i ListTrialBalanceLinesRow
+		if err := rows.Scan(
+			&i.Code,
+			&i.Name,
+			&i.MainCode,
+			&i.Level,
+			&i.IsLeaf,
+			&i.Debit,
+			&i.Credit,
+			&i.Balance,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

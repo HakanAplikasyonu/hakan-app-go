@@ -53,7 +53,10 @@ type Import struct {
 	SHA256       string    `json:"sha256"`
 	AccountCount int       `json:"account_count"`
 	SkippedRows  int       `json:"skipped_rows"`
-	CreatedAt    time.Time `json:"created_at"`
+	// Period is the trial balance period ("YYYY-MM"), null when unknown
+	// or for an account plan (#393).
+	Period    *string   `json:"period"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // ImportResult is what Import returns.
@@ -67,9 +70,11 @@ type ImportResult struct {
 // NewImport is an import to persist.
 type NewImport struct {
 	Target, Format, Kind, FileName, SHA256 string
-	Skipped                                int
-	UserID                                 int64
-	Accounts                               []Account
+	// Period is the trial balance period ("YYYY-MM", empty when unknown).
+	Period   string
+	Skipped  int
+	UserID   int64
+	Accounts []Account
 }
 
 // Page is a page of accounts.
@@ -99,6 +104,12 @@ type Store interface {
 	// MissingAssigned lists account codes applied to the engagement that the
 	// active plan of target does not have (#319).
 	MissingAssigned(ctx context.Context, s Subject, target string) ([]MissingAccount, error)
+	// TrialBalances lists trial balance imports that carry amounts, newest
+	// upload first (#393).
+	TrialBalances(ctx context.Context, s Subject, limit int32) ([]TrialBalance, error)
+	// TrialBalanceLines returns the accounts of one trial balance import with
+	// their amounts, down to maxLevel (0: all).
+	TrialBalanceLines(ctx context.Context, s Subject, importID int64, maxLevel int) ([]Account, error)
 }
 
 // MissingAccount is an applied account code to open in the target program.
@@ -127,11 +138,16 @@ func target(t string) (string, error) {
 	return t, nil
 }
 
-// Import parses data and makes it the engagement's active plan.
-func (s *Service) Import(ctx context.Context, sub Subject, userID int64, tgt, fileName string, data []byte) (ImportResult, error) {
+// Import parses data and makes it the engagement's active plan. A trial
+// balance also keeps its amounts for the mizan report (#393); period
+// ("YYYY-MM", optional) overrides the one read from the file.
+func (s *Service) Import(ctx context.Context, sub Subject, userID int64, tgt, fileName, period string, data []byte) (ImportResult, error) {
 	tgt, err := target(tgt)
 	if err != nil {
 		return ImportResult{}, err
+	}
+	if period != "" && !ValidPeriod(period) {
+		return ImportResult{}, fmt.Errorf("%w: period must be YYYY-MM", ErrInvalid)
 	}
 	if len(data) == 0 {
 		return ImportResult{}, ErrEmpty
@@ -149,6 +165,12 @@ func (s *Service) Import(ctx context.Context, sub Subject, userID int64, tgt, fi
 	if len(p.Accounts) > MaxAccounts {
 		return ImportResult{}, fmt.Errorf("%w: more than %d accounts", ErrTooLarge, MaxAccounts)
 	}
+	if period == "" && p.Kind == KindTrialBalance {
+		period = p.Period
+	}
+	if p.Kind != KindTrialBalance {
+		period = ""
+	}
 	sum := sha256.Sum256(data)
 	if len(fileName) > 255 {
 		fileName = fileName[:255]
@@ -156,6 +178,7 @@ func (s *Service) Import(ctx context.Context, sub Subject, userID int64, tgt, fi
 	imp, err := s.store.Replace(ctx, sub, NewImport{
 		Target: tgt, Format: p.Format, Kind: p.Kind, FileName: fileName,
 		SHA256: hex.EncodeToString(sum[:]), Skipped: p.SkipCount, UserID: userID, Accounts: p.Accounts,
+		Period: period,
 	})
 	if err != nil {
 		return ImportResult{}, err

@@ -78,6 +78,7 @@ test('the ids the flows tap exist in the screens', () => {
     src('(app)/clients/[engagement].tsx'),
     src('(app)/belgeler/[engagement].tsx'),
     src('../features/payroll/payroll-tab.tsx'),
+    src('../features/mizan/mizan-tab.tsx'),
     src('../features/files/file-row.tsx'),
   ].join('\n');
   // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").

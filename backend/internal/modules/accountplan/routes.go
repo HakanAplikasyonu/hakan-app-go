@@ -40,6 +40,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/imports", write, h.Import, eng...)
 	r.Tenant("GET "+base+"/imports", read, h.ListImports, eng...)
 	r.Tenant("GET "+base+"/accounts", read, h.ListAccounts, eng...)
+	r.Tenant("GET "+base+"/trial-balances", read, h.ListTrialBalances, eng...)
+	r.Tenant("GET "+base+"/trial-balances/{trialBalance}", read, h.TrialBalance, eng...)
 	r.Tenant("POST "+base+"/check", read, h.Check, eng...)
 	r.Tenant("GET "+base+"/missing", read, h.Missing, eng...)
 	r.Tenant("POST "+base+"/missing-template", read, h.MissingTemplate, eng...)

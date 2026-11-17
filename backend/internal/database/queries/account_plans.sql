@@ -1,6 +1,6 @@
 -- name: InsertAccountPlanImport :one
-INSERT INTO account_plan_imports (organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by)
-VALUES (@organization_id, @engagement_id, @target, @source_format, @source_kind, @file_name, @sha256, @account_count, @skipped_rows, sqlc.narg(imported_by))
+INSERT INTO account_plan_imports (organization_id, engagement_id, target, source_format, source_kind, file_name, sha256, account_count, skipped_rows, imported_by, period)
+VALUES (@organization_id, @engagement_id, @target, @source_format, @source_kind, @file_name, @sha256, @account_count, @skipped_rows, sqlc.narg(imported_by), sqlc.narg(period))
 RETURNING *;
 
 -- name: DeleteAccountPlanAccounts :execrows
@@ -67,3 +67,37 @@ WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
 GROUP BY a.account_code
 ORDER BY a.account_code
 LIMIT 5000;
+
+-- name: InsertTrialBalanceLines :execrows
+-- Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
+INSERT INTO trial_balance_lines (organization_id, engagement_id, import_id, code, name, main_code, level, is_leaf, debit, credit, balance)
+SELECT @organization_id, @engagement_id, @import_id, a.code, a.name, a.main_code, a.level, a.is_leaf, a.debit, a.credit, a.balance
+FROM jsonb_to_recordset(@rows::jsonb) AS a(code text, name text, main_code text, level smallint, is_leaf boolean,
+                                           debit numeric, credit numeric, balance numeric);
+
+-- name: ListTrialBalanceImports :many
+-- Tutarlı mizan içe aktarmaları (#393), yeni önce; toplamlar alt (yaprak)
+-- hesaplardan, ana hesaplar iki kez sayılmasın.
+SELECT i.*,
+       t.debit_total::numeric AS debit_total,
+       t.credit_total::numeric AS credit_total
+FROM account_plan_imports i
+CROSS JOIN LATERAL (
+    SELECT COALESCE(SUM(l.debit) FILTER (WHERE l.is_leaf), 0) AS debit_total,
+           COALESCE(SUM(l.credit) FILTER (WHERE l.is_leaf), 0) AS credit_total,
+           COUNT(*) AS line_count
+    FROM trial_balance_lines l
+    WHERE l.organization_id = i.organization_id AND l.engagement_id = i.engagement_id AND l.import_id = i.id
+) t
+WHERE i.organization_id = @organization_id AND i.engagement_id = @engagement_id
+  AND i.source_kind = 'trial_balance' AND t.line_count > 0
+ORDER BY i.id DESC
+LIMIT @lim;
+
+-- name: ListTrialBalanceLines :many
+-- Bir mizanın satırları; max_level verilirse o kırılıma kadar.
+SELECT code, name, main_code, level, is_leaf, debit, credit, balance
+FROM trial_balance_lines
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND import_id = @import_id
+  AND (sqlc.narg(max_level)::smallint IS NULL OR level <= sqlc.narg(max_level))
+ORDER BY code;

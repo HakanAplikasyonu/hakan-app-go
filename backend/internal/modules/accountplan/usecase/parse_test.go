@@ -143,3 +143,43 @@ func TestMissingTemplateKeepsCodesAsText(t *testing.T) {
 }
 
 var timeZero = time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+
+func TestParseTrialBalanceAmountsAndPeriod(t *testing.T) {
+	t.Parallel()
+	csv := "ATLAS GIDA GENEL GEÇİCİ MİZAN 01.01.2026 - 30.09.2026\n" +
+		"Hesap Kodu;Hesap Adı;Borç;Alacak;Borç Bakiye;Alacak Bakiye\n" +
+		"100;KASA;125.400,00;118.250,00;7.150,00;\n" +
+		"100.01;MERKEZ KASA;125.400,00;118.250,00;7.150,00;\n" +
+		"320;SATICILAR;10.000,00;45.500,50;;35.500,50\n"
+	p, err := Parse("mizan.csv", []byte(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Kind != KindTrialBalance || p.Period != "2026-09" || len(p.Accounts) != 3 {
+		t.Fatalf("parsed = %+v", p)
+	}
+	got := map[string][3]string{}
+	for _, a := range p.Accounts {
+		got[a.Code] = [3]string{a.Debit.StringFixed(2), a.Credit.StringFixed(2), a.Balance.StringFixed(2)}
+	}
+	if got["100.01"] != [3]string{"125400.00", "118250.00", "7150.00"} || got["320"] != [3]string{"10000.00", "45500.50", "-35500.50"} {
+		t.Fatalf("amounts = %v", got)
+	}
+}
+
+func TestParseTrialBalanceWithoutBalanceColumns(t *testing.T) {
+	t.Parallel()
+	csv := "Hesap Kodu,Hesap Adı,Borç,Alacak\n102,BANKALAR,1500.25,500\n"
+	p, err := Parse("mizan-2026-10.csv", []byte(csv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Period != "2026-10" || p.Accounts[0].Balance.StringFixed(2) != "1000.25" {
+		t.Fatalf("parsed = %+v", p)
+	}
+	// A plain account plan has no amounts and no period.
+	p, err = Parse("plan-2026-10.csv", []byte("Hesap Kodu;Hesap Adı\n100;KASA\n"))
+	if err != nil || p.Kind != KindAccountPlan || !p.Accounts[0].Balance.IsZero() {
+		t.Fatalf("plan = %+v %v", p, err)
+	}
+}
