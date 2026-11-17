@@ -1,0 +1,41 @@
+# Luca "Hesap Planı Aktar" CSV şablonu (issue #464).
+#
+# DOĞRULANMADI: Kaynak, başka bir ekibin Luca test hesabındaki ekran
+# gözlemi; bizde gerçek Luca'da denenmedi. Sütun adları ve sırası, ayraç,
+# kodlama ve satır sonu davranışı bu gözleme göre yazıldı. Luca'nın şablon
+# dosyası gelince yeni bir sürüm dosyası (hesap_plani_<sürüm>.yaml,
+# verified: true) eklenir. Kod değişmez.
+driver: luca
+template: hesap_plani
+version: "unverified-1"
+verified: false
+csv:
+  # Luca ayraç olarak ";" ya da "," kabul ediyor; varsayılan ";".
+  delimiter: ";"
+  quote: '"'
+  quote_mode: minimal
+  # UTF-8 yazılırsa Luca'da Türkçe karakterler bozuluyor (ı, ş, ğ …).
+  encoding: windows-1254
+  line_ending: crlf
+  header: true
+  # Gözlem: başlık satırının sonunda satır sonu yok. Veri satırı varken son
+  # veri satırı için aynı davranış final_line_end ile seçilir.
+  header_line_end: false
+  final_line_end: false
+  trailing_delimiter: false
+columns:            # sıra = dosyadaki sıra
+  - { key: code,        header: "Hesap Kodu",     required: true }
+  - { key: name,        header: "Hesap Adı",      required: true }
+  - { key: tax_no,      header: "Vergi No" }
+  - { key: tax_office,  header: "Vergi Dairesi" }
+  - { key: tckn,        header: "T.C. Kimlik No" }
+  - { key: address,     header: "Adres" }
+  - { key: currency,    header: "Döviz" }
+  - { key: email,       header: "E-Posta" }
+  - { key: vat_rate,    header: "Kdv Oran" }
+  - { key: vat_account, header: "Kdv Hesap Kodu" }
+options:
+  # Cari alt hesap kodu: hesap planında o ana hesabın altında alt hesap
+  # yoksa kullanılan seviye düzeni (120.01.001: iki ve üç haneli iki seviye).
+  default_segments: "2,3"
+notes: "Sütunlar, ayraç, kodlama ve satır sonu Luca'da doğrulanmadı (ekran gözlemi, #464)."

@@ -391,6 +391,7 @@ type Querier interface {
 	// KVKK hukuki metinleri ve onaylar (issue #57). Platform geneli tablolar;
 	// ofis ve mükellef kapsamı onay kaydının kendisindedir.
 	GetCurrentLegalDocument(ctx context.Context, arg GetCurrentLegalDocumentParams) (LegalDocument, error)
+	GetCustomerForSubaccount(ctx context.Context, arg GetCustomerForSubaccountParams) (GetCustomerForSubaccountRow, error)
 	GetDesktopAgent(ctx context.Context, arg GetDesktopAgentParams) (DesktopAgent, error)
 	GetDocumentTask(ctx context.Context, arg GetDocumentTaskParams) (GetDocumentTaskRow, error)
 	GetDocumentTaskNotifyNames(ctx context.Context, arg GetDocumentTaskNotifyNamesParams) (GetDocumentTaskNotifyNamesRow, error)
@@ -415,6 +416,7 @@ type Querier interface {
 	GetExportJobByID(ctx context.Context, id int64) (ExportJob, error)
 	GetExportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ExportJob, error)
 	GetExportSettings(ctx context.Context, arg GetExportSettingsParams) (ExportSetting, error)
+	GetGeneratedSubaccount(ctx context.Context, arg GetGeneratedSubaccountParams) (GeneratedSubaccount, error)
 	GetGitHubAppSettings(ctx context.Context) (GithubAppSetting, error)
 	GetImportJobByID(ctx context.Context, id int64) (ImportJob, error)
 	GetImportJobByUUID(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
@@ -571,6 +573,7 @@ type Querier interface {
 	InsertAIUsageEvent(ctx context.Context, arg InsertAIUsageEventParams) error
 	// rows: [{"code","name","main_code","level","is_leaf"}, ...]
 	InsertAccountPlanAccounts(ctx context.Context, arg InsertAccountPlanAccountsParams) (int64, error)
+	InsertAccountPlanExport(ctx context.Context, arg InsertAccountPlanExportParams) (AccountPlanExport, error)
 	InsertAccountPlanImport(ctx context.Context, arg InsertAccountPlanImportParams) (AccountPlanImport, error)
 	InsertAccountRule(ctx context.Context, arg InsertAccountRuleParams) (AccountRule, error)
 	// Muhasebe programına aktarım görevleri (issue #391).
@@ -599,6 +602,9 @@ type Querier interface {
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
 	InsertExportBatchDocument(ctx context.Context, arg InsertExportBatchDocumentParams) error
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
+	// Aynı cari ya da aynı kod için ikinci satır yazılmaz (eşzamanlı istekte
+	// kaybeden ON CONFLICT ile boş döner, çağıran yeniden okur).
+	InsertGeneratedSubaccount(ctx context.Context, arg InsertGeneratedSubaccountParams) (GeneratedSubaccount, error)
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	// Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
 	// ikinci kez gelirse eklenmez. Tarihi, satıcısı, VKN'si, fiş numarası ve
@@ -663,6 +669,8 @@ type Querier interface {
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
+	// Karşılaştırılan sürüm: mükellefin son Luca hesap planı / mizan dökümü.
+	LatestAccountPlanImport(ctx context.Context, arg LatestAccountPlanImportParams) (LatestAccountPlanImportRow, error)
 	// Dönemin en son çalıştırması (önceki karar ve notları taşımak için).
 	LatestReconciliationRun(ctx context.Context, arg LatestReconciliationRunParams) (ReconciliationRun, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
@@ -672,6 +680,7 @@ type Querier interface {
 	ListAccountPlanCodeSet(ctx context.Context, arg ListAccountPlanCodeSetParams) ([]string, error)
 	// Cari hesap açma önerisi: ana hesabın (120 / 320) etkin plandaki alt kodları.
 	ListAccountPlanCodesUnder(ctx context.Context, arg ListAccountPlanCodesUnderParams) ([]ListAccountPlanCodesUnderRow, error)
+	ListAccountPlanExports(ctx context.Context, arg ListAccountPlanExportsParams) ([]ListAccountPlanExportsRow, error)
 	ListAccountPlanImports(ctx context.Context, arg ListAccountPlanImportsParams) ([]AccountPlanImport, error)
 	ListAccountRuleVersions(ctx context.Context, arg ListAccountRuleVersionsParams) ([]AccountRule, error)
 	// Bir seviyenin (ofis şablonu: engagement_id NULL) kuralları.
@@ -752,6 +761,8 @@ type Querier interface {
 	ListCounterpartyReconciliations(ctx context.Context, arg ListCounterpartyReconciliationsParams) ([]ListCounterpartyReconciliationsRow, error)
 	ListCurrentLegalDocuments(ctx context.Context, language string) ([]LegalDocument, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
+	// Dosyadaki vergi bilgileri: VKN / TCKN ile cari kartı.
+	ListCustomersByTaxIDs(ctx context.Context, arg ListCustomersByTaxIDsParams) ([]ListCustomersByTaxIDsRow, error)
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
 	ListCustomersForBankClassification(ctx context.Context, taxpayerID int64) ([]ListCustomersForBankClassificationRow, error)
 	ListDataWarnings(ctx context.Context, arg ListDataWarningsParams) ([]DataWarning, error)
@@ -780,6 +791,8 @@ type Querier interface {
 	// Atanan ofis üyeleri (hâlâ üye olanlar); atanan yoksa ofis sahipleri.
 	ListEngagementAlertRecipients(ctx context.Context, arg ListEngagementAlertRecipientsParams) ([]int64, error)
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
+	// Cari hafızası (#319): incelemede kararlaştırılmış cari hesaplar.
+	ListEngagementCounterpartyAccounts(ctx context.Context, arg ListEngagementCounterpartyAccountsParams) ([]ListEngagementCounterpartyAccountsRow, error)
 	// Ofis panelinde mükellefin masrafları; kategori ve hesap ofis tarafından.
 	ListEngagementExpenses(ctx context.Context, arg ListEngagementExpensesParams) ([]ListEngagementExpensesRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
@@ -820,6 +833,8 @@ type Querier interface {
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
+	// Luca hesap planı ve cari alt hesap çıktısı (#464).
+	ListGeneratedSubaccounts(ctx context.Context, arg ListGeneratedSubaccountsParams) ([]GeneratedSubaccount, error)
 	ListHistorySharesForEngagement(ctx context.Context, arg ListHistorySharesForEngagementParams) ([]ListHistorySharesForEngagementRow, error)
 	// Ofis geçişi: geçmiş veri paylaşımı ve engagement'ın gördüğü belgeler
 	// (issue #8, D2).
@@ -898,6 +913,8 @@ type Querier interface {
 	ListPermissionSlugsByRoleSlug(ctx context.Context, slug string) ([]string, error)
 	ListPermissionsFiltered(ctx context.Context, arg ListPermissionsFilteredParams) ([]Permission, error)
 	ListPetitions(ctx context.Context, arg ListPetitionsParams) ([]ListPetitionsRow, error)
+	// Etkin planın hesapları (tüm hesap planı dosyası ve kod üretimi).
+	ListPlanAccountsForExport(ctx context.Context, arg ListPlanAccountsForExportParams) ([]ListPlanAccountsForExportRow, error)
 	// Mizan hafızası: etkin planın verilen ana hesaplar altındaki satırları.
 	ListPlanAccountsForMains(ctx context.Context, arg ListPlanAccountsForMainsParams) ([]ListPlanAccountsForMainsRow, error)
 	ListPlatformNotifications(ctx context.Context, arg ListPlatformNotificationsParams) ([]Notification, error)
@@ -956,6 +973,9 @@ type Querier interface {
 	ListStorageStarsByUser(ctx context.Context, userID int64) ([]StorageStar, error)
 	ListStorageTrash(ctx context.Context, arg ListStorageTrashParams) ([]StorageTrash, error)
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
+	// Alt hesap açılabilecek cariler: perakende varsayılan müşterisi ve
+	// kaynakta silinenler hariç.
+	ListSubaccountCandidates(ctx context.Context, taxpayerID int64) ([]ListSubaccountCandidatesRow, error)
 	ListSuggestionDecisions(ctx context.Context, arg ListSuggestionDecisionsParams) ([]ListSuggestionDecisionsRow, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
 	ListTaxReturns(ctx context.Context, arg ListTaxReturnsParams) ([]TaxReturn, error)
@@ -1155,6 +1175,9 @@ type Querier interface {
 	ReconciliationUnpostedRetailSales(ctx context.Context, arg ReconciliationUnpostedRetailSalesParams) ([]ReconciliationUnpostedRetailSalesRow, error)
 	// Access tokens of an ended (or unknown) session are refused (#323).
 	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)
+	// Üretilen kod cari hafızasına da yazılır; incelemede verilmiş bir karar
+	// varsa ona dokunulmaz.
+	RememberGeneratedCounterpartyAccount(ctx context.Context, arg RememberGeneratedCounterpartyAccountParams) error
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
