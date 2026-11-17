@@ -5,6 +5,8 @@
 // OTA güncellemesi kapalıdır.
 //
 // Mağaza derlemesi (EXPO_PUBLIC_APP_ENV=production) https API ister.
+const { withAndroidManifest } = require('expo/config-plugins');
+
 function assertStoreConfig() {
   if (process.env.EXPO_PUBLIC_APP_ENV !== 'production') return;
   const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -37,10 +39,24 @@ function appLinks(config) {
   };
 }
 
+// GWP-ASan kapalı (#454): Android 14'te uygulamalar için örneklemeli açık
+// gelir; Hermes'in realloc'u örneklenince GWP-ASan yığın izini çerçeve
+// işaretçisiyle toplarken (android_unsafe_frame_pointer_chase) SIGSEGV ile
+// düşüyor. Maestro koşusunda uygulama açılışta kapanıyor, akış "Giriş yap"ı
+// göremeden düşüyordu (gece koşusu, logcat'te libhermesvm.so + gwp_asan).
+// Örnekleme rastgele olduğu için hata da aralıklıydı.
+function withoutGwpAsan(config) {
+  return withAndroidManifest(config, (c) => {
+    const application = c.modResults.manifest.application?.[0];
+    if (application) application.$['android:gwpAsanMode'] = 'never';
+    return c;
+  });
+}
+
 module.exports = ({ config }) => {
   assertStoreConfig();
   const projectId = config.extra?.eas?.projectId ?? process.env.EAS_OFFICE_PROJECT_ID?.trim();
-  return {
+  return withoutGwpAsan({
     ...config,
     ...appLinks(config),
     // OTA (#242): güncelleme yalnızca aynı uygulama sürümünün derlemelerine
@@ -54,5 +70,5 @@ module.exports = ({ config }) => {
       ...config.extra,
       ...(projectId ? { eas: { ...config.extra?.eas, projectId } } : {}),
     },
-  };
+  });
 };
