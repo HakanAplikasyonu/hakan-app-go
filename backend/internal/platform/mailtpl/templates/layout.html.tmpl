@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<title>{{.Subject}}</title>
+<style>
+{{.DarkCSS}}
+</style>
+</head>
+<body class="m-bg" style="{{.S.Body}}">
+<div style="{{.S.Preheader}}">{{.Preheader}}&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;&#8199;&#65279;&#847;</div>
+<table role="presentation" class="m-bg" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="{{.S.BgColor}}" style="{{.S.Outer}}">
+<tr>
+<td align="center" style="padding:24px 12px;">
+<table role="presentation" class="m-card" width="{{.Width}}" cellpadding="0" cellspacing="0" border="0" bgcolor="{{.S.CardColor}}" style="{{.S.Card}}">
+<tr>
+<td style="{{.S.Header}}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+{{- if .Logo}}
+<td style="vertical-align:middle;"><img src="{{.Logo}}" width="{{.Size}}" height="{{.Size}}" alt="{{.Product}}" style="{{.S.Logo}}"></td>
+{{- end}}
+<td class="m-text" style="{{.S.Wordmark}}">{{.Product}}</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td class="m-text" style="{{.S.Content}}">
+{{- if .Heading}}
+<h1 class="m-text" style="{{.S.Heading}}">{{.Heading}}</h1>
+{{- end}}
+{{- if .Greeting}}
+<p class="m-text" style="{{.S.P}}">{{.Greeting}}</p>
+{{- end}}
+{{- range .Blocks}}
+{{- if .IsParagraph}}
+<p class="m-text" style="{{$.S.P}}">{{range .Segments}}{{if .URL}}<a class="m-link" href="{{.URL}}" style="{{$.S.Link}}">{{.Text}}</a>{{else if eq .Text "\n"}}<br>{{else}}{{.Text}}{{end}}{{end}}</p>
+{{- else if .IsCode}}
+{{- if .Label}}
+<p class="m-muted" style="{{$.S.CodeLabel}}">{{.Label}}</p>
+{{- end}}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+<tr><td class="m-tint m-text" bgcolor="{{$.S.TintColor}}" style="{{$.S.Code}}">{{.Text}}</td></tr>
+</table>
+{{- else if .IsButton}}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 0 0;">
+<tr><td align="center" bgcolor="{{$.S.BrandColor}}" style="{{$.S.ButtonCell}}"><a href="{{.URL}}" target="_blank" style="{{$.S.Button}}">{{.Label}}</a></td></tr>
+</table>
+<p class="m-muted" style="{{$.S.Fallback}}">{{index $.T "button_fallback"}}<br><a class="m-link" href="{{.URL}}" style="{{$.S.Link}}">{{.URL}}</a></p>
+{{- else if .IsFacts}}
+{{- if .Label}}
+<p class="m-text" style="{{$.S.P}}"><strong>{{.Label}}</strong></p>
+{{- end}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="{{$.S.FactsTable}}">
+{{- range .Facts}}
+<tr><td class="m-muted m-fact" style="{{$.S.FactLabel}}">{{.Label}}</td><td class="m-text m-fact" style="{{$.S.FactValue}}">{{.Value}}</td></tr>
+{{- end}}
+</table>
+{{- else if .IsNote}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">
+<tr><td class="m-tint m-text" bgcolor="{{$.S.TintColor}}" style="{{$.S.Note}}">{{if .Label}}<p style="{{$.S.NoteTitle}}">{{.Label}}</p>{{end}}{{range .Segments}}{{if .URL}}<a class="m-link" href="{{.URL}}" style="{{$.S.Link}}">{{.Text}}</a>{{else if eq .Text "\n"}}<br>{{else}}{{.Text}}{{end}}{{end}}</td></tr>
+</table>
+{{- end}}
+{{- end}}
+{{- if .SignOff}}
+<p class="m-text" style="{{.S.SignOff}}">{{range $i, $l := .SignOff}}{{if $i}}<br>{{end}}{{$l}}{{end}}</p>
+{{- end}}
+</td>
+</tr>
+</table>
+<table role="presentation" width="{{.Width}}" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:{{.Width}}px;">
+<tr>
+<td class="m-muted" style="{{.S.Footer}}">
+{{- if .Reason}}{{.Reason}}<br>{{end}}
+{{- if .PreferencesURL}}{{index .T "unsubscribe"}} <a class="m-muted" href="{{.PreferencesURL}}" style="{{.S.FooterLink}}">{{index .T "preferences"}}</a><br>{{end}}
+{{- .Footer}}
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{{- if .Heading}}{{.Heading}}
+
+{{end}}
+{{- if .Greeting}}{{.Greeting}}
+
+{{end}}
+{{- range .Blocks}}
+{{- if .IsParagraph}}{{.Text}}
+
+{{else if .IsCode}}{{if .Label}}{{.Label}}: {{end}}{{.Text}}
+
+{{else if .IsButton}}{{.Label}}:
+{{.URL}}
+
+{{else if .IsFacts}}{{if .Label}}{{.Label}}
+{{end}}{{range .FactLines}}{{.}}
+{{end}}
+{{else if .IsNote}}{{if .Label}}{{.Label}}:
+{{end}}{{.Text}}
+
+{{end}}
+{{- end}}
+{{- range .SignOff}}{{.}}
+{{end}}
+
+--
+{{if .Reason}}{{.Reason}}
+{{end}}
+{{- if .PreferencesURL}}{{index .T "preferences"}}: {{.PreferencesURL}}
+{{end}}
+{{- .Footer}}
