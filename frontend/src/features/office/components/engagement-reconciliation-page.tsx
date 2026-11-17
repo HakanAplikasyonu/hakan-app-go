@@ -44,7 +44,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
-import { useOfficePeriod } from "../period";
+import { useOfficePeriod, usePeriodText } from "../period";
 import {
   type DecisionStatus,
   type ReconciliationItem,
@@ -93,6 +93,7 @@ export function EngagementReconciliationPage({
 
 function ReconciliationInner({ engagement }: { engagement: string }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(permissions.tenant.reconciliation.write);
@@ -123,7 +124,9 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
     onError: (e) =>
       toast.error(
         isApiError(e) && e.code === "RECONCILIATION_NO_TRIAL_BALANCE"
-          ? t("office.reconciliation.no_trial_balance", { period })
+          ? t("office.reconciliation.no_trial_balance", {
+              period: periodText(period),
+            })
           : errText(e, t("office.reconciliation.run_failed")),
       ),
   });
@@ -136,7 +139,9 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
             {row?.taxpayer_title ?? t("office.reconciliation.title")}
           </h1>
           <p className="text-text-2 text-sm">
-            {t("office.reconciliation.description", { period })}
+            {t("office.reconciliation.description", {
+              period: periodText(period),
+            })}
           </p>
         </div>
         {canWrite ? (
@@ -198,7 +203,7 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
               : t("office.reconciliation.empty_title")}
           </h2>
           <p className="text-text-2 mx-auto mt-1 max-w-lg text-sm">
-            {t("office.reconciliation.empty", { period })}
+            {t("office.reconciliation.empty", { period: periodText(period) })}
           </p>
         </div>
       ) : view === "counterparties" ? (
@@ -231,6 +236,7 @@ function AccountsView({
   canWrite: boolean;
 }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const qc = useQueryClient();
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -475,8 +481,8 @@ function AccountsView({
       <div className="text-text-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         <span>
           {t("office.reconciliation.window", {
-            from: detail.run.window_from,
-            to: detail.run.window_to,
+            from: periodText(detail.run.window_from),
+            to: periodText(detail.run.window_to),
           })}
           {sum.cumulative ? ` · ${t("office.reconciliation.cumulative")}` : ""}
         </span>

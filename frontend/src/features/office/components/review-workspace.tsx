@@ -74,7 +74,7 @@ import {
   useReviewThreshold,
   valueLabel,
 } from "../hooks/use-review";
-import { useOfficePeriod } from "../period";
+import { periodLabel, useOfficePeriod } from "../period";
 import {
   REVIEW_PAGE_MAX,
   type ReviewSuggestion,
@@ -222,7 +222,7 @@ function EvidenceChain({
         <>
           {ctx.itemName
             ? `“${ctx.itemName}”`
-            : (matchSummary(s) ?? suggestionTitle(s, t))}
+            : (matchSummary(s, t) ?? suggestionTitle(s, t))}
           {lineBits.length ? (
             <span className="text-muted-foreground block text-xs">
               {lineBits.join(" · ")}
@@ -474,7 +474,7 @@ function useCounterpartyHistory(s: ReviewSuggestion | undefined) {
 }
 
 function ReviewWorkspaceInner() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const params = useSearchParams();
@@ -911,8 +911,13 @@ function ReviewWorkspaceInner() {
                 {ctx.invoiceType}
               </span>
             ) : null}
-            <span className="text-muted-foreground font-mono">
-              {[dirKey ? t(dirKey) : undefined, current.period]
+            <span className="text-muted-foreground">
+              {[
+                dirKey ? t(dirKey) : undefined,
+                current.period
+                  ? periodLabel(current.period, locale)
+                  : undefined,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </span>
@@ -971,9 +976,9 @@ function ReviewWorkspaceInner() {
               <div className="text-base font-medium break-words">
                 {suggestionTitle(current, t)}
               </div>
-              {matchSummary(current) ? (
+              {matchSummary(current, t) ? (
                 <p className="text-text-2 mt-1 text-sm">
-                  {matchSummary(current)}
+                  {matchSummary(current, t)}
                 </p>
               ) : null}
               {ctx.taxRate || lineTypeLabel(ctx.lineType, t) || ctx.lineNo ? (
@@ -1392,7 +1397,7 @@ function ReviewWorkspaceInner() {
                               <span className="min-w-0 flex-1 truncate">
                                 {[
                                   c.itemName ? c.counterparty : undefined,
-                                  matchSummary(s),
+                                  matchSummary(s, t),
                                   s.engagement_uuid
                                     ? directory.entries.get(s.engagement_uuid)
                                         ?.title

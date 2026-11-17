@@ -23,7 +23,13 @@ import {
   useReviewPeriodTotals,
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress } from "../lib/command";
-import { daysUntil, monthName, useOfficePeriod, vatDueDate } from "../period";
+import {
+  daysUntil,
+  monthName,
+  useOfficePeriod,
+  usePeriodText,
+  vatDueDate,
+} from "../period";
 import type { OfficeDashboardUpload } from "../services/dashboard.service";
 import type {
   PeriodMatrixCell,
@@ -208,6 +214,7 @@ function FeedItem({ u }: { u: OfficeDashboardUpload }) {
  */
 export function OfficeHome() {
   const { t, locale } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const { user } = useAuth();
   const { focus } = useOfficePeriod();
@@ -296,7 +303,7 @@ export function OfficeHome() {
         <Skeleton className="h-64 w-full rounded-[14px]" />
       ) : (
         <DonemTaci
-          baslik={t("office.home.crown_title", { period: focus })}
+          baslik={t("office.home.crown_title", { period: periodText(focus) })}
           hazir={ready}
           toplam={rows.length}
           veri={data}
@@ -395,7 +402,7 @@ export function OfficeHome() {
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Panel
-          title={t("office.home_behind_title", { period: focus })}
+          title={t("office.home_behind_title", { period: periodText(focus) })}
           description={t("office.home_behind_description")}
           actions={
             <Link
@@ -445,7 +452,7 @@ export function OfficeHome() {
         <div className="flex flex-col gap-4">
           <section className="bg-card rounded-[14px] border p-4">
             <h2 className="mb-3 text-base font-semibold">
-              {t("office.home_vat_title", { period: focus })}
+              {t("office.home_vat_title", { period: periodText(focus) })}
             </h2>
             {vat.isLoading ? (
               <Skeleton className="h-16 w-full" />

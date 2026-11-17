@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { kindTitle, suggestionTitle, valueText } from "./suggestion-label";
+import {
+  kindTitle,
+  matchSummary,
+  suggestionTitle,
+  valueText,
+} from "./suggestion-label";
 
 const t = (key: string, vars?: Record<string, string | number>) =>
   ({
@@ -35,5 +40,31 @@ describe("bank_account suggestions (#383)", () => {
       ),
     ).toBe("EFT UCRETI");
     expect(valueText(base.proposed_value)).toBe("120.01.015");
+  });
+});
+
+describe("reconciliation suggestions (#455)", () => {
+  const s = {
+    kind: "reconciliation",
+    target_type: "reconciliation_item",
+    target_field: "status",
+    proposed_value: { status: "resolved", note: "…" },
+    provenance: {
+      inputs: {
+        main_code: "102",
+        ledger_net: "68050.00",
+        source_net: "0.00",
+        difference: "68050.00",
+      },
+    },
+  };
+  it("never titles by the raw field name", () => {
+    expect(suggestionTitle(s, t)).toBe("Mutabakat farkı: 102");
+    expect(suggestionTitle(s, t)).not.toMatch(/status/i);
+  });
+  it("summarises amounts in tr-TR", () => {
+    expect(matchSummary(s)).toBe(
+      "Mizan 68.050,00 TL · Kaynaklar 0,00 TL · Fark 68.050,00 TL",
+    );
   });
 });

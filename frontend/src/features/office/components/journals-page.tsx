@@ -41,7 +41,7 @@ import {
   useJournalExports,
   useJournalTransfers,
 } from "../hooks/use-journals";
-import { sub, sum, toMinor } from "../lib/decimal";
+import { formatMoney, sub, sum, toMinor } from "../lib/decimal";
 import {
   journalService,
   TRANSFER_DRIVERS,
@@ -55,7 +55,12 @@ import {
   TRANSFER_STATUS,
 } from "./journal-transfers-panel";
 import { FilterSelect, Figure, Money, Panel } from "./office-ui";
-import { ALL_PERIODS, isPeriod, useOfficePeriod } from "../period";
+import {
+  ALL_PERIODS,
+  isPeriod,
+  useOfficePeriod,
+  usePeriodText,
+} from "../period";
 
 type LineRow = {
   account: string;
@@ -288,7 +293,7 @@ function NewDraft({ engagement }: { engagement: string }) {
               {balanced
                 ? t("office.journals.balanced")
                 : t("office.journals.difference", {
-                    amount: sub(debit, credit),
+                    amount: formatMoney(sub(debit, credit), "TRY"),
                   })}
             </span>
             <Figure>
@@ -325,6 +330,7 @@ function ExportPanel({
   period: string;
 }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const drivers = useExportDrivers(slug);
   const { export: run } = useJournalActions(slug, engagement);
@@ -340,7 +346,7 @@ function ExportPanel({
     <Panel
       title={t("office.journals.export_title")}
       description={t("office.journals.export_description", {
-        period: period || "—",
+        period: periodText(period),
       })}
     >
       <div className="space-y-3 p-4">

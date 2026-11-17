@@ -128,6 +128,20 @@ export function suggestionTitle(s: SuggestionLike, t: Translate) {
   };
   const m = s.kind === "bank_match" ? asMatch(s.proposed_value) : null;
   if (m) return matchTitle(m, t);
+  // Mutabakat farkı (#389): hedef alan `status`; ham alan adı yerine hesap.
+  if (s.kind === "reconciliation") {
+    const code = str("main_code");
+    return code
+      ? tr(
+          t,
+          "office.review_api.reconciliation_title",
+          `Mutabakat farkı: ${code}`,
+          {
+            code,
+          },
+        )
+      : kindTitle(s.kind, t);
+  }
   if (s.kind === "receipt_field") {
     const where = tr(t, `office.review_api.target_${s.target_type}`, "");
     return where
@@ -145,10 +159,41 @@ export function suggestionTitle(s: SuggestionLike, t: Translate) {
   return fieldTitle(s.target_field, t);
 }
 
-/** Banka eşleşmesinin alt satırı: karşı taraf · tutar · tarih. */
-export function matchSummary(s: SuggestionLike) {
-  if (s.kind !== "bank_match") return undefined;
+/** Banka eşleşmesinin alt satırı: karşı taraf · tutar · tarih. Mutabakat
+ * farkında: mizan · kaynaklar · fark (tr-TR). */
+export function matchSummary(s: SuggestionLike, t?: Translate) {
   const i = s.provenance?.inputs ?? {};
+  if (s.kind === "reconciliation") {
+    const money = (k: string) =>
+      typeof i[k] === "string" && DECIMAL_RE.test(i[k] as string)
+        ? `${trMoney.format(Number(i[k]))} TL`
+        : undefined;
+    const part = (k: string, key: string, fallback: string) => {
+      const v = money(k);
+      if (!v) return undefined;
+      return t
+        ? tr(t, key, `${fallback} ${v}`, { amount: v })
+        : `${fallback} ${v}`;
+    };
+    return (
+      [
+        part("ledger_net", "office.review_api.reconciliation_ledger", "Mizan"),
+        part(
+          "source_net",
+          "office.review_api.reconciliation_sources",
+          "Kaynaklar",
+        ),
+        part(
+          "difference",
+          "office.review_api.reconciliation_difference",
+          "Fark",
+        ),
+      ]
+        .filter(Boolean)
+        .join(" · ") || undefined
+    );
+  }
+  if (s.kind !== "bank_match") return undefined;
   const amount =
     typeof i.amount === "string"
       ? `${trMoney.format(Number(i.amount))} ${typeof i.currency === "string" ? i.currency : ""}`.trim()

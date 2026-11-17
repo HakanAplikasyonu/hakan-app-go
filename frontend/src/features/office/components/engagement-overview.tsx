@@ -20,7 +20,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import { useWarningGroups } from "../hooks/use-warnings";
-import { useOfficePeriod } from "../period";
+import { useOfficePeriod, usePeriodText } from "../period";
 import type { PeriodMatrixRow } from "../services/periods.service";
 
 type Cell = PeriodMatrixRow["cells"][number];
@@ -189,7 +189,6 @@ function PeriodStrip({
               <button
                 type="button"
                 aria-pressed={on}
-                aria-label={`${cell.period}: ${label}${cell.open_blockers ? ` · ${cell.open_blockers}` : ""}`}
                 onClick={() => onPick(cell.period)}
                 className={cn(
                   "focus-visible:ring-ring flex min-h-11 w-full flex-col items-center gap-2 rounded-xl px-1.5 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none",
@@ -201,7 +200,10 @@ function PeriodStrip({
                 <span className="font-mono text-xs tabular-nums">
                   {month(cell.period)}
                 </span>
-                <TacRozeti durum={durum} boyut={30} />
+                {/* Ad görünür metinden gelir (ay · durum); rozet tekrar okunmaz. */}
+                <span aria-hidden>
+                  <TacRozeti durum={durum} boyut={30} />
+                </span>
                 <span
                   className={cn(
                     "text-center text-xs leading-tight",
@@ -281,6 +283,7 @@ type DocTask = {
  */
 export function EngagementOverviewPage({ engagement }: { engagement: string }) {
   const { t, locale } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const { focus, setPeriod } = useOfficePeriod();
   const matrix = usePeriodMatrix(MONTHS);
@@ -374,7 +377,9 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
             id="readiness-title"
             className="font-display mb-2 text-base font-bold"
           >
-            {t("office.engagement.readiness_title", { period })}
+            {t("office.engagement.readiness_title", {
+              period: periodText(period),
+            })}
           </h2>
           {cell ? (
             <p
