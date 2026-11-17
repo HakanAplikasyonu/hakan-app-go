@@ -1,45 +1,17 @@
-import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
+import { scan } from "./a11y";
+import { Api, DEMO, engagementOf, letterToken, officePath, uiLogin } from "./lib";
 
 /**
- * Erişilebilirlik denetimi (#194): ana sayfalarda axe-core (WCAG 2.1 A/AA).
- * Kritik ve ciddi (critical / serious) ihlal testi kırar; orta ve küçük
- * ihlaller test ekine (annotation) yazılır. Yalnızca okur: diğer dosyalarla
- * paralel koşar.
+ * Erişilebilirlik denetimi (#194, #455): ana sayfalarda axe-core (WCAG 2.1
+ * A/AA, `./a11y`). Kritik ve ciddi (critical / serious) ihlal testi kırar;
+ * orta ve küçük ihlaller test ekine (annotation) yazılır. Yalnızca okur:
+ * diğer dosyalarla paralel koşar.
  *
  * Klavye: komut paleti Ctrl+K ile açılır, odak aramada, Esc ile kapanır.
+ * Durumla açılan diyaloglarda odak içeri taşınır, Esc ile açan düğmeye döner.
  */
-const BLOCKING = new Set(["critical", "serious"]);
-
-async function scan(page: Page, name: string) {
-  // İçerik yüklensin: yükleniyor iskeletleri ve geçici durumlar denetlenmez.
-  await page.waitForLoadState("networkidle");
-  const result = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    // Realtime hata ayıklama paneli yalnızca `next dev`'de çizilir (üretimde yok).
-    .exclude('[aria-label^="Realtime debug"]')
-    .exclude('[title^="Realtime ·"]')
-    .analyze();
-  const blocking = result.violations.filter((v) => BLOCKING.has(v.impact ?? ""));
-  const minor = result.violations.filter((v) => !BLOCKING.has(v.impact ?? ""));
-  for (const v of minor) {
-    test.info().annotations.push({ type: `a11y:${v.impact}`, description: `${name}: ${v.id} (${v.nodes.length})` });
-  }
-  const report = blocking
-    .map(
-      (v) =>
-        `${v.impact} ${v.id}: ${v.help}\n` +
-        v.nodes
-          .slice(0, 5)
-          .map((n) => `    ${n.target.join(" ")} — ${n.failureSummary?.split("\n").slice(1, 2).join("").trim()}`)
-          .join("\n"),
-    )
-    .join("\n");
-  expect(blocking, `${name}\n${report}`).toEqual([]);
-}
-
 test.describe("@a11y misafir sayfaları", () => {
   for (const path of ["/login", "/platform/register", "/forgot-password", "/yardim", "/yardim/ofis-yoneticisi"]) {
     test(path, async ({ page }) => {
@@ -67,10 +39,20 @@ test.describe("@a11y ofis paneli", () => {
       "/taxpayer-requests",
       `/invoices?taxpayer=${atlas}`,
       "/review",
+      // Düzenlenebilir ızgara (#394).
+      "/review?view=grid",
       "/warnings",
+      // Toplu rapor gönderimi (#386), WhatsApp eşleşmeleri (#388).
+      "/reports",
+      "/whatsapp",
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,
       // Co-pilot çubuğu mükellef ekranlarında (#392).
+      `/engagements/${atlas}`,
+      `/engagements/${atlas}/payroll`,
+      `/engagements/${atlas}/easytrade`,
+      `/engagements/${atlas}/documents`,
+      `/engagements/${atlas}/petitions`,
       `/engagements/${atlas}/bank`,
       `/engagements/${atlas}/report`,
       `/engagements/${atlas}/expenses`,
@@ -108,6 +90,34 @@ test.describe("@a11y ofis paneli", () => {
     await scan(page, "komut paleti");
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
+  });
+
+  // #455: durumla (Trigger'sız) açılan diyaloglarda odak body'ye düşüyordu.
+  test("klavye: diyalog Enter ile açılır, odak içeride, Esc ile açan düğmeye döner", async ({ page }) => {
+    await uiLogin(page, DEMO.owner);
+    const cases = [
+      { path: `/engagements/${atlas}/expenses`, button: "Kategoriler" },
+      { path: `/engagements/${atlas}/report`, button: "E-postayla gönder" },
+      { path: `/engagements/${atlas}/reconciliation`, button: "Ayrıntı" },
+    ];
+    for (const c of cases) {
+      await test.step(`${c.path} · ${c.button}`, async () => {
+        await page.goto(officePath(c.path));
+        const opener = page.getByRole("main").getByRole("button", { name: c.button, exact: true }).first();
+        await expect(opener).toBeVisible({ timeout: 30_000 });
+        await opener.focus();
+        await page.keyboard.press("Enter");
+        const dialog = page.getByRole("dialog");
+        await expect(dialog).toBeVisible();
+        await expect
+          .poll(() => dialog.evaluate((d) => d.contains(document.activeElement)), { message: "odak diyalogda" })
+          .toBe(true);
+        await scan(page, `${c.path} · ${c.button} diyaloğu`, { include: '[role="dialog"]' });
+        await page.keyboard.press("Escape");
+        await expect(dialog).toBeHidden();
+        await expect(opener).toBeFocused();
+      });
+    }
   });
 
   // #285: çevrimdışı rozeti ve genel bakış kartı yalnızca çevrimdışı ajan
@@ -154,11 +164,31 @@ test.describe("@a11y mükellef paneli", () => {
     await uiLogin(page, DEMO.taxpayerUser);
     await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
     const base = new URL(page.url()).pathname;
-    for (const s of ["", "/invoices", "/receipts", "/uploads"]) {
+    for (const s of ["", "/invoices", "/receipts", "/uploads", "/payroll", "/report", "/requests"]) {
       await test.step(s || "/", async () => {
         await page.goto(base + s);
         await scan(page, base + s);
       });
     }
+  });
+});
+
+// Karşı firmanın mutabakat yanıt sayfası (#389): oturumsuz, mektup bağlantısıyla.
+test.describe("@a11y mutabakat yanıt sayfası", () => {
+  test("geçerli ve geçersiz bağlantı", async ({ page }) => {
+    const api = await Api.login(DEMO.owner);
+    const atlas = await engagementOf(api, DEMO.atlas.title);
+    const letters = await api.json<{ items: { uuid: string; status: string }[] }>(
+      await api.get(`/v1/tenant/engagements/${atlas}/reconciliation/letters`),
+    );
+    await api.dispose();
+    // Demo verisi: yanıt bekleyen (kuyrukta / gönderildi) bir mektup.
+    const open = letters.items.find((l) => l.status === "queued" || l.status === "sent");
+    expect(open, "yanıt bekleyen demo mektubu").toBeTruthy();
+    await page.goto(`/mutabakat/${letterToken(open!.uuid)}`);
+    await expect(page.getByRole("heading", { name: "Cari hesap mutabakatı" })).toBeVisible();
+    await scan(page, "/mutabakat/{belirteç}");
+    await page.goto("/mutabakat/gecersiz-belirtec-0000000000000000");
+    await scan(page, "/mutabakat/{geçersiz}");
   });
 });

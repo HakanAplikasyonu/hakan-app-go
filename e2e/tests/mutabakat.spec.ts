@@ -1,10 +1,6 @@
-import { createHmac } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import path from "node:path";
-
 import { expect, test, type Page } from "@playwright/test";
 
-import { Api, DEMO, engagementOf, officePath, uiLogin, uniqueEmail, uniqueVkn } from "./lib";
+import { Api, DEMO, engagementOf, letterToken, officePath, uiLogin, uniqueEmail, uniqueVkn } from "./lib";
 
 /**
  * Mutabakat panosu (#389, #452): Atlas Gıda'nın demo mutabakatı (mizan –
@@ -17,28 +13,6 @@ import { Api, DEMO, engagementOf, officePath, uiLogin, uniqueEmail, uniqueVkn } 
  * çalıştırılmaz (demo kararlarını sıfırlamasın).
  */
 test.describe.configure({ mode: "serial" });
-
-/**
- * Mektubun yanıt belirteci (backend reconciliation.LetterToken): HMAC-SHA256,
- * anahtar "reconciliation-letter:" + APP_ENCRYPTION_KEY, ileti mektup
- * UUID'sinin 16 baytı. Anahtar scripts/e2e-up.sh'ın env dosyasından okunur.
- *
- * E-posta beklenmez: mektup gönderim taraması yalnızca ayrı worker sürecinde
- * (cmd/worker) çalışır; e2e ortamı API içi worker kullanır ve mektup
- * "Kuyrukta" kalır (#461).
- */
-function letterToken(letterUuid: string): string {
-  const envFile = path.join(process.env.E2E_DIR ?? path.join(__dirname, "..", ".run"), "e2e.env");
-  let key = process.env.APP_ENCRYPTION_KEY ?? "app-dev-encryption-key-32bytes!!";
-  if (existsSync(envFile)) {
-    for (const line of readFileSync(envFile, "utf8").split(/\r?\n/)) {
-      const m = line.match(/^APP_ENCRYPTION_KEY=(.*)$/);
-      if (m) key = m[1];
-    }
-  }
-  const id = Buffer.from(letterUuid.replace(/-/g, ""), "hex");
-  return createHmac("sha256", `reconciliation-letter:${key}`).update(id).digest("hex");
-}
 
 let engagement = "";
 
@@ -153,6 +127,9 @@ test.describe("mutabakat", () => {
     await expect(letter).toContainText(/Kuyrukta|Gönderildi/);
 
     // Karşı firma mektuptaki bağlantıyla, oturum açmadan yanıtlar.
+    // E-posta beklenmez: mektup gönderim taraması yalnızca ayrı worker
+    // sürecinde (cmd/worker) çalışır; e2e ortamı API içi worker kullanır ve
+    // mektup "Kuyrukta" kalır (#461). Belirteç lib.ts'teki letterToken ile.
     const api = await Api.login(DEMO.owner);
     const letters = await api.json<{ items: { uuid: string; recipient_email: string | null }[] }>(
       await api.get(`/v1/tenant/engagements/${engagement}/reconciliation/letters`),

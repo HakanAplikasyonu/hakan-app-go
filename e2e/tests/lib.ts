@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { createHmac, randomUUID } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import {
@@ -212,4 +212,22 @@ export async function pickTaxpayer(page: Page, title: string) {
 
 function escapeRe(s: string) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Mektubun yanıt belirteci (backend reconciliation.LetterToken): HMAC-SHA256,
+ * anahtar "reconciliation-letter:" + APP_ENCRYPTION_KEY, ileti mektup
+ * UUID'sinin 16 baytı. Anahtar scripts/e2e-up.sh'ın env dosyasından okunur.
+ */
+export function letterToken(letterUuid: string): string {
+  const envFile = path.join(process.env.E2E_DIR ?? path.join(__dirname, "..", ".run"), "e2e.env");
+  let key = process.env.APP_ENCRYPTION_KEY ?? "app-dev-encryption-key-32bytes!!";
+  if (existsSync(envFile)) {
+    for (const line of readFileSync(envFile, "utf8").split(/\r?\n/)) {
+      const m = line.match(/^APP_ENCRYPTION_KEY=(.*)$/);
+      if (m) key = m[1];
+    }
+  }
+  const id = Buffer.from(letterUuid.replace(/-/g, ""), "hex");
+  return createHmac("sha256", `reconciliation-letter:${key}`).update(id).digest("hex");
 }
