@@ -10,6 +10,11 @@
 -- kişiyi tekrar tanımak için anahtarlı özeti (national_id_digest, HMAC-SHA256)
 -- tutulur.
 
+-- roles ve role_permissions FORCE altında (000086): sahip süper kullanıcı
+-- değilken izin kopyaları ofis rollerine ancak sistem kipinde yazılır
+-- (DATABASE_RULES, "Owner forced everywhere").
+SET LOCAL app.system = 'on';
+
 INSERT INTO permissions (name, slug) VALUES
     ('Read tenant payroll', 'tenant.payroll.read'),
     ('Write tenant payroll', 'tenant.payroll.write')
