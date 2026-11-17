@@ -2,10 +2,18 @@
 
 import { MonitorSmartphone } from "lucide-react";
 import Link from "next/link";
+import { useMemo } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { ErrorState } from "@/components/common/error-state";
 import { StatusChip } from "@/components/common/status-chip";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  createActionsColumn,
+  createColumn,
+  DataTable,
+  type DataTableFeatures,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/config/permissions";
@@ -18,7 +26,7 @@ import { usePermission } from "@/providers/permission-provider";
 
 import { useDesktopAgents, useRevokeDesktopAgent } from "../hooks/use-agents";
 import type { DesktopAgent } from "../services/agents.service";
-import { Panel, TableBox } from "./office-ui";
+import { Panel } from "./office-ui";
 
 /**
  * `/t/{slug}/agents` (#285): the office's desktop agents (issue #51) with
@@ -46,6 +54,7 @@ export function AgentsPanel() {
   const agents = useDesktopAgents(slug);
   const items = agents.data?.items ?? [];
   const offline = items.filter((a) => a.status === "offline").length;
+  const columns = useAgentColumns(can(permissions.tenant.agents.write));
 
   return (
     <Panel
@@ -82,34 +91,13 @@ export function AgentsPanel() {
           </p>
         </div>
       ) : (
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.agents.col_name")}</th>
-              <th>{t("office.agents.col_platform")}</th>
-              <th>{t("office.agents.col_version")}</th>
-              <th>{t("office.agents.col_status")}</th>
-              <th>{t("office.agents.col_last_seen")}</th>
-              <th>{t("office.agents.col_last_error")}</th>
-              {can(permissions.tenant.agents.write) ? (
-                <th>
-                  <span className="sr-only">
-                    {t("office.agents.col_actions")}
-                  </span>
-                </th>
-              ) : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((a) => (
-              <AgentRow
-                key={a.uuid}
-                agent={a}
-                canRevoke={can(permissions.tenant.agents.write)}
-              />
-            ))}
-          </tbody>
-        </TableBox>
+        <DataTable<DesktopAgent>
+          columns={columns}
+          data={items}
+          getRowId={(a) => a.uuid}
+          bordered={false}
+          features={panelTable}
+        />
       )}
     </Panel>
   );
@@ -121,18 +109,111 @@ const platformKey: Record<DesktopAgent["platform"], string> = {
   linux: "office.agents.platform_linux",
 };
 
-function AgentRow({
-  agent,
-  canRevoke,
-}: {
-  agent: DesktopAgent;
-  canRevoke: boolean;
-}) {
+// Panel içine gömülü istemci tarafı liste: araç çubuğu ve sayfalama yok,
+// sıralama açık; mobilde kartlar.
+const panelTable: DataTableFeatures = {
+  toolbar: false,
+  pagination: false,
+  rowSelection: false,
+  columnFilters: false,
+  facetedFilters: false,
+  globalFilter: false,
+  viewMode: false,
+  columnVisibility: false,
+  columnResizing: false,
+  columnPinning: false,
+  columnOrdering: false,
+  density: false,
+};
+
+function useAgentColumns(canRevoke: boolean) {
   const { t, locale } = useLocale();
+  return useMemo<ColumnDef<DesktopAgent, unknown>[]>(
+    () => [
+      createColumn<DesktopAgent>({
+        id: "name",
+        labelKey: "office.agents.col_name",
+        accessorKey: "name",
+        gridPrimary: true,
+        meta: { cellClassName: "font-medium" },
+      }),
+      createColumn<DesktopAgent>({
+        id: "platform",
+        labelKey: "office.agents.col_platform",
+        accessorFn: (a) => t(platformKey[a.platform]),
+      }),
+      createColumn<DesktopAgent>({
+        id: "version",
+        labelKey: "office.agents.col_version",
+        accessorFn: (a) => a.version || "—",
+        meta: { cellClassName: "font-mono text-xs" },
+      }),
+      createColumn<DesktopAgent>({
+        id: "status",
+        labelKey: "office.agents.col_status",
+        accessorKey: "status",
+        cell: ({ row }) => {
+          const online = row.original.status === "online";
+          return (
+            <StatusChip
+              tone={online ? "success" : "danger"}
+              label={
+                online ? t("office.agents.online") : t("office.agents.offline")
+              }
+            />
+          );
+        },
+      }),
+      createColumn<DesktopAgent>({
+        id: "last_seen_at",
+        labelKey: "office.agents.col_last_seen",
+        accessorKey: "last_seen_at",
+        gridSecondary: true,
+        cell: ({ row }) => (
+          <time
+            dateTime={row.original.last_seen_at}
+            title={datetime(row.original.last_seen_at, undefined, locale)}
+          >
+            {relativeDatetime(row.original.last_seen_at, locale)}
+          </time>
+        ),
+      }),
+      createColumn<DesktopAgent>({
+        id: "last_error",
+        labelKey: "office.agents.col_last_error",
+        accessorFn: (a) => a.last_error?.at ?? "",
+        meta: { cellClassName: "text-sm" },
+        cell: ({ row }) => {
+          const err = row.original.last_error;
+          return err ? (
+            <span className="text-status-blocking">
+              {t("office.agents.error_AGENT_OFFLINE")} ·{" "}
+              {datetime(err.at, undefined, locale)}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          );
+        },
+      }),
+      ...(canRevoke
+        ? [
+            createActionsColumn<DesktopAgent>({
+              labelKey: "office.agents.col_actions",
+              cell: (a) => <RevokeAgentButton agent={a} />,
+            }),
+          ]
+        : []),
+    ],
+    [canRevoke, locale, t],
+  );
+}
+
+/** Satırın "Kaldır" düğmesi; onay iletişimiyle ajanı iptal eder. */
+function RevokeAgentButton({ agent }: { agent: DesktopAgent }) {
+  const { t } = useLocale();
   const { slug } = useTenant();
   const { confirmDelete } = useDialogs();
   const revoke = useRevokeDesktopAgent(slug);
-  const online = agent.status === "online";
 
   const onRevoke = async () => {
     const ok = await confirmDelete({
@@ -144,49 +225,14 @@ function AgentRow({
   };
 
   return (
-    <tr data-agent={agent.uuid}>
-      <td className="font-medium">{agent.name}</td>
-      <td>{t(platformKey[agent.platform])}</td>
-      <td className="font-mono text-xs">{agent.version || "—"}</td>
-      <td>
-        <StatusChip
-          tone={online ? "success" : "danger"}
-          label={
-            online ? t("office.agents.online") : t("office.agents.offline")
-          }
-        />
-      </td>
-      <td>
-        <time
-          dateTime={agent.last_seen_at}
-          title={datetime(agent.last_seen_at, undefined, locale)}
-        >
-          {relativeDatetime(agent.last_seen_at, locale)}
-        </time>
-      </td>
-      <td className="text-sm">
-        {agent.last_error ? (
-          <span className="text-status-blocking">
-            {t("office.agents.error_AGENT_OFFLINE")} ·{" "}
-            {datetime(agent.last_error.at, undefined, locale)}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </td>
-      {canRevoke ? (
-        <td className="text-right">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => void onRevoke()}
-            disabled={revoke.isPending}
-          >
-            {t("office.agents.revoke")}
-          </Button>
-        </td>
-      ) : null}
-    </tr>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => void onRevoke()}
+      disabled={revoke.isPending}
+    >
+      {t("office.agents.revoke")}
+    </Button>
   );
 }
 

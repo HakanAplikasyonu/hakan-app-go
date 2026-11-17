@@ -52,6 +52,9 @@ export function ColumnHeader<TData>({
     return <div className={cn("text-sm font-medium", className)}>{label}</div>;
   }
 
+  const canReorder =
+    (table.options.meta as { columnOrdering?: boolean } | undefined)
+      ?.columnOrdering !== false;
   const order = table.getState().columnOrder;
   const allIds = order.length
     ? order
@@ -67,7 +70,12 @@ export function ColumnHeader<TData>({
     table.setColumnOrder(next);
   };
 
-  if (!column.getCanSort() && !column.getCanHide() && !column.getCanPin()) {
+  if (
+    !column.getCanSort() &&
+    !column.getCanHide() &&
+    !column.getCanPin() &&
+    !canReorder
+  ) {
     return <div className={cn("text-sm font-medium", className)}>{label}</div>;
   }
 
@@ -110,18 +118,22 @@ export function ColumnHeader<TData>({
             </>
           ) : null}
 
-          <DropdownMenuItem onClick={() => move(-1)} disabled={index <= 0}>
-            <ChevronLeft className="size-3.5" />
-            {t("table.move_left")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => move(1)}
-            disabled={index < 0 || index >= allIds.length - 1}
-          >
-            <ChevronRight className="size-3.5" />
-            {t("table.move_right")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          {canReorder ? (
+            <>
+              <DropdownMenuItem onClick={() => move(-1)} disabled={index <= 0}>
+                <ChevronLeft className="size-3.5" />
+                {t("table.move_left")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => move(1)}
+                disabled={index < 0 || index >= allIds.length - 1}
+              >
+                <ChevronRight className="size-3.5" />
+                {t("table.move_right")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
 
           {column.getCanPin() ? (
             <>

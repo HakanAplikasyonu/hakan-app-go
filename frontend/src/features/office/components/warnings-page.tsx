@@ -1,13 +1,15 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { CircleAlert, Info, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
-import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
+import { EntityTable, useUrlListState } from "@/components/entity";
 import { BosDurum, TacRozeti } from "@/components/hakan";
+import { createActionsColumn, createColumn } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -16,10 +18,7 @@ import { date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import {
-  useEngagementDirectory,
-  type EngagementEntry,
-} from "../hooks/use-engagement-directory";
+import { useEngagementDirectory } from "../hooks/use-engagement-directory";
 import {
   useAcknowledgeWarningGroup,
   useWarningGroups,
@@ -37,15 +36,14 @@ import type {
 import {
   FilterSelect,
   Figure,
-  Panel,
   SeverityBadge,
-  TableBox,
   WarningStatusLabel,
 } from "./office-ui";
 import {
   ApiWarningActions,
   WARNINGS_WRITE_PERMISSION,
 } from "./warning-actions";
+import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { useOfficePeriod } from "../period";
 
 const PAGE_SIZE = 25;
@@ -90,80 +88,123 @@ function useEntityLabel() {
   };
 }
 
-function WarningRow({
-  warning: w,
-  taxpayer,
-  directoryLoading,
-}: {
-  warning: ApiDataWarning;
-  taxpayer: EngagementEntry | undefined;
-  directoryLoading: boolean;
-}) {
+function useWarningColumns() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  const directory = useEngagementDirectory();
   const warningText = useApiWarningText();
   const entityLabel = useEntityLabel();
-  return (
-    <tr>
-      <td>
-        <SeverityBadge severity={w.severity} />
-      </td>
-      <td className="min-w-72">
-        <div>{warningText(w)}</div>
-        <Figure className="text-muted-foreground text-xs">
-          {[w.code, w.producer, w.period].filter(Boolean).join(" · ")}
-        </Figure>
-      </td>
-      <td>
-        <div>
-          {taxpayer?.title ??
-            (directoryLoading
-              ? "…"
-              : t("office.warnings_api.unknown_taxpayer"))}
-        </div>
-        {taxpayer?.taxId ? (
-          <Figure className="text-muted-foreground text-xs">
-            {taxpayer.taxId}
-          </Figure>
-        ) : null}
-      </td>
-      <td>
-        {w.entity_type === "invoice" && w.entity_uuid ? (
-          <Link
-            href={routes.tenant.invoice(slug, w.entity_uuid, w.engagement_uuid)}
-            className="text-brand hover:underline"
-          >
-            {t("office.warnings_api.open_invoice")}
-          </Link>
-        ) : (
-          <span className="text-muted-foreground">
-            {entityLabel(w.entity_type)}
-          </span>
-        )}
-      </td>
-      <td className="whitespace-nowrap">
-        <WarningStatusLabel status={w.status} />
-        <div className="text-muted-foreground text-xs">
-          {date(w.updated_at, "dd.MM.yyyy", locale)}
-        </div>
-      </td>
-      <td className="text-right">
-        <ApiWarningActions warning={w} />
-      </td>
-    </tr>
+  const { entries, isLoading: directoryLoading } = directory;
+  return useMemo<ColumnDef<ApiDataWarning, unknown>[]>(
+    () => [
+      createColumn<ApiDataWarning>({
+        id: "severity",
+        labelKey: "office.col_severity",
+        accessorKey: "severity",
+        cell: ({ row }) => <SeverityBadge severity={row.original.severity} />,
+      }),
+      createColumn<ApiDataWarning>({
+        id: "warning",
+        labelKey: "office.col_warning",
+        accessorKey: "code",
+        gridPrimary: true,
+        meta: { cellClassName: "min-w-72" },
+        cell: ({ row }) => {
+          const w = row.original;
+          return (
+            <>
+              <div>{warningText(w)}</div>
+              <Figure className="text-muted-foreground text-xs">
+                {[w.code, w.producer, w.period].filter(Boolean).join(" · ")}
+              </Figure>
+            </>
+          );
+        },
+      }),
+      createColumn<ApiDataWarning>({
+        id: "taxpayer",
+        labelKey: "office.col_taxpayer",
+        accessorKey: "engagement_uuid",
+        cell: ({ row }) => {
+          const taxpayer = entries.get(row.original.engagement_uuid);
+          return (
+            <>
+              <div>
+                {taxpayer?.title ??
+                  (directoryLoading
+                    ? "…"
+                    : t("office.warnings_api.unknown_taxpayer"))}
+              </div>
+              {taxpayer?.taxId ? (
+                <Figure className="text-muted-foreground text-xs">
+                  {taxpayer.taxId}
+                </Figure>
+              ) : null}
+            </>
+          );
+        },
+      }),
+      createColumn<ApiDataWarning>({
+        id: "document",
+        labelKey: "office.col_document",
+        accessorKey: "entity_type",
+        cell: ({ row }) => {
+          const w = row.original;
+          return w.entity_type === "invoice" && w.entity_uuid ? (
+            <Link
+              href={routes.tenant.invoice(
+                slug,
+                w.entity_uuid,
+                w.engagement_uuid,
+              )}
+              className="text-brand hover:underline"
+            >
+              {t("office.warnings_api.open_invoice")}
+            </Link>
+          ) : (
+            <span className="text-muted-foreground">
+              {entityLabel(w.entity_type)}
+            </span>
+          );
+        },
+      }),
+      createColumn<ApiDataWarning>({
+        id: "status",
+        labelKey: "office.col_status",
+        accessorKey: "status",
+        meta: { cellClassName: "whitespace-nowrap" },
+        cell: ({ row }) => (
+          <>
+            <WarningStatusLabel status={row.original.status} />
+            <div className="text-muted-foreground text-xs">
+              {date(row.original.updated_at, "dd.MM.yyyy", locale)}
+            </div>
+          </>
+        ),
+      }),
+      createActionsColumn<ApiDataWarning>({
+        cell: (w) => <ApiWarningActions warning={w} />,
+      }),
+    ],
+    // warningText / entityLabel her çizimde yeni; yalnızca t'ye bağlı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [directoryLoading, entries, locale, slug, t],
   );
 }
 
 /**
  * Düz liste (eski görünüm): sunucuda süzme ve sayfalama. Mükellef seçiliyse
  * o engagement'ın listesi kullanılır (ofis listesinde engagement süzgeci yok).
+ * Sayfa, sayfa boyutu ve kod süzgeci URL'de (#381).
  */
 function WarningsTable({
+  listState,
   engagement,
   severity,
   status,
   period,
 }: {
+  listState: ReturnType<typeof useUrlListState>;
   engagement?: string;
   severity?: ApiWarningSeverity;
   status?: ApiWarningStatus;
@@ -171,17 +212,22 @@ function WarningsTable({
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const directory = useEngagementDirectory();
   const rules = useWarningRules(slug);
-  const [code, setCode] = useState(ALL);
-  const filterKey = [engagement, severity, status, period, code].join("|");
-  const [page, setPage] = useState({ key: filterKey, offset: 0 });
-  const offset = page.key === filterKey ? page.offset : 0;
-  const setOffset = (next: number) => setPage({ key: filterKey, offset: next });
+  const columns = useWarningColumns();
+  const code = listState.getParam("code") ?? ALL;
+
+  // Üst çubuktaki dönem URL dışında değişir; liste ilk sayfaya döner.
+  const lastPeriod = useRef(period);
+  const { onPaginationChange } = listState;
+  useEffect(() => {
+    if (lastPeriod.current === period) return;
+    lastPeriod.current = period;
+    onPaginationChange((p) => ({ ...p, pageIndex: 0 }));
+  }, [onPaginationChange, period]);
 
   const query: WarningListQuery = {
-    limit: PAGE_SIZE,
-    offset,
+    limit: listState.params.limit,
+    offset: listState.params.offset,
     severity,
     status,
     code: code === ALL ? undefined : code,
@@ -190,8 +236,6 @@ function WarningsTable({
   const list = useWarnings(slug, query, engagement);
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const from = total === 0 ? 0 : offset + 1;
-  const to = Math.min(offset + items.length, total);
   const codes = [
     ...new Set((rules.data?.items ?? []).map((r) => r.code)),
   ].sort();
@@ -202,80 +246,38 @@ function WarningsTable({
         <FilterSelect
           label={t("office.warnings_api.filter_code")}
           value={code}
-          onChange={setCode}
+          onChange={(v) => listState.setParams({ code: v === ALL ? null : v })}
           options={[
             { value: ALL, label: t("office.filter_all") },
             ...codes.map((c) => ({ value: c, label: c })),
           ]}
         />
       ) : null}
-      <Panel>
-        {list.isLoading ? (
-          <div className="p-4">
-            <Loading label={t("common.loading")} />
-          </div>
-        ) : list.isError ? (
-          <ErrorState
-            className="m-4"
-            title={t("office.warnings_api.load_error")}
-            description={list.error.message}
-            onRetry={() => void list.refetch()}
-            retryLabel={t("common.retry")}
-          />
-        ) : items.length === 0 ? (
-          <EmptyState className="m-4" title={t("office.warnings_empty")} />
-        ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th>{t("office.col_severity")}</th>
-                <th>{t("office.col_warning")}</th>
-                <th>{t("office.col_taxpayer")}</th>
-                <th>{t("office.col_document")}</th>
-                <th>{t("office.col_status")}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((w) => (
-                <WarningRow
-                  key={w.uuid}
-                  warning={w}
-                  taxpayer={directory.entries.get(w.engagement_uuid)}
-                  directoryLoading={directory.isLoading}
-                />
-              ))}
-            </tbody>
-          </TableBox>
-        )}
-        {total > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3 text-sm">
-            <span className="text-muted-foreground text-xs">
-              {t("office.warnings_api.range", { from, to, total })}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={offset === 0 || list.isFetching}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              >
-                {t("office.warnings_api.prev")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={offset + PAGE_SIZE >= total || list.isFetching}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-              >
-                {t("office.warnings_api.next")}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Panel>
+      <EntityTable<ApiDataWarning>
+        columns={columns}
+        data={items}
+        getRowId={(w) => w.uuid}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        errorTitle={t("office.warnings_api.load_error")}
+        errorDescription={list.error?.message}
+        onRetry={() => void list.refetch()}
+        emptyTitle={t("office.warnings_empty")}
+        emptyDescription=""
+        state={listState.tableState}
+        rowCount={total}
+        pageSizeOptions={[25, 50, 100]}
+        // Sunucu sıralama ve serbest arama sunmuyor; yalnızca sayfalama.
+        features={{
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          rowSelection: false,
+          facetedFilters: false,
+          viewMode: false,
+          persistKey: "office.warnings.table",
+        }}
+      />
     </div>
   );
 }
@@ -490,14 +492,39 @@ function WarningGroupCard({
  * gruplu kartlar ya da düz liste. Dönem üst çubuktaki global seçiciden.
  */
 export function WarningsPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <WarningsInner />
+    </Suspense>
+  );
+}
+
+const STATUS_TABS: StatusTab[] = ["open", "acknowledged", "resolved"];
+
+function WarningsInner() {
   const { t } = useLocale();
   const { slug } = useTenant();
   const directory = useEngagementDirectory();
   const { period } = useOfficePeriod();
-  const [engagement, setEngagement] = useState(ALL);
-  const [status, setStatus] = useState<StatusTab>("open");
-  const [severity, setSeverity] = useState<ApiWarningSeverity | null>(null);
-  const [view, setView] = useState<ViewMode>("grouped");
+  // Süzgeçler URL'de (#381): geri tuşu ve paylaşılan bağlantı aynı görünümü
+  // açar; süzgeç değişince liste görünümü ilk sayfaya döner.
+  const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
+  const engagement = listState.getParam(ENGAGEMENT_PARAM) ?? ALL;
+  const rawStatus = listState.getParam("status") as StatusTab | null;
+  const status: StatusTab =
+    rawStatus && STATUS_TABS.includes(rawStatus) ? rawStatus : "open";
+  const rawSeverity = listState.getParam("severity") as ApiWarningSeverity;
+  const severity = SEVERITIES.includes(rawSeverity) ? rawSeverity : null;
+  const view: ViewMode =
+    listState.getParam("view") === "list" ? "list" : "grouped";
+  const setEngagement = (v: string) =>
+    listState.setParams({ [ENGAGEMENT_PARAM]: v === ALL ? null : v });
+  const setStatus = (v: StatusTab) =>
+    listState.setParams({ status: v === "open" ? null : v });
+  const setSeverity = (v: ApiWarningSeverity | null) =>
+    listState.setParams({ severity: v });
+  const setView = (v: ViewMode) =>
+    listState.setParams({ view: v === "grouped" ? null : v });
   const eng = engagement === ALL ? undefined : engagement;
 
   const open = useWarningGroups(slug, { period, status: "open" }, eng);
@@ -639,6 +666,7 @@ export function WarningsPage() {
 
       {view === "list" ? (
         <WarningsTable
+          listState={listState}
           engagement={eng}
           severity={severity ?? undefined}
           status={status}

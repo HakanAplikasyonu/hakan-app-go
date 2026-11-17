@@ -23,6 +23,8 @@ Yeni arayüzün proje sahibine gösterilecek ekran görüntüleri (Refs #324).
   - Go API CORS yanıtı vermediği için Expo web'in API istekleri Playwright'ta yakalanıp CORS başlıklarıyla geçirildi. Ürün kodu değişmedi.
 - Görüntüler pngquant ile sıkıştırıldı; her biri 400 KB'tan küçük.
 
+**Ortak tablo çekirdeği güncellemesi (#381).** Ofis listeleri ortak tablo çekirdeğine taşındıktan sonra şu ekranlar aynı yöntemle yeniden çekildi (m3-light 1440×900; tema ve telefon varyantları kendi boyutlarında): 02, 05, 07, 08, 09, 14, 15, 18, 20, 22, 24. Bu çekimde pngquant yoktu; dosyalar sıkıştırılmadı ama yine 400 KB'tan küçük. 10 (mizan hafızası) ve 11 (yevmiye) yeniden çekilmedi: o ekranların örnek verisi mizan hafızası senaryosunun tamamından geliyor ve senaryo bu çekimde yarıda kaldı (#381'in PR'ında açıklandı). İki tablo da aynı çekirdeğe taşındı.
+
 ## Ofis web paneli
 
 | # | Dosya | Açıklama |

@@ -221,6 +221,11 @@ export function TableView<TData>({
                       header.column.columnDef.header,
                       header.getContext(),
                     )
+                  ) : meta?.customHeader ? (
+                    flexRender(
+                      header.column.columnDef.header,
+                      header.getContext(),
+                    )
                   ) : meta?.srOnlyHeader ? (
                     <span className="sr-only">
                       <ColumnHeader
@@ -541,10 +546,11 @@ function TableCell<TData>({
         "align-middle",
         cellPad,
         meta?.align && alignClass[meta.align],
-        meta?.cellClassName,
         cell.column.id === "actions" && "whitespace-nowrap",
         pinned === "left" && "bg-background sticky start-0 z-10",
         pinned === "right" && "bg-background sticky end-0 z-10",
+        // Kolon sınıfı en sonda: sabit kolon zeminini de ezebilir.
+        meta?.cellClassName,
       )}
       style={{
         left:

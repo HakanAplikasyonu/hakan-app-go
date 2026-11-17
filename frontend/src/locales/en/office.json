@@ -224,8 +224,6 @@
   "engagement_col_number": "Invoice no.",
   "engagement_col_date": "Date",
   "engagement_col_amount": "Payable amount",
-  "engagement_prev": "Previous",
-  "engagement_next": "Next",
   "nav_command": "Command center",
   "command.title": "Command center",
   "command.description": "Taxpayer × period status: where is the work, who has it, what is it waiting for?",
