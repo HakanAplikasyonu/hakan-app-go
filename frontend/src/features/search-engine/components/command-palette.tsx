@@ -91,12 +91,16 @@ export function CommandPalette({
 
       <CommandInput
         ref={inputRef}
+        aria-label={t("search.input_label")}
         placeholder={data.placeholder}
         value={data.query}
         onValueChange={data.setQuery}
       />
 
-      <CommandList className="max-h-[min(420px,50vh)]">
+      <CommandList
+        className="max-h-[min(420px,50vh)]"
+        label={t("search.results_label")}
+      >
         {onAsk && data.query.trim().length >= 3 ? (
           <CommandGroup heading={t("search.copilot_group")}>
             <CommandItem

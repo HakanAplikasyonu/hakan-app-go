@@ -13,18 +13,18 @@ import { Api, DEMO, engagementOf, officePath, uiLogin, uniqueEmail } from "./lib
  *   yüklenir; hiçbir satır eklenmez (#484). Onay / ret yapılmaz: duman testi
  *   Ekim dönemini kilitler, bu dosya dönem durumuna bağlı kalmaz.
  * - Easytrade: Atlas Gıda, yalnızca okur.
- * - Rapor: Selin Yılmaz; gönderim benzersiz alıcıya kuyruğa alınır. E-posta
- *   beklenmez: gönderim taraması e2e'deki API içi worker'da yok (#461).
+ * - Rapor: Atlas Gıda (demo raporu zaten gönderilmiş); gönderim benzersiz
+ *   alıcıya kuyruğa alınır. Selin'in gönderilmemiş raporu co-pilot testinindir
+ *   (copilot-izgara.spec.ts). E-posta beklenmez: gönderim taraması e2e'deki
+ *   API içi worker'da yok (#461).
  */
 test.describe.configure({ mode: "serial" });
 
 let atlas = "";
-let selin = "";
 
 test.beforeAll(async () => {
   const api = await Api.login(DEMO.owner);
   atlas = await engagementOf(api, DEMO.atlas.title);
-  selin = await engagementOf(api, DEMO.selin.title);
   await api.dispose();
 });
 
@@ -128,7 +128,7 @@ test.describe("Easytrade", () => {
 test.describe("mükellef raporu", () => {
   test("aylık / yıllık, PDF ve e-postayla gönder", async ({ page }) => {
     await uiLogin(page, DEMO.owner);
-    await page.goto(officePath(`/engagements/${selin}/report`));
+    await page.goto(officePath(`/engagements/${atlas}/report`));
     await expect(page.getByRole("heading", { name: "Mükellef raporu" })).toBeVisible();
 
     const kind = page.getByRole("radiogroup", { name: "Rapor türü" });
@@ -155,13 +155,13 @@ test.describe("mükellef raporu", () => {
     const send = page.getByRole("button", { name: /^Seçilenlere gönder/ });
     await expect(send).toBeDisabled();
 
-    await page.getByRole("row").filter({ hasText: DEMO.selin.title }).getByRole("checkbox").check();
+    await page.getByRole("row").filter({ hasText: DEMO.atlas.title }).getByRole("checkbox").check();
     await expect(send).toHaveText(/\(1\)/);
     await send.click();
     const confirm = page.getByRole("dialog");
     if (await confirm.isVisible().catch(() => false)) {
       await confirm.getByRole("button", { name: /Gönder/ }).last().click();
     }
-    await expect(page.getByRole("table").last().getByRole("row").filter({ hasText: DEMO.selin.title }).first()).toBeVisible();
+    await expect(page.getByRole("table").last().getByRole("row").filter({ hasText: DEMO.atlas.title }).first()).toBeVisible();
   });
 });
