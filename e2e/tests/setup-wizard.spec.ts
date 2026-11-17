@@ -109,10 +109,22 @@ test("mükellef listesi: 200 satır, hatalı satırlar satır satır", async () 
     buffer: Buffer.from(list.csv, "utf8"),
   });
   await expect(owner.getByText(`${ROWS - 3} geçerli, 3 hatalı satır`)).toBeVisible();
-  // Satır numaraları başlık 1. satır olacak şekilde: 199, 200, 201.
-  await expect(owner.getByText("Hatalı VKN Ltd.")).toBeVisible();
-  await expect(owner.getByText("E-postasız A.Ş.")).toBeVisible();
-  await expect(owner.getByText("Tekrar A.Ş.")).toBeVisible();
+  // Satır numaraları başlık 1. satır olacak şekilde: 199, 200, 201. Hatalı
+  // satırlar yerinde düzeltilir (#330): unvan metin değil, satırın kutusunda.
+  const rows = owner.getByRole("table", { name: "Yüklenen mükellef listesi" });
+  const bad = [
+    [199, "Hatalı VKN Ltd.", "sağlama hanesi tutmuyor"],
+    [200, "E-postasız A.Ş.", "onay e-postası için iletişim e-postası gerekli"],
+    [201, "Tekrar A.Ş.", "aynı VKN/TCKN 3. satırda da var"],
+  ] as const;
+  for (const [n, title, reason] of bad) {
+    const field = owner.getByRole("textbox", { name: `${n}. satır unvan` });
+    const row = rows.getByRole("row").filter({ has: field });
+    await expect(row.getByRole("textbox", { name: `${n}. satır unvan` })).toHaveValue(title);
+    await expect(row).toContainText(reason);
+  }
+  // Gerekçe Türkçe; Go hata zinciri sızmaz.
+  await expect(rows).not.toContainText("invalid request");
   await owner.getByRole("button", { name: "Kaydet ve devam et" }).click();
 });
 

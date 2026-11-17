@@ -18,6 +18,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxid"
 )
 
 // Bulk taxpayer import (issue #273, setup wizard): an office uploads its
@@ -232,9 +233,24 @@ func kindOf(raw, taxID string) string {
 	return KindLegal
 }
 
+// validationMessage is the Turkish text an office sees for a rejected row:
+// Validate's known causes are translated; anything else loses its Go error
+// prefixes ("taxpayers: invalid request: …"), never the raw chain (#397).
 func validationMessage(err error) string {
+	switch {
+	case errors.Is(err, taxid.ErrChecksum):
+		return "VKN/TCKN geçersiz: sağlama hanesi tutmuyor"
+	case errors.Is(err, taxid.ErrFormat):
+		return "VKN 10, TCKN 11 haneli olmalı"
+	case errors.Is(err, errLegalNeedsVKN):
+		return "tüzel kişi için 10 haneli VKN gerekli"
+	case errors.Is(err, errTitle):
+		return fmt.Sprintf("unvan boş ya da %d karakterden uzun", maxTitleLen)
+	case errors.Is(err, errTaxOfficeLen):
+		return fmt.Sprintf("vergi dairesi en çok %d karakter olabilir", maxTaxOfficeLen)
+	}
 	msg := err.Error()
-	if i := strings.Index(msg, ": "); i >= 0 {
+	if i := strings.LastIndex(msg, ": "); i >= 0 {
 		msg = msg[i+2:]
 	}
 	return msg

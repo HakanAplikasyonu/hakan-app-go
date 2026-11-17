@@ -187,9 +187,15 @@ test("ilk ay: öneriler yüklemeyle gelir, müşavir 153'ü 150.01'e düzeltir",
     await expect(row).toHaveCount(1);
     // Kuyruk ve karar ekranı tek sayfa (#326): satırı seç, "Kodu düzelt".
     await row.click();
-    await office.getByRole("button", { name: "Kodu düzelt" }).click();
+    // Önceki kart çıkış animasyonunda bir süre DOM'da kalır (#397): düğmeyi
+    // bu kalemin karar kartında ara.
+    const card = office.getByRole("article").filter({ hasText: item });
+    await card.getByRole("button", { name: "Kodu düzelt" }).click();
     const input = office.getByPlaceholder("Hesap kodu ya da adı…");
     await input.fill(CORRECTED);
+    // Yazılan kod listede seçili olur; Enter onu işler (#397).
+    const option = office.getByRole("option", { name: new RegExp(`^${CORRECTED.replace(".", "\\.")} `) });
+    await expect(option).toHaveAttribute("aria-selected", "true");
     await input.press("Enter");
     await expect(lineRow(item, "153")).toHaveCount(0);
   }
@@ -199,7 +205,8 @@ test("onaylanan yeni cari Luca'da açılacak hesaplarda, şablon indirilir", asy
   await openQueue();
   const yeni = queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" });
   await yeni.click();
-  await office.getByRole("button", { name: "Onayla", exact: true }).click();
+  const card = office.getByRole("article").filter({ hasText: "Yeni Lojistik" });
+  await card.getByRole("button", { name: "Onayla", exact: true }).click();
   await expect(queueRows().filter({ hasText: "Cari hesap: Yeni Lojistik" })).toHaveCount(0);
 
   await office.goto(officePath(`/account-plan?taxpayer=${engagement}`));
