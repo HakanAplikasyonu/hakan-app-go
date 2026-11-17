@@ -8162,6 +8162,295 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}/transfers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: batchUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: createJournalTransfer
+      summary: Send an export to the accounting program through the desktop agent
+      description: |
+        Requires `tenant.journals.export` (issue #391). Queues a transfer
+        (`method: agent_folder`): the office's desktop agent writes the
+        export's files to the taxpayer's import folder and reports the
+        outcome. Only Luca and Zirve exports (`422 TRANSFER_UNSUPPORTED`);
+        an export whose entries were all reversed cannot be sent
+        (`422 TRANSFER_REVERSED`). An export has at most one open or
+        imported transfer (`409 TRANSFER_EXISTS`). No Luca / Zirve
+        credential is needed or stored.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalTransferInput" }
+      responses:
+        "201":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: The export already has an open or imported transfer (`TRANSFER_EXISTS`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: Not a Luca / Zirve export (`TRANSFER_UNSUPPORTED`) or every entry reversed (`TRANSFER_REVERSED`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Journals]
+      operationId: listJournalTransfers
+      summary: Transfers to the accounting program, newest first
+      description: |
+        Requires `tenant.journals.read` (issue #391). The history and error
+        screen of the journals page; the desktop agent polls
+        `status=queued`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { $ref: "#/components/schemas/JournalTransferStatus" } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Transfers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransferPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Journals]
+      operationId: getJournalTransfer
+      summary: One transfer to the accounting program
+      description: Requires `tenant.journals.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/claim:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: claimJournalTransfer
+      summary: Desktop agent takes a queued transfer
+      description: |
+        Requires `tenant.agents.write`. The agent (`agent_uuid`, registered
+        to the office and not revoked) takes a queued transfer, or one
+        another agent claimed more than 15 minutes ago without reporting.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalTransferClaimInput" }
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: The transfer is not in a state that allows this (`TRANSFER_STATE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The desktop agent is unknown or revoked (`AGENT_UNKNOWN`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/delivery:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: deliverJournalTransfer
+      summary: Desktop agent reports the outcome
+      description: |
+        Requires `tenant.agents.write`. Only the agent that claimed the
+        transfer reports. `delivered` lists the files written to the folder
+        (name, SHA-256, size); `failed` gives an error code and a Turkish
+        message shown on the journals page.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalTransferDeliveryInput" }
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: The transfer is not in a state that allows this (`TRANSFER_STATE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The desktop agent is unknown or revoked (`AGENT_UNKNOWN`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/complete:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: completeJournalTransfer
+      summary: Close a delivered transfer
+      description: |
+        Requires `tenant.journals.export`. The user imported the files in
+        the program (`imported`) or the program rejected them (`failed`,
+        with the program's message).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JournalTransferCompleteInput" }
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: The transfer is not in a state that allows this (`TRANSFER_STATE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: cancelJournalTransfer
+      summary: Cancel an open transfer
+      description: |
+        Requires `tenant.journals.export`. Queued, claimed or delivered
+        transfers only.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "409":
+          description: The transfer is not in a state that allows this (`TRANSFER_STATE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-transfers/{transferUuid}/retry:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transferUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: retryJournalTransfer
+      summary: Send a failed or cancelled transfer's export again
+      description: |
+        Requires `tenant.journals.export`. Opens a new queued transfer for
+        the same export; the old one stays in the history.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Transfer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalTransfer"
+        "409":
+          description: The transfer is not in a state that allows this (`TRANSFER_STATE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/privacy-requests:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -15656,6 +15945,98 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/JournalExportDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    JournalTransferStatus:
+      type: string
+      enum: [queued, claimed, delivered, imported, failed, cancelled]
+
+    JournalTransferInput:
+      type: object
+      properties:
+        method: { type: string, enum: [agent_folder], default: agent_folder }
+
+    JournalTransferClaimInput:
+      type: object
+      required: [agent_uuid]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+
+    JournalTransferFile:
+      type: object
+      required: [name, sha256, size]
+      properties:
+        name: { type: string, maxLength: 255 }
+        sha256: { type: string, minLength: 64, maxLength: 64 }
+        size: { type: integer, format: int64 }
+
+    JournalTransferDeliveryInput:
+      type: object
+      required: [agent_uuid, outcome]
+      properties:
+        agent_uuid: { type: string, format: uuid }
+        outcome: { type: string, enum: [delivered, failed] }
+        files: { type: array, maxItems: 100, items: { $ref: "#/components/schemas/JournalTransferFile" } }
+        folder_label: { type: string, maxLength: 200, description: Folder name shown to the user (not the full path) }
+        error_code: { type: string, pattern: "^[A-Z][A-Z0-9_]{1,63}$", example: FOLDER_MISSING }
+        error_message: { type: string, maxLength: 2000 }
+
+    JournalTransferCompleteInput:
+      type: object
+      required: [outcome]
+      properties:
+        outcome: { type: string, enum: [imported, failed] }
+        message: { type: string, maxLength: 2000, description: Required for failed; the program's error message }
+
+    JournalTransfer:
+      type: object
+      required: [uuid, batch_uuid, driver, method, status, files, delivered_files, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        batch_uuid: { type: string, format: uuid }
+        period: { type: string }
+        driver: { type: string, example: luca }
+        method: { type: string, enum: [agent_folder] }
+        status: { $ref: "#/components/schemas/JournalTransferStatus" }
+        agent:
+          type: object
+          required: [uuid, name]
+          properties:
+            uuid: { type: string, format: uuid }
+            name: { type: string }
+        files: { type: array, items: { $ref: "#/components/schemas/ExportFile" } }
+        delivered_files: { type: array, items: { $ref: "#/components/schemas/JournalTransferFile" } }
+        folder_label: { type: string }
+        error_code: { type: string }
+        error_message: { type: string }
+        claimed_at: { type: string, format: date-time }
+        delivered_at: { type: string, format: date-time }
+        completed_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    JournalTransferPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/JournalTransfer" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    EnvelopeJournalTransfer:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalTransfer" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeJournalTransferPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalTransferPage" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     PrivacyRequestInput:

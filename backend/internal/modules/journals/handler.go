@@ -72,6 +72,19 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base+"/journal-exports/{batchUuid}/files/{fileName}", engaged(read, h.download))
 	mux.Handle("GET "+base+"/journal-export-settings", scoped(read, h.getSettings))
 	mux.Handle("PUT "+base+"/journal-export-settings", scoped(export, h.putSettings))
+
+	// Transfers to the accounting program (#391). The office asks, closes,
+	// cancels and retries (export); the desktop agent of the office claims
+	// and reports delivery with its own agent permission.
+	agent := rbac.PermTenantAgentsWrite
+	mux.Handle("POST "+base+"/journal-exports/{batchUuid}/transfers", engaged(export, h.requestTransfer))
+	mux.Handle("GET "+base+"/journal-transfers", engaged(read, h.listTransfers))
+	mux.Handle("GET "+base+"/journal-transfers/{transferUuid}", engaged(read, h.getTransfer))
+	mux.Handle("POST "+base+"/journal-transfers/{transferUuid}/claim", engaged(agent, h.claimTransfer))
+	mux.Handle("POST "+base+"/journal-transfers/{transferUuid}/delivery", engaged(agent, h.deliverTransfer))
+	mux.Handle("POST "+base+"/journal-transfers/{transferUuid}/complete", engaged(export, h.completeTransfer))
+	mux.Handle("POST "+base+"/journal-transfers/{transferUuid}/cancel", engaged(export, h.cancelTransfer))
+	mux.Handle("POST "+base+"/journal-transfers/{transferUuid}/retry", engaged(export, h.retryTransfer))
 }
 
 func (h *Handler) drivers(w http.ResponseWriter, r *http.Request) {
@@ -298,6 +311,18 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "ALREADY_EXPORTED", "entry already exported; reverse it first")
 	case errors.Is(err, ErrNothingToExport):
 		response.Error(w, r, http.StatusUnprocessableEntity, "NOTHING_TO_EXPORT", "no approved entries to export")
+	case errors.Is(err, ErrTransferExists):
+		response.Conflict(w, r, "TRANSFER_EXISTS", "the export already has an open or imported transfer")
+	case errors.Is(err, ErrTransferState):
+		response.Conflict(w, r, "TRANSFER_STATE", "the transfer is not in a state that allows this")
+	case errors.Is(err, ErrTransferDriver):
+		response.Error(w, r, http.StatusUnprocessableEntity, "TRANSFER_UNSUPPORTED", "exports of this program cannot be transferred")
+	case errors.Is(err, ErrTransferReversed):
+		response.Error(w, r, http.StatusUnprocessableEntity, "TRANSFER_REVERSED", "every entry of the export was reversed")
+	case errors.Is(err, ErrAgentUnknown):
+		response.Error(w, r, http.StatusUnprocessableEntity, "AGENT_UNKNOWN", "desktop agent not found or revoked")
+	case errors.Is(err, ErrTransferInvalid):
+		response.BadRequest(w, r, "INVALID_TRANSFER", err.Error())
 	case errors.Is(err, accountingexport.ErrUnknownDriver), errors.Is(err, accountingexport.ErrTemplate):
 		response.BadRequest(w, r, "UNKNOWN_DRIVER", err.Error())
 	default:

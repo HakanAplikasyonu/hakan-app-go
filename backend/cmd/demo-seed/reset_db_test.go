@@ -106,6 +106,12 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		WHERE s.kind = 'receipt_field' AND s.status = 'pending'`, demo.OrgSlug); n != len(demoReceiptFields) {
 		t.Fatalf("pending receipt fields = %d, want %d", n, len(demoReceiptFields))
 	}
+	// #391: one imported Luca transfer and one failed Zirve transfer, once.
+	if n := count(t, d, `
+		SELECT count(*) FROM accounting_transfers a JOIN organizations o ON o.id = a.organization_id AND o.slug = $1
+		WHERE (a.driver = 'luca' AND a.status = 'imported') OR (a.driver = 'zirve' AND a.status = 'failed' AND a.error_message <> '')`, demo.OrgSlug); n != 2 {
+		t.Fatalf("demo transfers = %d, want 2", n)
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,

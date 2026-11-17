@@ -85,6 +85,29 @@ type AccountRuleSetting struct {
 	UpdatedAt              pgtype.Timestamptz `json:"updated_at"`
 }
 
+type AccountingTransfer struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ExportBatchID  int64              `json:"export_batch_id"`
+	Driver         string             `json:"driver"`
+	Method         string             `json:"method"`
+	Status         string             `json:"status"`
+	AgentID        pgtype.Int8        `json:"agent_id"`
+	DeliveredFiles []byte             `json:"delivered_files"`
+	FolderLabel    pgtype.Text        `json:"folder_label"`
+	ErrorCode      pgtype.Text        `json:"error_code"`
+	ErrorMessage   pgtype.Text        `json:"error_message"`
+	RequestedBy    int64              `json:"requested_by"`
+	CompletedBy    pgtype.Int8        `json:"completed_by"`
+	ClaimedAt      pgtype.Timestamptz `json:"claimed_at"`
+	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type ActivityEvent struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

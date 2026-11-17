@@ -46,8 +46,12 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
+	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
+	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
 	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
@@ -55,12 +59,16 @@ type Querier interface {
 	ClearPossibleDuplicateLinks(ctx context.Context, arg ClearPossibleDuplicateLinksParams) error
 	// Koşul başka yolla kalktı (ör. müşavir faturayla eşledi): açık görev kapanır.
 	CloseResolvedDocumentTasks(ctx context.Context, arg CloseResolvedDocumentTasksParams) (int64, error)
+	// Kullanıcının kapanışı: programda aktarıldı (imported) ya da program hata
+	// verdi (failed, mesajıyla). Yalnızca teslim edilmiş görev kapanır.
+	CompleteAccountingTransfer(ctx context.Context, arg CompleteAccountingTransferParams) (AccountingTransfer, error)
 	// Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 	CompleteDocumentTask(ctx context.Context, arg CompleteDocumentTaskParams) (int64, error)
 	ConfirmUserTOTP(ctx context.Context, arg ConfirmUserTOTPParams) (UserTotp, error)
 	ConsumeOTP(ctx context.Context, id int64) (int64, error)
 	CopyOfficeAccountRules(ctx context.Context, arg CopyOfficeAccountRulesParams) (int32, error)
 	CountAccountPlanAccounts(ctx context.Context, arg CountAccountPlanAccountsParams) (int64, error)
+	CountAccountingTransfers(ctx context.Context, arg CountAccountingTransfersParams) (int64, error)
 	CountActivityEvents(ctx context.Context, arg CountActivityEventsParams) (int64, error)
 	CountAllBulkJobs(ctx context.Context) (int64, error)
 	CountAllExportJobs(ctx context.Context) (int64, error)
@@ -230,6 +238,8 @@ type Querier interface {
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
 	DeleteWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) error
 	DeleteWebAuthnCredentialByUUID(ctx context.Context, arg DeleteWebAuthnCredentialByUUIDParams) error
+	// Ajanın sonucu: dosyalar klasörde (delivered) ya da hata (failed).
+	DeliverAccountingTransfer(ctx context.Context, arg DeliverAccountingTransferParams) (AccountingTransfer, error)
 	DisablePushDevice(ctx context.Context, arg DisablePushDeviceParams) error
 	EndEngagement(ctx context.Context, arg EndEngagementParams) (Engagement, error)
 	// tenant-lint: cross-org ofis geçişi: önceki ofisin engagement'ı mükellef onayıyla biter
@@ -283,8 +293,10 @@ type Querier interface {
 	FinishUBLUploadJob(ctx context.Context, arg FinishUBLUploadJobParams) error
 	GetAccountRuleByID(ctx context.Context, arg GetAccountRuleByIDParams) (AccountRule, error)
 	GetAccountRuleSettings(ctx context.Context, organizationID int64) (AccountRuleSetting, error)
+	GetAccountingTransfer(ctx context.Context, arg GetAccountingTransferParams) (GetAccountingTransferRow, error)
 	GetActiveAccountPlanImport(ctx context.Context, arg GetActiveAccountPlanImportParams) (AccountPlanImport, error)
 	GetActiveAccountRuleForUpdate(ctx context.Context, arg GetActiveAccountRuleForUpdateParams) (AccountRule, error)
+	GetActiveDesktopAgent(ctx context.Context, arg GetActiveDesktopAgentParams) (DesktopAgent, error)
 	// tenant-lint: cross-org onay sırasında mükellefin (hangi ofiste olursa) aktif engagement'ı
 	GetActiveEngagementForTaxpayer(ctx context.Context, taxpayerID int64) (Engagement, error)
 	// tenant-lint: cross-org mükellefin kendi aktif engagement'ı (hangi ofiste olursa)
@@ -453,6 +465,9 @@ type Querier interface {
 	InsertAccountPlanAccounts(ctx context.Context, arg InsertAccountPlanAccountsParams) (int64, error)
 	InsertAccountPlanImport(ctx context.Context, arg InsertAccountPlanImportParams) (AccountPlanImport, error)
 	InsertAccountRule(ctx context.Context, arg InsertAccountRuleParams) (AccountRule, error)
+	// Muhasebe programına aktarım görevleri (issue #391).
+	// Satır dönmezse çıktının açık ya da aktarılmış görevi var.
+	InsertAccountingTransfer(ctx context.Context, arg InsertAccountingTransferParams) (AccountingTransfer, error)
 	InsertActivityEvent(ctx context.Context, arg InsertActivityEventParams) (ActivityEvent, error)
 	InsertAppLog(ctx context.Context, arg InsertAppLogParams) error
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
@@ -519,6 +534,7 @@ type Querier interface {
 	ListAccountRuleVersions(ctx context.Context, arg ListAccountRuleVersionsParams) ([]AccountRule, error)
 	// Bir seviyenin (ofis şablonu: engagement_id NULL) kuralları.
 	ListAccountRules(ctx context.Context, arg ListAccountRulesParams) ([]AccountRule, error)
+	ListAccountingTransfers(ctx context.Context, arg ListAccountingTransfersParams) ([]ListAccountingTransfersRow, error)
 	// tenant-lint: org-wide kural adayı önizlemesi ofisin aktif engagement'larını gezer
 	ListActiveEngagementsForRules(ctx context.Context, organizationID int64) ([]ListActiveEngagementsForRulesRow, error)
 	ListActivePublicKeys(ctx context.Context, keys []string) ([]string, error)
