@@ -40,6 +40,11 @@ type Statement struct {
 	Lines       []Line
 	// Errors are rows that could not be read; they are reported, not stored.
 	Errors []RowError
+	// BankID is the bank the file belongs to (template, IBAN or bank name in
+	// the header area; #383). Empty when unknown.
+	BankID string
+	// Template says how the columns of a table statement were found.
+	Template *TemplateMatch
 }
 
 // Line is one movement plus what the parser learned about it.

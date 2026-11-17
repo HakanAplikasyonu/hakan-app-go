@@ -30,6 +30,12 @@ type pdfText struct {
 // table's header row fixes the column boundaries (23 §5.1) and every text run
 // below it falls into the column whose range contains its start.
 func ReadPDFRows(data []byte) ([][]string, error) {
+	return ReadPDFRowsWith(data, nil)
+}
+
+// ReadPDFRowsWith is ReadPDFRows that also takes a saved or built-in
+// template's header row as the table header (#383).
+func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
 	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("pdf: %w", err)
@@ -49,7 +55,7 @@ func ReadPDFRows(data []byte) ([][]string, error) {
 	var out [][]string
 	var bounds []float64 // start x of each header column
 	for _, row := range rows {
-		if isHeaderRow(row) {
+		if isHeaderRow(row) || isTemplateHeader(row, tpls) {
 			bounds = bounds[:0]
 			for _, t := range row {
 				bounds = append(bounds, t.x)
@@ -142,6 +148,15 @@ func isHeaderRow(row []pdfText) bool {
 	return hasDate && hasDesc && hasAmt
 }
 
+func isTemplateHeader(row []pdfText, tpls []Template) bool {
+	cells := make([]string, len(row))
+	for i, t := range row {
+		cells[i] = t.s
+	}
+	_, m := matchTemplate(cells, "pdf", tpls)
+	return m != nil
+}
+
 // columnOf: the last header column that starts at or before x, with a small
 // tolerance for right-aligned numbers that start a little left of the header.
 func columnOf(bounds []float64, x float64) int {
@@ -156,11 +171,16 @@ func columnOf(bounds []float64, x float64) int {
 
 // ParsePDF reads a text PDF statement. The running balance must add up.
 func ParsePDF(data []byte) (Statement, error) {
-	rows, err := ReadPDFRows(data)
+	return ParsePDFWith(data, nil)
+}
+
+// ParsePDFWith is ParsePDF with the office's templates.
+func ParsePDFWith(data []byte, tpls []Template) (Statement, error) {
+	rows, err := ReadPDFRowsWith(data, tpls)
 	if err != nil {
 		return Statement{}, err
 	}
-	st, err := ParseTabular(rows, "pdf")
+	st, err := ParseTabularWith(rows, "pdf", tpls)
 	if err != nil {
 		return st, err
 	}

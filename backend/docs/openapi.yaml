@@ -10576,10 +10576,140 @@ paths:
         "422":
           description: |
             `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
-            `STATEMENT_BALANCE_MISMATCH` (text PDF) or `SCANNED_PDF`
+            `STATEMENT_BALANCE_MISMATCH` (text PDF), `SCANNED_PDF` or `STATEMENT_LAYOUT_UNKNOWN`
+            (no template and no known header names; analyse the file with
+            `POST /v1/tenant/bank-statement-templates/analyze` and save a template)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/bank-statement-templates:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Bank]
+      operationId: listTenantBankStatementTemplates
+      summary: The office's bank statement templates, then the built-in ones
+      description: |
+        Requires `tenant.bank.read`. A template is a header row (fingerprint:
+        SHA-256 of the ordered, normalized header names) and the field of
+        every header. Office templates (`source = office`) are tried before
+        the built-in templates of the big Turkish banks (`source = builtin`)
+        and before the header synonyms. `fields` lists the assignable fields.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Templates
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementTemplateList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Bank]
+      operationId: saveTenantBankStatementTemplate
+      summary: Save a statement layout as an office template
+      description: |
+        Requires `tenant.bank.write`. `columns` are the header cells in
+        order (as `analyze` returned them) with their field; `field: ""`
+        ignores a column. Date and amount (or debit and credit) are
+        required, a field at most once. The same format + fingerprint
+        replaces the earlier template. The next upload of that layout is
+        read with it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BankStatementTemplateInput" }
+      responses:
+        "201":
+          description: Saved template
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementTemplate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "422":
+          description: "`INVALID_TEMPLATE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/bank-statement-templates/analyze:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Bank]
+      operationId: analyzeTenantBankStatement
+      summary: Read a statement file's layout and propose its columns
+      description: |
+        Requires `tenant.bank.write`. Nothing is imported. The header row is
+        matched to a template (`matched`); otherwise its cells are proposed
+        from the header words (`origin: heuristic`) and, when AI is
+        configured, by the model on a masked sample (`origin: ai`,
+        confidence at most 0.9). `lines` / `row_errors` say what the
+        proposal reads from the file. The accountant corrects the fields and
+        saves the result with `POST /v1/tenant/bank-statement-templates`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: Analysis
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankStatementAnalysis" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "413":
+          description: File too large (`UPLOAD_TOO_LARGE`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "415":
+          description: "`UNSUPPORTED_FILE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`TEMPLATE_NOT_NEEDED` (MT940), `STATEMENT_LAYOUT_UNKNOWN`, `SCANNED_PDF` or `STATEMENT_UNREADABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/bank-statement-templates/{templateUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: templateUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Bank]
+      operationId: deleteTenantBankStatementTemplate
+      summary: Delete one of the office's statement templates
+      description: Requires `tenant.bank.write`. Built-in templates cannot be deleted.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/bank-transactions:
@@ -16723,9 +16853,126 @@ components:
         format: { type: string, enum: [mt940, excel, csv, pdf] }
         encoding: { type: string }
         preview: { type: boolean }
+        bank_id: { type: string, description: "Bank of the file (template, IBAN or bank name); empty for MT940 or when unknown" }
+        template: { $ref: "#/components/schemas/BankStatementTemplateMatch" }
         accounts:
           type: array
           items: { $ref: "#/components/schemas/BankStatementAccount" }
+
+    BankStatementField:
+      type: string
+      enum: ["", date, time, value_date, description, amount, debit, credit, balance, receipt, reference, channel,
+        counterparty, counterparty_iban, counterparty_tax_id]
+
+    BankStatementTemplateColumn:
+      type: object
+      required: [header, field]
+      properties:
+        header: { type: string }
+        field: { $ref: "#/components/schemas/BankStatementField" }
+
+    BankStatementTemplateMatch:
+      type: object
+      required: [source, fingerprint]
+      properties:
+        source: { type: string, enum: [office, builtin, synonyms] }
+        name: { type: string }
+        bank_id: { type: string }
+        fingerprint: { type: string }
+
+    BankStatementTemplate:
+      type: object
+      required: [source, name, fingerprint, columns, hits]
+      properties:
+        uuid: { type: string, format: uuid, description: Office templates only }
+        source: { type: string, enum: [office, builtin] }
+        bank_id: { type: string }
+        name: { type: string }
+        format: { type: string, enum: [excel, csv, pdf], description: Empty for built-in templates (any table format) }
+        fingerprint: { type: string }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementTemplateColumn" }
+        hits: { type: integer }
+        last_used_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    BankStatementTemplateInput:
+      type: object
+      required: [format, columns]
+      additionalProperties: false
+      properties:
+        bank_id: { type: string, example: ziraat }
+        name: { type: string }
+        format: { type: string, enum: [excel, csv, pdf] }
+        columns:
+          type: array
+          minItems: 2
+          items: { $ref: "#/components/schemas/BankStatementTemplateColumn" }
+
+    BankStatementColumnSuggestion:
+      type: object
+      required: [index, header, field, confidence]
+      properties:
+        index: { type: integer, description: Column index in the file }
+        header: { type: string }
+        field: { $ref: "#/components/schemas/BankStatementField" }
+        confidence: { type: number }
+        origin: { type: string, enum: [template, synonym, heuristic, ai] }
+
+    BankStatementAnalysis:
+      type: object
+      required: [format, header_row, headers, fingerprint, columns, sample, lines, row_errors, warnings]
+      properties:
+        format: { type: string, enum: [excel, csv, pdf] }
+        bank_id: { type: string }
+        header_row: { type: integer, description: 1-based }
+        headers: { type: array, items: { type: string } }
+        fingerprint: { type: string }
+        matched: { $ref: "#/components/schemas/BankStatementTemplateMatch" }
+        columns:
+          type: array
+          items: { $ref: "#/components/schemas/BankStatementColumnSuggestion" }
+        sample:
+          type: array
+          description: Up to five data rows, one cell per header
+          items: { type: array, items: { type: string } }
+        lines: { type: integer }
+        row_errors: { type: integer }
+        warnings: { type: array, items: { type: string } }
+
+    EnvelopeBankStatementTemplate:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementTemplate" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeBankStatementTemplateList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, fields]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/BankStatementTemplate" }
+            fields:
+              type: array
+              items: { $ref: "#/components/schemas/BankStatementField" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeBankStatementAnalysis:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankStatementAnalysis" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeBankStatementReport:
       type: object

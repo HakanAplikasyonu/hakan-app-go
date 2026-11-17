@@ -41,10 +41,15 @@ func head(b []byte, n int) []byte {
 // Parse reads any supported statement file into statements (one per account
 // block) and returns the detected format and text encoding.
 func Parse(name string, data []byte) ([]Statement, string, error) {
+	return ParseWith(name, data, nil)
+}
+
+// ParseWith is Parse with the office's saved templates (#383).
+func ParseWith(name string, data []byte, tpls []Template) ([]Statement, string, error) {
 	format := Detect(name, data)
 	switch format {
 	case "pdf":
-		st, err := ParsePDF(data)
+		st, err := ParsePDFWith(data, tpls)
 		if err != nil {
 			return nil, format, err
 		}
@@ -54,7 +59,7 @@ func Parse(name string, data []byte) ([]Statement, string, error) {
 		if err != nil {
 			return nil, format, err
 		}
-		st, err := ParseTabular(rows, "excel")
+		st, err := ParseTabularWith(rows, "excel", tpls)
 		if err != nil {
 			return nil, format, err
 		}
@@ -69,7 +74,7 @@ func Parse(name string, data []byte) ([]Statement, string, error) {
 		if err != nil {
 			return nil, format, fmt.Errorf("csv: %w", err)
 		}
-		st, err := ParseTabular(rows, "csv")
+		st, err := ParseTabularWith(rows, "csv", tpls)
 		if err != nil {
 			return nil, format, err
 		}

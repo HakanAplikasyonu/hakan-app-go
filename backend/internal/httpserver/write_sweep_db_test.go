@@ -143,6 +143,9 @@ var tenantWrites = map[string]sweepCase{
 	"PATCH /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rows/{rowNo}": {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/commit":        {},
 	"POST /v1/tenant/engagements/{engagementUuid}/excel-imports/{importUuid}/rollback":      {},
+	"POST /v1/tenant/bank-statement-templates":                                              {body: `{"format":"csv","name":"Tarama","columns":[{"header":"Gün","field":"date"},{"header":"Tutar","field":"amount"}]}`},
+	"POST /v1/tenant/bank-statement-templates/analyze":                                      {file: "file", fileName: "ekstre.csv", fileBody: "Tarih;Açıklama;Tutar;Bakiye\n05.10.2026;Ödeme;-100,00;900,00\n"},
+	"DELETE /v1/tenant/bank-statement-templates/{templateUuid}":                             {},
 	"DELETE /v1/tenant/excel-import-templates/{templateUuid}":                               {},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts":                                 {file: "image", fileName: "fis.png", fileBody: officeReceiptPNG},
 	// WhatsApp Web uzantısı (#388).

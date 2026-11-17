@@ -7844,6 +7844,105 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/bank-statement-templates": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's bank statement templates, then the built-in ones
+         * @description Requires `tenant.bank.read`. A template is a header row (fingerprint:
+         *     SHA-256 of the ordered, normalized header names) and the field of
+         *     every header. Office templates (`source = office`) are tried before
+         *     the built-in templates of the big Turkish banks (`source = builtin`)
+         *     and before the header synonyms. `fields` lists the assignable fields.
+         */
+        get: operations["listTenantBankStatementTemplates"];
+        put?: never;
+        /**
+         * Save a statement layout as an office template
+         * @description Requires `tenant.bank.write`. `columns` are the header cells in
+         *     order (as `analyze` returned them) with their field; `field: ""`
+         *     ignores a column. Date and amount (or debit and credit) are
+         *     required, a field at most once. The same format + fingerprint
+         *     replaces the earlier template. The next upload of that layout is
+         *     read with it.
+         */
+        post: operations["saveTenantBankStatementTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/bank-statement-templates/analyze": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read a statement file's layout and propose its columns
+         * @description Requires `tenant.bank.write`. Nothing is imported. The header row is
+         *     matched to a template (`matched`); otherwise its cells are proposed
+         *     from the header words (`origin: heuristic`) and, when AI is
+         *     configured, by the model on a masked sample (`origin: ai`,
+         *     confidence at most 0.9). `lines` / `row_errors` say what the
+         *     proposal reads from the file. The accountant corrects the fields and
+         *     saves the result with `POST /v1/tenant/bank-statement-templates`.
+         */
+        post: operations["analyzeTenantBankStatement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/bank-statement-templates/{templateUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                templateUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete one of the office's statement templates
+         * @description Requires `tenant.bank.write`. Built-in templates cannot be deleted.
+         */
+        delete: operations["deleteTenantBankStatementTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
         parameters: {
             query?: never;
@@ -12813,7 +12912,100 @@ export interface components {
             format: "mt940" | "excel" | "csv" | "pdf";
             encoding?: string;
             preview: boolean;
+            /** @description Bank of the file (template, IBAN or bank name); empty for MT940 or when unknown */
+            bank_id?: string;
+            template?: components["schemas"]["BankStatementTemplateMatch"];
             accounts: components["schemas"]["BankStatementAccount"][];
+        };
+        /** @enum {string} */
+        BankStatementField: "" | "date" | "time" | "value_date" | "description" | "amount" | "debit" | "credit" | "balance" | "receipt" | "reference" | "channel" | "counterparty" | "counterparty_iban" | "counterparty_tax_id";
+        BankStatementTemplateColumn: {
+            header: string;
+            field: components["schemas"]["BankStatementField"];
+        };
+        BankStatementTemplateMatch: {
+            /** @enum {string} */
+            source: "office" | "builtin" | "synonyms";
+            name?: string;
+            bank_id?: string;
+            fingerprint: string;
+        };
+        BankStatementTemplate: {
+            /**
+             * Format: uuid
+             * @description Office templates only
+             */
+            uuid?: string;
+            /** @enum {string} */
+            source: "office" | "builtin";
+            bank_id?: string;
+            name: string;
+            /**
+             * @description Empty for built-in templates (any table format)
+             * @enum {string}
+             */
+            format?: "excel" | "csv" | "pdf";
+            fingerprint: string;
+            columns: components["schemas"]["BankStatementTemplateColumn"][];
+            hits: number;
+            /** Format: date-time */
+            last_used_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        BankStatementTemplateInput: {
+            /** @example ziraat */
+            bank_id?: string;
+            name?: string;
+            /** @enum {string} */
+            format: "excel" | "csv" | "pdf";
+            columns: components["schemas"]["BankStatementTemplateColumn"][];
+        };
+        BankStatementColumnSuggestion: {
+            /** @description Column index in the file */
+            index: number;
+            header: string;
+            field: components["schemas"]["BankStatementField"];
+            confidence: number;
+            /** @enum {string} */
+            origin?: "template" | "synonym" | "heuristic" | "ai";
+        };
+        BankStatementAnalysis: {
+            /** @enum {string} */
+            format: "excel" | "csv" | "pdf";
+            bank_id?: string;
+            /** @description 1-based */
+            header_row: number;
+            headers: string[];
+            fingerprint: string;
+            matched?: components["schemas"]["BankStatementTemplateMatch"];
+            columns: components["schemas"]["BankStatementColumnSuggestion"][];
+            /** @description Up to five data rows, one cell per header */
+            sample: string[][];
+            lines: number;
+            row_errors: number;
+            warnings: string[];
+        };
+        EnvelopeBankStatementTemplate: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankStatementTemplate"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankStatementTemplateList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BankStatementTemplate"][];
+                fields: components["schemas"]["BankStatementField"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankStatementAnalysis: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankStatementAnalysis"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeBankStatementReport: {
             /** @enum {boolean} */
@@ -28055,7 +28247,9 @@ export interface operations {
             };
             /**
              * @description `UNKNOWN_BANK_ACCOUNT`, `BANK_ACCOUNT_REQUIRED`, `STATEMENT_UNREADABLE`, `STATEMENT_INVALID_ROW`,
-             *     `STATEMENT_BALANCE_MISMATCH` (text PDF) or `SCANNED_PDF`
+             *     `STATEMENT_BALANCE_MISMATCH` (text PDF), `SCANNED_PDF` or `STATEMENT_LAYOUT_UNKNOWN`
+             *     (no template and no known header names; analyse the file with
+             *     `POST /v1/tenant/bank-statement-templates/analyze` and save a template)
              */
             422: {
                 headers: {
@@ -28065,6 +28259,172 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantBankStatementTemplates: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementTemplateList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    saveTenantBankStatementTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BankStatementTemplateInput"];
+            };
+        };
+        responses: {
+            /** @description Saved template */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementTemplate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            /** @description `INVALID_TEMPLATE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    analyzeTenantBankStatement: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Analysis */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankStatementAnalysis"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            /** @description File too large (`UPLOAD_TOO_LARGE`) */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `UNSUPPORTED_FILE` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `TEMPLATE_NOT_NEEDED` (MT940), `STATEMENT_LAYOUT_UNKNOWN`, `SCANNED_PDF` or `STATEMENT_UNREADABLE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTenantBankStatementTemplate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                templateUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -37,6 +37,8 @@ const (
 	colChannel
 	colCounterparty
 	colTime
+	colCounterpartyIBAN
+	colCounterpartyTaxID
 )
 
 // headerNames are matched on the normalized header text (banking.NormalizeDescription).
@@ -53,6 +55,9 @@ var headerNames = map[column][]string{
 	colChannel:      {"KANAL", "ISLEM KANALI", "CHANNEL"},
 	colCounterparty: {"KARSI TARAF", "KARSI TARAF ADI", "GONDEREN ALICI", "ALICI GONDEREN", "COUNTERPARTY"},
 	colTime:         {"SAAT", "ISLEM SAATI", "TIME"},
+	// Issue #383: columns some banks add.
+	colCounterpartyIBAN:  {"KARSI TARAF IBAN", "KARSI IBAN", "GONDEREN IBAN", "ALICI IBAN", "COUNTERPARTY IBAN"},
+	colCounterpartyTaxID: {"KARSI TARAF VKN", "GONDEREN ALICI VKN", "VKN TCKN", "KARSI TARAF VKN TCKN"},
 }
 
 var reIBANLoose = regexp.MustCompile(`TR\d{2}(?:\s?\d{4}){5}\s?\d{2}`)
@@ -73,12 +78,17 @@ func ReadXLSX(data []byte) ([][]string, error) {
 
 // ReadCSV reads semicolon, comma or tab separated text.
 func ReadCSV(text string) ([][]string, error) {
-	first, _, _ := strings.Cut(text, "\n")
-	sep := ','
-	best := strings.Count(first, ",")
-	for _, c := range []rune{';', '\t'} {
-		if n := strings.Count(first, string(c)); n > best {
-			sep, best = c, n
+	// The separator is the one used most on a line of the first 20: banks
+	// put a title line without separators above the table (#383).
+	sep, best := ',', 0
+	for i, line := range strings.SplitN(text, "\n", 21) {
+		if i == 20 {
+			break
+		}
+		for _, c := range []rune{',', ';', '\t'} {
+			if n := strings.Count(line, string(c)); n > best {
+				sep, best = c, n
+			}
 		}
 	}
 	r := csv.NewReader(strings.NewReader(text))
@@ -91,6 +101,12 @@ func ReadCSV(text string) ([][]string, error) {
 // ParseTabular finds the account and the header row, maps the columns and
 // reads the movements. format is "excel" or "csv".
 func ParseTabular(rows [][]string, format string) (Statement, error) {
+	return ParseTabularWith(rows, format, nil)
+}
+
+// ParseTabularWith is ParseTabular with the office's saved templates; they
+// are tried before the built-in ones and the header synonyms (#383).
+func ParseTabularWith(rows [][]string, format string, tpls []Template) (Statement, error) {
 	st := Statement{Format: format}
 	// Account: an IBAN in the header area (first 10 rows, 23 §4).
 	for i := 0; i < len(rows) && i < 10 && st.AccountIBAN == ""; i++ {
@@ -103,9 +119,19 @@ func ParseTabular(rows [][]string, format string) (Statement, error) {
 			}
 		}
 	}
-	hdr, cols := findHeader(rows)
+	hdr, cols, match := findHeader(rows, format, tpls)
 	if hdr < 0 {
-		return st, fmt.Errorf("%s: header row with date, description and amount columns not found", format)
+		return st, fmt.Errorf("%w (%s: header row with date, description and amount columns not found)", ErrLayoutUnknown, format)
+	}
+	st.Template = match
+	switch {
+	case match != nil && match.BankID != "":
+		st.BankID = match.BankID
+	case st.AccountIBAN != "":
+		st.BankID = BankFromIBAN(st.AccountIBAN)
+	}
+	if st.BankID == "" {
+		st.BankID = bankFromText(rows, hdr)
 	}
 	for r := hdr + 1; r < len(rows); r++ {
 		row := rows[r]
@@ -131,36 +157,47 @@ func ParseTabular(rows [][]string, format string) (Statement, error) {
 	return st, nil
 }
 
-func findHeader(rows [][]string) (int, map[column]int) {
+func findHeader(rows [][]string, format string, tpls []Template) (int, map[column]int, *TemplateMatch) {
 	for i := 0; i < len(rows) && i < 40; i++ {
-		cols := map[column]int{}
-		for j, cell := range rows[i] {
-			n := banking.NormalizeDescription(cell)
-			if n == "" {
-				continue
-			}
-			for c, names := range headerNames {
-				if _, done := cols[c]; done {
-					continue
-				}
-				for _, name := range names {
-					if n == name {
-						cols[c] = j
-						break
-					}
-				}
-			}
+		if cols, m := matchTemplate(rows[i], format, tpls); m != nil {
+			return i, cols, m
 		}
+	}
+	for i := 0; i < len(rows) && i < 40; i++ {
+		cols := synonymColumns(rows[i])
 		_, hasDate := cols[colDate]
 		_, hasDesc := cols[colDescription]
 		_, hasAmt := cols[colAmount]
 		_, hasDebit := cols[colDebit]
 		_, hasCredit := cols[colCredit]
 		if hasDate && hasDesc && (hasAmt || (hasDebit && hasCredit)) {
-			return i, cols
+			return i, cols, &TemplateMatch{Source: SourceSynonyms, Fingerprint: Fingerprint(rows[i])}
 		}
 	}
-	return -1, nil
+	return -1, nil, nil
+}
+
+// synonymColumns maps a row's cells by the header names banks use.
+func synonymColumns(row []string) map[column]int {
+	cols := map[column]int{}
+	for j, cell := range row {
+		n := banking.NormalizeDescription(cell)
+		if n == "" {
+			continue
+		}
+		for c, names := range headerNames {
+			if _, done := cols[c]; done {
+				continue
+			}
+			for _, name := range names {
+				if n == name {
+					cols[c] = j
+					break
+				}
+			}
+		}
+	}
+	return cols
 }
 
 func cell(row []string, cols map[column]int, c column) string {
@@ -231,8 +268,14 @@ func readRow(row []string, cols map[column]int) (Line, error) {
 	l.CounterpartyName = cell(row, cols, colCounterparty)
 	compact := strings.ReplaceAll(strings.ToUpper(l.Description), " ", "")
 	l.CounterpartyIBAN = findIBAN(compact)
+	if v := banking.NormalizeIBAN(cell(row, cols, colCounterpartyIBAN)); v != "" {
+		l.CounterpartyIBAN = v
+	}
 	if m := reTaxID.FindStringSubmatch(l.Description); m != nil {
 		l.CounterpartyTaxID = m[1]
+	}
+	if vkn, tckn := banking.SplitTaxID(cell(row, cols, colCounterpartyTaxID)); vkn+tckn != "" {
+		l.CounterpartyTaxID = vkn + tckn
 	}
 	return l, nil
 }

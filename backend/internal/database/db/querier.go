@@ -201,6 +201,7 @@ type Querier interface {
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
 	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
+	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
 	DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error
 	// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
@@ -610,6 +611,9 @@ type Querier interface {
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
 	ListBankRules(ctx context.Context, taxpayerID int64) ([]BankRule, error)
+	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
+	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
+	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
@@ -1089,6 +1093,7 @@ type Querier interface {
 	SupersedePeriodSummaryDrafts(ctx context.Context, arg SupersedePeriodSummaryDraftsParams) error
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
+	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
 	UpdateAppSettings(ctx context.Context, arg UpdateAppSettingsParams) (AppSetting, error)
 	UpdateAuthSettings(ctx context.Context, arg UpdateAuthSettingsParams) (AuthSetting, error)
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
@@ -1134,6 +1139,7 @@ type Querier interface {
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
 	UpsertBankRule(ctx context.Context, arg UpsertBankRuleParams) (BankRule, error)
+	UpsertBankStatementTemplate(ctx context.Context, arg UpsertBankStatementTemplateParams) (BankStatementTemplate, error)
 	UpsertBillingPlan(ctx context.Context, arg UpsertBillingPlanParams) (BillingPlan, error)
 	UpsertBillingStatement(ctx context.Context, arg UpsertBillingStatementParams) (BillingStatement, error)
 	UpsertCounterpartyAccount(ctx context.Context, arg UpsertCounterpartyAccountParams) error
