@@ -52,6 +52,12 @@ import {
 import { useEngagementScope } from "../engagement-scope";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import {
+  DOUBLE_BOOKING_CODES,
+  DoubleBookingReview,
+  ExportDocumentsPanel,
+  LucaPullSettingsPanel,
+} from "./journal-double-booking";
+import {
   JournalTransfersPanel,
   TRANSFER_STATUS,
 } from "./journal-transfers-panel";
@@ -334,14 +340,49 @@ function ExportPanel({
   const periodText = usePeriodText();
   const { slug } = useTenant();
   const drivers = useExportDrivers(slug);
-  const { export: run } = useJournalActions(slug, engagement);
+  const { export: run, check } = useJournalActions(slug, engagement);
   const items = drivers.data?.items ?? [];
   const [driver, setDriver] = useState("luca");
+  // Documents the accountant confirmed after the pre-export check (#466).
+  const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const chosen = items.find((d) => d.name === driver);
+  const review =
+    check.data && check.data.driver === driver && check.data.excluded.length
+      ? check.data
+      : undefined;
   const blocked =
     run.isError && isApiError(run.error) && run.error.code === "EXPORT_BLOCKED"
-      ? run.error.details
+      ? run.error.details.filter((d) => !DOUBLE_BOOKING_CODES.has(d.code ?? ""))
       : [];
+
+  const exportNow = (confirm: string[]) =>
+    run.mutate(
+      {
+        driver,
+        period,
+        confirm_documents: confirm.length ? confirm : undefined,
+      },
+      {
+        onSuccess: () => {
+          check.reset();
+          setConfirmed(new Set());
+        },
+      },
+    );
+  // Önce ön kontrol: uyarılı belge yoksa doğrudan çıktı alınır; varsa
+  // müşavir hangi belgelerin yine de aktarılacağını seçer.
+  const start = () => {
+    run.reset();
+    setConfirmed(new Set());
+    check.mutate(
+      { driver, period },
+      {
+        onSuccess: (c) => {
+          if (!c.excluded.length) exportNow([]);
+        },
+      },
+    );
+  };
 
   return (
     <Panel
@@ -355,7 +396,11 @@ function ExportPanel({
           <FilterSelect
             label={t("office.journals.driver")}
             value={driver}
-            onChange={setDriver}
+            onChange={(v) => {
+              setDriver(v);
+              check.reset();
+              setConfirmed(new Set());
+            }}
             options={items.map((d) => ({
               value: d.name,
               label: driverLabel(t, d.name),
@@ -370,10 +415,10 @@ function ExportPanel({
           ) : null}
           <Button
             size="sm"
-            disabled={!period || run.isPending || !chosen}
-            onClick={() => run.mutate({ driver, period })}
+            disabled={!period || run.isPending || check.isPending || !chosen}
+            onClick={start}
           >
-            {run.isPending ? (
+            {run.isPending || check.isPending ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <FileSpreadsheet className="size-4" />
@@ -381,10 +426,57 @@ function ExportPanel({
             {t("office.journals.export")}
           </Button>
         </div>
+        {chosen && !chosen.verified && chosen.name === "luca" ? (
+          <p className="text-status-warning text-xs">
+            {t("office.journals.luca_format_unverified")}
+          </p>
+        ) : null}
         {!period ? (
           <p className="text-muted-foreground text-xs">
             {t("office.journals.pick_period")}
           </p>
+        ) : null}
+        {review ? (
+          <div className="space-y-2">
+            <DoubleBookingReview
+              check={review}
+              confirmed={confirmed}
+              onToggle={(key, on) =>
+                setConfirmed((prev) => {
+                  const next = new Set(prev);
+                  if (on) next.add(key);
+                  else next.delete(key);
+                  return next;
+                })
+              }
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={run.isPending || (!review.entries && !confirmed.size)}
+                onClick={() => exportNow([...confirmed])}
+              >
+                <FileSpreadsheet className="size-4" />
+                {confirmed.size
+                  ? t("office.journals.dup.export_confirmed", {
+                      count: confirmed.size,
+                    })
+                  : t("office.journals.dup.export_rest", {
+                      count: review.entries,
+                    })}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  check.reset();
+                  setConfirmed(new Set());
+                }}
+              >
+                {t("office.journals.dup.cancel")}
+              </Button>
+            </div>
+          </div>
         ) : null}
         {blocked.length ? (
           <div className="border-status-blocking/40 rounded-md border p-3 text-sm">
@@ -400,9 +492,14 @@ function ExportPanel({
               ))}
             </ul>
           </div>
-        ) : run.isError ? (
+        ) : run.isError &&
+          !(isApiError(run.error) && run.error.code === "EXPORT_BLOCKED") ? (
           <p className="text-status-blocking text-sm">
             {errorText(t, run.error, t("office.api.load_error"))}
+          </p>
+        ) : check.isError ? (
+          <p className="text-status-blocking text-sm">
+            {errorText(t, check.error, t("office.api.load_error"))}
           </p>
         ) : null}
         {run.data ? (
@@ -410,6 +507,13 @@ function ExportPanel({
             <p className="text-status-approved">
               {t("office.journals.exported", { count: run.data.entries })}
             </p>
+            {run.data.excluded?.length ? (
+              <p className="text-status-warning text-xs">
+                {t("office.journals.dup.left_out", {
+                  count: run.data.excluded.length,
+                })}
+              </p>
+            ) : null}
             <ul className="mt-1 space-y-1">
               {run.data.files.map((f) => (
                 <li key={f.name}>
@@ -731,6 +835,10 @@ function JournalsInner() {
           </ul>
         </Panel>
       ) : null}
+
+      <ExportDocumentsPanel engagement={engagement} />
+
+      <LucaPullSettingsPanel engagement={engagement} />
 
       <JournalTransfersPanel engagement={engagement} />
     </div>

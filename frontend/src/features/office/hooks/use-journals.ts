@@ -7,6 +7,8 @@ import {
   journalService,
   type JournalDraftInput,
   type JournalExportInput,
+  type JournalExportSettings,
+  type OfficeJournalExportSettings,
 } from "@/features/office/services/journals.service";
 
 export function useExportDrivers(slug: string) {
@@ -53,6 +55,44 @@ export function useJournalTransfers(slug: string, engagement: string) {
   });
 }
 
+/** Document → file trail of the export history (#466). */
+export function useJournalDocuments(
+  slug: string,
+  engagement: string,
+  q: string,
+  batch = "",
+) {
+  return useQuery({
+    queryKey: journalKeys.documents(slug, engagement, q, batch),
+    queryFn: () => journalService.documents(slug, engagement, q, batch),
+    enabled: !!engagement,
+  });
+}
+
+export function useJournalSettings(slug: string, engagement: string) {
+  return useQuery({
+    queryKey: journalKeys.settings(slug, engagement),
+    queryFn: () => journalService.settings(slug, engagement),
+    enabled: !!engagement,
+  });
+}
+
+/** Office-wide export settings; saving refreshes every engagement's view. */
+export function useOfficeJournalSettings(slug: string) {
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: journalKeys.officeSettings(slug),
+    queryFn: () => journalService.officeSettings(slug),
+  });
+  const save = useMutation({
+    mutationFn: (input: OfficeJournalExportSettings) =>
+      journalService.saveOfficeSettings(slug, input),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["tenant", slug.toLowerCase()] }),
+  });
+  return { query, save };
+}
+
 /** Mutations of one engagement; every success refreshes its journal data. */
 export function useJournalActions(slug: string, engagement: string) {
   const qc = useQueryClient();
@@ -77,6 +117,16 @@ export function useJournalActions(slug: string, engagement: string) {
     export: useMutation({
       mutationFn: (input: JournalExportInput) =>
         journalService.export(slug, engagement, input),
+      onSuccess: refresh,
+    }),
+    check: useMutation({
+      mutationFn: (input: JournalExportInput) =>
+        journalService.check(slug, engagement, input),
+    }),
+    saveSettings: useMutation({
+      mutationFn: (
+        input: Omit<JournalExportSettings, "effective_luca_pull_integrators">,
+      ) => journalService.saveSettings(slug, engagement, input),
       onSuccess: refresh,
     }),
     requestTransfer: useMutation({

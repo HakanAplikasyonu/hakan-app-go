@@ -15,6 +15,18 @@ export type JournalTransfer = components["schemas"]["JournalTransfer"];
 export type JournalTransferPage = components["schemas"]["JournalTransferPage"];
 export type JournalTransferStatus =
   components["schemas"]["JournalTransferStatus"];
+export type JournalExportCheck = components["schemas"]["JournalExportCheck"];
+export type JournalExportDocument =
+  components["schemas"]["JournalExportDocument"];
+export type JournalExportSettings =
+  components["schemas"]["JournalExportSettings"];
+export type OfficeJournalExportSettings =
+  components["schemas"]["OfficeJournalExportSettings"];
+export type ExportIssue = components["schemas"]["ExportIssue"];
+
+/** Integrators Luca can fetch e-invoices from itself (#466). */
+export const LUCA_INTEGRATORS = ["isnet", "turmob", "gib"] as const;
+export type LucaIntegrator = (typeof LUCA_INTEGRATORS)[number];
 
 /** Programs whose exports the desktop agent can hand to the program (#391). */
 export const TRANSFER_DRIVERS = new Set(["luca", "zirve"]);
@@ -43,6 +55,12 @@ export const journalKeys = {
     [...base(slug, engagement), "journals", "exports"] as const,
   transfers: (slug: string, engagement: string) =>
     [...base(slug, engagement), "journals", "transfers"] as const,
+  documents: (slug: string, engagement: string, q: string, batch: string) =>
+    [...base(slug, engagement), "journals", "documents", q, batch] as const,
+  settings: (slug: string, engagement: string) =>
+    [...base(slug, engagement), "journals", "settings"] as const,
+  officeSettings: (slug: string) =>
+    ["tenant", slug.toLowerCase(), "journal-export-settings"] as const,
 };
 
 /**
@@ -108,6 +126,60 @@ export const journalService = {
       slug,
       "POST",
       `${eng(engagement)}/journal-exports`,
+      { body: input, silent: true },
+    );
+  },
+  /** Pre-export check (#466): issues and entries left out; nothing written. */
+  check(slug: string, engagement: string, input: JournalExportInput) {
+    return tenantRequest<JournalExportCheck>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-exports/check`,
+      { body: input, silent: true },
+    );
+  },
+  /** Document → file trail of the export history (#466). */
+  documents(slug: string, engagement: string, q: string, batch: string) {
+    return tenantRequest<{ items: JournalExportDocument[] }>(
+      slug,
+      "GET",
+      `${eng(engagement)}/journal-export-documents`,
+      { query: { q: q || undefined, batch: batch || undefined, limit: 100 } },
+    );
+  },
+  settings(slug: string, engagement: string) {
+    return tenantRequest<JournalExportSettings>(
+      slug,
+      "GET",
+      `${eng(engagement)}/journal-export-settings`,
+    );
+  },
+  /** Saves the taxpayer's export settings; `luca_pull_integrators: null`
+   * returns to the office setting. */
+  saveSettings(
+    slug: string,
+    engagement: string,
+    input: Omit<JournalExportSettings, "effective_luca_pull_integrators">,
+  ) {
+    return tenantRequest<JournalExportSettings>(
+      slug,
+      "PUT",
+      `${eng(engagement)}/journal-export-settings`,
+      { body: input, silent: true },
+    );
+  },
+  officeSettings(slug: string) {
+    return tenantRequest<OfficeJournalExportSettings>(
+      slug,
+      "GET",
+      "/v1/tenant/journal-export-settings",
+    );
+  },
+  saveOfficeSettings(slug: string, input: OfficeJournalExportSettings) {
+    return tenantRequest<OfficeJournalExportSettings>(
+      slug,
+      "PUT",
+      "/v1/tenant/journal-export-settings",
       { body: input, silent: true },
     );
   },
