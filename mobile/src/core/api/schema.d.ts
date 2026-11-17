@@ -4765,6 +4765,7 @@ export interface paths {
         /**
          * Upload an Excel / CSV export
          * @description Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
+         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
          */
         post: operations["uploadExcelImport"];
         delete?: never;
@@ -4941,6 +4942,7 @@ export interface paths {
         /**
          * Write the import to the common model
          * @description Requires `tenant.excel_imports.commit` (accountant). Only from preview. Rows already in the database (same source key or ETTN) are not duplicated. The same Idempotency-Key returns the committed import; another key gets 409.
+         *     Non-invoice data types (#395) are written by their module: payroll as the run of the period (a re-import replaces it), expenses and Z reports with the sheet row key (an exported list re-imports without duplicates), bank movements per account IBAN through the statement importer (no account column: the taxpayer's only bank account). Rows the module refuses are counted in `summary.rejected` with `summary.row_errors`; a refusal of the whole file (no period, unknown account) is 400.
          */
         post: operations["commitExcelImport"];
         delete?: never;
@@ -4969,7 +4971,7 @@ export interface paths {
         put?: never;
         /**
          * Remove the invoices this import created
-         * @description Requires `tenant.excel_imports.commit`. Invoices that existed before are left alone.
+         * @description Requires `tenant.excel_imports.commit`. Invoices that existed before are left alone. Only invoice imports roll back; other data types get 409 and are corrected in their own screens (#395).
          */
         post: operations["rollbackExcelImport"];
         delete?: never;
@@ -4996,6 +4998,32 @@ export interface paths {
          * @description Requires `tenant.excel_imports.read`. The office's company / tenant templates and the global ones.
          */
         get: operations["listExcelImportTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/excel-import-data-types": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Importable data types and their fields
+         * @description Requires `tenant.excel_imports.read`. Invoices, payroll, expenses, Z reports and bank movements (#395) with their target fields, field kinds and required groups (each group needs one mapped field). `available` is false when the server has no writer for the type.
+         */
+        get: operations["listExcelImportDataTypes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11986,7 +12014,7 @@ export interface components {
             field: string;
             confidence: number;
             /** @enum {string} */
-            origin: "template" | "ai" | "user";
+            origin: "template" | "ai" | "user" | "header";
             needs_review: boolean;
         };
         ExcelImport: {
@@ -12030,6 +12058,15 @@ export interface components {
                 added?: number;
                 duplicates?: number;
                 rolled_back?: number;
+                /** @description Rows the owning module refused (#395) */
+                rejected?: number;
+                row_errors?: {
+                    row_no: number;
+                    reason: string;
+                }[];
+                /** @description What the owning module wrote (#395) */
+                note?: string;
+                /** @description Invoices: payable total; payroll: net; expenses / Z: total; bank: 0 */
                 total_payable?: string;
                 vat_by_rate?: {
                     rate?: string;
@@ -12068,7 +12105,7 @@ export interface components {
         };
         ExcelImportMappingInput: {
             /** @enum {string} */
-            data_type?: "outgoing_invoices" | "incoming_invoices";
+            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
             source_system?: string;
             columns?: {
                 column: string;
@@ -12092,6 +12129,29 @@ export interface components {
             columns?: components["schemas"]["ExcelImportColumnMap"][];
             /** Format: date-time */
             updated_at?: string;
+        };
+        ExcelImportDataType: {
+            /** @enum {string} */
+            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            /** @example Banka hareketleri */
+            label: string;
+            fields: {
+                key: string;
+                description: string;
+                /** @enum {string} */
+                kind?: "text" | "date" | "money" | "rate" | "int";
+            }[];
+            required: string[][];
+            total_field?: string;
+            available: boolean;
+        };
+        EnvelopeExcelImportDataTypes: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ExcelImportDataType"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeExcelImport: {
             /** @enum {boolean} */
@@ -24976,7 +25036,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    data_type?: "outgoing_invoices" | "incoming_invoices";
+                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
                     /** @example bizimhesap */
                     source_system?: string;
                     /** @example 2026-10 */
@@ -25282,6 +25342,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeExcelImportTemplates"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listExcelImportDataTypes: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeExcelImportDataTypes"];
                 };
             };
             401: components["responses"]["Unauthenticated"];

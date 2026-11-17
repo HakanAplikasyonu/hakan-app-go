@@ -7,6 +7,8 @@ const (
 	OriginTemplate = "template"
 	OriginAI       = "ai"
 	OriginUser     = "user"
+	// OriginHeader: matched by the owning module's header names (#395).
+	OriginHeader = "header"
 )
 
 // ReviewBelow is the confidence under which a column is asked to the

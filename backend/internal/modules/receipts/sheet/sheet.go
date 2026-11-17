@@ -139,6 +139,25 @@ type Parsed struct {
 	Key string
 }
 
+// HeaderKey returns the column key whose header or alias is h.
+func HeaderKey(cols []Column, h string) (string, bool) {
+	n := parse.Normalize(h)
+	if n == "" {
+		return "", false
+	}
+	for _, c := range cols {
+		if parse.Normalize(c.Header) == n {
+			return c.Key, true
+		}
+		for _, a := range c.Aliases {
+			if parse.Normalize(a) == n {
+				return c.Key, true
+			}
+		}
+	}
+	return "", false
+}
+
 // Read finds the header row (the first with Tarih and Toplam) in the first
 // sheet that has one and returns the data rows below it. Empty rows and
 // "Toplam" summary rows are skipped.

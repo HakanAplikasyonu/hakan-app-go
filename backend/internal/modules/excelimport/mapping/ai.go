@@ -56,21 +56,40 @@ const systemPrompt = `Sen bir muhasebe veri eşleme aracısın. Bir Excel/CSV d�
 {"data_type":"outgoing_invoices|incoming_invoices","source_guess":"<program adı veya unknown>","columns":[{"column":"B","header":"...","field":"<alan veya null>","confidence":0.0}],"warnings":["..."]}
 Kurallar: her kolon için bir giriş; emin olmadığın veya hedefi olmayan kolonda field=null; bir alan en fazla bir kolona; confidence 0 ile 1 arası. Oran bazında KDV kolonları için "tax_summary[<oran>].base" ve "tax_summary[<oran>].vat" kullan (ör. "KDV %20" -> tax_summary[20].vat).`
 
+const recordSystemPrompt = `Sen bir muhasebe veri eşleme aracısın. Bir Excel/CSV dosyasının (bordro, masraf fişi, Z raporu veya banka ekstresi) başlıklarını ve maskelenmiş örnek satırlarını alırsın; her kolonu verilen hedef alanlardan birine eşlersin. Değer hesaplama, satır üretme, değer değiştirme YOK. Yalnızca şu JSON nesnesini döndür, başka metin yazma:
+{"data_type":"<verilen veri türü>","source_guess":"<program / banka adı veya unknown>","columns":[{"column":"B","header":"...","field":"<alan veya null>","confidence":0.0}],"warnings":["..."]}
+Kurallar: her kolon için bir giriş; emin olmadığın veya hedefi olmayan kolonda field=null; bir alan en fazla bir kolona; confidence 0 ile 1 arası. Borç ve alacak ayrı kolonlardaysa debit / credit, tek işaretli tutar kolonu varsa amount kullan.`
+
 // Map asks the model; an invalid answer is retried once (04 §4.3 rule 4).
 // On a second failure it returns an all-unmapped mapping for the
-// accountant, with a warning, and no error.
+// accountant, with a warning, and no error. Payroll sheets go to
+// MapPayroll; the other record types use their catalog (#395).
 func (m *AIMapper) Map(ctx context.Context, req AIRequest) (Mapping, error) {
 	if m == nil || m.ai == nil || !m.ai.Enabled() {
 		return Mapping{}, ErrAIUnavailable
 	}
+	if req.DataType == Payroll {
+		return m.MapPayroll(ctx, req)
+	}
 	headers, rows := MaskSample(req.Sheet, req.Layout)
 	sample, _ := json.Marshal(map[string]any{"headers": headers, "rows": rows})
+	system, purpose := systemPrompt, "excel_column_mapping"
 	var fields []string
-	for _, f := range InvoiceFields {
-		fields = append(fields, f.Key+" ("+f.Description+")")
+	var user string
+	if c, ok := CatalogFor(req.DataType); ok && !IsInvoice(req.DataType) {
+		for _, f := range c.Fields {
+			fields = append(fields, f.Key+" ("+f.Description+")")
+		}
+		system = recordSystemPrompt
+		user = fmt.Sprintf("Veri türü: %s (%s)\nHedef alanlar:\n- %s\nÖrnek (maskeli):\n%s",
+			c.DataType, c.Label, strings.Join(fields, "\n- "), sample)
+	} else {
+		for _, f := range InvoiceFields {
+			fields = append(fields, f.Key+" ("+f.Description+")")
+		}
+		user = fmt.Sprintf("Beklenen veri türü: %s\nHedef alanlar:\n- %s\n- tax_summary[<oran>].base / tax_summary[<oran>].vat\nÖrnek (maskeli):\n%s",
+			orUnknown(req.DataType), strings.Join(fields, "\n- "), sample)
 	}
-	user := fmt.Sprintf("Beklenen veri türü: %s\nHedef alanlar:\n- %s\n- tax_summary[<oran>].base / tax_summary[<oran>].vat\nÖrnek (maskeli):\n%s",
-		orUnknown(req.DataType), strings.Join(fields, "\n- "), sample)
 	var tp *int64
 	if req.TaxpayerID > 0 {
 		tp = &req.TaxpayerID
@@ -87,7 +106,7 @@ func (m *AIMapper) Map(ctx context.Context, req AIRequest) (Mapping, error) {
 		}
 		res, err := m.ai.Complete(ctx, aiusecase.Call{
 			OrganizationID: req.OrganizationID, TaxpayerID: tp, UserID: uid,
-			Purpose: "excel_column_mapping", System: []provider.SystemBlock{{Text: systemPrompt, Cache: true}},
+			Purpose: purpose, System: []provider.SystemBlock{{Text: system, Cache: true}},
 			Messages: msgs, MaxTokens: 2048,
 		})
 		if err != nil {

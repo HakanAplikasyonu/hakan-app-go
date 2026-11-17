@@ -12,40 +12,40 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
 )
 
-// Payroll is the data type of a payroll (bordro) sheet (#382). It is not in
-// SupportedDataTypes: payroll sheets are committed by the payroll module,
-// not by the invoice import flow.
+// Payroll is the data type of a payroll (bordro) sheet (#382). Payroll
+// sheets are committed by the payroll module (its own upload, or the
+// common Excel import flow through excelimport/target, #395).
 const Payroll = "payroll"
 
 // PayrollFields is the target catalog of a payroll sheet.
 var PayrollFields = []Field{
-	{"employee_name", "personel adı soyadı"},
-	{"first_name", "personel adı (soyadı ayrı kolonda)"},
-	{"last_name", "personel soyadı"},
-	{"national_id", "TC kimlik numarası"},
-	{"sgk_no", "SGK sicil numarası"},
-	{"job_title", "görevi / unvanı"},
-	{"department", "bölüm / departman"},
-	{"hire_date", "işe giriş tarihi"},
-	{"exit_date", "işten çıkış tarihi"},
-	{"period", "bordro dönemi (ay/yıl)"},
-	{"days_worked", "SGK prim günü / çalışılan gün"},
-	{"gross", "brüt ücret / toplam kazanç"},
-	{"sgk_base", "SGK matrahı"},
-	{"sgk_employee", "SGK işçi payı (%14)"},
-	{"unemployment_employee", "işsizlik sigortası işçi payı (%1)"},
-	{"income_tax_base", "gelir vergisi matrahı"},
-	{"income_tax", "ödenecek gelir vergisi"},
-	{"income_tax_exemption", "asgari ücret gelir vergisi istisnası"},
-	{"stamp_tax", "ödenecek damga vergisi"},
-	{"stamp_tax_exemption", "asgari ücret damga vergisi istisnası"},
-	{"agi", "asgari geçim indirimi (AGİ)"},
-	{"other_deductions", "diğer kesintiler (avans, icra, sendika)"},
-	{"net", "net ücret / ele geçen"},
-	{"sgk_employer", "SGK işveren payı"},
-	{"unemployment_employer", "işsizlik sigortası işveren payı (%2)"},
-	{"sgk_incentive", "SGK teşvik indirimi"},
-	{"employer_cost", "işverene toplam maliyet"},
+	{Key: "employee_name", Description: "personel adı soyadı"},
+	{Key: "first_name", Description: "personel adı (soyadı ayrı kolonda)"},
+	{Key: "last_name", Description: "personel soyadı"},
+	{Key: "national_id", Description: "TC kimlik numarası"},
+	{Key: "sgk_no", Description: "SGK sicil numarası"},
+	{Key: "job_title", Description: "görevi / unvanı"},
+	{Key: "department", Description: "bölüm / departman"},
+	{Key: "hire_date", Description: "işe giriş tarihi"},
+	{Key: "exit_date", Description: "işten çıkış tarihi"},
+	{Key: "period", Description: "bordro dönemi (ay/yıl)"},
+	{Key: "days_worked", Description: "SGK prim günü / çalışılan gün"},
+	{Key: "gross", Description: "brüt ücret / toplam kazanç"},
+	{Key: "sgk_base", Description: "SGK matrahı"},
+	{Key: "sgk_employee", Description: "SGK işçi payı (%14)"},
+	{Key: "unemployment_employee", Description: "işsizlik sigortası işçi payı (%1)"},
+	{Key: "income_tax_base", Description: "gelir vergisi matrahı"},
+	{Key: "income_tax", Description: "ödenecek gelir vergisi"},
+	{Key: "income_tax_exemption", Description: "asgari ücret gelir vergisi istisnası"},
+	{Key: "stamp_tax", Description: "ödenecek damga vergisi"},
+	{Key: "stamp_tax_exemption", Description: "asgari ücret damga vergisi istisnası"},
+	{Key: "agi", Description: "asgari geçim indirimi (AGİ)"},
+	{Key: "other_deductions", Description: "diğer kesintiler (avans, icra, sendika)"},
+	{Key: "net", Description: "net ücret / ele geçen"},
+	{Key: "sgk_employer", Description: "SGK işveren payı"},
+	{Key: "unemployment_employer", Description: "işsizlik sigortası işveren payı (%2)"},
+	{Key: "sgk_incentive", Description: "SGK teşvik indirimi"},
+	{Key: "employer_cost", Description: "işverene toplam maliyet"},
 }
 
 // PayrollField reports whether f is a payroll target field.
