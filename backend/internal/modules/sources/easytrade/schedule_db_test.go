@@ -52,8 +52,8 @@ func TestScheduledSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Oct + Nov × invoices + expenses.
-	if res.Status != "success" || res.Kind != RunScheduled || res.Counters.WindowsDone != 4 || res.Counters.InvoicesCreated != 4 || res.Counters.ExpensesCreated != 1 {
+	// Oct + Nov × invoices, expenses, financial transactions, Z reports.
+	if res.Status != "success" || res.Kind != RunScheduled || res.Counters.WindowsDone != 8 || res.Counters.InvoicesCreated != 4 || res.Counters.ExpensesCreated != 1 {
 		t.Fatalf("run: %+v", res)
 	}
 	list, _ := svc.List(ctx, tp)
@@ -68,7 +68,7 @@ func TestScheduledSync(t *testing.T) {
 	}
 	var windows int
 	_ = d.Pool.QueryRow(ctx, `SELECT count(*) FROM sync_windows w JOIN source_connections c ON c.id = w.connection_id WHERE c.uuid = $1 AND w.status = 'done'`, c.UUID).Scan(&windows)
-	if windows != 4 {
+	if windows != 8 {
 		t.Fatalf("%d done windows", windows)
 	}
 

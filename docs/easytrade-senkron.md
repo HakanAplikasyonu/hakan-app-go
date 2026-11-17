@@ -59,3 +59,46 @@ sig=$(printf '%s.%s' "$ts" "$body" | openssl dgst -sha256 -hmac "$EASYTRADE_WEBH
 curl -X POST "$API/v1/webhooks/easytrade" -H "Content-Type: application/json" \
   -H "X-Easytrade-Timestamp: $ts" -H "X-Easytrade-Signature: sha256=$sig" -d "$body"
 ```
+
+## 3. Okunan kaynaklar ve yazıldıkları modüller
+
+| Kalem (`sync_windows.item`) | Easytrade ucu | Portal | Not |
+|---|---|---|---|
+| `invoices` | `invoices/sales`, `invoices/purchases` + detay | `invoices` | 09 §3 |
+| `expenses` | `expenses` + detay | `expenses` | Detaylı: `payment_method` (`payment_method_type` / `financial_transactions[]`), `receipt_number`, satıcı VKN/TCKN (`customer.tax_number`), plaka. Şablon (`is_main_expense`) ve reddedilen masraf yazılmaz. |
+| `financial_transactions` | `financial-transactions` + detay | `source_financial_transactions` (yeni) | Tahsilat, ödeme, gelir/gider, perakende satış ödemesi. `payment_method_type`, `transaction_type`, `transaction_flow` Easytrade değerleriyle; `direction` (in/out) türetilir. Kişi/cari (`customer`), kasa/banka (`cash_box`). `referenceable_type = Invoice` → portal faturasına `invoice_id` bağlantısı (eşleştirme girdisi). İptal edilen yazılmaz. |
+| `z_reports` | **Önerilen** `z-reports` + detay | `retail_sales` (`source_id = z:<id>`) | Easytrade'de yok; uç 404 dönerken kalem `unsupported` sayılır, çalışma başarısız olmaz. Ödeme ve KDV kırılımı ham veride. |
+
+Ödeme türü değerleri (Easytrade `payment_method_type`): `cash` (nakit),
+`bank_transfer` (havale/EFT), `credit_card` (kart/POS), `check` (çek),
+`promissory_note` (senet), `credit` (veresiye); tanınmayan değer `unknown`
+olur, ham değer korunur.
+
+Dönem görünümleri:
+
+- `GET …/easytrade-connections/{uuid}/financial-transactions?period=YYYY-MM`: satırlar, ödeme türü × yön toplamı, cari bazında giriş/çıkış, faturaya bağlanan referans sayısı.
+- `GET …/easytrade-connections/{uuid}/z-reports?period=YYYY-MM`: Z raporları, dönem toplamı, ödeme türü dağılımı, `supported`.
+
+Banka/kasa: Easytrade'in kasa/banka hareketleri `source_financial_transactions`
+içinde `cash_box_*` alanlarıyla tutulur. `bank_transactions` banka kanalına
+(`source_system = bank_*`) ayrılmış olduğu için oraya yazılmaz; banka
+eşleştirmesi bu tabloyu ikinci girdi olarak okuyabilir (banka şeridi).
+
+## 4. Easytrade'den istenecekler
+
+Easytrade API'sinde bugün olmayan ya da belgelenmemiş, tam uyum için
+gereken uçlar ve bilgiler. Terimler Easytrade'in kendi terimleridir.
+`09` §9'daki 14 soru da geçerlidir; aşağıdakiler #385 kapsamında eklenenlerdir.
+
+| # | İstek | Portal tarafı |
+|---|---|---|
+| 1 | **Webhook (giden bildirim):** şirkette `invoice`, `expense`, `financial_transaction`, `retail_sale`, `z_report` oluştuğunda/değiştiğinde/silindiğinde `POST {portal}/v1/webhooks/easytrade`; gövde `{event_id, event, company_id, resource, resource_id, occurred_at}`, imza `X-Easytrade-Signature: sha256=HMAC(secret, "{X-Easytrade-Timestamp}.{gövde}")`. Paylaşılan sırrın şirket ya da entegrasyon bazında üretilmesi. | Hazır (§2), sır boşken kapalı |
+| 2 | **Z raporu ucu:** `GET /company/z-reports` (sayfalı, `sort=report_date`, şube bağlamı) ve `GET /company/z-reports/{id}`: `report_date`, `z_report_number`, `okc_serial_number`, `subtotal_amount`, `tax_amount`, `total_amount`, `currency`, `payments` (`payment_method_type` → tutar), `vat_breakdown[]` (`tax_rate`, `taxable_amount`, `tax_amount`). ÖKC/Paygo'dan gelen mali Z; `eod-sessions` kasa kapanışıdır, Z değildir. | Arabirim + fake ile test edildi (`ZReportSource`) |
+| 3 | `GET /company/financial-transactions` için tarih filtresi (`filters[transaction_date][start|end]`) ve liste elemanında `transaction_date` | Bugün tarih sıralı tarama ile pencere kesiliyor |
+| 4 | `financial_transaction.payment_method_type` değer listesi (havale ve EFT ayrımı var mı), `transaction_type` / `transaction_flow` anlamları (para girişi / çıkışı) | Yön türetmesi tahmine dayalı (`direction`) |
+| 5 | `financial_transaction.customer` (ad, VKN/TCKN) ve `cash_box` (ad, `type`) detayda gömülü mü, yoksa yalnızca `customer_id` / `cash_box_id` mi | Gömülü değilse `customers` / `cash-boxes` ayrıca okunmalı |
+| 6 | `referenceable_type` değerleri (`App\Models\Invoice`, `Sale` …) ve bir tahsilatın birden çok faturayı kapattığı durumda `allocations[]` | Fatura eşleştirmesi bugün tek referansla |
+| 7 | `expense` detayında ödeme türü (`payment_method_type`), fiş no (`receipt_number`), satıcı VKN'si; `GET /company/expenses/{id}/receipt` dosyasının kalıcı adresi | Ödeme türü ve fiş no alınıyor; fiş görseli henüz indirilmiyor |
+| 8 | Silinen kayıtların bildirimi (webhook `*.deleted` ya da `sync/pull` içinde) | `deleted_at_source` tespiti yok |
+| 9 | Şirket API token'ı (`api_token` + `api_secret`) ile kimlik doğrulama yöntemi; kullanıcı şifresi istemeden bağlantı | Bugün kullanıcı girişi + 30 günlük token |
+| 10 | Hız sınırı (istek/dakika) ve `429` yanıtında `Retry-After` | Zamanlama 5 dk'dan başlayan geri çekilme ile deniyor |

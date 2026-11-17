@@ -42,6 +42,8 @@ const (
 	PurposeExpenseRawPayload    = "expense.raw_payload"     // expenses
 	PurposeRetailSaleRawPayload = "retail_sale.raw_payload" // retail_sales
 	PurposeEntegratorHeader     = "entegrator.header_raw"   // entegrator_documents
+	// PurposeFinancialTxRawPayload: source_financial_transactions (issue #385).
+	PurposeFinancialTxRawPayload = "source_financial_transaction.raw_payload"
 )
 
 var ErrFieldKeyReused = errors.New("secrets: field key must differ from APP_ENCRYPTION_KEY and the vault keys")

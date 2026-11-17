@@ -41,6 +41,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("PATCH "+one, middleware.Chain(http.HandlerFunc(h.schedule), authn, org, write, eng))
 	mux.Handle("POST "+one+"/sync", middleware.Chain(http.HandlerFunc(h.sync), authn, org, write, eng))
 	mux.Handle("GET "+one+"/sync-runs", middleware.Chain(http.HandlerFunc(h.runs), authn, org, read, eng))
+	mux.Handle("GET "+one+"/financial-transactions", middleware.Chain(http.HandlerFunc(h.financial), authn, org, read, eng))
+	mux.Handle("GET "+one+"/z-reports", middleware.Chain(http.HandlerFunc(h.zReports), authn, org, read, eng))
 	mux.Handle("GET "+one+"/vat-reconciliation", middleware.Chain(http.HandlerFunc(h.reconcile), authn, org, read, eng))
 }
 
@@ -143,6 +145,49 @@ func (h *Handler) runs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
+func periodParam(w http.ResponseWriter, r *http.Request) (string, bool) {
+	p := r.URL.Query().Get("period")
+	if !periodOK(p) {
+		response.BadRequest(w, r, "INVALID_PERIOD", "period is YYYY-MM")
+		return "", false
+	}
+	return p, true
+}
+
+func (h *Handler) financial(w http.ResponseWriter, r *http.Request) {
+	id, ok := connID(w, r)
+	if !ok {
+		return
+	}
+	period, ok := periodParam(w, r)
+	if !ok {
+		return
+	}
+	out, err := h.svc.FinancialTransactions(r.Context(), tp(r), id, period)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
+}
+
+func (h *Handler) zReports(w http.ResponseWriter, r *http.Request) {
+	id, ok := connID(w, r)
+	if !ok {
+		return
+	}
+	period, ok := periodParam(w, r)
+	if !ok {
+		return
+	}
+	out, err := h.svc.ZReports(r.Context(), tp(r), id, period)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, out)
 }
 
 func (h *Handler) reconcile(w http.ResponseWriter, r *http.Request) {

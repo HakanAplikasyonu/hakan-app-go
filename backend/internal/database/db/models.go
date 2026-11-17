@@ -1510,6 +1510,42 @@ type SourceConnection struct {
 	SyncFailures        int32              `json:"sync_failures"`
 }
 
+type SourceFinancialTransaction struct {
+	ID                  int64              `json:"id"`
+	Uuid                uuid.UUID          `json:"uuid"`
+	TaxpayerID          int64              `json:"taxpayer_id"`
+	SourceSystem        string             `json:"source_system"`
+	SourceID            string             `json:"source_id"`
+	CaptureMethod       string             `json:"capture_method"`
+	TransactionDate     pgtype.Date        `json:"transaction_date"`
+	DueDate             pgtype.Date        `json:"due_date"`
+	Period              string             `json:"period"`
+	TransactionType     string             `json:"transaction_type"`
+	TransactionFlow     string             `json:"transaction_flow"`
+	Direction           string             `json:"direction"`
+	PaymentMethodType   string             `json:"payment_method_type"`
+	Amount              pgtype.Numeric     `json:"amount"`
+	Currency            string             `json:"currency"`
+	ExchangeRate        pgtype.Numeric     `json:"exchange_rate"`
+	AmountTry           pgtype.Numeric     `json:"amount_try"`
+	Description         string             `json:"description"`
+	ReferenceDocumentNo pgtype.Text        `json:"reference_document_no"`
+	Status              string             `json:"status"`
+	CustomerSourceID    pgtype.Text        `json:"customer_source_id"`
+	CustomerName        pgtype.Text        `json:"customer_name"`
+	CustomerTaxNumber   pgtype.Text        `json:"customer_tax_number"`
+	CashBoxSourceID     pgtype.Text        `json:"cash_box_source_id"`
+	CashBoxName         pgtype.Text        `json:"cash_box_name"`
+	CashBoxType         pgtype.Text        `json:"cash_box_type"`
+	ReferenceableType   pgtype.Text        `json:"referenceable_type"`
+	ReferenceableID     pgtype.Text        `json:"referenceable_id"`
+	InvoiceID           pgtype.Int8        `json:"invoice_id"`
+	RawPayload          []byte             `json:"raw_payload"`
+	ContentHash         pgtype.Text        `json:"content_hash"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
 type StepupSetting struct {
 	ID                        int16              `json:"id"`
 	TtlHours                  int32              `json:"ttl_hours"`

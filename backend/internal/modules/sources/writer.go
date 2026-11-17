@@ -35,8 +35,59 @@ type Expense struct {
 	VendorName   string
 	VendorTaxID  string
 	VehiclePlate string
-	Raw          map[string]any
-	Hash         string
+	// PaymentMethod is expenses.payment_method (cash, bank_transfer,
+	// credit_card, check, promissory_note, credit); empty → NULL.
+	PaymentMethod string
+	ReceiptNumber string
+	Raw           map[string]any
+	Hash          string
+}
+
+// FinancialTransaction is a collection, payment or other money movement
+// (01 §4.9). Names and values are Easytrade's.
+type FinancialTransaction struct {
+	SourceID            string
+	Date                time.Time
+	DueDate             *time.Time
+	Period              string
+	TransactionType     string
+	TransactionFlow     string
+	Direction           string // in, out, unknown
+	PaymentMethodType   string // cash, bank_transfer, credit_card, check, promissory_note, credit, unknown
+	Amount              decimal.Decimal
+	Currency            string
+	ExchangeRate        *decimal.Decimal
+	AmountTRY           decimal.Decimal
+	Description         string
+	ReferenceDocumentNo string
+	Status              string
+	CustomerSourceID    string
+	CustomerName        string
+	CustomerTaxNumber   string
+	CashBoxSourceID     string
+	CashBoxName         string
+	CashBoxType         string
+	// ReferenceableType Invoice links the movement to the portal invoice
+	// with source_id ReferenceableID (matching input).
+	ReferenceableType string
+	ReferenceableID   string
+	Raw               map[string]any
+	Hash              string
+}
+
+// ZReport is one fiscal day-end report (01 §4.7), written to retail_sales.
+type ZReport struct {
+	SourceID        string
+	Date            time.Time
+	Period          string
+	ZReportNumber   string
+	OKCSerialNumber string
+	Subtotal        decimal.Decimal
+	Tax             decimal.Decimal
+	Total           decimal.Decimal
+	Currency        string
+	Raw             map[string]any // payments and VAT breakdown stay here
+	Hash            string
 }
 
 // Excluded counts what was read but not written, by reason.
@@ -44,9 +95,11 @@ type Excluded map[string]int
 
 // Batch is one window's mapped records.
 type Batch struct {
-	Invoices []model.Invoice
-	Expenses []Expense
-	Excluded Excluded
+	Invoices              []model.Invoice
+	Expenses              []Expense
+	FinancialTransactions []FinancialTransaction
+	ZReports              []ZReport
+	Excluded              Excluded
 }
 
 // Report counts one import (02 §11: counts and totals equal the source).
@@ -57,7 +110,58 @@ type Report struct {
 	ExpensesUpdated    int      `json:"expenses_updated"`
 	ExpensesUnchanged  int      `json:"expenses_unchanged"`
 	PossibleDuplicates int      `json:"possible_duplicates"`
+	// Financial transactions and Z reports (issue #385); sources without
+	// them leave the counts out.
+	FinancialCreated   int      `json:"financial_created,omitempty"`
+	FinancialUpdated   int      `json:"financial_updated,omitempty"`
+	FinancialUnchanged int      `json:"financial_unchanged,omitempty"`
+	ZReportsCreated    int      `json:"z_reports_created,omitempty"`
+	ZReportsUpdated    int      `json:"z_reports_updated,omitempty"`
+	ZReportsUnchanged  int      `json:"z_reports_unchanged,omitempty"`
 	Excluded           Excluded `json:"excluded"`
+}
+
+// Add sums r into rep.
+func (rep *Report) Add(r Report) {
+	rep.InvoicesCreated += r.InvoicesCreated
+	rep.InvoicesExisting += r.InvoicesExisting
+	rep.ExpensesCreated += r.ExpensesCreated
+	rep.ExpensesUpdated += r.ExpensesUpdated
+	rep.ExpensesUnchanged += r.ExpensesUnchanged
+	rep.PossibleDuplicates += r.PossibleDuplicates
+	rep.FinancialCreated += r.FinancialCreated
+	rep.FinancialUpdated += r.FinancialUpdated
+	rep.FinancialUnchanged += r.FinancialUnchanged
+	rep.ZReportsCreated += r.ZReportsCreated
+	rep.ZReportsUpdated += r.ZReportsUpdated
+	rep.ZReportsUnchanged += r.ZReportsUnchanged
+	if rep.Excluded == nil {
+		rep.Excluded = Excluded{}
+	}
+	for k, v := range r.Excluded {
+		rep.Excluded[k] += v
+	}
+}
+
+func count(err error, inserted bool, created, updated, unchanged *int) error {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		*unchanged++
+	case err != nil:
+		return err
+	case inserted:
+		*created++
+	default:
+		*updated++
+	}
+	return nil
+}
+
+func date(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: *t, Valid: true}
 }
 
 // Write stores a batch in one transaction: invoices through the common
@@ -100,6 +204,7 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 				TaxExclusiveAmount: repository.Num(e.Amount.Sub(e.TaxAmount)), TaxAmount: repository.Num(e.TaxAmount),
 				Description: e.Description, ReceiptType: rt, VendorTaxNumber: repository.Text(e.VendorTaxID),
 				VendorName: repository.Text(e.VendorName), VehiclePlate: repository.Text(e.VehiclePlate),
+				PaymentMethod: repository.Text(e.PaymentMethod), ReceiptNumber: repository.Text(e.ReceiptNumber),
 				RawPayload: raw, ContentHash: repository.Text(e.Hash),
 			})
 			switch {
@@ -111,6 +216,58 @@ func Write(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64, sourceSyst
 				rep.ExpensesCreated++
 			default:
 				rep.ExpensesUpdated++
+			}
+		}
+		for _, f := range b.FinancialTransactions {
+			raw, err := json.Marshal(f.Raw)
+			if err != nil {
+				return err
+			}
+			if raw, err = secrets.SealField(secrets.PurposeFinancialTxRawPayload, raw); err != nil {
+				return err
+			}
+			cur := f.Currency
+			if cur == "" {
+				cur = "TRY"
+			}
+			row, err := q.UpsertSourceFinancialTransaction(ctx, db.UpsertSourceFinancialTransactionParams{
+				TaxpayerID: taxpayerID, SourceSystem: sourceSystem, SourceID: f.SourceID,
+				TransactionDate: pgtype.Date{Time: f.Date, Valid: true}, DueDate: date(f.DueDate), Period: f.Period,
+				TransactionType: f.TransactionType, TransactionFlow: f.TransactionFlow, Direction: f.Direction,
+				PaymentMethodType: f.PaymentMethodType, Amount: repository.Num(f.Amount), Currency: cur,
+				ExchangeRate: repository.NumPtr(f.ExchangeRate), AmountTry: repository.Num(f.AmountTRY),
+				Description: f.Description, ReferenceDocumentNo: repository.Text(f.ReferenceDocumentNo), Status: f.Status,
+				CustomerSourceID: repository.Text(f.CustomerSourceID), CustomerName: repository.Text(f.CustomerName),
+				CustomerTaxNumber: repository.Text(f.CustomerTaxNumber), CashBoxSourceID: repository.Text(f.CashBoxSourceID),
+				CashBoxName: repository.Text(f.CashBoxName), CashBoxType: repository.Text(f.CashBoxType),
+				ReferenceableType: repository.Text(f.ReferenceableType), ReferenceableID: repository.Text(f.ReferenceableID),
+				RawPayload: raw, ContentHash: repository.Text(f.Hash),
+			})
+			if err := count(err, row.Inserted, &rep.FinancialCreated, &rep.FinancialUpdated, &rep.FinancialUnchanged); err != nil {
+				return err
+			}
+		}
+		for _, z := range b.ZReports {
+			raw, err := json.Marshal(z.Raw)
+			if err != nil {
+				return err
+			}
+			if raw, err = secrets.SealField(secrets.PurposeRetailSaleRawPayload, raw); err != nil {
+				return err
+			}
+			cur := z.Currency
+			if cur == "" {
+				cur = "TRY"
+			}
+			row, err := q.UpsertSourceZReport(ctx, db.UpsertSourceZReportParams{
+				TaxpayerID: taxpayerID, SourceSystem: sourceSystem, SourceID: z.SourceID,
+				SaleDate: pgtype.Date{Time: z.Date, Valid: true}, Period: repository.Text(z.Period),
+				ZReportNumber: repository.Text(z.ZReportNumber), OkcSerialNumber: repository.Text(z.OKCSerialNumber),
+				SubtotalAmount: repository.Num(z.Subtotal), TaxAmount: repository.Num(z.Tax), TotalAmount: repository.Num(z.Total),
+				Currency: cur, RawPayload: raw, ContentHash: repository.Text(z.Hash),
+			})
+			if err := count(err, row.Inserted, &rep.ZReportsCreated, &rep.ZReportsUpdated, &rep.ZReportsUnchanged); err != nil {
+				return err
 			}
 		}
 		return nil

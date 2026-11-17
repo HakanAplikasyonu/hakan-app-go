@@ -29,3 +29,4 @@ bank_transaction_matches
 taxpayer_history_shares
 bank_transaction_documents
 entegrator_documents
+source_financial_transactions

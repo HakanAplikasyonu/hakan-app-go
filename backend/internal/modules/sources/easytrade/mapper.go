@@ -89,17 +89,25 @@ func hash(o obj) string {
 
 // Items the adapter reads; each is one sync_windows.item (issue #385).
 const (
-	ItemInvoices = "invoices"
-	ItemExpenses = "expenses"
+	ItemInvoices  = "invoices"
+	ItemExpenses  = "expenses"
+	ItemFinancial = "financial_transactions"
+	ItemZReports  = "z_reports"
 )
 
-// Items lists what a sync reads, in order.
-var Items = []string{ItemInvoices, ItemExpenses}
+// Items lists what a sync reads, in order: invoices before the financial
+// transactions that reference them.
+var Items = []string{ItemInvoices, ItemExpenses, ItemFinancial, ItemZReports}
 
 // DateField is the sync_windows.date_field of an item.
 func DateField(item string) string {
-	if item == ItemExpenses {
+	switch item {
+	case ItemExpenses:
 		return "expense"
+	case ItemFinancial:
+		return "transaction"
+	case ItemZReports:
+		return "report"
 	}
 	return "issue"
 }
@@ -152,6 +160,10 @@ func (c *Client) ReadItem(ctx context.Context, item string, branches []Branch, f
 			err = c.readInvoices(ctx, &b, seen, from, to)
 		case ItemExpenses:
 			err = c.readExpenses(ctx, &b, seen, from, to)
+		case ItemFinancial:
+			err = c.readFinancial(ctx, &b, seen, from, to)
+		case ItemZReports:
+			err = c.readZReports(ctx, &b, seen, from, to)
 		default:
 			err = fmt.Errorf("easytrade: unknown item %q", item)
 		}
@@ -381,9 +393,18 @@ func mapExpense(d obj) (sources.Expense, string) {
 	}
 	return sources.Expense{
 		SourceID: d.str("id"), Date: date, Period: date.Format("2006-01"), Amount: amount, TaxAmount: tax, TaxRate: rate,
-		Currency: cur, Description: d.str("description"), VendorName: d.sub("customer").str("name"),
-		VehiclePlate: plate(d.str("description")), Raw: map[string]any{"easytrade": map[string]any(d)}, Hash: hash(d),
+		Currency: cur, Description: d.str("description"),
+		VendorName:    firstNonEmpty(d.sub("customer").str("name"), d.str("vendor_name")),
+		VendorTaxID:   vendorTaxID(d),
+		PaymentMethod: expensePayment(d),
+		ReceiptNumber: firstNonEmpty(d.str("receipt_number"), d.str("document_number"), d.str("reference_document_no")),
+		VehiclePlate:  plate(d.str("description")), Raw: map[string]any{"easytrade": map[string]any(d)}, Hash: hash(d),
 	}, ""
+}
+
+// vendorTaxID: expenses.vendor_tax_number holds a VKN (10) or TCKN (11).
+func vendorTaxID(d obj) string {
+	return taxID(d.sub("customer").str("tax_number"), d.sub("customer").str("identity_number"), d.str("vendor_tax_number"))
 }
 
 func firstNonEmpty(vs ...string) string {

@@ -21,14 +21,36 @@ const (
 
 // Easytrade fakes the Easytrade API: /auth/login → token, Bearer +
 // X-Company-ID (+ X-Branch-ID) headers, branches, paged sales / purchases /
-// expenses (date desc, id desc), their details and the VAT report.
+// expenses / financial transactions (date desc, id desc), their details and
+// the VAT report. Z reports (GET /company/z-reports) are the endpoint the
+// portal asks Easytrade for (issue #385): nil ZReports answers 404 like
+// Easytrade today.
 type Easytrade struct {
-	mu       sync.Mutex
-	Invoices map[string]map[string]any // id → detail
-	BranchOf map[string]string         // invoice id (expense: "e"+id) → branch
-	Expenses map[string]map[string]any
-	License  bool // false → 403 LICENSE_EXPIRED
-	Logins   int
+	mu        sync.Mutex
+	Invoices  map[string]map[string]any // id → detail
+	BranchOf  map[string]string         // invoice id (expense "e"+id, financial "f"+id, Z "z"+id) → branch; missing → "1"
+	Expenses  map[string]map[string]any
+	Financial map[string]map[string]any // financial-transactions id → detail
+	ZReports  map[string]map[string]any // nil → 404
+	License   bool                      // false → 403 LICENSE_EXPIRED
+	Logins    int
+}
+
+func (f *Easytrade) branchOf(key string) string {
+	if b, ok := f.BranchOf[key]; ok {
+		return b
+	}
+	return "1"
+}
+
+func (f *Easytrade) listOf(r *http.Request, w http.ResponseWriter, rows map[string]map[string]any, prefix, field string) {
+	var out []map[string]any
+	for id, d := range rows {
+		if f.branchOf(prefix+id) == r.Header.Get("X-Branch-ID") {
+			out = append(out, map[string]any{"id": json.Number(id), field: d[field]})
+		}
+	}
+	page(w, r, out, field)
 }
 
 func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -72,13 +94,21 @@ func (f *Easytrade) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.URL.Path == "/company/expenses":
 		var rows []map[string]any
 		for id, d := range f.Expenses {
-			if f.BranchOf["e"+id] == br {
+			if f.branchOf("e"+id) == br {
 				rows = append(rows, map[string]any{"id": json.Number(id), "expense_date": d["expense_date"]})
 			}
 		}
 		page(w, r, rows, "expense_date")
 	case strings.HasPrefix(r.URL.Path, "/company/expenses/"):
 		writeJSON(w, map[string]any{"data": f.Expenses[strings.TrimPrefix(r.URL.Path, "/company/expenses/")]})
+	case r.URL.Path == "/company/financial-transactions":
+		f.listOf(r, w, f.Financial, "f", "transaction_date")
+	case strings.HasPrefix(r.URL.Path, "/company/financial-transactions/"):
+		writeJSON(w, map[string]any{"data": f.Financial[strings.TrimPrefix(r.URL.Path, "/company/financial-transactions/")]})
+	case r.URL.Path == "/company/z-reports" && f.ZReports != nil:
+		f.listOf(r, w, f.ZReports, "z", "report_date")
+	case strings.HasPrefix(r.URL.Path, "/company/z-reports/") && f.ZReports != nil:
+		writeJSON(w, map[string]any{"data": f.ZReports[strings.TrimPrefix(r.URL.Path, "/company/z-reports/")]})
 	case r.URL.Path == "/company/reports/vat":
 		writeJSON(w, map[string]any{"data": map[string]any{"sales": f.VAT("outgoing"), "purchases": f.VAT("incoming")}})
 	default:
@@ -165,5 +195,56 @@ func EasytradeSample() *Easytrade {
 	}
 	f.Expenses["901"] = EasytradeExpense(901, "2026-10-05", "kırtasiye", false)
 	f.BranchOf["e901"] = "1"
+	f.Financial = EasytradeFinancialSample()
+	f.ZReports = EasytradeZReportSample()
 	return f
+}
+
+// EasytradeFinancial is one financial transaction detail (01 §4.9).
+func EasytradeFinancial(id int, date, typ, method, amount, customer, taxNumber string, invoiceID int) map[string]any {
+	d := map[string]any{"id": id, "transaction_date": date, "transaction_type": map[string]any{"value": typ, "label": typ},
+		"payment_method_type": map[string]any{"value": method, "label": method}, "amount": amount, "currency": map[string]any{"code": "TRY"},
+		"description": typ + " " + customer, "status": map[string]any{"value": "completed"},
+		"customer": map[string]any{"id": 500 + id, "name": customer, "tax_number": taxNumber},
+		"cash_box": map[string]any{"id": 7, "name": "Merkez Kasa", "type": "cash"}}
+	if invoiceID > 0 {
+		d["referenceable_type"] = `App\Models\Invoice`
+		d["referenceable_id"] = invoiceID
+	}
+	return d
+}
+
+// EasytradeFinancialSample: October collections and payments of two
+// people (Ahmet, Mehmet) by cash, card and bank transfer; two reference
+// sample invoices.
+func EasytradeFinancialSample() map[string]map[string]any {
+	return map[string]map[string]any{
+		"801": EasytradeFinancial(801, "2026-10-04", "income", "cash", "120.00", "Ahmet Yılmaz", "12345678950", 1),
+		"802": EasytradeFinancial(802, "2026-10-09", "income", "credit_card", "250.00", "Mehmet Demir", "", 2),
+		"803": EasytradeFinancial(803, "2026-10-14", "expense", "bank_transfer", "300.00", "Yıldız Market", "9100000021", 3),
+		"804": EasytradeFinancial(804, "2026-10-20", "retail_sale", "credit_card", "80.00", "Ahmet Yılmaz", "12345678950", 0),
+		"805": EasytradeFinancial(805, "2026-10-21", "income", "cash", "40.00", "Mehmet Demir", "", 0),
+	}
+}
+
+// EasytradeZReport is one Z report in the proposed shape
+// (docs/easytrade-senkron.md §4).
+func EasytradeZReport(id int, date, no, cash, card string) map[string]any {
+	c, k := decimal.RequireFromString(cash), decimal.RequireFromString(card)
+	total := c.Add(k)
+	tax := total.Mul(decimal.NewFromInt(20)).Div(decimal.NewFromInt(120)).Round(2)
+	return map[string]any{"id": id, "report_date": date, "z_report_number": no, "okc_serial_number": "AB12345678",
+		"total_amount": total.StringFixed(2), "tax_amount": tax.StringFixed(2), "subtotal_amount": total.Sub(tax).StringFixed(2),
+		"currency":      map[string]any{"code": "TRY"},
+		"payments":      map[string]any{"cash": c.StringFixed(2), "credit_card": k.StringFixed(2)},
+		"vat_breakdown": []map[string]any{{"tax_rate": "20", "taxable_amount": total.Sub(tax).StringFixed(2), "tax_amount": tax.StringFixed(2)}}}
+}
+
+// EasytradeZReportSample: three October days.
+func EasytradeZReportSample() map[string]map[string]any {
+	return map[string]map[string]any{
+		"71": EasytradeZReport(71, "2026-10-01", "0041", "1200.00", "2400.00"),
+		"72": EasytradeZReport(72, "2026-10-02", "0042", "800.00", "3100.00"),
+		"73": EasytradeZReport(73, "2026-10-03", "0043", "950.50", "2049.50"),
+	}
 }

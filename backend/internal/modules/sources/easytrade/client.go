@@ -5,6 +5,11 @@
 // questions (list schemas, date filters, status values, tax_breakdowns) are
 // open: lists only give ids, details carry the content, windows are cut on
 // the client (09 §2), unknown values are kept raw.
+//
+// Issue #385: scheduled sync (schedule.go), signed webhook (webhook.go),
+// financial transactions and Z reports (financial.go). The portal-side
+// contract and the list of what Easytrade still has to offer ("Easytrade'den
+// istenecekler") are in docs/easytrade-senkron.md.
 package easytrade
 
 import (
@@ -38,6 +43,20 @@ var (
 	ErrNoBranch = errors.New("easytrade: no active branch")
 )
 
+// HTTPError is a non-2xx answer not covered by the sentinels above; it
+// matches ErrUpstream.
+type HTTPError struct {
+	Method, Path string
+	Status       int
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("easytrade: %s %s: HTTP %d", e.Method, e.Path, e.Status)
+}
+
+// Is makes errors.Is(err, ErrUpstream) true.
+func (e *HTTPError) Is(target error) bool { return target == ErrUpstream }
+
 // Token is the Sanctum bearer token (30 days, 09 §1.1).
 type Token struct {
 	Value     string    `json:"token"`
@@ -53,6 +72,8 @@ type Client struct {
 	Interval  time.Duration
 	// OnToken stores a refreshed token.
 	OnToken func(Token) error
+	// ZReports reads Z reports; nil → HTTPZReports (issue #385).
+	ZReports ZReportSource
 
 	token Token
 	last  time.Time
@@ -179,7 +200,7 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	case res.StatusCode == http.StatusBadRequest && bytes.Contains(raw, []byte("Aktif şube")):
 		return ErrNoBranch
 	case res.StatusCode >= 300:
-		return fmt.Errorf("%w: %s %s: HTTP %d", ErrUpstream, method, path, res.StatusCode)
+		return &HTTPError{Method: method, Path: path, Status: res.StatusCode}
 	}
 	if out == nil {
 		return nil
