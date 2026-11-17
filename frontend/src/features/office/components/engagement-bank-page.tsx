@@ -3,7 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDownLeft, ArrowUpRight, Link2Off } from "lucide-react";
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
@@ -28,7 +28,12 @@ import { Money } from "./office-ui";
 type BankPage = components["schemas"]["BankTransactionPage"];
 type BankRow = components["schemas"]["BankTransaction"];
 type MatchFilter = "all" | "unmatched" | "suggested" | "matched";
-const MATCH_FILTERS: MatchFilter[] = ["all", "unmatched", "suggested", "matched"];
+const MATCH_FILTERS: MatchFilter[] = [
+  "all",
+  "unmatched",
+  "suggested",
+  "matched",
+];
 const PAGE = 50;
 
 // Eşleşme rozetleri: önceki tint sınıflarıyla aynı tonlar.
@@ -145,6 +150,15 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     listState.setParams({ match: m === "all" ? null : m });
   const { limit, offset } = listState.params;
   const columns = useBankColumns();
+
+  // Üst çubuktaki dönem URL dışında değişir; liste ilk sayfaya döner.
+  const lastPeriod = useRef(period);
+  const { onPaginationChange } = listState;
+  useEffect(() => {
+    if (lastPeriod.current === period) return;
+    lastPeriod.current = period;
+    onPaginationChange((p) => ({ ...p, pageIndex: 0 }));
+  }, [onPaginationChange, period]);
 
   const list = useQuery({
     queryKey: [

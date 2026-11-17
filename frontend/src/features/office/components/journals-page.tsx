@@ -182,6 +182,8 @@ function NewDraft({ engagement }: { engagement: string }) {
           />
         ),
       }),
+      // Silme düğmesi satır sırasına ve kalem sayısına bakar; bunları hücre
+      // bağlamından okumak için yardımcının cell'i geçersiz kılınır.
       {
         ...createActionsColumn<LineRow>({
           labelKey: "office.journals.remove_line",

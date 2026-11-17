@@ -29,10 +29,7 @@ import { toPanelInvoice } from "../lib/from-api";
 import { AmountWaterfall } from "./amount-waterfall";
 import type { InvoiceLine } from "../types";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
-import {
-  LINE_TABLE_FEATURES,
-  useInvoiceLineColumns,
-} from "./invoice-drawer";
+import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
 import { InvoiceStateBadge } from "./invoices-page";
 import {

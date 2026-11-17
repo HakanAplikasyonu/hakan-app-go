@@ -115,14 +115,14 @@ function useMatrixColumns(periods: string[], focus: string, locale: string) {
           // Başlık ay adı (çeviri anahtarı değil): labelKey boş, label dolu.
           labelKey: "",
           label: monthLabel(p, locale),
-          accessorFn: (r) => (cellAt(r, p) ? statusOf(cellAt(r, p)!) : ""),
+          accessorFn: (r) => {
+            const c = cellAt(r, p);
+            return c ? statusOf(c) : "";
+          },
           enableHiding: false,
           meta: {
             align: "center",
-            headerClassName: cn(
-              "text-xs",
-              p === focus ? "text-foreground" : "text-muted-foreground",
-            ),
+            headerClassName: p === focus ? "text-foreground" : undefined,
             cellClassName: cn("px-1", p === focus && "bg-muted/30"),
           },
           cell: ({ row }) => {
