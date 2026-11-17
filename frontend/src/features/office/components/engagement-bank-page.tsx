@@ -23,13 +23,11 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import { downloadFile } from "../services/download";
 import { useOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
 import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 
 type BankPage = components["schemas"]["BankTransactionPage"];
@@ -149,8 +147,6 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { period } = useOfficePeriod();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   // Sayfa, sayfa boyutu ve eşleşme süzgeci URL'de (#381).
   const listState = useUrlListState({ initialPageSize: PAGE });
   const rawMatch = listState.getParam("match") as MatchFilter | null;
@@ -224,9 +220,9 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display truncate text-2xl font-bold">
-            {row?.taxpayer_title ?? t("office.bank.title")}
-          </h1>
+          <h2 className="font-display truncate text-xl font-bold">
+            {t("office.bank.title")}
+          </h2>
           <p className="text-text-2 text-sm">{t("office.bank.description")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -253,7 +249,6 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
           <BankStatementUpload engagement={engagement} />
         </div>
       </div>
-      <EngagementTabs engagement={engagement} />
       <EngagementNextWork engagement={engagement} />
       <div
         role="tablist"

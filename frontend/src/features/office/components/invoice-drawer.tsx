@@ -22,7 +22,6 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
@@ -31,6 +30,7 @@ import {
   useEngagementInvoice,
   useInvoiceUBL,
 } from "../hooks/use-office-invoices";
+import { useInvoiceHref } from "../engagement-scope";
 import { toPanelInvoice } from "../lib/from-api";
 import { createDocumentRequest } from "../services/engagement-documents.service";
 import type { InvoiceLine } from "../types";
@@ -133,6 +133,7 @@ export function InvoiceDrawer({
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  const invoiceHref = useInvoiceHref();
   const { can } = usePermission();
   const detail = useEngagementInvoice(slug, engagement, id ?? "");
   const ubl = useInvoiceUBL(
@@ -295,7 +296,7 @@ export function InvoiceDrawer({
 
             <div className="border-line bg-surface sticky bottom-0 flex flex-wrap gap-2 border-t p-4">
               <Button asChild className="min-h-11 md:min-h-9">
-                <Link href={routes.tenant.invoice(slug, d.uuid, engagement)}>
+                <Link href={invoiceHref(d.uuid, engagement)}>
                   {t("office.drawer.open_invoice")}
                 </Link>
               </Button>

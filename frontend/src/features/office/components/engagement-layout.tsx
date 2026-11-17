@@ -1,0 +1,329 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { KeyboardEvent, ReactNode } from "react";
+
+import { ErrorState } from "@/components/common/error-state";
+import { TacRozeti, type TacDurumu } from "@/components/hakan";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Permission } from "@/config/permissions";
+import { routes } from "@/config/routes";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
+
+import { EngagementScopeProvider } from "../engagement-scope";
+import { usePeriodMatrix } from "../hooks/use-office-data";
+import { tabState } from "../lib/engagement-nav";
+import { useOfficePeriod } from "../period";
+import type { PeriodMatrixRow } from "../services/periods.service";
+
+type Cell = PeriodMatrixRow["cells"][number];
+/** Dönem şeridindeki ay sayısı (genel bakışla aynı sorgu, önbellekten). */
+export const ENGAGEMENT_MONTHS = 6;
+
+/** Dönem hücresi → taç ve etiket (veri · onay · aktarım). */
+export function periodCrown(cell: Cell): {
+  durum: TacDurumu;
+  key: string;
+} {
+  if (cell.locked) return { durum: "aktarildi", key: "locked" };
+  if (cell.open_blockers > 0) return { durum: "sorun", key: "blocked" };
+  if (cell.ready) return { durum: "onaylandi", key: "ready" };
+  if (cell.open_change_requests > 0)
+    return { durum: "yuklendi", key: "changes" };
+  return { durum: "bekleniyor", key: "open" };
+}
+
+function initials(title: string) {
+  const parts = title
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toLocaleUpperCase(
+    "tr-TR",
+  );
+}
+
+
+type EngagementTab = { href: string; label: string; exact?: boolean };
+
+/** Mükellef ayrıntısının sekmeleri (tuval OfisMukellefler). */
+export function useEngagementTabs(engagement: string): EngagementTab[] {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { can } = usePermission();
+  return [
+    {
+      href: routes.tenant.engagement(slug, engagement),
+      label: t("office.engagement.tab_overview"),
+      exact: true,
+    },
+    {
+      href: routes.tenant.engagementInvoices(slug, engagement),
+      label: t("office.nav_invoices"),
+    },
+    {
+      href: routes.tenant.engagementBank(slug, engagement),
+      label: t("office.engagement.tab_bank"),
+    },
+    // Maaş verisi hassas: izni olmayan (stajyer) sekmeyi görmez (#382).
+    ...(can(Permission.TenantPayrollRead)
+      ? [
+          {
+            href: routes.tenant.engagementPayroll(slug, engagement),
+            label: t("office.engagement.tab_payroll"),
+          },
+        ]
+      : []),
+    {
+      href: routes.tenant.engagementEasytrade(slug, engagement),
+      label: t("sources.easytrade.tab"),
+    },
+    {
+      href: routes.tenant.engagementExpenses(slug, engagement),
+      label: t("office.engagement.tab_expenses"),
+    },
+    {
+      href: routes.tenant.engagementZReports(slug, engagement),
+      label: t("office.engagement.tab_zreports"),
+    },
+    {
+      href: routes.tenant.engagementReconciliation(slug, engagement),
+      label: t("office.engagement.tab_reconciliation"),
+    },
+    {
+      href: routes.tenant.engagementDocuments(slug, engagement),
+      label: t("office.engagement.tab_documents"),
+    },
+    // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
+    ...(can(Permission.TenantTaxReturnsRead)
+      ? [
+          {
+            href: routes.tenant.engagementTaxReturns(slug, engagement),
+            label: t("office.engagement.tab_tax_returns"),
+          },
+        ]
+      : []),
+    {
+      href: routes.tenant.engagementPetitions(slug, engagement),
+      label: t("office.engagement.tab_petitions"),
+    },
+    {
+      href: routes.tenant.engagementReport(slug, engagement),
+      label: t("office.engagement.tab_report"),
+    },
+  ];
+}
+
+/** Ok tuşları, Home ve End sekmeler arasında odağı taşır. */
+function onTabsKeyDown(e: KeyboardEvent<HTMLElement>) {
+  const links = Array.from(
+    e.currentTarget.querySelectorAll<HTMLAnchorElement>("a[href]"),
+  );
+  const i = links.indexOf(document.activeElement as HTMLAnchorElement);
+  if (i < 0) return;
+  const next =
+    e.key === "ArrowRight"
+      ? (i + 1) % links.length
+      : e.key === "ArrowLeft"
+        ? (i - 1 + links.length) % links.length
+        : e.key === "Home"
+          ? 0
+          : e.key === "End"
+            ? links.length - 1
+            : -1;
+  if (next < 0) return;
+  e.preventDefault();
+  links[next]?.focus();
+}
+
+export function EngagementTabs({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
+  const pathname = usePathname();
+  const tabs = useEngagementTabs(engagement);
+  return (
+    <nav
+      aria-label={t("office.engagement.tabs")}
+      onKeyDown={onTabsKeyDown}
+      className="border-line flex gap-1 overflow-x-auto border-b"
+      data-testid="engagement-tabs"
+    >
+      {tabs.map((tab) => {
+        const state = tabState(pathname, tab);
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            aria-current={state}
+            className={cn(
+              "focus-visible:ring-ring relative flex min-h-11 items-center px-3 text-sm whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset",
+              "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full",
+              state
+                ? "text-foreground after:bg-brand font-semibold"
+                : "text-text-2 hover:text-foreground",
+            )}
+          >
+            {tab.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * Dönem şeridi: son altı dönem, her biri bir taç (veri · onay · aktarım).
+ * Bir döneme basınca ofisin global dönemi o olur; seçili dönem vurgulu.
+ */
+function PeriodStrip({
+  cells,
+  focus,
+  onPick,
+}: {
+  cells: Cell[];
+  focus: string;
+  onPick: (period: string) => void;
+}) {
+  const { t, locale } = useLocale();
+  const month = (p: string) =>
+    new Intl.DateTimeFormat(locale, { month: "short", year: "2-digit" }).format(
+      new Date(`${p}-01T00:00:00`),
+    );
+  return (
+    <section
+      aria-labelledby="period-strip-title"
+      className="bg-surface border-line rounded-xl border p-4 md:p-5"
+    >
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2
+          id="period-strip-title"
+          className="font-display text-base font-bold"
+        >
+          {t("office.engagement.strip_title")}
+        </h2>
+        <span className="text-text-3 text-xs">
+          {t("office.engagement.strip_hint")}
+        </span>
+      </div>
+      <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        {cells.map((cell) => {
+          const { durum, key } = periodCrown(cell);
+          const on = cell.period === focus;
+          const label = t(`office.engagement.state_${key}`);
+          return (
+            <li key={cell.period}>
+              <button
+                type="button"
+                aria-pressed={on}
+                onClick={() => onPick(cell.period)}
+                className={cn(
+                  "focus-visible:ring-ring flex min-h-11 w-full flex-col items-center gap-2 rounded-xl px-1.5 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                  on
+                    ? "bg-brand-tint outline-brand outline-[1.5px]"
+                    : "hover:bg-surface-2",
+                )}
+              >
+                <span className="font-mono text-xs tabular-nums">
+                  {month(cell.period)}
+                </span>
+                {/* Ad görünür metinden gelir (ay · durum); rozet tekrar okunmaz. */}
+                <span aria-hidden>
+                  <TacRozeti durum={durum} boyut={30} />
+                </span>
+                <span
+                  className={cn(
+                    "text-center text-xs leading-tight",
+                    key === "blocked"
+                      ? "text-danger font-semibold"
+                      : "text-text-2",
+                  )}
+                >
+                  {label}
+                  {cell.open_blockers ? ` · ${cell.open_blockers}` : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+
+/**
+ * Mükellef detayının ortak düzeni (#468): başlık (unvan, VKN), sekme çubuğu
+ * ve dönem şeridi her alt sayfada tek kaynaktan çizilir; alt sayfalar
+ * mükellef bağlamını (`useEngagementScope`) görür.
+ */
+export function EngagementLayout({
+  engagement,
+  children,
+}: {
+  engagement: string;
+  children: ReactNode;
+}) {
+  const { t } = useLocale();
+  const { focus, setPeriod } = useOfficePeriod();
+  const matrix = usePeriodMatrix(ENGAGEMENT_MONTHS);
+  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
+  // Matris yeniden eskiye gelir; şerit soldan sağa eskiden yeniye.
+  const cells = [...(row?.cells ?? [])].sort((a, b) =>
+    a.period.localeCompare(b.period),
+  );
+  const period = (cells.find((c) => c.period === focus) ?? cells.at(-1))
+    ?.period;
+
+  if (matrix.isLoading) {
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-12 w-80" />
+        <EngagementTabs engagement={engagement} />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+  if (matrix.isError || !row) {
+    return (
+      <ErrorState
+        title={t("office.engagement.not_found")}
+        description={t("office.engagement.not_found_hint")}
+      />
+    );
+  }
+
+  return (
+    <EngagementScopeProvider engagement={engagement}>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-4">
+          <span
+            aria-hidden
+            className="bg-brand text-on-brand flex size-12 items-center justify-center rounded-xl text-base font-bold"
+          >
+            {initials(row.taxpayer_title)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display truncate text-2xl font-bold">
+              {row.taxpayer_title}
+            </h1>
+            <p className="text-text-2 text-sm">
+              {row.taxpayer_tax_id.length === 11 ? "TCKN" : "VKN"}{" "}
+              <span className="font-mono">{row.taxpayer_tax_id}</span>
+            </p>
+          </div>
+        </div>
+        <EngagementTabs engagement={engagement} />
+        <PeriodStrip
+          cells={cells}
+          focus={period ?? focus}
+          onPick={setPeriod}
+        />
+        {children}
+      </div>
+    </EngagementScopeProvider>
+  );
+}

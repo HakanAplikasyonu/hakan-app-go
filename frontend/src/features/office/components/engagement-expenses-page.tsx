@@ -31,7 +31,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod } from "../period";
 import {
   type Expense,
@@ -40,7 +39,6 @@ import {
   receiptsService,
 } from "../services/receipts.service";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
 
@@ -180,8 +178,6 @@ function ExpensesInner({ engagement }: { engagement: string }) {
   const canApprove = can(permissions.tenant.receipts.approve);
   const qc = useQueryClient();
   const { period } = useOfficePeriod();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   const listState = useUrlListState({ initialPageSize: PAGE });
   const rawStatus = listState.getParam("status") as StatusFilter | null;
   const status: StatusFilter =
@@ -394,9 +390,9 @@ function ExpensesInner({ engagement }: { engagement: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display truncate text-2xl font-bold">
-            {row?.taxpayer_title ?? t("office.expenses.title")}
-          </h1>
+          <h2 className="font-display truncate text-xl font-bold">
+            {t("office.expenses.title")}
+          </h2>
           <p className="text-text-2 text-sm">
             {t("office.expenses.description")}
           </p>
@@ -439,7 +435,6 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           {imp.input}
         </div>
       </div>
-      <EngagementTabs engagement={engagement} />
 
       <SummaryCards
         cards={[

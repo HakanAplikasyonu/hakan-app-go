@@ -15,6 +15,8 @@ type EntityPageProps = {
   permission?: string | string[];
   permissionMode?: "all" | "any";
   forbiddenFallback?: ReactNode;
+  /** PageHeader başlık düzeyi (mükellef sekmelerinde 2, #468). */
+  headingLevel?: 1 | 2;
   children: ReactNode;
 };
 
@@ -29,6 +31,7 @@ export function EntityPage({
   permission,
   permissionMode = "all",
   forbiddenFallback = null,
+  headingLevel,
   children,
 }: EntityPageProps) {
   const body = (
@@ -38,6 +41,7 @@ export function EntityPage({
         description={description}
         breadcrumbs={breadcrumbs}
         actions={actions}
+        headingLevel={headingLevel}
       />
       {children}
     </>

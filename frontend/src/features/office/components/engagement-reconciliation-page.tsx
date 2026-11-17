@@ -43,7 +43,6 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod, usePeriodText } from "../period";
 import {
   type DecisionStatus,
@@ -52,7 +51,6 @@ import {
   reconciliationKeys,
   reconciliationService,
 } from "../services/reconciliation.service";
-import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 import {
   BabsView,
@@ -99,8 +97,6 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
   const canWrite = can(permissions.tenant.reconciliation.write);
   const qc = useQueryClient();
   const { focus: period } = useOfficePeriod();
-  const matrix = usePeriodMatrix(1);
-  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   const listState = useUrlListState({ initialPageSize: 100 });
   const rawView = listState.getParam("view") as View | null;
   const view: View = rawView && VIEWS.includes(rawView) ? rawView : "accounts";
@@ -135,9 +131,9 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display truncate text-2xl font-bold">
-            {row?.taxpayer_title ?? t("office.reconciliation.title")}
-          </h1>
+          <h2 className="font-display truncate text-xl font-bold">
+            {t("office.reconciliation.title")}
+          </h2>
           <p className="text-text-2 text-sm">
             {t("office.reconciliation.description", {
               period: periodText(period),
@@ -161,7 +157,6 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
           </Button>
         ) : null}
       </div>
-      <EngagementTabs engagement={engagement} />
       <div
         role="tablist"
         aria-label={t("office.reconciliation.view_label")}
