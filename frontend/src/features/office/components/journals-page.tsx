@@ -42,6 +42,7 @@ import {
   useJournalTransfers,
 } from "../hooks/use-journals";
 import { formatMoney, sub, sum, toMinor } from "../lib/decimal";
+import { exportIssueText } from "../lib/export-issue";
 import {
   journalService,
   TRANSFER_DRIVERS,
@@ -392,10 +393,7 @@ function ExportPanel({
             </p>
             <ul className="space-y-0.5 text-xs">
               {blocked.map((d, i) => (
-                <li key={i}>
-                  <Figure>{d.code}</Figure> {d.field ? `· ${d.field}` : ""}{" "}
-                  <span className="text-muted-foreground">{d.message}</span>
-                </li>
+                <li key={i}>{exportIssueText(d, t)}</li>
               ))}
             </ul>
           </div>

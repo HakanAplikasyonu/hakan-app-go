@@ -25,6 +25,7 @@ import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import type { OfficeInvoice } from "../services/office-invoices.service";
 import { directionOf } from "../lib/from-api";
+import { invoiceKindText } from "../lib/ubl-codes";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
 import { FilterSelect, Figure } from "./office-ui";
@@ -144,8 +145,7 @@ function useInvoiceColumns(engagement: string) {
                 {t(`office.direction_${dir}`)}
               </span>
               <div className="text-muted-foreground">
-                {inv.profile ? `${inv.profile} · ` : ""}
-                {inv.type}
+                {invoiceKindText(inv.type, inv.profile, t)}
               </div>
             </div>
           );

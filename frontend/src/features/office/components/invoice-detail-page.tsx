@@ -26,6 +26,7 @@ import {
   useSuggestInvoiceAccounts,
 } from "../hooks/use-review";
 import { toPanelInvoice } from "../lib/from-api";
+import { invoiceKindText } from "../lib/ubl-codes";
 import { AmountWaterfall } from "./amount-waterfall";
 import type { InvoiceLine } from "../types";
 import { carryListParams, useEngagementScope } from "../engagement-scope";
@@ -185,8 +186,7 @@ function InvoiceDetailInner({ id }: { id: string }) {
                 {t(`office.direction_${invoice.direction}`)}
               </Field>
               <Field label={t("office.col_type")}>
-                {d.profile ? `${d.profile} · ` : ""}
-                {d.type}
+                {invoiceKindText(d.type, d.profile, t)}
               </Field>
               <Field label={t("office.col_counterparty")}>
                 {d.counterparty_name ?? "—"}

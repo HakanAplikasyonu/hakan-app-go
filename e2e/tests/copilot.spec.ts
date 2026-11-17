@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+import { scan } from "./a11y";
 import { Api, DEMO, officePath, uiLogin } from "./lib";
 
 /**
@@ -25,8 +25,7 @@ test.describe("co-pilot", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText("Fişleri muhasebe programına aktar")).toBeVisible();
     await expect(dialog.getByRole("button", { name: /Onayla ve çalıştır/ })).toBeEnabled();
-    const axe = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa"]).analyze();
-    expect(axe.violations.filter((v) => v.impact === "critical" || v.impact === "serious")).toEqual([]);
+    await scan(page, "co-pilot onay penceresi", { include: '[role="dialog"]' });
 
     // Vazgeç: plan iptal, hiçbir adım çalışmadı.
     await dialog.getByRole("button", { name: "Vazgeç" }).click();
