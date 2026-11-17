@@ -33,5 +33,7 @@
   "collapse_sidebar": "Collapse sidebar",
   "expand_sidebar": "Expand sidebar",
   "nav_item_info": "Details",
-  "section_tenant": "Organization"
+  "section_tenant": "Organization",
+  "support": "Support",
+  "support_unread": "Support ({{count}} unread replies)"
 }

@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 
 import { MarkaLogosu } from "@/components/hakan";
 import { UserMenu } from "@/components/layout/user-menu";
+import { SupportButton } from "@/components/support";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +33,7 @@ import {
 } from "@/features/taxpayer/services/taxpayer.service";
 import { ApiError } from "@/lib/api/errors";
 import { TaxpayerNav } from "@/features/taxpayer/components/taxpayer-nav";
+import { TaxpayerSupportWidget } from "@/features/taxpayer/components/taxpayer-support-widget";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -121,6 +123,7 @@ export function TaxpayerShell({
             <TaxpayerNav taxpayer={context.data.taxpayer.uuid} />
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
+            <SupportButton />
             <CompanySwitcher
               current={context.data.taxpayer.uuid}
               title={context.data.taxpayer.title}
@@ -138,6 +141,7 @@ export function TaxpayerShell({
       >
         {children(context.data)}
       </main>
+      <TaxpayerSupportWidget context={context.data} />
     </div>
   );
 }
