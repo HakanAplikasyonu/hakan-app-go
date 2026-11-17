@@ -244,6 +244,7 @@ type Querier interface {
 	DeletePushDeviceForUser(ctx context.Context, arg DeletePushDeviceForUserParams) (int64, error)
 	DeletePushSubscription(ctx context.Context, arg DeletePushSubscriptionParams) error
 	DeletePushTickets(ctx context.Context, ids []int64) error
+	DeleteRetailSaleVatLines(ctx context.Context, arg DeleteRetailSaleVatLinesParams) error
 	DeleteRole(ctx context.Context, argUuid uuid.UUID) error
 	DeleteRolePermissions(ctx context.Context, arg DeleteRolePermissionsParams) error
 	DeleteSecretRecord(ctx context.Context, argUuid uuid.UUID) (int64, error)
@@ -451,6 +452,7 @@ type Querier interface {
 	// Zamanlanmış mükellef raporu (issue #386).
 	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
 	GetRetailSale(ctx context.Context, arg GetRetailSaleParams) (RetailSale, error)
+	GetRetailSaleByUUID(ctx context.Context, arg GetRetailSaleByUUIDParams) (RetailSale, error)
 	GetRoleByID(ctx context.Context, id int64) (Role, error)
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
 	GetRoleByUUID(ctx context.Context, argUuid uuid.UUID) (Role, error)
@@ -575,6 +577,8 @@ type Querier interface {
 	// Mükellef raporu gönderimleri (issue #386).
 	InsertReportDelivery(ctx context.Context, arg InsertReportDeliveryParams) (ReportDelivery, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
+	// rows: [{"tax_rate","tax_base","tax_amount"}, ...]
+	InsertRetailSaleVatLines(ctx context.Context, arg InsertRetailSaleVatLinesParams) (int64, error)
 	InsertRolePermission(ctx context.Context, arg InsertRolePermissionParams) error
 	InsertSecretRecord(ctx context.Context, arg InsertSecretRecordParams) error
 	// Bordrosu olmayan dönem için elle girilen tahakkuk.
@@ -716,6 +720,7 @@ type Querier interface {
 	// derin sayfa da ilk sayfa kadar ucuzdur.
 	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
 	ListEngagementReportDeliveries(ctx context.Context, arg ListEngagementReportDeliveriesParams) ([]ReportDelivery, error)
+	ListEngagementRetailSales(ctx context.Context, arg ListEngagementRetailSalesParams) ([]ListEngagementRetailSalesRow, error)
 	ListEngagementTaxpayerMembers(ctx context.Context, arg ListEngagementTaxpayerMembersParams) ([]ListEngagementTaxpayerMembersRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
@@ -834,6 +839,10 @@ type Querier interface {
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
+	// Mükellefin ÖKC seri numaraları (Z sayısı, son Z tarihi).
+	ListRetailSaleDevices(ctx context.Context, taxpayerID int64) ([]ListRetailSaleDevicesRow, error)
+	ListRetailSaleVatLines(ctx context.Context, arg ListRetailSaleVatLinesParams) ([]ListRetailSaleVatLinesRow, error)
+	ListRetailSalesForContinuity(ctx context.Context, arg ListRetailSalesForContinuityParams) ([]ListRetailSalesForContinuityRow, error)
 	// Ofis satırları ve, engagement verilirse, onun satırları.
 	ListReviewSettings(ctx context.Context, arg ListReviewSettingsParams) ([]ListReviewSettingsRow, error)
 	ListRolePermissionSlugsByRoleUUID(ctx context.Context, argUuid uuid.UUID) ([]string, error)
@@ -991,6 +1000,7 @@ type Querier interface {
 	OfficeDashboardCounts(ctx context.Context, arg OfficeDashboardCountsParams) (OfficeDashboardCountsRow, error)
 	// tenant-lint: org-wide ofis panosu son yüklemeler; read_all yoksa engagement_assignments ile süzülür
 	OfficeDashboardRecentUploads(ctx context.Context, arg OfficeDashboardRecentUploadsParams) ([]OfficeDashboardRecentUploadsRow, error)
+	OpenWarningCodesForEntity(ctx context.Context, arg OpenWarningCodesForEntityParams) ([]string, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
@@ -1092,6 +1102,7 @@ type Querier interface {
 	SetBillingStatementStatus(ctx context.Context, arg SetBillingStatementStatusParams) (BillingStatement, error)
 	// Masraf ekranından verilen karar fiş yakalama kaydına da yansır.
 	SetCaptureStatusForExpense(ctx context.Context, arg SetCaptureStatusForExpenseParams) error
+	SetCaptureStatusForRetailSale(ctx context.Context, arg SetCaptureStatusForRetailSaleParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
@@ -1110,6 +1121,11 @@ type Querier interface {
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
+	// Z raporu yönetimi (issue #384): KDV / ödeme kırılımı, ÖKC bazında liste,
+	// süreklilik denetimi, onay ve satış fişi.
+	// Kırılım ve başlık düzeltmesi (yalnızca bekleyen kayıt). NULL verilen alan
+	// değişmez; subtotal toplam - KDV ile yeniden hesaplanır.
+	SetRetailSaleBreakdown(ctx context.Context, arg SetRetailSaleBreakdownParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
 	SetSourceConnectionCapabilities(ctx context.Context, arg SetSourceConnectionCapabilitiesParams) (int64, error)
 	SetSourceConnectionCompany(ctx context.Context, arg SetSourceConnectionCompanyParams) (SourceConnection, error)
@@ -1132,6 +1148,9 @@ type Querier interface {
 	// durumları.
 	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
 	SummarizeEngagementExpenses(ctx context.Context, arg SummarizeEngagementExpensesParams) (SummarizeEngagementExpensesRow, error)
+	SummarizeEngagementRetailSales(ctx context.Context, arg SummarizeEngagementRetailSalesParams) (SummarizeEngagementRetailSalesRow, error)
+	// Filtredeki Z raporlarının KDV oranı kırılımı.
+	SummarizeRetailSaleVatRates(ctx context.Context, arg SummarizeRetailSaleVatRatesParams) ([]SummarizeRetailSaleVatRatesRow, error)
 	SummarizeSourceFinancialByCustomer(ctx context.Context, arg SummarizeSourceFinancialByCustomerParams) ([]SummarizeSourceFinancialByCustomerRow, error)
 	SummarizeSourceFinancialByPayment(ctx context.Context, arg SummarizeSourceFinancialByPaymentParams) ([]SummarizeSourceFinancialByPaymentRow, error)
 	// Onaylı masraflar (beyana yalnızca onaylı masraf girer).

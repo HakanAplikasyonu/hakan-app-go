@@ -87,6 +87,8 @@ func TestCatalogMatchesDocAndSeed(t *testing.T) {
 		"UBL_SCHEMATRON_FAIL": true, "ACCOUNT_NOT_IN_TARGET_PLAN": true,
 		// docs/00 K9 (T10, issue #33)
 		"VAT_PAYABLE_THRESHOLD": true, "VAT_DEADLINE_NEAR": true,
+		// Z raporu sürekliliği (issue #384)
+		"Z_NUMBER_GAP": true, "Z_NUMBER_DUPLICATE": true, "Z_DAY_GAP": true,
 	}
 	for code, sev := range doc {
 		if _, ok := Lookup(code); !ok {

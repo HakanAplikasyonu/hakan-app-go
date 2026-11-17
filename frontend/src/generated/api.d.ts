@@ -5474,6 +5474,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Z reports by ÖKC and day
+         * @description Requires `tenant.receipts.read` and engagement access. Daily Z reports
+         *     (receipt capture, Excel, integrations) sorted by ÖKC serial and date,
+         *     with the VAT rate and payment breakdown, the open continuity warnings
+         *     (Z_NUMBER_GAP, Z_NUMBER_DUPLICATE, Z_DAY_GAP) and the journal draft of
+         *     approved reports. Totals, the VAT rate summary and the device list are
+         *     over the whole filter.
+         */
+        get: operations["listEngagementRetailSales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/continuity": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-run the Z continuity check
+         * @description Requires `tenant.receipts.write` and engagement access. Checks every
+         *     ÖKC of the taxpayer: a Z number skipped between two consecutive
+         *     reports (Z_NUMBER_GAP), the same number on another day
+         *     (Z_NUMBER_DUPLICATE), more than one day without a report (Z_DAY_GAP,
+         *     info: the device may be closed). Rejected reports are left out.
+         *     Warnings no longer found are resolved. The check also runs after every
+         *     Z capture and correction.
+         */
+        post: operations["runZContinuity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One Z report
+         * @description Requires `tenant.receipts.read` and engagement access.
+         */
+        get: operations["getEngagementRetailSale"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Correct a pending Z report and its breakdown
+         * @description Requires `tenant.receipts.write` and engagement access. Omitted fields
+         *     stay; vat_lines, when given, replace the rate breakdown. The ÖKC's
+         *     continuity check runs again. 409 when the report is decided.
+         */
+        patch: operations["updateEngagementRetailSale"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/approve": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a Z report and create its sales journal draft
+         * @description Requires `tenant.receipts.approve` and engagement access. Creates a
+         *     journal draft (source_kind receipt): 100 Kasa (cash) and 108 Diğer
+         *     hazır değerler (card) debit; per VAT rate 600 Yurt içi satışlar (base)
+         *     and 391 Hesaplanan KDV credit, matched to the imported plan's rate
+         *     sub-accounts. Without a payment breakdown the total is cash; without
+         *     rate lines the total VAT is one line. A difference up to 0.10 TL goes
+         *     to the largest base. 422 RECORD_INCOMPLETE without a date / total or
+         *     when the breakdown does not add up; 409 when already decided.
+         */
+        post: operations["approveEngagementRetailSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/{retailSaleUuid}/reject": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a Z report
+         * @description Requires `tenant.receipts.approve` and engagement access. The report
+         *     leaves the continuity check. 409 when already decided.
+         */
+        post: operations["rejectEngagementRetailSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/controls/run": {
         parameters: {
             query?: never;
@@ -11756,6 +11924,99 @@ export interface components {
                 pending: number;
                 amount: string;
                 tax_amount: string;
+                /** Format: int32 */
+                limit: number;
+                /** Format: int32 */
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        RetailSaleVatLine: {
+            /**
+             * @description Decimal, percent
+             * @example 20
+             */
+            tax_rate: string;
+            /** @description Decimal, excl. VAT */
+            tax_base: string;
+            tax_amount: string;
+        };
+        RetailSale: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            sale_date: string | null;
+            period: string | null;
+            z_report_number: string | null;
+            okc_serial_number: string | null;
+            subtotal_amount?: string | null;
+            tax_amount: string | null;
+            total_amount: string | null;
+            currency: string;
+            cash_amount?: string | null;
+            card_amount?: string | null;
+            other_payment_amount?: string | null;
+            /** Format: int32 */
+            receipt_count?: number | null;
+            vat_lines: components["schemas"]["RetailSaleVatLine"][];
+            source_system: string;
+            capture_method: string;
+            /** @enum {string} */
+            approval_status: "pending" | "approved" | "rejected";
+            ocr_confidence?: string | null;
+            has_attachment: boolean;
+            /** @description Open warning codes on the report */
+            warnings: string[];
+            journal: components["schemas"]["ReceiptJournalRef"] | null;
+            /** @description the rate lines differ from the total by more than 0.10 */
+            breakdown_mismatch: boolean;
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        RetailSaleInput: {
+            /** Format: date */
+            sale_date?: string;
+            z_report_number?: string;
+            okc_serial_number?: string;
+            total_amount?: string;
+            tax_amount?: string;
+            cash_amount?: string;
+            card_amount?: string;
+            other_payment_amount?: string;
+            /** Format: int32 */
+            receipt_count?: number;
+            vat_lines?: components["schemas"]["RetailSaleVatLine"][];
+        };
+        EnvelopeRetailSale: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["RetailSale"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeRetailSalePage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["RetailSale"][];
+                /** Format: int64 */
+                total: number;
+                /** Format: int64 */
+                pending: number;
+                total_amount: string;
+                tax_amount: string;
+                cash_amount: string;
+                card_amount: string;
+                vat_rates: components["schemas"]["RetailSaleVatLine"][];
+                devices: {
+                    /** @description empty for reports without a serial */
+                    okc_serial_number: string;
+                    /** Format: int64 */
+                    reports: number;
+                    /** Format: date */
+                    last_date: string | null;
+                }[];
                 /** Format: int32 */
                 limit: number;
                 /** Format: int32 */
@@ -25181,6 +25442,246 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeExpense"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementRetailSales: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "pending" | "approved" | "rejected";
+                /** @description ÖKC serial number; `-` = none */
+                okc?: string;
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRetailSalePage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    runZContinuity: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            reports_with_findings: number;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `WARNINGS_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getEngagementRetailSale: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRetailSale"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateEngagementRetailSale: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetailSaleInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRetailSale"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    approveEngagementRetailSale: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRetailSale"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `RECORD_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    rejectEngagementRetailSale: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                retailSaleUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeRetailSale"];
                 };
             };
             400: components["responses"]["BadRequest"];

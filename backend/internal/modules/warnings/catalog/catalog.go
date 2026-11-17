@@ -133,6 +133,10 @@ var Codes = []Code{
 	// KDV erken uyarı (docs/00 K9, T10; issue #33). Seed: *_vat_forecast.up.sql.
 	{"VAT_PAYABLE_THRESHOLD", "00", []string{EntityPeriod}},
 	{"VAT_DEADLINE_NEAR", "00", []string{EntityPeriod}},
+	// Z raporu süreklilik kontrolü (issue #384). Seed: *_retail_sale_breakdown.up.sql.
+	{"Z_NUMBER_GAP", "3.2", []string{EntityRetailSale}},
+	{"Z_NUMBER_DUPLICATE", "3.2", []string{EntityRetailSale}},
+	{"Z_DAY_GAP", "3.2", []string{EntityRetailSale}},
 }
 
 var bank = []string{EntityBankTransaction, EntityPeriod}
