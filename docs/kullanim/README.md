@@ -10,6 +10,7 @@ kenar çubuğunda, mükellef panelinde üst menüdedir.
 | [Mizan hafızası](mizan-hafizasi.md) | Mizan yükleme, kural adayları ve sonraki aylarda otomatik kodlama |
 | [Mükellef](mukellef.md) | Mükellef kullanıcıları: web paneli ve mobil uygulama |
 | [Masaüstü ajanı](masaustu.md) | Ofis bilgisayarına kurulan ajan: kurulum, klasör izleme, sorun giderme |
+| [WhatsApp Web uzantısı](whatsapp-uzantisi.md) | WhatsApp'tan gelen fiş ve belgeyi tek tıkla kaydetme: kurulum, eşleştirme, gizlilik |
 
 ## Bakım
 
