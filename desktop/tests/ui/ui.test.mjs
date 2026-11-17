@@ -266,6 +266,37 @@ test("muhasebe programı, ayarlar ve gelişmiş: okunur sonuçlar", async () => 
   await signIn(page);
 
   await page.getByRole("tab", { name: "Muhasebe programı" }).click();
+
+  // Luca / Zirve aktarım klasörü (#391): mükellef + program + klasör.
+  await page.getByText("Henüz aktarım klasörü yok.").waitFor();
+  await page.getByRole("button", { name: "Klasörü kaydet" }).click();
+  await page.getByText("Aktarım klasörünü seçin.").waitFor();
+  await page.evaluate(() => (window.__mock.picked = "/home/ofis/Luca aktarım"));
+  await page.locator("#xfer-engagement").selectOption({ label: "Zeytin Gıda Ltd. Şti." });
+  await page.locator("#xfer-pick").click();
+  await page.getByRole("button", { name: "Klasörü kaydet" }).click();
+  const xfer = page.getByRole("list", { name: "Aktarım klasörleri" });
+  await xfer.getByText("Zeytin Gıda Ltd. Şti. · Luca").waitFor();
+  const added = await page.evaluate(() => window.__mock.calls.find((c) => c.args?.method === "transfer.add_target")?.args.params);
+  assert.equal(added.driver, "luca");
+  assert.equal(added.path, "/home/ofis/Luca aktarım");
+  await page.evaluate(() => {
+    window.__mock.transfer = {
+      recent: [
+        { transfer_uuid: "1f2e3d4c-0000-4000-8000-000000000001", engagement_uuid: "6f1d2e3c-4b5a-4c7d-8e9f-0a1b2c3d4e5f", taxpayer_title: "Zeytin Gıda Ltd. Şti.", driver: "luca", period: "2026-10", outcome: "delivered", files: ["luca_2026-10_0f1e2d3c.xlsx"], folder: "Luca aktarım", at: new Date().toISOString() },
+        { transfer_uuid: "1f2e3d4c-0000-4000-8000-000000000002", engagement_uuid: "6f1d2e3c-4b5a-4c7d-8e9f-0a1b2c3d4e5f", taxpayer_title: "Zeytin Gıda Ltd. Şti.", driver: "zirve", outcome: "failed", folder: "Zirve", reason: "Aktarım klasörüne yazma izni yok.", at: new Date().toISOString() },
+      ],
+    };
+    window.__mock.emit("sidecar://event", { event: "transfer", data: {} });
+  });
+  const recent = page.getByRole("list", { name: "Son aktarımlar" });
+  await recent.getByText("Klasöre bırakıldı").waitFor();
+  await recent.getByText("Aktarım klasörüne yazma izni yok.").waitFor();
+  assert.doesNotMatch(await page.locator("#xfer").innerText(), UUID);
+  await xfer.getByRole("button", { name: "Kaldır" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Kaldır" }).click();
+  await page.getByText("Henüz aktarım klasörü yok.").waitFor();
+
   await page.getByLabel("Sunucu", { exact: true }).fill("MUHASEBE-PC");
   await page.getByLabel("Veritabanı").fill("LOGODB");
   await page.getByLabel("Kullanıcı").fill("okur");

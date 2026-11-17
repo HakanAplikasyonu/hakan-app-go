@@ -26,8 +26,10 @@ type Runtime struct {
 	Client  *Client
 	State   *State
 	Watcher *Watcher
-	Version string
-	emit    Emitter
+	// Transfers Luca / Zirve aktarım klasörlerine teslim (#391).
+	Transfers *Transferrer
+	Version   string
+	emit      Emitter
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
@@ -38,6 +40,8 @@ type Runtime struct {
 	// (#284). İkisi de tek elemanlı: üst üste gelen istekler birleşir.
 	kick   chan struct{}
 	rescan chan struct{}
+	// transferNow aktarım turunu beklemeden başlatır.
+	transferNow chan struct{}
 }
 
 // NewRuntime durumu dataDir'den yükler.
@@ -52,7 +56,7 @@ func NewRuntime(dataDir, version string, emit Emitter) (*Runtime, error) {
 	c := NewClient(nil)
 	r := &Runtime{
 		Client: c, State: st, Version: version, emit: emit, interval: DefaultHeartbeat,
-		kick: make(chan struct{}, 1), rescan: make(chan struct{}, 1),
+		kick: make(chan struct{}, 1), rescan: make(chan struct{}, 1), transferNow: make(chan struct{}, 1),
 	}
 	// Yenileme belirteci kabuğa gider; kabuk anahtar zincirine yazar. Ön
 	// yüze iletilmez.
@@ -65,6 +69,7 @@ func NewRuntime(dataDir, version string, emit Emitter) (*Runtime, error) {
 		c.SetOrganization(snap.Organization.Slug)
 	}
 	r.Watcher = &Watcher{State: st, Uploader: c, Emit: func(ev UploadEvent) { emit("upload", ev) }}
+	r.Transfers = &Transferrer{State: st, API: c, Emit: func(ev TransferEvent) { emit("transfer", ev) }}
 	return r, nil
 }
 
@@ -88,6 +93,9 @@ type Status struct {
 	Watches      []WatchView `json:"watches"`
 	Stats        WatchStats  `json:"stats"`
 	Uploaded     int         `json:"uploaded_total"`
+	// Luca / Zirve aktarım klasörleri ve son aktarımlar (#391).
+	Targets  []TransferTarget `json:"transfer_targets"`
+	Transfer TransferActivity `json:"transfer"`
 }
 
 func (r *Runtime) Status() Status {
@@ -99,6 +107,7 @@ func (r *Runtime) Status() Status {
 		AgentUUID: snap.AgentUUID, AgentName: snap.AgentName, MachineID: snap.MachineID,
 		Running: r.cancel != nil, BeatError: r.beatError, Watches: []WatchView{},
 		Stats: r.Watcher.Stats(), Uploaded: r.State.UploadedCount(),
+		Targets: append([]TransferTarget{}, snap.Targets...), Transfer: r.Transfers.Activity(),
 	}
 	for _, w := range snap.Watches {
 		st.Watches = append(st.Watches, WatchView{Watch: w, Activity: r.Watcher.Activity(w.Path)})
@@ -230,6 +239,7 @@ func (r *Runtime) Start(_ context.Context) error {
 
 	go r.beatLoop(ctx)
 	go r.scanLoop(ctx)
+	go r.transferLoop(ctx)
 	return nil
 }
 
@@ -325,6 +335,69 @@ func (r *Runtime) scanLoop(ctx context.Context) {
 		case <-r.rescan:
 		}
 	}
+}
+
+func (r *Runtime) transferLoop(ctx context.Context) {
+	t := time.NewTicker(TransferInterval)
+	defer t.Stop()
+	for {
+		r.Transfers.Run(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		case <-r.transferNow:
+		}
+	}
+}
+
+// RunTransfers aktarım turunu hemen başlatır.
+func (r *Runtime) RunTransfers() { signal(r.transferNow) }
+
+// AddTarget bir mükellef + program için aktarım klasörü tanımlar; aynı
+// mükellef ve programın eski klasörünün yerine geçer.
+func (r *Runtime) AddTarget(path, engagementUUID, driver, taxpayerTitle string) (TransferTarget, error) {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if !filepath.IsAbs(path) {
+		return TransferTarget{}, errors.New("klasör yolu mutlak olmalı")
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() {
+		return TransferTarget{}, errors.New("klasör bulunamadı")
+	}
+	if strings.TrimSpace(engagementUUID) == "" {
+		return TransferTarget{}, errors.New("mükellef seçilmeli")
+	}
+	if _, ok := TransferDrivers[driver]; !ok {
+		return TransferTarget{}, errors.New("program Luca ya da Zirve olmalı")
+	}
+	tg := TransferTarget{Path: path, EngagementUUID: engagementUUID, Driver: driver, TaxpayerTitle: strings.TrimSpace(taxpayerTitle)}
+	err = r.State.Update(func(d *stateData) {
+		for i := range d.Targets {
+			if d.Targets[i].EngagementUUID == engagementUUID && d.Targets[i].Driver == driver {
+				d.Targets[i] = tg
+				return
+			}
+		}
+		d.Targets = append(d.Targets, tg)
+	})
+	if err == nil {
+		signal(r.transferNow)
+	}
+	return tg, err
+}
+
+// RemoveTarget mükellef + programın aktarım klasörünü kaldırır.
+func (r *Runtime) RemoveTarget(engagementUUID, driver string) error {
+	return r.State.Update(func(d *stateData) {
+		out := d.Targets[:0]
+		for _, t := range d.Targets {
+			if t.EngagementUUID != engagementUUID || t.Driver != driver {
+				out = append(out, t)
+			}
+		}
+		d.Targets = out
+	})
 }
 
 // AddWatch bir klasörü izlemeye alır.

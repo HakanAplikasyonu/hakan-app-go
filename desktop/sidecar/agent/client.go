@@ -265,6 +265,97 @@ func (c *Client) UploadUBL(ctx context.Context, engagementUUID, fileName string,
 	return job, err
 }
 
+func transferPath(engagementUUID string) string {
+	return "/v1/tenant/engagements/" + url.PathEscape(engagementUUID) + "/journal-transfers"
+}
+
+// ListTransfers mükellefin bekleyen (queued) ya da üstlenilmiş (claimed)
+// aktarım görevleri (#391).
+func (c *Client) ListTransfers(ctx context.Context, engagementUUID, status string) ([]RemoteTransfer, error) {
+	var page struct {
+		Items []RemoteTransfer `json:"items"`
+	}
+	err := c.do(ctx, http.MethodGet, transferPath(engagementUUID)+"?limit=50&status="+url.QueryEscape(status), nil, &page, true)
+	return page.Items, err
+}
+
+// ClaimTransfer görevi bu ajana alır.
+func (c *Client) ClaimTransfer(ctx context.Context, engagementUUID, transferUUID, agentUUID string) (RemoteTransfer, error) {
+	var t RemoteTransfer
+	err := c.do(ctx, http.MethodPost, transferPath(engagementUUID)+"/"+url.PathEscape(transferUUID)+"/claim",
+		map[string]string{"agent_uuid": agentUUID}, &t, true)
+	return t, err
+}
+
+// ReportDelivery ajanın sonucunu bildirir.
+func (c *Client) ReportDelivery(ctx context.Context, engagementUUID, transferUUID string, rep DeliveryReport) error {
+	return c.do(ctx, http.MethodPost, transferPath(engagementUUID)+"/"+url.PathEscape(transferUUID)+"/delivery", rep, nil, true)
+}
+
+// MaxExportFileBytes indirilen çıktı dosyası için üst sınır.
+const MaxExportFileBytes = 64 << 20
+
+// DownloadExportFile bir çıktı dosyasını mevcut indirme ucundan alır.
+func (c *Client) DownloadExportFile(ctx context.Context, engagementUUID, batchUUID, name string) ([]byte, error) {
+	path := "/v1/tenant/engagements/" + url.PathEscape(engagementUUID) + "/journal-exports/" +
+		url.PathEscape(batchUUID) + "/files/" + url.PathEscape(name)
+	for attempt := 0; ; attempt++ {
+		data, err := c.raw(ctx, path)
+		var ae *APIError
+		if attempt == 0 && errors.As(err, &ae) && ae.Status == http.StatusUnauthorized {
+			c.mu.Lock()
+			c.access = ""
+			c.mu.Unlock()
+			continue
+		}
+		return data, err
+	}
+}
+
+// raw yetkili bir GET'in gövdesini zarfsız döner (dosya indirme).
+func (c *Client) raw(ctx context.Context, path string) ([]byte, error) {
+	c.mu.Lock()
+	base, org := c.base, c.org
+	c.mu.Unlock()
+	if base == "" {
+		return nil, errors.New("API adresi ayarlanmadı")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	tok, err := c.accessToken(ctx)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+	req.Header.Set("User-Agent", "hakan-desktop-agent")
+	if org != "" {
+		req.Header.Set("X-Organization", org)
+	}
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("sunucuya ulaşılamadı: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		e := &APIError{Status: resp.StatusCode, Code: "HTTP_ERROR", Message: http.StatusText(resp.StatusCode)}
+		var env response.Envelope
+		if raw, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)); err == nil && json.Unmarshal(raw, &env) == nil && env.Error != nil {
+			e.Code, e.Message = env.Error.Code, env.Error.Message
+		}
+		return nil, e
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, MaxExportFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > MaxExportFileBytes {
+		return nil, errors.New("çıktı dosyası çok büyük")
+	}
+	return data, nil
+}
+
 // AgentInfo, /v1/tenant/agents yanıtı.
 type AgentInfo struct {
 	UUID             string `json:"uuid"`

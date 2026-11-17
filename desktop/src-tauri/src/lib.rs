@@ -44,6 +44,10 @@ const ALLOWED_METHODS: &[&str] = &[
     "watch.add",
     "watch.remove",
     "watch.clear_errors",
+    // Luca / Zirve aktarım klasörleri (#391).
+    "transfer.add_target",
+    "transfer.remove_target",
+    "transfer.run",
     "source.test",
     "source.preview",
 ];

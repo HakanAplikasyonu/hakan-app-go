@@ -59,6 +59,16 @@ desktop/
   doğrulanmadı; pilot mükellefte geçersiz kılma dosyasıyla düzeltilir.
   Okunan veri şimdilik sunucuya gönderilmez.
 
+## Luca / Zirve aktarım klasörü (#391)
+
+Araştırma ve karar: `docs/arastirma/luca-zirve-aktarim.md`. Luca'nın herkese açık fiş API'si yok ve yükleme ekranı doğrulama kodu istiyor; Zirve masaüstü programı ve şeması belgelenmemiş. Bu yüzden ajan programa ya da veritabanına yazmaz. Yalnızca dosyayı programın içe aktaracağı klasöre bırakır.
+
+- **Hedef:** **Muhasebe programı** ekranında mükellef + program (Luca / Zirve) + klasör seçilir (`transfer.add_target`, `transfer.remove_target`). Kayıt `agent-state.json` içinde `transfer_targets` alanına yazılır. Aynı mükellef ve programın tek klasörü olur.
+- **Akış:** ofis panelinde (journals) "Masaüstü ajanına gönder" denen çıktılar dakikada bir yoklanır (`GET …/journal-transfers?status=queued`, ayrıca bu ajanın üstlendiği `claimed`). Klasörü olan görev üstlenilir (`…/claim`). Dosyalar mevcut indirme ucundan alınır ve SHA-256'ları çıktıdakiyle karşılaştırılır. Klasöre önce `.ad.part` adıyla yazılır, sonra yeniden adlandırılır. Ad `<çıktı adı>_<çıktı kimliğinin ilk 8 hanesi>` biçimindedir: aynı dönemin iki çıktısı çakışmaz, aynı çıktının yeniden teslimi aynı adı kullanır.
+- **Sonuç** `…/delivery` ile bildirilir: `delivered` (dosya adları, özetleri) ya da `failed` + Türkçe neden. Nedenler: `FOLDER_MISSING`, `WRITE_DENIED`, `WRITE_FAILED`, `FILE_EXISTS` (aynı adla farklı dosya var; üstüne yazılmaz), `CHECKSUM_MISMATCH`, `FILE_MISSING`. Ağ ya da sunucu hatası bildirilmez: görev üstlenilmiş kalır, sonraki turda aynı ajan sürdürür; 15 dakika sessiz kalırsa başka ajan alabilir.
+- Sunucuya klasörün yalnızca adı gider, tam yolu gitmez. Luca / Zirve parolası istenmez ve saklanmaz.
+- Son 20 sonuç `agent.status` içindeki `transfer.recent` alanında, ekranda "Son aktarımlar" listesinde görünür. Programda içe aktarmayı kullanıcı yapar ve ofis panelinde "Aktarıldı" ya da "Hata verdi" olarak kapatır.
+
 ## Arka planda çalışma (#204)
 
 - **Tepsi** (`src-tauri/src/tray.rs`, #325; tuval `docs/tasarim/tuval/AjanTepsi.dc.html`): simgenin 5 durumu (Bağlı, Gönderiyor, Duraklatıldı, Sorun var, Güncelleme hazır) kodla çizilen M3 taç türevidir (32 px RGBA; macOS'ta şablon simge, Windows/Linux'ta pencere temasına göre lacivert ya da açık). Menü: durum satırı, ofis · bilgisayar, 3 sayaç, son dosyalar ya da sorunlu dosyalar (Şimdi yeniden dene, Ayrıntılar), HAKAN'ı aç, Şimdi tara, İzlemeyi duraklat (30 dk / 2 sa / süresiz) ya da sürdür, Panelde aç, Ayarlar, Oturum açılışında başlat, sürüm / Güncelle ve yeniden başlat, Çıkış. Durum yalnızca mevcut sidecar olaylarından, `agent.status`'tan (kabuk içinden, dakikada bir ve olaylarda) ve güncelleyici durumundan okunur; sidecar değişmez. "Şimdi tara" ayrı RPC olmadığından izlenen ilk klasörü aynı değerlerle `watch.add` ile yeniden ekler (kayıt değişmez, tarama hemen tetiklenir). Sekme isteği ön yüze `shell://navigate` olayıyla gider. Sol tık pencereyi açar.

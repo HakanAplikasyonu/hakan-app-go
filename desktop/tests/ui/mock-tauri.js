@@ -14,6 +14,8 @@
     running: false,
     mfa: true,
     watches: [],
+    targets: [],
+    transfer: { recent: [] },
     picked: "/home/ofis/E-Faturalar/Zeytin",
     update: {
       enabled: false,
@@ -40,6 +42,8 @@
         stats: { watched_folders: this.watches.length, uploaded: 3, failed: 1 },
         uploaded_total: 3,
         heartbeat_error: this.heartbeatError || undefined,
+        transfer_targets: this.targets,
+        transfer: this.transfer,
       };
     },
     emit(name, payload) {
@@ -85,6 +89,16 @@
           return this.status();
         case "watch.clear_errors":
           for (const w of this.watches) if (w.path === p.path) w.activity.errors = [];
+          return this.status();
+        case "transfer.add_target": {
+          const t = { path: p.path, engagement_uuid: p.engagement_uuid, driver: p.driver, taxpayer_title: p.taxpayer_title };
+          this.targets = this.targets.filter((x) => !(x.engagement_uuid === t.engagement_uuid && x.driver === t.driver)).concat(t);
+          return t;
+        }
+        case "transfer.remove_target":
+          this.targets = this.targets.filter((x) => !(x.engagement_uuid === p.engagement_uuid && x.driver === p.driver));
+          return this.status();
+        case "transfer.run":
           return this.status();
         case "auth.logout":
           this.signedIn = false;

@@ -50,7 +50,11 @@ func (f *fakeAPI) handler() http.Handler {
 		return func(w http.ResponseWriter, r *http.Request) {
 			f.mu.Lock()
 			good := r.Header.Get("Authorization") == "Bearer "+f.access && f.access != ""
-			f.orgHeader = r.Header.Get("X-Organization")
+			// Yalnızca ofis uçları: /v1/auth/me başlıksız gider ve heartbeat
+			// ile yarışıp değeri silmesin.
+			if strings.HasPrefix(r.URL.Path, "/v1/tenant/") {
+				f.orgHeader = r.Header.Get("X-Organization")
+			}
 			f.mu.Unlock()
 			if !good {
 				fail(w, 401, "UNAUTHENTICATED")
