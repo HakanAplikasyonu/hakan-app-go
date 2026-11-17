@@ -1,8 +1,8 @@
 import { BosDurum, KristalYukleyici } from '@hakan/mobile-core/hakan';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Chip, Notice, Text } from '@/components/ui';
-import { errorMessage } from '@/core/api/envelope';
+import { LoadError } from '@/components/load-error';
+import { Button, Chip, Text } from '@/components/ui';
 import { FileRow } from '@/features/files/file-row';
 
 import { archiveFile, type useArchiveDocuments } from './api';
@@ -28,7 +28,9 @@ export function DocumentList({
       </View>
     );
   }
-  if (query.error) return <Notice>{errorMessage(query.error)}</Notice>;
+  if (query.error && items.length === 0) {
+    return <LoadError title="Evraklar alınamadı" error={query.error} retry={query.refetch} retrying={query.isRefetching} />;
+  }
   if (items.length === 0) return <BosDurum baslik={empty.title} aciklama={empty.text} />;
   const total = query.data?.pages[0]?.total ?? items.length;
   return (

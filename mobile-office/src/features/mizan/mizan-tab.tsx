@@ -3,6 +3,7 @@ import { Segment } from '@hakan/mobile-core/ui/parcalar';
 import { useMemo, useState } from 'react';
 import { Pressable, Share, StyleSheet, Switch, View } from 'react-native';
 
+import { LoadError } from '@/components/load-error';
 import { PeriodChips } from '@/components/period-chips';
 import { Card, Chip, Field, Notice, Text } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
@@ -46,7 +47,7 @@ export function MizanTab({ engagement, title }: { engagement: string; title?: st
       </View>
     );
   }
-  if (list.error) return <Notice>{errorMessage(list.error)}</Notice>;
+  if (list.error) return <LoadError title="Mizanlar alınamadı" error={list.error} retry={list.refetch} retrying={list.isRefetching} />;
   if (items.length === 0) {
     return (
       <BosDurum

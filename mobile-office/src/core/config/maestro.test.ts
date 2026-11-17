@@ -17,10 +17,10 @@ const COMMANDS = new Set([
   'launchApp', 'stopApp', 'clearState', 'tapOn', 'longPressOn', 'doubleTapOn', 'inputText', 'eraseText',
   'hideKeyboard', 'pressKey', 'back', 'scroll', 'scrollUntilVisible', 'swipe', 'assertVisible',
   'assertNotVisible', 'assertTrue', 'extendedWaitUntil', 'waitForAnimationToEnd', 'runFlow', 'openLink',
-  'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat',
+  'takeScreenshot', 'copyTextFrom', 'pasteText', 'evalScript', 'repeat', 'setAirplaneMode',
 ]);
 const ALLOWED_ENV = new Set(['MAESTRO_EMAIL', 'MAESTRO_PASSWORD']);
-const ORDER = ['login', 'select-office', 'dashboard', 'review-approve', 'task-create', 'client-documents', 'copilot', 'signout'];
+const ORDER = ['login', 'select-office', 'dashboard', 'review-approve', 'task-create', 'client-documents', 'copilot', 'offline', 'signout'];
 
 function flows() {
   return readdirSync(flowsDir)
@@ -85,6 +85,7 @@ test('the ids the flows tap exist in the screens', () => {
     src('../features/files/file-row.tsx'),
     src('(app)/siradaki-is.tsx'),
     src('../features/copilot/next-work.tsx'),
+    src('../components/load-error.tsx'),
   ].join('\n');
   // Sabit testID ("x" ya da 'x') ya da önekle kurulan testID (`x-${...}`, testIDOnek="x").
   const has = (id: string) => {

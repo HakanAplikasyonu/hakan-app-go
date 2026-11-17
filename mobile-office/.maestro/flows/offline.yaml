@@ -1,0 +1,58 @@
+# Çevrimdışı ve yeniden deneme (#454): mükellef ayrıntısı açıkken bağlantı
+# kesilir (uçak modu); Belgeler → Bordro sekmesi "henüz bordro yok" değil
+# hata ve "Tekrar dene" gösterir. Bağlantı gelince yeniden deneme sekmeyi
+# doldurur. Uçak modu her durumda akışın sonunda kapatılır.
+appId: app.hakan.office
+name: offline
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-clients"
+- tapOn:
+    id: "clients-search"
+- inputText: "Atlas"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "client-row"
+    timeout: 20000
+- tapOn:
+    id: "client-row"
+    index: 0
+- scrollUntilVisible:
+    element:
+      id: "client-documents-payroll"
+    direction: DOWN
+    timeout: 15000
+- setAirplaneMode: enabled
+- tapOn:
+    id: "client-documents-payroll"
+- extendedWaitUntil:
+    visible:
+      id: "load-retry"
+    timeout: 30000
+- assertVisible: "Bordrolar alınamadı"
+- assertNotVisible: "Bordro yok"
+- takeScreenshot: musavir-cevrimdisi
+- setAirplaneMode: disabled
+# Bağlantının geri gelmesi birkaç saniye sürer: "Tekrar dene" sekme dolana
+# kadar (en çok 5 kez) denenir.
+- repeat:
+    while:
+      notVisible:
+        id: "payroll-tab"
+    times: 5
+    commands:
+      - tapOn:
+          id: "load-retry"
+          optional: true
+      - extendedWaitUntil:
+          visible:
+            id: "payroll-tab"
+          timeout: 5000
+          optional: true
+- assertVisible:
+    id: "payroll-tab"
+- assertVisible:
+    id: "payroll-document"
