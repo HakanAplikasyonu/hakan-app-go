@@ -124,6 +124,8 @@ tags:
     description: Account code rules (versioned office template and engagement rules, suggestions, rule candidates)
   - name: VAT
     description: KDV erken uyarı (dönem içi tahmin, devreden KDV, beyan takvimi; docs/00 K9 T10)
+  - name: Related
+    description: Kayıtlar arası ilişkili kayıtlar (fatura, banka, fiş, uyarı, inceleme; #469)
 paths:
   /healthz:
     get:
@@ -15028,6 +15030,42 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/related/{kind}/{recordUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - name: kind
+        in: path
+        required: true
+        description: Kind of the source record.
+        schema: { $ref: "#/components/schemas/RelatedSourceKind" }
+      - name: recordUuid
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Related]
+      operationId: listRelatedRecords
+      summary: Records related to one record of the engagement
+      description: |
+        Requires `tenant.engagements.read`, engagement access and the read permission of the source kind (invoice → `tenant.invoices.read`, bank_transaction → `tenant.bank.read`, journal_draft → `tenant.journals.read`, warning → `tenant.warnings.read`, expense / retail_sale → `tenant.receipts.read`, payroll_run → `tenant.payroll.read`, financial_transaction → `tenant.invoices.read`). Items of kinds the caller may not read are left out (payroll is shown only with `tenant.payroll.read`).
+
+        No table of its own (#469); links come from existing columns: bank matches (payment ↔ invoice / payroll run), journal line sources, bank / receipt postings and `payroll_runs.journal_draft_id` (record → journal), `data_warnings.entity_type/entity_id` (warning ↔ source document; invoice line warnings belong to the invoice), `suggestions.target_type/target_id` (review), `retail_sales.invoice_id` and `source_financial_transactions.invoice_id`. A warning also lists its rule (`kind: rule`, `label` = warning code). A bank transaction lists the counterparty account of its posting (`kind: account`, no uuid). At most 200 items, ordered by relation, kind and date. 404 when the record is not in the engagement (or outside its visibility window).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Related records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeRelatedRecords"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/vat-forecast:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23335,6 +23373,47 @@ components:
         calendar: { $ref: "#/components/schemas/VATCalendar" }
         checks: { $ref: "#/components/schemas/VATChecks" }
         excluded: { $ref: "#/components/schemas/VATExcluded" }
+
+    RelatedSourceKind:
+      type: string
+      enum: [invoice, bank_transaction, journal_draft, warning, expense, retail_sale, payroll_run, financial_transaction]
+
+    RelatedRecord:
+      type: object
+      required: [kind, uuid, relation, date, amount, currency, status, label, detail]
+      properties:
+        kind:
+          type: string
+          enum: [invoice, bank_transaction, journal_draft, warning, suggestion, expense, retail_sale, payroll_run, financial_transaction, rule, account]
+        uuid: { type: [string, "null"], format: uuid, description: "null for rule and account" }
+        relation:
+          type: string
+          enum: [payment, journal, source, warning, review, rule, counterparty_account]
+          description: "payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and review suggestions about it."
+        date: { type: [string, "null"], format: date }
+        amount: { type: [string, "null"], description: "Decimal; matched amount for payments, debit total for journals" }
+        currency: { type: [string, "null"] }
+        status: { type: string, description: "Status of the record in its own vocabulary (invoice status, bank match_status, journal status, warning status, …)" }
+        label: { type: string, description: "Invoice number, bank description, journal description, warning code, suggestion kind, Z report number, payroll period, account code" }
+        detail: { type: [string, "null"], description: "Counterparty, debit/credit, entry number, severity, target field, account name, …" }
+
+    RelatedRecords:
+      type: object
+      required: [kind, uuid, items]
+      properties:
+        kind: { $ref: "#/components/schemas/RelatedSourceKind" }
+        uuid: { type: string, format: uuid }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/RelatedRecord" }
+
+    EnvelopeRelatedRecords:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/RelatedRecords" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATForecast:
       type: object

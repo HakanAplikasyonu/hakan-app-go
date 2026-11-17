@@ -100,6 +100,7 @@ import (
 	receiptsreviewlink "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/reviewlink"
 	receiptsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	reconciliationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reconciliation"
+	relatedmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/related"
 	reportsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	reviewhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/handler"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
@@ -707,6 +708,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			vatforecastrepository.New(deps.Queries), warningsrepository.NewConfig(deps.Queries), warningEngine,
 		), activityRec),
 		engagements: engagementResolver,
+		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,
 		taxpayers:   taxpayerResolver,
 	})...); err != nil {

@@ -918,6 +918,9 @@ type Querier interface {
 	ListReconciliationItems(ctx context.Context, arg ListReconciliationItemsParams) ([]ListReconciliationItemsRow, error)
 	ListReconciliationLetters(ctx context.Context, arg ListReconciliationLettersParams) ([]ReconciliationLetter, error)
 	ListReconciliationRuns(ctx context.Context, arg ListReconciliationRunsParams) ([]ListReconciliationRunsRow, error)
+	// Kaynağın (kind, source_id) ilişkili kayıtları. Bütün sütunlar metin:
+	// tarih YYYY-MM-DD, tutar ondalık; olmayan değer boş metin.
+	ListRelatedRecords(ctx context.Context, arg ListRelatedRecordsParams) ([]ListRelatedRecordsRow, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)
@@ -1194,6 +1197,19 @@ type Querier interface {
 	ResolveLatestCounterpartyReconciliation(ctx context.Context, arg ResolveLatestCounterpartyReconciliationParams) error
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)
+	// İlişkili kayıtlar (#469): bir mükellef kaydının (fatura, banka hareketi,
+	// fiş, uyarı, masraf, Z raporu, bordro, Easytrade hareketi) bağlı olduğu
+	// kayıtlar. Yeni tablo yok; bağlar mevcut sütunlardan okunur:
+	//   bank_transaction_matches (hareket ↔ fatura / bordro),
+	//   journal_draft_lines.source_kind/source_id, bank_transaction_postings.
+	//   journal_draft_uuid, receipt_postings.journal_draft_id,
+	//   payroll_runs.journal_draft_id (kayıt → fiş),
+	//   data_warnings.entity_type/entity_id (uyarı ↔ kaynak belge),
+	//   suggestions.target_type/target_id (inceleme kaydı),
+	//   retail_sales.invoice_id, source_financial_transactions.invoice_id.
+	// Her sorgu taxpayer_id / engagement_id ile süzülür; RLS ayrıca korur.
+	// Kaynak kaydın iç kimliği; kayıt bu engagement'ta görünmüyorsa satır yok.
+	ResolveRelatedSource(ctx context.Context, arg ResolveRelatedSourceParams) (int64, error)
 	// Mükellef kullanıcıları ve ofis davetleri (issue #4).
 	// tenant-lint: cross-taxpayer üyelik çözümü; taxpayer uuid + user_id ile tek satır
 	ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxpayerMembershipParams) (ResolveTaxpayerMembershipRow, error)
