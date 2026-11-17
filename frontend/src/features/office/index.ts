@@ -15,3 +15,5 @@ export { EngagementBankPage } from "./components/engagement-bank-page";
 export { EngagementPayrollPage } from "./components/engagement-payroll-page";
 export { EngagementEasytradePage } from "./components/engagement-easytrade-page";
 export { WhatsAppPage } from "./components/whatsapp-page";
+export { EngagementExpensesPage } from "./components/engagement-expenses-page";
+export { EngagementZReportsPage } from "./components/engagement-zreports-page";

@@ -155,6 +155,12 @@ export const routes = {
     /** Easytrade sync, financial transactions and Z reports (#385). */
     engagementEasytrade: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/easytrade`,
+    /** Expenses (masraf) of one engagement (#384). */
+    engagementExpenses: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/expenses`,
+    /** Z reports (ÖKC gün sonu) of one engagement (#384). */
+    engagementZReports: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/z-reports`,
     /** Template-based petitions of one engagement (issue #56). */
     engagementPetitions: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,
