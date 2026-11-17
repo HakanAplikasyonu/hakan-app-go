@@ -74,6 +74,9 @@ export const Permission = {
   /** Mutabakat: mizan – kaynak ve cari mutabakat (#389). */
   TenantReconciliationRead: "tenant.reconciliation.read",
   TenantReconciliationWrite: "tenant.reconciliation.write",
+  /** Beyanname önizlemesi ve beyan kayıtları (issue #390). */
+  TenantTaxReturnsRead: "tenant.tax_returns.read",
+  TenantTaxReturnsWrite: "tenant.tax_returns.write",
   /** Belge arşivi ve İSG evrakları (issue #393). */
   TenantDocumentsRead: "tenant.documents.read",
   TenantDocumentsWrite: "tenant.documents.write",

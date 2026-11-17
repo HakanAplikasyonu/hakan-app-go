@@ -13,6 +13,7 @@ export { AccountMemoryPage } from "./components/account-memory-page";
 export { EngagementOverviewPage } from "./components/engagement-overview";
 export { EngagementBankPage } from "./components/engagement-bank-page";
 export { EngagementPayrollPage } from "./components/engagement-payroll-page";
+export { EngagementTaxReturnsPage } from "./components/engagement-tax-returns-page";
 export { EngagementEasytradePage } from "./components/engagement-easytrade-page";
 export { WhatsAppPage } from "./components/whatsapp-page";
 export { EngagementExpensesPage } from "./components/engagement-expenses-page";

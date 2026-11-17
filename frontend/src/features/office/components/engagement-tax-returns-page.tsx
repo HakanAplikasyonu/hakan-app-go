@@ -1,0 +1,1355 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Download,
+  FileCheck2,
+  Info,
+  Landmark,
+  RotateCcw,
+} from "lucide-react";
+import { type ReactNode, Suspense, useId, useMemo, useState } from "react";
+import { toast } from "sonner";
+
+import { ErrorState } from "@/components/common/error-state";
+import { EntityTable, useUrlListState } from "@/components/entity";
+import {
+  createColumn,
+  createDateColumn,
+  createMoneyColumn,
+  createStatusColumn,
+  type StatusVariant,
+} from "@/components/tables";
+import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Permission } from "@/config/permissions";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { isApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
+
+import { usePeriodMatrix } from "../hooks/use-office-data";
+import { useOfficePeriod } from "../period";
+import {
+  TAX_RETURN_KINDS,
+  type TaxReturnAdjustments,
+  type TaxReturnBABS,
+  type TaxReturnBABSRow,
+  type TaxReturnCheckItem,
+  type TaxReturnEmployee,
+  type TaxReturnKDV1,
+  type TaxReturnKind,
+  type TaxReturnMUHSGK,
+  type TaxReturnPreview,
+  type TaxReturnSummary,
+  taxReturnKeys,
+  taxReturnsService,
+} from "../services/tax-returns.service";
+import { EngagementTabs } from "./engagement-overview";
+import { Money } from "./office-ui";
+import { SummaryCards } from "./receipts-ui";
+
+const statusVariants: Record<string, StatusVariant> = {
+  draft: { labelKey: "office.tax_returns.status_draft", tone: "neutral" },
+  prepared: { labelKey: "office.tax_returns.status_prepared", tone: "info" },
+  filed: { labelKey: "office.tax_returns.status_filed", tone: "ok" },
+};
+
+const kindVariants: Record<string, StatusVariant> = Object.fromEntries(
+  TAX_RETURN_KINDS.map((k) => [
+    k,
+    { labelKey: `office.tax_returns.kind_${k}`, tone: "neutral" as const },
+  ]),
+);
+
+const tableFeatures = {
+  sorting: false,
+  globalFilter: false,
+  columnFilters: false,
+  rowSelection: false,
+  facetedFilters: false,
+  viewMode: false,
+} as const;
+
+function errText(e: unknown, fallback: string) {
+  return isApiError(e) && e.message ? e.message : fallback;
+}
+
+function useDates() {
+  const { locale } = useLocale();
+  return useMemo(() => {
+    const tag = locale === "tr" ? "tr-TR" : "en-GB";
+    return {
+      day: (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString(tag),
+      month: (p: string) =>
+        new Date(`${p}-01T00:00:00`).toLocaleDateString(tag, {
+          month: "long",
+          year: "numeric",
+        }),
+    };
+  }, [locale]);
+}
+
+function rateLabel(rate: string, unknown: string) {
+  return rate === "" ? unknown : `%${rate}`;
+}
+
+/**
+ * `/t/{slug}/engagements/{uuid}/tax-returns` (#390): dönemin KDV1, MUHSGK ve
+ * Ba/Bs beyanı form düzeninde. Dönem üst çubuktan, beyan türü URL'de
+ * (`?kind=`). Taslak güncel veriden hesaplanır; kontrol listesindeki uyarılar
+ * onaylanınca hazırlanır (donmuş görüntü), sonra verildi olarak işaretlenir.
+ * Excel çıktısı Luca / Zirve'ye aktarım için.
+ */
+export function EngagementTaxReturnsPage({
+  engagement,
+}: {
+  engagement: string;
+}) {
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <TaxReturnsInner engagement={engagement} />
+    </Suspense>
+  );
+}
+
+function TaxReturnsInner({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { can } = usePermission();
+  const canWrite = can(Permission.TenantTaxReturnsWrite);
+  const qc = useQueryClient();
+  // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
+  const { focus: period, setPeriod } = useOfficePeriod();
+  const dates = useDates();
+  const matrix = usePeriodMatrix(1);
+  const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
+  const listState = useUrlListState({ initialPageSize: 50 });
+  const rawKind = listState.getParam("kind") as TaxReturnKind | null;
+  const kind: TaxReturnKind =
+    rawKind && TAX_RETURN_KINDS.includes(rawKind) ? rawKind : "kdv1";
+
+  const key = taxReturnKeys.one(slug, engagement, kind, period);
+  const preview = useQuery({
+    queryKey: key,
+    queryFn: () => taxReturnsService.get(slug, engagement, kind, period),
+  });
+  const history = useQuery({
+    queryKey: [...taxReturnKeys.all(slug, engagement), "list"],
+    queryFn: () => taxReturnsService.list(slug, engagement),
+  });
+  const onSaved = (p: TaxReturnPreview) => {
+    qc.setQueryData(key, p);
+    void qc.invalidateQueries({
+      queryKey: taxReturnKeys.all(slug, engagement),
+    });
+  };
+
+  const p = preview.data;
+  const isDraft = !p || p.status === "draft";
+  const editable = canWrite && isDraft;
+  const acks = p?.record?.acknowledged ?? [];
+  const adjustments: TaxReturnAdjustments = p?.record?.adjustments ?? {};
+
+  const save = useMutation({
+    mutationFn: (body: {
+      acknowledged?: string[];
+      adjustments?: TaxReturnAdjustments;
+    }) =>
+      taxReturnsService.saveDraft(slug, engagement, kind, period, {
+        acknowledged: body.acknowledged ?? acks,
+        adjustments: kind === "kdv1" ? (body.adjustments ?? adjustments) : {},
+        note: p?.record?.note ?? null,
+      }),
+    onSuccess: onSaved,
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.save_failed"))),
+  });
+  const prepare = useMutation({
+    mutationFn: () =>
+      taxReturnsService.prepare(slug, engagement, kind, period, acks),
+    onSuccess: (x) => {
+      onSaved(x);
+      toast.success(t("office.tax_returns.prepared"));
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.prepare_failed"))),
+  });
+  const reopen = useMutation({
+    mutationFn: () => taxReturnsService.reopen(slug, engagement, kind, period),
+    onSuccess: onSaved,
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.save_failed"))),
+  });
+  const file = useMutation({
+    mutationFn: (v: { filed_on: string; accrual_number: string }) =>
+      taxReturnsService.file(slug, engagement, kind, period, {
+        filed_on: v.filed_on,
+        accrual_number: v.accrual_number || null,
+      }),
+    onSuccess: (x) => {
+      onSaved(x);
+      toast.success(t("office.tax_returns.filed"));
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.file_failed"))),
+  });
+
+  const toggleAck = (code: string, on: boolean) =>
+    save.mutate({
+      acknowledged: on ? [...acks, code] : acks.filter((a) => a !== code),
+    });
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display truncate text-2xl font-bold">
+            {row?.taxpayer_title ?? t("office.tax_returns.title")}
+          </h1>
+          <p className="text-text-2 text-sm">
+            {t("office.tax_returns.description")}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="max-md:min-h-11"
+          disabled={!p}
+          onClick={() =>
+            void taxReturnsService
+              .exportFile(slug, engagement, kind, period)
+              .catch(() => toast.error(t("office.tax_returns.export_failed")))
+          }
+        >
+          <Download className="size-4" aria-hidden />
+          {t("office.tax_returns.export")}
+        </Button>
+      </div>
+      <EngagementTabs engagement={engagement} />
+
+      <div
+        role="group"
+        aria-label={t("office.tax_returns.kinds")}
+        className="flex flex-wrap gap-2"
+      >
+        {TAX_RETURN_KINDS.map((k) => (
+          <button
+            key={k}
+            type="button"
+            aria-pressed={kind === k}
+            onClick={() =>
+              listState.setParams({ kind: k === "kdv1" ? null : k })
+            }
+            className={cn(
+              "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
+              kind === k
+                ? "border-brand bg-brand text-on-brand"
+                : "border-line bg-surface text-text-2 hover:text-foreground",
+            )}
+          >
+            {t(`office.tax_returns.kind_${k}`)}
+          </button>
+        ))}
+      </div>
+
+      {preview.isLoading ? (
+        <div className="space-y-3" aria-busy>
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      ) : preview.isError || !p ? (
+        <ErrorState
+          title={t("office.api.load_error")}
+          description={preview.error?.message}
+          onRetry={() => void preview.refetch()}
+          retryLabel={t("common.retry")}
+        />
+      ) : (
+        <>
+          <StatusBar
+            p={p}
+            periodLabel={dates.month(period)}
+            dueLabel={dates.day(p.calendar.due_date)}
+            filedLabel={
+              p.record?.filed_on ? dates.day(p.record.filed_on) : undefined
+            }
+            canWrite={canWrite}
+            busy={prepare.isPending || reopen.isPending || file.isPending}
+            onPrepare={() => prepare.mutate()}
+            onReopen={() => reopen.mutate()}
+            onFile={(v) => file.mutate(v)}
+          />
+          <Checklist
+            items={p.checklist}
+            editable={editable}
+            busy={save.isPending}
+            onToggle={toggleAck}
+          />
+          {p.kdv1 ? (
+            <KDV1View
+              k={p.kdv1}
+              editable={editable}
+              busy={save.isPending}
+              onAdjust={(a) => save.mutate({ adjustments: a })}
+            />
+          ) : null}
+          {p.muhsgk ? <MUHSGKView m={p.muhsgk} /> : null}
+          {p.babs ? <BABSView b={p.babs} /> : null}
+        </>
+      )}
+
+      <History
+        items={history.data?.items ?? []}
+        loading={history.isLoading}
+        error={history.isError}
+        onRetry={() => void history.refetch()}
+        onPick={(x) => {
+          setPeriod(x.period);
+          listState.setParams({ kind: x.kind === "kdv1" ? null : x.kind });
+        }}
+      />
+    </div>
+  );
+}
+
+function StatusBar({
+  p,
+  periodLabel,
+  dueLabel,
+  filedLabel,
+  canWrite,
+  busy,
+  onPrepare,
+  onReopen,
+  onFile,
+}: {
+  p: TaxReturnPreview;
+  periodLabel: string;
+  dueLabel: string;
+  filedLabel?: string;
+  canWrite: boolean;
+  busy: boolean;
+  onPrepare: () => void;
+  onReopen: () => void;
+  onFile: (v: { filed_on: string; accrual_number: string }) => void;
+}) {
+  const { t } = useLocale();
+  const [filing, setFiling] = useState(false);
+  const [filedOn, setFiledOn] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [accrual, setAccrual] = useState("");
+  const filedOnId = useId();
+  const open = p.open_warnings.length;
+  const days = p.calendar.days_left;
+  const tone = statusVariants[p.status]?.tone ?? "neutral";
+  return (
+    <section
+      aria-label={t("office.tax_returns.status_label")}
+      className="bg-surface border-line flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border p-4"
+    >
+      <div className="flex min-w-0 flex-col">
+        <span className="text-text-2 text-xs">
+          {t(`office.tax_returns.kind_${p.kind}_long`)}
+        </span>
+        <span className="font-display text-lg font-bold">{periodLabel}</span>
+      </div>
+      <span
+        className={cn(
+          "rounded-full px-2.5 py-1 text-xs font-semibold",
+          tone === "ok"
+            ? "bg-ok-tint text-ok"
+            : tone === "info"
+              ? "bg-brand-tint text-brand-text"
+              : "bg-surface-3 text-text-2",
+        )}
+      >
+        {t(`office.tax_returns.status_${p.status}`)}
+      </span>
+      <span className="text-text-2 flex items-center gap-1.5 text-sm">
+        <CalendarClock className="size-4" aria-hidden />
+        {t("office.tax_returns.due", { date: dueLabel })}
+        {p.status !== "filed" ? (
+          <span
+            className={cn(days < 0 ? "text-danger" : days <= 5 && "text-warn")}
+          >
+            ·{" "}
+            {days < 0
+              ? t("office.tax_returns.overdue", { days: -days })
+              : t("office.tax_returns.days_left", { days })}
+          </span>
+        ) : null}
+      </span>
+      {p.status === "filed" ? (
+        <span className="text-text-2 text-sm">
+          {t("office.tax_returns.filed_on", { date: filedLabel ?? "—" })}
+          {p.record?.accrual_number
+            ? ` · ${t("office.tax_returns.accrual_number")}: ${p.record.accrual_number}`
+            : ""}
+        </span>
+      ) : null}
+      {p.frozen && p.record?.prepared_at ? (
+        <span className="text-text-3 text-xs">
+          {t("office.tax_returns.frozen_hint")}
+        </span>
+      ) : null}
+      <div className="ms-auto flex flex-wrap gap-2">
+        {canWrite && p.status === "draft" ? (
+          <Button
+            size="sm"
+            className="max-md:min-h-11"
+            disabled={busy || open > 0}
+            title={
+              open > 0 ? t("office.tax_returns.prepare_blocked") : undefined
+            }
+            onClick={onPrepare}
+          >
+            <FileCheck2 className="size-4" aria-hidden />
+            {t("office.tax_returns.prepare")}
+          </Button>
+        ) : null}
+        {canWrite && p.status === "prepared" ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              className="max-md:min-h-11"
+              disabled={busy}
+              onClick={onReopen}
+            >
+              <RotateCcw className="size-4" aria-hidden />
+              {t("office.tax_returns.reopen")}
+            </Button>
+            <Button
+              size="sm"
+              className="max-md:min-h-11"
+              disabled={busy}
+              aria-expanded={filing}
+              onClick={() => setFiling((v) => !v)}
+            >
+              <CheckCircle2 className="size-4" aria-hidden />
+              {t("office.tax_returns.mark_filed")}
+            </Button>
+          </>
+        ) : null}
+      </div>
+      {canWrite && p.status === "draft" && open > 0 ? (
+        <p className="text-warn w-full text-sm">
+          {t("office.tax_returns.open_warnings", { count: open })}
+        </p>
+      ) : null}
+      {filing && p.status === "prepared" ? (
+        <form
+          className="border-line flex w-full flex-wrap items-end gap-3 border-t pt-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (filedOn)
+              onFile({ filed_on: filedOn, accrual_number: accrual.trim() });
+          }}
+        >
+          <div className="flex flex-col gap-1 text-sm">
+            <label htmlFor={filedOnId} className="text-text-2">
+              {t("office.tax_returns.filed_on_label")}
+            </label>
+            <DatePicker id={filedOnId} value={filedOn} onChange={setFiledOn} />
+          </div>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-text-2">
+              {t("office.tax_returns.accrual_number")}
+            </span>
+            <input
+              maxLength={64}
+              className="bg-background focus-visible:ring-ring h-9 w-56 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+              value={accrual}
+              onChange={(e) => setAccrual(e.target.value)}
+            />
+          </label>
+          <Button
+            type="submit"
+            size="sm"
+            className="max-md:min-h-11"
+            disabled={busy}
+          >
+            {t("office.tax_returns.save_filed")}
+          </Button>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
+function Checklist({
+  items,
+  editable,
+  busy,
+  onToggle,
+}: {
+  items: TaxReturnCheckItem[];
+  editable: boolean;
+  busy: boolean;
+  onToggle: (code: string, on: boolean) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <section className="bg-surface border-line rounded-xl border p-4">
+      <h2 className="font-display mb-3 text-base font-bold">
+        {t("office.tax_returns.checklist")}
+      </h2>
+      {items.length === 0 ? (
+        <p className="text-text-2 flex items-center gap-2 text-sm">
+          <CheckCircle2 className="text-ok size-4" aria-hidden />
+          {t("office.tax_returns.checklist_empty")}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((c) => {
+            const warn = c.severity === "warning";
+            const Icon = warn ? AlertTriangle : Info;
+            return (
+              <li
+                key={c.code}
+                className={cn(
+                  "flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2",
+                  warn && !c.acknowledged
+                    ? "border-warn/40 bg-warn-tint"
+                    : "border-line",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "mt-0.5 size-4 shrink-0",
+                    warn ? "text-warn" : "text-text-3",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 text-sm">
+                  <span className="sr-only">
+                    {t(`office.tax_returns.severity_${c.severity}`)}:{" "}
+                  </span>
+                  {c.message}
+                  {c.amount ? (
+                    <span className="text-text-2 ms-1">
+                      (<Money value={c.amount} />)
+                    </span>
+                  ) : null}
+                </span>
+                {warn ? (
+                  <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
+                    <input
+                      type="checkbox"
+                      className="size-4"
+                      checked={c.acknowledged}
+                      disabled={!editable || busy}
+                      onChange={(e) => onToggle(c.code, e.target.checked)}
+                    />
+                    {t("office.tax_returns.acknowledge")}
+                  </label>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** Form bölümü: başlık ve "alan · tutar" satırları. */
+function Section({
+  title,
+  children,
+  className,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={cn("bg-surface border-line rounded-xl border p-4", className)}
+    >
+      <h2 className="font-display mb-3 text-base font-bold">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Grid({
+  head,
+  rows,
+  empty,
+}: {
+  head: string[];
+  rows: ReactNode[][];
+  empty: string;
+}) {
+  if (rows.length === 0) return <p className="text-text-2 text-sm">{empty}</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[32rem] text-sm">
+        <thead>
+          <tr className="text-text-2 border-line border-b text-left text-xs">
+            {head.map((h, i) => (
+              <th
+                key={h}
+                scope="col"
+                className={cn("py-2 pe-3 font-medium", i > 0 && "text-right")}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-line border-b last:border-0">
+              {r.map((c, j) => (
+                <td
+                  key={j}
+                  className={cn(
+                    "py-2 pe-3",
+                    j > 0 && "text-right tabular-nums",
+                  )}
+                >
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Lines({
+  rows,
+}: {
+  rows: { label: string; value: string; strong?: boolean }[];
+}) {
+  return (
+    <dl className="divide-line divide-y text-sm">
+      {rows.map((r) => (
+        <div
+          key={r.label}
+          className={cn(
+            "flex items-center justify-between gap-4 py-2",
+            r.strong && "font-semibold",
+          )}
+        >
+          <dt className={cn(!r.strong && "text-text-2")}>{r.label}</dt>
+          <dd>
+            <Money value={r.value} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function AdjustmentsForm({
+  value,
+  busy,
+  onSave,
+}: {
+  value: TaxReturnAdjustments;
+  busy: boolean;
+  onSave: (a: TaxReturnAdjustments) => void;
+}) {
+  const { t } = useLocale();
+  const fields = ["carried_in", "additional_vat", "other_deductions"] as const;
+  const [draft, setDraft] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((f) => [f, value[f] ?? ""])),
+  );
+  const [error, setError] = useState("");
+  return (
+    <form
+      className="border-line mt-4 grid gap-3 border-t pt-4 sm:grid-cols-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const out: TaxReturnAdjustments = {};
+        for (const f of fields) {
+          const raw = (draft[f] ?? "")
+            .trim()
+            .replace(/\./g, "")
+            .replace(",", ".");
+          if (raw === "") continue;
+          if (!/^\d+(\.\d{1,2})?$/.test(raw)) {
+            setError(t("office.tax_returns.adjust_invalid"));
+            return;
+          }
+          out[f] = raw;
+        }
+        setError("");
+        onSave(out);
+      }}
+    >
+      <p className="text-text-2 text-sm sm:col-span-3">
+        {t("office.tax_returns.adjust_hint")}
+      </p>
+      {fields.map((f) => (
+        <label key={f} className="flex flex-col gap-1 text-sm">
+          <span className="text-text-2">
+            {t(`office.tax_returns.adj_${f}`)}
+          </span>
+          <input
+            inputMode="decimal"
+            placeholder="0,00"
+            className="bg-background focus-visible:ring-ring h-9 rounded-md border px-2 text-right tabular-nums focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+            value={draft[f] ?? ""}
+            onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))}
+          />
+        </label>
+      ))}
+      {error ? (
+        <p role="alert" className="text-danger text-sm sm:col-span-3">
+          {error}
+        </p>
+      ) : null}
+      <div className="sm:col-span-3">
+        <Button type="submit" size="sm" variant="outline" disabled={busy}>
+          {t("office.tax_returns.adjust_save")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function KDV1View({
+  k,
+  editable,
+  busy,
+  onAdjust,
+}: {
+  k: TaxReturnKDV1;
+  editable: boolean;
+  busy: boolean;
+  onAdjust: (a: TaxReturnAdjustments) => void;
+}) {
+  const { t } = useLocale();
+  const x = k.totals;
+  const unknown = t("office.tax_returns.rate_unknown");
+  const m = (v: string) => <Money value={v} />;
+  return (
+    <div className="space-y-4">
+      <SummaryCards
+        cards={[
+          {
+            label: t("office.tax_returns.calculated_vat"),
+            value: <Money value={x.total_vat} />,
+            icon: Landmark,
+            box: "bg-surface-3 text-text-2",
+          },
+          {
+            label: t("office.tax_returns.total_deductions"),
+            value: <Money value={x.total_deductions} />,
+            icon: Landmark,
+            box: "bg-surface-3 text-text-2",
+          },
+          {
+            label: t("office.tax_returns.payable"),
+            value: <Money value={x.payable} />,
+            icon: Landmark,
+            box: "bg-brand-tint text-brand-text",
+          },
+          {
+            label: t("office.tax_returns.carry_out"),
+            value: <Money value={x.carry_out} />,
+            icon: Landmark,
+            box: "bg-ok-tint text-ok",
+          },
+        ]}
+      />
+      <Section title={t("office.tax_returns.kdv1_sales")}>
+        <Grid
+          head={[
+            t("office.tax_returns.col_rate"),
+            t("office.tax_returns.col_base"),
+            t("office.tax_returns.col_vat"),
+            t("office.tax_returns.col_invoice_base"),
+            t("office.tax_returns.col_retail_base"),
+            t("office.tax_returns.col_purchase_return_base"),
+          ]}
+          rows={k.sales.map((s) => [
+            rateLabel(s.rate, unknown),
+            m(s.base),
+            m(s.vat),
+            m(s.invoice_base),
+            m(s.retail_base),
+            m(s.purchase_return_base),
+          ])}
+          empty={t("office.tax_returns.none")}
+        />
+      </Section>
+      {k.withholdings.length > 0 ? (
+        <Section title={t("office.tax_returns.kdv1_withholdings")}>
+          <Grid
+            head={[
+              t("office.tax_returns.col_code"),
+              t("office.tax_returns.col_base"),
+              t("office.tax_returns.col_rate"),
+              t("office.tax_returns.col_ratio"),
+              t("office.tax_returns.col_withheld"),
+              t("office.tax_returns.col_declared"),
+            ]}
+            rows={k.withholdings.map((w) => [
+              w.code || "—",
+              m(w.base),
+              rateLabel(w.rate, unknown),
+              w.ratio,
+              m(w.withheld),
+              m(w.declared_vat),
+            ])}
+            empty=""
+          />
+        </Section>
+      ) : null}
+      {k.special_bases.length > 0 ? (
+        <Section title={t("office.tax_returns.kdv1_special")}>
+          <Grid
+            head={[
+              t("office.tax_returns.col_code"),
+              t("office.tax_returns.col_base"),
+              t("office.tax_returns.col_rate"),
+              t("office.tax_returns.col_vat"),
+            ]}
+            rows={k.special_bases.map((s) => [
+              s.code || "—",
+              m(s.base),
+              rateLabel(s.rate, unknown),
+              m(s.vat),
+            ])}
+            empty=""
+          />
+        </Section>
+      ) : null}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Section title={t("office.tax_returns.kdv1_calculated")}>
+          <Lines
+            rows={[
+              {
+                label: t("office.tax_returns.base_total"),
+                value: x.base_total,
+              },
+              {
+                label: t("office.tax_returns.calculated_vat_line"),
+                value: x.calculated_vat,
+              },
+              {
+                label: t("office.tax_returns.additional_vat"),
+                value: x.additional_vat,
+              },
+              {
+                label: t("office.tax_returns.total_vat"),
+                value: x.total_vat,
+                strong: true,
+              },
+            ]}
+          />
+        </Section>
+        <Section title={t("office.tax_returns.kdv1_deductions")}>
+          <Lines
+            rows={[
+              {
+                label: t("office.tax_returns.carried_in", {
+                  source: t(`office.tax_returns.carry_${k.carry.source}`),
+                }),
+                value: x.carried_in,
+              },
+              {
+                label: t("office.tax_returns.current_input"),
+                value: x.current_input,
+              },
+              {
+                label: t("office.tax_returns.sales_returns"),
+                value: x.sales_returns_vat,
+              },
+              {
+                label: t("office.tax_returns.responsible_vat"),
+                value: x.responsible_vat,
+              },
+              {
+                label: t("office.tax_returns.other_deductions"),
+                value: x.other_deductions,
+              },
+              {
+                label: t("office.tax_returns.total_deductions"),
+                value: x.total_deductions,
+                strong: true,
+              },
+            ]}
+          />
+          {editable ? (
+            <AdjustmentsForm
+              key={JSON.stringify(k.adjustments)}
+              value={k.adjustments}
+              busy={busy}
+              onSave={onAdjust}
+            />
+          ) : null}
+        </Section>
+      </div>
+      <Section title={t("office.tax_returns.kdv1_purchases")}>
+        <Grid
+          head={[
+            t("office.tax_returns.col_rate"),
+            t("office.tax_returns.col_base"),
+            t("office.tax_returns.col_vat"),
+            t("office.tax_returns.col_invoice_vat"),
+            t("office.tax_returns.col_expense_vat"),
+          ]}
+          rows={k.purchases.map((s) => [
+            rateLabel(s.rate, unknown),
+            m(s.base),
+            m(s.vat),
+            m(s.invoice_vat),
+            m(s.expense_vat),
+          ])}
+          empty={t("office.tax_returns.none")}
+        />
+      </Section>
+      {k.exemptions.length > 0 ? (
+        <Section title={t("office.tax_returns.kdv1_exemptions")}>
+          <Grid
+            head={[
+              t("office.tax_returns.col_group"),
+              t("office.tax_returns.col_code"),
+              t("office.tax_returns.col_delivery"),
+              t("office.tax_returns.col_deferred"),
+            ]}
+            rows={k.exemptions.map((e) => [
+              t(`office.tax_returns.group_${e.group}`),
+              e.code || "—",
+              m(e.base),
+              e.group === "export_registered" ? m(e.vat) : "—",
+            ])}
+            empty=""
+          />
+        </Section>
+      ) : null}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Section title={t("office.tax_returns.kdv1_result")}>
+          <Lines
+            rows={[
+              {
+                label: t("office.tax_returns.deferred_vat"),
+                value: x.deferred_vat,
+              },
+              {
+                label: t("office.tax_returns.payable"),
+                value: x.payable,
+                strong: true,
+              },
+              {
+                label: t("office.tax_returns.carry_out"),
+                value: x.carry_out,
+                strong: true,
+              },
+            ]}
+          />
+        </Section>
+        <Section title={t("office.tax_returns.kdv1_extra")}>
+          <Lines
+            rows={[
+              {
+                label: t("office.tax_returns.delivery_total"),
+                value: x.delivery_total,
+              },
+              {
+                label: t("office.tax_returns.card_sales"),
+                value: x.card_sales,
+              },
+            ]}
+          />
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+function MUHSGKView({ m }: { m: TaxReturnMUHSGK }) {
+  const { t } = useLocale();
+  const pr = m.payroll;
+  const pm = m.premium;
+  const columns = useMemo<ColumnDef<TaxReturnEmployee, unknown>[]>(
+    () => [
+      createColumn<TaxReturnEmployee>({
+        id: "name",
+        labelKey: "office.tax_returns.col_employee",
+        accessorFn: (e) => e.name,
+        gridPrimary: true,
+        cell: ({ row }) => (
+          <>
+            <div>{row.original.name}</div>
+            <div className="text-text-3 font-mono text-xs">
+              {[row.original.national_id_masked, row.original.sgk_no]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          </>
+        ),
+      }),
+      createColumn<TaxReturnEmployee>({
+        id: "days",
+        labelKey: "office.tax_returns.col_days",
+        accessorFn: (e) => e.days_worked ?? "",
+        cell: ({ row }) => row.original.days_worked ?? "—",
+      }),
+      createMoneyColumn<TaxReturnEmployee>({
+        id: "gross",
+        labelKey: "office.tax_returns.col_gross",
+        accessor: (e) => e.gross,
+      }),
+      createMoneyColumn<TaxReturnEmployee>({
+        id: "sgk_base",
+        labelKey: "office.tax_returns.col_sgk_base",
+        accessor: (e) => e.sgk_base,
+      }),
+      createMoneyColumn<TaxReturnEmployee>({
+        id: "income_tax_base",
+        labelKey: "office.tax_returns.col_income_tax_base",
+        accessor: (e) => e.income_tax_base,
+      }),
+      createMoneyColumn<TaxReturnEmployee>({
+        id: "income_tax",
+        labelKey: "office.tax_returns.col_income_tax",
+        accessor: (e) => e.income_tax,
+      }),
+      createMoneyColumn<TaxReturnEmployee>({
+        id: "stamp_tax",
+        labelKey: "office.tax_returns.col_stamp_tax",
+        accessor: (e) => e.stamp_tax,
+      }),
+    ],
+    [],
+  );
+  return (
+    <div className="space-y-4">
+      <SummaryCards
+        cards={[
+          {
+            label: t("office.tax_returns.income_tax"),
+            value: <Money value={m.totals.income_tax} />,
+            icon: Landmark,
+            box: "bg-surface-3 text-text-2",
+          },
+          {
+            label: t("office.tax_returns.stamp_tax"),
+            value: <Money value={m.totals.stamp_tax} />,
+            icon: Landmark,
+            box: "bg-surface-3 text-text-2",
+          },
+          {
+            label: t("office.tax_returns.tax_payable"),
+            value: <Money value={m.totals.tax_payable} />,
+            icon: Landmark,
+            box: "bg-brand-tint text-brand-text",
+          },
+          {
+            label: t("office.tax_returns.premium_payable"),
+            value: <Money value={m.totals.premium_payable} />,
+            icon: Landmark,
+            box: "bg-surface-3 text-text-2",
+          },
+        ]}
+      />
+      <Section title={t("office.tax_returns.muhsgk_taxes")}>
+        <Grid
+          head={[
+            t("office.tax_returns.col_payment_kind"),
+            t("office.tax_returns.col_base"),
+            t("office.tax_returns.col_rate"),
+            t("office.tax_returns.col_tax"),
+            t("office.tax_returns.col_count"),
+          ]}
+          rows={m.withholdings.map((w) => [
+            t(`office.tax_returns.withholding_${w.kind}`),
+            <Money key="b" value={w.base} />,
+            w.rate && w.rate !== "0" ? `%${w.rate}` : "—",
+            <Money key="t" value={w.tax} />,
+            w.count,
+          ])}
+          empty={t("office.tax_returns.muhsgk_empty")}
+        />
+      </Section>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {pr ? (
+          <Section title={t("office.tax_returns.muhsgk_payroll")}>
+            <p className="text-text-2 mb-2 text-sm">
+              {t("office.tax_returns.muhsgk_payroll_hint", {
+                count: pr.employee_count,
+                days: pr.days_total,
+              })}
+            </p>
+            <Lines
+              rows={[
+                { label: t("office.tax_returns.col_gross"), value: pr.gross },
+                {
+                  label: t("office.tax_returns.col_income_tax_base"),
+                  value: pr.income_tax_base,
+                },
+                {
+                  label: t("office.tax_returns.income_tax_exemption"),
+                  value: pr.income_tax_exemption,
+                },
+                {
+                  label: t("office.tax_returns.stamp_tax_exemption"),
+                  value: pr.stamp_tax_exemption,
+                },
+                {
+                  label: t("office.tax_returns.col_sgk_base"),
+                  value: pr.sgk_base,
+                },
+              ]}
+            />
+          </Section>
+        ) : null}
+        <Section title={t("office.tax_returns.muhsgk_premium")}>
+          <Lines
+            rows={[
+              ...(pr
+                ? [
+                    {
+                      label: t("office.tax_returns.sgk_employee"),
+                      value: pr.sgk_employee,
+                    },
+                    {
+                      label: t("office.tax_returns.unemployment_employee"),
+                      value: pr.unemployment_employee,
+                    },
+                    {
+                      label: t("office.tax_returns.sgk_employer"),
+                      value: pr.sgk_employer,
+                    },
+                    {
+                      label: t("office.tax_returns.unemployment_employer"),
+                      value: pr.unemployment_employer,
+                    },
+                  ]
+                : []),
+              {
+                label: t("office.tax_returns.premium_expected"),
+                value: pm.expected,
+                strong: true,
+              },
+              {
+                label: t("office.tax_returns.premium_incentive"),
+                value: pm.expected_incentive,
+              },
+              ...(pm.accrual
+                ? [
+                    {
+                      label: t("office.tax_returns.premium_accrual"),
+                      value: pm.accrual,
+                      strong: true,
+                    },
+                    {
+                      label: t("office.tax_returns.premium_difference"),
+                      value: pm.difference ?? "0",
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </Section>
+      </div>
+      <Section title={t("office.tax_returns.muhsgk_employees")}>
+        <EntityTable<TaxReturnEmployee>
+          columns={columns}
+          data={m.employees}
+          getRowId={(e) => String(e.line_no)}
+          emptyTitle={t("office.tax_returns.employees_empty_title")}
+          emptyDescription={t("office.tax_returns.employees_empty")}
+          features={{
+            ...tableFeatures,
+            persistKey: "office.tax_returns.employees",
+          }}
+        />
+      </Section>
+    </div>
+  );
+}
+
+function BABSView({ b }: { b: TaxReturnBABS }) {
+  const { t } = useLocale();
+  const columns = useMemo<ColumnDef<TaxReturnBABSRow, unknown>[]>(
+    () => [
+      createColumn<TaxReturnBABSRow>({
+        id: "name",
+        labelKey: "office.tax_returns.col_counterparty",
+        accessorFn: (r) => r.name,
+        gridPrimary: true,
+        cell: ({ row }) => row.original.name || "—",
+      }),
+      createColumn<TaxReturnBABSRow>({
+        id: "id",
+        labelKey: "office.tax_returns.col_tax_id",
+        accessorFn: (r) => r.counterparty_id,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.counterparty_id}
+            {row.original.id_type ? (
+              <span className="text-text-3 ms-1 uppercase">
+                {row.original.id_type}
+              </span>
+            ) : null}
+          </span>
+        ),
+      }),
+      createColumn<TaxReturnBABSRow>({
+        id: "count",
+        labelKey: "office.tax_returns.col_documents",
+        accessorFn: (r) => r.document_count,
+      }),
+      createMoneyColumn<TaxReturnBABSRow>({
+        id: "amount",
+        labelKey: "office.tax_returns.col_amount",
+        accessor: (r) => r.amount,
+        className: "font-semibold",
+      }),
+    ],
+    [],
+  );
+  const forms = [
+    { key: "ba", form: b.ba },
+    { key: "bs", form: b.bs },
+  ] as const;
+  return (
+    <div className="space-y-4">
+      <p className="text-text-2 text-sm">
+        {t("office.tax_returns.babs_hint")} <Money value={b.threshold} />
+      </p>
+      <div className="grid gap-4 xl:grid-cols-2">
+        {forms.map(({ key, form }) => (
+          <Section
+            key={key}
+            title={`${t(`office.tax_returns.form_${key}`)} · ${form.document_count} ${t("office.tax_returns.documents")}`}
+          >
+            <EntityTable<TaxReturnBABSRow>
+              columns={columns}
+              data={form.rows}
+              getRowId={(r) => r.counterparty_id}
+              emptyTitle={t("office.tax_returns.babs_empty_title")}
+              emptyDescription={t("office.tax_returns.babs_empty")}
+              features={{
+                ...tableFeatures,
+                persistKey: `office.tax_returns.${key}`,
+              }}
+            />
+            <p className="text-text-2 mt-2 flex flex-wrap justify-between gap-2 text-sm">
+              <span>
+                {t("office.tax_returns.below_threshold", {
+                  count: form.below_threshold,
+                })}
+              </span>
+              <span className="font-semibold">
+                {t("office.tax_returns.total")}: <Money value={form.amount} />
+              </span>
+            </p>
+          </Section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function History({
+  items,
+  loading,
+  error,
+  onRetry,
+  onPick,
+}: {
+  items: TaxReturnSummary[];
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  onPick: (x: TaxReturnSummary) => void;
+}) {
+  const { t } = useLocale();
+  const dates = useDates();
+  const columns = useMemo<ColumnDef<TaxReturnSummary, unknown>[]>(
+    () => [
+      createColumn<TaxReturnSummary>({
+        id: "period",
+        labelKey: "office.tax_returns.col_period",
+        accessorFn: (x) => x.period,
+        gridPrimary: true,
+        cell: ({ row }) => dates.month(row.original.period),
+      }),
+      createStatusColumn<TaxReturnSummary>({
+        id: "kind",
+        labelKey: "office.tax_returns.col_kind",
+        accessor: (x) => x.kind,
+        variants: kindVariants,
+      }),
+      createStatusColumn<TaxReturnSummary>({
+        id: "status",
+        labelKey: "office.tax_returns.col_status",
+        accessor: (x) => x.status,
+        variants: statusVariants,
+      }),
+      createMoneyColumn<TaxReturnSummary>({
+        id: "payable",
+        labelKey: "office.tax_returns.col_payable",
+        accessor: (x) => x.payable,
+      }),
+      createMoneyColumn<TaxReturnSummary>({
+        id: "carry_out",
+        labelKey: "office.tax_returns.col_carry_out",
+        accessor: (x) => x.carry_out,
+      }),
+      createDateColumn<TaxReturnSummary>({
+        id: "due_date",
+        labelKey: "office.tax_returns.col_due",
+        accessor: (x) => x.due_date,
+      }),
+      createDateColumn<TaxReturnSummary>({
+        id: "filed_on",
+        labelKey: "office.tax_returns.col_filed_on",
+        accessor: (x) => x.filed_on,
+      }),
+      createColumn<TaxReturnSummary>({
+        id: "accrual",
+        labelKey: "office.tax_returns.accrual_number",
+        accessorFn: (x) => x.accrual_number ?? "",
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.accrual_number ?? "—"}
+          </span>
+        ),
+      }),
+    ],
+    [dates],
+  );
+  return (
+    <section className="space-y-3">
+      <h2 className="font-display text-lg font-bold">
+        {t("office.tax_returns.history")}
+      </h2>
+      <EntityTable<TaxReturnSummary>
+        columns={columns}
+        data={items}
+        getRowId={(x) => x.uuid}
+        isLoading={loading}
+        isError={error}
+        errorTitle={t("office.api.load_error")}
+        onRetry={onRetry}
+        emptyTitle={t("office.tax_returns.history_empty_title")}
+        emptyDescription={t("office.tax_returns.history_empty")}
+        onRowClick={onPick}
+        features={{
+          ...tableFeatures,
+          persistKey: "office.tax_returns.history",
+        }}
+      />
+    </section>
+  );
+}

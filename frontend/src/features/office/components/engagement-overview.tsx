@@ -98,6 +98,15 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
     },
+    // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
+    ...(can(Permission.TenantTaxReturnsRead)
+      ? [
+          {
+            href: routes.tenant.engagementTaxReturns(slug, engagement),
+            label: t("office.engagement.tab_tax_returns"),
+          },
+        ]
+      : []),
     {
       href: routes.tenant.engagementPetitions(slug, engagement),
       label: t("office.engagement.tab_petitions"),

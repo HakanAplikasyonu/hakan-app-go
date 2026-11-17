@@ -152,6 +152,10 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM reconciliation_items WHERE status = 'explained' AND note IS NOT NULL`:                                 1,
 		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until BETWEEN CURRENT_DATE AND CURRENT_DATE + 30`: 1,
 		`SELECT count(*) FROM taxpayer_documents WHERE category = 'isg' AND valid_until < CURRENT_DATE`:                             1,
+		// #390: Eylül KDV1 ve MUHSGK verildi, Ba/Bs hazırlandı; Ekim KDV1 taslak.
+		`SELECT count(*) FROM tax_returns WHERE period = '2026-09' AND status = 'filed' AND accrual_number IS NOT NULL`: 2,
+		`SELECT count(*) FROM tax_returns WHERE period = '2026-09' AND kind = 'babs' AND status = 'prepared'`:           1,
+		`SELECT count(*) FROM tax_returns WHERE period = '2026-10' AND kind = 'kdv1' AND status = 'draft'`:              1,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)
