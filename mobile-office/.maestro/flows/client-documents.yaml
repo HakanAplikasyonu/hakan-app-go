@@ -1,0 +1,35 @@
+# Mükellef belgeleri (#393): demo mükellefi Atlas Gıda'nın ayrıntısından
+# Belgeler → Bordro sekmesi açılır; dönem bordrosu ve personel bazında
+# bordro PDF'leri görünür.
+appId: app.hakan.office
+name: client-documents
+tags: [smoke]
+---
+- launchApp
+- tapOn:
+    id: "tab-clients"
+- tapOn:
+    id: "clients-search"
+- inputText: "Atlas"
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "client-row"
+    timeout: 20000
+- tapOn:
+    id: "client-row"
+    index: 0
+- scrollUntilVisible:
+    element:
+      id: "client-documents-payroll"
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: "client-documents-payroll"
+- extendedWaitUntil:
+    visible:
+      id: "payroll-tab"
+    timeout: 15000
+- assertVisible:
+    id: "payroll-document"
+- takeScreenshot: musavir-bordro
