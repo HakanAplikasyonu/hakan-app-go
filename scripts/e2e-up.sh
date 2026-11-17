@@ -12,6 +12,7 @@
 #   E2E_SKIP_BUILD=1  frontend derlemesini atla (önceki .next kullanılır)
 #   E2E_SKIP_FRONTEND=1  frontend'i hiç başlatma (yalnızca API; mobil Maestro işi, #300)
 #   E2E_SA_EMAIL / E2E_SA_PASSWORD  oluşturulan platform yöneticisi
+#   E2E_SKIP_SMOKE=1  ortam hazır olunca duman testini (scripts/smoke.mjs, #456) koşma
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -128,6 +129,12 @@ else
     echo $! > "$DIR/frontend.pid"
   )
   wait_for frontend "http://127.0.0.1:3000/login" 90
+fi
+
+if [ "${E2E_SKIP_SMOKE:-}" != "1" ]; then
+  echo "== duman testi (scripts/smoke.mjs)"
+  SMOKE_SA_EMAIL="${E2E_SA_EMAIL:-sa@e2e.local}" SMOKE_SA_PASSWORD="${E2E_SA_PASSWORD:-E2e-Admin-123!}" \
+    node "$ROOT/scripts/smoke.mjs"
 fi
 
 echo "e2e ortamı hazır: API http://localhost:8080, panel http://localhost:3000 (Mailhog http://localhost:${MAILHOG_UI_PORT:-8025})"

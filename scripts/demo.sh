@@ -107,6 +107,7 @@ cat <<MSG
 Demo hazır. Uygulamayı başlatın:
   make backend-dev     # API :8080 (ayrı terminal)
   make frontend-dev    # panel :3000 (ayrı terminal)
+  make smoke           # ana akışların duman testi (API çalışırken)
 
 Girişler:
   Ofis paneli   http://localhost:3000/login         sahip@demo.hakan.local, musavir@…, stajyer@…
