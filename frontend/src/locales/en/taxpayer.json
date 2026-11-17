@@ -58,6 +58,7 @@
   "nav_invoices": "Invoices",
   "nav_receipts": "Receipts",
   "nav_uploads": "Upload",
+  "nav_report": "Report",
   "home_invoices": "Your sales and purchase invoices with VAT summaries.",
   "home_receipts": "Receipts you sent and their review status.",
   "home_uploads": "Send e-invoice XML / ZIP files to your accountant.",

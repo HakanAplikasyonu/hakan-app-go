@@ -148,6 +148,9 @@ export const routes = {
     /** Template-based petitions of one engagement (issue #56). */
     engagementPetitions: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/petitions`,
+    /** Mükellef raporu: dörtlü grafik, PDF, e-posta (#386). */
+    engagementReport: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/report`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */
   taxpayer: {
@@ -160,6 +163,8 @@ export const routes = {
     requests: (uuid: string) => `/m/${encodeURIComponent(uuid)}/requests`,
     receipts: (uuid: string) => `/m/${encodeURIComponent(uuid)}/receipts`,
     uploads: (uuid: string) => `/m/${encodeURIComponent(uuid)}/uploads`,
+    /** Aylık / yıllık rapor (#386). */
+    report: (uuid: string) => `/m/${encodeURIComponent(uuid)}/report`,
   },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,
