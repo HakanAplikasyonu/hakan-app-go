@@ -159,6 +159,30 @@ bir deneme şirketinde kontrol edin.
 **Önceki çıktılar** listesi hangi dosyada kaç fiş olduğunu ve geri alınanları
 gösterir.
 
+### Masaüstü ajanıyla programa aktarım
+
+Dosyayı indirip elle taşımak yerine Luca ya da Zirve çıktısını ofis
+bilgisayarındaki masaüstü ajanına gönderebilirsiniz. Ajan dosyayı programın
+içe aktaracağı klasöre bırakır. Luca ya da Zirve parolası istenmez; içe
+aktarmayı programda siz yaparsınız. Bu yolun nedeni:
+`docs/arastirma/luca-zirve-aktarim.md`.
+
+1. Masaüstü uygulamasında **Muhasebe programı → Luca / Zirve aktarım
+   klasörleri** bölümünde mükellefi, programı ve klasörü seçip kaydedin.
+2. **Önceki çıktılar** listesinde çıktının yanındaki **Masaüstü ajanına
+   gönder** düğmesine basın. Durum **Ajan bekleniyor** olur. Ajan bir dakika
+   içinde dosyayı klasöre bırakınca durum **Klasörde, içe aktarılmayı
+   bekliyor** olur.
+3. Dosyayı programın içe aktarma ekranından yükleyin. Sonra **Programa
+   aktarım** tablosunda **Aktarıldı** ya da **Hata verdi** düğmesine basın.
+   Hata verdi derseniz programın gösterdiği mesajı yazın.
+4. Ajan dosyayı bırakamazsa hata mesajı tabloda görünür; ör. klasör
+   bulunamadı ya da yazma izni yok. Tablonun üstünde de uyarı çıkar. Sorunu
+   giderip **Yeniden dene** ile tekrar gönderin.
+
+Aktarıldı olarak işaretlenen bir çıktı bir daha gönderilemez. Luca aynı
+dosya iki kez yüklenince fişleri iki kez keser; bu kural bunu önler.
+
 ## 8. Dönem durumu
 
 **Komuta merkezi** mükellef × dönem matrisidir: iş nerede, kimde, ne bekliyor?

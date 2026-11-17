@@ -11,6 +11,13 @@ export type JournalExportSummary =
   components["schemas"]["JournalExportSummary"];
 export type JournalExportInput = components["schemas"]["JournalExportInput"];
 export type ExportDriver = components["schemas"]["ExportDriver"];
+export type JournalTransfer = components["schemas"]["JournalTransfer"];
+export type JournalTransferPage = components["schemas"]["JournalTransferPage"];
+export type JournalTransferStatus =
+  components["schemas"]["JournalTransferStatus"];
+
+/** Programs whose exports the desktop agent can hand to the program (#391). */
+export const TRANSFER_DRIVERS = new Set(["luca", "zirve"]);
 
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
@@ -34,6 +41,8 @@ export const journalKeys = {
     [...base(slug, engagement), "journals", "draft", draft] as const,
   exports: (slug: string, engagement: string) =>
     [...base(slug, engagement), "journals", "exports"] as const,
+  transfers: (slug: string, engagement: string) =>
+    [...base(slug, engagement), "journals", "transfers"] as const,
 };
 
 /**
@@ -100,6 +109,53 @@ export const journalService = {
       "POST",
       `${eng(engagement)}/journal-exports`,
       { body: input, silent: true },
+    );
+  },
+  transfers(slug: string, engagement: string) {
+    return tenantRequest<JournalTransferPage>(
+      slug,
+      "GET",
+      `${eng(engagement)}/journal-transfers`,
+      { query: { limit: 200 } },
+    );
+  },
+  /** Queue an export for the desktop agent (#391). */
+  requestTransfer(slug: string, engagement: string, batch: string) {
+    return tenantRequest<JournalTransfer>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-exports/${encodeURIComponent(batch)}/transfers`,
+      { body: { method: "agent_folder" }, silent: true },
+    );
+  },
+  completeTransfer(
+    slug: string,
+    engagement: string,
+    transfer: string,
+    outcome: "imported" | "failed",
+    message?: string,
+  ) {
+    return tenantRequest<JournalTransfer>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-transfers/${encodeURIComponent(transfer)}/complete`,
+      { body: { outcome, message }, silent: true },
+    );
+  },
+  cancelTransfer(slug: string, engagement: string, transfer: string) {
+    return tenantRequest<JournalTransfer>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-transfers/${encodeURIComponent(transfer)}/cancel`,
+      { silent: true },
+    );
+  },
+  retryTransfer(slug: string, engagement: string, transfer: string) {
+    return tenantRequest<JournalTransfer>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-transfers/${encodeURIComponent(transfer)}/retry`,
+      { silent: true },
     );
   },
   /** Link for a stored export file (a plain GET; the BFF adds the session). */
