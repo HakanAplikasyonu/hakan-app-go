@@ -10686,6 +10686,501 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}/counterparties:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: runRef, in: path, required: true, description: "`latest` or a run uuid", schema: { type: string, example: latest } }
+    get:
+      tags: [Reconciliation]
+      operationId: listReconciliationCounterparties
+      summary: Counterparty (cari) reconciliation of a run
+      description: |
+        Requires `tenant.reconciliation.read` (#389). Per counterparty (VKN/TCKN): the trial balance balance of its 120 / 320 account from the counterparty account memory, the portal balance (invoices up to the period end, sales +, purchases −, minus bank payments matched to them, TL) and the period's Form BA (purchases) / BS (sales) totals (KDV hariç, invoice count) against the declared form lines. A counterparty reaching 5.000 TL must be on the form. Each row has the contact email of its customer card and its newest letter.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationCounterpartyPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/counterparties/{counterpartyUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: counterpartyUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [Reconciliation]
+      operationId: decideReconciliationCounterparty
+      summary: Decide a counterparty reconciliation
+      description: |
+        Requires `tenant.reconciliation.write` (#389). `explained` needs a note; 409 `RECONCILIATION_IN_REVIEW` while its suggestion is pending.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: 
+              type: object
+              required: [status]
+              additionalProperties: false
+              properties:
+                status: { type: string, enum: [open, explained, resolved, ignored] }
+                note: { type: [string, "null"], maxLength: 2000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationCounterparty" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/counterparties/{counterpartyUuid}/review:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: counterpartyUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Reconciliation]
+      operationId: sendReconciliationCounterpartyToReview
+      summary: Send a counterparty reconciliation to the review queue
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Like an account item: a `reconciliation` suggestion (target `counterparty_reconciliation`) whose explanation is the note given, else one built from the balance and BA/BS results. 409 `RECONCILIATION_NO_DIFFERENCE` when the balance matches and BA/BS has no issue.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, properties: { note: { type: [string, "null"], maxLength: 2000 } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationCounterparty" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503":
+          description: "`RECONCILIATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/babs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reconciliation]
+      operationId: listBabsDeclarations
+      summary: Declared Form BA / BS lines of a period
+      description: |
+        Requires `tenant.reconciliation.read` (#389). `form`: ba or bs (default both).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+        - { name: form, in: query, schema: { type: string, enum: [ba, bs] } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { type: object, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/BabsDeclaration" } } } }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Reconciliation]
+      operationId: saveBabsDeclaration
+      summary: Add or replace a declared form line
+      description: |
+        Requires `tenant.reconciliation.write` (#389). The line of the same period, form and counterparty is replaced. Amount in TL (KDV hariç).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BabsDeclarationInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BabsDeclaration" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/babs/imports:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Reconciliation]
+      operationId: importBabsDeclarations
+      summary: Import a Form BA / BS listing (Excel / CSV)
+      description: |
+        Requires `tenant.reconciliation.write` (#389). The header row is found by its columns: VKN/TCKN and Tutar (Mal ve Hizmet Bedeli) are required, Unvan, Belge Sayısı, Form (Ba/Bs) and Dönem optional. `period` and `form` apply to rows that do not name their own. Amounts without a clear decimal style are read the Turkish way (5.000 = five thousand). Bad rows are reported, the others stored. 422 `BABS_HEADER_NOT_FOUND`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                form: { type: string, enum: [ba, bs] }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/BabsImportResult" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "422":
+          description: "`BABS_HEADER_NOT_FOUND`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/babs/{declarationUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: declarationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Reconciliation]
+      operationId: deleteBabsDeclaration
+      summary: Delete a declared form line
+      description: |
+        Requires `tenant.reconciliation.write` (#389).
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/letters:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reconciliation]
+      operationId: listReconciliationLetters
+      summary: Reconciliation letters
+      description: |
+        Requires `tenant.reconciliation.read` (#389). Newest first, at most 200.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: counterparty_tax_id, in: query, schema: { type: string, pattern: "^[0-9]{10,11}$" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { type: object, required: [items], properties: { items: { type: array, items: { $ref: "#/components/schemas/ReconciliationLetter" } } } }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Reconciliation]
+      operationId: createReconciliationLetter
+      summary: Create a reconciliation letter for a counterparty
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Freezes the letter (office, taxpayer, counterparty, balance as of the date: the trial balance's, else the portal's, unless `balance` is given; positive = the counterparty owes). `send: true` queues the email (PDF attached, with the response link); the worker sends it within a minute and retries on failure. The response link works for 60 days.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: 
+              type: object
+              required: [counterparty_uuid]
+              additionalProperties: false
+              properties:
+                counterparty_uuid: { type: string, format: uuid }
+                email: { type: [string, "null"], format: email }
+                as_of_date: { type: [string, "null"], format: date }
+                balance: { type: [string, "null"] }
+                note: { type: [string, "null"], maxLength: 2000 }
+                send: { type: boolean, default: false }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationLetter" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503":
+          description: "`RECONCILIATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/pdf:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: letterUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Reconciliation]
+      operationId: getReconciliationLetterPdf
+      summary: The letter as PDF
+      description: |
+        Requires `tenant.reconciliation.read` (#389).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/send:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: letterUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Reconciliation]
+      operationId: sendReconciliationLetter
+      summary: Queue a letter's email (again)
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Optionally to another address. 409 `RECONCILIATION_LETTER_ANSWERED` for an answered letter.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, properties: { email: { type: [string, "null"], format: email } } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationLetter" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503":
+          description: "`RECONCILIATION_UNAVAILABLE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: letterUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Reconciliation]
+      operationId: recordReconciliationLetterResponse
+      summary: Record an answer received another way
+      description: |
+        Requires `tenant.reconciliation.write` (#389). Phone, signed paper. `agreed` resolves the counterparty's open row in the newest run.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReconciliationLetterResponseInput" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ReconciliationLetter" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/public/reconciliation-letters/preview:
+    post:
+      tags: [Reconciliation]
+      operationId: previewPublicReconciliationLetter
+      summary: The letter behind a response link (no sign in)
+      description: |
+        #389. The token from the letter's link (`/mutabakat/{token}`), sent in the body so it stays out of API URLs and logs, opens this
+        one letter for 60 days (410 `RECONCILIATION_LETTER_EXPIRED` after).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              additionalProperties: false
+              properties:
+                token: { type: string, pattern: "^[0-9a-f]{64}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PublicReconciliationLetter" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`RECONCILIATION_LETTER_EXPIRED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/public/reconciliation-letters/respond:
+    post:
+      tags: [Reconciliation]
+      operationId: respondPublicReconciliationLetter
+      summary: Answer a reconciliation letter (no sign in)
+      description: |
+        #389. `agreed` or `disputed` (a dispute needs the balance in the counterparty's books or a note). Answered once:
+        409 `RECONCILIATION_LETTER_ANSWERED`. `agreed` resolves the counterparty's open row in the newest run.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/ReconciliationLetterResponseInput"
+                - type: object
+                  required: [token]
+                  properties:
+                    token: { type: string, pattern: "^[0-9a-f]{64}$" }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/PublicReconciliationLetter" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "410":
+          description: "`RECONCILIATION_LETTER_EXPIRED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/journal-export-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23127,3 +23622,158 @@ components:
       properties:
         run: { $ref: "#/components/schemas/ReconciliationRun" }
         items: { type: array, items: { $ref: "#/components/schemas/ReconciliationItem" } }
+    ReconciliationCounterparty:
+      type: object
+      required: [uuid, counterparty_tax_id, counterparty_name, account_code, ledger_balance, source_balance, difference, result, ba_amount, ba_count, bs_amount, bs_count, declared_ba_amount, declared_ba_count, declared_bs_amount, declared_bs_count, ba_result, bs_result, status, note, review, decided_at, email, last_letter]
+      properties:
+        uuid: { type: string, format: uuid }
+        counterparty_tax_id: { type: string }
+        counterparty_name: { type: string }
+        account_code: { type: [string, "null"], description: "The counterparty's account codes, comma separated" }
+        ledger_balance: { type: [string, "null"], description: "Signed: positive = the counterparty owes" }
+        source_balance: { type: string }
+        difference: { type: [string, "null"] }
+        result: { type: string, enum: [matched, difference, no_ledger_account] }
+        ba_amount: { type: string }
+        ba_count: { type: integer }
+        bs_amount: { type: string }
+        bs_count: { type: integer }
+        declared_ba_amount: { type: [string, "null"] }
+        declared_ba_count: { type: [integer, "null"] }
+        declared_bs_amount: { type: [string, "null"] }
+        declared_bs_count: { type: [integer, "null"] }
+        ba_result: { $ref: "#/components/schemas/BabsResult" }
+        bs_result: { $ref: "#/components/schemas/BabsResult" }
+        status: { type: string, enum: [open, explained, in_review, resolved, ignored] }
+        note: { type: [string, "null"] }
+        review:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [uuid, status]
+              properties:
+                uuid: { type: string, format: uuid }
+                status: { type: string }
+        decided_at: { type: [string, "null"], format: date-time }
+        email: { type: [string, "null"] }
+        last_letter:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [uuid, status, response, sent_at]
+              properties:
+                uuid: { type: string, format: uuid }
+                status: { type: string, enum: [draft, queued, sent, failed, responded] }
+                response: { type: [string, "null"], enum: [agreed, disputed, null] }
+                sent_at: { type: [string, "null"], format: date-time }
+    BabsResult:
+      type: string
+      enum: [not_required, ok, missing_in_form, extra_in_form, amount_mismatch, count_mismatch, no_declaration]
+    ReconciliationCounterpartyPage:
+      type: object
+      required: [run, items]
+      properties:
+        run: { $ref: "#/components/schemas/ReconciliationRun" }
+        items: { type: array, items: { $ref: "#/components/schemas/ReconciliationCounterparty" } }
+    BabsDeclaration:
+      type: object
+      required: [uuid, period, form_type, counterparty_tax_id, counterparty_name, document_count, amount, source, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        form_type: { type: string, enum: [ba, bs] }
+        counterparty_tax_id: { type: string }
+        counterparty_name: { type: string }
+        document_count: { type: integer }
+        amount: { type: string }
+        source: { type: string, enum: [import, manual, demo] }
+        created_at: { type: string, format: date-time }
+    BabsDeclarationInput:
+      type: object
+      required: [period, form_type, counterparty_tax_id, amount]
+      additionalProperties: false
+      properties:
+        period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+        form_type: { type: string, enum: [ba, bs] }
+        counterparty_tax_id: { type: string, pattern: "^[0-9]{10,11}$" }
+        counterparty_name: { type: string }
+        document_count: { type: integer, minimum: 0 }
+        amount: { type: string, example: "12500" }
+    BabsImportResult:
+      type: object
+      required: [imported, errors]
+      properties:
+        imported: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [line, message]
+            properties:
+              line: { type: integer }
+              message: { type: string }
+    ReconciliationLetterSnapshot:
+      type: object
+      required: [office, taxpayer_title, taxpayer_tax_id, counterparty_name, counterparty_tax_id, account_code, as_of_date, balance, currency, period, note]
+      properties:
+        office: { type: string }
+        taxpayer_title: { type: string }
+        taxpayer_tax_id: { type: string }
+        counterparty_name: { type: string }
+        counterparty_tax_id: { type: string }
+        account_code: { type: string }
+        as_of_date: { type: string, format: date }
+        balance: { type: string }
+        currency: { type: string }
+        period: { type: string }
+        note: { type: string }
+    ReconciliationLetter:
+      type: object
+      required: [uuid, counterparty_tax_id, counterparty_name, recipient_email, account_code, as_of_date, balance, currency, status, attempts, last_error, sent_at, response, response_balance, response_note, responder_name, response_channel, responded_at, expires_at, snapshot, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        counterparty_tax_id: { type: string }
+        counterparty_name: { type: string }
+        recipient_email: { type: [string, "null"] }
+        account_code: { type: [string, "null"] }
+        as_of_date: { type: string, format: date }
+        balance: { type: string }
+        currency: { type: string }
+        status: { type: string, enum: [draft, queued, sent, failed, responded] }
+        attempts: { type: integer }
+        last_error: { type: [string, "null"] }
+        sent_at: { type: [string, "null"], format: date-time }
+        response: { type: [string, "null"], enum: [agreed, disputed, null] }
+        response_balance: { type: [string, "null"] }
+        response_note: { type: [string, "null"] }
+        responder_name: { type: [string, "null"] }
+        response_channel: { type: [string, "null"], enum: [link, manual, null] }
+        responded_at: { type: [string, "null"], format: date-time }
+        expires_at: { type: [string, "null"], format: date-time }
+        snapshot: { $ref: "#/components/schemas/ReconciliationLetterSnapshot" }
+        created_at: { type: string, format: date-time }
+    ReconciliationLetterResponseInput:
+      type: object
+      required: [response]
+      properties:
+        response: { type: string, enum: [agreed, disputed] }
+        balance: { type: [string, "null"], description: "The balance in the counterparty's books (signed like the letter's)" }
+        note: { type: [string, "null"], maxLength: 2000 }
+        responder_name: { type: [string, "null"], maxLength: 200 }
+    PublicReconciliationLetter:
+      type: object
+      required: [office, taxpayer_title, taxpayer_tax_id, counterparty_name, counterparty_tax_id, as_of_date, balance, currency, note, response, response_balance, responded_at, expires_at]
+      properties:
+        office: { type: string }
+        taxpayer_title: { type: string }
+        taxpayer_tax_id: { type: string }
+        counterparty_name: { type: string }
+        counterparty_tax_id: { type: string }
+        as_of_date: { type: string, format: date }
+        balance: { type: string }
+        currency: { type: string }
+        note: { type: string }
+        response: { type: [string, "null"], enum: [agreed, disputed, null] }
+        response_balance: { type: [string, "null"] }
+        responded_at: { type: [string, "null"], format: date-time }
+        expires_at: { type: [string, "null"], format: date-time }

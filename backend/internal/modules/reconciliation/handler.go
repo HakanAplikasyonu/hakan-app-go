@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/parse"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -20,11 +21,7 @@ import (
 )
 
 // Handler serves the reconciliation routes.
-type Handler struct {
-	svc       *Service
-	extra     []extraRoute
-	failExtra func(w http.ResponseWriter, r *http.Request, err error) bool
-}
+type Handler struct{ svc *Service }
 
 // NewHandler builds the handler.
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
@@ -51,20 +48,29 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("GET", "/runs/{runRef}", read, h.getRun)
 	route("PATCH", "/items/{itemUuid}", write, h.decide)
 	route("POST", "/items/{itemUuid}/review", write, h.review)
-	for _, r := range h.extra {
-		perm := read
-		if r.write {
-			perm = write
-		}
-		route(r.method, r.path, perm, r.fn)
-	}
+	route("GET", "/runs/{runRef}/counterparties", read, h.listCounterparties)
+	route("PATCH", "/counterparties/{counterpartyUuid}", write, h.decideCounterparty)
+	route("POST", "/counterparties/{counterpartyUuid}/review", write, h.reviewCounterparty)
+	route("GET", "/babs", read, h.listDeclarations)
+	route("POST", "/babs", write, h.saveDeclaration)
+	route("POST", "/babs/imports", write, h.importDeclarations)
+	route("DELETE", "/babs/{declarationUuid}", write, h.deleteDeclaration)
+	route("GET", "/letters", read, h.listLetters)
+	route("POST", "/letters", write, h.createLetter)
+	route("GET", "/letters/{letterUuid}/pdf", read, h.letterPDF)
+	route("POST", "/letters/{letterUuid}/send", write, h.sendLetter)
+	route("POST", "/letters/{letterUuid}/response", write, h.recordResponse)
 }
 
-// extraRoute is a route added by another file of the package.
-type extraRoute struct {
-	method, path string
-	write        bool
-	fn           http.HandlerFunc
+// RegisterPublicRoutes mounts the counterparty's response link (no sign in;
+// the token, sent in the body so it stays out of URLs and logs, opens one
+// letter).
+func RegisterPublicRoutes(mux *http.ServeMux, h *Handler) {
+	if h == nil {
+		return
+	}
+	mux.HandleFunc("POST /v1/public/reconciliation-letters/preview", h.publicLetter)
+	mux.HandleFunc("POST /v1/public/reconciliation-letters/respond", h.publicRespond)
 }
 
 func userID(r *http.Request) int64 {
@@ -108,10 +114,19 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "RECONCILIATION_IN_REVIEW", err.Error())
 	case errors.Is(err, ErrNoReview):
 		response.ServiceUnavailable(w, r, "RECONCILIATION_UNAVAILABLE", err.Error())
+	case errors.Is(err, ErrBadRecipient), errors.Is(err, ErrNoRecipient):
+		response.BadRequest(w, r, "RECONCILIATION_BAD_RECIPIENT", err.Error())
+	case errors.Is(err, ErrLetterAnswered):
+		response.Conflict(w, r, "RECONCILIATION_LETTER_ANSWERED", err.Error())
+	case errors.Is(err, ErrLetterExpired):
+		response.Error(w, r, http.StatusGone, "RECONCILIATION_LETTER_EXPIRED", err.Error())
+	case errors.Is(err, ErrLettersDisabled):
+		response.ServiceUnavailable(w, r, "RECONCILIATION_UNAVAILABLE", err.Error())
+	case errors.Is(err, ErrNoBABSHeader):
+		response.Error(w, r, http.StatusUnprocessableEntity, "BABS_HEADER_NOT_FOUND", err.Error())
+	case errors.Is(err, parse.ErrUnsupported), errors.Is(err, parse.ErrEmpty), errors.Is(err, parse.ErrTooLarge), errors.Is(err, parse.ErrTooManyRows):
+		response.BadRequest(w, r, "FILE_UNREADABLE", err.Error())
 	default:
-		if h.failExtra != nil && h.failExtra(w, r, err) {
-			return
-		}
 		response.InternalErr(w, r, err, "reconciliation request failed")
 	}
 }

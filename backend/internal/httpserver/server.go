@@ -657,8 +657,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore)))
 	// Mutabakat (#389): mizan – kaynak çifte mutabakatı ve cari mutabakat.
-	reconciliationmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		reconciliationmodule.NewHandler(reconciliationmodule.New(database.Ambient{Pool: deps.DB}, reviewSvc)))
+	reconciliationH := reconciliationmodule.NewHandler(reconciliationmodule.New(database.Ambient{Pool: deps.DB}, reviewSvc).
+		WithLetters(reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}))
+	reconciliationmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, reconciliationH)
+	reconciliationmodule.RegisterPublicRoutes(mux, reconciliationH)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),

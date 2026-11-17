@@ -54,6 +54,8 @@ type Querier interface {
 	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
 	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
+	// tenant-lint: cross-org worker taraması (rls.System): sırası gelen mektuplar.
+	ClaimReconciliationLetters(ctx context.Context, lim int32) ([]ReconciliationLetter, error)
 	// tenant-lint: cross-org worker taraması (rls.System); sırası gelen gönderimleri sahiplenir
 	// Sırası gelen ya da 10 dakikadır "sending"de takılı kalan gönderimler.
 	ClaimReportDeliveries(ctx context.Context, batchLimit int32) ([]ReportDelivery, error)
@@ -220,6 +222,7 @@ type Querier interface {
 	DeleteAppLogByUUID(ctx context.Context, argUuid uuid.UUID) (int64, error)
 	DeleteAppLogsByUUIDs(ctx context.Context, uuids []uuid.UUID) (int64, error)
 	DeleteAppLogsMatching(ctx context.Context, arg DeleteAppLogsMatchingParams) (int64, error)
+	DeleteBabsDeclaration(ctx context.Context, arg DeleteBabsDeclarationParams) (int64, error)
 	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
 	DeleteBankCounterpartyAlias(ctx context.Context, arg DeleteBankCounterpartyAliasParams) (int64, error)
 	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
@@ -380,6 +383,8 @@ type Querier interface {
 	GetCopilotPlanForUpdate(ctx context.Context, arg GetCopilotPlanForUpdateParams) (CopilotPlan, error)
 	// Cari hafızası (#319): karşı tarafın VKN'si ile hatırlanan cari hesap.
 	GetCounterpartyAccount(ctx context.Context, arg GetCounterpartyAccountParams) (GetCounterpartyAccountRow, error)
+	GetCounterpartyReconciliation(ctx context.Context, arg GetCounterpartyReconciliationParams) (GetCounterpartyReconciliationRow, error)
+	GetCounterpartyReconciliationByID(ctx context.Context, arg GetCounterpartyReconciliationByIDParams) (CounterpartyReconciliation, error)
 	// KVKK hukuki metinleri ve onaylar (issue #57). Platform geneli tablolar;
 	// ofis ve mükellef kapsamı onay kaydının kendisindedir.
 	GetCurrentLegalDocument(ctx context.Context, arg GetCurrentLegalDocumentParams) (LegalDocument, error)
@@ -474,6 +479,9 @@ type Querier interface {
 	GetReceiptPosting(ctx context.Context, arg GetReceiptPostingParams) (ReceiptPosting, error)
 	GetReconciliationItem(ctx context.Context, arg GetReconciliationItemParams) (GetReconciliationItemRow, error)
 	GetReconciliationItemByID(ctx context.Context, arg GetReconciliationItemByIDParams) (ReconciliationItem, error)
+	GetReconciliationLetter(ctx context.Context, arg GetReconciliationLetterParams) (ReconciliationLetter, error)
+	// tenant-lint: cross-org yanıt bağlantısı jetonla açılır (rls.System içinde, jetonun özeti tekil).
+	GetReconciliationLetterByToken(ctx context.Context, tokenDigest pgtype.Text) (GetReconciliationLetterByTokenRow, error)
 	GetReconciliationRun(ctx context.Context, arg GetReconciliationRunParams) (GetReconciliationRunRow, error)
 	// Zamanlanmış mükellef raporu (issue #386).
 	GetReportSchedule(ctx context.Context, arg GetReportScheduleParams) (ReportSchedule, error)
@@ -576,6 +584,7 @@ type Querier interface {
 	InsertCashBox(ctx context.Context, arg InsertCashBoxParams) (CashBox, error)
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCopilotPlan(ctx context.Context, arg InsertCopilotPlanParams) (CopilotPlan, error)
+	InsertCounterpartyReconciliations(ctx context.Context, arg InsertCounterpartyReconciliationsParams) (int64, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertDocumentTaskUpload(ctx context.Context, arg InsertDocumentTaskUploadParams) (DocumentTaskUpload, error)
 	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
@@ -609,6 +618,7 @@ type Querier interface {
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
 	// rows: [{"main_code","account_name","ledger_debit",...,"status","note"}]
 	InsertReconciliationItems(ctx context.Context, arg InsertReconciliationItemsParams) (int64, error)
+	InsertReconciliationLetter(ctx context.Context, arg InsertReconciliationLetterParams) (ReconciliationLetter, error)
 	InsertReconciliationRun(ctx context.Context, arg InsertReconciliationRunParams) (ReconciliationRun, error)
 	// Mükellef raporu gönderimleri (issue #386).
 	InsertReportDelivery(ctx context.Context, arg InsertReportDeliveryParams) (ReportDelivery, error)
@@ -678,6 +688,7 @@ type Querier interface {
 	// addan. Eksik hesap şablonunu (Luca) besler.
 	ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
+	ListBabsDeclarations(ctx context.Context, arg ListBabsDeclarationsParams) ([]BabsDeclaration, error)
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -723,6 +734,7 @@ type Querier interface {
 	// tenant-lint: org-wide sıradaki iş listesi; read_all yoksa engagement_assignments ile süzülür
 	ListCopilotEngagements(ctx context.Context, arg ListCopilotEngagementsParams) ([]ListCopilotEngagementsRow, error)
 	ListCopilotPlans(ctx context.Context, arg ListCopilotPlansParams) ([]CopilotPlan, error)
+	ListCounterpartyReconciliations(ctx context.Context, arg ListCounterpartyReconciliationsParams) ([]ListCounterpartyReconciliationsRow, error)
 	ListCurrentLegalDocuments(ctx context.Context, language string) ([]LegalDocument, error)
 	ListCustomerSourceLinks(ctx context.Context, arg ListCustomerSourceLinksParams) ([]CustomerSourceLink, error)
 	// Sınıflandırma adım 5 için mükellefin carileri (VKN/TCKN, IBAN, tür).
@@ -884,6 +896,7 @@ type Querier interface {
 	ListReceiptCaptures(ctx context.Context, arg ListReceiptCapturesParams) ([]ReceiptCapture, error)
 	// Bir çalıştırmanın kalemleri; inceleme kuyruğundaki önerinin durumuyla.
 	ListReconciliationItems(ctx context.Context, arg ListReconciliationItemsParams) ([]ListReconciliationItemsRow, error)
+	ListReconciliationLetters(ctx context.Context, arg ListReconciliationLettersParams) ([]ReconciliationLetter, error)
 	ListReconciliationRuns(ctx context.Context, arg ListReconciliationRunsParams) ([]ListReconciliationRunsRow, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
@@ -1029,6 +1042,12 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
+	// tenant-lint: cross-org worker taraması (rls.System).
+	MarkReconciliationLetterFailed(ctx context.Context, arg MarkReconciliationLetterFailedParams) error
+	// tenant-lint: cross-org worker taraması (rls.System).
+	MarkReconciliationLetterRetry(ctx context.Context, arg MarkReconciliationLetterRetryParams) error
+	// tenant-lint: cross-org worker taraması (rls.System).
+	MarkReconciliationLetterSent(ctx context.Context, id int64) error
 	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
 	MarkReportDeliveryFailed(ctx context.Context, arg MarkReportDeliveryFailedParams) error
 	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
@@ -1075,14 +1094,29 @@ type Querier interface {
 	// hatalı pencere olduğu gibi kalır.
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
 	PrepareTaxReturn(ctx context.Context, arg PrepareTaxReturnParams) (TaxReturn, error)
+	// Aynı dönemin bir önceki çalıştırması (cari kararlarını taşımak için).
+	PreviousReconciliationRun(ctx context.Context, arg PreviousReconciliationRunParams) (ReconciliationRun, error)
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	// Webhook (issue #385): zamanlanmış bağlantının sıradaki senkronunu şimdiye
 	// çeker ve son bildirim zamanını yazar.
 	PullSourceConnectionNow(ctx context.Context, arg PullSourceConnectionNowParams) (int64, error)
 	QueueImportJob(ctx context.Context, argUuid uuid.UUID) (ImportJob, error)
+	QueueReconciliationLetter(ctx context.Context, arg QueueReconciliationLetterParams) (ReconciliationLetter, error)
 	// Her banka hesabının (cash box) dönem sonuna kadarki son hareketinin
 	// bakiyesi; bakiyesi okunmamış hesap sayılmaz.
 	ReconciliationBankClosingBalances(ctx context.Context, arg ReconciliationBankClosingBalancesParams) ([]ReconciliationBankClosingBalancesRow, error)
+	// Cari hafızası (#90): karşı firmanın 120 / 320 (ve benzeri) alt hesabı.
+	ReconciliationCounterpartyAccounts(ctx context.Context, arg ReconciliationCounterpartyAccountsParams) ([]ReconciliationCounterpartyAccountsRow, error)
+	// Karşı firmanın cari kartındaki e-posta (mektup alıcısı önerisi).
+	ReconciliationCounterpartyContacts(ctx context.Context, taxpayerID int64) ([]ReconciliationCounterpartyContactsRow, error)
+	// Cari mutabakat, BA/BS ve mutabakat mektupları (#389).
+	// Karşı firma bazında: dönem sonuna kadarki faturalardan işaretli bakiye
+	// (satış +, alış −; TL) ve dönemin BA (alış) / BS (satış) KDV hariç
+	// tutarı ile belge sayısı.
+	ReconciliationCounterpartyInvoices(ctx context.Context, arg ReconciliationCounterpartyInvoicesParams) ([]ReconciliationCounterpartyInvoicesRow, error)
+	// Faturalara eşleşmiş banka hareketleri, karşı firma bazında işaretli
+	// (gelen para alacağı azaltır −, giden para borcu azaltır +).
+	ReconciliationCounterpartyPayments(ctx context.Context, arg ReconciliationCounterpartyPaymentsParams) ([]ReconciliationCounterpartyPaymentsRow, error)
 	// Mutabakat (#389): mizan – kaynak çifte mutabakatı. Çalıştırma, kalem ve
 	// cari tabloları engagement kapsamlı (tenant_tables.txt); kaynak tablolar
 	// (fatura, banka, masraf, Z, bordro) mükellef kapsamlı.
@@ -1132,6 +1166,8 @@ type Querier interface {
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
+	// Karşı tarafın "mutabıkız" yanıtı: en son çalıştırmadaki açık satır çözülür.
+	ResolveLatestCounterpartyReconciliation(ctx context.Context, arg ResolveLatestCounterpartyReconciliationParams) error
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
 	ResolveOrganizationScopeByUUID(ctx context.Context, arg ResolveOrganizationScopeByUUIDParams) (ResolveOrganizationScopeByUUIDRow, error)
 	// Mükellef kullanıcıları ve ofis davetleri (issue #4).
@@ -1139,6 +1175,7 @@ type Querier interface {
 	ResolveTaxpayerMembership(ctx context.Context, arg ResolveTaxpayerMembershipParams) (ResolveTaxpayerMembershipRow, error)
 	// Etkin seviye ve açık/kapalı (#13): engagement ayarı > ofis ayarı > katalog varsayılanı.
 	ResolveWarningSetting(ctx context.Context, arg ResolveWarningSettingParams) (ResolveWarningSettingRow, error)
+	RespondReconciliationLetter(ctx context.Context, arg RespondReconciliationLetterParams) (ReconciliationLetter, error)
 	RetireAccountRule(ctx context.Context, arg RetireAccountRuleParams) (int64, error)
 	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
@@ -1182,6 +1219,7 @@ type Querier interface {
 	// Masraf ekranından verilen karar fiş yakalama kaydına da yansır.
 	SetCaptureStatusForExpense(ctx context.Context, arg SetCaptureStatusForExpenseParams) error
 	SetCaptureStatusForRetailSale(ctx context.Context, arg SetCaptureStatusForRetailSaleParams) error
+	SetCounterpartyReconciliationReview(ctx context.Context, arg SetCounterpartyReconciliationReviewParams) error
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
@@ -1200,6 +1238,7 @@ type Querier interface {
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetReceiptPostingJournal(ctx context.Context, arg SetReceiptPostingJournalParams) error
 	SetReconciliationItemReview(ctx context.Context, arg SetReconciliationItemReviewParams) error
+	SetReconciliationLetterToken(ctx context.Context, arg SetReconciliationLetterTokenParams) error
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	// Z raporu yönetimi (issue #384): KDV / ödeme kırılımı, ÖKC bazında liste,
 	// süreklilik denetimi, onay ve satış fişi.
@@ -1279,6 +1318,7 @@ type Querier interface {
 	UpdateBankConnectionSetup(ctx context.Context, arg UpdateBankConnectionSetupParams) (SourceConnection, error)
 	UpdateBankCounterpartyAlias(ctx context.Context, arg UpdateBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
 	UpdateCopilotPlan(ctx context.Context, arg UpdateCopilotPlanParams) (CopilotPlan, error)
+	UpdateCounterpartyReconciliationDecision(ctx context.Context, arg UpdateCounterpartyReconciliationDecisionParams) (CounterpartyReconciliation, error)
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
 	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
 	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)
@@ -1298,6 +1338,7 @@ type Querier interface {
 	UpdateOrganizationRole(ctx context.Context, arg UpdateOrganizationRoleParams) (Role, error)
 	UpdatePeriodSummaryBody(ctx context.Context, arg UpdatePeriodSummaryBodyParams) (PeriodSummary, error)
 	UpdateReconciliationItemDecision(ctx context.Context, arg UpdateReconciliationItemDecisionParams) (ReconciliationItem, error)
+	UpdateReconciliationRunSummary(ctx context.Context, arg UpdateReconciliationRunSummaryParams) error
 	UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSaleFieldParams) (RetailSale, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
 	UpdateSgkPremium(ctx context.Context, arg UpdateSgkPremiumParams) (SgkPremium, error)
@@ -1320,6 +1361,7 @@ type Querier interface {
 	UpsertAccountRuleSettings(ctx context.Context, arg UpsertAccountRuleSettingsParams) (AccountRuleSetting, error)
 	// Tekil (taxpayer_id, sha256): aynı dosya ikinci kez gelirse mevcut satır döner.
 	UpsertAttachment(ctx context.Context, arg UpsertAttachmentParams) (UpsertAttachmentRow, error)
+	UpsertBabsDeclaration(ctx context.Context, arg UpsertBabsDeclarationParams) (BabsDeclaration, error)
 	UpsertBankDailySummary(ctx context.Context, arg UpsertBankDailySummaryParams) error
 	UpsertBankLedgerAccount(ctx context.Context, arg UpsertBankLedgerAccountParams) error
 	// Öneri yazılır; onaylanmış bir hareketin önerisi değişmez.

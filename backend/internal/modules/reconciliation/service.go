@@ -51,10 +51,11 @@ type Reviewer interface {
 
 // Service is the reconciliation use case layer.
 type Service struct {
-	pool   database.Pool
-	q      *db.Queries
-	review Reviewer
-	now    func() time.Time
+	pool    database.Pool
+	q       *db.Queries
+	review  Reviewer
+	now     func() time.Time
+	letters *LetterConfig
 	// afterRun runs inside the run's transaction after the account items
 	// are stored (the counterparty step).
 	afterRun func(ctx context.Context, q *db.Queries, sc engagementctx.Scope, run db.ReconciliationRun, c collected) error
@@ -62,7 +63,9 @@ type Service struct {
 
 // New builds the service; review may be nil (sending to the queue fails).
 func New(pool database.Pool, review Reviewer) *Service {
-	return &Service{pool: pool, q: database.QueriesFor(pool), review: review, now: time.Now}
+	s := &Service{pool: pool, q: database.QueriesFor(pool), review: review, now: time.Now}
+	s.afterRun = s.counterpartyStep
+	return s
 }
 
 // ---- views ----
