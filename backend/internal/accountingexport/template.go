@@ -44,6 +44,11 @@ type Column struct {
 	// e.g. Luca description_source: "{description} ETTN:{ettn}"). Empty
 	// placeholders and the text around them are dropped by the driver.
 	Pattern string `yaml:"pattern"`
+	// ProgramField and DataType describe how the column is mapped in the
+	// target program's import definition (Luca ekstre tanımı: fiş sütunu
+	// "Evrak Tarihi", veri türü "Tarih"); the UI shows them as a guide.
+	ProgramField string `yaml:"program_field"`
+	DataType     string `yaml:"data_type"`
 }
 
 // ErrTemplate wraps template loading errors.

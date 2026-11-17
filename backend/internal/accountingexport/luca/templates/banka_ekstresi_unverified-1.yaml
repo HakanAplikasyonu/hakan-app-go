@@ -1,0 +1,44 @@
+# Luca "Banka Aktarımı (Excel/CSV)" / "Banka Ekstreleri" CSV şablonu (#465).
+#
+# DOĞRULANMADI: Kaynak, başka bir ekibin Luca test hesabındaki ekran
+# gözlemi; bizde gerçek Luca'da denenmedi. Luca'da ekstre tanımı müşavir
+# tarafından bir kez kurulur: başlığı CSV'den alma, on sütunluk eşleme
+# (sütun adı, fiş sütunu, veri türü), ayraç, tırnak, döviz. Aşağıdaki
+# program_field (fiş sütunu) ve data_type (Metin / Tarih / Para) bu tanım
+# için ekrandaki eşleme rehberinde gösterilir. Gerçek tanım doğrulanınca yeni
+# bir sürüm dosyası (banka_ekstresi_<sürüm>.yaml, verified: true) eklenir.
+driver: luca
+template: banka_ekstresi
+version: "unverified-1"
+verified: false
+csv:
+  delimiter: ";"
+  quote: '"'
+  quote_mode: minimal
+  encoding: windows-1254
+  line_ending: crlf
+  header: true
+  header_line_end: false
+  final_line_end: false
+  trailing_delimiter: false
+columns:            # sıra = dosyadaki sıra
+  - { key: doc_date,    header: "Evrak Tarihi", required: true, format: "02.01.2006", program_field: "Evrak Tarihi", data_type: "Tarih" }
+  - { key: doc_no,      header: "Evrak No",     program_field: "Evrak No", data_type: "Metin" }
+  - { key: description, header: "Açıklama",     program_field: "Açıklama", data_type: "Metin" }
+  # amount_layout: signed → yalnızca Tutar; two_columns → Borç ve Alacak.
+  - { key: amount,      header: "Tutar",        required: true, decimal: ",", program_field: "Tutar", data_type: "Para" }
+  - { key: debit,       header: "Borç",         decimal: ",", program_field: "Tutar", data_type: "Para" }
+  - { key: credit,      header: "Alacak",       decimal: ",", program_field: "Tutar", data_type: "Para" }
+  - { key: tax_id,      header: "VKN/TCKN",     program_field: "TC Kimlik No / Vergi No (BA/BS)", data_type: "Metin" }
+  - { key: iban,        header: "IBAN",         program_field: "IBAN / TCKN / VKN", data_type: "Metin" }
+  - { key: currency,    header: "Döviz",        program_field: "Diğer", data_type: "Metin" }
+options:
+  # signed: tek Tutar sütunu, işaretli. two_columns: Borç (para çıkışı, B)
+  # ve Alacak (para girişi, A) sütunları; ekstredeki yön işaretiyle aynı.
+  amount_layout: signed
+  # signed düzende para girişinin işareti: "+" (giriş artı, çıkış eksi) ya
+  # da "-" (giriş eksi, çıkış artı).
+  incoming_sign: "+"
+  # Binlik ayırıcı; boş = yok (1234,56).
+  thousands: ""
+notes: "Sütunlar, ayraç, kodlama, tarih ve ondalık biçimi Luca'da doğrulanmadı (ekran gözlemi, #465)."

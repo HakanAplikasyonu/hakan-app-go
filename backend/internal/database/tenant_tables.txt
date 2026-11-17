@@ -77,3 +77,5 @@ reconciliation_letters engagement
 office_export_settings
 generated_subaccounts engagement
 account_plan_exports engagement
+bank_statement_exports engagement
+bank_statement_export_items engagement
