@@ -1,9 +1,11 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { Lock, Search, Waypoints } from "lucide-react";
 import { useDeferredValue, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { DataTable, createColumn } from "@/components/tables";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -20,7 +22,10 @@ import {
   type CellStatus,
   type MatrixFilter,
 } from "../lib/command";
-import type { PeriodMatrixCell } from "../services/periods.service";
+import type {
+  PeriodMatrixCell,
+  PeriodMatrixRow,
+} from "../services/periods.service";
 import { Figure, FilterSelect, Panel } from "./office-ui";
 
 const PERIOD_COUNT = 6;
@@ -79,6 +84,59 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
 }
 
 /**
+ * Matris kolonları (#381): mükellef sabit (sol), her dönem bir kolon. Odak
+ * dönem başlıkta ve hücrede vurgulanır; sıra ilerlemeye göre olduğundan
+ * tablo sıralaması kapalı.
+ */
+function useMatrixColumns(periods: string[], focus: string, locale: string) {
+  return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
+    () => [
+      createColumn<PeriodMatrixRow>({
+        id: "taxpayer",
+        labelKey: "office.col_taxpayer",
+        accessorKey: "taxpayer_title",
+        enableHiding: false,
+        gridPrimary: true,
+        meta: { cellClassName: "bg-card max-w-72" },
+        cell: ({ row }) => (
+          <>
+            <div className="truncate font-medium">
+              {row.original.taxpayer_title}
+            </div>
+            <Figure className="text-muted-foreground text-xs">
+              {row.original.taxpayer_tax_id}
+            </Figure>
+          </>
+        ),
+      }),
+      ...periods.map((p) =>
+        createColumn<PeriodMatrixRow>({
+          id: p,
+          // Başlık ay adı (çeviri anahtarı değil): labelKey boş, label dolu.
+          labelKey: "",
+          label: monthLabel(p, locale),
+          accessorFn: (r) => (cellAt(r, p) ? statusOf(cellAt(r, p)!) : ""),
+          enableHiding: false,
+          meta: {
+            align: "center",
+            headerClassName: cn(
+              "text-xs",
+              p === focus ? "text-foreground" : "text-muted-foreground",
+            ),
+            cellClassName: cn("px-1", p === focus && "bg-muted/30"),
+          },
+          cell: ({ row }) => {
+            const cell = cellAt(row.original, p);
+            return cell ? <CellBadge cell={cell} /> : null;
+          },
+        }),
+      ),
+    ],
+    [periods, focus, locale],
+  );
+}
+
+/**
  * Komuta merkezi (#34): mükellef × dönem durumu, dönem yönetiminin (#32)
  * matrisinden. Satırlar yetkiye göre gelir: tüm mükellefleri görme izni
  * olmayan kullanıcı yalnızca kendisine atananları görür.
@@ -101,6 +159,7 @@ export function CommandCenterPage() {
     () => sortByProgress(filterRows(rows, { ...filter, query }, focus), focus),
     [rows, filter, query, focus],
   );
+  const columns = useMatrixColumns(periods, focus, locale);
 
   return (
     <div className="space-y-4">
@@ -199,74 +258,33 @@ export function CommandCenterPage() {
             {t("office.load_failed")}
           </p>
         ) : (
-          <div className="max-h-[70vh] overflow-auto">
-            <table className="w-full border-separate border-spacing-0 text-sm">
-              <thead className="bg-card sticky top-0 z-10">
-                <tr>
-                  <th className="bg-card sticky left-0 z-20 border-b px-4 py-2 text-left text-xs font-medium">
-                    {t("office.col_taxpayer")}
-                  </th>
-                  {periods.map((p) => (
-                    <th
-                      key={p}
-                      className="border-b px-1 py-2 text-xs font-medium"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setPicked(p)}
-                        className={cn(
-                          "min-h-6 w-full rounded px-2 py-0.5 max-md:min-h-11",
-                          p === focus
-                            ? "bg-foreground text-background"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {monthLabel(p, locale)}
-                      </button>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((row) => (
-                  <tr key={row.engagement_uuid}>
-                    <td className="bg-card sticky left-0 z-[1] max-w-72 border-b px-4 py-1.5">
-                      <div className="truncate font-medium">
-                        {row.taxpayer_title}
-                      </div>
-                      <Figure className="text-muted-foreground text-xs">
-                        {row.taxpayer_tax_id}
-                      </Figure>
-                    </td>
-                    {periods.map((p) => {
-                      const cell = cellAt(row, p);
-                      return (
-                        <td
-                          key={p}
-                          className={cn(
-                            "border-b px-1 py-1.5",
-                            p === focus && "bg-muted/30",
-                          )}
-                        >
-                          {cell ? <CellBadge cell={cell} /> : null}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {visible.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={periods.length + 1}
-                      className="text-muted-foreground px-4 py-8 text-center"
-                    >
-                      {t("office.command.no_rows")}
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <DataTable<PeriodMatrixRow>
+            columns={columns}
+            data={visible}
+            getRowId={(r) => r.engagement_uuid}
+            bordered={false}
+            maxHeight="70vh"
+            emptyTitle={t("office.command.no_rows")}
+            emptyDescription=""
+            // Mükellef kolonu yatay kaydırmada solda sabit.
+            initialState={{ columnPinning: { left: ["taxpayer"] } }}
+            features={{
+              toolbar: false,
+              sorting: false,
+              pagination: false,
+              rowSelection: false,
+              columnFilters: false,
+              globalFilter: false,
+              facetedFilters: false,
+              viewMode: false,
+              columnVisibility: false,
+              columnResizing: false,
+              columnPinning: false,
+              columnOrdering: false,
+              density: false,
+              stickyHeader: true,
+            }}
+          />
         )}
       </Panel>
       <p className="text-muted-foreground text-xs">

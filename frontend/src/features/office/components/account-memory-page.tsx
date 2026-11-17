@@ -302,9 +302,7 @@ function CandidatesPanel({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const candidates = useRuleCandidates(slug, engagement);
   const items = candidates.data?.items ?? [];
-  const candidateColumns = useMemo<
-    ColumnDef<AccountRuleCandidate, unknown>[]
-  >(
+  const candidateColumns = useMemo<ColumnDef<AccountRuleCandidate, unknown>[]>(
     () => [
       createColumn<AccountRuleCandidate>({
         id: "counterparty",

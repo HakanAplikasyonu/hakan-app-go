@@ -1,12 +1,18 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDownLeft, ArrowUpRight, Link2Off } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useMemo } from "react";
 
-import { ErrorState } from "@/components/common/error-state";
-import { BosDurum } from "@/components/hakan";
-import { Button } from "@/components/ui/button";
+import { EntityTable, useUrlListState } from "@/components/entity";
+import {
+  createColumn,
+  createDateColumn,
+  createStatusColumn,
+  MoneyCell,
+  type StatusVariant,
+} from "@/components/tables";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { components } from "@/generated/api";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -17,18 +23,99 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useOfficePeriod } from "../period";
 import { EngagementTabs } from "./engagement-overview";
-import { Money, TableBox } from "./office-ui";
+import { Money } from "./office-ui";
 
 type BankPage = components["schemas"]["BankTransactionPage"];
+type BankRow = components["schemas"]["BankTransaction"];
 type MatchFilter = "all" | "unmatched" | "suggested" | "matched";
+const MATCH_FILTERS: MatchFilter[] = ["all", "unmatched", "suggested", "matched"];
 const PAGE = 50;
 
-const matchClass: Record<string, string> = {
-  unmatched: "bg-warn-tint text-warn",
-  suggested: "bg-brand-tint text-brand-text",
-  matched: "bg-ok-tint text-ok",
-  ignored: "bg-surface-3 text-text-2",
+// Eşleşme rozetleri: önceki tint sınıflarıyla aynı tonlar.
+const matchVariants: Record<string, StatusVariant> = {
+  unmatched: { labelKey: "office.bank.match_unmatched", tone: "warn" },
+  suggested: { labelKey: "office.bank.match_suggested", tone: "info" },
+  matched: { labelKey: "office.bank.match_matched", tone: "ok" },
+  ignored: { labelKey: "office.bank.match_ignored", tone: "neutral" },
 };
+
+function useBankColumns() {
+  const { t } = useLocale();
+  return useMemo<ColumnDef<BankRow, unknown>[]>(
+    () => [
+      createDateColumn<BankRow>({
+        id: "transaction_date",
+        labelKey: "office.col_date",
+        accessor: (x) => x.transaction_date,
+        className: "text-sm",
+        gridSecondary: true,
+      }),
+      createColumn<BankRow>({
+        id: "description",
+        labelKey: "office.bank.col_description",
+        accessorFn: (x) => x.counterparty_name || x.description,
+        gridPrimary: true,
+        meta: { cellClassName: "min-w-64" },
+        cell: ({ row }) => {
+          const x = row.original;
+          return (
+            <>
+              <div className="max-w-md truncate">
+                {x.counterparty_name || x.description}
+              </div>
+              <div className="text-text-3 max-w-md truncate text-xs">
+                {x.counterparty_name ? x.description : null}
+                {x.possible_duplicate ? (
+                  <span className="text-warn ms-1 font-semibold">
+                    · {t("office.bank.possible_duplicate")}
+                  </span>
+                ) : null}
+              </div>
+            </>
+          );
+        },
+      }),
+      createColumn<BankRow>({
+        id: "cash_box_name",
+        labelKey: "office.bank.col_account",
+        accessorKey: "cash_box_name",
+        meta: { cellClassName: "text-text-2 text-sm whitespace-nowrap" },
+      }),
+      // İşaretli tutar (+ giriş / − çıkış); yön ekran okuyucuya ayrıca okunur.
+      createColumn<BankRow>({
+        id: "amount",
+        labelKey: "office.bank.col_amount",
+        accessorKey: "amount",
+        meta: { align: "end" },
+        cell: ({ row }) => {
+          const x = row.original;
+          return (
+            <span
+              className={cn(
+                "font-semibold whitespace-nowrap",
+                x.direction === "in" ? "text-ok" : "text-foreground",
+              )}
+            >
+              <span className="sr-only">
+                {t(`office.bank.direction_${x.direction}`)}:{" "}
+              </span>
+              {x.direction === "in" ? "+" : "−"}
+              <MoneyCell value={x.amount} currency={x.currency} />
+            </span>
+          );
+        },
+      }),
+      createStatusColumn<BankRow>({
+        id: "match_status",
+        labelKey: "office.bank.col_match",
+        accessor: (x) => x.match_status,
+        variants: matchVariants,
+        fallback: matchVariants.ignored,
+      }),
+    ],
+    [t],
+  );
+}
 
 /**
  * `/t/{slug}/engagements/{uuid}/bank` (arayüz 6/9, #329): mükellefin banka
@@ -36,15 +123,28 @@ const matchClass: Record<string, string> = {
  * eşleşme özeti, eşleşme süzgeci ve sayfalama.
  */
 export function EngagementBankPage({ engagement }: { engagement: string }) {
-  const { t, locale } = useLocale();
+  return (
+    <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+      <EngagementBankInner engagement={engagement} />
+    </Suspense>
+  );
+}
+
+function EngagementBankInner({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
   const { slug } = useTenant();
   const { period } = useOfficePeriod();
   const matrix = usePeriodMatrix(1);
   const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
-  const [match, setMatch] = useState<MatchFilter>("all");
-  const key = `${period ?? "all"}|${match}`;
-  const [page, setPage] = useState({ key, offset: 0 });
-  const offset = page.key === key ? page.offset : 0;
+  // Sayfa, sayfa boyutu ve eşleşme süzgeci URL'de (#381).
+  const listState = useUrlListState({ initialPageSize: PAGE });
+  const rawMatch = listState.getParam("match") as MatchFilter | null;
+  const match: MatchFilter =
+    rawMatch && MATCH_FILTERS.includes(rawMatch) ? rawMatch : "all";
+  const setMatch = (m: MatchFilter) =>
+    listState.setParams({ match: m === "all" ? null : m });
+  const { limit, offset } = listState.params;
+  const columns = useBankColumns();
 
   const list = useQuery({
     queryKey: [
@@ -52,7 +152,7 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
       slug.toLowerCase(),
       "bank-transactions",
       engagement,
-      { period, match, offset },
+      { period, match, limit, offset },
     ],
     queryFn: () =>
       tenantRequest<BankPage>(
@@ -63,7 +163,7 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
           query: {
             period,
             match_status: match === "all" ? undefined : match,
-            limit: PAGE,
+            limit,
             offset,
           },
         },
@@ -72,10 +172,8 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
   });
   const items = list.data?.items ?? [];
   const sum = list.data?.summary;
-  const fmtDate = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString(
-      locale === "tr" ? "tr-TR" : "en-GB",
-    );
+  // Özet eşleşme süzgecinden bağımsız sayar; seçili süzgecin toplamı oradan.
+  const total = sum ? (match === "all" ? sum.total : sum[match]) : 0;
   const filters: { key: MatchFilter; label: string; count?: number }[] = [
     { key: "all", label: t("office.bank.filter_all"), count: sum?.total },
     {
@@ -175,115 +273,31 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
         ))}
       </div>
 
-      <section className="bg-surface border-line overflow-hidden rounded-xl border">
-        {list.isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : list.isError ? (
-          <ErrorState
-            className="m-4"
-            title={t("office.api.load_error")}
-            description={list.error.message}
-            onRetry={() => void list.refetch()}
-            retryLabel={t("common.retry")}
-          />
-        ) : items.length === 0 ? (
-          <BosDurum
-            className="border-0"
-            baslik={t("office.bank.empty_title")}
-            aciklama={t("office.bank.empty")}
-          />
-        ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th>{t("office.col_date")}</th>
-                <th>{t("office.bank.col_description")}</th>
-                <th>{t("office.bank.col_account")}</th>
-                <th className="text-right">{t("office.bank.col_amount")}</th>
-                <th>{t("office.bank.col_match")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((x) => (
-                <tr key={x.uuid}>
-                  <td className="font-mono text-sm whitespace-nowrap">
-                    {fmtDate(x.transaction_date)}
-                  </td>
-                  <td className="min-w-64">
-                    <div className="max-w-md truncate">
-                      {x.counterparty_name || x.description}
-                    </div>
-                    <div className="text-text-3 max-w-md truncate text-xs">
-                      {x.counterparty_name ? x.description : null}
-                      {x.possible_duplicate ? (
-                        <span className="text-warn ms-1 font-semibold">
-                          · {t("office.bank.possible_duplicate")}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="text-text-2 text-sm whitespace-nowrap">
-                    {x.cash_box_name}
-                  </td>
-                  <td
-                    className={cn(
-                      "text-right font-semibold whitespace-nowrap",
-                      x.direction === "in" ? "text-ok" : "text-foreground",
-                    )}
-                  >
-                    <span className="sr-only">
-                      {t(`office.bank.direction_${x.direction}`)}:{" "}
-                    </span>
-                    {x.direction === "in" ? "+" : "−"}
-                    <Money value={x.amount} currency={x.currency} />
-                  </td>
-                  <td>
-                    <span
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-                        matchClass[x.match_status] ?? matchClass.ignored,
-                      )}
-                    >
-                      {t(`office.bank.match_${x.match_status}`)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </TableBox>
-        )}
-      </section>
-
-      {sum && (match === "all" ? sum.total : items.length) > PAGE ? (
-        <div className="flex items-center justify-end gap-2 text-xs">
-          <span className="text-text-3">
-            {t("office.api.page_of", {
-              from: offset + 1,
-              to: offset + items.length,
-              total: sum.total,
-            })}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={offset === 0}
-            onClick={() => setPage({ key, offset: Math.max(0, offset - PAGE) })}
-          >
-            {t("office.api.prev")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={items.length < PAGE}
-            onClick={() => setPage({ key, offset: offset + PAGE })}
-          >
-            {t("office.api.next")}
-          </Button>
-        </div>
-      ) : null}
+      <EntityTable<BankRow>
+        columns={columns}
+        data={items}
+        getRowId={(x) => x.uuid}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        errorTitle={t("office.api.load_error")}
+        errorDescription={list.error?.message}
+        onRetry={() => void list.refetch()}
+        emptyTitle={t("office.bank.empty_title")}
+        emptyDescription={t("office.bank.empty")}
+        state={listState.tableState}
+        rowCount={total}
+        pageSizeOptions={[25, 50, 100]}
+        // Sunucu sıralama ve serbest arama sunmuyor; yalnızca sayfalama.
+        features={{
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          rowSelection: false,
+          facetedFilters: false,
+          viewMode: false,
+          persistKey: "office.bank.table",
+        }}
+      />
     </div>
   );
 }

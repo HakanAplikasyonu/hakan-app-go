@@ -10,10 +10,19 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useCallback, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
+import {
+  createActionsColumn,
+  createColumn,
+  createDateColumn,
+  createMoneyColumn,
+  DataTable,
+  type DataTableFeatures,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -35,7 +44,7 @@ import {
   type JournalDraft,
 } from "../services/journals.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
-import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
+import { FilterSelect, Figure, Money, Panel } from "./office-ui";
 import { ALL_PERIODS, isPeriod, useOfficePeriod } from "../period";
 
 type LineRow = {
@@ -59,6 +68,29 @@ const statusClass: Record<JournalDraft["status"], string> = {
 };
 
 type Translate = (key: string) => string;
+
+// Gömülü tablolar: araç çubuğu, sayfalama, seçim ve görünüm ayarları yok.
+const embeddedTable: DataTableFeatures = {
+  toolbar: false,
+  pagination: false,
+  rowSelection: false,
+  columnFilters: false,
+  facetedFilters: false,
+  globalFilter: false,
+  viewMode: false,
+  columnVisibility: false,
+  columnResizing: false,
+  columnPinning: false,
+  columnOrdering: false,
+  density: false,
+};
+
+// Fiş kalemi formu: sıralama da kapalı (kalem sırası fişin sırasıdır).
+// Mobilde kartlar bilinçli açık; kart içindeki girdiler çalışır.
+const lineEditorTable: DataTableFeatures = {
+  ...embeddedTable,
+  sorting: false,
+};
 
 /** API error in Turkish when the code is known, else the server message (#161). */
 function errorText(t: Translate, err: unknown, fallback: string) {
@@ -87,8 +119,92 @@ function NewDraft({ engagement }: { engagement: string }) {
   const debit = sum(lines.map((l) => l.debit || "0"));
   const credit = sum(lines.map((l) => l.credit || "0"));
   const balanced = toMinor(debit) === toMinor(credit) && toMinor(debit) > 0;
-  const set = (i: number, k: keyof LineRow, v: string) =>
-    setLines((ls) => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
+  const set = useCallback(
+    (i: number, k: keyof LineRow, v: string) =>
+      setLines((ls) => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l))),
+    [],
+  );
+  // Kolonlar yalnızca t ve set'e bağlı: her tuşta yeniden oluşursa hücreler
+  // yeniden bağlanır ve girdi odağı kaybolur.
+  const lineColumns = useMemo<ColumnDef<LineRow, unknown>[]>(
+    () => [
+      createColumn<LineRow>({
+        id: "account",
+        labelKey: "office.col_account",
+        gridPrimary: true,
+        cell: ({ row }) => (
+          <Input
+            className="h-8 w-36 font-mono"
+            placeholder="770.01"
+            aria-label={`${t("office.col_account")} ${row.index + 1}`}
+            value={row.original.account}
+            onChange={(e) => set(row.index, "account", e.target.value)}
+          />
+        ),
+      }),
+      createColumn<LineRow>({
+        id: "description",
+        labelKey: "office.journals.line_description",
+        cell: ({ row }) => (
+          <Input
+            className="h-8"
+            aria-label={`${t("office.journals.line_description")} ${row.index + 1}`}
+            value={row.original.description}
+            onChange={(e) => set(row.index, "description", e.target.value)}
+          />
+        ),
+      }),
+      createColumn<LineRow>({
+        id: "debit",
+        labelKey: "office.journals.debit",
+        meta: { align: "end" },
+        cell: ({ row }) => (
+          <Input
+            className="h-8 w-32 text-right font-mono"
+            inputMode="decimal"
+            aria-label={`${t("office.journals.debit")} ${row.index + 1}`}
+            value={row.original.debit}
+            onChange={(e) => set(row.index, "debit", e.target.value)}
+          />
+        ),
+      }),
+      createColumn<LineRow>({
+        id: "credit",
+        labelKey: "office.journals.credit",
+        meta: { align: "end" },
+        cell: ({ row }) => (
+          <Input
+            className="h-8 w-32 text-right font-mono"
+            inputMode="decimal"
+            aria-label={`${t("office.journals.credit")} ${row.index + 1}`}
+            value={row.original.credit}
+            onChange={(e) => set(row.index, "credit", e.target.value)}
+          />
+        ),
+      }),
+      {
+        ...createActionsColumn<LineRow>({
+          labelKey: "office.journals.remove_line",
+          cell: () => null,
+        }),
+        cell: ({ row, table }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="max-md:min-w-11"
+            aria-label={t("office.journals.remove_line")}
+            disabled={table.options.data.length <= 2}
+            onClick={() =>
+              setLines((ls) => ls.filter((_, j) => j !== row.index))
+            }
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        ),
+      },
+    ],
+    [set, t],
+  );
 
   const submit = () => {
     create.mutate(
@@ -136,72 +252,12 @@ function NewDraft({ engagement }: { engagement: string }) {
             onChange={(e) => setDescription(e.target.value)}
           />
         </div>
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.col_account")}</th>
-              <th>{t("office.journals.line_description")}</th>
-              <th className="text-right">{t("office.journals.debit")}</th>
-              <th className="text-right">{t("office.journals.credit")}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l, i) => (
-              <tr key={i}>
-                <td>
-                  <Input
-                    className="h-8 w-36 font-mono"
-                    placeholder="770.01"
-                    aria-label={`${t("office.col_account")} ${i + 1}`}
-                    value={l.account}
-                    onChange={(e) => set(i, "account", e.target.value)}
-                  />
-                </td>
-                <td>
-                  <Input
-                    className="h-8"
-                    aria-label={`${t("office.journals.line_description")} ${i + 1}`}
-                    value={l.description}
-                    onChange={(e) => set(i, "description", e.target.value)}
-                  />
-                </td>
-                <td className="text-right">
-                  <Input
-                    className="h-8 w-32 text-right font-mono"
-                    inputMode="decimal"
-                    aria-label={`${t("office.journals.debit")} ${i + 1}`}
-                    value={l.debit}
-                    onChange={(e) => set(i, "debit", e.target.value)}
-                  />
-                </td>
-                <td className="text-right">
-                  <Input
-                    className="h-8 w-32 text-right font-mono"
-                    inputMode="decimal"
-                    aria-label={`${t("office.journals.credit")} ${i + 1}`}
-                    value={l.credit}
-                    onChange={(e) => set(i, "credit", e.target.value)}
-                  />
-                </td>
-                <td>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="max-md:min-w-11"
-                    aria-label={t("office.journals.remove_line")}
-                    disabled={lines.length <= 2}
-                    onClick={() =>
-                      setLines((ls) => ls.filter((_, j) => j !== i))
-                    }
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableBox>
+        <DataTable<LineRow>
+          columns={lineColumns}
+          data={lines}
+          getRowId={(_, i) => String(i)}
+          features={lineEditorTable}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button
             variant="outline"
@@ -380,6 +436,92 @@ function JournalsInner() {
   const { approve, reverse } = useJournalActions(slug, engagement);
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
+  const approveDraft = approve.mutate;
+  const approving = approve.isPending;
+  const reverseDraft = reverse.mutate;
+  const reversing = reverse.isPending;
+  const draftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
+    () => [
+      createColumn<JournalDraft>({
+        id: "entry_no",
+        labelKey: "office.journals.entry_no",
+        accessorFn: (d) => `${d.period} / ${d.entry_no}`,
+        gridPrimary: true,
+        cell: ({ row }) => (
+          <Figure>
+            {row.original.period} / {row.original.entry_no}
+          </Figure>
+        ),
+      }),
+      createDateColumn<JournalDraft>({
+        id: "entry_date",
+        labelKey: "office.col_date",
+        accessor: (d) => d.entry_date,
+        gridSecondary: true,
+      }),
+      createColumn<JournalDraft>({
+        id: "entry_type",
+        labelKey: "office.col_type",
+        accessorKey: "entry_type",
+        meta: { cellClassName: "text-xs" },
+      }),
+      createMoneyColumn<JournalDraft>({
+        id: "debit",
+        labelKey: "office.journals.debit",
+        accessor: (d) => d.debit,
+      }),
+      createMoneyColumn<JournalDraft>({
+        id: "credit",
+        labelKey: "office.journals.credit",
+        accessor: (d) => d.credit,
+      }),
+      createColumn<JournalDraft>({
+        id: "status",
+        labelKey: "office.col_status",
+        accessorKey: "status",
+        cell: ({ row }) => (
+          <span
+            className={cn(
+              "rounded-md px-2 py-0.5 text-xs font-medium",
+              statusClass[row.original.status],
+            )}
+          >
+            {t(`office.journals.status_${row.original.status}`)}
+          </span>
+        ),
+      }),
+      createActionsColumn<JournalDraft>({
+        cell: (d) =>
+          d.status === "draft" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={approving}
+              onClick={() => approveDraft(d.uuid)}
+            >
+              <Check className="size-4" />
+              {t("office.journals.approve")}
+            </Button>
+          ) : d.status === "exported" ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={reversing}
+              onClick={() => {
+                const reason = window.prompt(
+                  t("office.journals.reverse_prompt"),
+                );
+                if (reason?.trim()) reverseDraft({ draft: d.uuid, reason });
+              }}
+            >
+              <Undo2 className="size-4" />
+              {t("office.journals.reverse")}
+            </Button>
+          ) : null,
+      }),
+    ],
+    [approveDraft, approving, reverseDraft, reversing, t],
+  );
 
   const header = (
     <PageHeader
@@ -448,79 +590,13 @@ function JournalsInner() {
         ) : rows.length === 0 ? (
           <EmptyState className="m-4" title={t("office.journals.empty")} />
         ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th>{t("office.journals.entry_no")}</th>
-                <th>{t("office.col_date")}</th>
-                <th>{t("office.col_type")}</th>
-                <th className="text-right">{t("office.journals.debit")}</th>
-                <th className="text-right">{t("office.journals.credit")}</th>
-                <th>{t("office.col_status")}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr key={d.uuid}>
-                  <td>
-                    <Figure>
-                      {d.period} / {d.entry_no}
-                    </Figure>
-                  </td>
-                  <td>
-                    <Figure>{fmt(d.entry_date)}</Figure>
-                  </td>
-                  <td className="text-xs">{d.entry_type}</td>
-                  <td className="text-right">
-                    <Money value={d.debit} />
-                  </td>
-                  <td className="text-right">
-                    <Money value={d.credit} />
-                  </td>
-                  <td>
-                    <span
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-xs font-medium",
-                        statusClass[d.status],
-                      )}
-                    >
-                      {t(`office.journals.status_${d.status}`)}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    {d.status === "draft" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={approve.isPending}
-                        onClick={() => approve.mutate(d.uuid)}
-                      >
-                        <Check className="size-4" />
-                        {t("office.journals.approve")}
-                      </Button>
-                    ) : d.status === "exported" ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={reverse.isPending}
-                        onClick={() => {
-                          const reason = window.prompt(
-                            t("office.journals.reverse_prompt"),
-                          );
-                          if (reason?.trim())
-                            reverse.mutate({ draft: d.uuid, reason });
-                        }}
-                      >
-                        <Undo2 className="size-4" />
-                        {t("office.journals.reverse")}
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </TableBox>
+          <DataTable<JournalDraft>
+            columns={draftColumns}
+            data={rows}
+            getRowId={(d) => d.uuid}
+            bordered={false}
+            features={embeddedTable}
+          />
         )}
       </Panel>
 

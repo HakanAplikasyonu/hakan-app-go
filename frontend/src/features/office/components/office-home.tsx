@@ -1,5 +1,6 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -7,6 +8,7 @@ import { useMemo } from "react";
 
 import { DonemTaci, TacRozeti } from "@/components/hakan";
 import type { TacDurumu } from "@/components/hakan";
+import { DataTable, createColumn } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
@@ -23,9 +25,12 @@ import {
 import { cellAt, sortByProgress } from "../lib/command";
 import { daysUntil, monthName, useOfficePeriod, vatDueDate } from "../period";
 import type { OfficeDashboardUpload } from "../services/dashboard.service";
-import type { PeriodMatrixCell } from "../services/periods.service";
+import type {
+  PeriodMatrixCell,
+  PeriodMatrixRow,
+} from "../services/periods.service";
 import { OfflineAgentsCard } from "./agents-page";
-import { Figure, Money, Panel, TableBox } from "./office-ui";
+import { Figure, Money, Panel } from "./office-ui";
 
 const LIST_LIMIT = 8;
 
@@ -110,6 +115,69 @@ const cellKey: Record<TacDurumu, string> = {
   sorun: "office.home.cell_sorun",
 };
 
+/**
+ * "İşi geride olan mükellefler" kolonları (#381). Sıra ilerlemeye göre
+ * (sortByProgress) anlamlı olduğundan tablo sıralaması kapalı.
+ */
+function useBehindColumns(focus: string) {
+  const { t } = useLocale();
+  return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
+    () => [
+      createColumn<PeriodMatrixRow>({
+        id: "taxpayer",
+        labelKey: "office.col_taxpayer",
+        accessorKey: "taxpayer_title",
+        enableHiding: false,
+        gridPrimary: true,
+        cell: ({ row }) => (
+          <>
+            <div className="font-medium">{row.original.taxpayer_title}</div>
+            <Figure className="text-text-2 text-xs">
+              {row.original.taxpayer_tax_id}
+            </Figure>
+          </>
+        ),
+      }),
+      createColumn<PeriodMatrixRow>({
+        id: "status",
+        labelKey: "office.col_status",
+        accessorFn: (r) => cellCrown(cellAt(r, focus)),
+        enableHiding: false,
+        cell: ({ row }) => {
+          const crown = cellCrown(cellAt(row.original, focus));
+          return (
+            <TacRozeti
+              durum={crown}
+              etiket
+              metin={t(cellKey[crown])}
+              className="text-xs"
+            />
+          );
+        },
+      }),
+      // Engelleyici ve değişiklik talebi masaüstünde; mobil kartta yok (önceki
+      // `hidden md:table-cell` davranışı).
+      createColumn<PeriodMatrixRow>({
+        id: "blockers",
+        labelKey: "office.col_blockers",
+        accessorFn: (r) => cellAt(r, focus)?.open_blockers ?? 0,
+        enableHiding: false,
+        meta: { align: "end", cardHidden: true },
+        cell: ({ getValue }) => <Figure>{getValue() as number}</Figure>,
+      }),
+      createColumn<PeriodMatrixRow>({
+        id: "change_requests",
+        labelKey: "office.col_change_requests",
+        accessorFn: (r) => cellAt(r, focus)?.open_change_requests ?? 0,
+        enableHiding: false,
+        meta: { align: "end", cardHidden: true },
+        cell: ({ getValue }) => <Figure>{getValue() as number}</Figure>,
+      }),
+    ],
+    [focus, t],
+  );
+}
+
 function FeedItem({ u }: { u: OfficeDashboardUpload }) {
   const { t, locale } = useLocale();
   const failed = /fail|error|rejected/i.test(u.status);
@@ -156,6 +224,7 @@ export function OfficeHome() {
     () => sortByProgress(rows, focus).slice(0, LIST_LIMIT),
     [rows, focus],
   );
+  const behindColumns = useBehindColumns(focus);
   const vatSum = useMemo(() => {
     const items = vat.data?.items ?? [];
     let payable = 0;
@@ -349,50 +418,27 @@ export function OfficeHome() {
               {t("office.taxpayers_empty")}
             </p>
           ) : (
-            <TableBox>
-              <thead>
-                <tr>
-                  <th>{t("office.col_taxpayer")}</th>
-                  <th>{t("office.col_status")}</th>
-                  <th className="hidden text-right md:table-cell">
-                    {t("office.col_blockers")}
-                  </th>
-                  <th className="hidden text-right md:table-cell">
-                    {t("office.col_change_requests")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {behind.map((r) => {
-                  const c = cellAt(r, focus);
-                  const crown = cellCrown(c);
-                  return (
-                    <tr key={r.engagement_uuid}>
-                      <td>
-                        <div className="font-medium">{r.taxpayer_title}</div>
-                        <Figure className="text-text-2 text-xs">
-                          {r.taxpayer_tax_id}
-                        </Figure>
-                      </td>
-                      <td>
-                        <TacRozeti
-                          durum={crown}
-                          etiket
-                          metin={t(cellKey[crown])}
-                          className="text-xs"
-                        />
-                      </td>
-                      <td className="hidden text-right md:table-cell">
-                        <Figure>{c?.open_blockers ?? 0}</Figure>
-                      </td>
-                      <td className="hidden text-right md:table-cell">
-                        <Figure>{c?.open_change_requests ?? 0}</Figure>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </TableBox>
+            <DataTable<PeriodMatrixRow>
+              columns={behindColumns}
+              data={behind}
+              getRowId={(r) => r.engagement_uuid}
+              bordered={false}
+              features={{
+                toolbar: false,
+                sorting: false,
+                pagination: false,
+                rowSelection: false,
+                columnFilters: false,
+                globalFilter: false,
+                facetedFilters: false,
+                viewMode: false,
+                columnVisibility: false,
+                columnResizing: false,
+                columnPinning: false,
+                columnOrdering: false,
+                density: false,
+              }}
+            />
           )}
         </Panel>
 

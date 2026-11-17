@@ -111,7 +111,9 @@ function MemberRoleCell({
   const editable = canWrite && !isSelf && options.length > 1;
 
   if (!editable) {
-    return <>{tenantRoleLabel(t, current, { roles, fallback: member.role.name })}</>;
+    return (
+      <>{tenantRoleLabel(t, current, { roles, fallback: member.role.name })}</>
+    );
   }
   return (
     <Select
@@ -247,7 +249,8 @@ function InvitationsSection({ canWrite }: { canWrite: boolean }) {
   const { t } = useLocale();
   const { slug, role } = useTenant();
   const query = useTenantInvitations(slug);
-  const revoke = useRevokeTenantInvitation(slug);
+  const { mutate: revokeInvitation, isPending: revoking } =
+    useRevokeTenantInvitation(slug);
   const items = query.data?.items ?? [];
 
   const columns = useMemo<ColumnDef<TenantInvitation, unknown>[]>(
@@ -297,15 +300,15 @@ function InvitationsSection({ canWrite }: { canWrite: boolean }) {
               type="button"
               size="sm"
               variant="ghost"
-              disabled={revoke.isPending}
-              onClick={() => revoke.mutate(inv.uuid)}
+              disabled={revoking}
+              onClick={() => revokeInvitation(inv.uuid)}
             >
               {t("tenant.invitations_revoke")}
             </Button>
           ) : null,
       }),
     ],
-    [canWrite, officeRoles.roles, revoke, role.key, t],
+    [canWrite, officeRoles.roles, revokeInvitation, revoking, role.key, t],
   );
 
   return (
