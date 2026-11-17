@@ -1,14 +1,24 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { FileSignature } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useMemo } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
-import { EntityPage, EntitySectionCard } from "@/components/entity";
+import {
+  EntityPage,
+  EntitySectionCard,
+  EntityTable,
+  useUrlListState,
+} from "@/components/entity";
+import {
+  createColumn,
+  createDateColumn,
+  createMoneyColumn,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
-import type { AppLocale } from "@/config/i18n";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -18,21 +28,48 @@ import {
   useEngagementHistoryShares,
 } from "@/features/office/hooks/use-engagement-documents";
 import type { EngagementDocument } from "@/features/office/services/engagement-documents.service";
-import { currency, date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { EngagementTabs } from "./engagement-overview";
 
 const PAGE_SIZE = 25;
 
-function formatAmount(doc: EngagementDocument, locale: AppLocale) {
-  const value = Number(doc.payable_amount);
-  if (!Number.isFinite(value)) return `${doc.payable_amount} ${doc.currency}`;
-  try {
-    return currency(value, doc.currency || "TRY", locale);
-  } catch {
-    return `${doc.payable_amount} ${doc.currency}`;
-  }
+function useDocumentColumns() {
+  const { t } = useLocale();
+  return useMemo<ColumnDef<EngagementDocument, unknown>[]>(
+    () => [
+      createColumn<EngagementDocument>({
+        id: "invoice_number",
+        labelKey: "office.engagement_col_number",
+        accessorKey: "invoice_number",
+        gridPrimary: true,
+        meta: { cellClassName: "font-mono" },
+      }),
+      createDateColumn<EngagementDocument>({
+        id: "issue_date",
+        labelKey: "office.engagement_col_date",
+        accessor: (doc) => doc.issue_date,
+        className: "text-muted-foreground",
+        gridSecondary: true,
+      }),
+      createColumn<EngagementDocument>({
+        id: "direction",
+        labelKey: "office.col_direction",
+        accessorKey: "direction",
+        cell: ({ row }) =>
+          row.original.direction === "outgoing"
+            ? t("office.direction_sales")
+            : t("office.direction_purchase"),
+      }),
+      createMoneyColumn<EngagementDocument>({
+        id: "payable_amount",
+        labelKey: "office.engagement_col_amount",
+        accessor: (doc) => doc.payable_amount,
+        currency: (doc) => doc.currency || "TRY",
+      }),
+    ],
+    [t],
+  );
 }
 
 /** The owner's consents for documents from before this engagement (D2). */
@@ -77,96 +114,57 @@ function DocumentsSection({
   engagement: string;
   enabled: boolean;
 }) {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { slug } = useTenant();
-  const [offset, setOffset] = useState(0);
+  // Sayfa URL'de (#381). Liste toplam vermiyor: dolu sayfa "sonraki
+  // olabilir" demek; çekirdek sayfalaması toplamsız (hasNextPage) çalışır.
+  const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
+  const { limit, offset } = listState.params;
   const query = useEngagementDocuments(
     slug,
     engagement,
-    { limit: PAGE_SIZE, offset },
+    { limit, offset },
     enabled,
   );
+  const columns = useDocumentColumns();
   const items = query.data?.items ?? [];
-  // The list has no total: a full page means there may be more.
-  const hasNext = items.length >= PAGE_SIZE;
 
   return (
     <EntitySectionCard title={t("office.engagement_documents_title")}>
-      {query.isLoading ? <Loading label={t("common.loading")} /> : null}
-      {query.isError ? (
-        <ErrorState
-          title={t("common.error_generic")}
-          onRetry={() => void query.refetch()}
-          retryLabel={t("common.retry")}
-        />
-      ) : null}
-      {query.data && items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
-          {t("office.engagement_documents_empty")}
-        </p>
-      ) : null}
-      {items.length ? (
-        <div className="relative overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("office.engagement_col_number")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("office.engagement_col_date")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("office.col_direction")}
-                </th>
-                <th className="py-2 text-end font-medium">
-                  {t("office.engagement_col_amount")}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((doc) => (
-                <tr key={doc.uuid} className="border-b last:border-0">
-                  <td className="py-2 pe-3 font-mono">{doc.invoice_number}</td>
-                  <td className="text-muted-foreground py-2 pe-3">
-                    {date(doc.issue_date, "dd.MM.yyyy", locale)}
-                  </td>
-                  <td className="py-2 pe-3">
-                    {doc.direction === "outgoing"
-                      ? t("office.direction_sales")
-                      : t("office.direction_purchase")}
-                  </td>
-                  <td className="py-2 text-end tabular-nums">
-                    {formatAmount(doc, locale)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      {offset > 0 || hasNext ? (
-        <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={offset === 0 || query.isFetching}
-            onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-          >
-            {t("office.engagement_prev")}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!hasNext || query.isFetching}
-            onClick={() => setOffset((o) => o + PAGE_SIZE)}
-          >
-            {t("office.engagement_next")}
-          </Button>
-        </div>
-      ) : null}
+      <EntityTable<EngagementDocument>
+        columns={columns}
+        data={items}
+        getRowId={(doc) => doc.uuid}
+        isLoading={query.isLoading}
+        isError={query.isError}
+        errorTitle={t("common.error_generic")}
+        onRetry={() => void query.refetch()}
+        emptyTitle={t("office.engagement_documents_empty")}
+        emptyDescription=""
+        bordered={false}
+        state={{
+          pagination: listState.pagination,
+          onPaginationChange: listState.onPaginationChange,
+        }}
+        hasNextPage={!query.isFetching && items.length >= limit}
+        pageSizeOptions={[25, 50, 100]}
+        // Kart içinde gömülü liste: araç çubuğu ve seçim yok; sunucu
+        // sıralama sunmuyor.
+        features={{
+          toolbar: false,
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          facetedFilters: false,
+          rowSelection: false,
+          viewMode: false,
+          columnVisibility: false,
+          columnResizing: false,
+          columnPinning: false,
+          columnOrdering: false,
+          density: false,
+        }}
+      />
     </EntitySectionCard>
   );
 }
@@ -223,7 +221,9 @@ export function EngagementDocumentsPage({
         <EntitySectionCard title={t("office.engagement_history_title")}>
           <HistorySharesLine engagement={engagementUuid} enabled={canRead} />
         </EntitySectionCard>
-        <DocumentsSection engagement={engagementUuid} enabled={canRead} />
+        <Suspense fallback={<Loading label={t("common.loading")} />}>
+          <DocumentsSection engagement={engagementUuid} enabled={canRead} />
+        </Suspense>
       </div>
     </EntityPage>
   );

@@ -39,7 +39,5 @@
   "col_created": "Oluşturulma",
   "col_actions": "İşlemler",
   "pdf_action": "PDF",
-  "pdf_failed": "PDF açılamadı.",
-  "prev": "Önceki",
-  "next": "Sonraki"
+  "pdf_failed": "PDF açılamadı."
 }

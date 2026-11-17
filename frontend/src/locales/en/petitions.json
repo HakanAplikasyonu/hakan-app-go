@@ -39,7 +39,5 @@
   "col_created": "Created",
   "col_actions": "Actions",
   "pdf_action": "Download PDF",
-  "pdf_failed": "Could not open the PDF.",
-  "prev": "Previous",
-  "next": "Next"
+  "pdf_failed": "Could not open the PDF."
 }

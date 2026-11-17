@@ -31,6 +31,9 @@ export function useSelectedEngagement(slug: string) {
   const select = (engagement: string) => {
     const next = new URLSearchParams(params);
     next.set(ENGAGEMENT_PARAM, engagement);
+    // Mükellef değişince liste sayfası başa döner (#381).
+    next.delete("page");
+    next.delete("offset");
     router.replace(`${pathname}?${next.toString()}`);
   };
 

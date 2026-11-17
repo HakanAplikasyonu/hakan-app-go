@@ -251,6 +251,9 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
     enableColumnFilters: features.columnFilters,
     enableGlobalFilter: features.globalFilter,
     enableRowSelection: features.rowSelection,
+    // Kolon görünürlüğü kapalıysa başlık menüsünde "gizle" de çıkmaz.
+    enableHiding: features.columnVisibility,
+    meta: { columnOrdering: features.columnOrdering },
     enableColumnResizing: features.columnResizing,
     columnResizeMode: "onChange",
     enableColumnPinning: features.columnPinning,

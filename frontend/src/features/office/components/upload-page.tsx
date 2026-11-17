@@ -1,10 +1,12 @@
 "use client";
 
+import type { ColumnDef } from "@tanstack/react-table";
 import { FileUp, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
-import { Suspense, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { DataTable, createColumn } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,7 +26,7 @@ import type {
   UBLUploadJob,
 } from "../services/office-invoices.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
-import { Figure, Panel, SeverityBadge, TableBox } from "./office-ui";
+import { Figure, Panel, SeverityBadge } from "./office-ui";
 
 const itemClass: Record<UBLUploadItem["status"], string> = {
   added: "bg-status-approved/12 text-status-approved",
@@ -56,6 +58,104 @@ function JobStatus({ status }: { status: UBLUploadJob["status"] }) {
   );
 }
 
+/** Yükleme raporunun dosya satırları (#381). */
+function useReportColumns(engagement: string) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  return useMemo<ColumnDef<UBLUploadItem, unknown>[]>(
+    () => [
+      createColumn<UBLUploadItem>({
+        id: "name",
+        labelKey: "office.col_file",
+        accessorKey: "name",
+        enableHiding: false,
+        gridPrimary: true,
+        meta: { cellClassName: "max-w-80 truncate" },
+        cell: ({ row }) => (
+          <Figure className="text-xs">{row.original.name}</Figure>
+        ),
+      }),
+      createColumn<UBLUploadItem>({
+        id: "status",
+        labelKey: "office.col_result",
+        accessorKey: "status",
+        enableHiding: false,
+        cell: ({ row }) => {
+          const f = row.original;
+          return (
+            <>
+              <span
+                className={cn(
+                  "rounded-md px-2 py-0.5 text-xs font-medium",
+                  itemClass[f.status],
+                )}
+              >
+                {t(`office.api.item_${f.status}`)}
+              </span>
+              {f.error ? (
+                <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                  {uploadErrorText(t, f.error_code, f.error)}
+                </span>
+              ) : null}
+            </>
+          );
+        },
+      }),
+      createColumn<UBLUploadItem>({
+        id: "invoice_number",
+        labelKey: "office.col_number",
+        accessorFn: (f) => f.invoice_number ?? "",
+        enableHiding: false,
+        cell: ({ row }) => {
+          const f = row.original;
+          return (
+            <>
+              {f.invoice_uuid && f.invoice_uuid !== NIL_UUID ? (
+                <Link
+                  className="hover:underline"
+                  href={routes.tenant.invoice(slug, f.invoice_uuid, engagement)}
+                >
+                  <Figure>{f.invoice_number ?? f.invoice_uuid}</Figure>
+                </Link>
+              ) : (
+                "—"
+              )}
+              {f.ettn && f.ettn !== NIL_UUID ? (
+                <Figure className="text-muted-foreground block text-[11px]">
+                  {f.ettn}
+                </Figure>
+              ) : null}
+            </>
+          );
+        },
+      }),
+      createColumn<UBLUploadItem>({
+        id: "warnings",
+        labelKey: "office.col_warnings",
+        accessorFn: (f) => f.warnings?.length ?? 0,
+        enableHiding: false,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const f = row.original;
+          return (
+            <div className="flex flex-wrap gap-1">
+              {f.warnings?.length
+                ? f.warnings.map((c) => (
+                    <span key={c} className="inline-flex items-center gap-1">
+                      <SeverityBadge severity={severityOf(c)} />
+                      <Figure className="text-xs">{c}</Figure>
+                    </span>
+                  ))
+                : "—"}
+            </div>
+          );
+        },
+      }),
+    ],
+    [engagement, slug, t],
+  );
+}
+
 function JobReport({
   engagement,
   jobId,
@@ -66,6 +166,7 @@ function JobReport({
   const { t } = useLocale();
   const { slug } = useTenant();
   const { data: job } = useUBLUpload(slug, engagement, jobId);
+  const columns = useReportColumns(engagement);
   if (!job) return <Skeleton className="h-24 w-full" />;
   const items = job.report?.items ?? [];
   return (
@@ -86,76 +187,27 @@ function JobReport({
         <p className="text-status-blocking px-4 py-3 text-sm">{job.error}</p>
       ) : null}
       {items.length ? (
-        <TableBox>
-          <thead>
-            <tr>
-              <th>{t("office.col_file")}</th>
-              <th>{t("office.col_result")}</th>
-              <th>{t("office.col_number")}</th>
-              <th>{t("office.col_warnings")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((f, i) => (
-              <tr key={i}>
-                <td className="max-w-80 truncate">
-                  <Figure className="text-xs">{f.name}</Figure>
-                </td>
-                <td>
-                  <span
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-xs font-medium",
-                      itemClass[f.status],
-                    )}
-                  >
-                    {t(`office.api.item_${f.status}`)}
-                  </span>
-                  {f.error ? (
-                    <span className="text-muted-foreground mt-0.5 block text-[11px]">
-                      {uploadErrorText(t, f.error_code, f.error)}
-                    </span>
-                  ) : null}
-                </td>
-                <td>
-                  {f.invoice_uuid && f.invoice_uuid !== NIL_UUID ? (
-                    <Link
-                      className="hover:underline"
-                      href={routes.tenant.invoice(
-                        slug,
-                        f.invoice_uuid,
-                        engagement,
-                      )}
-                    >
-                      <Figure>{f.invoice_number ?? f.invoice_uuid}</Figure>
-                    </Link>
-                  ) : (
-                    "—"
-                  )}
-                  {f.ettn && f.ettn !== NIL_UUID ? (
-                    <Figure className="text-muted-foreground block text-[11px]">
-                      {f.ettn}
-                    </Figure>
-                  ) : null}
-                </td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {f.warnings?.length
-                      ? f.warnings.map((c) => (
-                          <span
-                            key={c}
-                            className="inline-flex items-center gap-1"
-                          >
-                            <SeverityBadge severity={severityOf(c)} />
-                            <Figure className="text-xs">{c}</Figure>
-                          </span>
-                        ))
-                      : "—"}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </TableBox>
+        // İstemci tarafı rapor: dosya ve sonuca göre sıralanabilir; geri
+        // kalan araçlar gömülü tabloda kapalı.
+        <DataTable<UBLUploadItem>
+          columns={columns}
+          data={items}
+          bordered={false}
+          features={{
+            toolbar: false,
+            pagination: false,
+            rowSelection: false,
+            columnFilters: false,
+            globalFilter: false,
+            facetedFilters: false,
+            viewMode: false,
+            columnVisibility: false,
+            columnResizing: false,
+            columnPinning: false,
+            columnOrdering: false,
+            density: false,
+          }}
+        />
       ) : null}
     </Panel>
   );

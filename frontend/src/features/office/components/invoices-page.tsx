@@ -2,10 +2,17 @@
 
 import { FileText, PanelRightOpen, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { EntityTable, useUrlListState } from "@/components/entity";
+import {
+  createActionsColumn,
+  createColumn,
+  createDateColumn,
+  createMoneyColumn,
+} from "@/components/tables";
 import { TacRozeti } from "@/components/hakan";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -16,10 +23,11 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
+import type { OfficeInvoice } from "../services/office-invoices.service";
 import { directionOf } from "../lib/from-api";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
-import { FilterSelect, Figure, Money, Panel, TableBox } from "./office-ui";
+import { FilterSelect, Figure } from "./office-ui";
 import { useOfficePeriod } from "../period";
 
 type Dir = "all" | "outgoing" | "incoming";
@@ -47,38 +55,180 @@ export function InvoiceStateBadge({ status }: { status: string }) {
   );
 }
 
+type InvoiceRow = OfficeInvoice;
+
+function useInvoiceColumns(slug: string, engagement: string) {
+  const { t } = useLocale();
+  return useMemo<ColumnDef<InvoiceRow, unknown>[]>(
+    () => [
+      createColumn<InvoiceRow>({
+        id: "signal",
+        labelKey: "office.col_status",
+        enableSorting: false,
+        enableHiding: false,
+        meta: { srOnlyHeader: true, cardHidden: true },
+        size: 32,
+        cell: ({ row }) => (
+          <TacRozeti
+            durum={row.original.open_warnings ? "sorun" : "yuklendi"}
+            boyut={16}
+          />
+        ),
+      }),
+      createDateColumn<InvoiceRow>({
+        id: "issue_date",
+        labelKey: "office.col_date",
+        accessor: (inv) => inv.issue_date,
+        gridSecondary: true,
+      }),
+      createColumn<InvoiceRow>({
+        id: "invoice_number",
+        labelKey: "office.col_number",
+        accessorKey: "invoice_number",
+        gridPrimary: true,
+        cell: ({ row }) => {
+          const inv = row.original;
+          return (
+            <div className="flex items-center gap-1.5">
+              <Link
+                href={routes.tenant.invoice(slug, inv.uuid, engagement)}
+                className="hover:underline"
+              >
+                <Figure className="font-medium">{inv.invoice_number}</Figure>
+              </Link>
+              {inv.open_warnings ? (
+                <span
+                  className="text-status-warning inline-flex items-center gap-0.5 text-xs"
+                  title={t("office.open_warnings", {
+                    count: inv.open_warnings,
+                  })}
+                >
+                  <TriangleAlert className="size-3.5" aria-hidden />
+                  <Figure>{inv.open_warnings}</Figure>
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+      }),
+      createColumn<InvoiceRow>({
+        id: "counterparty",
+        labelKey: "office.col_counterparty",
+        accessorFn: (inv) => inv.counterparty_name ?? "",
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <div className="max-w-64 truncate">
+              {row.original.counterparty_name ?? ""}
+            </div>
+            <Figure className="text-muted-foreground text-xs">
+              {row.original.counterparty_tax_id ?? ""}
+            </Figure>
+          </div>
+        ),
+      }),
+      createColumn<InvoiceRow>({
+        id: "type",
+        labelKey: "office.col_type",
+        accessorFn: (inv) => inv.type,
+        cell: ({ row }) => {
+          const inv = row.original;
+          const dir = directionOf(inv.direction);
+          return (
+            <div className="text-xs">
+              <span
+                className={
+                  dir === "sales" ? "text-status-approved" : "text-brand"
+                }
+              >
+                {t(`office.direction_${dir}`)}
+              </span>
+              <div className="text-muted-foreground">
+                {inv.profile ? `${inv.profile} · ` : ""}
+                {inv.type}
+              </div>
+            </div>
+          );
+        },
+      }),
+      createMoneyColumn<InvoiceRow>({
+        id: "tax_exclusive_amount",
+        labelKey: "office.col_base",
+        accessor: (inv) => inv.tax_exclusive_amount,
+        currency: (inv) => inv.currency,
+      }),
+      createMoneyColumn<InvoiceRow>({
+        id: "tax_amount",
+        labelKey: "office.col_vat",
+        accessor: (inv) => inv.tax_amount,
+        currency: (inv) => inv.currency,
+      }),
+      createMoneyColumn<InvoiceRow>({
+        id: "payable_amount",
+        labelKey: "office.col_payable",
+        accessor: (inv) => inv.payable_amount,
+        currency: (inv) => inv.currency,
+        className: "font-medium",
+      }),
+      createColumn<InvoiceRow>({
+        id: "status",
+        labelKey: "office.col_status",
+        accessorKey: "status",
+        cell: ({ row }) => <InvoiceStateBadge status={row.original.status} />,
+      }),
+    ],
+    [engagement, slug, t],
+  );
+}
+
 function InvoicesInner() {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { slug } = useTenant();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
   const { options, selected, select, isLoading, isError } =
     useSelectedEngagement(slug);
   const engagement = selected?.engagement ?? "";
 
-  const direction = (params.get("direction") ?? "all") as Dir;
-  // Çekmecedeki fatura URL'de (#329): geri tuşu ve paylaşılan bağlantı çalışır.
-  const open = params.get("invoice");
-  const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
-  const setParam = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value === "all" || value === "0" || value === "") next.delete(key);
-    else next.set(key, value);
-    if (key !== "offset" && key !== "invoice") next.delete("offset");
-    router.replace(`${pathname}?${next.toString()}`);
-  };
+  // Sayfa, sayfa boyutu ve süzgeçler URL'de (#381); çekmecedeki fatura da
+  // URL'de (#329): geri tuşu ve paylaşılan bağlantı çalışır.
+  const listState = useUrlListState({ initialPageSize: PAGE });
+  const direction = (listState.getParam("direction") ?? "all") as Dir;
+  const open = listState.getParam("invoice");
+  const openInvoice = (uuid: string | null) =>
+    listState.setParams({ invoice: uuid }, { resetPage: false });
+
   const { period } = useOfficePeriod();
   const list = useEngagementInvoices(slug, engagement, {
     direction: direction === "all" ? undefined : direction,
     period,
-    limit: PAGE,
-    offset,
+    limit: listState.params.limit,
+    offset: listState.params.offset,
   });
-  const fmtDate = (d: string) =>
-    new Date(`${d}T00:00:00`).toLocaleDateString(
-      locale === "tr" ? "tr-TR" : "en-GB",
-    );
+  const baseColumns = useInvoiceColumns(slug, engagement);
+  const columns = useMemo<ColumnDef<InvoiceRow, unknown>[]>(
+    () => [
+      ...baseColumns,
+      createActionsColumn<InvoiceRow>({
+        labelKey: "office.drawer.preview",
+        cell: (inv) => (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="size-11 md:size-8"
+            aria-haspopup="dialog"
+            aria-label={t("office.drawer.preview_of", {
+              number: inv.invoice_number,
+            })}
+            onClick={() => openInvoice(inv.uuid)}
+          >
+            <PanelRightOpen className="size-4" aria-hidden />
+          </Button>
+        ),
+      }),
+    ],
+    // openInvoice yalnızca listState'e bağlı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseColumns, t, listState.setParams],
+  );
 
   const header = (
     <PageHeader
@@ -124,7 +274,9 @@ function InvoicesInner() {
         <FilterSelect<Dir>
           label={t("office.col_direction")}
           value={direction}
-          onChange={(v) => setParam("direction", v)}
+          onChange={(v) =>
+            listState.setParams({ direction: v === "all" ? null : v })
+          }
           options={[
             { value: "all", label: t("office.filter_all") },
             { value: "outgoing", label: t("office.direction_sales") },
@@ -132,185 +284,39 @@ function InvoicesInner() {
           ]}
         />
       </div>
-      <Panel>
-        {list.isLoading ? (
-          <Skeleton className="m-4 h-40" />
-        ) : list.isError ? (
-          <EmptyState className="m-4" title={t("office.api.load_error")} />
-        ) : rows.length === 0 ? (
-          <EmptyState className="m-4" title={t("office.invoices_empty")} />
-        ) : (
-          <TableBox>
-            <thead>
-              <tr>
-                <th className="w-8">
-                  <span className="sr-only">{t("office.col_status")}</span>
-                </th>
-                <th>{t("office.col_date")}</th>
-                <th>{t("office.col_number")}</th>
-                <th>{t("office.col_counterparty")}</th>
-                <th>{t("office.col_type")}</th>
-                <th className="text-right">{t("office.col_base")}</th>
-                <th className="text-right">{t("office.col_vat")}</th>
-                <th className="text-right">{t("office.col_payable")}</th>
-                <th>{t("office.col_status")}</th>
-                <th className="w-10">
-                  <span className="sr-only">{t("office.drawer.preview")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((inv) => {
-                const dir = directionOf(inv.direction);
-                return (
-                  <tr
-                    key={inv.uuid}
-                    aria-selected={open === inv.uuid}
-                    onClick={(e) => {
-                      // Bağlantı ve düğmeler kendi işini yapar; satırın geri
-                      // kalanı çekmeceyi açar.
-                      if ((e.target as HTMLElement).closest("a,button")) return;
-                      setParam("invoice", inv.uuid);
-                    }}
-                    className={cn(
-                      "hover:bg-muted/40 cursor-pointer",
-                      open === inv.uuid && "bg-brand-tint hover:bg-brand-tint",
-                    )}
-                  >
-                    <td>
-                      <TacRozeti
-                        durum={inv.open_warnings ? "sorun" : "yuklendi"}
-                        boyut={16}
-                      />
-                    </td>
-                    <td className="whitespace-nowrap">
-                      <Figure>{fmtDate(inv.issue_date)}</Figure>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1.5">
-                        <Link
-                          href={routes.tenant.invoice(
-                            slug,
-                            inv.uuid,
-                            engagement,
-                          )}
-                          className="hover:underline"
-                        >
-                          <Figure className="font-medium">
-                            {inv.invoice_number}
-                          </Figure>
-                        </Link>
-                        {inv.open_warnings ? (
-                          <span
-                            className="text-status-warning inline-flex items-center gap-0.5 text-xs"
-                            title={t("office.open_warnings", {
-                              count: inv.open_warnings,
-                            })}
-                          >
-                            <TriangleAlert className="size-3.5" aria-hidden />
-                            <Figure>{inv.open_warnings}</Figure>
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="max-w-64 truncate">
-                        {inv.counterparty_name ?? ""}
-                      </div>
-                      <Figure className="text-muted-foreground text-xs">
-                        {inv.counterparty_tax_id ?? ""}
-                      </Figure>
-                    </td>
-                    <td className="text-xs">
-                      <span
-                        className={
-                          dir === "sales"
-                            ? "text-status-approved"
-                            : "text-brand"
-                        }
-                      >
-                        {t(`office.direction_${dir}`)}
-                      </span>
-                      <div className="text-muted-foreground">
-                        {inv.profile ? `${inv.profile} · ` : ""}
-                        {inv.type}
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      <Money
-                        value={inv.tax_exclusive_amount}
-                        currency={inv.currency}
-                      />
-                    </td>
-                    <td className="text-right">
-                      <Money value={inv.tax_amount} currency={inv.currency} />
-                    </td>
-                    <td className="text-right font-medium">
-                      <Money
-                        value={inv.payable_amount}
-                        currency={inv.currency}
-                      />
-                    </td>
-                    <td>
-                      <InvoiceStateBadge status={inv.status} />
-                    </td>
-                    <td>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="size-11 md:size-8"
-                        aria-haspopup="dialog"
-                        aria-label={t("office.drawer.preview_of", {
-                          number: inv.invoice_number,
-                        })}
-                        onClick={() => setParam("invoice", inv.uuid)}
-                      >
-                        <PanelRightOpen className="size-4" aria-hidden />
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </TableBox>
-        )}
-      </Panel>
+      <EntityTable<InvoiceRow>
+        columns={columns}
+        data={rows}
+        getRowId={(inv) => inv.uuid}
+        isLoading={list.isLoading}
+        isError={list.isError}
+        errorTitle={t("office.api.load_error")}
+        onRetry={() => void list.refetch()}
+        emptyTitle={t("office.invoices_empty")}
+        emptyDescription=""
+        state={listState.tableState}
+        rowCount={total}
+        pageSizeOptions={[25, 50, 100]}
+        // Sunucu sıralama ve serbest arama sunmuyor; yalnızca sayfalama.
+        features={{
+          sorting: false,
+          globalFilter: false,
+          columnFilters: false,
+          rowSelection: false,
+          facetedFilters: false,
+          persistKey: "office.invoices.table",
+        }}
+        // Bağlantı ve düğmeler kendi işini yapar; satırın geri kalanı
+        // çekmeceyi açar.
+        onRowClick={(inv) => openInvoice(inv.uuid)}
+        isRowActive={(inv) => inv.uuid === open}
+      />
       <InvoiceDrawer
         engagement={engagement}
         invoice={open}
         taxpayerTitle={selected?.title}
-        onClose={() => setParam("invoice", "")}
+        onClose={() => openInvoice(null)}
       />
-      {total > PAGE ? (
-        <div className="flex items-center justify-end gap-2 text-xs">
-          <span className="text-muted-foreground">
-            {t("office.api.page_of", {
-              from: offset + 1,
-              to: Math.min(offset + PAGE, total),
-              total,
-            })}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={offset === 0}
-            onClick={() =>
-              setParam("offset", String(Math.max(0, offset - PAGE)))
-            }
-          >
-            {t("office.api.prev")}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={offset + PAGE >= total}
-            onClick={() => setParam("offset", String(offset + PAGE))}
-          >
-            {t("office.api.next")}
-          </Button>
-        </div>
-      ) : null}
     </div>
   );
 }

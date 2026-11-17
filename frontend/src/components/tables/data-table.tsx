@@ -39,6 +39,7 @@ export function DataTable<TData>({
   isRowActive,
   getRowClassName,
   rowCount,
+  hasNextPage,
   bordered,
   maxHeight,
   caption,
@@ -88,7 +89,8 @@ export function DataTable<TData>({
     manual,
     state,
     initialState,
-    pageCount,
+    // Toplam bilinmiyorsa TanStack'e "bilinmeyen sayfa sayısı" (-1).
+    pageCount: hasNextPage !== undefined ? -1 : pageCount,
     rowCount,
   });
 
@@ -254,6 +256,7 @@ export function DataTable<TData>({
           table={table}
           pageSizeOptions={pageSizeOptions}
           compact={forceMobileCards}
+          hasNextPage={hasNextPage}
         />
       ) : null}
     </div>

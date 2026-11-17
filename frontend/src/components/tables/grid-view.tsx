@@ -167,7 +167,12 @@ function DefaultCard<TData>({
                       ? t(meta.labelKey)
                       : (meta?.label ?? cell.column.id)}
                   </dt>
-                  <dd className="min-w-0 text-end font-medium">
+                  <dd
+                    className={cn(
+                      "min-w-0 text-end font-medium",
+                      meta?.cellClassName,
+                    )}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </dd>
                 </div>
