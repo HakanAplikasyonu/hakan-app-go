@@ -576,6 +576,7 @@ func TestAuthzScopedLists(t *testing.T) {
 
 func assertNoLeak(t *testing.T, what, body string) {
 	t.Helper()
+	body = bodyText([]byte(body)) // Excel and PDF answers are decoded (#453)
 	for _, s := range idorLeaks {
 		if strings.Contains(body, s) {
 			t.Errorf("leak: %s answered with %q: %s", what, s, firstLine(body))
