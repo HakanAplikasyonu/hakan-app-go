@@ -85,6 +85,7 @@
   "amount_base": "Tax base",
   "amount_withholding": "Withholding",
   "lines_title": "Lines",
+  "col_line_no": "#",
   "col_item": "Item",
   "col_quantity": "Quantity",
   "col_rate": "VAT rate",

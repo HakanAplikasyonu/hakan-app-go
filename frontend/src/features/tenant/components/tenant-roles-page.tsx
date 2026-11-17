@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { z } from "zod";
@@ -9,6 +10,11 @@ import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { EntityPage, EntitySectionCard } from "@/components/entity";
 import { AppForm, AppInput, AppTextarea } from "@/components/forms";
+import {
+  DataTable,
+  createActionsColumn,
+  createColumn,
+} from "@/components/tables";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -273,13 +279,11 @@ function RoleDialog({
   );
 }
 
-function RoleRow({
+function RoleRowActions({
   role,
-  canWrite,
   onEdit,
 }: {
   role: TenantRole;
-  canWrite: boolean;
   onEdit: (role: TenantRole) => void;
 }) {
   const { t } = useLocale();
@@ -298,54 +302,30 @@ function RoleRow({
   };
 
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pe-3">
-        <div className="flex flex-wrap items-center gap-2 font-medium">
-          {role.name}
-          {role.is_system ? (
-            <Badge variant="secondary">{t("tenant.roles_system")}</Badge>
-          ) : null}
-        </div>
-        <div className="text-muted-foreground font-mono text-xs">
-          {role.key}
-        </div>
-        {role.description ? (
-          <div className="text-muted-foreground mt-0.5 text-xs">
-            {role.description}
-          </div>
-        ) : null}
-      </td>
-      <td className="py-2 pe-3 tabular-nums">{role.permissions.length}</td>
-      <td className="py-2 pe-3 tabular-nums">{role.member_count}</td>
-      <td className="py-2 text-end whitespace-nowrap">
-        {canWrite ? (
-          <>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => onEdit(role)}
-            >
-              <Pencil className="size-4" />
-              {t("tenant.roles_edit")}
-            </Button>
-            {role.is_system ? null : (
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={remove.isPending || inUse}
-                title={inUse ? t("tenant.roles_delete_in_use") : undefined}
-                onClick={() => void onDelete()}
-              >
-                <Trash2 className="size-4" />
-                {t("tenant.roles_delete")}
-              </Button>
-            )}
-          </>
-        ) : null}
-      </td>
-    </tr>
+    <div className="whitespace-nowrap">
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        onClick={() => onEdit(role)}
+      >
+        <Pencil className="size-4" />
+        {t("tenant.roles_edit")}
+      </Button>
+      {role.is_system ? null : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={remove.isPending || inUse}
+          title={inUse ? t("tenant.roles_delete_in_use") : undefined}
+          onClick={() => void onDelete()}
+        >
+          <Trash2 className="size-4" />
+          {t("tenant.roles_delete")}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -360,6 +340,58 @@ function RolesSection({
   const { slug } = useTenant();
   const query = useTenantRoles(slug);
   const roles = query.data?.items ?? [];
+
+  const columns = useMemo<ColumnDef<TenantRole, unknown>[]>(
+    () => [
+      createColumn<TenantRole>({
+        id: "role",
+        labelKey: "tenant.roles_role",
+        accessorKey: "name",
+        gridPrimary: true,
+        cell: ({ row }) => {
+          const role = row.original;
+          return (
+            <>
+              <div className="flex flex-wrap items-center gap-2 font-medium">
+                {role.name}
+                {role.is_system ? (
+                  <Badge variant="secondary">{t("tenant.roles_system")}</Badge>
+                ) : null}
+              </div>
+              <div className="text-muted-foreground font-mono text-xs">
+                {role.key}
+              </div>
+              {role.description ? (
+                <div className="text-muted-foreground mt-0.5 text-xs">
+                  {role.description}
+                </div>
+              ) : null}
+            </>
+          );
+        },
+      }),
+      createColumn<TenantRole>({
+        id: "permission_count",
+        labelKey: "tenant.roles_permission_count",
+        accessorFn: (role) => role.permissions.length,
+        meta: { cellClassName: "tabular-nums" },
+      }),
+      createColumn<TenantRole>({
+        id: "member_count",
+        labelKey: "tenant.roles_member_count",
+        accessorKey: "member_count",
+        meta: { cellClassName: "tabular-nums" },
+      }),
+      ...(canWrite
+        ? [
+            createActionsColumn<TenantRole>({
+              cell: (role) => <RoleRowActions role={role} onEdit={onEdit} />,
+            }),
+          ]
+        : []),
+    ],
+    [canWrite, onEdit, t],
+  );
 
   return (
     <EntitySectionCard title={t("tenant.roles_title")} badge={roles.length}>
@@ -377,35 +409,27 @@ function RolesSection({
         </p>
       ) : null}
       {roles.length ? (
-        <div className="relative overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  <ShieldCheck className="me-1 inline size-3.5" />
-                  {t("tenant.roles_role")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("tenant.roles_permission_count")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("tenant.roles_member_count")}
-                </th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {roles.map((role) => (
-                <RoleRow
-                  key={role.key}
-                  role={role}
-                  canWrite={canWrite}
-                  onEdit={onEdit}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<TenantRole>
+          columns={columns}
+          data={roles}
+          getRowId={(role) => role.key}
+          bordered={false}
+          // Gömülü küçük liste: yalnızca sıralama açık.
+          features={{
+            toolbar: false,
+            pagination: false,
+            rowSelection: false,
+            columnFilters: false,
+            globalFilter: false,
+            facetedFilters: false,
+            viewMode: false,
+            columnVisibility: false,
+            columnResizing: false,
+            columnPinning: false,
+            columnOrdering: false,
+            density: false,
+          }}
+        />
       ) : null}
     </EntitySectionCard>
   );
@@ -418,6 +442,10 @@ export function TenantRolesPage() {
   const { can } = usePermission();
   const canWrite = can(permissions.tenant.roles.write);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const onEdit = useCallback(
+    (role: TenantRole) => setDialog({ mode: "edit", role }),
+    [],
+  );
 
   return (
     <EntityPage
@@ -445,10 +473,7 @@ export function TenantRolesPage() {
         ) : null
       }
     >
-      <RolesSection
-        canWrite={canWrite}
-        onEdit={(role) => setDialog({ mode: "edit", role })}
-      />
+      <RolesSection canWrite={canWrite} onEdit={onEdit} />
       {dialog && canWrite ? (
         <RoleDialog
           key={dialog.mode === "edit" ? dialog.role.key : "create"}

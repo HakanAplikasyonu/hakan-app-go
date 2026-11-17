@@ -1,12 +1,20 @@
 "use client";
 
-import { LogOut, UsersRound } from "lucide-react";
+import type { ColumnDef } from "@tanstack/react-table";
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useMemo } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { StatusChip } from "@/components/common/status-chip";
 import { EntityPage, EntitySectionCard } from "@/components/entity";
+import {
+  DataTable,
+  createActionsColumn,
+  createColumn,
+  createDateColumn,
+} from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -38,37 +46,56 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import type {
+  TenantInvitation,
   TenantMember,
   TenantRole,
 } from "@/features/tenant/services/tenant.service";
 import { defaultHomeForUser } from "@/lib/auth/types";
-import { date } from "@/lib/utils/format";
 import { useAuth } from "@/providers/auth-provider";
 import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-function MemberRow({
-  member,
-  isSelf,
-  actorRole,
-  canWrite,
-  roles,
-  roleOptions,
-}: {
-  member: TenantMember;
-  isSelf: boolean;
+/** Gömülü küçük liste: araç çubuğu, sayfalama, seçim yok; sıralama açık. */
+const EMBEDDED_FEATURES = {
+  toolbar: false,
+  pagination: false,
+  rowSelection: false,
+  columnFilters: false,
+  globalFilter: false,
+  facetedFilters: false,
+  viewMode: false,
+  columnVisibility: false,
+  columnResizing: false,
+  columnPinning: false,
+  columnOrdering: false,
+  density: false,
+} as const;
+
+type MemberRowContext = {
+  selfUuid: string | undefined;
   actorRole: string;
   canWrite: boolean;
   roles: readonly TenantRole[] | undefined;
   roleOptions: readonly TenantRoleOption[];
+};
+
+function memberName(member: TenantMember) {
+  return `${member.user.name} ${member.user.surname}`.trim();
+}
+
+function MemberRoleCell({
+  member,
+  ctx,
+}: {
+  member: TenantMember;
+  ctx: MemberRowContext;
 }) {
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { slug } = useTenant();
-  const { confirmDelete } = useDialogs();
   const changeRole = useChangeTenantMemberRole(slug);
-  const remove = useRemoveTenantMember(slug);
-  const name = `${member.user.name} ${member.user.surname}`.trim();
+  const { actorRole, canWrite, roles, roleOptions } = ctx;
+  const isSelf = member.user.uuid === ctx.selfUuid;
   const current = member.role.key;
   // Options the caller may move this member to (the server enforces the same).
   const options = roleOptions.filter((o) =>
@@ -82,12 +109,58 @@ function MemberRow({
     });
   }
   const editable = canWrite && !isSelf && options.length > 1;
+
+  if (!editable) {
+    return (
+      <>{tenantRoleLabel(t, current, { roles, fallback: member.role.name })}</>
+    );
+  }
+  return (
+    <Select
+      value={current}
+      disabled={changeRole.isPending}
+      onValueChange={(roleKey) =>
+        changeRole.mutate({
+          userUuid: member.user.uuid,
+          roleKey,
+        })
+      }
+    >
+      <SelectTrigger className="h-8 w-36" aria-label={t("tenant.members_role")}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.key} value={o.key}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function MemberRemoveButton({
+  member,
+  ctx,
+}: {
+  member: TenantMember;
+  ctx: MemberRowContext;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { confirmDelete } = useDialogs();
+  const remove = useRemoveTenantMember(slug);
+  const isSelf = member.user.uuid === ctx.selfUuid;
   const removable =
-    canWrite && !isSelf && canChangeRole(actorRole, current, "");
+    ctx.canWrite &&
+    !isSelf &&
+    canChangeRole(ctx.actorRole, member.role.key, "");
+  if (!removable) return null;
 
   const onRemove = async () => {
     const ok = await confirmDelete({
-      title: t("tenant.members_remove_title", { name }),
+      title: t("tenant.members_remove_title", { name: memberName(member) }),
       description: t("tenant.members_remove_description"),
       confirmLabel: t("tenant.members_remove"),
     });
@@ -95,75 +168,148 @@ function MemberRow({
   };
 
   return (
-    <tr className="border-b last:border-0">
-      <td className="py-2 pe-3">
-        <div className="font-medium">
-          {name}
-          {isSelf ? (
-            <span className="text-muted-foreground ms-1 text-xs font-normal">
-              ({t("tenant.members_you")})
-            </span>
-          ) : null}
-        </div>
-        <div className="text-muted-foreground text-xs">{member.user.email}</div>
-      </td>
-      <td className="py-2 pe-3">
-        {editable ? (
-          <Select
-            value={current}
-            disabled={changeRole.isPending}
-            onValueChange={(roleKey) =>
-              changeRole.mutate({
-                userUuid: member.user.uuid,
-                roleKey,
-              })
-            }
-          >
-            <SelectTrigger
-              className="h-8 w-36"
-              aria-label={t("tenant.members_role")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((o) => (
-                <SelectItem key={o.key} value={o.key}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
-          tenantRoleLabel(t, current, { roles, fallback: member.role.name })
-        )}
-      </td>
-      <td className="text-muted-foreground py-2 pe-3 text-sm">
-        {date(member.created_at, "dd.MM.yyyy", locale)}
-      </td>
-      <td className="py-2 text-end">
-        {removable ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={remove.isPending}
-            onClick={() => void onRemove()}
-          >
-            {t("tenant.members_remove")}
-          </Button>
-        ) : null}
-      </td>
-    </tr>
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      disabled={remove.isPending}
+      onClick={() => void onRemove()}
+    >
+      {t("tenant.members_remove")}
+    </Button>
+  );
+}
+
+function MembersTable({
+  members,
+  ctx,
+}: {
+  members: TenantMember[];
+  ctx: MemberRowContext;
+}) {
+  const { t } = useLocale();
+  const columns = useMemo<ColumnDef<TenantMember, unknown>[]>(
+    () => [
+      createColumn<TenantMember>({
+        id: "user",
+        labelKey: "tenant.members_user",
+        accessorFn: memberName,
+        gridPrimary: true,
+        cell: ({ row }) => {
+          const member = row.original;
+          return (
+            <>
+              <div className="font-medium">
+                {memberName(member)}
+                {member.user.uuid === ctx.selfUuid ? (
+                  <span className="text-muted-foreground ms-1 text-xs font-normal">
+                    ({t("tenant.members_you")})
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-muted-foreground text-xs">
+                {member.user.email}
+              </div>
+            </>
+          );
+        },
+      }),
+      createColumn<TenantMember>({
+        id: "role",
+        labelKey: "tenant.members_role",
+        accessorFn: (m) => m.role.key,
+        cell: ({ row }) => <MemberRoleCell member={row.original} ctx={ctx} />,
+      }),
+      createDateColumn<TenantMember>({
+        id: "created_at",
+        labelKey: "tenant.members_since",
+        accessor: (m) => m.created_at,
+        className: "text-muted-foreground",
+      }),
+      createActionsColumn<TenantMember>({
+        cell: (member) => <MemberRemoveButton member={member} ctx={ctx} />,
+      }),
+    ],
+    [ctx, t],
+  );
+
+  return (
+    <DataTable<TenantMember>
+      columns={columns}
+      data={members}
+      getRowId={(m) => m.user.uuid}
+      bordered={false}
+      features={EMBEDDED_FEATURES}
+    />
   );
 }
 
 function InvitationsSection({ canWrite }: { canWrite: boolean }) {
   const officeRoles = useOfficeRoles();
-  const { t, locale } = useLocale();
+  const { t } = useLocale();
   const { slug, role } = useTenant();
   const query = useTenantInvitations(slug);
-  const revoke = useRevokeTenantInvitation(slug);
+  const { mutate: revokeInvitation, isPending: revoking } =
+    useRevokeTenantInvitation(slug);
   const items = query.data?.items ?? [];
+
+  const columns = useMemo<ColumnDef<TenantInvitation, unknown>[]>(
+    () => [
+      createColumn<TenantInvitation>({
+        id: "email",
+        labelKey: "tenant.invitations_email",
+        accessorKey: "email",
+        gridPrimary: true,
+        cell: ({ row }) => {
+          const inv = row.original;
+          return (
+            <>
+              <div className="font-medium">{inv.email}</div>
+              <StatusChip
+                label={t(
+                  INVITATION_STATUS_LABEL_KEYS[inv.status] ??
+                    INVITATION_STATUS_LABEL_KEYS.pending!,
+                )}
+                tone={inv.status === "expired" ? "danger" : "warning"}
+              />
+            </>
+          );
+        },
+      }),
+      createColumn<TenantInvitation>({
+        id: "role",
+        labelKey: "tenant.members_role",
+        accessorFn: (inv) => inv.role.key,
+        cell: ({ row }) =>
+          tenantRoleLabel(t, row.original.role.key, {
+            roles: officeRoles.roles,
+            fallback: row.original.role.name,
+          }),
+      }),
+      createDateColumn<TenantInvitation>({
+        id: "expires_at",
+        labelKey: "tenant.invitations_expires",
+        accessor: (inv) => inv.expires_at,
+        className: "text-muted-foreground",
+      }),
+      createActionsColumn<TenantInvitation>({
+        // Only owners may cancel an owner-role invitation.
+        cell: (inv) =>
+          canWrite && (inv.role.key !== "owner" || role.key === "owner") ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={revoking}
+              onClick={() => revokeInvitation(inv.uuid)}
+            >
+              {t("tenant.invitations_revoke")}
+            </Button>
+          ) : null,
+      }),
+    ],
+    [canWrite, officeRoles.roles, revokeInvitation, revoking, role.key, t],
+  );
 
   return (
     <EntitySectionCard
@@ -190,64 +336,13 @@ function InvitationsSection({ canWrite }: { canWrite: boolean }) {
         </p>
       ) : null}
       {items.length ? (
-        <div className="relative overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-muted-foreground border-b text-xs">
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("tenant.invitations_email")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("tenant.members_role")}
-                </th>
-                <th className="py-2 pe-3 text-start font-medium">
-                  {t("tenant.invitations_expires")}
-                </th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((inv) => (
-                <tr key={inv.uuid} className="border-b last:border-0">
-                  <td className="py-2 pe-3">
-                    <div className="font-medium">{inv.email}</div>
-                    <StatusChip
-                      label={t(
-                        INVITATION_STATUS_LABEL_KEYS[inv.status] ??
-                          INVITATION_STATUS_LABEL_KEYS.pending!,
-                      )}
-                      tone={inv.status === "expired" ? "danger" : "warning"}
-                    />
-                  </td>
-                  <td className="py-2 pe-3">
-                    {tenantRoleLabel(t, inv.role.key, {
-                      roles: officeRoles.roles,
-                      fallback: inv.role.name,
-                    })}
-                  </td>
-                  <td className="text-muted-foreground py-2 pe-3">
-                    {date(inv.expires_at, "dd.MM.yyyy", locale)}
-                  </td>
-                  <td className="py-2 text-end">
-                    {/* Only owners may cancel an owner-role invitation. */}
-                    {canWrite &&
-                    (inv.role.key !== "owner" || role.key === "owner") ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={revoke.isPending}
-                        onClick={() => revoke.mutate(inv.uuid)}
-                      >
-                        {t("tenant.invitations_revoke")}
-                      </Button>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<TenantInvitation>
+          columns={columns}
+          data={items}
+          getRowId={(inv) => inv.uuid}
+          bordered={false}
+          features={EMBEDDED_FEATURES}
+        />
       ) : null}
     </EntitySectionCard>
   );
@@ -266,6 +361,22 @@ export function TenantMembersPage() {
   const officeRoles = useOfficeRoles();
   const leave = useLeaveTenant(tenant.slug);
   const members = membersQuery.data?.items ?? [];
+  const memberCtx = useMemo<MemberRowContext>(
+    () => ({
+      selfUuid: user?.uuid,
+      actorRole: tenant.role.key,
+      canWrite,
+      roles: officeRoles.roles,
+      roleOptions: officeRoles.options,
+    }),
+    [
+      user?.uuid,
+      tenant.role.key,
+      canWrite,
+      officeRoles.roles,
+      officeRoles.options,
+    ],
+  );
 
   const onLeave = async () => {
     const ok = await confirm({
@@ -333,38 +444,7 @@ export function TenantMembersPage() {
             </p>
           ) : null}
           {members.length ? (
-            <div className="relative overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground border-b text-xs">
-                    <th className="py-2 pe-3 text-start font-medium">
-                      <UsersRound className="me-1 inline size-3.5" />
-                      {t("tenant.members_user")}
-                    </th>
-                    <th className="py-2 pe-3 text-start font-medium">
-                      {t("tenant.members_role")}
-                    </th>
-                    <th className="py-2 pe-3 text-start font-medium">
-                      {t("tenant.members_since")}
-                    </th>
-                    <th className="py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m) => (
-                    <MemberRow
-                      key={m.user.uuid}
-                      member={m}
-                      isSelf={m.user.uuid === user?.uuid}
-                      actorRole={tenant.role.key}
-                      canWrite={canWrite}
-                      roles={officeRoles.roles}
-                      roleOptions={officeRoles.options}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <MembersTable members={members} ctx={memberCtx} />
           ) : null}
         </EntitySectionCard>
 

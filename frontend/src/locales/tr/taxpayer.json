@@ -85,6 +85,7 @@
   "amount_base": "Matrah",
   "amount_withholding": "Tevkifat",
   "lines_title": "Satırlar",
+  "col_line_no": "#",
   "col_item": "Kalem",
   "col_quantity": "Miktar",
   "col_rate": "KDV oranı",
