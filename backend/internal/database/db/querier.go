@@ -441,6 +441,9 @@ type Querier interface {
 	GetOAuthAccountByProviderAccount(ctx context.Context, arg GetOAuthAccountByProviderAccountParams) (GetOAuthAccountByProviderAccountRow, error)
 	GetOAuthAccountByUserProvider(ctx context.Context, arg GetOAuthAccountByUserProviderParams) (GetOAuthAccountByUserProviderRow, error)
 	GetOAuthProviderSettings(ctx context.Context, provider string) (OauthProviderSetting, error)
+	// Çift kayıt koruması (#466): Luca çekim ayarları, fiş satırlarının kaynak
+	// belgeleri ve belge → dosya izi.
+	GetOfficeExportSettings(ctx context.Context, organizationID int64) (OfficeExportSetting, error)
 	// Destek widget'ı ofis ayarı (issue #387).
 	GetOfficeSupportSettings(ctx context.Context, organizationID int64) (OfficeSupportSetting, error)
 	// The consent link carries only the token: the mükellef is not an office
@@ -594,6 +597,7 @@ type Querier interface {
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
+	InsertExportBatchDocument(ctx context.Context, arg InsertExportBatchDocumentParams) error
 	InsertExportBatchItem(ctx context.Context, arg InsertExportBatchItemParams) error
 	InsertImportChange(ctx context.Context, arg InsertImportChangeParams) (ImportChange, error)
 	// Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
@@ -802,6 +806,9 @@ type Querier interface {
 	ListExpenseCategories(ctx context.Context, arg ListExpenseCategoriesParams) ([]ExpenseCategory, error)
 	ListExportBatchItems(ctx context.Context, arg ListExportBatchItemsParams) ([]ListExportBatchItemsRow, error)
 	ListExportBatches(ctx context.Context, arg ListExportBatchesParams) ([]ListExportBatchesRow, error)
+	// Dışa aktarım geçmişinde belge → dosya izi. batch_id verilirse o çıktının
+	// belgeleri; q verilirse ETTN ya da belge numarasında arama.
+	ListExportDocuments(ctx context.Context, arg ListExportDocumentsParams) ([]ListExportDocumentsRow, error)
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
@@ -826,6 +833,8 @@ type Querier interface {
 	// Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
 	ListJournalDrafts(ctx context.Context, arg ListJournalDraftsParams) ([]ListJournalDraftsRow, error)
 	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)
+	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
+	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Eksik belge görevi (issue #36). Banka tabloları yalnızca okunur.
 	// Kontrolün baktığı hareketler: dönemin tedarikçi ödemesi / müşteri
@@ -1169,6 +1178,10 @@ type Querier interface {
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
+	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
+	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
+	// faturadan gelir.
+	ResolveInvoiceLineSources(ctx context.Context, arg ResolveInvoiceLineSourcesParams) ([]ResolveInvoiceLineSourcesRow, error)
 	// Karşı tarafın "mutabıkız" yanıtı: en son çalıştırmadaki açık satır çözülür.
 	ResolveLatestCounterpartyReconciliation(ctx context.Context, arg ResolveLatestCounterpartyReconciliationParams) error
 	ResolveOrganizationScopeBySlug(ctx context.Context, arg ResolveOrganizationScopeBySlugParams) (ResolveOrganizationScopeBySlugRow, error)
@@ -1313,6 +1326,10 @@ type Querier interface {
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
+	// Mükellefin entegratör bağlantıları (entegrator_<ad>): kaynağı entegratör
+	// olmayan bir faturanın (Excel, UBL yükleme) hangi entegratörden kesildiğini
+	// tahmin etmek için.
+	TaxpayerEntegratorSystems(ctx context.Context, taxpayerID int64) ([]string, error)
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
 	// Geri alınan karar: öneri incelemeye döner; fişe girmiş hareket fişte kalır.
 	UnapproveBankPosting(ctx context.Context, arg UnapproveBankPostingParams) (int64, error)
@@ -1387,9 +1404,11 @@ type Querier interface {
 	// tenant-lint: cross-org kapsam CHECK ile kısıtlı; company/tenant satırı organization_id taşır
 	UpsertExcelImportTemplate(ctx context.Context, arg UpsertExcelImportTemplateParams) (ExcelImportTemplate, error)
 	UpsertExpenseCategory(ctx context.Context, arg UpsertExpenseCategoryParams) (ExpenseCategory, error)
+	// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 	UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error)
 	UpsertInvoiceSource(ctx context.Context, arg UpsertInvoiceSourceParams) (InvoiceSource, error)
 	UpsertNotificationPreferences(ctx context.Context, arg UpsertNotificationPreferencesParams) (NotificationPreference, error)
+	UpsertOfficeExportSettings(ctx context.Context, arg UpsertOfficeExportSettingsParams) (OfficeExportSetting, error)
 	UpsertOfficeReviewSetting(ctx context.Context, arg UpsertOfficeReviewSettingParams) error
 	UpsertOfficeSupportSettings(ctx context.Context, arg UpsertOfficeSupportSettingsParams) (OfficeSupportSetting, error)
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error

@@ -924,6 +924,24 @@ type ExportBatch struct {
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 }
 
+type ExportBatchDocument struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	ExportBatchID  int64              `json:"export_batch_id"`
+	JournalDraftID int64              `json:"journal_draft_id"`
+	SourceKind     string             `json:"source_kind"`
+	DocumentKey    string             `json:"document_key"`
+	InvoiceUuid    pgtype.UUID        `json:"invoice_uuid"`
+	DocumentNo     pgtype.Text        `json:"document_no"`
+	DocumentDate   pgtype.Date        `json:"document_date"`
+	FileName       string             `json:"file_name"`
+	ConfirmedCodes []string           `json:"confirmed_codes"`
+	ConfirmedBy    pgtype.Int8        `json:"confirmed_by"`
+	ConfirmedAt    pgtype.Timestamptz `json:"confirmed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type ExportBatchItem struct {
 	ID             int64              `json:"id"`
 	OrganizationID int64              `json:"organization_id"`
@@ -963,6 +981,7 @@ type ExportSetting struct {
 	UpdatedBy                 pgtype.Int8        `json:"updated_by"`
 	CreatedAt                 pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `json:"updated_at"`
+	LucaPullIntegrators       []string           `json:"luca_pull_integrators"`
 }
 
 type GithubAppSetting struct {
@@ -1321,6 +1340,15 @@ type OauthProviderSetting struct {
 	AppleTeamID        string             `json:"apple_team_id"`
 	AppleKeyID         string             `json:"apple_key_id"`
 	ApplePrivateKeyEnc pgtype.Text        `json:"apple_private_key_enc"`
+}
+
+type OfficeExportSetting struct {
+	ID                  int64              `json:"id"`
+	OrganizationID      int64              `json:"organization_id"`
+	LucaPullIntegrators []string           `json:"luca_pull_integrators"`
+	UpdatedBy           pgtype.Int8        `json:"updated_by"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OfficeSupportSetting struct {

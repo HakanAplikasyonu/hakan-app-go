@@ -118,9 +118,16 @@ type Line struct {
 
 // SourceRef links a line to its source document.
 type SourceRef struct {
-	Kind string // invoice, bank_transaction, receipt
-	ID   string // ETTN, bank transaction uuid …
+	Kind string // invoice, invoice_item, bank_transaction, receipt …
+	ID   string // journal_draft_lines.source_id (invoice id, bank transaction id …)
 	URL  string // portal link that opens the document
+	// DocumentKey identifies the source document across exports (#466): the
+	// invoice ETTN (lower case), "" when the line has no document. Two lines
+	// with the same key come from the same invoice.
+	DocumentKey string
+	// ETTN is the invoice ETTN when known; drivers write it into the file
+	// (Luca: Açıklama) so the program shows which document a line came from.
+	ETTN string
 }
 
 // VATRow is one rate of a KDV summary.
@@ -165,6 +172,16 @@ const (
 	IssueTemplateUnverified   = "TEMPLATE_UNVERIFIED"
 	IssueUnsupportedType      = "ENTRY_TYPE_UNSUPPORTED"
 	IssueInvoiceEntryExcluded = "INVOICE_ENTRY_EXCLUDED"
+	// Double booking guard (#466). Both leave the entry out of the files
+	// until the accountant confirms the document for this export.
+	//
+	// IssueDocumentAlreadyExported: the same document (ETTN) is already in a
+	// live export file of the same program.
+	IssueDocumentAlreadyExported = "DOCUMENT_ALREADY_EXPORTED"
+	// IssueProgramPullsDocument: the target program fetches this e-invoice
+	// itself from the integrator (Luca: İşNet NetteFatura, TÜRMOB e-Belge,
+	// GİB e-Belge), per office / taxpayer setting.
+	IssueProgramPullsDocument = "PROGRAM_PULLS_DOCUMENT"
 )
 
 // HasBlocker reports whether any issue blocks the export.
@@ -198,6 +215,19 @@ type Result struct {
 	// EntryIDs are the entries that went into the files (after exclusions);
 	// export_batch_item rows are written for these.
 	EntryIDs []string `json:"entry_ids"`
+	// EntryFiles maps an entry ID to the file it went into (the first one
+	// when a split entry spans files): the document → file trail (#466).
+	EntryFiles map[string]string `json:"-"`
+}
+
+// AddEntryFile records that entry id went into file name (first file wins).
+func (r *Result) AddEntryFile(id, name string) {
+	if r.EntryFiles == nil {
+		r.EntryFiles = map[string]string{}
+	}
+	if _, ok := r.EntryFiles[id]; !ok {
+		r.EntryFiles[id] = name
+	}
 }
 
 // Driver is a target program.

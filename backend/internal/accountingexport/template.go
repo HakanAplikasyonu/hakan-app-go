@@ -40,6 +40,10 @@ type Column struct {
 	// for amounts written as text ("" = numeric cell).
 	Format  string `yaml:"format"`
 	Decimal string `yaml:"decimal"`
+	// Pattern builds a text value from placeholders (keys that support it,
+	// e.g. Luca description_source: "{description} ETTN:{ettn}"). Empty
+	// placeholders and the text around them are dropped by the driver.
+	Pattern string `yaml:"pattern"`
 }
 
 // ErrTemplate wraps template loading errors.

@@ -33,6 +33,7 @@ journal_drafts engagement
 journal_draft_lines engagement
 export_batches engagement
 export_batch_items engagement
+export_batch_documents engagement
 accounting_transfers engagement
 taxpayer_onboarding_requests
 account_plan_imports engagement
@@ -73,3 +74,4 @@ reconciliation_items engagement
 counterparty_reconciliations engagement
 babs_declarations engagement
 reconciliation_letters engagement
+office_export_settings

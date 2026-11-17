@@ -3,11 +3,13 @@ SELECT * FROM export_settings
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id;
 
 -- name: UpsertExportSettings :one
-INSERT INTO export_settings (organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by)
-VALUES (@organization_id, @engagement_id, @invoices_reach_luca_directly, @block_on_unknown_account, sqlc.narg(updated_by))
+-- luca_pull_integrators NULL: ofis ayarı geçerli (#466).
+INSERT INTO export_settings (organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, luca_pull_integrators, updated_by)
+VALUES (@organization_id, @engagement_id, @invoices_reach_luca_directly, @block_on_unknown_account, sqlc.narg(luca_pull_integrators)::text[], sqlc.narg(updated_by))
 ON CONFLICT (engagement_id) DO UPDATE SET
     invoices_reach_luca_directly = EXCLUDED.invoices_reach_luca_directly,
     block_on_unknown_account = EXCLUDED.block_on_unknown_account,
+    luca_pull_integrators = EXCLUDED.luca_pull_integrators,
     updated_by = EXCLUDED.updated_by
 RETURNING *;
 

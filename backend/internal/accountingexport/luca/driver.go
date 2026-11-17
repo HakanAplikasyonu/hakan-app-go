@@ -32,7 +32,7 @@ import (
 const Name = "luca"
 
 // DefaultTemplate is used when Config.Template is empty.
-const DefaultTemplate = "unverified-1"
+const DefaultTemplate = "unverified-2"
 
 // ContentType of the produced files.
 const ContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -75,7 +75,7 @@ var knownKeys = map[string]bool{
 	"entry_no": true, "entry_date": true, "account": true, "debit": true, "credit": true,
 	"description": true, "entry_description": true, "entry_type": true, "document_type": true,
 	"doc_no": true, "doc_date": true, "quantity": true, "currency": true, "exchange_rate": true,
-	"foreign_amount": true, "source_id": true,
+	"foreign_amount": true, "source_id": true, "ettn": true, "description_source": true,
 }
 
 // New builds a driver from a template (tests, or a template loaded elsewhere).
@@ -164,6 +164,9 @@ func (d *driver) Export(ctx context.Context, b ae.Batch, w ae.FileWriter) (ae.Re
 			return res, err
 		}
 		res.Files = append(res.Files, f)
+		for _, v := range g {
+			res.AddEntryFile(v.ID, f.Name)
+		}
 	}
 	return res, nil
 }
@@ -249,8 +252,16 @@ func (d *driver) writeCell(f *excelize.File, sheet, ref string, c ae.Column, e a
 		}
 		return writeAmount(f, sheet, ref, c, *v, money)
 	}
+	if c.Key == "description_source" {
+		val := sourceDescription(c.Pattern, firstNonEmpty(l.Description, e.Description), l.Source.ETTN)
+		if val == "" {
+			return nil
+		}
+		return f.SetCellStr(sheet, ref, val)
+	}
 	val := map[string]string{
 		"description":       firstNonEmpty(l.Description, e.Description),
+		"ettn":              l.Source.ETTN,
 		"entry_description": e.Description,
 		"entry_type":        d.t.EntryTypes[e.Type],
 		"document_type":     e.DocumentType,
@@ -286,6 +297,46 @@ func writeAmount(f *excelize.File, sheet, ref string, c ae.Column, v decimal.Dec
 		return err
 	}
 	return f.SetCellStyle(sheet, ref, ref, style)
+}
+
+// sourceDescription fills a description_source pattern. Placeholders:
+// {description}, {ettn}. A segment whose placeholder is empty is dropped
+// with the literal text that leads it ("{description} ETTN:{ettn}" with no
+// ETTN gives just the description). Empty pattern: "{description} ETTN:{ettn}".
+func sourceDescription(pattern, description, ettn string) string {
+	if pattern == "" {
+		pattern = "{description} ETTN:{ettn}"
+	}
+	vals := map[string]string{"description": description, "ettn": ettn}
+	var out strings.Builder
+	rest := pattern
+	for rest != "" {
+		open := strings.Index(rest, "{")
+		if open < 0 {
+			out.WriteString(rest)
+			break
+		}
+		end := strings.Index(rest[open:], "}")
+		if end < 0 {
+			out.WriteString(rest)
+			break
+		}
+		lead, key := rest[:open], rest[open+1:open+end]
+		rest = rest[open+end+1:]
+		v, known := vals[key]
+		if !known {
+			out.WriteString(lead + "{" + key + "}")
+			continue
+		}
+		if v == "" {
+			continue
+		}
+		if out.Len() == 0 {
+			lead = strings.TrimLeft(lead, " ")
+		}
+		out.WriteString(lead + v)
+	}
+	return strings.TrimSpace(out.String())
 }
 
 func firstNonEmpty(a, b string) string {

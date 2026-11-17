@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -69,7 +70,7 @@ func TestInfoUnverified(t *testing.T) {
 		info.Limits.MaxEntriesPerFile != 50 || info.Limits.MaxLinesPerEntry != 400 {
 		t.Fatalf("info: %+v", info)
 	}
-	if len(Versions()) == 0 || Versions()[0] != DefaultTemplate {
+	if !slices.Contains(Versions(), DefaultTemplate) || !slices.Contains(Versions(), "unverified-1") {
 		t.Fatalf("versions: %v", Versions())
 	}
 	if _, err := ae.Open(Name, ae.Config{Template: "nope"}); err == nil {
@@ -93,7 +94,7 @@ func TestThreeEntriesGrouping(t *testing.T) {
 		t.Fatalf("issues: %+v", res.Issues)
 	}
 	got := rows(t, w, "luca_fis_2026-10.xlsx")
-	if fmt.Sprint(got[0]) != "[Fiş No Fiş Tarihi Hesap Kodu Borç Alacak]" {
+	if fmt.Sprint(got[0]) != "[Fiş No Fiş Tarihi Hesap Kodu Borç Alacak Evrak No Evrak Tarihi Açıklama]" {
 		t.Fatalf("header: %v", got[0])
 	}
 	if len(got) != 1+7 {
@@ -272,5 +273,75 @@ entry_types: { mahsup: "M", acilis: "A", kapanis: "K" }
 	}
 	if _, err := New(tb); err == nil {
 		t.Fatal("unknown column key accepted")
+	}
+}
+
+// #466: every line carries its source document: Evrak No / Evrak Tarihi and
+// the invoice ETTN in Açıklama; a line without a document keeps its plain
+// description.
+func TestSourceDocumentColumns(t *testing.T) {
+	docDate := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
+	inv := ae.SourceRef{Kind: "invoice_item", ID: "41", DocumentKey: "3f2a0c1e-0000-4000-8000-000000000001", ETTN: "3f2a0c1e-0000-4000-8000-000000000001"}
+	l1 := dr("153", "100")
+	l1.Description, l1.DocNo, l1.DocDate, l1.Source = "Mal alışı", "ABC2026000000123", &docDate, inv
+	l2 := cr("320.01", "100")
+	l2.DocNo, l2.DocDate, l2.Source = "ABC2026000000123", &docDate, inv
+	plain := entry("2", day, dr("770", "5"), cr("102", "5"))
+	res, w := run(t, open(t), ae.Batch{Period: "2026-10", Entries: []ae.Entry{entry("1", day, l1, l2), plain}})
+	got := rows(t, w, res.Files[0].Name)
+	head := got[0]
+	col := func(name string) int {
+		for i, h := range head {
+			if h == name {
+				return i
+			}
+		}
+		t.Fatalf("no column %q in %v", name, head)
+		return -1
+	}
+	no, date, desc := col("Evrak No"), col("Evrak Tarihi"), col("Açıklama")
+	if got[1][no] != "ABC2026000000123" || got[1][date] == "" {
+		t.Fatalf("document columns: %v", got[1])
+	}
+	if got[1][desc] != "Mal alışı ETTN:3f2a0c1e-0000-4000-8000-000000000001" {
+		t.Fatalf("line description: %q", got[1][desc])
+	}
+	// No line description: the voucher's description, then the ETTN.
+	if got[2][desc] != "fiş 1 ETTN:3f2a0c1e-0000-4000-8000-000000000001" {
+		t.Fatalf("voucher description: %q", got[2][desc])
+	}
+	// No document: no ETTN suffix, no Evrak No.
+	if got[3][desc] != "fiş 2" || (len(got[3]) > no && got[3][no] != "") {
+		t.Fatalf("plain line: %v", got[3])
+	}
+	if res.EntryFiles["id-1"] != res.Files[0].Name || res.EntryFiles["id-2"] != res.Files[0].Name {
+		t.Fatalf("entry files: %v", res.EntryFiles)
+	}
+}
+
+func TestSourceDescriptionPattern(t *testing.T) {
+	cases := []struct{ pattern, desc, ettn, want string }{
+		{"", "Kira", "e1", "Kira ETTN:e1"},
+		{"{description} ETTN:{ettn}", "", "e1", "ETTN:e1"},
+		{"{description} ETTN:{ettn}", "Kira", "", "Kira"},
+		{"{ettn} / {description}", "Kira", "e1", "e1 / Kira"},
+		{"{description} [{unknown}]", "Kira", "e1", "Kira [{unknown}]"},
+		{"{description} ETTN:{ettn}", "", "", ""},
+	}
+	for _, c := range cases {
+		if got := sourceDescription(c.pattern, c.desc, c.ettn); got != c.want {
+			t.Errorf("sourceDescription(%q, %q, %q) = %q, want %q", c.pattern, c.desc, c.ettn, got, c.want)
+		}
+	}
+}
+
+// The older template version stays loadable for exports made with it.
+func TestPreviousTemplateStillOpens(t *testing.T) {
+	drv, err := ae.Open(Name, ae.Config{Template: "unverified-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if drv.Info().TemplateVer != "unverified-1" || drv.Info().Verified {
+		t.Fatalf("info: %+v", drv.Info())
 	}
 }

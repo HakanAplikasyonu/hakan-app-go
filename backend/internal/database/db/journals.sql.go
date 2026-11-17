@@ -70,7 +70,7 @@ func (q *Queries) GetExportBatch(ctx context.Context, arg GetExportBatchParams) 
 }
 
 const getExportSettings = `-- name: GetExportSettings :one
-SELECT id, organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by, created_at, updated_at FROM export_settings
+SELECT id, organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by, created_at, updated_at, luca_pull_integrators FROM export_settings
 WHERE organization_id = $1 AND engagement_id = $2
 `
 
@@ -91,6 +91,7 @@ func (q *Queries) GetExportSettings(ctx context.Context, arg GetExportSettingsPa
 		&i.UpdatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LucaPullIntegrators,
 	)
 	return i, err
 }
@@ -633,13 +634,14 @@ func (q *Queries) ReverseExportBatchItem(ctx context.Context, arg ReverseExportB
 }
 
 const upsertExportSettings = `-- name: UpsertExportSettings :one
-INSERT INTO export_settings (organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO export_settings (organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, luca_pull_integrators, updated_by)
+VALUES ($1, $2, $3, $4, $5::text[], $6)
 ON CONFLICT (engagement_id) DO UPDATE SET
     invoices_reach_luca_directly = EXCLUDED.invoices_reach_luca_directly,
     block_on_unknown_account = EXCLUDED.block_on_unknown_account,
+    luca_pull_integrators = EXCLUDED.luca_pull_integrators,
     updated_by = EXCLUDED.updated_by
-RETURNING id, organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by, created_at, updated_at
+RETURNING id, organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, updated_by, created_at, updated_at, luca_pull_integrators
 `
 
 type UpsertExportSettingsParams struct {
@@ -647,15 +649,18 @@ type UpsertExportSettingsParams struct {
 	EngagementID              int64       `json:"engagement_id"`
 	InvoicesReachLucaDirectly bool        `json:"invoices_reach_luca_directly"`
 	BlockOnUnknownAccount     bool        `json:"block_on_unknown_account"`
+	LucaPullIntegrators       []string    `json:"luca_pull_integrators"`
 	UpdatedBy                 pgtype.Int8 `json:"updated_by"`
 }
 
+// luca_pull_integrators NULL: ofis ayarı geçerli (#466).
 func (q *Queries) UpsertExportSettings(ctx context.Context, arg UpsertExportSettingsParams) (ExportSetting, error) {
 	row := q.db.QueryRow(ctx, upsertExportSettings,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.InvoicesReachLucaDirectly,
 		arg.BlockOnUnknownAccount,
+		arg.LucaPullIntegrators,
 		arg.UpdatedBy,
 	)
 	var i ExportSetting
@@ -668,6 +673,7 @@ func (q *Queries) UpsertExportSettings(ctx context.Context, arg UpsertExportSett
 		&i.UpdatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LucaPullIntegrators,
 	)
 	return i, err
 }
