@@ -87,10 +87,13 @@ type AccountResult struct {
 
 // Report is what an import (or a preview) did.
 type Report struct {
-	ImportID uuid.UUID       `json:"import_id"`
-	Format   string          `json:"format"`
-	Encoding string          `json:"encoding,omitempty"`
-	Preview  bool            `json:"preview"`
+	ImportID uuid.UUID `json:"import_id"`
+	Format   string    `json:"format"`
+	Encoding string    `json:"encoding,omitempty"`
+	Preview  bool      `json:"preview"`
+	// BankID and Template: which bank layout read the file (#383); empty for MT940.
+	BankID   string          `json:"bank_id,omitempty"`
+	Template *TemplateMatch  `json:"template,omitempty"`
 	Accounts []AccountResult `json:"accounts"`
 }
 
@@ -98,6 +101,7 @@ type Report struct {
 type Importer struct {
 	pool *pgxpool.Pool
 	bank *banking.Service
+	ai   ColumnSuggester
 }
 
 // NewImporter builds the importer.
@@ -115,11 +119,18 @@ type resolved struct {
 // Import parses the file, finds each block's account, checks the running
 // balance and writes the movements (or only reports them when Preview).
 func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
-	sts, format, err := Parse(req.FileName, req.Data)
+	tpls, err := im.officeTemplates(ctx, req.OrganizationID)
+	if err != nil {
+		return Report{}, err
+	}
+	sts, format, err := ParseWith(req.FileName, req.Data, tpls)
 	if err != nil {
 		return Report{}, parseError{err}
 	}
 	rep := Report{ImportID: uuid.New(), Format: format, Preview: req.Preview}
+	if len(sts) > 0 {
+		rep.BankID, rep.Template = sts[0].BankID, sts[0].Template
+	}
 	if format == "mt940" || format == "csv" {
 		_, rep.Encoding = Decode(head(req.Data, 4096))
 	}
@@ -164,6 +175,12 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return rep, err
+	}
+	if rep.Template != nil && rep.Template.ID > 0 {
+		_ = database.BestEffort(ctx, "bank_statement_template_hit", func(ctx context.Context) error {
+			return database.QueriesFor(im.pool).TouchBankStatementTemplate(ctx, db.TouchBankStatementTemplateParams{
+				OrganizationID: req.OrganizationID, ID: rep.Template.ID})
+		})
 	}
 	for _, res := range inserted {
 		if err := im.bank.ClassifyInserted(ctx, req.TaxpayerID, res); err != nil {
@@ -212,6 +229,9 @@ func (im *Importer) importBlock(ctx context.Context, tx pgx.Tx, req Request, imp
 	}
 	if ar.BankID == "" {
 		ar.BankID = BankFromIBAN(ar.Account)
+	}
+	if ar.BankID == "" {
+		ar.BankID = st.BankID
 	}
 
 	txns := make([]banking.Transaction, 0, len(st.Lines))

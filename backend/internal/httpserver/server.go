@@ -451,8 +451,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	// Banka ekstresi yükleme (issue #19): MT940 / Excel / CSV / metin PDF.
 	bankSvc := bankingmodule.NewService(deps.DB, nil)
+	bankImporter := bankstatement.NewImporter(deps.DB, bankSvc)
 	bankstatement.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankstatement.NewHandler(bankstatement.NewImporter(deps.DB, bankSvc), bankSvc, deps.Queries))
+		bankstatement.NewHandler(bankImporter, bankSvc, deps.Queries))
 	// Paraşüt adaptörü (issue #47): OAuth ile mükellef yetkisi, salt okuma.
 	var sourceVault secrets.Vault
 	if kr, err := secrets.ParseKeyring(cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key); err != nil {
@@ -595,6 +596,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	searchSvc := searchusecase.New(searchClient, searchReg, log)
 	// Appliers are registered by the modules that own suggestion targets.
 	aiSvc := aimodule.NewService(cfg.AI, airepository.NewPostgres(deps.Queries).WithLedgerPool(deps.DB), log)
+	// Banka ekstresi şablon analizi (#383): bilinmeyen biçimde AI kolon eşleme.
+	bankImporter.WithColumnSuggester(bankstatement.NewAIColumnMapper(aiSvc))
 	// Appliers are registered by the modules that own suggestion targets.
 	reviewSvc := reviewusecase.New(reviewrepository.New(deps.DB, deps.Queries)).
 		Register(receiptsreviewlink.Kind, receiptsreviewlink.Applier{}).

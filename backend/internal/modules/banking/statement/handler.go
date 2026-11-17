@@ -56,6 +56,12 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("PATCH "+boxes+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.renameCashBox), authn, org, write, eng))
 	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
 	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
+	// Office statement templates (#383): no engagement, the office's layouts.
+	tpl := "/v1/tenant/bank-statement-templates"
+	mux.Handle("GET "+tpl, middleware.Chain(http.HandlerFunc(h.listTemplates), authn, org, read))
+	mux.Handle("POST "+tpl, middleware.Chain(http.HandlerFunc(h.saveTemplate), authn, org, write))
+	mux.Handle("POST "+tpl+"/analyze", middleware.Chain(http.HandlerFunc(h.analyze), authn, org, write))
+	mux.Handle("DELETE "+tpl+"/{templateUuid}", middleware.Chain(http.HandlerFunc(h.deleteTemplate), authn, org, write))
 }
 
 // upload: multipart "file", optional "cash_box_uuid" (when the file names no
@@ -146,6 +152,9 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):
 		response.Error(w, r, http.StatusUnprocessableEntity, "SCANNED_PDF", "the PDF has no text layer; scanned statements are not supported yet")
+	case errors.Is(err, ErrLayoutUnknown):
+		response.Error(w, r, http.StatusUnprocessableEntity, "STATEMENT_LAYOUT_UNKNOWN",
+			"the columns of this file are not known; analyse it with POST /v1/tenant/bank-statement-templates/analyze and save a template")
 	case errors.Is(err, ErrPDFBalance):
 		response.Error(w, r, http.StatusUnprocessableEntity, "STATEMENT_BALANCE_MISMATCH", err.Error())
 	case errors.Is(err, banking.ErrInvalidTransaction):

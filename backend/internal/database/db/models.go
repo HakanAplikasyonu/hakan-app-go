@@ -251,6 +251,22 @@ type BankRule struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type BankStatementTemplate struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	BankID         pgtype.Text        `json:"bank_id"`
+	Name           string             `json:"name"`
+	Format         string             `json:"format"`
+	Fingerprint    string             `json:"fingerprint"`
+	Columns        []byte             `json:"columns"`
+	Hits           int32              `json:"hits"`
+	LastUsedAt     pgtype.Timestamptz `json:"last_used_at"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type BankTransaction struct {
 	ID                         int64              `json:"id"`
 	Uuid                       uuid.UUID          `json:"uuid"`
