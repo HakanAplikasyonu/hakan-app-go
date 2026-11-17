@@ -93,6 +93,8 @@ tags:
     description: KVKK texts (versioned) and acceptance records
   - name: Agents
     description: Desktop local agents (registration, heartbeat, AGENT_OFFLINE)
+  - name: Reports
+    description: Mükellef raporu (#386) — ciro, gider kategorileri, KDV, trend; PDF ve e-posta
   - name: Summaries
     description: AI period summary drafts (numbers backed by portal data)
   - name: Realtime
@@ -7233,6 +7235,40 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/report:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reports]
+      operationId: getEngagementReport
+      summary: Taxpayer report (month or year)
+      description: |
+        Requires `tenant.engagements.read` (#386). Revenue, expenses by
+        category, VAT and the income-expense trend of one month (`period`,
+        trend: the 12 months up to it) or one calendar year (`year`, trend:
+        its months), compared with the previous month / year. Every amount
+        comes from portal data (active invoices net of returns, approved
+        expenses, approved Z reports not linked to an invoice), in TRY
+        excluding VAT. A monthly report carries the period's AI comment
+        (approved summary first, otherwise the latest draft). Give exactly
+        one of `period` and `year`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportPeriod"
+        - $ref: "#/components/parameters/ReportYear"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/agents:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -10228,6 +10264,38 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/taxpayer/report:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [Reports, TaxpayerPortal]
+      operationId: getTaxpayerReport
+      summary: My report (month or year)
+      description: |
+        The same numbers the office sees (#386), for the mükellef's own data;
+        no AI comment (it reaches the mükellef with the office's report
+        email). Any mükellef member may read.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReportPeriod"
+        - $ref: "#/components/parameters/ReportYear"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxpayerReport" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/taxpayer/document-tasks:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -11028,6 +11096,18 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    ReportPeriod:
+      name: period
+      in: query
+      required: false
+      description: Monthly report (YYYY-MM). Exactly one of period and year.
+      schema: { type: string, example: "2026-10" }
+    ReportYear:
+      name: year
+      in: query
+      required: false
+      description: Yearly report (YYYY). Exactly one of period and year.
+      schema: { type: string, example: "2026" }
     XTaxpayer:
       name: X-Taxpayer
       in: header
@@ -12516,6 +12596,98 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/PeriodSummary" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    ReportTotals:
+      type: object
+      description: Sums of one range. Amounts are decimal strings (TRY, 2 places, VAT excluded).
+      required: [revenue, expenses, net, vat_calculated, vat_deductible, vat_payable, sales_invoices, purchase_invoices, expense_records, retail_reports]
+      properties:
+        revenue: { type: string, example: "95250.75", description: Sales net of returns + Z reports }
+        expenses: { type: string, example: "31250.40", description: Purchases net of returns + approved expenses }
+        net: { type: string }
+        vat_calculated: { type: string }
+        vat_deductible: { type: string }
+        vat_payable: { type: string, description: "calculated − deductible; negative: carried forward (earlier carry-over not included)" }
+        sales_invoices: { type: integer, format: int64 }
+        purchase_invoices: { type: integer, format: int64 }
+        expense_records: { type: integer, format: int64 }
+        retail_reports: { type: integer, format: int64 }
+
+    ReportMonth:
+      type: object
+      required: [period, label, revenue, expenses, net, vat_calculated, vat_deductible, vat_payable]
+      properties:
+        period: { type: string, example: "2026-10" }
+        label: { type: string, example: "Eki 26" }
+        revenue: { type: string }
+        expenses: { type: string }
+        net: { type: string }
+        vat_calculated: { type: string }
+        vat_deductible: { type: string }
+        vat_payable: { type: string }
+
+    ReportCategory:
+      type: object
+      required: [key, label, amount, records, share]
+      properties:
+        key: { type: string, example: purchase_invoices, description: "purchase_invoices or the expense category (today the document type)" }
+        label: { type: string, example: Alış faturaları }
+        amount: { type: string }
+        records: { type: integer, format: int64 }
+        share: { type: string, example: "62.5", description: Percent of all expenses }
+
+    TaxpayerReport:
+      type: object
+      required: [kind, period, label, currency, taxpayer, totals, previous, change, months, categories, commentary, notes, generated_at]
+      properties:
+        kind: { type: string, enum: [month, year] }
+        period: { type: string, example: "2026-10", description: "YYYY-MM or YYYY" }
+        label: { type: string, example: Ekim 2026 }
+        currency: { type: string, enum: [TRY] }
+        taxpayer:
+          type: object
+          required: [title, tax_id]
+          properties:
+            title: { type: string }
+            tax_id: { type: string }
+        totals: { $ref: "#/components/schemas/ReportTotals" }
+        previous: { $ref: "#/components/schemas/ReportTotals" }
+        change:
+          type: object
+          description: Percent change against the previous month / year (1 place); null when the previous value is zero.
+          required: [revenue, expenses, net]
+          properties:
+            revenue: { type: [string, "null"] }
+            expenses: { type: [string, "null"] }
+            net: { type: [string, "null"] }
+        months:
+          type: array
+          items: { $ref: "#/components/schemas/ReportMonth" }
+        categories:
+          type: array
+          items: { $ref: "#/components/schemas/ReportCategory" }
+        commentary:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [summary_uuid, period, status, body]
+              properties:
+                summary_uuid: { type: string, format: uuid }
+                period: { type: string }
+                status: { type: string, enum: [approved, draft] }
+                body: { type: string }
+        notes:
+          type: array
+          items: { type: string }
+        generated_at: { type: string, format: date-time }
+
+    EnvelopeTaxpayerReport:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxpayerReport" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     DesktopAgent:

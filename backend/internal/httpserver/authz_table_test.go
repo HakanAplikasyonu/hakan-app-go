@@ -39,6 +39,10 @@ const (
 // authzTable classifies every operation (generated from the observed
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
+	// Mükellef raporu (#386).
+	"GET /v1/tenant/engagements/{engagementUuid}/report": azTenantRead,
+	"GET /v1/taxpayer/report":                            azTaxpayerRead,
+
 	// Rule preview and rule candidate setting (#333); the setting is written by owner / admin.
 	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules/preview": azTenantReadAction,
