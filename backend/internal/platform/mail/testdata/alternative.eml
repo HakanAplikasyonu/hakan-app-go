@@ -1,0 +1,27 @@
+From: "Bildirim Merkezi" <noreply@posta.example.com>
+To: ayse@example.com
+Reply-To: <destek@example.com>
+Subject: Belge bekleniyor
+Date: Tue, 17 Nov 2026 09:30:00 +0300
+Message-ID: <0123456789abcdef@posta.example.com>
+MIME-Version: 1.0
+List-Unsubscribe: <https://app.example.com/api/v1/notifications/unsubscribe?u=1&sig=ab>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+Content-Type: multipart/alternative; boundary="sinir-0-0123456789"
+
+--sinir-0-0123456789
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset=UTF-8
+
+Merhaba Ay=C5=9Fe,
+
+Giri=C5=9F kodunuz: 482913
+Kod 10 dakika ge=C3=A7erlidir.
+
+--sinir-0-0123456789
+Content-Transfer-Encoding: quoted-printable
+Content-Type: text/html; charset=UTF-8
+
+<!DOCTYPE html><html lang=3D"tr"><body><p>Merhaba Ay=C5=9Fe,</p><p>Giri=C5=
+=9F kodunuz: <strong>482913</strong></p></body></html>
+--sinir-0-0123456789--

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	netmail "net/mail"
 	"net/url"
 	"os"
 	"strconv"
@@ -388,6 +389,9 @@ type SMTPConfig struct {
 	Password string
 	From     string
 	FromName string
+	// ReplyTo is the default Reply-To address (MAIL_REPLY_TO). Empty: no
+	// Reply-To header, replies go to From.
+	ReplyTo string
 	// Timeout bounds the whole send (dial + TLS + handshake + delivery). A
 	// hung SMTP server must never block a worker or request indefinitely.
 	Timeout time.Duration
@@ -520,6 +524,7 @@ func Load() (Config, error) {
 			Password:              getEnv("SMTP_PASSWORD", ""),
 			From:                  firstNonEmpty(getEnv("MAIL_FROM", ""), getEnv("SMTP_FROM", "noreply@localhost")),
 			FromName:              getEnv("MAIL_FROM_NAME", "App"),
+			ReplyTo:               getEnv("MAIL_REPLY_TO", ""),
 			Timeout:               getDuration("SMTP_TIMEOUT", 10*time.Second),
 			TLSMode:               strings.ToLower(getEnv("SMTP_TLS", "auto")),
 			TLSInsecureSkipVerify: getBool("SMTP_TLS_INSECURE_SKIP_VERIFY", false),
@@ -699,6 +704,11 @@ func (c Config) validate() error {
 	}
 	if c.Tenancy.Enabled && c.Tenancy.InviteTTL <= 0 {
 		return fmt.Errorf("config: TENANCY_INVITE_TTL must be positive")
+	}
+	if c.SMTP.ReplyTo != "" {
+		if _, err := netmail.ParseAddress(c.SMTP.ReplyTo); err != nil {
+			return fmt.Errorf("config: MAIL_REPLY_TO must be an email address")
+		}
 	}
 	switch c.SMTP.TLSMode {
 	case "", "auto", "starttls", "implicit", "none":
