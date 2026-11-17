@@ -37,6 +37,22 @@ export function useJournalExports(slug: string, engagement: string) {
   });
 }
 
+/** Transfers to the accounting program (#391); refreshed every 30 s while
+ * one waits for the desktop agent. */
+export function useJournalTransfers(slug: string, engagement: string) {
+  return useQuery({
+    queryKey: journalKeys.transfers(slug, engagement),
+    queryFn: () => journalService.transfers(slug, engagement),
+    enabled: !!engagement,
+    refetchInterval: (q) =>
+      q.state.data?.items.some(
+        (t) => t.status === "queued" || t.status === "claimed",
+      )
+        ? 30_000
+        : false,
+  });
+}
+
 /** Mutations of one engagement; every success refreshes its journal data. */
 export function useJournalActions(slug: string, engagement: string) {
   const qc = useQueryClient();
@@ -61,6 +77,36 @@ export function useJournalActions(slug: string, engagement: string) {
     export: useMutation({
       mutationFn: (input: JournalExportInput) =>
         journalService.export(slug, engagement, input),
+      onSuccess: refresh,
+    }),
+    requestTransfer: useMutation({
+      mutationFn: (batch: string) =>
+        journalService.requestTransfer(slug, engagement, batch),
+      onSuccess: refresh,
+    }),
+    completeTransfer: useMutation({
+      mutationFn: (v: {
+        transfer: string;
+        outcome: "imported" | "failed";
+        message?: string;
+      }) =>
+        journalService.completeTransfer(
+          slug,
+          engagement,
+          v.transfer,
+          v.outcome,
+          v.message,
+        ),
+      onSuccess: refresh,
+    }),
+    cancelTransfer: useMutation({
+      mutationFn: (transfer: string) =>
+        journalService.cancelTransfer(slug, engagement, transfer),
+      onSuccess: refresh,
+    }),
+    retryTransfer: useMutation({
+      mutationFn: (transfer: string) =>
+        journalService.retryTransfer(slug, engagement, transfer),
       onSuccess: refresh,
     }),
   };

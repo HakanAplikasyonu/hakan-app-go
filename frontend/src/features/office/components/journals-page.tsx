@@ -6,6 +6,7 @@ import {
   Download,
   FileSpreadsheet,
   Loader2,
+  MonitorUp,
   Plus,
   Trash2,
   Undo2,
@@ -21,6 +22,7 @@ import {
   createDateColumn,
   createMoneyColumn,
   DataTable,
+  StatusPill,
   type DataTableFeatures,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -37,13 +39,21 @@ import {
   useJournalActions,
   useJournalDrafts,
   useJournalExports,
+  useJournalTransfers,
 } from "../hooks/use-journals";
 import { sub, sum, toMinor } from "../lib/decimal";
 import {
   journalService,
+  TRANSFER_DRIVERS,
   type JournalDraft,
+  type JournalExportSummary,
+  type JournalTransfer,
 } from "../services/journals.service";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
+import {
+  JournalTransfersPanel,
+  TRANSFER_STATUS,
+} from "./journal-transfers-panel";
 import { FilterSelect, Figure, Money, Panel } from "./office-ui";
 import { ALL_PERIODS, isPeriod, useOfficePeriod } from "../period";
 
@@ -421,6 +431,56 @@ function ExportPanel({
   );
 }
 
+/**
+ * "Masaüstü ajanına gönder" for a Luca / Zirve export (#391); the latest
+ * open or imported transfer of the export is shown instead.
+ */
+function SendToAgent({
+  engagement,
+  batch,
+  latest,
+}: {
+  engagement: string;
+  batch: JournalExportSummary;
+  latest?: JournalTransfer;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { requestTransfer } = useJournalActions(slug, engagement);
+  if (!TRANSFER_DRIVERS.has(batch.driver) || batch.entries <= batch.reversed)
+    return null;
+  if (latest && latest.status !== "failed" && latest.status !== "cancelled") {
+    const v = TRANSFER_STATUS[latest.status];
+    return (
+      <StatusPill tone={v?.tone}>
+        {v ? t(v.labelKey) : latest.status}
+      </StatusPill>
+    );
+  }
+  return (
+    <span className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={requestTransfer.isPending}
+        onClick={() => requestTransfer.mutate(batch.uuid)}
+      >
+        {requestTransfer.isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <MonitorUp className="size-4" />
+        )}
+        {t("office.journals.transfer_send")}
+      </Button>
+      {requestTransfer.isError ? (
+        <span className="text-status-blocking text-xs">
+          {errorText(t, requestTransfer.error, t("office.api.load_error"))}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function JournalsInner() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
@@ -435,6 +495,12 @@ function JournalsInner() {
     setGlobalPeriod(isPeriod(value) ? value : ALL_PERIODS);
   const drafts = useJournalDrafts(slug, engagement, period);
   const exports = useJournalExports(slug, engagement);
+  const transfers = useJournalTransfers(slug, engagement);
+  // Newest transfer per export (the list is newest first).
+  const latestTransfer = new Map<string, JournalTransfer>();
+  for (const tr of transfers.data?.items ?? [])
+    if (!latestTransfer.has(tr.batch_uuid))
+      latestTransfer.set(tr.batch_uuid, tr);
   const { approve, reverse } = useJournalActions(slug, engagement);
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
@@ -623,7 +689,12 @@ function JournalsInner() {
                     · <Figure>{fmt(b.created_at)}</Figure>
                   </span>
                 </span>
-                <span className="flex flex-wrap gap-1">
+                <span className="flex flex-wrap items-center gap-1">
+                  <SendToAgent
+                    engagement={engagement}
+                    batch={b}
+                    latest={latestTransfer.get(b.uuid)}
+                  />
                   {b.files.map((f) => (
                     <Button
                       key={f.name}
@@ -648,6 +719,8 @@ function JournalsInner() {
           </ul>
         </Panel>
       ) : null}
+
+      <JournalTransfersPanel engagement={engagement} />
     </div>
   );
 }
