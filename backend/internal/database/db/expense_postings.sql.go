@@ -188,6 +188,99 @@ func (q *Queries) GetReceiptPosting(ctx context.Context, arg GetReceiptPostingPa
 	return i, err
 }
 
+const insertImportedExpense = `-- name: InsertImportedExpense :one
+INSERT INTO expenses (
+    taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
+    tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number,
+    vehicle_plate, payment_method, content_hash
+) VALUES (
+    $1, 'excel_import', $2, 'excel_import', $3, $4, $5, 'TRY', $6,
+    $7, $8, $9, $10, $11,
+    $12, $13, $14, $15, $16
+)
+ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate, tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number, z_report_number, okc_serial_number, vehicle_plate, payment_method, is_deductible, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at
+`
+
+type InsertImportedExpenseParams struct {
+	TaxpayerID         int64          `json:"taxpayer_id"`
+	SourceID           string         `json:"source_id"`
+	ExpenseDate        pgtype.Date    `json:"expense_date"`
+	Period             pgtype.Text    `json:"period"`
+	Amount             pgtype.Numeric `json:"amount"`
+	TaxRate            pgtype.Numeric `json:"tax_rate"`
+	TaxExclusiveAmount pgtype.Numeric `json:"tax_exclusive_amount"`
+	TaxAmount          pgtype.Numeric `json:"tax_amount"`
+	Description        string         `json:"description"`
+	ReceiptType        string         `json:"receipt_type"`
+	VendorTaxNumber    pgtype.Text    `json:"vendor_tax_number"`
+	VendorName         pgtype.Text    `json:"vendor_name"`
+	ReceiptNumber      pgtype.Text    `json:"receipt_number"`
+	VehiclePlate       pgtype.Text    `json:"vehicle_plate"`
+	PaymentMethod      pgtype.Text    `json:"payment_method"`
+	ContentHash        pgtype.Text    `json:"content_hash"`
+}
+
+// Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
+// ikinci kez gelirse eklenmez.
+func (q *Queries) InsertImportedExpense(ctx context.Context, arg InsertImportedExpenseParams) (Expense, error) {
+	row := q.db.QueryRow(ctx, insertImportedExpense,
+		arg.TaxpayerID,
+		arg.SourceID,
+		arg.ExpenseDate,
+		arg.Period,
+		arg.Amount,
+		arg.TaxRate,
+		arg.TaxExclusiveAmount,
+		arg.TaxAmount,
+		arg.Description,
+		arg.ReceiptType,
+		arg.VendorTaxNumber,
+		arg.VendorName,
+		arg.ReceiptNumber,
+		arg.VehiclePlate,
+		arg.PaymentMethod,
+		arg.ContentHash,
+	)
+	var i Expense
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.SourceSystem,
+		&i.SourceID,
+		&i.CaptureMethod,
+		&i.ExpenseDate,
+		&i.Period,
+		&i.Amount,
+		&i.Currency,
+		&i.TaxRate,
+		&i.TaxExclusiveAmount,
+		&i.TaxAmount,
+		&i.Description,
+		&i.ReceiptType,
+		&i.VendorTaxNumber,
+		&i.VendorName,
+		&i.ReceiptNumber,
+		&i.ZReportNumber,
+		&i.OkcSerialNumber,
+		&i.VehiclePlate,
+		&i.PaymentMethod,
+		&i.IsDeductible,
+		&i.ApprovalStatus,
+		&i.OcrConfidence,
+		&i.OcrFields,
+		&i.AttachmentID,
+		&i.RawPayload,
+		&i.ContentHash,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listEngagementExpenses = `-- name: ListEngagementExpenses :many
 SELECT e.id, e.uuid, e.source_system, e.capture_method, e.expense_date, e.period, e.amount, e.currency, e.tax_rate,
        e.tax_exclusive_amount, e.tax_amount, e.description, e.receipt_type, e.vendor_tax_number, e.vendor_name,

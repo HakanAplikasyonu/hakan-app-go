@@ -5642,6 +5642,135 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Expense list as Excel
+         * @description Requires `tenant.receipts.read` and engagement access. The filtered
+         *     expense list (Tarih, Satıcı, VKN / TCKN, Fiş No, Açıklama, Kategori, Hesap Kodu, KDV Oranı, KDV, Toplam, Ödeme, Plaka, Durum, Yevmiye No) as .xlsx (at most 10 000 rows). The file is also the import
+         *     template: edited and uploaded again, only its new rows are added.
+         */
+        get: operations["exportEngagementExpenses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/expenses/import": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import expenses from Excel / CSV
+         * @description Requires `tenant.receipts.write` and engagement access. .xlsx or .csv
+         *     (max 10 MB, 5 000 rows) with the export's columns; Tarih and Toplam
+         *     are required, the header row is found anywhere in the first sheet
+         *     that has one (common aliases accepted: Fiş Tarihi, Firma, Tutar,
+         *     Ödeme Şekli). Rows become pending expenses (capture_method
+         *     excel_import); a Kategori (code or name) or Hesap Kodu cell becomes
+         *     the office's choice; only KDV Oranı computes the VAT from the
+         *     total. A row with the same date, vendor, VKN, receipt number and
+         *     total is skipped. Bad rows are listed with their line, the others
+         *     are imported.
+         */
+        post: operations["importEngagementExpenses"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Z reports as Excel
+         * @description Requires `tenant.receipts.read` and engagement access. The filtered
+         *     Z list (Tarih, ÖKC Seri No, Z No, Fiş Sayısı, Nakit, Kart, Diğer Ödeme, %0 / %1 / %10 / %20 Matrah and KDV, Toplam KDV, Toplam, Durum, Uyarılar, Yevmiye No) as .xlsx (at most 10 000 rows). The file is also the import
+         *     template: edited and uploaded again, only its new rows are added.
+         */
+        get: operations["exportEngagementRetailSales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/retail-sales/import": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Z reports from Excel / CSV
+         * @description Requires `tenant.receipts.write` and engagement access. .xlsx or .csv
+         *     with the export's columns; Tarih and Toplam are required. Rows become
+         *     pending Z reports with the payment and VAT rate breakdown; the
+         *     continuity check of every ÖKC touched runs afterwards. A row with the
+         *     same date, ÖKC, Z number and total is skipped.
+         */
+        post: operations["importEngagementRetailSales"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/controls/run": {
         parameters: {
             query?: never;
@@ -12083,6 +12212,22 @@ export interface components {
                 limit: number;
                 /** Format: int32 */
                 offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeReceiptImportResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                rows: number;
+                inserted: number;
+                /** @description already imported (same row identity) */
+                skipped: number;
+                errors: {
+                    /** @description 1-based sheet row */
+                    line: number;
+                    message: string;
+                }[];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -25792,6 +25937,161 @@ export interface operations {
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementExpenses: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "pending" | "approved" | "rejected";
+                category?: string;
+                q?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    importEngagementExpenses: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReceiptImportResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementRetailSales: {
+        parameters: {
+            query?: {
+                period?: string;
+                status?: "pending" | "approved" | "rejected";
+                okc?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    importEngagementRetailSales: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReceiptImportResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

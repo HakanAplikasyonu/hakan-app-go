@@ -124,3 +124,18 @@ SELECT code, name, is_leaf FROM account_plan_accounts
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND target = @target
   AND main_code = ANY(@mains::text[])
 ORDER BY code;
+
+-- name: InsertImportedExpense :one
+-- Excel içe aktarma (#384): satır içeriği kaynak anahtarıdır; aynı satır
+-- ikinci kez gelirse eklenmez.
+INSERT INTO expenses (
+    taxpayer_id, source_system, source_id, capture_method, expense_date, period, amount, currency, tax_rate,
+    tax_exclusive_amount, tax_amount, description, receipt_type, vendor_tax_number, vendor_name, receipt_number,
+    vehicle_plate, payment_method, content_hash
+) VALUES (
+    @taxpayer_id, 'excel_import', @source_id, 'excel_import', @expense_date, @period, @amount, 'TRY', sqlc.narg(tax_rate),
+    sqlc.narg(tax_exclusive_amount), sqlc.narg(tax_amount), @description, @receipt_type, sqlc.narg(vendor_tax_number),
+    sqlc.narg(vendor_name), sqlc.narg(receipt_number), sqlc.narg(vehicle_plate), sqlc.narg(payment_method), @content_hash
+)
+ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
+RETURNING *;

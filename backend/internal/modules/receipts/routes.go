@@ -48,6 +48,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/receipts/{receiptUuid}/reject", approve, h.Reject, eng...)
 	// Masraflar, kategoriler ve muhasebeleştirme (#384).
 	r.Tenant("GET "+base+"/expenses", read, h.Expenses, eng...)
+	r.Tenant("GET "+base+"/expenses/export", read, h.ExportExpenses, eng...)
+	r.Tenant("POST "+base+"/expenses/import", write, h.ImportExpenses, eng...)
 	r.Tenant("GET "+base+"/expenses/{expenseUuid}", read, h.Expense, eng...)
 	r.Tenant("PATCH "+base+"/expenses/{expenseUuid}", write, h.SetExpensePosting, eng...)
 	r.Tenant("POST "+base+"/expenses/{expenseUuid}/approve", approve, h.ApproveExpense, eng...)
@@ -58,6 +60,8 @@ func (m Module) Routes(r *module.Router) {
 	// Z raporları: ÖKC bazında liste, kırılım, süreklilik, onay (#384).
 	r.Tenant("GET "+base+"/retail-sales", read, h.RetailSales, eng...)
 	r.Tenant("POST "+base+"/retail-sales/continuity", write, h.RunZContinuity, eng...)
+	r.Tenant("GET "+base+"/retail-sales/export", read, h.ExportRetailSales, eng...)
+	r.Tenant("POST "+base+"/retail-sales/import", write, h.ImportRetailSales, eng...)
 	r.Tenant("GET "+base+"/retail-sales/{retailSaleUuid}", read, h.RetailSale, eng...)
 	r.Tenant("PATCH "+base+"/retail-sales/{retailSaleUuid}", write, h.UpdateRetailSale, eng...)
 	r.Tenant("POST "+base+"/retail-sales/{retailSaleUuid}/approve", approve, h.ApproveRetailSale, eng...)

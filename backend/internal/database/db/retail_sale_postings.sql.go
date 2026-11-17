@@ -72,6 +72,90 @@ func (q *Queries) GetRetailSaleByUUID(ctx context.Context, arg GetRetailSaleByUU
 	return i, err
 }
 
+const insertImportedRetailSale = `-- name: InsertImportedRetailSale :one
+INSERT INTO retail_sales (
+    taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number,
+    subtotal_amount, tax_amount, total_amount, currency, cash_amount, card_amount, other_payment_amount, receipt_count,
+    content_hash
+) VALUES (
+    $1, 'excel_import', $2, 'excel_import', $3, $4, $5,
+    $6, $7, $8, $9, 'TRY',
+    $10, $11, $12, $13,
+    $14
+)
+ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
+RETURNING id, uuid, taxpayer_id, source_system, source_id, capture_method, sale_date, period, z_report_number, okc_serial_number, subtotal_amount, tax_amount, total_amount, currency, invoice_id, approval_status, ocr_confidence, ocr_fields, attachment_id, raw_payload, content_hash, approved_by, approved_at, created_at, updated_at, cash_amount, card_amount, other_payment_amount, receipt_count
+`
+
+type InsertImportedRetailSaleParams struct {
+	TaxpayerID         int64          `json:"taxpayer_id"`
+	SourceID           string         `json:"source_id"`
+	SaleDate           pgtype.Date    `json:"sale_date"`
+	Period             pgtype.Text    `json:"period"`
+	ZReportNumber      pgtype.Text    `json:"z_report_number"`
+	OkcSerialNumber    pgtype.Text    `json:"okc_serial_number"`
+	SubtotalAmount     pgtype.Numeric `json:"subtotal_amount"`
+	TaxAmount          pgtype.Numeric `json:"tax_amount"`
+	TotalAmount        pgtype.Numeric `json:"total_amount"`
+	CashAmount         pgtype.Numeric `json:"cash_amount"`
+	CardAmount         pgtype.Numeric `json:"card_amount"`
+	OtherPaymentAmount pgtype.Numeric `json:"other_payment_amount"`
+	ReceiptCount       pgtype.Int4    `json:"receipt_count"`
+	ContentHash        pgtype.Text    `json:"content_hash"`
+}
+
+func (q *Queries) InsertImportedRetailSale(ctx context.Context, arg InsertImportedRetailSaleParams) (RetailSale, error) {
+	row := q.db.QueryRow(ctx, insertImportedRetailSale,
+		arg.TaxpayerID,
+		arg.SourceID,
+		arg.SaleDate,
+		arg.Period,
+		arg.ZReportNumber,
+		arg.OkcSerialNumber,
+		arg.SubtotalAmount,
+		arg.TaxAmount,
+		arg.TotalAmount,
+		arg.CashAmount,
+		arg.CardAmount,
+		arg.OtherPaymentAmount,
+		arg.ReceiptCount,
+		arg.ContentHash,
+	)
+	var i RetailSale
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.SourceSystem,
+		&i.SourceID,
+		&i.CaptureMethod,
+		&i.SaleDate,
+		&i.Period,
+		&i.ZReportNumber,
+		&i.OkcSerialNumber,
+		&i.SubtotalAmount,
+		&i.TaxAmount,
+		&i.TotalAmount,
+		&i.Currency,
+		&i.InvoiceID,
+		&i.ApprovalStatus,
+		&i.OcrConfidence,
+		&i.OcrFields,
+		&i.AttachmentID,
+		&i.RawPayload,
+		&i.ContentHash,
+		&i.ApprovedBy,
+		&i.ApprovedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CashAmount,
+		&i.CardAmount,
+		&i.OtherPaymentAmount,
+		&i.ReceiptCount,
+	)
+	return i, err
+}
+
 const insertRetailSaleVatLines = `-- name: InsertRetailSaleVatLines :execrows
 INSERT INTO retail_sale_vat_lines (taxpayer_id, retail_sale_id, tax_rate, tax_base, tax_amount)
 SELECT $1, $2, r.tax_rate, r.tax_base, r.tax_amount
