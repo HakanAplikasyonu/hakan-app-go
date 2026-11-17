@@ -25,6 +25,7 @@ import type {
   UBLUploadItem,
   UBLUploadJob,
 } from "../services/office-invoices.service";
+import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { Figure, Panel, SeverityBadge } from "./office-ui";
 
@@ -61,7 +62,7 @@ function JobStatus({ status }: { status: UBLUploadJob["status"] }) {
 /** Yükleme raporunun dosya satırları (#381). */
 function useReportColumns(engagement: string) {
   const { t } = useLocale();
-  const { slug } = useTenant();
+  const invoiceHref = useInvoiceHref({ carry: false });
   return useMemo<ColumnDef<UBLUploadItem, unknown>[]>(
     () => [
       createColumn<UBLUploadItem>({
@@ -113,7 +114,7 @@ function useReportColumns(engagement: string) {
               {f.invoice_uuid && f.invoice_uuid !== NIL_UUID ? (
                 <Link
                   className="hover:underline"
-                  href={routes.tenant.invoice(slug, f.invoice_uuid, engagement)}
+                  href={invoiceHref(f.invoice_uuid, engagement)}
                 >
                   <Figure>{f.invoice_number ?? f.invoice_uuid}</Figure>
                 </Link>
@@ -152,7 +153,7 @@ function useReportColumns(engagement: string) {
         },
       }),
     ],
-    [engagement, slug, t],
+    [engagement, invoiceHref, t],
   );
 }
 
@@ -216,9 +217,11 @@ function JobReport({
 function UploadInner() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  // Mükellef detayının Yüklemeler sekmesinde mükellef sabit (#468).
+  const scope = useEngagementScope();
   const { options, selected, select, isLoading, isError } =
-    useSelectedEngagement(slug);
-  const engagement = selected?.engagement ?? "";
+    useSelectedEngagement(slug, scope);
+  const engagement = scope ?? selected?.engagement ?? "";
   const uploads = useUBLUploads(slug, engagement);
   const create = useCreateUBLUploads(slug, engagement);
   const [files, setFiles] = useState<File[]>([]);
@@ -247,9 +250,10 @@ function UploadInner() {
       title={t("office.upload_title")}
       description={t("office.upload_description")}
       icon={<Upload className="size-6" />}
+      headingLevel={scope ? 2 : 1}
     />
   );
-  if (isLoading) {
+  if (!scope && isLoading) {
     return (
       <div className="space-y-4">
         {header}
@@ -257,7 +261,7 @@ function UploadInner() {
       </div>
     );
   }
-  if (isError || options.length === 0) {
+  if (!scope && (isError || options.length === 0)) {
     return (
       <div className="space-y-4">
         {header}
@@ -278,14 +282,16 @@ function UploadInner() {
       {header}
       <Panel>
         <div className="space-y-4 p-4">
-          <EngagementPicker
-            options={options}
-            selected={selected}
-            onSelect={(v) => {
-              setShown(null);
-              select(v);
-            }}
-          />
+          {scope ? null : (
+            <EngagementPicker
+              options={options}
+              selected={selected}
+              onSelect={(v) => {
+                setShown(null);
+                select(v);
+              }}
+            />
+          )}
           <label
             onDragOver={(e) => {
               e.preventDefault();
@@ -397,7 +403,11 @@ function UploadInner() {
         {t("office.api.upload_footnote")}{" "}
         <Link
           className="text-brand underline underline-offset-2"
-          href={`${routes.tenant.invoices(slug)}?taxpayer=${encodeURIComponent(engagement)}`}
+          href={
+            scope
+              ? routes.tenant.engagementInvoices(slug, scope)
+              : `${routes.tenant.invoices(slug)}?taxpayer=${encodeURIComponent(engagement)}`
+          }
         >
           {t("office.nav_invoices")}
         </Link>

@@ -11,13 +11,13 @@ import { EntityTable, useUrlListState } from "@/components/entity";
 import { BosDurum, TacRozeti } from "@/components/hakan";
 import { createActionsColumn, createColumn } from "@/components/tables";
 import { Button } from "@/components/ui/button";
-import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { date } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
 import {
   useAcknowledgeWarningGroup,
@@ -90,7 +90,7 @@ function useEntityLabel() {
 
 function useWarningColumns() {
   const { t, locale } = useLocale();
-  const { slug } = useTenant();
+  const invoiceHref = useInvoiceHref({ carry: false });
   const directory = useEngagementDirectory();
   const warningText = useApiWarningText();
   const entityLabel = useEntityLabel();
@@ -152,11 +152,7 @@ function useWarningColumns() {
           const w = row.original;
           return w.entity_type === "invoice" && w.entity_uuid ? (
             <Link
-              href={routes.tenant.invoice(
-                slug,
-                w.entity_uuid,
-                w.engagement_uuid,
-              )}
+              href={invoiceHref(w.entity_uuid, w.engagement_uuid)}
               className="text-brand hover:underline"
             >
               {t("office.warnings_api.open_invoice")}
@@ -188,7 +184,7 @@ function useWarningColumns() {
     ],
     // warningText / entityLabel her çizimde yeni; yalnızca t'ye bağlı.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [directoryLoading, entries, locale, slug, t],
+    [directoryLoading, entries, invoiceHref, locale, t],
   );
 }
 
@@ -342,6 +338,7 @@ function WarningGroupCard({
 }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  const invoiceHref = useInvoiceHref({ carry: false });
   const { can } = usePermission();
   const directory = useEngagementDirectory();
   const warningText = useApiWarningText();
@@ -449,11 +446,7 @@ function WarningGroupCard({
                       className="min-h-11 md:min-h-8"
                     >
                       <Link
-                        href={routes.tenant.invoice(
-                          slug,
-                          w.entity_uuid,
-                          w.engagement_uuid,
-                        )}
+                        href={invoiceHref(w.entity_uuid, w.engagement_uuid)}
                       >
                         {t("office.warnings_api.open_invoice")}
                       </Link>
@@ -509,7 +502,9 @@ function WarningsInner() {
   // Süzgeçler URL'de (#381): geri tuşu ve paylaşılan bağlantı aynı görünümü
   // açar; süzgeç değişince liste görünümü ilk sayfaya döner.
   const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
-  const engagement = listState.getParam(ENGAGEMENT_PARAM) ?? ALL;
+  // Mükellef detayının Uyarılar sekmesinde mükellef sabit, seçici yok (#468).
+  const scope = useEngagementScope();
+  const engagement = scope ?? listState.getParam(ENGAGEMENT_PARAM) ?? ALL;
   const rawStatus = listState.getParam("status") as StatusTab | null;
   const status: StatusTab =
     rawStatus && STATUS_TABS.includes(rawStatus) ? rawStatus : "open";
@@ -565,9 +560,15 @@ function WarningsInner() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-xl font-bold">
-          {t("office.warnings_title")}
-        </h1>
+        {scope ? (
+          <h2 className="font-display text-xl font-bold">
+            {t("office.warnings_title")}
+          </h2>
+        ) : (
+          <h1 className="font-display text-xl font-bold">
+            {t("office.warnings_title")}
+          </h1>
+        )}
         <div
           role="group"
           aria-label={t("office.col_status")}
@@ -594,18 +595,20 @@ function WarningsInner() {
           ))}
         </div>
         <div className="flex-1" />
-        <FilterSelect
-          label={t("office.col_taxpayer")}
-          value={engagement}
-          onChange={setEngagement}
-          options={[
-            { value: ALL, label: t("office.filter_all") },
-            ...directory.list.map((x) => ({
-              value: x.engagementUuid,
-              label: x.title,
-            })),
-          ]}
-        />
+        {scope ? null : (
+          <FilterSelect
+            label={t("office.col_taxpayer")}
+            value={engagement}
+            onChange={setEngagement}
+            options={[
+              { value: ALL, label: t("office.filter_all") },
+              ...directory.list.map((x) => ({
+                value: x.engagementUuid,
+                label: x.title,
+              })),
+            ]}
+          />
+        )}
         <FilterSelect<ViewMode>
           label={t("office.warnings_view")}
           value={view}

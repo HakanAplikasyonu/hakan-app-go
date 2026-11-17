@@ -57,7 +57,8 @@ export function EngagementNextWork({
   const run = () => {
     if (!step?.action) return;
     if (write) copilot?.review(bulkSteps([row]));
-    else router.push(actionHref(slug, step.action, engagement));
+    // Mükellef sayfalarındaki kart: hedef mükellef sekmesinde açılır (#468).
+    else router.push(actionHref(slug, step.action, engagement, true));
   };
 
   const next = step?.action ? (

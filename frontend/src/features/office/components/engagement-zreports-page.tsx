@@ -290,7 +290,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
         cell: ({ row }) =>
           row.original.journal ? (
             <Link
-              href={routes.tenant.journals(slug)}
+              href={routes.tenant.engagementJournals(slug, engagement)}
               className="text-brand-text font-mono text-sm hover:underline"
             >
               #{row.original.journal.entry_no}
@@ -327,7 +327,7 @@ function ZReportsInner({ engagement }: { engagement: string }) {
           ) : null,
       }),
     ];
-  }, [t, slug, canApprove, decide]);
+  }, [t, slug, engagement, canApprove, decide]);
 
   const data = list.data;
   const filters = STATUS_FILTERS.map((k) => ({

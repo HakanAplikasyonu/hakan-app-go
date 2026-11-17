@@ -49,6 +49,7 @@ import {
   type JournalExportSummary,
   type JournalTransfer,
 } from "../services/journals.service";
+import { useEngagementScope } from "../engagement-scope";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import {
   JournalTransfersPanel,
@@ -490,9 +491,11 @@ function SendToAgent({
 function JournalsInner() {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
+  // Mükellef detayının Fişler sekmesinde mükellef sabit (#468).
+  const scope = useEngagementScope();
   const { options, selected, select, isLoading, isError } =
-    useSelectedEngagement(slug);
-  const engagement = selected?.engagement ?? "";
+    useSelectedEngagement(slug, scope);
+  const engagement = scope ?? selected?.engagement ?? "";
   // Global dönem seçici (#326); "Tüm dönemler"de bu ay (yeni fişin dönemi).
   const { period: selectedPeriod, setPeriod: setGlobalPeriod } =
     useOfficePeriod();
@@ -602,9 +605,10 @@ function JournalsInner() {
       title={t("office.journals.title")}
       description={t("office.journals.page_description")}
       icon={<BookOpenCheck className="size-6" />}
+      headingLevel={scope ? 2 : 1}
     />
   );
-  if (isLoading) {
+  if (!scope && isLoading) {
     return (
       <div className="space-y-4">
         {header}
@@ -612,7 +616,7 @@ function JournalsInner() {
       </div>
     );
   }
-  if (isError || options.length === 0) {
+  if (!scope && (isError || options.length === 0)) {
     return (
       <div className="space-y-4">
         {header}
@@ -633,11 +637,13 @@ function JournalsInner() {
     <div className="space-y-4">
       {header}
       <div className="flex flex-wrap items-center gap-3">
-        <EngagementPicker
-          options={options}
-          selected={selected}
-          onSelect={select}
-        />
+        {scope ? null : (
+          <EngagementPicker
+            options={options}
+            selected={selected}
+            onSelect={select}
+          />
+        )}
         <label className="flex items-center gap-2 text-xs">
           <span className="text-muted-foreground">
             {t("office.api.col_period")}

@@ -35,19 +35,28 @@ export function actionHref(
   slug: string,
   action: CopilotAction,
   engagement: string,
+  /**
+   * Mükellef detayından açılınca inceleme ve fişler mükellef sekmesinde
+   * açılır; sekme çubuğu kaybolmaz (#468).
+   */
+  inEngagement = false,
 ): string {
   switch (action) {
     case "open_documents":
       return routes.tenant.engagementDocuments(slug, engagement);
     case "open_review":
-      return `${routes.tenant.review(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
+      return inEngagement
+        ? routes.tenant.engagementReview(slug, engagement)
+        : `${routes.tenant.review(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
     case "bank_suggest":
     case "bank_approve":
       return routes.tenant.engagementBank(slug, engagement);
     case "report_send":
       return routes.tenant.engagementReport(slug, engagement);
     default:
-      return `${routes.tenant.journals(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
+      return inEngagement
+        ? routes.tenant.engagementJournals(slug, engagement)
+        : `${routes.tenant.journals(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
   }
 }
 

@@ -148,7 +148,14 @@ function InvoiceDetailInner({ id }: { id: string }) {
                             action: {
                               label: t("office.nav_review"),
                               onClick: () =>
-                                router.push(routes.tenant.review(slug)),
+                                router.push(
+                                  scope
+                                    ? routes.tenant.engagementReview(
+                                        slug,
+                                        scope,
+                                      )
+                                    : routes.tenant.review(slug),
+                                ),
                             },
                           },
                         );

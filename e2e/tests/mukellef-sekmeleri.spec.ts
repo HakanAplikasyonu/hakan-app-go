@@ -125,6 +125,49 @@ test.describe("mükellef sekmeleri", () => {
     await expectShell(page, taxpayer.title);
   });
 
+  test("sekme içi bağlantılar mükellef rotasında kalır: uyarılar, yüklemeler, inceleme, fişler", async ({ page }) => {
+    await uiLogin(page, DEMO.owner);
+    const base = `/engagements/${engagement}`;
+
+    // Genel bakıştaki "Açık uyarı" sayacı Uyarılar sekmesine gider.
+    await page.goto(officePath(base));
+    await expectShell(page, taxpayer.title);
+    await page.getByRole("link", { name: /Açık uyarı/ }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/warnings`));
+    await expectShell(page, taxpayer.title);
+    await expect(tabs(page).getByRole("link", { name: "Uyarılar" })).toHaveAttribute("aria-current", "page");
+    // Mükellef sabit: mükellef seçicisi yok.
+    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+
+    // Yüklemeler: bu mükellefin işleri; "Faturalar" bağlantısı sekmede kalır.
+    await tabs(page).getByRole("link", { name: "Yüklemeler" }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/upload`));
+    await expectShell(page, taxpayer.title);
+    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+    await page.locator("main p a", { hasText: "Faturalar" }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/invoices`));
+    await expectShell(page, taxpayer.title);
+
+    // İnceleme: kuyruk bu mükellefe süzülü, sekme çubuğu yerinde.
+    await tabs(page).getByRole("link", { name: "İnceleme" }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/review`));
+    await expectShell(page, taxpayer.title);
+    await expect(page.getByRole("heading", { level: 2, name: "İnceleme kuyruğu" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+
+    // Fişler: yevmiye taslakları bu mükellefin.
+    await tabs(page).getByRole("link", { name: "Fişler" }).click();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/journals`));
+    await expectShell(page, taxpayer.title);
+    await expect(page.getByRole("heading", { level: 2, name: "Yevmiye ve çıktı" })).toBeVisible();
+    expect(new URL(page.url()).searchParams.get("taxpayer")).toBeNull();
+
+    // Geri tuşu sekmeler arasında da çalışır.
+    await page.goBack();
+    await page.waitForURL((u) => u.pathname.endsWith(`${base}/review`));
+    await expectShell(page, taxpayer.title);
+  });
+
   test("her sekme aynı başlık ve sekme çubuğuyla açılır", async ({ page }) => {
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath(`/engagements/${atlas}`));

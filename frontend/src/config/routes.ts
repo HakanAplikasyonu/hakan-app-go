@@ -154,6 +154,18 @@ export const routes = {
     /** Mükellef detayı içinde fatura ayrıntısı; sekme çubuğu korunur (#468). */
     engagementInvoice: (slug: string, engagementUuid: string, id: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/invoices/${encodeURIComponent(id)}`,
+    /** Uyarılar sekmesi: mükellefin uyarıları (#468). */
+    engagementWarnings: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/warnings`,
+    /** Fişler sekmesi: mükellefin yevmiye taslakları ve çıktısı (#468). */
+    engagementJournals: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/journals`,
+    /** İnceleme sekmesi: mükellefin öneri kuyruğu (#468). */
+    engagementReview: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/review`,
+    /** Yüklemeler sekmesi: mükellefin UBL yüklemeleri (#468). */
+    engagementUpload: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/upload`,
     /** Bank transactions of one engagement (#329). */
     engagementBank: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/bank`,
