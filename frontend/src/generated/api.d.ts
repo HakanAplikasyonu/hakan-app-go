@@ -4274,6 +4274,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/payroll/documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Şirketin bordro PDF'leri (salt okuma)
+         * @description Mükellef web paneli ve mobil uygulama (#382). Ofisin mükellefe açtığı
+         *     bordro dökümleri; yalnızca mükellefin sahip rolü görür.
+         */
+        get: operations["listTaxpayerPayrollDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/payroll/documents/{documentUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Bordro PDF'ini indir
+         * @description Mükellefe açık bir bordro belgesi (#382); her zaman ek olarak iner.
+         */
+        get: operations["downloadTaxpayerPayrollDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/context": {
         parameters: {
             query?: never;
@@ -6527,6 +6582,407 @@ export interface paths {
          *     export), `410 PRIVACY_EXPORT_EXPIRED`.
          */
         get: operations["downloadPrivacyExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/employees": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's employees
+         * @description Requires `tenant.payroll.read` (#382). Sorted by name. `status`: active (no exit date or a future one), exited, all. `q` searches name, SGK no and job title. The national id is masked.
+         */
+        get: operations["listPayrollEmployees"];
+        put?: never;
+        /**
+         * Add an employee by hand
+         * @description Requires `tenant.payroll.write` (#382). `national_id` (TCKN) is checked and stored masked with a keyed digest, never in clear.
+         */
+        post: operations["createPayrollEmployee"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/employees/{employeeUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                employeeUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update an employee
+         * @description Requires `tenant.payroll.write` (#382). Omitted fields stay; an empty string clears a field.
+         */
+        patch: operations["updatePayrollEmployee"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/imports": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import a payroll workbook (Excel / CSV)
+         * @description Requires `tenant.payroll.write` (#382). Luca, Zirve, Logo payroll exports and free-form sheets. Columns are
+         *     mapped from the header words; when name, gross or net is missing and
+         *     an AI provider is configured, the AI column mapper (excelimport, #24)
+         *     is asked. `mapping` (JSON, column letter to field) overrides the
+         *     mapping. `?preview=true` writes nothing. A commit replaces the
+         *     period's run and lines, links employees by TCKN (or name) and writes
+         *     the period's SGK accrual. 422 `PAYROLL_MAPPING_INCOMPLETE` /
+         *     `PAYROLL_PERIOD_REQUIRED` name what is missing in `details`.
+         */
+        post: operations["importPayroll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/runs": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Payroll runs by period
+         * @description Requires `tenant.payroll.read` (#382). Newest period first, with the net paid through matched bank payments, the SGK accrual status and the journal draft.
+         */
+        get: operations["listPayrollRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * A payroll run with its lines
+         * @description Requires `tenant.payroll.read` (#382).
+         */
+        get: operations["getPayrollRun"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a payroll run
+         * @description Requires `tenant.payroll.write` (#382). Lines go with it; its bank matches are removed. Refused (409 `PAYROLL_RUN_LOCKED`) when its journal draft is approved or exported.
+         */
+        delete: operations["deletePayrollRun"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the run as Excel
+         * @description Requires `tenant.payroll.read` (#382). One sheet, one row per employee and a total row; the TCKN stays masked.
+         */
+        get: operations["exportPayrollRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/runs/{runUuid}/journal-draft": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write the run's journal draft
+         * @description Requires `tenant.payroll.write` (#382). A `journal_drafts` entry dated the period's last day: 770 debit (gross +
+         *     employer shares − incentive), 335 (net), 360 (income and stamp tax −
+         *     AGİ), 361 (SGK and unemployment, both shares − incentive) and 336
+         *     (other deductions) credit. Accounts may be overridden. 409
+         *     `PAYROLL_JOURNAL_EXISTS` when the run has one.
+         */
+        post: operations["createPayrollJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/bank-match": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match salary and SGK payments
+         * @description Requires `tenant.payroll.write` (#382). Outgoing TRY movements from the period's first day to 15 days after the
+         *     SGK due date: an SGK payment of the open accrual amount marks the
+         *     accrual paid; one movement of the whole net, or one per employee
+         *     (IBAN or name and the line's net), is matched to the run.
+         */
+        post: operations["matchPayrollBank"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * SGK accruals and payments
+         * @description Requires `tenant.payroll.read` (#382). Newest period first. `status`: accrued, partial, paid, overdue.
+         */
+        get: operations["listSgkPremiums"];
+        put?: never;
+        /**
+         * Record an SGK accrual by hand
+         * @description Requires `tenant.payroll.write` (#382). For a period without an imported payroll. The due date defaults to the end of the next month.
+         */
+        post: operations["createSgkPremium"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/sgk-premiums/{premiumUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                premiumUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Record an SGK payment or correct an accrual
+         * @description Requires `tenant.payroll.write` (#382). `paid_amount` / `paid_at` record the payment. The amounts of an accrual that comes from a payroll cannot be changed.
+         */
+        patch: operations["updateSgkPremium"];
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Payroll PDFs
+         * @description Requires `tenant.payroll.read` (#382). Payroll printouts, payslips and SGK documents, newest period first.
+         */
+        get: operations["listPayrollDocuments"];
+        put?: never;
+        /**
+         * Attach a payroll PDF
+         * @description Requires `tenant.payroll.write` (#382). PDF only (content checked), up to 20 MB. `visible_to_taxpayer` (default true) shows it in the mükellef panel and app.
+         */
+        post: operations["uploadPayrollDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a payroll PDF
+         * @description Requires `tenant.payroll.write` (#382).
+         */
+        delete: operations["deletePayrollDocument"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a payroll PDF
+         * @description Requires `tenant.payroll.read` (#382). Always an attachment.
+         */
+        get: operations["downloadPayrollDocument"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12314,6 +12770,266 @@ export interface components {
                 /** Format: int64 */
                 matched: number;
             };
+        };
+        /** @description An employee of the taxpayer (#382). The national id is never returned in clear. */
+        PayrollEmployee: {
+            /** Format: uuid */
+            uuid: string;
+            full_name: string;
+            /** @example 123******01 */
+            national_id_masked: string | null;
+            sgk_no: string | null;
+            job_title: string | null;
+            department: string | null;
+            iban: string | null;
+            /** Format: date */
+            hire_date: string | null;
+            /** Format: date */
+            exit_date: string | null;
+            exit_reason: string | null;
+            /** @enum {string} */
+            status: "active" | "exited";
+            /** Format: date-time */
+            created_at: string;
+        };
+        PayrollEmployeeInput: {
+            full_name?: string;
+            /** @description TCKN (11 digits, checksum checked); empty clears */
+            national_id?: string;
+            sgk_no?: string;
+            job_title?: string;
+            department?: string;
+            iban?: string;
+            /** Format: date */
+            hire_date?: string;
+            /** Format: date */
+            exit_date?: string;
+            exit_reason?: string;
+        };
+        PayrollEmployeePage: {
+            items: components["schemas"]["PayrollEmployee"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
+            /** Format: int64 */
+            active: number;
+            /** Format: int64 */
+            exited: number;
+        };
+        /** @description Decimal strings. */
+        PayrollTotals: {
+            employee_count: number;
+            gross_total: string;
+            net_total: string;
+            sgk_employee_total: string;
+            unemployment_employee_total: string;
+            sgk_employer_total: string;
+            unemployment_employer_total: string;
+            sgk_incentive_total: string;
+            income_tax_total: string;
+            stamp_tax_total: string;
+            /** @description Minimum wage income and stamp tax exemptions */
+            exemption_total: string;
+            other_deductions_total: string;
+            employer_cost_total: string;
+        };
+        PayrollIssue: {
+            /** @description 1-based sheet row; 0 for the whole file */
+            row: number;
+            /** @enum {string} */
+            code: "NET_MISMATCH" | "INVALID_TCKN" | "MISSING_NAME" | "ZERO_GROSS" | "EMPLOYER_COST_MISMATCH" | "DUPLICATE_TCKN" | "NEGATIVE_AMOUNT" | "MISSING_REQUIRED_COLUMN" | "NO_ROWS" | "PERIOD_UNKNOWN" | "TOTAL_ROW_SKIPPED";
+            message: string;
+        };
+        /** @description One employee row. Amounts are decimal strings; taxes are payable amounts after the exemptions. */
+        PayrollLine: {
+            row: number;
+            /** Format: uuid */
+            employee_uuid?: string | null;
+            employee_name: string;
+            national_id_masked?: string;
+            sgk_no?: string;
+            job_title?: string;
+            department?: string;
+            /** Format: date-time */
+            hire_date?: string;
+            /** Format: date-time */
+            exit_date?: string;
+            days_worked?: number;
+            gross: string;
+            sgk_base: string;
+            sgk_employee: string;
+            unemployment_employee: string;
+            income_tax_base: string;
+            income_tax: string;
+            income_tax_exemption: string;
+            stamp_tax: string;
+            stamp_tax_exemption: string;
+            agi: string;
+            other_deductions: string;
+            net: string;
+            sgk_employer: string;
+            unemployment_employer: string;
+            sgk_incentive: string;
+            employer_cost: string;
+        };
+        PayrollPremiumStatus: {
+            /** Format: uuid */
+            uuid: string;
+            payable_amount: string;
+            paid_amount: string;
+            /** Format: date */
+            due_date: string;
+            /** @enum {string} */
+            status: "accrued" | "partial" | "paid" | "overdue";
+        };
+        PayrollRun: {
+            /** Format: uuid */
+            uuid: string;
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            source: "import" | "manual" | "demo";
+            /** @enum {string} */
+            source_system: "luca" | "zirve" | "logo" | "generic";
+            source_file_name: string | null;
+            totals: components["schemas"]["PayrollTotals"];
+            issues: components["schemas"]["PayrollIssue"][];
+            /** @description Net salaries paid through matched bank movements */
+            net_paid: string;
+            /** @enum {string} */
+            payment_status: "unpaid" | "partial" | "paid";
+            sgk: components["schemas"]["PayrollPremiumStatus"] | null;
+            /** Format: uuid */
+            journal_draft_uuid: string | null;
+            /** @enum {string|null} */
+            journal_draft_status: "draft" | "approved" | "exported" | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PayrollRunPage: {
+            items: components["schemas"]["PayrollRun"][];
+            limit: number;
+            offset: number;
+        };
+        PayrollRunDetail: components["schemas"]["PayrollRun"] & {
+            lines: components["schemas"]["PayrollLine"][];
+        };
+        PayrollColumnMap: {
+            /** @example B */
+            column: string;
+            header: string;
+            /** @description Target field; empty when unmapped */
+            field: string;
+            confidence: number;
+            /** @enum {string} */
+            origin: "template" | "ai" | "user";
+            needs_review: boolean;
+        };
+        PayrollImportResult: {
+            /** @description YYYY-MM; empty when neither the file nor the request names it */
+            period: string;
+            /** @enum {string} */
+            source_system: "luca" | "zirve" | "logo" | "generic";
+            sheet: string;
+            header_row: number;
+            columns: components["schemas"]["PayrollColumnMap"][];
+            missing: string[];
+            /** @enum {string} */
+            mapped_by: "template" | "ai" | "user";
+            /** @description The first 50 lines */
+            lines: components["schemas"]["PayrollLine"][];
+            line_count: number;
+            totals: components["schemas"]["PayrollTotals"];
+            issues: components["schemas"]["PayrollIssue"][];
+            warnings: string[];
+            committed: boolean;
+            run?: components["schemas"]["PayrollRun"];
+        };
+        PayrollAccounts: {
+            /** @default 770 */
+            expense_account: string;
+            /** @default 335 */
+            personnel_account: string;
+            /** @default 360 */
+            taxes_account: string;
+            /** @default 361 */
+            sgk_account: string;
+            /** @default 336 */
+            other_deductions_account: string;
+        };
+        PayrollBankMatchResult: {
+            period: string;
+            examined: number;
+            salary_matched: number;
+            sgk_matched: number;
+            bank_transaction_uuids: string[];
+        };
+        SgkPremium: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @description Employee and employer SGK and unemployment shares */
+            accrual_amount: string;
+            incentive_amount: string;
+            payable_amount: string;
+            /** Format: date */
+            due_date: string;
+            document_no: string | null;
+            paid_amount: string;
+            /** Format: date */
+            paid_at: string | null;
+            /** @enum {string} */
+            status: "accrued" | "partial" | "paid" | "overdue";
+            /** Format: uuid */
+            bank_transaction_uuid: string | null;
+            note: string | null;
+            from_payroll: boolean;
+        };
+        SgkPremiumInput: {
+            /** @description Create only */
+            period?: string;
+            accrual_amount?: string;
+            incentive_amount?: string;
+            /** Format: date */
+            due_date?: string;
+            document_no?: string;
+            paid_amount?: string;
+            /** Format: date */
+            paid_at?: string;
+            note?: string;
+        };
+        SgkPremiumPage: {
+            items: components["schemas"]["SgkPremium"][];
+            limit: number;
+            offset: number;
+        };
+        PayrollDocument: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            kind: "payroll" | "payslip" | "sgk_accrual" | "sgk_receipt" | "other";
+            title: string;
+            file_name: string;
+            /** Format: int64 */
+            size_bytes: number;
+            content_type: string;
+            visible_to_taxpayer: boolean;
+            /** Format: uuid */
+            employee_uuid: string | null;
+            employee_name: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        PayrollDocumentPage: {
+            items: components["schemas"]["PayrollDocument"][];
+            /** Format: int64 */
+            total: number;
+            limit: number;
+            offset: number;
         };
         CashBox: {
             /** Format: uuid */
@@ -21141,6 +21857,93 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listTaxpayerPayrollDocuments: {
+        parameters: {
+            query?: {
+                period?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollDocumentPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadTaxpayerPayrollDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getTaxpayerContext: {
         parameters: {
             query?: never;
@@ -24635,6 +25438,762 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPayrollEmployees: {
+        parameters: {
+            query?: {
+                status?: "active" | "exited" | "all";
+                q?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollEmployeePage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createPayrollEmployee: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollEmployeeInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollEmployee"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updatePayrollEmployee: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                employeeUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PayrollEmployeeInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollEmployee"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    importPayroll: {
+        parameters: {
+            query?: {
+                preview?: boolean;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    period?: string;
+                    /** @description JSON object, e.g. {"B":"gross","F":"net"} */
+                    mapping?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Preview (nothing written) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollImportResult"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            /** @description Imported */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollImportResult"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description File too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `PAYROLL_MAPPING_INCOMPLETE`, `PAYROLL_PERIOD_REQUIRED`, `PAYROLL_SHEET_NOT_FOUND` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPayrollRuns: {
+        parameters: {
+            query?: {
+                year?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollRunPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getPayrollRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollRunDetail"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deletePayrollRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportPayrollRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workbook */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createPayrollJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                runUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PayrollAccounts"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["JournalDraft"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+            /** @description `PAYROLL_UNAVAILABLE` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    matchPayrollBank: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollBankMatchResult"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listSgkPremiums: {
+        parameters: {
+            query?: {
+                year?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["SgkPremiumPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createSgkPremium: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SgkPremiumInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["SgkPremium"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateSgkPremium: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                premiumUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SgkPremiumInput"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["SgkPremium"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listPayrollDocuments: {
+        parameters: {
+            query?: {
+                period?: string;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollDocumentPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    uploadPayrollDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    period: string;
+                    /** @enum {string} */
+                    kind?: "payroll" | "payslip" | "sgk_accrual" | "sgk_receipt" | "other";
+                    title?: string;
+                    /** Format: uuid */
+                    employee_uuid?: string;
+                    /** @default true */
+                    visible_to_taxpayer?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["PayrollDocument"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `NOT_PDF` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `PAYROLL_UNAVAILABLE`: storage is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deletePayrollDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadPayrollDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                documentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

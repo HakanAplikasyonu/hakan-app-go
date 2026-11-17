@@ -53,6 +53,7 @@ import (
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
+	excelmapping "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
@@ -83,6 +84,7 @@ import (
 	orghandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/handler"
 	orgrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/repository"
 	orgusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/organizations/usecase"
+	payrollmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/payroll"
 	periodshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/handler"
 	periodsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/repository"
 	periodsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/usecase"
@@ -613,6 +615,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	// Mükellef paneli ve mobil fiş yüklemesi aynı servisi kullanır (#199).
 	portalH.WithReceipts(receiptsSvc)
+	// Personel, bordro ve SGK (#382): ofis uçları ve mükellef panelinde bordro PDF'leri.
+	var payrollStore payrollmodule.ObjectStore
+	if deps.Storage != nil {
+		payrollStore = deps.Storage
+	}
+	payrollH := payrollmodule.NewHandler(payrollmodule.New(database.Ambient{Pool: deps.DB}, payrollStore, cfg.Encryption.Key).
+		WithJournals(journalsmodule.New(deps.DB, deps.Storage)).
+		WithAI(excelmapping.NewAIMapper(aiSvc)))
+	payrollmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, payrollH)
+	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
 	if err := modRouter.Mount(selfRegisteredModules(moduleHandlers{
 		access:   accesshandler.New(stepUpSvc, activityRec),
 		search:   searchhandler.New(searchSvc),

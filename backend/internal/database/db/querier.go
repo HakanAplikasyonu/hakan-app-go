@@ -79,9 +79,11 @@ type Querier interface {
 	CountAppLogs(ctx context.Context, arg CountAppLogsParams) (int64, error)
 	CountAppLogsByLevel(ctx context.Context) ([]CountAppLogsByLevelRow, error)
 	CountAssignedEngagements(ctx context.Context, arg CountAssignedEngagementsParams) (int64, error)
+	CountBankTransactionMatches(ctx context.Context, arg CountBankTransactionMatchesParams) (int64, error)
 	CountBulkJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountChangeRequests(ctx context.Context, arg CountChangeRequestsParams) (int64, error)
 	CountDocumentTasks(ctx context.Context, arg CountDocumentTasksParams) (int64, error)
+	CountEmployees(ctx context.Context, taxpayerID int64) (CountEmployeesRow, error)
 	// Görünürlük yalnızca tarihe bağlı olduğundan her farklı tarih için bir kez
 	// sorulur, satır başına değil (#182). MATERIALIZED, planlayıcının koşulu
 	// yeniden satır taramasına itmesini engeller.
@@ -222,6 +224,9 @@ type Querier interface {
 	DeleteOfficeWarningRule(ctx context.Context, arg DeleteOfficeWarningRuleParams) (int64, error)
 	DeleteOrganizationMember(ctx context.Context, arg DeleteOrganizationMemberParams) (int64, error)
 	DeleteOrganizationRole(ctx context.Context, arg DeleteOrganizationRoleParams) (int64, error)
+	DeletePayrollDocument(ctx context.Context, arg DeletePayrollDocumentParams) error
+	DeletePayrollLines(ctx context.Context, arg DeletePayrollLinesParams) error
+	DeletePayrollRun(ctx context.Context, arg DeletePayrollRunParams) error
 	DeletePeriodLock(ctx context.Context, arg DeletePeriodLockParams) (int64, error)
 	DeletePrivacyTaxpayerMember(ctx context.Context, arg DeletePrivacyTaxpayerMemberParams) (int64, error)
 	DeletePrivacyUserDevices(ctx context.Context, userID int64) (int64, error)
@@ -240,6 +245,8 @@ type Querier interface {
 	DeleteStorageShare(ctx context.Context, argUuid uuid.UUID) error
 	DeleteStorageStar(ctx context.Context, arg DeleteStorageStarParams) error
 	DeleteStorageTrashByUUID(ctx context.Context, argUuid uuid.UUID) error
+	// Bordro ya da SGK tahakkuku silinince eşleşmeleri de silinir.
+	DeleteTargetMatches(ctx context.Context, arg DeleteTargetMatchesParams) ([]int64, error)
 	DeleteTaxpayerVehicle(ctx context.Context, arg DeleteTaxpayerVehicleParams) (int64, error)
 	DeleteUserTOTP(ctx context.Context, userID int64) error
 	DeleteVATOpening(ctx context.Context, arg DeleteVATOpeningParams) (int64, error)
@@ -262,6 +269,8 @@ type Querier interface {
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
+	// İçe aktarma boş alanları doldurur, elle girileni ezmez.
+	FillEmployeeFromImport(ctx context.Context, arg FillEmployeeFromImportParams) error
 	// Verilen kodlardan planda olanlar (denetim).
 	FindAccountPlanCodes(ctx context.Context, arg FindAccountPlanCodesParams) ([]FindAccountPlanCodesRow, error)
 	// 21 §5 kural 2: aynı hesap + tarih + yön + tutar + işlem sonrası bakiye.
@@ -280,6 +289,8 @@ type Querier interface {
 	// Aynı satıcı + tarih + tutar (+ fiş no varsa) başka görselle gelmiş mi.
 	FindDuplicateExpense(ctx context.Context, arg FindDuplicateExpenseParams) (FindDuplicateExpenseRow, error)
 	FindDuplicateRetailSale(ctx context.Context, arg FindDuplicateRetailSaleParams) (FindDuplicateRetailSaleRow, error)
+	// TCKN'siz satır için: aynı adlı, TCKN'si bilinmeyen tek personel.
+	FindEmployeeByName(ctx context.Context, arg FindEmployeeByNameParams) (Employee, error)
 	// tenant-lint: cross-org şablon araması kendi ofisi, kendi mükellefi ve global ile sınırlı
 	// En özel kapsam önce: company > tenant > global.
 	FindExcelImportTemplates(ctx context.Context, arg FindExcelImportTemplatesParams) ([]ExcelImportTemplate, error)
@@ -335,6 +346,8 @@ type Querier interface {
 	// Tek görevli bildirimin bağlantısı görevin kendisine gider (#201).
 	GetDocumentTaskUUID(ctx context.Context, arg GetDocumentTaskUUIDParams) (uuid.UUID, error)
 	GetDocumentTaskUploadFile(ctx context.Context, arg GetDocumentTaskUploadFileParams) (GetDocumentTaskUploadFileRow, error)
+	GetEmployeeByDigest(ctx context.Context, arg GetEmployeeByDigestParams) (Employee, error)
+	GetEmployeeByUUID(ctx context.Context, arg GetEmployeeByUUIDParams) (Employee, error)
 	GetEngagementAlertNames(ctx context.Context, arg GetEngagementAlertNamesParams) (GetEngagementAlertNamesRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
@@ -359,6 +372,7 @@ type Querier interface {
 	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
+	GetJournalDraftIDByUUID(ctx context.Context, arg GetJournalDraftIDByUUIDParams) (int64, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
@@ -393,6 +407,11 @@ type Querier interface {
 	// Kurulum sihirbazının durumu organizations.settings içindeki "setup"
 	// anahtarında; ayarların geri kalanına dokunulmaz.
 	GetOrganizationSetup(ctx context.Context, organizationID int64) ([]byte, error)
+	GetPayrollDocument(ctx context.Context, arg GetPayrollDocumentParams) (GetPayrollDocumentRow, error)
+	// Bordronun bu ofisteki fiş taslağı ve durumu (taslak, onaylı, aktarılmış).
+	GetPayrollJournalDraft(ctx context.Context, arg GetPayrollJournalDraftParams) (GetPayrollJournalDraftRow, error)
+	GetPayrollRunByPeriod(ctx context.Context, arg GetPayrollRunByPeriodParams) (PayrollRun, error)
+	GetPayrollRunByUUID(ctx context.Context, arg GetPayrollRunByUUIDParams) (PayrollRun, error)
 	// tenant-lint: cross-org mükellef sahibi talebi uuid ve kendi VKN'siyle bulur
 	GetPendingOnboardingRequestForTaxID(ctx context.Context, arg GetPendingOnboardingRequestForTaxIDParams) (GetPendingOnboardingRequestForTaxIDRow, error)
 	GetPeriodLock(ctx context.Context, arg GetPeriodLockParams) (PeriodLock, error)
@@ -411,6 +430,8 @@ type Querier interface {
 	GetRoleBySlug(ctx context.Context, slug string) (Role, error)
 	GetRoleByUUID(ctx context.Context, argUuid uuid.UUID) (Role, error)
 	GetSecretRecord(ctx context.Context, argUuid uuid.UUID) (GetSecretRecordRow, error)
+	GetSgkPremiumByPeriod(ctx context.Context, arg GetSgkPremiumByPeriodParams) (SgkPremium, error)
+	GetSgkPremiumByUUID(ctx context.Context, arg GetSgkPremiumByUUIDParams) (SgkPremium, error)
 	GetSourceConnection(ctx context.Context, arg GetSourceConnectionParams) (SourceConnection, error)
 	GetSourceConnectionBySystem(ctx context.Context, arg GetSourceConnectionBySystemParams) (SourceConnection, error)
 	GetStepupSettings(ctx context.Context) (StepupSetting, error)
@@ -491,6 +512,7 @@ type Querier interface {
 	InsertChangeRequest(ctx context.Context, arg InsertChangeRequestParams) (ChangeRequest, error)
 	InsertCustomer(ctx context.Context, arg InsertCustomerParams) (Customer, error)
 	InsertDocumentTaskUpload(ctx context.Context, arg InsertDocumentTaskUploadParams) (DocumentTaskUpload, error)
+	InsertEmployee(ctx context.Context, arg InsertEmployeeParams) (Employee, error)
 	InsertExcelImportRow(ctx context.Context, arg InsertExcelImportRowParams) error
 	InsertExpenseDraft(ctx context.Context, arg InsertExpenseDraftParams) (Expense, error)
 	InsertExportBatch(ctx context.Context, arg InsertExportBatchParams) (ExportBatch, error)
@@ -506,6 +528,8 @@ type Querier interface {
 	InsertLegalDocumentDraft(ctx context.Context, arg InsertLegalDocumentDraftParams) (LegalDocument, error)
 	InsertNotificationHistory(ctx context.Context, arg InsertNotificationHistoryParams) (NotificationHistory, error)
 	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) (OutboxEvent, error)
+	InsertPayrollDocument(ctx context.Context, arg InsertPayrollDocumentParams) (PayrollDocument, error)
+	InsertPayrollLine(ctx context.Context, arg InsertPayrollLineParams) error
 	InsertPeriodLock(ctx context.Context, arg InsertPeriodLockParams) (PeriodLock, error)
 	InsertPeriodLockEvent(ctx context.Context, arg InsertPeriodLockEventParams) (PeriodLockEvent, error)
 	InsertPeriodSummary(ctx context.Context, arg InsertPeriodSummaryParams) (PeriodSummary, error)
@@ -518,6 +542,8 @@ type Querier interface {
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
 	InsertRolePermission(ctx context.Context, arg InsertRolePermissionParams) error
 	InsertSecretRecord(ctx context.Context, arg InsertSecretRecordParams) error
+	// Bordrosu olmayan dönem için elle girilen tahakkuk.
+	InsertSgkPremium(ctx context.Context, arg InsertSgkPremiumParams) (SgkPremium, error)
 	InsertStorageActivity(ctx context.Context, arg InsertStorageActivityParams) (StorageActivity, error)
 	InsertStorageLink(ctx context.Context, arg InsertStorageLinkParams) (StorageLink, error)
 	InsertStorageShare(ctx context.Context, arg InsertStorageShareParams) (StorageShare, error)
@@ -618,6 +644,10 @@ type Querier interface {
 	// Zamanlanmış kaynak senkronu (issue #385).
 	// tenant-lint: cross-taxpayer worker taraması (rls.System) zamanı gelmiş bağlantıları ofisler arası seçer
 	ListDueSourceConnections(ctx context.Context, arg ListDueSourceConnectionsParams) ([]ListDueSourceConnectionsRow, error)
+	// Personel, bordro ve SGK primleri (#382). Bütün tablolar mükellef
+	// kapsamlı (taxpayer_tables.txt).
+	// status: active (çıkışı yok ya da bugünden sonra), exited, NULL = hepsi.
+	ListEmployees(ctx context.Context, arg ListEmployeesParams) ([]ListEmployeesRow, error)
 	ListEnabledLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
 	// Atanan ofis üyeleri (hâlâ üye olanlar); atanan yoksa ofis sahipleri.
 	ListEngagementAlertRecipients(ctx context.Context, arg ListEngagementAlertRecipientsParams) ([]int64, error)
@@ -693,6 +723,7 @@ type Querier interface {
 	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
+	ListOpenSgkPremiums(ctx context.Context, taxpayerID int64) ([]SgkPremium, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
 	ListOrganizationMembersByOrg(ctx context.Context, arg ListOrganizationMembersByOrgParams) ([]ListOrganizationMembersByOrgRow, error)
 	ListOrganizationMembershipsByUser(ctx context.Context, userID int64) ([]ListOrganizationMembershipsByUserRow, error)
@@ -703,6 +734,13 @@ type Querier interface {
 	// Queued rows whose deliver task never ran a claim: lost before #309
 	// (Deliver returned nil on the commit race) or dropped from the queue.
 	ListOrphanedQueuedNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
+	// Maaş ve SGK ödemesi olabilecek, eşleşmemiş çıkışlar.
+	ListPayrollBankCandidates(ctx context.Context, arg ListPayrollBankCandidatesParams) ([]ListPayrollBankCandidatesRow, error)
+	ListPayrollDocuments(ctx context.Context, arg ListPayrollDocumentsParams) ([]ListPayrollDocumentsRow, error)
+	ListPayrollLines(ctx context.Context, arg ListPayrollLinesParams) ([]ListPayrollLinesRow, error)
+	// Dönem bordroları, yeniden eskiye: net maaş ödemesine eşlenen banka
+	// tutarı, SGK tahakkuk/ödeme durumu ve fiş taslağı.
+	ListPayrollRuns(ctx context.Context, arg ListPayrollRunsParams) ([]ListPayrollRunsRow, error)
 	// Mükellef panelinde sahibin göreceği bekleyen talepler (mükellefin kendi
 	// VKN'si için). Ofislerin kendi kayıtlarıdır ama yalnızca talebin hedefi
 	// olan mükellefe gösterilir.
@@ -751,6 +789,7 @@ type Querier interface {
 	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
 	ListScopedInbox(ctx context.Context, arg ListScopedInboxParams) ([]Notification, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
+	ListSgkPremiums(ctx context.Context, arg ListSgkPremiumsParams) ([]ListSgkPremiumsRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -892,6 +931,7 @@ type Querier interface {
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
+	PayrollRunNetPaid(ctx context.Context, arg PayrollRunNetPaidParams) (pgtype.Numeric, error)
 	PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error)
 	PeriodMatrixChangeRequests(ctx context.Context, arg PeriodMatrixChangeRequestsParams) ([]PeriodMatrixChangeRequestsRow, error)
 	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)
@@ -996,6 +1036,7 @@ type Querier interface {
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)
+	SetPayrollRunJournalDraft(ctx context.Context, arg SetPayrollRunJournalDraftParams) error
 	SetReceiptCaptureStatus(ctx context.Context, arg SetReceiptCaptureStatusParams) (ReceiptCapture, error)
 	SetRetailSaleApproval(ctx context.Context, arg SetRetailSaleApprovalParams) (RetailSale, error)
 	SetRolePermissions(ctx context.Context, roleID int64) error
@@ -1037,6 +1078,7 @@ type Querier interface {
 	// Onaylanan hesap kodu, henüz onaylanmamış yevmiye taslaklarında aynı
 	// kaynağa (ör. invoice_item:<id>) bağlı satırlara yazılır (issue #239).
 	UpdateDraftJournalLinesAccount(ctx context.Context, arg UpdateDraftJournalLinesAccountParams) (int64, error)
+	UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) (Employee, error)
 	UpdateExcelImportAnalysis(ctx context.Context, arg UpdateExcelImportAnalysisParams) (ExcelImport, error)
 	// İnceleme kuyruğu düzeltmesi: tek alan, metin olarak (dönüşüm uygulamada).
 	UpdateExpenseField(ctx context.Context, arg UpdateExpenseFieldParams) (Expense, error)
@@ -1053,6 +1095,7 @@ type Querier interface {
 	UpdatePeriodSummaryBody(ctx context.Context, arg UpdatePeriodSummaryBodyParams) (PeriodSummary, error)
 	UpdateRetailSaleField(ctx context.Context, arg UpdateRetailSaleFieldParams) (RetailSale, error)
 	UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error)
+	UpdateSgkPremium(ctx context.Context, arg UpdateSgkPremiumParams) (SgkPremium, error)
 	UpdateStepupSettings(ctx context.Context, arg UpdateStepupSettingsParams) (StepupSetting, error)
 	UpdateSuggestionDecision(ctx context.Context, arg UpdateSuggestionDecisionParams) (Suggestion, error)
 	UpdateTaxpayerProfile(ctx context.Context, arg UpdateTaxpayerProfileParams) (Taxpayer, error)
@@ -1098,11 +1141,15 @@ type Querier interface {
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.
 	UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataWarningParams) (DataWarning, error)
 	UpsertOrganizationBilling(ctx context.Context, arg UpsertOrganizationBillingParams) (OrganizationBilling, error)
+	// Aynı dönemin yeniden içe aktarılması toplamları ve kaynağı değiştirir.
+	UpsertPayrollRun(ctx context.Context, arg UpsertPayrollRunParams) (PayrollRun, error)
 	// Mobile push devices (Expo) and their pending push tickets.
 	// A token moves to the calling user when the device switches accounts and is
 	// re-enabled on every registration.
 	UpsertPushDevice(ctx context.Context, arg UpsertPushDeviceParams) (PushDevice, error)
 	UpsertPushSubscription(ctx context.Context, arg UpsertPushSubscriptionParams) (PushSubscription, error)
+	// Bordrodan gelen tahakkuk; ödeme bilgisi korunur.
+	UpsertSgkAccrual(ctx context.Context, arg UpsertSgkAccrualParams) (SgkPremium, error)
 	// Ön muhasebe programlarından gelen masraflar (#47 Paraşüt): kaynak anahtarıyla
 	// tekil (uq_expenses_source); aynı kayıt tekrar gelirse tutarlar güncellenir.
 	UpsertSourceExpense(ctx context.Context, arg UpsertSourceExpenseParams) (UpsertSourceExpenseRow, error)

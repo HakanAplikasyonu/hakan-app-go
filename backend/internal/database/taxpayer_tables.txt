@@ -30,3 +30,8 @@ taxpayer_history_shares
 bank_transaction_documents
 entegrator_documents
 source_financial_transactions
+employees
+payroll_runs
+payroll_lines
+sgk_premiums
+payroll_documents
