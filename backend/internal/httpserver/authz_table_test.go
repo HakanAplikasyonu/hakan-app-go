@@ -40,8 +40,13 @@ const (
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
 	// Mükellef raporu (#386).
-	"GET /v1/tenant/engagements/{engagementUuid}/report": azTenantRead,
-	"GET /v1/taxpayer/report":                            azTaxpayerRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/report":             azTenantRead,
+	"GET /v1/taxpayer/report":                                        azTaxpayerRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/report/pdf":         azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/report/deliveries":  azTenantRead,
+	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries": azTenantWrite,
+	"GET /v1/tenant/report-deliveries":                               azTenantRead,
+	"POST /v1/tenant/report-deliveries":                              azTenantWrite,
 
 	// Rule preview and rule candidate setting (#333); the setting is written by owner / admin.
 	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,

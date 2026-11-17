@@ -149,6 +149,8 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/vehicles":                                       {body: `{"plate":"34ABC123"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vehicles/{vehicleUuid}":                       {},
 	"POST /v1/tenant/engagements/{engagementUuid}/controls/run":                                   {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries":                              {body: `{"period":"2026-10","recipient":"rapor@demo.hakan.local"}`},
+	"POST /v1/tenant/report-deliveries":                                                           {body: `{"period":"2026-10","engagement_uuids":["{engagementUuid}"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries":                               {body: `{"period":"2026-10"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}":                  {body: `{"body":"Ekim dönemi özeti (tarama)."}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/period-summaries/{summaryUuid}/approve":         {},
@@ -494,6 +496,10 @@ func (e *sweepEnv) call(t *testing.T, op specOp, c sweepCase, taxpayer bool) {
 	path := paramRe.ReplaceAllStringFunc(op.path, func(m string) string {
 		return e.param(t, m[1:len(m)-1], op.path)
 	})
+	// A body may name the engagement (office-wide bulk routes, #386).
+	if strings.Contains(c.body, "{engagementUuid}") {
+		c.body = strings.ReplaceAll(c.body, "{engagementUuid}", e.param(t, "engagementUuid", op.path))
+	}
 	rec := e.do(t, op.method, path, c, taxpayer)
 	if os.Getenv("SWEEP_VERBOSE") != "" {
 		t.Logf("%d %s %s %s", rec.Code, op.method, op.path, strings.TrimSpace(firstLine(rec.Body.String())))

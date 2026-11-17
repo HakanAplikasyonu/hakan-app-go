@@ -53,6 +53,9 @@ type Querier interface {
 	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
 	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
 	ClaimOutboxEvents(ctx context.Context, arg ClaimOutboxEventsParams) ([]OutboxEvent, error)
+	// tenant-lint: cross-org worker taraması (rls.System); sırası gelen gönderimleri sahiplenir
+	// Sırası gelen ya da 10 dakikadır "sending"de takılı kalan gönderimler.
+	ClaimReportDeliveries(ctx context.Context, batchLimit int32) ([]ReportDelivery, error)
 	// tenant-lint: cross-org worker loads the job by id; the row carries its own scope
 	ClaimUBLUploadJob(ctx context.Context, id int64) (UblUploadJob, error)
 	ClearAppSettingsLogo(ctx context.Context) (AppSetting, error)
@@ -83,6 +86,7 @@ type Querier interface {
 	// sorulur, satır başına değil (#182). MATERIALIZED, planlayıcının koşulu
 	// yeniden satır taramasına itmesini engeller.
 	CountEngagementInvoices(ctx context.Context, arg CountEngagementInvoicesParams) (int64, error)
+	CountEngagementReportDeliveries(ctx context.Context, arg CountEngagementReportDeliveriesParams) (int64, error)
 	CountEngagementsByOrg(ctx context.Context, arg CountEngagementsByOrgParams) (int64, error)
 	CountExcelImportRows(ctx context.Context, arg CountExcelImportRowsParams) (int64, error)
 	CountExcelImports(ctx context.Context, arg CountExcelImportsParams) (int64, error)
@@ -90,6 +94,8 @@ type Querier interface {
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountJournalDrafts(ctx context.Context, arg CountJournalDraftsParams) (int64, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
+	// tenant-lint: org-wide ofis gönderim geçmişi sayımı; ListOfficeReportDeliveries ile aynı süzgeç
+	CountOfficeReportDeliveries(ctx context.Context, arg CountOfficeReportDeliveriesParams) (int64, error)
 	CountOnboardingRequestsByOrg(ctx context.Context, organizationID int64) (int64, error)
 	// Hazırlık: dönemin açık engelleyici uyarıları. Dönemsiz fatura uyarıları
 	// faturanın dönemine sayılır.
@@ -506,6 +512,8 @@ type Querier interface {
 	InsertPrivacyRequest(ctx context.Context, arg InsertPrivacyRequestParams) (PrivacyRequest, error)
 	InsertPushTicket(ctx context.Context, arg InsertPushTicketParams) error
 	InsertReceiptCapture(ctx context.Context, arg InsertReceiptCaptureParams) (ReceiptCapture, error)
+	// Mükellef raporu gönderimleri (issue #386).
+	InsertReportDelivery(ctx context.Context, arg InsertReportDeliveryParams) (ReportDelivery, error)
 	InsertRetailSaleDraft(ctx context.Context, arg InsertRetailSaleDraftParams) (RetailSale, error)
 	InsertRolePermission(ctx context.Context, arg InsertRolePermissionParams) error
 	InsertSecretRecord(ctx context.Context, arg InsertSecretRecordParams) error
@@ -623,6 +631,7 @@ type Querier interface {
 	// karşılaştırması idx_invoices_taxpayer_issue indeksinde sınır koşuludur,
 	// derin sayfa da ilk sayfa kadar ucuzdur.
 	ListEngagementInvoicesAfter(ctx context.Context, arg ListEngagementInvoicesAfterParams) ([]ListEngagementInvoicesAfterRow, error)
+	ListEngagementReportDeliveries(ctx context.Context, arg ListEngagementReportDeliveriesParams) ([]ReportDelivery, error)
 	ListEngagementTaxpayerMembers(ctx context.Context, arg ListEngagementTaxpayerMembersParams) ([]ListEngagementTaxpayerMembersRow, error)
 	// Belgeler (faturalar) bir engagement'ın gördüğü kadarıyla. Görünürlük
 	// kuralı engagement_document_visible'da (migration 000048).
@@ -679,6 +688,8 @@ type Querier interface {
 	// kapsamında (issue #166) çalışır; süzgeçler burada da açıkça yazılır.
 	// tenant-lint: org-wide ofis mükellef listesi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeClients(ctx context.Context, arg ListOfficeClientsParams) ([]ListOfficeClientsRow, error)
+	// tenant-lint: org-wide ofis gönderim geçmişi; read_all yoksa engagement_assignments ile süzülür
+	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
@@ -844,6 +855,12 @@ type Querier interface {
 	MarkOutboxFailed(ctx context.Context, arg MarkOutboxFailedParams) error
 	MarkOutboxPublished(ctx context.Context, id int64) error
 	MarkOutboxRetry(ctx context.Context, arg MarkOutboxRetryParams) error
+	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
+	MarkReportDeliveryFailed(ctx context.Context, arg MarkReportDeliveryFailedParams) error
+	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
+	MarkReportDeliveryRetry(ctx context.Context, arg MarkReportDeliveryRetryParams) error
+	// tenant-lint: cross-org worker taraması; satır ClaimReportDeliveries ile sahiplenildi
+	MarkReportDeliverySent(ctx context.Context, id int64) error
 	// tenant-lint: cross-org kullanıcının kendi bildirimleri; ofis filtresi parametreyle
 	MarkScopedInboxAllRead(ctx context.Context, arg MarkScopedInboxAllReadParams) (int64, error)
 	// tenant-lint: cross-org kullanıcının kendi bildirimi; ofis filtresi parametreyle

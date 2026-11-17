@@ -5320,6 +5320,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/report/pdf": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Taxpayer report as PDF
+         * @description Requires `tenant.engagements.read` (#386). The A4 PDF the taxpayer
+         *     receives: office-branded header, the four totals, the four charts,
+         *     the monthly table and the notes, Turkish number format. Only an
+         *     approved AI comment is printed.
+         */
+        get: operations["getEngagementReportPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/report/deliveries": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Report email history of the taxpayer
+         * @description Requires `tenant.engagements.read`. Newest first.
+         */
+        get: operations["listEngagementReportDeliveries"];
+        put?: never;
+        /**
+         * Email the report to the taxpayer (one click)
+         * @description Requires `tenant.engagements.write`. Builds the report (approved AI
+         *     comment only), keeps a snapshot and queues the email; the worker
+         *     renders the PDF from the snapshot and sends it within a minute
+         *     (three attempts). `recipient` defaults to the taxpayer's contact
+         *     email; 422 `NO_RECIPIENT` when there is none. Give exactly one of
+         *     `period` and `year`.
+         */
+        post: operations["sendEngagementReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/report-deliveries": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report email history of the office
+         * @description Requires `tenant.engagements.read` (#386). Every engagement with
+         *     `tenant.engagements.read_all`, otherwise the caller's assigned ones.
+         *     Newest first.
+         */
+        get: operations["listOfficeReportDeliveries"];
+        put?: never;
+        /**
+         * Email the report to selected taxpayers
+         * @description Requires `tenant.engagements.write`. Queues the report email for each
+         *     engagement (1-200). An engagement the caller may not reach
+         *     (`no_access`), an ended one (`ended`) or a taxpayer without a usable
+         *     contact email (`no_email`, `invalid_email`) is skipped and reported
+         *     per item.
+         */
+        post: operations["sendReportsBulk"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/agents": {
         parameters: {
             query?: never;
@@ -10035,6 +10139,69 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["TaxpayerReport"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReportDelivery: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            engagement_uuid?: string;
+            taxpayer_title: string;
+            /** @enum {string} */
+            kind: "month" | "year";
+            /** @example 2026-10 */
+            period: string;
+            /** @example Ekim 2026 */
+            label: string;
+            recipient: string;
+            /** @enum {string} */
+            origin: "manual" | "bulk" | "scheduled";
+            /** @enum {string} */
+            status: "queued" | "sending" | "sent" | "failed";
+            /** Format: int32 */
+            attempts: number;
+            last_error: string | null;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeReportDelivery: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["ReportDelivery"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeReportDeliveryPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ReportDelivery"][];
+                /** Format: int64 */
+                total: number;
+                /** Format: int32 */
+                limit: number;
+                /** Format: int32 */
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        ReportBulkItem: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** @enum {string} */
+            status: "queued" | "skipped";
+            reason: null | ("no_access" | "ended" | "no_email" | "invalid_email");
+            delivery: null | components["schemas"]["ReportDelivery"];
+        };
+        EnvelopeReportBulkResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["ReportBulkItem"][];
+                queued: number;
+                skipped: number;
+            };
             meta: components["schemas"]["ResponseMeta"];
         };
         DesktopAgent: {
@@ -22315,6 +22482,204 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementReportPdf: {
+        parameters: {
+            query?: {
+                /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
+                period?: components["parameters"]["ReportPeriod"];
+                /** @description Yearly report (YYYY). Exactly one of period and year. */
+                year?: components["parameters"]["ReportYear"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementReportDeliveries: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReportDeliveryPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendEngagementReport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period?: string;
+                    /** @example 2026 */
+                    year?: string;
+                    /** Format: email */
+                    recipient?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReportDelivery"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_RECIPIENT`: the taxpayer has no contact email */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeReportDeliveries: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                offset?: components["parameters"]["Offset"];
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReportDeliveryPage"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendReportsBulk: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    engagement_uuids: string[];
+                    /** @example 2026-10 */
+                    period?: string;
+                    /** @example 2026 */
+                    year?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Queued / skipped per engagement */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeReportBulkResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };
