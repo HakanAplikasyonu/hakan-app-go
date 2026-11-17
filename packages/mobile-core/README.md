@@ -19,6 +19,7 @@
 | `ui/sekme-cubugu` | Alt sekme çubuğu (telefon) ve 84 px ikon rayı (tablet); expo-router `Tabs` `tabBar` prop'u ile |
 | `ui/parcalar` | Arayüz v1 parçaları: kesik köşe, ekran başlığı, hap, segment, ilerleme çubuğu, kart, satır, Görünüm ayarı |
 | `notifications/inbox` | Mobil bildirim listesi modeli ve uçları (uç #333 ile gelecek; o zamana kadar `null`) |
+| `support/clickfix`, `ui/destek` | Destek ekranı (#387): ClickFix Web Widget'ı güvenli WebView'de (`react-native-webview`, eş bağımlılık). Yalnız ClickFix sayfasının kaynağında gezinir, `clickfix:link` https ise sistem tarayıcısında açılır; `clickfix:ready` sonrası doğrulanmış kimlik (`identify`, `user_hash` sunucudan) ya da ad/e-posta/bağlam (`update`) gider; kullanıcı değişince cihazdaki ziyaretçi silinir |
 | `screens` | Kök hata ekranı (expo-router `ErrorBoundary`) ve bağlantısız açılış ekranı; logo ve raporlayıcı uygulamadan gelir |
 
 Uygulamaya özgü olanlar uygulamada kalır: ortam değişkenleri (`core/config/env.ts`), saklama anahtarları (`core/storage.ts`), bağlantı eşlemesi (`core/push/links.ts`), oturum sağlayıcısı, logo ve marka adı. Uygulamaların `core/*` dosyaları bu paketi uygulamanın değerleriyle kuran ince sarmalayıcılardır; ekranlar eskisi gibi `@/core/...` yollarından içe aktarır.

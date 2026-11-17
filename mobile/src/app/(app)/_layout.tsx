@@ -36,6 +36,10 @@ export default function AppLayout() {
             name="notifications"
             options={{ headerShown: true, title: "Bildirimler" }}
           />
+          <Stack.Screen
+            name="destek"
+            options={{ headerShown: true, title: "Destek" }}
+          />
         </Stack>
       </ReceiptsProvider>
     </IlkAcilisKapisi>

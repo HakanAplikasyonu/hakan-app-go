@@ -22,6 +22,7 @@ export default function AppLayout() {
       <Stack.Screen name="review/[uuid]" options={{ headerShown: true, title: 'Öneri' }} />
       <Stack.Screen name="warnings/index" options={{ headerShown: true, title: 'Uyarılar' }} />
       <Stack.Screen name="warnings/[uuid]" options={{ headerShown: true, title: 'Uyarı' }} />
+      <Stack.Screen name="destek" options={{ headerShown: true, title: 'Destek' }} />
     </Stack>
   );
 }
