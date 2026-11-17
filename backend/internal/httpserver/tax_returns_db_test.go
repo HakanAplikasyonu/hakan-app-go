@@ -89,10 +89,19 @@ func TestTaxReturnFlow(t *testing.T) {
 		return e.do(t, method, path, sweepCase{body: body}, false)
 	}
 
-	// Kayıt yokken önizleme taslaktır ve yazmaz.
+	// Demo: Eylül KDV1 verildi, Ekim taslak; Ekim devreden KDV'yi Eylül'den alır.
 	p := call(t, http.MethodGet, base+"/kdv1/2026-10", "", http.StatusOK)
-	if p.Status != "draft" || p.Frozen || p.Record != nil || p.KDV1 == nil || p.Calendar.DueDate != "2026-11-30" {
+	if p.Status != "draft" || p.Frozen || p.Record == nil || p.KDV1 == nil || p.Calendar.DueDate != "2026-11-30" ||
+		p.KDV1.Carry.Source != "previous_return" {
 		t.Fatalf("kdv1 preview %+v", p)
+	}
+	sep := call(t, http.MethodGet, base+"/kdv1/2026-09", "", http.StatusOK)
+	if sep.Status != "filed" || !sep.Frozen || sep.KDV1.Totals.CarryOut != p.KDV1.Totals.CarriedIn {
+		t.Fatalf("september %+v, october carried in %s", sep, p.KDV1.Totals.CarriedIn)
+	}
+	// Kayıt yokken önizleme yazmaz.
+	if aug := call(t, http.MethodGet, base+"/kdv1/2026-08", "", http.StatusOK); aug.Record != nil || aug.Status != "draft" {
+		t.Fatalf("august %+v", aug)
 	}
 	if len(p.KDV1.Sales) == 0 {
 		t.Errorf("demo October has sales: %+v", p.KDV1)

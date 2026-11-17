@@ -154,6 +154,9 @@ export const routes = {
     /** Personel, bordro ve SGK of one engagement (#382). */
     engagementPayroll: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/payroll`,
+    /** KDV1, MUHSGK ve Ba/Bs beyan önizlemesi (#390). */
+    engagementTaxReturns: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/tax-returns`,
     /** Easytrade sync, financial transactions and Z reports (#385). */
     engagementEasytrade: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/easytrade`,
