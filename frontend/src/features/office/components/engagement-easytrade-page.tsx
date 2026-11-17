@@ -42,7 +42,7 @@ import {
   type EasytradeSyncRun,
   type EasytradeZReport,
 } from "../hooks/use-easytrade";
-import { useOfficePeriod } from "../period";
+import { useOfficePeriod, usePeriodText } from "../period";
 import { EngagementTabs } from "./engagement-overview";
 import { Money } from "./office-ui";
 
@@ -203,6 +203,7 @@ function ConnectionCard({
   period: string;
 }) {
   const { t, locale } = useLocale();
+  const periodText = usePeriodText();
   const { can } = usePermission();
   const canWrite = can(Permission.TenantInvoicesWrite);
   const dt = (v?: string | null) =>
@@ -300,7 +301,7 @@ function ConnectionCard({
                 aria-hidden
                 className={cn("size-4", et.syncNow.isPending && "animate-spin")}
               />
-              {t("sources.easytrade.sync_now", { period })}
+              {t("sources.easytrade.sync_now", { period: periodText(period) })}
             </Button>
           </div>
         ) : null}
@@ -341,6 +342,7 @@ function ConnectionCard({
 
 function PaymentSummary({ et, period }: { et: ET; period: string }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const sum = et.financial.data;
   const cards = useMemo(() => {
     const by: Record<string, { in: number; out: number; count: number }> = {};
@@ -358,7 +360,7 @@ function PaymentSummary({ et, period }: { et: ET; period: string }) {
   return (
     <section aria-labelledby="et-pay" className="space-y-2">
       <h2 id="et-pay" className="font-display text-lg font-semibold">
-        {t("sources.easytrade.payments_title", { period })}
+        {t("sources.easytrade.payments_title", { period: periodText(period) })}
       </h2>
       <div className="grid gap-3 sm:grid-cols-3">
         {cards.map((c) => {
@@ -402,6 +404,7 @@ function PaymentSummary({ et, period }: { et: ET; period: string }) {
 
 function FinancialSection({ et, period }: { et: ET; period: string }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const columns = useMemo(
     () => [
       createDateColumn<EasytradeFinancialTransaction>({
@@ -492,7 +495,9 @@ function FinancialSection({ et, period }: { et: ET; period: string }) {
     <section aria-labelledby="et-fin" className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="et-fin" className="font-display text-lg font-semibold">
-          {t("sources.easytrade.financial_title", { period })}
+          {t("sources.easytrade.financial_title", {
+            period: periodText(period),
+          })}
         </h2>
         {data && data.invoice_refs > 0 ? (
           <span className="text-text-2 text-sm">
@@ -589,6 +594,7 @@ function CustomerTotals({
 
 function ZSection({ et, period }: { et: ET; period: string }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const z = et.zReports.data;
   const columns = useMemo(
     () => [
@@ -642,7 +648,7 @@ function ZSection({ et, period }: { et: ET; period: string }) {
     <section aria-labelledby="et-z" className="space-y-2">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="et-z" className="font-display text-lg font-semibold">
-          {t("sources.easytrade.z_title", { period })}
+          {t("sources.easytrade.z_title", { period: periodText(period) })}
         </h2>
         {z && z.items.length > 0 ? (
           <span className="text-text-2 text-sm">

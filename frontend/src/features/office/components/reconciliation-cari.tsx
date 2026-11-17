@@ -53,6 +53,7 @@ import {
   reconciliationKeys,
   reconciliationService,
 } from "../services/reconciliation.service";
+import { usePeriodText } from "../period";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 import {
@@ -571,6 +572,7 @@ export function BabsView({
   canWrite: boolean;
 }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const qc = useQueryClient();
   const key = reconciliationKeys.babs(slug, engagement, period);
@@ -702,7 +704,7 @@ export function BabsView({
   return (
     <div className="space-y-4">
       <p className="text-text-2 text-sm">
-        {t("office.reconciliation.babs_hint", { period })}
+        {t("office.reconciliation.babs_hint", { period: periodText(period) })}
       </p>
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-2">

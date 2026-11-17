@@ -38,7 +38,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
-import { useOfficePeriod } from "../period";
+import { useOfficePeriod, usePeriodText } from "../period";
 import {
   payrollKeys,
   payrollService,
@@ -521,6 +521,7 @@ function ImportPanel({
   onDone: () => void;
 }) {
   const { t } = useLocale();
+  const periodText = usePeriodText();
   const { slug } = useTenant();
   const { focus } = useOfficePeriod();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -542,7 +543,7 @@ function ImportPanel({
       toast.success(
         t("office.payroll.imported", {
           count: res.line_count,
-          period: res.period,
+          period: periodText(res.period),
         }),
       );
       setPreview(null);
@@ -614,7 +615,7 @@ function ImportPanel({
             {t("office.payroll.preview_summary", {
               count: preview.line_count,
               source: t(`office.payroll.source_${preview.source_system}`),
-              period: preview.period || period || "–",
+              period: periodText(preview.period || period, "–"),
             })}
           </p>
           <p className="text-text-2">

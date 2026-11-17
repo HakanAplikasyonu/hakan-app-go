@@ -60,7 +60,9 @@ export function daysUntil(date: string, now = new Date()) {
   return Math.round((b - a) / 86_400_000);
 }
 
+/** "2026-10" → "Ekim 2026" (tr-TR). Dönem değilse değer aynen döner. */
 export function periodLabel(period: string, locale: string) {
+  if (!isPeriod(period)) return period;
   const [y, m] = period.split("-").map(Number);
   return new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-GB", {
     month: "long",

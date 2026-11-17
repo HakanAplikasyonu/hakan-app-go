@@ -10,7 +10,7 @@ import { DEMO, officePath, uiLogin } from "./lib";
  * değiştirmeden önce). Yalnızca okur.
  *
  * Değişen içerik maskelenir: `time` öğeleri, `[data-visual-mask]` ve
- * tarihe bağlı metinler (DYNAMIC_TEXT: dönem "Eki 26", "2026-10",
+ * tarihe bağlı metinler (DYNAMIC_TEXT: dönem "Eki 26", "Ekim 2026", "2026-10",
  * "2026-11-30", "16.11.2026", "14 gün kaldı"). Demo verisi bugüne göre
  * üretildiği için bunlar her gün / ay değişir. Yeni bir ekran başka oynak
  * içerik gösteriyorsa öğesine `data-visual-mask` ekleyin.
@@ -33,6 +33,8 @@ const DYNAMIC_TEXT = [
   /\b20\d{2}-\d{2}(-\d{2})?\b/,
   /\b\d{2}\.\d{2}\.20\d{2}\b/,
   /gün (kaldı|geçti)/,
+  // Dönem tr-TR yazılır (#455): "Ekim 2026".
+  /(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık) 20\d{2}/,
 ];
 
 /** Tema seçimi: providers/theme-provider (app.theme + app.palette). */
