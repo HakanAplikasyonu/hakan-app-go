@@ -143,6 +143,40 @@ yetkinizle çalışır. Size atanmamış mükellefleri ve yetkiniz olmayan işle
 plana almaz, nedenini pencerede not olarak yazar. Ofiste yapay zekâ
 tanımlıysa komutu o okur, tanımlı değilse komut kurallarla okunur.
 
+## Mutabakat
+
+Mükellef ayrıntısındaki **Mutabakat** sekmesi, üst çubukta seçili dönemin
+mizanını portaldaki kaynaklarla karşılaştırır. Önce o dönemin mizanını
+(tutarlarıyla) **Hesap planı** ekranından yükleyin, sonra **Karşılaştır**a
+basın. Mizan yeniden yüklenirse ya da yeni belge gelirse **Yeniden
+karşılaştır** deyin. Farkı değişmeyen hesaplarda kararınız ve notunuz korunur.
+
+- **Hesaplar:** her ana hesap (102, 191, 391, 600, 770 …) için mizan
+  hareketi ile fatura, banka, masraf, Z raporu ve bordro fişlerinin toplamı.
+  Aynı yılın önceki ayının mizanı yüklüyse yalnızca o aydan bu yana olan
+  hareket karşılaştırılır; yoksa yıl başından birikimli bakılır (açılış fişi
+  farka girer). **Ayrıntı** kaynak türüne göre tutarları, fişlenmemiş
+  kayıtları (eksik kayıt adayları) ve alt hesapları gösterir. Her farkın
+  yanında bir açıklama önerisi vardır: aktarılmamış fiş taslakları,
+  fişlenmemiş kayıtlar, yuvarlama, açılış fişi ya da portala yüklenmemiş
+  kaynak gibi. Üç noktalı menüden farkı **Açıkla** (not zorunlu), **Çözüldü**,
+  **Yok say** ya da **İncelemeye gönder** ile işaretleyin. İncelemeye giden
+  fark inceleme kuyruğunda kabul edilince çözülür. Mizanın 102 bakiyesi
+  banka ekstrelerinin son bakiyesiyle ayrıca denetlenir.
+- **Cari:** karşı firma (VKN / TCKN) bazında mizandaki 120 / 320 bakiyesi
+  (cari hafızasındaki hesaptan) ile faturalar ve eşleşen ödemelerden
+  hesaplanan bakiye; dönemin Form BA (alış) ve BS (satış) tutarı ile beyan
+  edilen satır. 5.000 TL'yi (KDV hariç) aşan firma formda olmalıdır.
+- **BA/BS beyanı:** verilen (ya da verilecek) formun satırlarını Excel / CSV
+  ile yükleyin (VKN/TCKN, Unvan, Belge Sayısı, Tutar) ya da elle ekleyin.
+  Yükledikten sonra yeniden karşılaştırın.
+- **Mektuplar:** Cari görünümünde **Mektup** ile karşı firmaya cari
+  mutabakat mektubu hazırlayın. "Hemen e-postayla gönder" açıksa mektup PDF
+  ekiyle ve tek tıkla yanıt bağlantısıyla gider. Karşı firma bağlantıdan
+  "Mutabıkız" ya da kendi bakiyesiyle "Mutabık değiliz" der; bağlantı 60 gün
+  geçerlidir. Telefonla ya da imzalı kâğıtla gelen yanıtı **Yanıt gir** ile
+  kaydedin. "Mutabıkız" yanıtı cari satırını çözer.
+
 ## Mükellef raporu
 
 Mükellef ayrıntısındaki **Rapor** sekmesi seçtiğiniz ayın ya da yılın

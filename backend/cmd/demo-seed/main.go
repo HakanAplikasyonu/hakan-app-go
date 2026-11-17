@@ -240,6 +240,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedArchive(ctx, pool, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
 				return fmt.Errorf("archive → %s: %w", tp.Key, err)
 			}
+			// Ekim mutabakatı: BA/BS beyanı, karşılaştırma, mektuplar (#389).
+			// Mizan, masraf ve bordrodan sonra: kaynaklar yerinde olsun.
+			if err := seedReconciliation(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("reconciliation → %s: %w", tp.Key, err)
+			}
 			// Co-pilot: the owner's command history (#392).
 			if err := seedCopilot(ctx, pool, org.ID, eng.ID); err != nil {
 				return fmt.Errorf("copilot → %s: %w", tp.Key, err)

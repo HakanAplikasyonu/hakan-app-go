@@ -1,0 +1,23 @@
+{
+  "title": "Cari hesap mutabakatı",
+  "from": "Gönderen: {{taxpayer}} · Alıcı: {{counterparty}}",
+  "balance_debit": "{{date}} tarihi itibarıyla firmamız kayıtlarında cari hesabınız {{amount}} borç bakiyesi vermektedir.",
+  "balance_credit": "{{date}} tarihi itibarıyla firmamız kayıtlarında cari hesabınız {{amount}} alacak bakiyesi vermektedir.",
+  "balance_zero": "{{date}} tarihi itibarıyla firmamız kayıtlarında cari hesabınız bakiye vermemektedir.",
+  "question": "Kayıtlarınızla karşılaştırdınız mı?",
+  "choice_agreed": "Mutabıkız",
+  "choice_disputed": "Mutabık değiliz",
+  "your_balance": "Kayıtlarımızdaki bakiye (TL)",
+  "your_balance_hint": "Borç bakiyesi için pozitif, alacak bakiyesi için eksi yazın. Bilmiyorsanız açıklama yazın.",
+  "name": "Adınız soyadınız",
+  "note": "Açıklama",
+  "submit": "Yanıtı gönder",
+  "failed": "Yanıt gönderilemedi.",
+  "answered_agreed": "Teşekkürler, mutabakat onaylandı.",
+  "answered_disputed": "Teşekkürler, itirazınız iletildi.",
+  "footer": "Bu sayfa {{office}} tarafından HAKAN üzerinden gönderildi.",
+  "not_found_title": "Bağlantı geçersiz",
+  "not_found": "Bu mutabakat bağlantısı bulunamadı. Bağlantıyı e-postadan eksiksiz kopyaladığınızdan emin olun.",
+  "expired_title": "Bağlantının süresi doldu",
+  "expired": "Bu mutabakat bağlantısı artık geçerli değil. Yeni bir mektup isteyin."
+}
