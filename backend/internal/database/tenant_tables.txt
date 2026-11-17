@@ -51,6 +51,7 @@ bank_ledger_accounts engagement
 bank_counterparty_aliases engagement
 bank_statement_templates
 vat_carry_forwards engagement
+tax_returns engagement
 desktop_agents
 organization_billing
 billing_statements

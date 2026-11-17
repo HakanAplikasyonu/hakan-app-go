@@ -10849,6 +10849,191 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List the stored tax returns of the engagement
+         * @description Requires `tenant.tax_returns.read`. Rows exist once a draft is saved
+         *     or a return is prepared; newest period first. `year` narrows to one
+         *     year.
+         */
+        get: operations["listEngagementTaxReturns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Preview a period's tax return in the form's shape
+         * @description Requires `tenant.tax_returns.read`. A draft (or a period without a
+         *     record) is computed from the current data with the draft's
+         *     adjustments and acknowledgements; a prepared or filed return returns
+         *     the snapshot frozen when it was prepared (`frozen: true`).
+         *
+         *     - `kdv1`: matrah by rate (invoices, approved Z reports), kısmi
+         *       tevkifat, özel matrah, indirilecek KDV (invoices, approved
+         *       deductible expenses), sorumlu sıfatıyla beyan edilen KDV,
+         *       istisnalar (tam / kısmi / ihraç kayıtlı), devreden, tecil,
+         *       ödenecek / sonraki döneme devreden KDV.
+         *     - `muhsgk`: payroll totals, wage and non-wage income tax
+         *       withholding, stamp tax, SGK premium vs accrual, employee annex
+         *       (national ids masked).
+         *     - `babs`: Form Ba (incoming) and Bs (outgoing) per counterparty at
+         *       or above 5.000 TL excluding VAT.
+         */
+        get: operations["getEngagementTaxReturn"];
+        /**
+         * Save a draft's adjustments, acknowledgements and note
+         * @description Requires `tenant.tax_returns.write`. `adjustments` is only for
+         *     `kdv1` (`carried_in`, `additional_vat`, `other_deductions`; decimal
+         *     strings ≥ 0); other kinds take `{}`. `acknowledged` replaces the
+         *     acknowledged checklist codes. `409 TAX_RETURN_NOT_DRAFT` once
+         *     prepared or filed.
+         */
+        put: operations["putEngagementTaxReturnDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Freeze the preview as the prepared return
+         * @description Requires `tenant.tax_returns.write`. Every checklist item with
+         *     severity `warning` must be acknowledged (stored on the draft or sent
+         *     in `acknowledged`), else `422 TAX_RETURN_UNACKNOWLEDGED` with the
+         *     open codes in `details[].code`. A prepared KDV1's `carry_out` is the
+         *     next period's devreden KDV.
+         */
+        post: operations["prepareEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a prepared return back into a draft
+         * @description Requires `tenant.tax_returns.write`. The snapshot is dropped;
+         *     adjustments and acknowledgements stay. A filed return cannot be
+         *     reopened (`409 TAX_RETURN_NOT_PREPARED`).
+         */
+        post: operations["reopenEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record that the prepared return was filed
+         * @description Requires `tenant.tax_returns.write`. `filed_on` is not before the
+         *     period's last day nor in the future; `accrual_number` is the
+         *     tahakkuk fiş no. Only a prepared return (`409
+         *     TAX_RETURN_NOT_PREPARED`).
+         */
+        post: operations["fileEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/whatsapp/pair": {
         parameters: {
             query?: never;
@@ -17394,6 +17579,284 @@ export interface components {
             amount: string;
             note?: string | null;
         };
+        /**
+         * @description TL amount, two decimals
+         * @example 1234.50
+         */
+        TaxReturnMoney: string;
+        TaxReturnCheckItem: {
+            /** @example PENDING_EXPENSES */
+            code: string;
+            /**
+             * @description A warning must be acknowledged before preparing; info is shown only.
+             * @enum {string}
+             */
+            severity: "warning" | "info";
+            message: string;
+            /** Format: int64 */
+            count: number;
+            amount?: components["schemas"]["TaxReturnMoney"];
+            acknowledged: boolean;
+        };
+        TaxReturnRecord: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            status: "draft" | "prepared" | "filed";
+            adjustments: components["schemas"]["TaxReturnKDV1Adjustments"];
+            acknowledged: string[];
+            note: string | null;
+            /** Format: date-time */
+            prepared_at: string | null;
+            /** Format: date */
+            filed_on: string | null;
+            accrual_number: string | null;
+            /** Format: date-time */
+            filed_at: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description KDV1 manual fields; absent means not entered. */
+        TaxReturnKDV1Adjustments: {
+            carried_in?: components["schemas"]["TaxReturnMoney"];
+            additional_vat?: components["schemas"]["TaxReturnMoney"];
+            other_deductions?: components["schemas"]["TaxReturnMoney"];
+        };
+        TaxReturnKDV1: {
+            sales: {
+                /** @example 20 */
+                rate: string;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+                invoice_base: components["schemas"]["TaxReturnMoney"];
+                invoice_vat: components["schemas"]["TaxReturnMoney"];
+                retail_base: components["schemas"]["TaxReturnMoney"];
+                retail_vat: components["schemas"]["TaxReturnMoney"];
+                purchase_return_base: components["schemas"]["TaxReturnMoney"];
+                purchase_return_vat: components["schemas"]["TaxReturnMoney"];
+            }[];
+            withholdings: {
+                /** @example 603 */
+                code: string;
+                rate: string;
+                /** @example 7/10 */
+                ratio: string;
+                /** Format: int64 */
+                invoice_count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+                withheld: components["schemas"]["TaxReturnMoney"];
+                declared_vat: components["schemas"]["TaxReturnMoney"];
+            }[];
+            special_bases: {
+                code: string;
+                rate: string;
+                /** Format: int64 */
+                invoice_count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+            }[];
+            purchases: {
+                /** @description Empty when an expense carried no rate */
+                rate: string;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+                invoice_base: components["schemas"]["TaxReturnMoney"];
+                invoice_vat: components["schemas"]["TaxReturnMoney"];
+                expense_base: components["schemas"]["TaxReturnMoney"];
+                expense_vat: components["schemas"]["TaxReturnMoney"];
+                /** Format: int64 */
+                invoice_count: number;
+                /** Format: int64 */
+                expense_count: number;
+            }[];
+            exemptions: {
+                /** @enum {string} */
+                group: "full" | "partial" | "export_registered" | "other";
+                /** @example 301 */
+                code: string;
+                /** Format: int64 */
+                invoice_count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                vat: components["schemas"]["TaxReturnMoney"];
+            }[];
+            totals: {
+                base_total: components["schemas"]["TaxReturnMoney"];
+                calculated_vat: components["schemas"]["TaxReturnMoney"];
+                additional_vat: components["schemas"]["TaxReturnMoney"];
+                total_vat: components["schemas"]["TaxReturnMoney"];
+                carried_in: components["schemas"]["TaxReturnMoney"];
+                current_input: components["schemas"]["TaxReturnMoney"];
+                sales_returns_vat: components["schemas"]["TaxReturnMoney"];
+                responsible_vat: components["schemas"]["TaxReturnMoney"];
+                other_deductions: components["schemas"]["TaxReturnMoney"];
+                total_deductions: components["schemas"]["TaxReturnMoney"];
+                exempt_base: components["schemas"]["TaxReturnMoney"];
+                deferred_vat: components["schemas"]["TaxReturnMoney"];
+                payable: components["schemas"]["TaxReturnMoney"];
+                carry_out: components["schemas"]["TaxReturnMoney"];
+                delivery_total: components["schemas"]["TaxReturnMoney"];
+                card_sales: components["schemas"]["TaxReturnMoney"];
+            };
+            carry: {
+                /** @enum {string} */
+                source: "manual" | "previous_return" | "opening" | "none";
+                period: string | null;
+            };
+            adjustments: components["schemas"]["TaxReturnKDV1Adjustments"];
+        };
+        TaxReturnMUHSGK: {
+            payroll: {
+                employee_count: number;
+                /** Format: int64 */
+                days_total: number;
+                gross: components["schemas"]["TaxReturnMoney"];
+                income_tax_base: components["schemas"]["TaxReturnMoney"];
+                income_tax: components["schemas"]["TaxReturnMoney"];
+                income_tax_exemption: components["schemas"]["TaxReturnMoney"];
+                stamp_tax: components["schemas"]["TaxReturnMoney"];
+                stamp_tax_exemption: components["schemas"]["TaxReturnMoney"];
+                sgk_base: components["schemas"]["TaxReturnMoney"];
+                sgk_employee: components["schemas"]["TaxReturnMoney"];
+                unemployment_employee: components["schemas"]["TaxReturnMoney"];
+                sgk_employer: components["schemas"]["TaxReturnMoney"];
+                unemployment_employer: components["schemas"]["TaxReturnMoney"];
+                sgk_incentive: components["schemas"]["TaxReturnMoney"];
+            } | null;
+            withholdings: {
+                /** @enum {string} */
+                kind: "wage" | "self_employed" | "agricultural" | "other";
+                rate: string;
+                /** Format: int64 */
+                count: number;
+                base: components["schemas"]["TaxReturnMoney"];
+                tax: components["schemas"]["TaxReturnMoney"];
+            }[];
+            employees: {
+                line_no: number;
+                name: string;
+                national_id_masked: string;
+                sgk_no: string;
+                hire_date: string;
+                exit_date: string;
+                days_worked: number | null;
+                gross: components["schemas"]["TaxReturnMoney"];
+                sgk_base: components["schemas"]["TaxReturnMoney"];
+                income_tax_base: components["schemas"]["TaxReturnMoney"];
+                income_tax: components["schemas"]["TaxReturnMoney"];
+                income_tax_exemption: components["schemas"]["TaxReturnMoney"];
+                stamp_tax: components["schemas"]["TaxReturnMoney"];
+                stamp_tax_exemption: components["schemas"]["TaxReturnMoney"];
+            }[];
+            premium: {
+                expected: components["schemas"]["TaxReturnMoney"];
+                expected_incentive: components["schemas"]["TaxReturnMoney"];
+                expected_payable: components["schemas"]["TaxReturnMoney"];
+                accrual: string | null;
+                incentive: string | null;
+                payable: string | null;
+                paid: string | null;
+                difference: string | null;
+                due_date: string;
+            };
+            totals: {
+                income_tax: components["schemas"]["TaxReturnMoney"];
+                stamp_tax: components["schemas"]["TaxReturnMoney"];
+                tax_payable: components["schemas"]["TaxReturnMoney"];
+                premium_payable: components["schemas"]["TaxReturnMoney"];
+            };
+        };
+        TaxReturnBABSForm: {
+            rows: {
+                counterparty_id: string;
+                /** @description vkn, tckn or empty when the id is neither 10 nor 11 digits */
+                id_type: string;
+                name: string;
+                /** Format: int64 */
+                document_count: number;
+                amount: components["schemas"]["TaxReturnMoney"];
+            }[];
+            /** Format: int64 */
+            document_count: number;
+            amount: components["schemas"]["TaxReturnMoney"];
+            /** Format: int64 */
+            below_threshold: number;
+        };
+        TaxReturnBABS: {
+            threshold: components["schemas"]["TaxReturnMoney"];
+            ba: components["schemas"]["TaxReturnBABSForm"];
+            bs: components["schemas"]["TaxReturnBABSForm"];
+        };
+        TaxReturnPreview: {
+            /** @enum {string} */
+            kind: "kdv1" | "muhsgk" | "babs";
+            period: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            /** @enum {string} */
+            status: "draft" | "prepared" | "filed";
+            /** @description The body is the snapshot taken when prepared */
+            frozen: boolean;
+            calendar: {
+                /** Format: date */
+                due_date: string;
+                days_left: number;
+                rolled_forward: boolean;
+            };
+            record: components["schemas"]["TaxReturnRecord"] | null;
+            open_warnings: string[];
+            /** Format: date-time */
+            computed_at: string;
+            checklist: components["schemas"]["TaxReturnCheckItem"][];
+            kdv1?: components["schemas"]["TaxReturnKDV1"];
+            muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
+            babs?: components["schemas"]["TaxReturnBABS"];
+        };
+        TaxReturnSummary: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "kdv1" | "muhsgk" | "babs";
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "prepared" | "filed";
+            payable: string | null;
+            carry_out: string | null;
+            /** Format: date */
+            due_date: string;
+            /** Format: date-time */
+            prepared_at: string | null;
+            /** Format: date */
+            filed_on: string | null;
+            accrual_number: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        TaxReturnDraftInput: {
+            adjustments?: components["schemas"]["TaxReturnKDV1Adjustments"];
+            acknowledged?: string[];
+            note?: string | null;
+        };
+        TaxReturnFileInput: {
+            /** Format: date */
+            filed_on: string;
+            accrual_number?: string | null;
+            note?: string | null;
+        };
+        EnvelopeTaxReturn: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxReturnPreview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxReturnList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["TaxReturnSummary"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeVATOpening: {
             /** @enum {boolean} */
             success: true;
@@ -17655,6 +18118,8 @@ export interface components {
         BankConnectionUuid: string;
         SourceConnectionUuid: string;
         EngagementUuid: string;
+        /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+        TaxReturnKind: "kdv1" | "muhsgk" | "babs";
         /** @description Monthly report (YYYY-MM). Exactly one of period and year. */
         ReportPeriod: string;
         /** @description Yearly report (YYYY). Exactly one of period and year. */
@@ -34688,6 +35153,247 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementTaxReturns: {
+        parameters: {
+            query?: {
+                year?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Returns */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putEngagementTaxReturnDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxReturnDraftInput"];
+            };
+        };
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    prepareEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    acknowledged?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Prepared return */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `TAX_RETURN_UNACKNOWLEDGED`: open checklist warnings */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    reopenEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Draft preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    fileEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxReturnFileInput"];
+            };
+        };
+        responses: {
+            /** @description Filed return */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -43,6 +43,8 @@ tags:
     description: Sıradaki iş akışı ve onaylı aksiyon komut çubuğu (#392)
   - name: Payroll
     description: Personel, bordro ve SGK primleri (#382)
+  - name: TaxReturns
+    description: Beyanname önizlemesi ve beyan kayıtları — KDV1, MUHSGK, Ba/Bs (#390)
   - name: DocumentArchive
     description: Mükellef belge arşivi ve İSG evrakları (#393)
   - name: Privacy
@@ -14101,6 +14103,221 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  # Beyanname formatına uygunluk (issue #390): KDV1, MUHSGK, Ba/Bs.
+  /v1/tenant/engagements/{engagementUuid}/tax-returns:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [TaxReturns]
+      operationId: listEngagementTaxReturns
+      summary: List the stored tax returns of the engagement
+      description: |
+        Requires `tenant.tax_returns.read`. Rows exist once a draft is saved
+        or a return is prepared; newest period first. `year` narrows to one
+        year.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: year, in: query, required: false, schema: { type: string, pattern: "^[0-9]{4}$" } }
+      responses:
+        "200":
+          description: Returns
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturnList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    get:
+      tags: [TaxReturns]
+      operationId: getEngagementTaxReturn
+      summary: Preview a period's tax return in the form's shape
+      description: |
+        Requires `tenant.tax_returns.read`. A draft (or a period without a
+        record) is computed from the current data with the draft's
+        adjustments and acknowledgements; a prepared or filed return returns
+        the snapshot frozen when it was prepared (`frozen: true`).
+
+        - `kdv1`: matrah by rate (invoices, approved Z reports), kısmi
+          tevkifat, özel matrah, indirilecek KDV (invoices, approved
+          deductible expenses), sorumlu sıfatıyla beyan edilen KDV,
+          istisnalar (tam / kısmi / ihraç kayıtlı), devreden, tecil,
+          ödenecek / sonraki döneme devreden KDV.
+        - `muhsgk`: payroll totals, wage and non-wage income tax
+          withholding, stamp tax, SGK premium vs accrual, employee annex
+          (national ids masked).
+        - `babs`: Form Ba (incoming) and Bs (outgoing) per counterparty at
+          or above 5.000 TL excluding VAT.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [TaxReturns]
+      operationId: putEngagementTaxReturnDraft
+      summary: Save a draft's adjustments, acknowledgements and note
+      description: |
+        Requires `tenant.tax_returns.write`. `adjustments` is only for
+        `kdv1` (`carried_in`, `additional_vat`, `other_deductions`; decimal
+        strings ≥ 0); other kinds take `{}`. `acknowledged` replaces the
+        acknowledged checklist codes. `409 TAX_RETURN_NOT_DRAFT` once
+        prepared or filed.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxReturnDraftInput"
+      responses:
+        "200":
+          description: Preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: prepareEngagementTaxReturn
+      summary: Freeze the preview as the prepared return
+      description: |
+        Requires `tenant.tax_returns.write`. Every checklist item with
+        severity `warning` must be acknowledged (stored on the draft or sent
+        in `acknowledged`), else `422 TAX_RETURN_UNACKNOWLEDGED` with the
+        open codes in `details[].code`. A prepared KDV1's `carry_out` is the
+        next period's devreden KDV.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                acknowledged: { type: array, items: { type: string } }
+      responses:
+        "200":
+          description: Prepared return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`TAX_RETURN_UNACKNOWLEDGED`: open checklist warnings"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: reopenEngagementTaxReturn
+      summary: Turn a prepared return back into a draft
+      description: |
+        Requires `tenant.tax_returns.write`. The snapshot is dropped;
+        adjustments and acknowledgements stay. A filed return cannot be
+        reopened (`409 TAX_RETURN_NOT_PREPARED`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Draft preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/file:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: fileEngagementTaxReturn
+      summary: Record that the prepared return was filed
+      description: |
+        Requires `tenant.tax_returns.write`. `filed_on` is not before the
+        period's last day nor in the future; `accrual_number` is the
+        tahakkuk fiş no. Only a prepared return (`409
+        TAX_RETURN_NOT_PREPARED`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaxReturnFileInput"
+      responses:
+        "200":
+          description: Filed return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   # WhatsApp Web uzantısı (issue #388).
   /v1/auth/whatsapp/pair:
     post:
@@ -14442,6 +14659,12 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    TaxReturnKind:
+      name: returnKind
+      in: path
+      required: true
+      description: kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -21955,6 +22178,334 @@ components:
       properties:
         amount: { type: string, description: "Decimal string ≥ 0, at most two decimals", example: "12500.00" }
         note: { type: [string, "null"], maxLength: 1000 }
+
+    # Beyanname formatına uygunluk (issue #390).
+    TaxReturnMoney:
+      type: string
+      description: TL amount, two decimals
+      example: "1234.50"
+
+    TaxReturnCheckItem:
+      type: object
+      required: [code, severity, message, count, acknowledged]
+      properties:
+        code: { type: string, example: PENDING_EXPENSES }
+        severity:
+          type: string
+          enum: [warning, info]
+          description: A warning must be acknowledged before preparing; info is shown only.
+        message: { type: string }
+        count: { type: integer, format: int64 }
+        amount: { $ref: "#/components/schemas/TaxReturnMoney" }
+        acknowledged: { type: boolean }
+
+    TaxReturnRecord:
+      type: object
+      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        status: { type: string, enum: [draft, prepared, filed] }
+        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        acknowledged: { type: array, items: { type: string } }
+        note: { type: [string, "null"] }
+        prepared_at: { type: [string, "null"], format: date-time }
+        filed_on: { type: [string, "null"], format: date }
+        accrual_number: { type: [string, "null"] }
+        filed_at: { type: [string, "null"], format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    TaxReturnKDV1Adjustments:
+      type: object
+      additionalProperties: false
+      description: KDV1 manual fields; absent means not entered.
+      properties:
+        carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
+        additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnKDV1:
+      type: object
+      required: [sales, withholdings, special_bases, purchases, exemptions, totals, carry, adjustments]
+      properties:
+        sales:
+          type: array
+          items:
+            type: object
+            required: [rate, base, vat, invoice_base, invoice_vat, retail_base, retail_vat, purchase_return_base, purchase_return_vat]
+            properties:
+              rate: { type: string, example: "20" }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              invoice_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              invoice_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              retail_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              retail_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              purchase_return_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              purchase_return_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        withholdings:
+          type: array
+          items:
+            type: object
+            required: [code, rate, ratio, invoice_count, base, vat, withheld, declared_vat]
+            properties:
+              code: { type: string, example: "603" }
+              rate: { type: string }
+              ratio: { type: string, example: "7/10" }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+              declared_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        special_bases:
+          type: array
+          items:
+            type: object
+            required: [code, rate, invoice_count, base, vat]
+            properties:
+              code: { type: string }
+              rate: { type: string }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        purchases:
+          type: array
+          items:
+            type: object
+            required: [rate, base, vat, invoice_base, invoice_vat, expense_base, expense_vat, invoice_count, expense_count]
+            properties:
+              rate: { type: string, description: Empty when an expense carried no rate }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              invoice_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              invoice_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              expense_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              expense_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              invoice_count: { type: integer, format: int64 }
+              expense_count: { type: integer, format: int64 }
+        exemptions:
+          type: array
+          items:
+            type: object
+            required: [group, code, invoice_count, base, vat]
+            properties:
+              group: { type: string, enum: [full, partial, export_registered, other] }
+              code: { type: string, example: "301" }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [base_total, calculated_vat, additional_vat, total_vat, carried_in, current_input, sales_returns_vat,
+                     responsible_vat, other_deductions, total_deductions, exempt_base, deferred_vat, payable, carry_out,
+                     delivery_total, card_sales]
+          properties:
+            base_total: { $ref: "#/components/schemas/TaxReturnMoney" }
+            calculated_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            total_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
+            current_input: { $ref: "#/components/schemas/TaxReturnMoney" }
+            sales_returns_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            responsible_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+            total_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+            exempt_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            deferred_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+            carry_out: { $ref: "#/components/schemas/TaxReturnMoney" }
+            delivery_total: { $ref: "#/components/schemas/TaxReturnMoney" }
+            card_sales: { $ref: "#/components/schemas/TaxReturnMoney" }
+        carry:
+          type: object
+          required: [source, period]
+          properties:
+            source: { type: string, enum: [manual, previous_return, opening, none] }
+            period: { type: [string, "null"] }
+        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+
+    TaxReturnMUHSGK:
+      type: object
+      required: [payroll, withholdings, employees, premium, totals]
+      properties:
+        payroll:
+          type: [object, "null"]
+          required: [employee_count, days_total, gross, income_tax_base, income_tax, income_tax_exemption, stamp_tax,
+                     stamp_tax_exemption, sgk_base, sgk_employee, unemployment_employee, sgk_employer, unemployment_employer, sgk_incentive]
+          properties:
+            employee_count: { type: integer }
+            days_total: { type: integer, format: int64 }
+            gross: { $ref: "#/components/schemas/TaxReturnMoney" }
+            income_tax_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            income_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+            income_tax_exemption: { $ref: "#/components/schemas/TaxReturnMoney" }
+            stamp_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+            stamp_tax_exemption: { $ref: "#/components/schemas/TaxReturnMoney" }
+            sgk_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            sgk_employee: { $ref: "#/components/schemas/TaxReturnMoney" }
+            unemployment_employee: { $ref: "#/components/schemas/TaxReturnMoney" }
+            sgk_employer: { $ref: "#/components/schemas/TaxReturnMoney" }
+            unemployment_employer: { $ref: "#/components/schemas/TaxReturnMoney" }
+            sgk_incentive: { $ref: "#/components/schemas/TaxReturnMoney" }
+        withholdings:
+          type: array
+          items:
+            type: object
+            required: [kind, rate, count, base, tax]
+            properties:
+              kind: { type: string, enum: [wage, self_employed, agricultural, other] }
+              rate: { type: string }
+              count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+        employees:
+          type: array
+          items:
+            type: object
+            required: [line_no, name, national_id_masked, sgk_no, hire_date, exit_date, days_worked, gross, sgk_base,
+                       income_tax_base, income_tax, income_tax_exemption, stamp_tax, stamp_tax_exemption]
+            properties:
+              line_no: { type: integer }
+              name: { type: string }
+              national_id_masked: { type: string }
+              sgk_no: { type: string }
+              hire_date: { type: string }
+              exit_date: { type: string }
+              days_worked: { type: [integer, "null"] }
+              gross: { $ref: "#/components/schemas/TaxReturnMoney" }
+              sgk_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              income_tax_base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              income_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+              income_tax_exemption: { $ref: "#/components/schemas/TaxReturnMoney" }
+              stamp_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+              stamp_tax_exemption: { $ref: "#/components/schemas/TaxReturnMoney" }
+        premium:
+          type: object
+          required: [expected, expected_incentive, expected_payable, accrual, incentive, payable, paid, difference, due_date]
+          properties:
+            expected: { $ref: "#/components/schemas/TaxReturnMoney" }
+            expected_incentive: { $ref: "#/components/schemas/TaxReturnMoney" }
+            expected_payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+            accrual: { type: [string, "null"] }
+            incentive: { type: [string, "null"] }
+            payable: { type: [string, "null"] }
+            paid: { type: [string, "null"] }
+            difference: { type: [string, "null"] }
+            due_date: { type: string }
+        totals:
+          type: object
+          required: [income_tax, stamp_tax, tax_payable, premium_payable]
+          properties:
+            income_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+            stamp_tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+            tax_payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+            premium_payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnBABSForm:
+      type: object
+      required: [rows, document_count, amount, below_threshold]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [counterparty_id, id_type, name, document_count, amount]
+            properties:
+              counterparty_id: { type: string }
+              id_type: { type: string, description: "vkn, tckn or empty when the id is neither 10 nor 11 digits" }
+              name: { type: string }
+              document_count: { type: integer, format: int64 }
+              amount: { $ref: "#/components/schemas/TaxReturnMoney" }
+        document_count: { type: integer, format: int64 }
+        amount: { $ref: "#/components/schemas/TaxReturnMoney" }
+        below_threshold: { type: integer, format: int64 }
+
+    TaxReturnBABS:
+      type: object
+      required: [threshold, ba, bs]
+      properties:
+        threshold: { $ref: "#/components/schemas/TaxReturnMoney" }
+        ba: { $ref: "#/components/schemas/TaxReturnBABSForm" }
+        bs: { $ref: "#/components/schemas/TaxReturnBABSForm" }
+
+    TaxReturnPreview:
+      type: object
+      required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, computed_at, checklist]
+      properties:
+        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        period: { type: string }
+        engagement_uuid: { type: string, format: uuid }
+        status: { type: string, enum: [draft, prepared, filed] }
+        frozen: { type: boolean, description: The body is the snapshot taken when prepared }
+        calendar:
+          type: object
+          required: [due_date, days_left, rolled_forward]
+          properties:
+            due_date: { type: string, format: date }
+            days_left: { type: integer }
+            rolled_forward: { type: boolean }
+        record:
+          oneOf:
+            - $ref: "#/components/schemas/TaxReturnRecord"
+            - type: "null"
+        open_warnings: { type: array, items: { type: string } }
+        computed_at: { type: string, format: date-time }
+        checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
+        kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
+        muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
+        babs: { $ref: "#/components/schemas/TaxReturnBABS" }
+
+    TaxReturnSummary:
+      type: object
+      required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        period: { type: string }
+        status: { type: string, enum: [draft, prepared, filed] }
+        payable: { type: [string, "null"] }
+        carry_out: { type: [string, "null"] }
+        due_date: { type: string, format: date }
+        prepared_at: { type: [string, "null"], format: date-time }
+        filed_on: { type: [string, "null"], format: date }
+        accrual_number: { type: [string, "null"] }
+        updated_at: { type: string, format: date-time }
+
+    TaxReturnDraftInput:
+      type: object
+      additionalProperties: false
+      properties:
+        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        acknowledged: { type: array, items: { type: string }, maxItems: 50 }
+        note: { type: [string, "null"], maxLength: 2000 }
+
+    TaxReturnFileInput:
+      type: object
+      additionalProperties: false
+      required: [filed_on]
+      properties:
+        filed_on: { type: string, format: date }
+        accrual_number: { type: [string, "null"], maxLength: 64 }
+        note: { type: [string, "null"], maxLength: 2000 }
+
+    EnvelopeTaxReturn:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxReturnPreview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeTaxReturnList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/TaxReturnSummary" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATOpening:
       type: object

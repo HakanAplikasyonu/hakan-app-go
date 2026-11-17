@@ -298,6 +298,7 @@ type Querier interface {
 	// prompt is the consent). An existing preference row is left untouched.
 	EnsureNotificationPreferencesPushDefault(ctx context.Context, userID int64) error
 	ExtensionExists(ctx context.Context, extname string) (bool, error)
+	FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (TaxReturn, error)
 	// Düşük öncelikli kanaldaki ek bilgi yalnızca boş alanlara yazılır (21 §5).
 	FillBankTransactionGaps(ctx context.Context, arg FillBankTransactionGapsParams) error
 	// İçe aktarma boş alanları doldurur, elle girileni ezmez.
@@ -493,6 +494,7 @@ type Querier interface {
 	GetSuggestionForUpdate(ctx context.Context, arg GetSuggestionForUpdateParams) (Suggestion, error)
 	// Müşavir mobil inceleme kuyruğu (issue #239).
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
+	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
 	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
@@ -912,6 +914,7 @@ type Querier interface {
 	ListStuckProcessingNotificationIDs(ctx context.Context, staleMinutes int32) ([]int64, error)
 	ListSuggestionDecisions(ctx context.Context, arg ListSuggestionDecisionsParams) ([]ListSuggestionDecisionsRow, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
+	ListTaxReturns(ctx context.Context, arg ListTaxReturnsParams) ([]TaxReturn, error)
 	// ---------------------------------------------------------------------------
 	// Mükellef tarafı (/v1/taxpayer/*). Kapsam X-Taxpayer üyeliğidir: görevler
 	// taxpayer_id ile ve yalnızca mükellefin AKTİF engagement'ından okunur.
@@ -1060,6 +1063,7 @@ type Querier interface {
 	// üzere 'pending'e döner (tam tarama, yeniden ilk yükleme). Çalışan ya da
 	// hatalı pencere olduğu gibi kalır.
 	PlanSyncWindow(ctx context.Context, arg PlanSyncWindowParams) (SyncWindow, error)
+	PrepareTaxReturn(ctx context.Context, arg PrepareTaxReturnParams) (TaxReturn, error)
 	PublishLegalDocument(ctx context.Context, arg PublishLegalDocumentParams) (LegalDocument, error)
 	// Webhook (issue #385): zamanlanmış bağlantının sıradaki senkronunu şimdiye
 	// çeker ve son bildirim zamanını yazar.
@@ -1069,6 +1073,7 @@ type Querier interface {
 	RefreshSessionEnded(ctx context.Context, arg RefreshSessionEndedParams) (pgtype.Bool, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
+	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
 	// Daha yüksek öncelikli bir kaynak geldiğinde faturanın içeriği o kaynaktan
 	// yeniden yazılır (01 §6). Kimlik (id, uuid) ve ETTN korunur.
 	ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceContentParams) (int64, error)
@@ -1207,6 +1212,32 @@ type Querier interface {
 	// Aynı hedef alanın bekleyen önerisi yenisiyle değişir.
 	SupersedePendingSuggestions(ctx context.Context, arg SupersedePendingSuggestionsParams) ([]SupersedePendingSuggestionsRow, error)
 	SupersedePeriodSummaryDrafts(ctx context.Context, arg SupersedePeriodSummaryDraftsParams) error
+	// Ba/Bs: karşı tarafa (VKN / TCKN) göre belge sayısı ve KDV hariç tutar (TL).
+	TaxReturnCounterparties(ctx context.Context, arg TaxReturnCounterpartiesParams) ([]TaxReturnCounterpartiesRow, error)
+	TaxReturnExpenseStats(ctx context.Context, arg TaxReturnExpenseStatsParams) (TaxReturnExpenseStatsRow, error)
+	// Onaylı, KDV'si indirilebilir masraf fişlerinin (ÖKC, akaryakıt, SMM ...)
+	// oran kırılımı. Maaş, vergi ödemesi ve banka masrafı KDV taşımaz.
+	TaxReturnExpenseVAT(ctx context.Context, arg TaxReturnExpenseVATParams) ([]TaxReturnExpenseVATRow, error)
+	// MUHSGK ücret dışı stopaj: gelen faturalarda (SMM, müstahsil, kira ...)
+	// kesilen gelir vergisi, belge sınıfına göre.
+	TaxReturnIncomeWithholdings(ctx context.Context, arg TaxReturnIncomeWithholdingsParams) ([]TaxReturnIncomeWithholdingsRow, error)
+	// Beyanname önizlemesi (#390): KDV1, MUHSGK ve Ba/Bs kaynak verisi ile
+	// ofisin dönem beyan kayıtları (tax_returns). Fatura kuralları KDV erken
+	// uyarıyla aynı (vat_forecast.sql): yalnızca aktif ve kaynakta silinmemiş
+	// faturalar; döviz tutarı invoices.exchange_rate ile TL'ye çevrilir ve özet
+	// satırı bazında kuruşa yuvarlanır; kuru olmayan döviz faturası dışarıda.
+	TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoiceLinesParams) ([]TaxReturnInvoiceLinesRow, error)
+	// Kontrol listesi: beyana giren / girmeyen fatura sayıları.
+	TaxReturnInvoiceStats(ctx context.Context, arg TaxReturnInvoiceStatsParams) (TaxReturnInvoiceStatsRow, error)
+	// Ba/Bs: karşı taraf kimliği olmayan (yabancı ya da eksik) faturalar.
+	TaxReturnMissingCounterparty(ctx context.Context, arg TaxReturnMissingCounterpartyParams) ([]TaxReturnMissingCounterpartyRow, error)
+	// MUHSGK çalışan eki: dönem bordrosunun satırları (TCKN maskeli).
+	TaxReturnPayrollLines(ctx context.Context, arg TaxReturnPayrollLinesParams) ([]TaxReturnPayrollLinesRow, error)
+	// Z raporları: onaylı / bekleyen sayısı, oran kırılımı olmayan onaylılar ve
+	// kredi kartıyla tahsil edilen (KDV dahil) tutar.
+	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
+	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
+	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	TouchBankStatementTemplate(ctx context.Context, arg TouchBankStatementTemplateParams) error
@@ -1307,6 +1338,8 @@ type Querier interface {
 	// Z raporu retail_sales'e günlük toplam olarak yazılır (01 §4.7); kaynak kimliği "z:<id>".
 	UpsertSourceZReport(ctx context.Context, arg UpsertSourceZReportParams) (UpsertSourceZReportRow, error)
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
+	// Taslağın düzeltme alanları ve onaylanan maddeler; yalnızca taslakken.
+	UpsertTaxReturnDraft(ctx context.Context, arg UpsertTaxReturnDraftParams) (TaxReturn, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)

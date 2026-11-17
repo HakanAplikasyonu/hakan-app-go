@@ -1956,6 +1956,31 @@ type SyncWindow struct {
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
+type TaxReturn struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Kind           string             `json:"kind"`
+	Period         string             `json:"period"`
+	Status         string             `json:"status"`
+	Adjustments    []byte             `json:"adjustments"`
+	Acknowledged   []byte             `json:"acknowledged"`
+	Snapshot       []byte             `json:"snapshot"`
+	PayableAmount  pgtype.Numeric     `json:"payable_amount"`
+	CarryOut       pgtype.Numeric     `json:"carry_out"`
+	FiledOn        pgtype.Date        `json:"filed_on"`
+	AccrualNumber  pgtype.Text        `json:"accrual_number"`
+	Note           pgtype.Text        `json:"note"`
+	PreparedBy     pgtype.Int8        `json:"prepared_by"`
+	PreparedAt     pgtype.Timestamptz `json:"prepared_at"`
+	FiledBy        pgtype.Int8        `json:"filed_by"`
+	FiledAt        pgtype.Timestamptz `json:"filed_at"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Taxpayer struct {
 	ID           int64              `json:"id"`
 	Uuid         uuid.UUID          `json:"uuid"`

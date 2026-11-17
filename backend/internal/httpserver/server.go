@@ -118,6 +118,7 @@ import (
 	supportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/support"
 	taxpayerportal "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayerportal"
 	taxpayersmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxpayers"
+	taxreturnsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxreturns"
 	tenantmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/tenant"
 	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
 	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
@@ -642,6 +643,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		WithAI(excelmapping.NewAIMapper(aiSvc)))
 	payrollmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, payrollH)
 	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
+	// Beyanname formatına uygunluk (#390): KDV1, MUHSGK ve Ba/Bs önizlemesi, beyan kayıtları.
+	taxreturnsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		taxreturnsmodule.NewHandler(taxreturnsmodule.New(deps.DB)))
 	// Belge arşivi ve İSG evrakları (#393).
 	var archiveStore archivemodule.ObjectStore
 	if deps.Storage != nil {
