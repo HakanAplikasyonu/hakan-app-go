@@ -9,6 +9,7 @@ import (
 	accesshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/access/handler"
 	accountplanmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan"
 	accountplanhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
+	planexporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/planexport"
 	accountrulesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules"
 	accountruleshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountrules/handler"
 	activitymodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/activity"
@@ -61,8 +62,10 @@ type moduleHandlers struct {
 	receipts *receiptshandler.Handler
 	// accountplan: hedef hesap planı (issue #30).
 	accountplan *accountplanhandler.Handler
-	periods     *periodshandler.Handler
-	summaries   *summarieshandler.Handler
+	// planexport: Luca hesap planı CSV ve cari alt hesaplar (#464).
+	planexport *planexporthandler.Handler
+	periods    *periodshandler.Handler
+	summaries  *summarieshandler.Handler
 	// reports: mükellef raporu (issue #386).
 	reports *reportsmodule.Handler
 	// copilot: sıradaki iş akışı ve komut çubuğu (issue #392).
@@ -106,7 +109,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		reviewmodule.Module{H: h.review, Engagements: h.engagements},
 		excelimportmodule.Module{H: h.excel, Engagements: h.engagements},
 		receiptsmodule.Module{H: h.receipts, Engagements: h.engagements},
-		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements},
+		accountplanmodule.Module{H: h.accountplan, Engagements: h.engagements, Plan: h.planexport},
 		periodsmodule.Module{H: h.periods, Engagements: h.engagements},
 		summariesmodule.Module{H: h.summaries, Engagements: h.engagements},
 		reportsmodule.Module{H: h.reports, Engagements: h.engagements, Taxpayers: h.taxpayers},

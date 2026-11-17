@@ -13639,6 +13639,176 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/subaccounts:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: listCariSubaccounts
+      summary: Cari sub accounts (generated and cari memory), with whether Luca's plan has them
+      description: Requires `tenant.account_plan.read` (#464).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 200 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Sub accounts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCariSubaccountList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [AccountPlan]
+      operationId: allocateCariSubaccount
+      summary: Sub account code of one cari under a main account
+      description: |
+        Requires `tenant.account_plan.write` (#464). Returns the cari's code
+        under `main_code` (120, 320, 159, 329 …): an earlier generated code
+        or a cari memory code as is (`200`, `created: false`), otherwise the
+        next free code (`201`). Levels and digit widths come from the
+        engagement's last imported Luca plan (120.01.001 → two levels of 2
+        and 3 digits), else the template default. The code never clashes
+        with the plan or another cari; the same cari never gets a second
+        code. The cari is given by its card (`customer_uuid`); no VKN /
+        TCKN is taken as input (D1b). A full level is `422 NO_FREE_CODE`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CariSubaccountInput" }
+      responses:
+        "200":
+          description: Existing code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCariSubaccountAllocation" }
+        "201":
+          description: New code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCariSubaccountAllocation" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`NO_FREE_CODE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-plan/subaccounts/generate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [AccountPlan]
+      operationId: generateCariSubaccounts
+      summary: Sub accounts for every customer (120) and supplier (320) card without one
+      description: Requires `tenant.account_plan.write` (#464). `main_codes` limits the run to 120 and/or 320.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                main_codes: { type: array, items: { type: string, enum: ["120", "320"] } }
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCariSubaccountGenerate" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422":
+          description: "`NO_FREE_CODE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-plan/luca-files:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: listLucaPlanFiles
+      summary: Download history of Luca hesap planı files
+      description: Requires `tenant.account_plan.read` (#464). Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeLucaPlanFileList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [AccountPlan]
+      operationId: downloadLucaPlanFile
+      summary: Luca "Hesap Planı Aktar" CSV (unverified template)
+      description: |
+        Requires `tenant.account_plan.read` (#464). `kind: new` lists only
+        the accounts Luca does not have yet (cari sub accounts and their
+        missing parent accounts, compared with the last imported Luca hesap
+        planı / mizan); `kind: full` the whole plan plus those. Columns, in
+        order: Hesap Kodu, Hesap Adı, Vergi No, Vergi Dairesi, T.C. Kimlik No,
+        Adres, Döviz, E-Posta, Kdv Oran, Kdv Hesap Kodu; `;` delimiter,
+        Windows-1254, CRLF, no line ending after the last line. The layout is
+        the YAML template `luca/templates/hesap_plani_<version>.yaml`
+        (`verified: false`: another team's observation of the Luca screen,
+        not tried in Luca). The download is recorded in the history;
+        `X-Export-UUID` names the record. Nothing new is
+        `422 NO_NEW_ACCOUNTS`; an empty Hesap Kodu / Hesap Adı is
+        `422 REQUIRED_FIELD_MISSING`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [new, full] }
+                template: { type: string, description: Template version; empty = default }
+      responses:
+        "200":
+          description: CSV file (Windows-1254)
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "422":
+          description: "`NO_NEW_ACCOUNTS` or `REQUIRED_FIELD_MISSING`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/missing-template:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21856,6 +22026,98 @@ components:
           required: [items, limit, offset]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/JournalExportDocument" } }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    CariSubaccount:
+      type: object
+      required: [code, main_code, name, counterparty_key, source, in_plan]
+      properties:
+        code: { type: string, example: "120.01.003" }
+        parent_code: { type: string, example: "120.01" }
+        main_code: { type: string, example: "120" }
+        name: { type: string }
+        counterparty_key: { type: string, description: "VKN / TCKN, or customer:<uuid>" }
+        customer_uuid: { type: string, format: uuid }
+        source: { type: string, enum: [generated, memory] }
+        in_plan: { type: boolean, description: The last imported Luca plan has the code }
+        created_at: { type: string, format: date-time }
+
+    CariSubaccountInput:
+      type: object
+      required: [main_code, customer_uuid]
+      properties:
+        main_code: { type: string, example: "120" }
+        customer_uuid: { type: string, format: uuid, description: The cari card; its VKN / TCKN keys the code }
+
+    LucaPlanFile:
+      type: object
+      required: [uuid, kind, template_version, template_verified, file_name, sha256, size, account_count, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        kind: { type: string, enum: [new, full] }
+        template_version: { type: string }
+        template_verified: { type: boolean }
+        file_name: { type: string }
+        sha256: { type: string }
+        size: { type: integer, format: int32 }
+        account_count: { type: integer, format: int32 }
+        compared_import_uuid: { type: string, format: uuid }
+        compared_file_name: { type: string }
+        created_at: { type: string, format: date-time }
+
+    EnvelopeCariSubaccountList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, total, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/CariSubaccount" } }
+            total: { type: integer }
+            limit: { type: integer }
+            offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeCariSubaccountAllocation:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [subaccount, created]
+          properties:
+            subaccount: { $ref: "#/components/schemas/CariSubaccount" }
+            created: { type: boolean }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeCariSubaccountGenerate:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [created, existing]
+          properties:
+            created: { type: array, items: { $ref: "#/components/schemas/CariSubaccount" } }
+            existing: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLucaPlanFileList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, limit, offset]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/LucaPlanFile" } }
             limit: { type: integer }
             offset: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }

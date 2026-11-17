@@ -8,6 +8,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/handler"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/accountplan/planexport"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -17,6 +18,8 @@ import (
 type Module struct {
 	H           *handler.Handler
 	Engagements engagementctx.Resolver
+	// Plan serves the Luca hesap planı file and cari sub accounts (#464).
+	Plan *planexport.Handler
 }
 
 // Name implements module.Module.
@@ -45,4 +48,12 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base+"/check", read, h.Check, eng...)
 	r.Tenant("GET "+base+"/missing", read, h.Missing, eng...)
 	r.Tenant("POST "+base+"/missing-template", read, h.MissingTemplate, eng...)
+	// Luca hesap planı CSV and cari sub accounts (#464).
+	if m.Plan != nil {
+		r.Tenant("GET "+base+"/subaccounts", read, m.Plan.ListSubaccounts, eng...)
+		r.Tenant("POST "+base+"/subaccounts", write, m.Plan.Allocate, eng...)
+		r.Tenant("POST "+base+"/subaccounts/generate", write, m.Plan.Generate, eng...)
+		r.Tenant("GET "+base+"/luca-files", read, m.Plan.ListFiles, eng...)
+		r.Tenant("POST "+base+"/luca-files", read, m.Plan.BuildFile, eng...)
+	}
 }

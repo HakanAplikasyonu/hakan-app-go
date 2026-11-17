@@ -10248,6 +10248,118 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/subaccounts": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Cari sub accounts (generated and cari memory), with whether Luca's plan has them
+         * @description Requires `tenant.account_plan.read` (#464).
+         */
+        get: operations["listCariSubaccounts"];
+        put?: never;
+        /**
+         * Sub account code of one cari under a main account
+         * @description Requires `tenant.account_plan.write` (#464). Returns the cari's code
+         *     under `main_code` (120, 320, 159, 329 …): an earlier generated code
+         *     or a cari memory code as is (`200`, `created: false`), otherwise the
+         *     next free code (`201`). Levels and digit widths come from the
+         *     engagement's last imported Luca plan (120.01.001 → two levels of 2
+         *     and 3 digits), else the template default. The code never clashes
+         *     with the plan or another cari; the same cari never gets a second
+         *     code. The cari is given by its card (`customer_uuid`); no VKN /
+         *     TCKN is taken as input (D1b). A full level is `422 NO_FREE_CODE`.
+         */
+        post: operations["allocateCariSubaccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/subaccounts/generate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sub accounts for every customer (120) and supplier (320) card without one
+         * @description Requires `tenant.account_plan.write` (#464). `main_codes` limits the run to 120 and/or 320.
+         */
+        post: operations["generateCariSubaccounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/luca-files": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download history of Luca hesap planı files
+         * @description Requires `tenant.account_plan.read` (#464). Newest first.
+         */
+        get: operations["listLucaPlanFiles"];
+        put?: never;
+        /**
+         * Luca "Hesap Planı Aktar" CSV (unverified template)
+         * @description Requires `tenant.account_plan.read` (#464). `kind: new` lists only
+         *     the accounts Luca does not have yet (cari sub accounts and their
+         *     missing parent accounts, compared with the last imported Luca hesap
+         *     planı / mizan); `kind: full` the whole plan plus those. Columns, in
+         *     order: Hesap Kodu, Hesap Adı, Vergi No, Vergi Dairesi, T.C. Kimlik No,
+         *     Adres, Döviz, E-Posta, Kdv Oran, Kdv Hesap Kodu; `;` delimiter,
+         *     Windows-1254, CRLF, no line ending after the last line. The layout is
+         *     the YAML template `luca/templates/hesap_plani_<version>.yaml`
+         *     (`verified: false`: another team's observation of the Luca screen,
+         *     not tried in Luca). The download is recorded in the history;
+         *     `X-Export-UUID` names the record. Nothing new is
+         *     `422 NO_NEW_ACCOUNTS`; an empty Hesap Kodu / Hesap Adı is
+         *     `422 REQUIRED_FIELD_MISSING`.
+         */
+        post: operations["downloadLucaPlanFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/account-plan/missing-template": {
         parameters: {
             query?: never;
@@ -17182,6 +17294,92 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["JournalExportDocument"][];
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CariSubaccount: {
+            /** @example 120.01.003 */
+            code: string;
+            /** @example 120.01 */
+            parent_code?: string;
+            /** @example 120 */
+            main_code: string;
+            name: string;
+            /** @description VKN / TCKN, or customer:<uuid> */
+            counterparty_key: string;
+            /** Format: uuid */
+            customer_uuid?: string;
+            /** @enum {string} */
+            source: "generated" | "memory";
+            /** @description The last imported Luca plan has the code */
+            in_plan: boolean;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        CariSubaccountInput: {
+            /** @example 120 */
+            main_code: string;
+            /**
+             * Format: uuid
+             * @description The cari card; its VKN / TCKN keys the code
+             */
+            customer_uuid: string;
+        };
+        LucaPlanFile: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            kind: "new" | "full";
+            template_version: string;
+            template_verified: boolean;
+            file_name: string;
+            sha256: string;
+            /** Format: int32 */
+            size: number;
+            /** Format: int32 */
+            account_count: number;
+            /** Format: uuid */
+            compared_import_uuid?: string;
+            compared_file_name?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeCariSubaccountList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["CariSubaccount"][];
+                total: number;
+                limit: number;
+                offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCariSubaccountAllocation: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                subaccount: components["schemas"]["CariSubaccount"];
+                created: boolean;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCariSubaccountGenerate: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                created: components["schemas"]["CariSubaccount"][];
+                existing: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLucaPlanFileList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["LucaPlanFile"][];
                 limit: number;
                 offset: number;
             };
@@ -35749,6 +35947,226 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listCariSubaccounts: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sub accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCariSubaccountList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    allocateCariSubaccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CariSubaccountInput"];
+            };
+        };
+        responses: {
+            /** @description Existing code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCariSubaccountAllocation"];
+                };
+            };
+            /** @description New code */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCariSubaccountAllocation"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_FREE_CODE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    generateCariSubaccounts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    main_codes?: ("120" | "320")[];
+                };
+            };
+        };
+        responses: {
+            /** @description Result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCariSubaccountGenerate"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `NO_FREE_CODE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listLucaPlanFiles: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description History */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLucaPlanFileList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadLucaPlanFile: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "new" | "full";
+                    /** @description Template version; empty = default */
+                    template?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description CSV file (Windows-1254) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            /** @description `NO_NEW_ACCOUNTS` or `REQUIRED_FIELD_MISSING` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
