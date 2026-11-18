@@ -66,7 +66,7 @@ function RowDragHandle() {
       type="button"
       className={cn(
         "inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0",
-        "text-muted-foreground/70 transition-colors outline-none",
+        "text-muted-foreground transition-colors outline-none",
         "hover:text-foreground hover:bg-transparent",
         "focus-visible:ring-ring focus-visible:ring-2",
         "cursor-grab touch-none active:cursor-grabbing",

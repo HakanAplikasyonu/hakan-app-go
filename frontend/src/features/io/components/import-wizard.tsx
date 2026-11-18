@@ -100,7 +100,7 @@ function StepIndicator({ step, t }: { step: Step; t: (k: string) => string }) {
               ? "border-primary bg-primary/10 text-primary font-medium"
               : index < activeIndex
                 ? "text-muted-foreground border-border"
-                : "text-muted-foreground/70 border-dashed",
+                : "text-muted-foreground border-dashed",
           )}
         >
           {t(`imports.step.${s}`)}
