@@ -187,7 +187,7 @@ type BigTaxpayer struct {
 
 // Rand returns the deterministic random stream of (office, index, salt).
 func Rand(office, index int, salt uint64) *rand.Rand {
-	return rand.New(rand.NewPCG(BigSeed^salt, uint64(office)<<32|uint64(index)))
+	return rand.New(rand.NewPCG(BigSeed^salt, uint64(office)<<32|uint64(index))) //nolint:gosec // deterministik demo verisi, güvenlik amaçlı değil
 }
 
 // GenerateTaxpayers returns n taxpayers of office o (0-based), deterministic.
