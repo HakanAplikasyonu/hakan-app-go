@@ -7,8 +7,8 @@
 // "Seçiciler kırılırsa").
 //
 // Gizlilik: buradaki seçicilerin hiçbiri mesaj metnini hedeflemez. Okunan
-// şeyler yalnızca mesaj satırının data-id özniteliği (sohbet kimliği için),
-// sohbet başlığı, görselin blob adresi ve belgenin dosya adıdır.
+// şeyler yalnızca mesaj satırının data-id özniteliği (eski sürümlerde sohbet
+// kimliği için), sohbet başlığı, görselin blob adresi ve belgenin dosya adıdır.
 
 export const SELECTORS = {
   /** Açık sohbet paneli. */
@@ -16,11 +16,20 @@ export const SELECTORS = {
   /** Sohbet başlığındaki ad (kişi / grup adı); title özniteliği tercih edilir. */
   chatTitle: [
     '#main header [data-testid="conversation-info-header-chat-title"]',
+    '#main header [data-testid="conversation-info-header-chat-title-name"]',
     "#main header span[title]",
     '#main header span[dir="auto"]',
   ],
-  /** Bir mesaj satırı: data-id = "<true|false>_<sohbet jid>_<mesaj id>[_<katılımcı>]". */
-  messageRow: "#main [data-id]",
+  /**
+   * Bir mesaj satırı. Güncel sürüm: data-id = "<mesaj id>",
+   * data-testid = "conv-msg-<mesaj id>". Eski sürüm: data-id =
+   * "<true|false>_<sohbet jid>_<mesaj id>[_<katılımcı>]".
+   */
+  messageRow: ["#main [data-id]", '#main [data-testid^="conv-msg-"]'],
+  /** Eski sürümde sohbet kimliğini taşıyan satırlar. */
+  legacyMessageRow: "#main [data-id]",
+  /** Mesaj satırı sayılmayacak data-id önekleri (gruplanmış çıkartmalar). */
+  messageRowSkipPrefix: ["grouped-sticker"],
   /** Mesaj içindeki görsel: indirilmiş görseller blob: adresiyle gelir. */
   messageImage: 'img[src^="blob:"]',
   /** Henüz indirilmemiş görselin bulanık önizlemesi. */
@@ -43,6 +52,7 @@ export const SELECTORS = {
   /** Belgenin indirme düğmesi (uzantı bunu tıklatıp dosyayı yakalar). */
   documentDownload: [
     '[data-testid="document-download"]',
+    '[data-testid="media-state-download"]',
     '[data-icon="audio-download"]',
     '[data-icon*="download"]',
     'button[aria-label*="İndir"]',
@@ -60,7 +70,8 @@ export const SELECTORS = {
 export const OWN_PREFIX = "hakan-wa";
 
 /**
- * data-id'den sohbet kimliği. Örnekler:
+ * Eski sürümlerde data-id'den sohbet kimliği (güncel sürümde kimlik
+ * sayfanın kendi dünyasından gelir, bkz. chat.ts). Örnekler:
  *   false_905551112233@c.us_3EB0A1B2C3        → 905551112233@c.us
  *   true_120363041234567890@g.us_ABCD_9055…@c.us → 120363041234567890@g.us
  *   false_98765432101234@lid_3EB0…            → 98765432101234@lid

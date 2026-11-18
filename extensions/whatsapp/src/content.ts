@@ -47,8 +47,9 @@ let running = false;
 
 async function onSave(target: Target, resolve: () => MediaItem | null, bar: Element | null): Promise<void> {
   if (running) return;
-  const chat = currentChat(document);
   const item = resolve();
+  // Kimlik tıklama anında istenir (sayfanın dünyasından, yoksa data-id'den).
+  const chat = item ? await currentChat(document) : null;
   if (!chat || !item) {
     toast(document, "Sohbet ya da dosya tanınamadı. Sohbeti yeniden açıp deneyin.", "error");
     return;

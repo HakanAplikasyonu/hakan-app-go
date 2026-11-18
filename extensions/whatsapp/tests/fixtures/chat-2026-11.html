@@ -1,0 +1,72 @@
+<!-- WhatsApp Web sohbet paneli, 2026 Kasım sonrası yapı (issue #388).
+     data-id artık yalnızca mesaj kimliğidir (true_/false_ öneki ve sohbet
+     jid'i yok); satır data-testid="conv-msg-<mesaj id>" taşır. Yapı,
+     kullanıcının tarayıcısından alınan maskeli tanı özetinden (scripts/tani.js)
+     sadeleştirildi. Mesaj metinleri, adlar ve tarihler uydurmadır ve uzantı
+     tarafından OKUNMAMALIDIR (testler denetler). -->
+<div id="app">
+  <div id="main">
+    <header data-testid="conversation-header">
+      <div data-testid="conversation-info-header">
+        <div data-testid="conversation-info-header-chat-title" aria-label="Deniz Yel (Yel Kırtasiye)">
+          <span dir="auto" data-testid="conversation-info-header-chat-title-name">Deniz Yel (Yel Kırtasiye)</span>
+        </div>
+      </div>
+    </header>
+    <div data-testid="conversation-panel-messages">
+      <div tabindex="-1" data-id="3B51F5A488CCD6E7B829" data-testid="conv-msg-3B51F5A488CCD6E7B829">
+        <div data-virtualized="false">
+          <div data-testid="msg-container">
+            <div data-pre-plain-text="[10:15, 03.11.2026] Deniz Yel: ">
+              <span data-testid="selectable-text">GİZLİ MESAJ METNİ: kira ödemesi yarın</span>
+            </div>
+            <div data-testid="msg-meta"><span>10:15</span></div>
+          </div>
+        </div>
+      </div>
+      <div tabindex="-1" data-id="AC1F00D2E3B4C5D6E7F8" data-testid="conv-msg-AC1F00D2E3B4C5D6E7F8">
+        <div data-virtualized="false">
+          <div data-testid="msg-container">
+            <span data-testid="tail-in" data-icon="tail-in"></span>
+            <div role="button"><img src="blob:https://web.whatsapp.com/66666666-6666-6666-6666-666666666666" alt="" width="330" height="440"></div>
+            <div data-pre-plain-text="[10:16, 03.11.2026] Deniz Yel: "><span data-testid="selectable-text">Fiş GİZLİ AÇIKLAMA</span></div>
+            <div data-testid="msg-meta"><span>10:16</span></div>
+          </div>
+        </div>
+      </div>
+      <div tabindex="-1" data-id="B0B0B0B0C1C1C1C1D2D2" data-testid="conv-msg-B0B0B0B0C1C1C1C1D2D2">
+        <div data-virtualized="false">
+          <div data-testid="msg-container">
+            <img src="data:image/jpeg;base64,/9j/4AAQSkZJRg==" alt="" width="330" height="440">
+            <div data-testid="media-state-download" role="button"><span data-icon="media-download"></span></div>
+          </div>
+        </div>
+      </div>
+      <div tabindex="-1" data-id="grouped-sticker--3EB0AAAA-3EB0BBBB">
+        <div data-testid="sticker-container">
+          <div data-testid="grouped-sticker-item"><img src="blob:https://web.whatsapp.com/77777777-7777-7777-7777-777777777777" alt="" width="190" height="190"></div>
+        </div>
+      </div>
+      <div tabindex="-1" data-id="D0C0FFEE000011112222" data-testid="conv-msg-D0C0FFEE000011112222">
+        <div data-virtualized="false">
+          <div data-testid="msg-container">
+            <div data-testid="quoted-message"><span data-testid="author">Deniz Yel</span><span data-testid="selectable-text">GİZLİ ALINTI</span></div>
+            <div data-testid="document-thumb"><span data-icon="document-pdf-icon"></span></div>
+            <span title="Kasım aidat makbuzu.pdf">Kasım aidat makbuzu.pdf</span>
+            <span title="2 sayfa">2 sayfa</span>
+            <div data-testid="media-state-download" role="button"><span data-icon="media-download"></span></div>
+            <div data-testid="msg-meta"><span>10:20</span></div>
+          </div>
+        </div>
+      </div>
+      <div tabindex="-1" data-id="E1E1E1E1F2F2F2F2A3A3" data-testid="conv-msg-E1E1E1E1F2F2F2F2A3A3">
+        <div data-virtualized="false">
+          <div data-testid="msg-container">
+            <div data-testid="document-thumb"><span data-icon="document-xls-icon"></span></div>
+            <span title="mizan.xlsx">mizan.xlsx</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

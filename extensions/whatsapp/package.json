@@ -1,6 +1,6 @@
 {
   "name": "@app/whatsapp-extension",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "HAKAN WhatsApp Web uzantısı (Chrome / Edge, Manifest V3): tıklanan görsel / PDF'i gider, gelir ya da belge olarak kaydeder",
   "type": "module",

@@ -1,7 +1,8 @@
-// Sayfadan okunanlar: sohbet kimliği, sohbet başlığı ve kaydedilebilir
+// Sayfadan okunanlar: sohbet kimliği (chat.ts ya da eski data-id), sohbet başlığı ve kaydedilebilir
 // medya. Seçicilerin tamamı selectors.ts'tedir. Mesaj metni okunmaz:
 // fonksiyonlar textContent / innerText kullanmaz, yalnızca öznitelik okur.
 
+import { requestChat, type PageChat } from "./chat";
 import { CHAT_ID_RE, DOCUMENT_EXTENSIONS, SELECTORS, closestAny, queryFirst } from "./selectors";
 
 export interface ChatInfo {
@@ -39,13 +40,48 @@ export function chatTitle(doc: Document): string {
   return raw.trim().slice(0, 120);
 }
 
-/** Açık sohbet: kimlik herhangi bir mesaj satırının data-id'sinden gelir. */
-export function currentChat(doc: Document): ChatInfo | null {
-  for (const row of Array.from(doc.querySelectorAll(SELECTORS.messageRow))) {
+const ROW_SELECTOR = SELECTORS.messageRow.join(", ");
+
+/** Açık sohbetin mesaj satırları (iç içe eşleşmeler ve gruplanmış çıkartmalar hariç). */
+export function messageRows(doc: Document): Element[] {
+  const out: Element[] = [];
+  for (const row of Array.from(doc.querySelectorAll(ROW_SELECTOR))) {
+    const id = row.getAttribute("data-id") ?? "";
+    if (SELECTORS.messageRowSkipPrefix.some((p) => id.startsWith(p))) continue;
+    if (row.parentElement?.closest(ROW_SELECTOR)) continue;
+    out.push(row);
+  }
+  return out;
+}
+
+/** Eski sürüm: kimlik herhangi bir mesaj satırının data-id'sinden gelir. */
+export function legacyChat(doc: Document): ChatInfo | null {
+  for (const row of Array.from(doc.querySelectorAll(SELECTORS.legacyMessageRow))) {
     const jid = parseChatJid(row.getAttribute("data-id"));
     if (jid) return { jid, title: chatTitle(doc) };
   }
   return null;
+}
+
+/**
+ * Açık sohbet. Önce sayfanın kendi dünyasına sorulur (güncel WhatsApp,
+ * chat.ts); yanıt yoksa eski data-id ayrıştırmasına düşülür.
+ */
+export async function currentChat(
+  doc: Document,
+  ask: (win: Window) => Promise<PageChat | null> = requestChat,
+): Promise<ChatInfo | null> {
+  const win = doc.defaultView;
+  let page: PageChat | null = null;
+  if (win) {
+    try {
+      page = await ask(win);
+    } catch {
+      page = null;
+    }
+  }
+  if (page?.jid) return { jid: page.jid, title: page.title || chatTitle(doc) };
+  return legacyChat(doc);
 }
 
 function isExcludedImage(img: HTMLImageElement): boolean {
@@ -84,8 +120,7 @@ export function mediaOf(row: Element): MediaItem | null {
 /** Açık sohbetteki bütün medya mesajları. */
 export function findMedia(doc: Document): MediaItem[] {
   const out: MediaItem[] = [];
-  for (const row of Array.from(doc.querySelectorAll(SELECTORS.messageRow))) {
-    if (!parseChatJid(row.getAttribute("data-id"))) continue;
+  for (const row of messageRows(doc)) {
     const m = mediaOf(row);
     if (m) out.push(m);
   }
