@@ -101,6 +101,28 @@ func seedBig(ctx context.Context, pool *pgxpool.Pool, pass string, sc bigScale, 
 	if err := bigTaxpayers(ctx, pool, w); err != nil {
 		return err
 	}
+	cnt := &bigCounts{}
+	for _, o := range w.offices {
+		t0 := time.Now()
+		ms := buildModels(w, o)
+		ids, err := writeDocuments(ctx, pool, w, o, ms, cnt)
+		if err != nil {
+			return fmt.Errorf("%s documents: %w", o.def.Slug, err)
+		}
+		for _, m := range ms {
+			tax := m.defaultTaxDue(w)
+			m.buildBank(w, w.cps, tax)
+			m.buildVouchers(w, tax)
+		}
+		if err := writeLedger(ctx, pool, w, o, ms, ids, cnt); err != nil {
+			return fmt.Errorf("%s ledger: %w", o.def.Slug, err)
+		}
+		fmt.Printf("big demo %-14s %d taxpayers (%s)\n", o.def.Slug, len(ms), time.Since(t0).Round(time.Millisecond))
+	}
+	if _, err := pool.Exec(ctx, `ANALYZE`); err != nil {
+		return fmt.Errorf("analyze: %w", err)
+	}
+	cnt.print()
 	fmt.Printf("big demo: %d offices, %d taxpayers, %s … %s (%s)\n", len(w.offices), w.clientCount(),
 		w.periods[0], w.periods[len(w.periods)-1], time.Since(start).Round(time.Millisecond))
 	return nil
@@ -169,7 +191,10 @@ func bigOffices(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, pass strin
 	return nil
 }
 
-// portalUser is the office's taxpayer-side account (last of staff).
+// owner, müşavir and portal user ids of an office (staff: owner first,
+// portal user last).
+func (o *bigOffice) owner() int64      { return o.staff[0] }
+func (o *bigOffice) accountant() int64 { return o.staff[1] }
 func (o *bigOffice) portalUser() int64 { return o.staff[len(o.staff)-1] }
 
 // bigTaxpayers registers the generated taxpayers, their engagements (most

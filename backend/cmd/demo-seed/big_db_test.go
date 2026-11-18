@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +58,8 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 		t.Errorf("portal user memberships = %d, want 1", n)
 	}
 
+	checkBigLedger(t, d)
+
 	if err := dropDemo(ctx, d.Pool); err != nil {
 		t.Fatal(err)
 	}
@@ -68,5 +71,58 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM taxpayers WHERE id = $1`, realTP); n != 1 {
 		t.Error("reset deleted a real taxpayer")
+	}
+}
+
+// checkBigLedger: faturalar, Z raporları, banka, yevmiye ve mizan aynı
+// rakamları anlatır.
+func checkBigLedger(t *testing.T, d *testdb.DB) {
+	t.Helper()
+	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
+		JOIN organizations o ON o.id = e.organization_id
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+	slugs := demo.BigOfficeSlugs()[:testScale.Offices]
+	for _, c := range []struct{ name, sql string }{
+		{"engagement without invoices in a period", `SELECT count(*) FROM (` + big + `) e
+			JOIN engagements g ON g.id = e.id
+			CROSS JOIN generate_series(0, 3) m
+			WHERE g.started_at < DATE '2026-11-01' - make_interval(months => m)
+			  AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.taxpayer_id = g.taxpayer_id
+			       AND i.period = to_char(DATE '2026-11-01' - make_interval(months => m), 'YYYY-MM'))`},
+		{"invoice tax summary ≠ header", `SELECT count(*) FROM invoices i
+			WHERE i.source_system = 'demo_big' AND i.tax_amount <> (SELECT sum(vat) FROM invoice_tax_summaries s
+			WHERE s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id)`},
+		{"invoice items ≠ header", `SELECT count(*) FROM invoices i
+			WHERE i.source_system = 'demo_big' AND i.tax_exclusive_amount <> (SELECT sum(tax_exclusive_amount) FROM invoice_items s
+			WHERE s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id)`},
+		{"Z report VAT lines ≠ header", `SELECT count(*) FROM retail_sales r
+			WHERE r.source_system = 'demo_big' AND r.tax_amount <> (SELECT sum(tax_amount) FROM retail_sale_vat_lines l
+			WHERE l.retail_sale_id = r.id AND l.taxpayer_id = r.taxpayer_id)`},
+		{"unbalanced voucher", `SELECT count(*) FROM (SELECT journal_draft_id FROM journal_draft_lines l
+			WHERE l.engagement_id IN (` + big + `) GROUP BY 1 HAVING sum(debit) <> sum(credit)) x`},
+		{"unbalanced mizan", `SELECT count(*) FROM (SELECT import_id FROM trial_balance_lines
+			WHERE engagement_id IN (` + big + `) AND is_leaf GROUP BY 1 HAVING sum(debit) <> sum(credit)) x`},
+		{"negative bank balance", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND balance_after < 0`},
+		// Mizan 102 (Ekim) = ekstrenin Ekim sonu bakiyesi − kayda alınmamış hareketler.
+		{"mizan 102 ≠ bank", `SELECT count(*) FROM (` + big + `) e
+			JOIN bank_ledger_accounts a ON a.engagement_id = e.id
+			JOIN account_plan_imports i ON i.engagement_id = e.id AND i.period = '2026-10'
+			JOIN trial_balance_lines l ON l.import_id = i.id AND l.code = '102'
+			WHERE l.balance <> (SELECT b.balance_after FROM bank_transactions b WHERE b.cash_box_id = a.cash_box_id
+			      AND b.period <= '2026-10' ORDER BY b.booked_at DESC, b.id DESC LIMIT 1)
+			  - COALESCE((SELECT sum(CASE WHEN b.debit_credit = 'A' THEN b.amount ELSE -b.amount END) FROM bank_transactions b
+			      WHERE b.cash_box_id = a.cash_box_id AND b.period <= '2026-10' AND b.match_status IN ('unmatched', 'suggested')), 0)`},
+	} {
+		var args []any
+		if strings.Contains(c.sql, "$1") {
+			args = append(args, slugs)
+		}
+		if n := count(t, d, c.sql, args...); n != 0 {
+			t.Errorf("%s: %d", c.name, n)
+		}
+	}
+	if n := count(t, d, `SELECT count(*) FROM bank_transaction_matches m JOIN bank_transactions b ON b.id = m.bank_transaction_id
+		WHERE b.source_system = 'bank_demo_big'`); n == 0 {
+		t.Error("no bank ↔ invoice matches")
 	}
 }
