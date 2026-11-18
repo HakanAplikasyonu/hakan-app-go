@@ -64,7 +64,19 @@ func main() {
 	// varsayılan: e2e / görsel testler dış betik yüklemez.
 	widget := flag.String("clickfix-widget-id", "", "ClickFix widget id of the demo office (support channel of its taxpayers; default DEMO_CLICKFIX_WIDGET_ID)")
 	scaleName := flag.String("scale", "small", "small (pilot demo) or big (presentation: offices, dozens of taxpayers, 24 months)")
+	nowFlag := flag.String("now", "", "big demo reference day YYYY-MM-DD (default today; DEMO_BIG_NOW): the same day gives the same data")
 	flag.Parse()
+	if *nowFlag == "" {
+		*nowFlag = os.Getenv("DEMO_BIG_NOW")
+	}
+	bigNow := time.Now()
+	if *nowFlag != "" {
+		d, perr := time.ParseInLocation(time.DateOnly, *nowFlag, istanbul)
+		if perr != nil {
+			fatal("-now: %v", perr)
+		}
+		bigNow = d.Add(12 * time.Hour)
+	}
 	scale, big, err := parseScale(*scaleName)
 	if err != nil {
 		fatal("%v", err)
@@ -125,7 +137,7 @@ func main() {
 	}
 	err = seed(ctx, pool, *pass, *widget)
 	if err == nil && big {
-		err = seedBig(ctx, pool, *pass, scale, time.Now())
+		err = seedBig(ctx, pool, *pass, scale, bigNow)
 	}
 	if err != nil {
 		// The steps run through the services, each in its own transaction;

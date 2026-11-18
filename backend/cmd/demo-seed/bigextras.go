@@ -176,6 +176,10 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				FROM whatsapp_chat_links l JOIN engagements e ON e.id = l.engagement_id
 				CROSS JOIN generate_series(1, 4) g
 				WHERE l.engagement_id = ANY($1::bigint[])`, []any{engs, o.accountant(), w.now}},
+			// Yanıt bekleyen cari mektubu: gönderildi, yanıt gelmedi.
+			{"reconciliation_letters (gönderildi)", `
+				UPDATE reconciliation_letters SET status = 'sent', sent_at = $2::timestamptz, attempts = 1
+				WHERE engagement_id = ANY($1::bigint[]) AND status = 'draft'`, []any{engs, w.now.AddDate(0, 0, -3)}},
 			{"report_schedules", `
 				INSERT INTO report_schedules (organization_id, engagement_id, taxpayer_id, enabled, day_of_month, recipient, last_period, updated_by)
 				SELECT e.organization_id, e.id, e.taxpayer_id, e.id % 5 <> 0, 1 + e.id % 5, t.contact_email, $2, $3
