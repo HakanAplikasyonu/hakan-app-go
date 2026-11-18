@@ -401,7 +401,7 @@ export function SystemOverviewPage() {
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-muted-foreground/90 text-sm font-semibold tracking-wider uppercase">
+        <h2 className="text-muted-foreground text-sm font-semibold tracking-wider uppercase">
           {t("settings.system.section_services")}
         </h2>
 

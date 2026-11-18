@@ -963,7 +963,7 @@ export function EditableGrid<TData>({
                               {col.render
                                 ? col.render(value, row)
                                 : displayText(col, value, row, locale) || (
-                                    <span className="text-muted-foreground/60">
+                                    <span className="text-muted-foreground">
                                       {editable && col.placeholder
                                         ? col.placeholder
                                         : ""}

@@ -203,12 +203,12 @@ function SubSidebarGroup({
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="group text-muted-foreground/80 hover:text-foreground flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold tracking-wider uppercase transition-colors"
+          className="group text-muted-foreground hover:text-foreground flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold tracking-wider uppercase transition-colors"
         >
           <span>{t(group.labelKey)}</span>
           <ChevronDown
             className={cn(
-              "text-muted-foreground/60 group-hover:text-foreground size-3 transition-transform duration-200",
+              "text-muted-foreground group-hover:text-foreground size-3 transition-transform duration-200",
               isOpen ? "rotate-0" : "-rotate-90",
             )}
           />
@@ -569,7 +569,7 @@ export function SettingsMobileNav({ className }: { className?: string }) {
               >
                 {filteredGroups.map((group) => (
                   <div key={group.id} className="space-y-1">
-                    <h4 className="text-muted-foreground/80 px-2 text-[10px] font-bold tracking-wider uppercase">
+                    <h4 className="text-muted-foreground px-2 text-[10px] font-bold tracking-wider uppercase">
                       {t(group.labelKey)}
                     </h4>
                     <div className="space-y-0.5">
