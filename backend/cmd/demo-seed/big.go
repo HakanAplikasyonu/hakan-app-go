@@ -109,13 +109,25 @@ func seedBig(ctx context.Context, pool *pgxpool.Pool, pass string, sc bigScale, 
 		if err != nil {
 			return fmt.Errorf("%s documents: %w", o.def.Slug, err)
 		}
-		for _, m := range ms {
-			tax := m.defaultTaxDue(w)
-			m.buildBank(w, w.cps, tax)
-			m.buildVouchers(w, tax)
+		if err := bigPayroll(ctx, pool, w, o, ms, cnt); err != nil {
+			return fmt.Errorf("%s payroll: %w", o.def.Slug, err)
+		}
+		dues, err := bigTaxReturns(ctx, pool, w, o, ms, cnt)
+		if err != nil {
+			return fmt.Errorf("%s tax returns: %w", o.def.Slug, err)
+		}
+		for k, m := range ms {
+			m.buildBank(w, w.cps, dues[k])
+			m.buildVouchers(w, dues[k])
 		}
 		if err := writeLedger(ctx, pool, w, o, ms, ids, cnt); err != nil {
 			return fmt.Errorf("%s ledger: %w", o.def.Slug, err)
+		}
+		if err := bigReconciliation(ctx, pool, w, o, ms, cnt); err != nil {
+			return fmt.Errorf("%s reconciliation: %w", o.def.Slug, err)
+		}
+		if err := bigExtras(ctx, pool, w, o, ms, cnt); err != nil {
+			return fmt.Errorf("%s extras: %w", o.def.Slug, err)
 		}
 		fmt.Printf("big demo %-14s %d taxpayers (%s)\n", o.def.Slug, len(ms), time.Since(t0).Round(time.Millisecond))
 	}

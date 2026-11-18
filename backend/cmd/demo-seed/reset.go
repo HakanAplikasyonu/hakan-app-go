@@ -84,6 +84,13 @@ func dropDemoTx(ctx context.Context, tx pgx.Tx) error {
 			return err
 		}
 	}
+	// Ofise bağlı ama ON DELETE SET NULL olan kayıtlar (bildirim, denetim
+	// kaydı) sahipsiz kalmasın.
+	for _, table := range []string{"notifications", "activity_events"} {
+		if _, err := tx.Exec(ctx, `DELETE FROM `+table+` WHERE organization_id = ANY($1::bigint[])`, orgIDs); err != nil {
+			return fmt.Errorf("delete demo %s: %w", table, err)
+		}
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = ANY($1::bigint[])`, orgIDs); err != nil {
 		return fmt.Errorf("delete demo offices: %w", err)
 	}

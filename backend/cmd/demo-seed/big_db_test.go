@@ -59,6 +59,7 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 	}
 
 	checkBigLedger(t, d)
+	checkBigReturns(t, d)
 
 	if err := dropDemo(ctx, d.Pool); err != nil {
 		t.Fatal(err)
@@ -124,5 +125,54 @@ func checkBigLedger(t *testing.T, d *testdb.DB) {
 	if n := count(t, d, `SELECT count(*) FROM bank_transaction_matches m JOIN bank_transactions b ON b.id = m.bank_transaction_id
 		WHERE b.source_system = 'bank_demo_big'`); n == 0 {
 		t.Error("no bank ↔ invoice matches")
+	}
+}
+
+// checkBigReturns: beyannameler servisle hazırlandı; banka ödemeleri
+// verilen beyanla, SGK ödemesi tahakkukla aynı; güncel ayda dikkat
+// gerektiren kalemler var.
+func checkBigReturns(t *testing.T, d *testdb.DB) {
+	t.Helper()
+	slugs := demo.BigOfficeSlugs()[:testScale.Offices]
+	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
+		JOIN organizations o ON o.id = e.organization_id
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+	for _, c := range []struct {
+		name string
+		sql  string
+		min  int
+	}{
+		{"filed KDV1 (2026-08)", `SELECT count(*) FROM tax_returns WHERE engagement_id IN (` + big + `) AND kind = 'kdv1' AND period = '2026-08' AND status = 'filed'`, testScale.Offices * testScale.Taxpayers},
+		{"late KDV1 (2026-09, not filed)", `SELECT count(*) FROM tax_returns WHERE engagement_id IN (` + big + `) AND kind = 'kdv1' AND period = '2026-09' AND status <> 'filed'`, 1},
+		{"MUHSGK", `SELECT count(*) FROM tax_returns WHERE engagement_id IN (` + big + `) AND kind = 'muhsgk'`, 1},
+		{"payroll runs", `SELECT count(*) FROM payroll_runs p JOIN engagements e ON e.taxpayer_id = p.taxpayer_id WHERE e.id IN (` + big + `)`, 1},
+		{"unmatched bank lines", `SELECT count(*) FROM bank_transactions b JOIN engagements e ON e.taxpayer_id = b.taxpayer_id
+			WHERE e.id IN (` + big + `) AND b.match_status = 'unmatched'`, 1},
+		{"open blockers", `SELECT count(*) FROM data_warnings WHERE engagement_id IN (` + big + `) AND status = 'open' AND severity = 'blocker'`, 1},
+		{"open document tasks", `SELECT count(*) FROM document_tasks WHERE engagement_id IN (` + big + `) AND status = 'open'`, 1},
+		{"pending review items", `SELECT count(*) FROM suggestions WHERE engagement_id IN (` + big + `) AND status = 'pending'`, 1},
+		{"reconciliation differences", `SELECT count(*) FROM reconciliation_items it JOIN reconciliation_runs r ON r.id = it.run_id
+			WHERE r.engagement_id IN (` + big + `) AND it.result <> 'matched'`, 1},
+		{"letters", `SELECT count(*) FROM reconciliation_letters WHERE engagement_id IN (` + big + `)`, 1},
+		{"period locks", `SELECT count(*) FROM period_locks WHERE engagement_id IN (` + big + `)`, 1},
+		{"notifications", `SELECT count(*) FROM notifications n JOIN organizations o ON o.id = n.organization_id WHERE o.slug = ANY($1::text[])`, 1},
+		{"report deliveries", `SELECT count(*) FROM report_deliveries WHERE engagement_id IN (` + big + `)`, 1},
+	} {
+		if n := count(t, d, c.sql, slugs); n < c.min {
+			t.Errorf("%s = %d, want ≥ %d", c.name, n, c.min)
+		}
+	}
+	for name, sql := range map[string]string{
+		"KDV bank payment ≠ filed return": `SELECT count(*) FROM tax_returns r JOIN engagements e ON e.id = r.engagement_id
+			LEFT JOIN bank_transactions b ON b.taxpayer_id = e.taxpayer_id AND b.description = 'GIB VERGI ODEMESI KDV ' || replace(r.period, '-', '/')
+			WHERE r.engagement_id IN (` + big + `) AND r.kind = 'kdv1' AND r.status = 'filed' AND r.payable_amount > 0
+			  AND b.amount IS DISTINCT FROM r.payable_amount`,
+		"SGK bank payment ≠ premium": `SELECT count(*) FROM sgk_premiums s JOIN engagements e ON e.taxpayer_id = s.taxpayer_id
+			JOIN bank_transactions b ON b.taxpayer_id = s.taxpayer_id AND b.description = 'SGK PRIM ODEMESI ' || replace(s.period, '-', '/')
+			WHERE e.id IN (` + big + `) AND (b.amount <> s.payable_amount OR b.transaction_date <> s.paid_at)`,
+	} {
+		if n := count(t, d, sql, slugs); n != 0 {
+			t.Errorf("%s: %d", name, n)
+		}
 	}
 }

@@ -234,7 +234,7 @@ func GenerateTaxpayers(o, n int) []BigTaxpayer {
 			tp.StartMonth = 999
 		}
 		// Each office has a few clients that need attention this month.
-		tp.Problem = i%5 == 2
+		tp.Problem = i%6 == 2
 		tp.Staff = sec.StaffMin + r.IntN(sec.StaffMax-sec.StaffMin+1)
 		if tp.Kind == "individual" && tp.Staff > 3 {
 			tp.Staff = 3

@@ -766,17 +766,6 @@ type taxDue struct {
 	filed map[string]bool
 }
 
-func (m *clientModel) defaultTaxDue(w *bigWorld) taxDue {
-	t := taxDue{kdv: m.kdvPayable, muh: map[string]kurus{}, filed: map[string]bool{}}
-	for _, pm := range m.payroll {
-		t.muh[pm.period] = pm.taxTotal()
-	}
-	for _, p := range m.periods {
-		t.filed[p] = filedByDeadline(w, m.c, p)
-	}
-	return t
-}
-
 // filedByDeadline: past periods are filed; the latest closed month is filed
 // by most clients when its deadline (26th / 28th of the next month) has
 // come; problem clients are late with the one before.
@@ -903,7 +892,7 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 			if tax.filed[p] {
 				add(bankTxn{date: next.AddDate(0, 0, 25), dir: "B", amount: tax.muh[p], desc: "GIB VERGI ODEMESI MUHSGK " + ps.Format("2006/01"),
 					kind: "VERGI_ODEMESI", kindDetail: "tax_payment", account: "360.02", invoice: -1})
-				add(bankTxn{date: next.AddDate(0, 0, 27+r.IntN(2)), dir: "B", amount: pm.sgkPayable(), desc: "SGK PRIM ODEMESI " + ps.Format("2006/01"),
+				add(bankTxn{date: sgkPaidOn(p), dir: "B", amount: pm.sgkPayable(), desc: "SGK PRIM ODEMESI " + ps.Format("2006/01"),
 					kind: "SGK_ODEMESI", kindDetail: "sgk_payment", account: "361.01", invoice: -1})
 			}
 		}
@@ -918,7 +907,7 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 	// last weeks (no invoice, no rule): a collection and a payment.
 	if m.c.Problem {
 		for k := 0; k < 3; k++ {
-			d := today.AddDate(0, 0, -(3 + k*6))
+			d := today.AddDate(0, 0, -(3 + k*9))
 			cp := cps[(m.c.Index*7+k*31)%len(cps)]
 			add(bankTxn{date: d, dir: "A", amount: kr(1500 + r.Float64()*42000), cpName: cp.Name, cpIBAN: cp.IBAN,
 				desc: "FAST GELEN GONDEREN: " + strings.ToUpper(slugASCII(cp.Name)) + " ODEME", kind: "FAST",
