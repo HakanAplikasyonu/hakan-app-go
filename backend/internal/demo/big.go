@@ -108,19 +108,19 @@ var flatSeason = [12]float64{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 // Sectors of the big demo.
 var Sectors = []Sector{
 	{Key: "perakende", Name: "Perakende", Words: []string{"Market", "Gıda", "Şarküteri", "Kuruyemiş", "Züccaciye"},
-		MonthlySales: 420000, Growth: 0.18, Season: [12]float64{0.9, 0.85, 0.95, 1, 1.05, 1.05, 1.1, 1.1, 1, 0.95, 1, 1.3},
+		MonthlySales: 850000, Growth: 0.18, Season: [12]float64{0.9, 0.85, 0.95, 1, 1.05, 1.05, 1.1, 1.1, 1, 0.95, 1, 1.3},
 		SalesRate: 1, Retail: true, StaffMin: 2, StaffMax: 6},
 	{Key: "insaat", Name: "İnşaat", Words: []string{"Yapı", "İnşaat", "Taahhüt", "Proje", "Yapı Malzemeleri"},
-		MonthlySales: 1650000, Growth: 0.22, Season: [12]float64{0.6, 0.65, 0.85, 1.05, 1.2, 1.25, 1.25, 1.2, 1.1, 1, 0.85, 0.7},
+		MonthlySales: 2600000, Growth: 0.22, Season: [12]float64{0.6, 0.65, 0.85, 1.05, 1.2, 1.25, 1.25, 1.2, 1.1, 1, 0.85, 0.7},
 		SalesRate: 20, Withholder: true, StaffMin: 4, StaffMax: 12},
 	{Key: "hizmet", Name: "Hizmet", Words: []string{"Danışmanlık", "Bilişim", "Temizlik Hizmetleri", "Organizasyon", "Lojistik"},
-		MonthlySales: 380000, Growth: 0.25, Season: flatSeason,
+		MonthlySales: 620000, Growth: 0.25, Season: flatSeason,
 		SalesRate: 20, Withholder: true, StaffMin: 1, StaffMax: 5},
 	{Key: "eticaret", Name: "E-ticaret", Words: []string{"Online", "Elektronik", "Moda", "Ev Tekstili", "Kozmetik"},
-		MonthlySales: 560000, Growth: 0.35, Season: [12]float64{0.85, 0.8, 0.9, 0.95, 1, 0.95, 0.9, 0.95, 1, 1.05, 1.45, 1.35},
+		MonthlySales: 950000, Growth: 0.35, Season: [12]float64{0.85, 0.8, 0.9, 0.95, 1, 0.95, 0.9, 0.95, 1, 1.05, 1.45, 1.35},
 		SalesRate: 20, Ecommerce: true, Exporter: true, StaffMin: 1, StaffMax: 4},
 	{Key: "restoran", Name: "Restoran", Words: []string{"Lokanta", "Kebap", "Kafe", "Pide Salonu", "Balık Restoran"},
-		MonthlySales: 300000, Growth: 0.2, Season: [12]float64{0.8, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.3, 1.1, 1, 0.9, 0.95},
+		MonthlySales: 680000, Growth: 0.2, Season: [12]float64{0.8, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.3, 1.1, 1, 0.9, 0.95},
 		SalesRate: 10, Retail: true, StaffMin: 3, StaffMax: 8},
 }
 
@@ -187,7 +187,7 @@ type BigTaxpayer struct {
 
 // Rand returns the deterministic random stream of (office, index, salt).
 func Rand(office, index int, salt uint64) *rand.Rand {
-	return rand.New(rand.NewPCG(BigSeed^salt, uint64(office)<<32|uint64(index)))
+	return rand.New(rand.NewPCG(BigSeed^salt, uint64(office)<<32|uint64(index))) //nolint:gosec // deterministik demo verisi, güvenlik amaçlı değil
 }
 
 // GenerateTaxpayers returns n taxpayers of office o (0-based), deterministic.
