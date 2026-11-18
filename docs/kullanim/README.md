@@ -11,7 +11,7 @@ kenar çubuğunda, mükellef panelinde üst menüdedir.
 | [Mükellef](mukellef.md) | Mükellef kullanıcıları: web paneli ve mobil uygulama |
 | [Masaüstü ajanı](masaustu.md) | Ofis bilgisayarına kurulan ajan: kurulum, klasör izleme, sorun giderme |
 | [WhatsApp Web uzantısı](whatsapp-uzantisi.md) | WhatsApp'tan gelen fiş ve belgeyi tek tıkla kaydetme: kurulum, eşleştirme, gizlilik |
-| [Demo senaryosu](demo-senaryosu.md) | Pilot gösterimi yapan ekip: `make demo` ile kurulum ve ekran ekran Ekim kapanışı |
+| [Demo senaryosu](demo-senaryosu.md) | Pilot gösterimi yapan ekip: `make demo` ile kurulum ve ekran ekran Ekim kapanışı; `make demo-big` ile üç ofisli, 24 aylık sunum verisi |
 
 ## Bakım
 
