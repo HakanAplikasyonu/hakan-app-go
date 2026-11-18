@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { currentChat, documentDownloadControl, findMedia, findViewer, mediaOf, parseChatJid } from "../src/dom";
+import { chatTitle, currentChat, documentDownloadControl, findMedia, findViewer, legacyChat, mediaOf, parseChatJid } from "../src/dom";
 import { BAR_CLASS, attachBar } from "../src/ui";
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name), "utf8");
@@ -10,6 +10,9 @@ const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", name)
 function load(name: string) {
   document.body.innerHTML = fixture(name);
 }
+
+// Sayfanın dünyası yanıt vermiyor (eski WhatsApp ya da MAIN betiği yok).
+const noPage = async () => null;
 
 describe("parseChatJid", () => {
   it.each([
@@ -27,8 +30,8 @@ describe("parseChatJid", () => {
 describe("chat fixture", () => {
   beforeEach(() => load("chat.html"));
 
-  it("reads the chat id and title", () => {
-    expect(currentChat(document)).toEqual({ jid: "905321234567@c.us", title: "Okan Atlas (Atlas Gıda)" });
+  it("reads the chat id and title", async () => {
+    expect(await currentChat(document, noPage)).toEqual({ jid: "905321234567@c.us", title: "Okan Atlas (Atlas Gıda)" });
   });
 
   it("finds only savable media", () => {
@@ -63,12 +66,12 @@ describe("chat fixture", () => {
     expect(findMedia(document)).toHaveLength(4);
   });
 
-  it("never reads message text", () => {
+  it("never reads message text", async () => {
     // dom.ts reads attributes only: watch textContent (jsdom has no innerText;
     // dom.ts does not use it either, see the source check below).
     const spyText = vi.spyOn(Node.prototype, "textContent", "get");
     const items = findMedia(document);
-    const chat = currentChat(document);
+    const chat = await currentChat(document, noPage);
     for (const m of items) mediaOf(m.row);
     expect(spyText).not.toHaveBeenCalled();
     expect(JSON.stringify({ chat, items: items.map((m) => ({ ...m, row: undefined })) })).not.toMatch(/GİZLİ/);
@@ -76,18 +79,82 @@ describe("chat fixture", () => {
   });
 
   it("has no text readers in the page modules", () => {
-    for (const f of ["dom.ts", "selectors.ts"]) {
+    for (const f of ["dom.ts", "selectors.ts", "chat.ts", "main-world.ts", "intercept.ts"]) {
       const src = readFileSync(join(__dirname, "..", "src", f), "utf8").replace(/\/\/.*$/gm, "");
       expect(src, f).not.toMatch(/\.(textContent|innerText|innerHTML|outerHTML)\b/);
+      expect(src, f).not.toMatch(/pre-plain-text|selectable-text|prePlainText/);
     }
   });
 });
 
 describe("group fixture", () => {
-  it("uses the group id, not the participant", () => {
+  it("uses the group id, not the participant", async () => {
     load("group.html");
-    expect(currentChat(document)?.jid).toBe("120363041234567890@g.us");
+    expect((await currentChat(document, noPage))?.jid).toBe("120363041234567890@g.us");
     expect(findMedia(document)).toHaveLength(1);
+  });
+});
+
+describe("2026-11 chat fixture (data-id = message id only)", () => {
+  beforeEach(() => load("chat-2026-11.html"));
+
+  it("finds media without a chat id in data-id", () => {
+    const summary = findMedia(document).map((m) => [m.row.getAttribute("data-id"), m.kind, m.src !== null, m.receiptable, m.fileName]);
+    expect(summary).toEqual([
+      ["AC1F00D2E3B4C5D6E7F8", "image", true, true, ""],
+      ["B0B0B0B0C1C1C1C1D2D2", "image", false, true, ""],
+      ["D0C0FFEE000011112222", "document", false, false, "Kasım aidat makbuzu.pdf"],
+    ]);
+    // Text, grouped stickers and .xlsx get no buttons.
+  });
+
+  it("rows are the outer conv-msg elements, not nested ones", () => {
+    for (const m of findMedia(document)) expect(m.row.getAttribute("data-testid")).toMatch(/^conv-msg-/);
+  });
+
+  it("clicks the media-state-download control for documents", () => {
+    const pdf = findMedia(document).find((m) => m.kind === "document")!;
+    expect(documentDownloadControl(pdf.row)?.getAttribute("data-testid")).toBe("media-state-download");
+  });
+
+  it("falls back to the document bubble without a download control", () => {
+    const pdf = findMedia(document).find((m) => m.kind === "document")!;
+    pdf.row.querySelector('[data-testid="media-state-download"]')!.remove();
+    expect(documentDownloadControl(pdf.row)?.getAttribute("data-testid")).toBe("document-thumb");
+  });
+
+  it("legacy data-id parsing finds no chat; the page world provides it", async () => {
+    expect(legacyChat(document)).toBeNull();
+    expect(await currentChat(document, noPage)).toBeNull();
+    expect(await currentChat(document, async () => ({ jid: "905551112233@c.us", title: "" }))).toEqual({
+      jid: "905551112233@c.us",
+      title: "Deniz Yel (Yel Kırtasiye)",
+    });
+    expect(await currentChat(document, async () => ({ jid: "120363000000000000@g.us", title: "Yel Kırtasiye Muhasebe" }))).toEqual({
+      jid: "120363000000000000@g.us",
+      title: "Yel Kırtasiye Muhasebe",
+    });
+  });
+
+  it("reads the title from the header attributes only", () => {
+    expect(chatTitle(document)).toBe("Deniz Yel (Yel Kırtasiye)");
+  });
+
+  it("never reads message text", async () => {
+    const spyText = vi.spyOn(Node.prototype, "textContent", "get");
+    const spyAttr = vi.spyOn(Element.prototype, "getAttribute");
+    const items = findMedia(document);
+    const chat = await currentChat(document, noPage);
+    for (const m of items) {
+      mediaOf(m.row);
+      documentDownloadControl(m.row);
+    }
+    chatTitle(document);
+    expect(spyText).not.toHaveBeenCalled();
+    expect(spyAttr.mock.calls.map((c) => c[0])).not.toContain("data-pre-plain-text");
+    expect(JSON.stringify({ chat, items: items.map((m) => ({ ...m, row: undefined })) })).not.toMatch(/GİZLİ|10:1|03\.11/);
+    spyText.mockRestore();
+    spyAttr.mockRestore();
   });
 });
 
