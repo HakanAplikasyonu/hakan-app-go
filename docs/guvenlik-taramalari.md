@@ -81,6 +81,18 @@ ya da kuralı toptan kapatmak yasaktır.
     vb.); kalıplar geliştiricinin yazdığı sabitler, kullanıcı girdisi değil.
     Son tarih **2026-12-18**: 4.0.8 çıkınca kayıt silinir, `overrides`'a
     `picomatch@<4.0.8: ^4.0.8` eklenir.
+  - npm kullanan dizinlerde (mobile, mobile-office, extensions/whatsapp) aynı
+    picomatch açığı `npm audit`'i düşürüyor. npm'in yerleşik yok sayma ayarı
+    yok ve CI'daki adım düz `npm audit --audit-level=high` çalıştırıyor. Bu
+    yüzden 4.0.8 çıkana ya da CI'a bir yok sayma listesi eklenene dek bu adım
+    kırmızı kalır (#459). Risk aynı: picomatch yalnızca Metro, Expo CLI, ESLint
+    ve Jest'te, geliştiricinin yazdığı kalıplarla çalışıyor.
+  - `glob` (GHSA-3g3m-2fjr-6pw4, `>=9 <=14.0.1`) ve `minimatch`
+    (GHSA-g3hv-75wg-m249, `>=7 <11.0.1`), orta düzey: mobile, mobile-office ve
+    frontend'de `overrides` ile `glob ^14.0.3`, `minimatch ^11.0.5` tabanı
+    verildi. Kaynakları @sentry/bundler-plugins 10.x (glob ^13), @expo/fingerprint
+    ve @typescript-eslint/typescript-estree (minimatch ^10). Bu paketler düzeltilmiş
+    sürüme geçince satırlar silinir.
 
 ## Gerçek bir sır sızarsa
 

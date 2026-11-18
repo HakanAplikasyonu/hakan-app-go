@@ -15,6 +15,8 @@ overrides:
   js-yaml@>=4.0.0 <4.3.2: ^4.3.2
   nanoid@<3.3.18: ^3.3.18
   source-map-js@<1.2.2: ^1.2.2
+  minimatch@>=7.0.0 <11.0.1: ^11.0.5
+  glob@>=9.0.0 <14.0.2: ^14.0.3
 
 # Düzeltmesi yayımlanmamış açıklar için gerekçeli ve süreli yok sayma
 # (docs/guvenlik-taramalari.md, "audit"). Düzeltme çıkınca satır silinip
