@@ -5,6 +5,7 @@
 //
 //	make demo-seed                 # create if missing
 //	make demo-seed ARGS=-reset     # drop the demo office and build it again
+//	make demo-big                  # büyük demo (sunum): -reset -scale=big
 //
 // What it creates (all identities invented, see internal/demo):
 //   - office "demo-smmm" with an owner, an admin (müşavir) and a member (stajyer)
@@ -16,6 +17,9 @@
 // Invoices are not seeded: upload the UBL set (internal/demo/ubl) from the
 // office panel (UBL yükle) so the demo shows the real upload flow. -reset
 // removes that data too (only for demo-only taxpayers, see dropDemo).
+//
+// -scale=big adds the big presentation demo on top (big.go): more offices,
+// dozens of taxpayers each and 24 months of history.
 //
 // It refuses to run with APP_ENV=production.
 package main
@@ -59,7 +63,12 @@ func main() {
 	// ayarına yazılır ve mükellef portalında Destek düğmesi görünür. Boş
 	// varsayılan: e2e / görsel testler dış betik yüklemez.
 	widget := flag.String("clickfix-widget-id", "", "ClickFix widget id of the demo office (support channel of its taxpayers; default DEMO_CLICKFIX_WIDGET_ID)")
+	scaleName := flag.String("scale", "small", "small (pilot demo) or big (presentation: offices, dozens of taxpayers, 24 months)")
 	flag.Parse()
+	scale, big, err := parseScale(*scaleName)
+	if err != nil {
+		fatal("%v", err)
+	}
 	if *widget == "" {
 		*widget = os.Getenv("DEMO_CLICKFIX_WIDGET_ID")
 	}
@@ -80,7 +89,11 @@ func main() {
 	}
 	payrollSecret = cfg.Encryption.Key
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	timeout := 60 * time.Second
+	if big {
+		timeout = 30 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	pool, err := database.NewPostgresPool(ctx, cfg.DB)
 	if err != nil {
@@ -110,7 +123,11 @@ func main() {
 		printSummary()
 		return
 	}
-	if err := seed(ctx, pool, *pass, *widget); err != nil {
+	err = seed(ctx, pool, *pass, *widget)
+	if err == nil && big {
+		err = seedBig(ctx, pool, *pass, scale, time.Now())
+	}
+	if err != nil {
 		// The steps run through the services, each in its own transaction;
 		// undo a half-built office so the next run starts clean.
 		if derr := dropDemo(ctx, pool); derr != nil {
@@ -119,6 +136,9 @@ func main() {
 		fatal("%v", err)
 	}
 	printSummary()
+	if big {
+		printBigSummary(scale)
+	}
 }
 
 func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string) error {
