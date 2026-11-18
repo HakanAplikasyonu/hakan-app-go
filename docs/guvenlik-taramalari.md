@@ -73,8 +73,14 @@ ya da kuralı toptan kapatmak yasaktır.
     açıklaması. Değer yok.
 - **audit**: düzeltme varsa yükseltilir ya da `overrides` ile taban sürüm
   verilir. Düzeltme yoksa paketin yerine başka paket kullanılır. Bunlar da
-  olmuyorsa yok sayma burada, gerekçesi ve son tarihiyle yazılır. Şu an böyle
-  bir kayıt yok.
+  olmuyorsa yok sayma burada, gerekçesi ve son tarihiyle yazılır
+  (`frontend/pnpm-workspace.yaml` → `auditConfig.ignoreGhsas`). Mevcutlar:
+  - `GHSA-fc5q-39xc-vjpf` (picomatch <=4.0.7, extglob ReDoS, high): npm'de
+    düzeltilmiş sürüm (4.0.8) yayımlanmadı. picomatch yalnızca derleme ve
+    geliştirme araçlarından geliyor (@sentry/nextjs → rollup, fdir, tinyglobby
+    vb.); kalıplar geliştiricinin yazdığı sabitler, kullanıcı girdisi değil.
+    Son tarih **2026-12-18**: 4.0.8 çıkınca kayıt silinir, `overrides`'a
+    `picomatch@<4.0.8: ^4.0.8` eklenir.
 
 ## Gerçek bir sır sızarsa
 
