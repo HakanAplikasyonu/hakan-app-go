@@ -5,6 +5,7 @@
 #
 #   make demo                     # altyapıyı kaldır, veritabanını SIFIRLA, kur
 #   make demo ARGS=--no-infra     # altyapı zaten çalışıyor (yalnızca DB + seed)
+#   make demo-big                 # büyük demo (sunum): aynı akış, demo-seed -scale=big
 #
 # DİKKAT: ENV_FILE'daki veritabanının public şeması silinip yeniden kurulur.
 # APP_ENV=production'da ve yerel olmayan bir DB_HOST'ta çalışmaz (bilerek
@@ -20,10 +21,12 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 INFRA=1
+SCALE=small
 for arg in "$@"; do
   case "$arg" in
     --no-infra) INFRA=0 ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    --big) SCALE=big ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "bilinmeyen seçenek: $arg" >&2; exit 2 ;;
   esac
 done
@@ -94,8 +97,10 @@ if ! command -v migrate >/dev/null 2>&1; then
 fi
 make -s -C "$ROOT" migrate-up ENV_FILE="$ENV_FILE" MIGRATE="$MIGRATE_CMD"
 
-echo "== demo seed"
-(cd "$ROOT/backend" && go run ./cmd/demo-seed -reset)
+echo "== demo seed (ölçek: $SCALE)"
+seed_start=$(date +%s)
+(cd "$ROOT/backend" && go run ./cmd/demo-seed -reset -scale="$SCALE")
+echo "== demo seed süresi: $(( $(date +%s) - seed_start )) sn"
 
 echo "== platform yöneticisi"
 SA_EMAIL="${SA_EMAIL:-admin@example.com}"
@@ -116,3 +121,10 @@ Girişler:
   Demo parolası: ${DEMO_PASSWORD:-Demo1234!}
 Senaryo: docs/kullanim/demo-senaryosu.md
 MSG
+if [ "$SCALE" = "big" ]; then
+  cat <<MSG
+Büyük demo (sunum): ofisler /t/demo-smmm, /t/demo-baskent, /t/demo-ege
+  sahip@baskent.demo.test, sahip@ege.demo.test (aynı demo parolası)
+  Ayrıntı: docs/kullanim/demo-senaryosu.md → "Büyük demo (sunum)"
+MSG
+fi

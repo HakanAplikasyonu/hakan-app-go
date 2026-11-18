@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,13 +13,14 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
-// dropDemo deletes the demo office and the data of its demo taxpayers (#148).
+// dropDemo deletes the demo office (and the big demo's offices, big.go) and
+// the data of its demo taxpayers (#148).
 //
 // Scope, so a reset never touches real tenant data:
-//   - the office is found by demo.OrgSlug only;
+//   - the offices are found by demo.BigOfficeSlugs (demo.OrgSlug first) only;
 //   - a taxpayer's data is deleted only when the taxpayer is demo-only: its
-//     tax id is one of demo.Taxpayers and no other office has (or had) an
-//     engagement with it. Otherwise the identity and its data are kept and
+//     tax id is one of demo.Taxpayers or in the big demo's fixed prefix
+//     range, and no other office has (or had) an engagement with it. Otherwise the identity and its data are kept and
 //     only the demo office's own rows go (ON DELETE CASCADE from the office).
 //
 // Taxpayer data (invoices, customers, bank lines, sources, …) references the
@@ -37,25 +37,31 @@ func dropDemo(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 func dropDemoTx(ctx context.Context, tx pgx.Tx) error {
-	var orgID int64
-	err := tx.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = $1`, demo.OrgSlug).Scan(&orgID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
-	}
+	rows, err := tx.Query(ctx, `SELECT id FROM organizations WHERE slug = ANY($1::text[]) ORDER BY id`, demo.BigOfficeSlugs())
 	if err != nil {
 		return err
+	}
+	orgIDs, err := pgx.CollectRows(rows, pgx.RowTo[int64])
+	if err != nil {
+		return err
+	}
+	if len(orgIDs) == 0 {
+		return nil
 	}
 
 	demoIDs := make([]string, 0, len(demo.Taxpayers))
 	for _, tp := range demo.Taxpayers {
 		demoIDs = append(demoIDs, tp.TaxID)
 	}
-	rows, err := tx.Query(ctx, `
+	// Büyük demonun mükellefleri sabit önekli aralıkta (internal/demo/big.go).
+	rows, err = tx.Query(ctx, `
 		SELECT DISTINCT t.id FROM taxpayers t
-		JOIN engagements e ON e.taxpayer_id = t.id AND e.organization_id = $1
-		WHERE t.tax_id = ANY($2::text[])
-		  AND NOT EXISTS (SELECT 1 FROM engagements o WHERE o.taxpayer_id = t.id AND o.organization_id <> $1)
-		ORDER BY t.id`, orgID, demoIDs)
+		JOIN engagements e ON e.taxpayer_id = t.id AND e.organization_id = ANY($1::bigint[])
+		WHERE (t.tax_id = ANY($2::text[])
+		       OR (length(t.tax_id) = 10 AND t.tax_id LIKE $3 || '%')
+		       OR (length(t.tax_id) = 11 AND t.tax_id LIKE $4 || '%'))
+		  AND NOT EXISTS (SELECT 1 FROM engagements o WHERE o.taxpayer_id = t.id AND o.organization_id <> ALL($1::bigint[]))
+		ORDER BY t.id`, orgIDs, demoIDs, demo.BigVKNPrefix, demo.BigTCKNPrefix)
 	if err != nil {
 		return err
 	}
@@ -78,8 +84,8 @@ func dropDemoTx(ctx context.Context, tx pgx.Tx) error {
 			return err
 		}
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = $1`, orgID); err != nil {
-		return fmt.Errorf("delete demo office: %w", err)
+	if _, err := tx.Exec(ctx, `DELETE FROM organizations WHERE id = ANY($1::bigint[])`, orgIDs); err != nil {
+		return fmt.Errorf("delete demo offices: %w", err)
 	}
 	return nil
 }
