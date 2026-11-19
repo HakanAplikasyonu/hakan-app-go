@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, type KeyboardEvent, type ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
 import { TacRozeti, type TacDurumu } from "@/components/hakan";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -259,14 +260,14 @@ function PeriodStrip({
           const label = t(`office.engagement.state_${key}`);
           return (
             <li key={cell.period}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 aria-pressed={on}
                 onClick={() => onPick(cell.period)}
                 className={cn(
-                  "focus-visible:ring-ring flex min-h-11 w-full flex-col items-center gap-2 rounded-xl px-1.5 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                  "h-auto min-h-11 w-full flex-col gap-2 rounded-xl px-1.5 py-3 font-normal whitespace-normal transition-colors",
                   on
-                    ? "bg-brand-tint outline-brand outline-[1.5px]"
+                    ? "bg-brand-tint hover:bg-brand-tint outline-brand outline-[1.5px]"
                     : "hover:bg-surface-2",
                 )}
               >
@@ -296,7 +297,7 @@ function PeriodStrip({
                     })}
                   </span>
                 ) : null}
-              </button>
+              </Button>
             </li>
           );
         })}

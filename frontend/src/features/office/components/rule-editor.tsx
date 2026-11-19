@@ -6,8 +6,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import {
   Sheet,
   SheetContent,
@@ -159,10 +164,10 @@ export function RuleEditor({ engagement }: { engagement: string }) {
             });
           }}
         >
-          <fieldset className="flex flex-col gap-4">
-            <legend className="text-muted-foreground mb-2 font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
+          <FieldSet className="gap-4">
+            <FieldLegend className="text-muted-foreground mb-2 font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
               {t("office.rules.if")}
-            </legend>
+            </FieldLegend>
             <Field id="rule-taxid" label={t("office.rules.cond_tax_id")}>
               <Input
                 id="rule-taxid"
@@ -192,20 +197,23 @@ export function RuleEditor({ engagement }: { engagement: string }) {
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field id="rule-dir" label={t("office.rules.cond_direction")}>
-                <select
+                <NativeSelect
                   id="rule-dir"
-                  className="bg-background h-10 rounded-md border px-2 text-sm"
+                  wrapperClassName="w-full"
+                  className="h-10"
                   value={draft.direction}
                   onChange={set("direction")}
                 >
-                  <option value="">{t("office.filter_all")}</option>
-                  <option value="incoming">
+                  <NativeSelectOption value="">
+                    {t("office.filter_all")}
+                  </NativeSelectOption>
+                  <NativeSelectOption value="incoming">
                     {t("office.review_api.direction_incoming")}
-                  </option>
-                  <option value="outgoing">
+                  </NativeSelectOption>
+                  <NativeSelectOption value="outgoing">
                     {t("office.review_api.direction_outgoing")}
-                  </option>
-                </select>
+                  </NativeSelectOption>
+                </NativeSelect>
               </Field>
               <Field id="rule-tax" label={t("office.rules.cond_tax_rate")}>
                 <Input
@@ -217,11 +225,11 @@ export function RuleEditor({ engagement }: { engagement: string }) {
                 />
               </Field>
             </div>
-          </fieldset>
-          <fieldset className="flex flex-col gap-4">
-            <legend className="text-muted-foreground mb-2 font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
+          </FieldSet>
+          <FieldSet className="gap-4">
+            <FieldLegend className="text-muted-foreground mb-2 font-mono text-[11px] font-semibold tracking-[0.08em] uppercase">
               {t("office.rules.then")}
-            </legend>
+            </FieldLegend>
             <Field
               id="rule-code"
               label={t("office.rules.code")}
@@ -240,7 +248,7 @@ export function RuleEditor({ engagement }: { engagement: string }) {
             <Field id="rule-name" label={t("office.rules.name")}>
               <Input id="rule-name" value={draft.name} onChange={set("name")} />
             </Field>
-          </fieldset>
+          </FieldSet>
 
           <section
             aria-labelledby="rule-preview-title"

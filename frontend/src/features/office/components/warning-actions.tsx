@@ -3,6 +3,8 @@
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Permission } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { datetime } from "@/lib/utils/format";
@@ -51,10 +53,10 @@ export function DecisionNoteForm({
         if (ok) onConfirm(note.trim());
       }}
     >
-      <label htmlFor={id} className="text-text-2 text-xs">
+      <Label htmlFor={id} className="text-text-2 text-xs font-normal">
         {label}
-      </label>
-      <textarea
+      </Label>
+      <Textarea
         id={id}
         autoFocus
         required
@@ -72,7 +74,7 @@ export function DecisionNoteForm({
           }
         }}
         placeholder={t("office.warning_decision.placeholder")}
-        className="bg-background focus-visible:ring-ring w-full rounded-md border px-2 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none"
+        className="min-h-0 px-2 py-1.5 shadow-none"
       />
       <div className="flex justify-end gap-1">
         <Button

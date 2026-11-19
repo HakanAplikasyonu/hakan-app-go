@@ -3,10 +3,18 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { Lock, Search, Waypoints } from "lucide-react";
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useId, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { DataTable, createColumn } from "@/components/tables";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -150,19 +158,20 @@ function useMatrixColumns(
           enableHiding: false,
           // Başlık dönemi seçen düğme (sıralama menüsü yerine).
           header: () => (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onPick(p)}
               aria-pressed={p === focus}
               className={cn(
-                "min-h-6 w-full rounded px-2 py-0.5 text-xs font-medium max-md:min-h-11",
+                "h-auto min-h-6 w-full rounded px-2 py-0.5 text-xs font-medium max-md:min-h-11",
                 p === focus
-                  ? "bg-foreground text-background"
+                  ? "bg-foreground text-background hover:bg-foreground hover:text-background"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
               {monthLabel(p, locale)}
-            </button>
+            </Button>
           ),
           meta: {
             align: "center",
@@ -197,6 +206,7 @@ export function CommandCenterPage() {
   const query = useDeferredValue(filter.query);
   const set = <K extends keyof MatrixFilter>(k: K, v: MatrixFilter[K]) =>
     setFilter((f) => ({ ...f, [k]: v }));
+  const blockersId = useId();
 
   const rows = useMemo(() => matrix.data?.items ?? [], [matrix.data]);
   const counts = useMemo(() => statusCounts(rows, focus), [rows, focus]);
@@ -236,35 +246,38 @@ export function CommandCenterPage() {
             })),
           ]}
         />
-        <label className="flex min-h-6 items-center gap-2 text-xs max-md:min-h-11">
-          <input
-            type="checkbox"
-            className="accent-brand size-4"
+        <div className="flex min-h-6 items-center gap-2 max-md:min-h-11">
+          <Checkbox
+            id={blockersId}
             checked={filter.blockersOnly}
-            onChange={(e) => set("blockersOnly", e.target.checked)}
+            onCheckedChange={(v) => set("blockersOnly", v === true)}
           />
-          {t("office.command.blockers_only")}
-        </label>
-        <label className="bg-background focus-within:ring-ring flex h-8 items-center gap-2 rounded-md border px-2 text-sm focus-within:ring-2 max-md:h-11">
-          <Search className="text-muted-foreground size-3.5" aria-hidden />
-          <input
-            className="h-full w-44 min-w-0 bg-transparent outline-none"
+          <Label htmlFor={blockersId} className="text-xs font-normal">
+            {t("office.command.blockers_only")}
+          </Label>
+        </div>
+        <InputGroup className="h-8 w-auto max-md:h-11">
+          <InputGroupAddon>
+            <Search className="size-3.5" aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            className="w-44 min-w-0"
             aria-label={t("office.command.search")}
             placeholder={t("office.command.search")}
             value={filter.query}
             onChange={(e) => set("query", e.target.value)}
           />
-        </label>
+        </InputGroup>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
         {cellStatuses.map((s) => (
-          <button
+          <Button
             key={s}
-            type="button"
+            variant="outline"
             onClick={() => set("status", filter.status === s ? "all" : s)}
             className={cn(
-              "bg-card flex flex-col items-start gap-1 rounded-xl border p-3 text-left transition-colors",
+              "bg-card hover:bg-card h-auto flex-col items-start gap-1 rounded-xl p-3 text-left font-normal shadow-none transition-colors",
               filter.status === s
                 ? "border-foreground/40"
                 : "hover:border-foreground/20",
@@ -281,7 +294,7 @@ export function CommandCenterPage() {
               </span>
             </span>
             <Figure className="text-xl font-semibold">{counts[s]}</Figure>
-          </button>
+          </Button>
         ))}
       </div>
 

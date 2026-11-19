@@ -4,6 +4,7 @@ import { Check, Minus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { PermissionGuard } from "@/components/common/permission-guard";
@@ -85,15 +86,15 @@ function Stepper({
             const current = i === active;
             return (
               <li key={key} className="shrink-0">
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   aria-current={current ? "step" : undefined}
                   aria-describedby={`setup-step-status-${key}`}
                   onClick={() => onSelect(i)}
                   className={cn(
-                    "flex min-h-11 w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-start transition-colors",
+                    "h-auto min-h-11 w-full justify-start gap-3 rounded-[10px] px-2.5 py-2 text-start font-normal transition-colors",
                     current
-                      ? "bg-brand-tint text-brand-text"
+                      ? "bg-brand-tint text-brand-text hover:bg-brand-tint hover:text-brand-text"
                       : "hover:bg-surface-2",
                   )}
                 >
@@ -129,7 +130,7 @@ function Stepper({
                         : t(SETUP_STATUS_LABEL_KEYS[status])}
                     </span>
                   </span>
-                </button>
+                </Button>
               </li>
             );
           })}

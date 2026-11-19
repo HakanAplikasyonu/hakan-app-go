@@ -9,6 +9,7 @@ import { EntityTable } from "@/components/entity";
 import { createColumn } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -101,12 +102,13 @@ function Assignees({
           {members.map((m) => {
             const on = assigned.has(m.uuid);
             return (
-              <button
+              <Button
                 key={m.uuid}
-                type="button"
+                variant="ghost"
+                size="sm"
                 disabled={toggle.isPending}
                 onClick={() => toggle.mutate({ user: m.uuid, assigned: on })}
-                className="hover:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm disabled:opacity-60"
+                className="h-auto w-full justify-start gap-2 px-2 py-1.5 text-left font-normal disabled:opacity-60"
                 aria-pressed={on}
               >
                 <span
@@ -119,7 +121,7 @@ function Assignees({
                 </span>
                 <span className="flex-1 truncate">{m.name}</span>
                 <span className="text-muted-foreground text-xs">{m.role}</span>
-              </button>
+              </Button>
             );
           })}
         </PopoverContent>
@@ -237,8 +239,8 @@ export function TaxpayersPage() {
           </Button>
         }
       />
-      <input
-        className="bg-background h-8 w-64 max-w-full rounded-md border px-2 text-sm max-md:h-11"
+      <Input
+        className="h-8 w-64 max-w-full px-2 max-md:h-11"
         placeholder={t("office.command.search")}
         value={query}
         onChange={(e) => setQuery(e.target.value)}

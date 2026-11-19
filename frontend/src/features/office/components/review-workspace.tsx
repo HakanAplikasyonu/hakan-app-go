@@ -45,6 +45,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { Label } from "@/components/ui/label";
 import {
   Popover,
   PopoverAnchor,
@@ -1045,21 +1046,21 @@ function ReviewWorkspaceInner() {
                 }}
                 footer={
                   canRule ? (
-                    <label className="flex min-h-11 items-center gap-2 text-sm">
+                    <Label className="flex min-h-11 items-center gap-2 text-sm font-normal">
                       <Checkbox
                         checked={ruleOnCorrect}
                         onCheckedChange={(v) => setRuleOnCorrect(v === true)}
                       />
                       {ruleLabel}
-                    </label>
+                    </Label>
                   ) : undefined
                 }
               >
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   onClick={() => canCorrect && setPicking(true)}
                   className={cn(
-                    "group flex w-full flex-wrap items-baseline gap-x-3 rounded-[10px] border border-dashed p-3 text-start transition-colors",
+                    "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-[10px] border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
                     canCorrect && "hover:border-brand",
                   )}
                 >
@@ -1088,7 +1089,7 @@ function ReviewWorkspaceInner() {
                       />
                     </>
                   ) : null}
-                </button>
+                </Button>
               </CodePicker>
               <div className="mt-4">
                 <EvidenceChain s={current} threshold={threshold} />
@@ -1385,14 +1386,14 @@ function ReviewWorkspaceInner() {
                     const title = suggestionTitle(s, t);
                     return (
                       <li key={s.uuid} data-index={i}>
-                        <button
-                          type="button"
+                        <Button
+                          variant="ghost"
                           aria-current={on ? "true" : undefined}
                           onClick={() => select(i)}
                           className={cn(
-                            "flex min-h-14 w-full items-center gap-3 rounded-[10px] px-3 py-2 text-start transition-colors",
+                            "h-auto min-h-14 w-full justify-start gap-3 rounded-[10px] px-3 py-2 text-start font-normal whitespace-normal transition-colors has-[>svg]:px-3",
                             on
-                              ? "bg-brand-tint shadow-[inset_3px_0_0_var(--color-brand)]"
+                              ? "bg-brand-tint hover:bg-brand-tint shadow-[inset_3px_0_0_var(--color-brand)]"
                               : "hover:bg-surface-2",
                           )}
                         >
@@ -1422,7 +1423,7 @@ function ReviewWorkspaceInner() {
                               </Figure>
                             </span>
                           </span>
-                        </button>
+                        </Button>
                       </li>
                     );
                   })}

@@ -6,6 +6,14 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -115,75 +123,91 @@ export function RelatedRecordsTable({
       </p>
     );
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm" data-testid="related-records">
-        <thead className="text-text-2 text-left text-xs">
-          <tr className="border-line border-b">
-            <th scope="col" className="px-4 py-2 font-medium">
-              {t("office.related.col_kind")}
-            </th>
-            <th scope="col" className="px-4 py-2 font-medium">
-              {t("office.related.col_record")}
-            </th>
-            <th scope="col" className="px-4 py-2 font-medium">
-              {t("office.related.col_date")}
-            </th>
-            <th scope="col" className="px-4 py-2 text-right font-medium">
-              {t("office.related.col_amount")}
-            </th>
-            <th scope="col" className="px-4 py-2 font-medium">
-              {t("office.related.col_status")}
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-line divide-y">
-          {items.map((item, i) => {
-            const href = relatedHref(slug, engagement, item);
-            const kindLabel = t(`office.related.kind.${item.kind}`);
-            return (
-              <tr key={`${item.kind}-${item.uuid ?? item.label}-${i}`}>
-                <td className="px-4 py-2 align-top whitespace-nowrap">
-                  <div className="font-medium">{kindLabel}</div>
-                  <div className="text-text-3 text-xs">
-                    {t(`office.related.relation.${item.relation}`)}
-                  </div>
-                </td>
-                <td className="px-4 py-2 align-top">
-                  {href ? (
-                    <Link
-                      href={href}
-                      className="text-brand-text hover:underline"
-                      aria-label={`${kindLabel}: ${item.label}`}
-                    >
-                      <RecordLabel item={item} />
-                    </Link>
-                  ) : (
+    <Table className="w-full text-sm" data-testid="related-records">
+      <TableHeader className="text-xs">
+        <TableRow className="border-line hover:bg-transparent">
+          <TableHead
+            scope="col"
+            className="text-text-2 h-auto px-4 py-2 font-medium"
+          >
+            {t("office.related.col_kind")}
+          </TableHead>
+          <TableHead
+            scope="col"
+            className="text-text-2 h-auto px-4 py-2 font-medium"
+          >
+            {t("office.related.col_record")}
+          </TableHead>
+          <TableHead
+            scope="col"
+            className="text-text-2 h-auto px-4 py-2 font-medium"
+          >
+            {t("office.related.col_date")}
+          </TableHead>
+          <TableHead
+            scope="col"
+            className="text-text-2 h-auto px-4 py-2 text-right font-medium"
+          >
+            {t("office.related.col_amount")}
+          </TableHead>
+          <TableHead
+            scope="col"
+            className="text-text-2 h-auto px-4 py-2 font-medium"
+          >
+            {t("office.related.col_status")}
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.map((item, i) => {
+          const href = relatedHref(slug, engagement, item);
+          const kindLabel = t(`office.related.kind.${item.kind}`);
+          return (
+            <TableRow
+              className="border-line hover:bg-transparent"
+              key={`${item.kind}-${item.uuid ?? item.label}-${i}`}
+            >
+              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                <div className="font-medium">{kindLabel}</div>
+                <div className="text-text-3 text-xs">
+                  {t(`office.related.relation.${item.relation}`)}
+                </div>
+              </TableCell>
+              <TableCell className="px-4 py-2 align-top">
+                {href ? (
+                  <Link
+                    href={href}
+                    className="text-brand-text hover:underline"
+                    aria-label={`${kindLabel}: ${item.label}`}
+                  >
                     <RecordLabel item={item} />
-                  )}
-                  <Detail item={item} />
-                </td>
-                <td className="px-4 py-2 align-top whitespace-nowrap">
-                  <Figure>{trDate(item.date)}</Figure>
-                </td>
-                <td className="px-4 py-2 text-right align-top whitespace-nowrap">
-                  {item.amount ? (
-                    <Money
-                      value={item.amount}
-                      currency={item.currency ?? "TRY"}
-                    />
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="px-4 py-2 align-top whitespace-nowrap">
-                  {tr(`office.related.status.${item.status}`, item.status)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                  </Link>
+                ) : (
+                  <RecordLabel item={item} />
+                )}
+                <Detail item={item} />
+              </TableCell>
+              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                <Figure>{trDate(item.date)}</Figure>
+              </TableCell>
+              <TableCell className="px-4 py-2 text-right align-top whitespace-nowrap">
+                {item.amount ? (
+                  <Money
+                    value={item.amount}
+                    currency={item.currency ?? "TRY"}
+                  />
+                ) : (
+                  "—"
+                )}
+              </TableCell>
+              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                {tr(`office.related.status.${item.status}`, item.status)}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }
 
