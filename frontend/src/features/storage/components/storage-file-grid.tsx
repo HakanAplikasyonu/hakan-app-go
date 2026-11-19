@@ -2,6 +2,7 @@
 
 import { Star } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StorageAccessBadge } from "@/features/storage/components/storage-access-badge";
@@ -75,9 +76,9 @@ export function StorageFileGrid({
                   aria-label={item.name}
                 />
               </div>
-              <button
-                type="button"
-                className="flex w-full flex-col items-center gap-2 pt-6 text-center"
+              <Button
+                variant="ghost"
+                className="h-auto w-full flex-col gap-2 px-0 pt-6 pb-0 text-center font-normal whitespace-normal hover:bg-transparent has-[>svg]:px-0"
                 onClick={() => onOpen(item)}
               >
                 <StorageFileThumbnail
@@ -101,7 +102,7 @@ export function StorageFileGrid({
                 <span className="text-muted-foreground text-xs">
                   {datetime(item.updated_at, "dd.MM.yyyy", locale)}
                 </span>
-              </button>
+              </Button>
               <div className="mt-2 flex justify-center">
                 <StorageAccessBadge access={item.access} />
               </div>

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useLocale } from "@/providers/locale-provider";
 import { cn } from "@/lib/utils";
 
@@ -62,13 +63,13 @@ function RowDragHandle() {
   const drag = useContext(RowDragContext);
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon"
       className={cn(
-        "inline-flex size-7 items-center justify-center rounded-md border-0 bg-transparent p-0",
-        "text-muted-foreground transition-colors outline-none",
+        "size-7 rounded-md border-0 bg-transparent p-0 max-md:size-7",
+        "text-muted-foreground transition-colors",
         "hover:text-foreground hover:bg-transparent",
-        "focus-visible:ring-ring focus-visible:ring-2",
         "cursor-grab touch-none active:cursor-grabbing",
         "disabled:cursor-not-allowed disabled:opacity-40",
         drag?.isDragging && "text-foreground cursor-grabbing",
@@ -79,7 +80,7 @@ function RowDragHandle() {
       {...(drag?.listeners as object)}
     >
       <GripVertical className="size-4" strokeWidth={1.75} aria-hidden />
-    </button>
+    </Button>
   );
 }
 

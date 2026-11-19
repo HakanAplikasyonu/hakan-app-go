@@ -201,9 +201,9 @@ function SubSidebarGroup({
   return (
     <Collapsible open={isOpen} onOpenChange={setOpen} className="space-y-1">
       <CollapsibleTrigger asChild>
-        <button
-          type="button"
-          className="group text-muted-foreground hover:text-foreground flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-bold tracking-wider uppercase transition-colors"
+        <Button
+          variant="ghost"
+          className="group text-muted-foreground hover:text-foreground h-auto w-full justify-between rounded-md px-2 py-1 text-[10px] font-bold tracking-wider uppercase transition-colors hover:bg-transparent has-[>svg]:px-2"
         >
           <span>{t(group.labelKey)}</span>
           <ChevronDown
@@ -212,7 +212,7 @@ function SubSidebarGroup({
               isOpen ? "rotate-0" : "-rotate-90",
             )}
           />
-        </button>
+        </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-0.5 pt-0.5">
         {group.items.map((item) => (

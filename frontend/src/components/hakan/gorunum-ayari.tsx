@@ -3,6 +3,7 @@
 import { useTheme } from "next-themes";
 import { useSyncExternalStore } from "react";
 
+import { Button } from "@/components/ui/button";
 import { brand } from "@/config/brand";
 import type { ThemeMode, ThemePalette } from "@/config/theme";
 import { cn } from "@/lib/utils";
@@ -99,9 +100,9 @@ export function GorunumAyari({ className }: { className?: string }) {
         {secenekler.map((s) => {
           const secili = etkin === `${s.palette}-${s.mode}`;
           return (
-            <button
+            <Button
               key={s.key}
-              type="button"
+              variant="ghost"
               role="radio"
               aria-checked={secili}
               onClick={() => {
@@ -111,7 +112,7 @@ export function GorunumAyari({ className }: { className?: string }) {
                   setTheme(s.mode);
               }}
               className={cn(
-                "flex min-h-11 flex-col gap-2 rounded-[12px] border-2 p-2 text-left text-[13px] font-semibold transition-colors",
+                "h-auto min-h-11 flex-col items-stretch justify-start gap-2 rounded-[12px] border-2 p-2 text-left text-[13px] font-semibold whitespace-normal transition-colors hover:bg-transparent",
                 secili
                   ? "border-brand"
                   : "border-line hover:border-line-strong",
@@ -136,7 +137,7 @@ export function GorunumAyari({ className }: { className?: string }) {
                 ))}
               </span>
               {t(s.key)}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -146,21 +147,21 @@ export function GorunumAyari({ className }: { className?: string }) {
         className="bg-surface-3 flex w-max gap-0.5 rounded-[10px] p-[3px]"
       >
         {kipler.map((k) => (
-          <button
+          <Button
             key={k.value}
-            type="button"
+            variant="ghost"
             role="radio"
             aria-checked={kip === k.value}
             onClick={() => setTheme(k.value)}
             className={cn(
-              "h-[30px] rounded-lg px-2.5 text-xs font-semibold transition-colors max-md:h-11",
+              "h-[30px] rounded-lg px-2.5 py-0 text-xs font-semibold transition-colors max-md:h-11",
               kip === k.value
-                ? "bg-card text-foreground shadow-card"
-                : "text-text-2",
+                ? "bg-card text-foreground hover:bg-card hover:text-foreground shadow-card"
+                : "text-text-2 hover:text-text-2 hover:bg-transparent",
             )}
           >
             {t(k.key)}
-          </button>
+          </Button>
         ))}
       </div>
     </section>

@@ -58,7 +58,10 @@ function LevelsField({
         {LEVELS.map((level) => {
           const checked = value.includes(level);
           return (
-            <label key={level} className="flex items-center gap-2 text-sm">
+            <Label
+              key={level}
+              className="flex items-center gap-2 text-sm leading-normal font-normal"
+            >
               <Checkbox
                 checked={checked}
                 onCheckedChange={(next) => {
@@ -67,7 +70,7 @@ function LevelsField({
                 }}
               />
               {t(`logs.levels.${level}`)}
-            </label>
+            </Label>
           );
         })}
       </div>

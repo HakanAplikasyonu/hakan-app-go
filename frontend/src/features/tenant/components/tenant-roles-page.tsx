@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { z } from "zod";
 
+import { Label } from "@/components/ui/label";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
 import { EntityPage, EntitySectionCard } from "@/components/entity";
@@ -95,15 +96,15 @@ function PermissionChecklist({
                     }
                     onCheckedChange={(v) => toggle(p.slug, v === true)}
                   />
-                  <label
+                  <Label
                     htmlFor={id}
-                    className="grid cursor-pointer gap-0.5 text-sm leading-none"
+                    className="grid cursor-pointer gap-0.5 text-sm leading-none font-normal"
                   >
                     <span>{p.name}</span>
                     <span className="text-muted-foreground font-mono text-xs">
                       {p.slug}
                     </span>
-                  </label>
+                  </Label>
                 </li>
               );
             })}

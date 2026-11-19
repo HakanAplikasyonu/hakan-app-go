@@ -106,14 +106,14 @@ export function HataDurumu({
       ) : null}
       {kod ? (
         <div className="text-text-2 text-xs">
-          <button
-            type="button"
-            className="underline underline-offset-2"
+          <Button
+            variant="link"
+            className="text-text-2 hover:text-text-2 h-auto p-0 text-xs font-normal underline underline-offset-2"
             aria-expanded={ayrinti}
             onClick={() => setAyrinti((v) => !v)}
           >
             {t("common.state_details")}
-          </button>
+          </Button>
           {ayrinti ? (
             <span className="ms-1.5 font-mono" data-visual-mask>
               {kod}

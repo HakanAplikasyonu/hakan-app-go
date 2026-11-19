@@ -3,6 +3,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useActiveSection } from "@/components/forms/use-active-section";
 import { useLocale } from "@/providers/locale-provider";
 import { cn } from "@/lib/utils";
@@ -110,21 +111,21 @@ export function FormNav({
           const Icon = item.icon;
           const active = activeId === item.id;
           return (
-            <button
+            <Button
               key={item.id}
-              type="button"
+              variant="ghost"
               onClick={() => scrollTo(item.id)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                "h-auto shrink-0 gap-2 rounded-full border px-3 py-1.5 text-sm font-normal transition-colors has-[>svg]:px-3",
                 active
-                  ? "border-primary/40 bg-primary/10 text-primary font-medium"
+                  ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary font-medium"
                   : "border-border bg-card text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground",
               )}
             >
               {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : null}
               {item.label}
-            </button>
+            </Button>
           );
         })}
       </nav>
@@ -148,14 +149,14 @@ export function FormNav({
           const active = activeId === item.id;
           return (
             <li key={item.id}>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
                 onClick={() => scrollTo(item.id)}
                 aria-current={active ? "true" : undefined}
                 className={cn(
-                  "group relative flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-start transition-colors",
+                  "group relative h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-2 text-start font-normal whitespace-normal transition-colors has-[>svg]:px-2.5",
                   active
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
@@ -200,7 +201,7 @@ export function FormNav({
                     </span>
                   ) : null}
                 </span>
-              </button>
+              </Button>
             </li>
           );
         })}

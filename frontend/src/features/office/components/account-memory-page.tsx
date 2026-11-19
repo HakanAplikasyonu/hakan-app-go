@@ -11,6 +11,7 @@ import {
 import { Suspense, useMemo, useRef, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/common/empty-state";
 import { StatusChip } from "@/components/common/status-chip";
 import { PageHeader } from "@/components/layout/page-header";
@@ -140,17 +141,14 @@ function PlanPanel({ engagement }: { engagement: string }) {
         )}
         {canWrite ? (
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2">
-              <span className="sr-only">{t("office.memory.plan_file")}</span>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".xlsx,.csv"
-                aria-label={t("office.memory.plan_file")}
-                className="file:bg-secondary file:text-secondary-foreground text-xs file:me-2 file:rounded-md file:border-0 file:px-3 file:py-1.5 max-md:min-h-11"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
+            <Input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.csv"
+              aria-label={t("office.memory.plan_file")}
+              className="file:bg-secondary file:text-secondary-foreground h-auto w-auto border-0 p-0 text-xs shadow-none file:me-2 file:h-auto file:rounded-md file:border-0 file:px-3 file:py-1.5 max-md:min-h-11"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
             <Button
               size="sm"
               onClick={submit}

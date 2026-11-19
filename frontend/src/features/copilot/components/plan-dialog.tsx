@@ -11,6 +11,7 @@ import {
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -208,12 +209,9 @@ export function PlanDialog({
                         <StepIcon state={st} />
                       )}
                       <div className="min-w-0 flex-1">
-                        <label
-                          htmlFor={id}
-                          className="block text-sm font-medium"
-                        >
+                        <Label htmlFor={id} className="block leading-normal">
                           {actionLabel(t, s.action)}
-                        </label>
+                        </Label>
                         <p className="text-text-2 text-xs">
                           {s.taxpayer_title} · {periodLabel(locale, s.period)}
                           {s.action === "export_transfer" ? (

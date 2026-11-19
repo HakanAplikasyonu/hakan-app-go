@@ -2,6 +2,7 @@
 
 import { Clock, Globe, HardDrive, Share2, Star, Trash2 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -43,12 +44,12 @@ export function StorageSidebar({
             const Icon = item.icon;
             const active = view === item.id;
             return (
-              <button
+              <Button
                 key={item.id}
-                type="button"
+                variant="ghost"
                 onClick={() => onViewChange(item.id)}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+                  "h-auto w-full justify-start gap-2 rounded-md px-2 py-1.5 text-sm font-normal has-[>svg]:px-2",
                   active
                     ? "bg-accent text-accent-foreground font-medium"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -56,7 +57,7 @@ export function StorageSidebar({
               >
                 <Icon className="size-4" />
                 {t(item.labelKey)}
-              </button>
+              </Button>
             );
           })}
         </nav>

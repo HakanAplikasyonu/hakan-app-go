@@ -178,9 +178,9 @@ export function NotificationInbox() {
                             className="bg-primary absolute start-2 top-4 size-1.5 rounded-full"
                           />
                         ) : null}
-                        <button
-                          type="button"
-                          className="flex w-full flex-col gap-1 px-3.5 py-2.5 ps-5 text-start"
+                        <Button
+                          variant="ghost"
+                          className="h-auto w-full flex-col items-stretch gap-1 px-3.5 py-2.5 ps-5 text-start font-normal whitespace-normal hover:bg-transparent"
                           onClick={() => openItem(item)}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -203,7 +203,7 @@ export function NotificationInbox() {
                               {formatNotificationText(item.body, t)}
                             </p>
                           ) : null}
-                        </button>
+                        </Button>
                         {actions.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5 px-5 pb-2.5">
                             {actions.slice(0, 2).map((action, index) => (

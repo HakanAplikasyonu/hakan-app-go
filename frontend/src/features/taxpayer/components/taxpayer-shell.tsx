@@ -203,14 +203,14 @@ export function CompanySwitcher({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="border-line hover:bg-surface-2 focus-visible:ring-ring flex min-h-11 items-center gap-2 rounded-lg border px-2 focus-visible:ring-2 focus-visible:outline-none md:min-h-10"
+        <Button
+          variant="ghost"
+          className="border-line hover:bg-surface-2 h-auto min-h-11 gap-2 rounded-lg border px-2 font-normal has-[>svg]:px-2 md:min-h-10"
           aria-label={`${t("taxpayer.switcher_label")}: ${name}`}
         >
           {face}
           <ChevronDown aria-hidden className="text-text-3 size-4" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="text-text-3 text-xs font-normal">

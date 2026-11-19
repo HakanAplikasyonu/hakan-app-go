@@ -3,6 +3,7 @@
 import { Upload, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { storageConfig } from "@/config/storage";
 import { fileSize } from "@/lib/utils";
@@ -112,9 +113,9 @@ export function FileUploader({
 
   return (
     <div className={cn("space-y-3", className)}>
-      <label
+      <Label
         className={cn(
-          "border-border flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center transition-colors",
+          "border-border flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-6 py-10 text-center leading-normal font-normal transition-colors",
           dragging && "border-primary bg-muted/40",
         )}
         onDragOver={(e) => {
@@ -139,7 +140,7 @@ export function FileUploader({
           accept={accept}
           onChange={(e) => void ingest(e.target.files)}
         />
-      </label>
+      </Label>
 
       <ul className="space-y-2">
         {items.map((item) => (

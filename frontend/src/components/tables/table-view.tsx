@@ -40,12 +40,32 @@ import type {
   DataTableColumnMeta,
   TableDensity,
 } from "@/components/tables/types";
+import {
+  Table as UiTable,
+  TableBody,
+  TableCaption,
+  TableCell as UiTableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 const densityCell: Record<TableDensity, string> = {
   compact: "px-2 py-1.5",
   comfortable: "px-3 py-2.5",
   spacious: "px-4 py-3.5",
+};
+
+/**
+ * `ui/table` onay kutulu hücrede sağ boşluğu sıfırlar; ızgaranın yoğunluk
+ * boşluğu korunur (seçim kolonu daralmasın).
+ */
+const densityCheckboxPad: Record<TableDensity, string> = {
+  compact: "[&:has([role=checkbox])]:pr-2",
+  comfortable: "[&:has([role=checkbox])]:pr-3",
+  spacious: "[&:has([role=checkbox])]:pr-4",
 };
 
 const alignClass: Record<ColumnAlign, string> = {
@@ -108,7 +128,7 @@ export function TableView<TData>({
   maxHeight,
   caption,
 }: TableViewProps<TData>) {
-  const cellPad = densityCell[density];
+  const cellPad = cn(densityCell[density], densityCheckboxPad[density]);
   const leafColumns = table.getVisibleLeafColumns();
   const leafHeaders =
     table.getHeaderGroups()[table.getHeaderGroups().length - 1]?.headers ?? [];
@@ -145,8 +165,10 @@ export function TableView<TData>({
         table-auto so the actions column can grow with icon buttons.
         Explicit widths still apply for select/reorder and user-resized cols.
       */}
-      <table className="w-full caption-bottom text-sm">
-        {caption ? <caption className="sr-only">{caption}</caption> : null}
+      <UiTable containerClassName="overflow-visible">
+        {caption ? (
+          <TableCaption className="sr-only">{caption}</TableCaption>
+        ) : null}
         <colgroup>
           {leafColumns.map((column) => {
             const sizing = table.getState().columnSizing;
@@ -172,20 +194,20 @@ export function TableView<TData>({
           })}
         </colgroup>
 
-        <thead
+        <TableHeader
           className={cn(
             stickyHeader
               ? "bg-muted sticky top-0 z-30 shadow-[0_1px_0_var(--border)]"
               : "bg-muted/40",
           )}
         >
-          <tr className="border-border border-b">
+          <TableRow className="border-border hover:bg-transparent">
             {leafHeaders.map((header) => {
               const meta = header.column.columnDef.meta as
                 DataTableColumnMeta | undefined;
               const pinned = header.column.getIsPinned();
               return (
-                <th
+                <TableHead
                   key={header.id}
                   scope="col"
                   aria-sort={
@@ -196,7 +218,7 @@ export function TableView<TData>({
                         : undefined
                   }
                   className={cn(
-                    "text-muted-foreground relative text-start align-middle font-medium",
+                    "text-muted-foreground relative h-auto text-start align-middle font-medium whitespace-normal",
                     cellPad,
                     meta?.align && alignClass[meta.align],
                     meta?.headerClassName,
@@ -255,20 +277,20 @@ export function TableView<TData>({
                       )}
                     />
                   ) : null}
-                </th>
+                </TableHead>
               );
             })}
-          </tr>
+          </TableRow>
 
           {showColumnFilters && !reorderMode ? (
-            <tr className="border-border border-b">
+            <TableRow className="border-border hover:bg-transparent">
               {leafHeaders.map((header) => {
                 const pinned = header.column.getIsPinned();
                 return (
-                  <th
+                  <TableHead
                     key={`filter-${header.id}`}
                     className={cn(
-                      "bg-background align-top font-normal",
+                      "bg-background text-foreground h-auto align-top font-normal whitespace-normal",
                       cellPad,
                       pinned === "left" && "bg-background sticky start-0 z-20",
                       pinned === "right" && "bg-background sticky end-0 z-20",
@@ -287,17 +309,17 @@ export function TableView<TData>({
                     <div className="min-w-0">
                       <ColumnFilter column={header.column} />
                     </div>
-                  </th>
+                  </TableHead>
                 );
               })}
-            </tr>
+            </TableRow>
           ) : null}
-        </thead>
+        </TableHeader>
 
-        <tbody>
+        <TableBody>
           {rows.length === 0 && emptyMessage ? (
-            <tr>
-              <td
+            <TableRow className="border-0 hover:bg-transparent">
+              <UiTableCell
                 colSpan={Math.max(colSpan, 1)}
                 className={cn("text-center", cellPad, "py-12")}
               >
@@ -311,8 +333,8 @@ export function TableView<TData>({
                     </p>
                   ) : null}
                 </div>
-              </td>
-            </tr>
+              </UiTableCell>
+            </TableRow>
           ) : (
             rows.map((row) =>
               reorderMode ? (
@@ -341,16 +363,16 @@ export function TableView<TData>({
               ),
             )
           )}
-        </tbody>
+        </TableBody>
 
         {hasFooter && footerGroup && rows.length > 0 ? (
-          <tfoot className="bg-muted/30 border-border border-t font-medium">
-            <tr>
+          <TableFooter className="bg-muted/30 border-border border-t font-medium">
+            <TableRow className="border-0 hover:bg-transparent">
               {footerGroup.headers.map((header) => {
                 const meta = header.column.columnDef.meta as
                   DataTableColumnMeta | undefined;
                 return (
-                  <td
+                  <UiTableCell
                     key={header.id}
                     className={cn(
                       "align-middle",
@@ -365,13 +387,13 @@ export function TableView<TData>({
                           header.column.columnDef.footer,
                           header.getContext(),
                         )}
-                  </td>
+                  </UiTableCell>
                 );
               })}
-            </tr>
-          </tfoot>
+            </TableRow>
+          </TableFooter>
         ) : null}
-      </table>
+      </UiTable>
     </div>
   );
 
@@ -422,9 +444,9 @@ function StaticTableRow<TData>({
   rowClassName,
 }: RowProps<TData>) {
   return (
-    <tr
+    <TableRow
       className={cn(
-        "border-border hover:bg-muted/30 data-[state=selected]:bg-muted/50 border-b last:border-0",
+        "border-border hover:bg-muted/30 data-[state=selected]:bg-muted/50 border-b transition-none last:border-0",
         onRowClick &&
           "focus-visible:ring-ring cursor-pointer focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset",
         active && "bg-brand-tint hover:bg-brand-tint",
@@ -466,7 +488,7 @@ function StaticTableRow<TData>({
           row={row}
         />
       ))}
-    </tr>
+    </TableRow>
   );
 }
 
@@ -489,11 +511,11 @@ function SortableTableRow<TData>({ row, table, cellPad }: RowProps<TData>) {
   };
 
   return (
-    <tr
+    <TableRow
       ref={setNodeRef}
       style={style}
       className={cn(
-        "border-border bg-background border-b last:border-0",
+        "border-border bg-background border-b transition-none last:border-0",
         isDragging
           ? "bg-muted/40 relative z-20 shadow-sm"
           : "hover:bg-muted/30",
@@ -512,7 +534,7 @@ function SortableTableRow<TData>({ row, table, cellPad }: RowProps<TData>) {
           />
         ))}
       </RowDragProvider>
-    </tr>
+    </TableRow>
   );
 }
 
@@ -541,7 +563,7 @@ function TableCell<TData>({
     editingCell?.rowId === row.id && editingCell?.columnId === cell.column.id;
 
   return (
-    <td
+    <UiTableCell
       className={cn(
         "align-middle",
         cellPad,
@@ -591,6 +613,6 @@ function TableCell<TData>({
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </EditableCell>
       </div>
-    </td>
+    </UiTableCell>
   );
 }

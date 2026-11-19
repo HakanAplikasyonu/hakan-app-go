@@ -4,13 +4,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { BosDurum } from "@/components/hakan";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { TaxpayerRequestRow } from "@/features/taxpayer/components/taxpayer-request-row";
 import {
   taxpayerTaskKeys,
   taxpayerTaskService,
   type TaxpayerDocumentTaskStatus,
 } from "@/features/taxpayer/services/taxpayer.service";
-import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 const FILTERS: TaxpayerDocumentTaskStatus[] = [
@@ -45,20 +45,13 @@ export function TaxpayerRequestsPage({ taxpayer }: { taxpayer: string }) {
         className="flex flex-wrap gap-2"
       >
         {FILTERS.map((f) => (
-          <button
+          <FilterChip
             key={f}
-            type="button"
-            aria-pressed={status === f}
-            onClick={() => setStatus(f)}
-            className={cn(
-              "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-              status === f
-                ? "border-brand bg-brand text-on-brand"
-                : "border-line bg-surface text-text-2 hover:text-foreground",
-            )}
+            pressed={status === f}
+            onPressedChange={() => setStatus(f)}
           >
             {t(`taxpayer.requests_filter_${f}`)}
-          </button>
+          </FilterChip>
         ))}
       </div>
       <section className="bg-surface border-line rounded-xl border p-4 md:p-5">
