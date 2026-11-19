@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { visibleTabs } from "../lib/visible-tabs";
+
 import { EngagementScopeProvider } from "../engagement-scope";
 
 import { ChangeRequestsPanel } from "./change-requests-panel";
@@ -58,7 +60,9 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
-  return [
+  // Her sekme ana listesinin okuma iznine bağlı (#382, #390, #518 E2):
+  // izni olmayan rol sekmeyi görmez, boş ya da hatalı ekrana düşmez.
+  const tabs: (EngagementTab & { permission?: string })[] = [
     {
       href: routes.tenant.engagement(slug, engagement),
       label: t("office.engagement.tab_overview"),
@@ -67,28 +71,29 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
     {
       href: routes.tenant.engagementInvoices(slug, engagement),
       label: t("office.nav_invoices"),
+      permission: Permission.TenantInvoicesRead,
     },
     {
       href: routes.tenant.engagementWarnings(slug, engagement),
       label: t("office.engagement.tab_warnings"),
+      permission: Permission.TenantWarningsRead,
     },
     {
       href: routes.tenant.engagementReview(slug, engagement),
       label: t("office.engagement.tab_review"),
+      permission: Permission.TenantReviewRead,
     },
     {
       href: routes.tenant.engagementBank(slug, engagement),
       label: t("office.engagement.tab_bank"),
+      permission: Permission.TenantBankRead,
     },
     // Maaş verisi hassas: izni olmayan (stajyer) sekmeyi görmez (#382).
-    ...(can(Permission.TenantPayrollRead)
-      ? [
-          {
-            href: routes.tenant.engagementPayroll(slug, engagement),
-            label: t("office.engagement.tab_payroll"),
-          },
-        ]
-      : []),
+    {
+      href: routes.tenant.engagementPayroll(slug, engagement),
+      label: t("office.engagement.tab_payroll"),
+      permission: Permission.TenantPayrollRead,
+    },
     {
       href: routes.tenant.engagementEasytrade(slug, engagement),
       label: t("sources.easytrade.tab"),
@@ -96,40 +101,38 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
     {
       href: routes.tenant.engagementExpenses(slug, engagement),
       label: t("office.engagement.tab_expenses"),
+      permission: Permission.TenantReceiptsRead,
     },
     {
       href: routes.tenant.engagementZReports(slug, engagement),
       label: t("office.engagement.tab_zreports"),
+      permission: Permission.TenantReceiptsRead,
     },
     {
       href: routes.tenant.engagementReconciliation(slug, engagement),
       label: t("office.engagement.tab_reconciliation"),
+      permission: Permission.TenantReconciliationRead,
     },
-    ...(can(Permission.TenantJournalsRead)
-      ? [
-          {
-            href: routes.tenant.engagementJournals(slug, engagement),
-            label: t("office.engagement.tab_journals"),
-          },
-        ]
-      : []),
+    {
+      href: routes.tenant.engagementJournals(slug, engagement),
+      label: t("office.engagement.tab_journals"),
+      permission: Permission.TenantJournalsRead,
+    },
     {
       href: routes.tenant.engagementDocuments(slug, engagement),
       label: t("office.engagement.tab_documents"),
+      permission: Permission.TenantDocumentsRead,
     },
     {
       href: routes.tenant.engagementUpload(slug, engagement),
       label: t("office.engagement.tab_upload"),
     },
     // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
-    ...(can(Permission.TenantTaxReturnsRead)
-      ? [
-          {
-            href: routes.tenant.engagementTaxReturns(slug, engagement),
-            label: t("office.engagement.tab_tax_returns"),
-          },
-        ]
-      : []),
+    {
+      href: routes.tenant.engagementTaxReturns(slug, engagement),
+      label: t("office.engagement.tab_tax_returns"),
+      permission: Permission.TenantTaxReturnsRead,
+    },
     {
       href: routes.tenant.engagementPetitions(slug, engagement),
       label: t("office.engagement.tab_petitions"),
@@ -144,6 +147,7 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.engagement.tab_connections"),
     },
   ];
+  return visibleTabs(tabs, can);
 }
 
 /** Ok tuşları, Home ve End sekmeler arasında odağı taşır. */
