@@ -2027,5 +2027,15 @@
   "excel.template_delete": "Sil",
   "excel.template_delete_title": "Şablon silinsin mi?",
   "excel.template_delete_body": "Aynı düzendeki dosyalar bundan sonra yeniden eşlenir. Yapılmış aktarımlar etkilenmez.",
-  "excel.template_deleted": "Şablon silindi"
+  "excel.template_deleted": "Şablon silindi",
+  "shell.breadcrumb_label": "Konum",
+  "shell.taxpayer_switch": "Mükellef değiştir: {{name}}",
+  "shell.taxpayer_search": "Mükellef ara…",
+  "shell.taxpayer_none": "Mükellef bulunamadı",
+  "shell.taxpayer_unknown": "Mükellef",
+  "shell.secondary_actions": "Destek ve bildirimler",
+  "shell.switch_office": "Ofis değiştir",
+  "shell.help": "Yardım ve kılavuzlar",
+  "shell.theme_light": "Açık temaya geç",
+  "shell.theme_dark": "Koyu temaya geç"
 }
