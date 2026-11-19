@@ -183,6 +183,9 @@ export const routes = {
     /** Mükellefe özgü dış bağlantılar: banka web servisi, Easytrade … (#518). */
     engagementConnections: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/connections`,
+    /** KVKK ilgili kişi talepleri (#193, #518). */
+    engagementPrivacy: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/privacy`,
     /** Expenses (masraf) of one engagement (#384). */
     engagementExpenses: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/expenses`,

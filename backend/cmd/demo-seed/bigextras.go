@@ -185,6 +185,26 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				SELECT e.organization_id, e.id, e.taxpayer_id, e.id % 5 <> 0, 1 + e.id % 5, t.contact_email, $2, $3
 				FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id WHERE e.id = ANY($1::bigint[])
 				ON CONFLICT (organization_id, engagement_id) DO NOTHING`, []any{engs, prev, o.owner()}},
+			// KVKK ilgili kişi talepleri (#518 B3): bekleyen dışa aktarım,
+			// reddedilmiş silme, süresi dolmuş dışa aktarım. Tamamlanmış silme
+			// yok: demo verisi anonimleştirilmiş görünmesin.
+			{"privacy_requests", `
+				INSERT INTO privacy_requests (organization_id, engagement_id, kind, subject_type, status, reason, decision_note,
+					summary, requested_by, decided_by, decided_at, completed_at, expires_at, created_at, updated_at)
+				SELECT e.organization_id, e.id, v.kind, 'taxpayer', v.status, v.reason, v.note,
+				       CASE WHEN v.status = 'completed' THEN jsonb_build_object('export_expires_at', $4::timestamptz - interval '3 days') ELSE '{}'::jsonb END,
+				       $2, CASE WHEN v.status <> 'pending' THEN $3::bigint END,
+				       CASE WHEN v.status <> 'pending' THEN $4::timestamptz - v.age + interval '1 day' END,
+				       CASE WHEN v.status = 'completed' THEN $4::timestamptz - v.age + interval '1 day' END,
+				       CASE WHEN v.status = 'completed' THEN $4::timestamptz - interval '3 days' END,
+				       $4::timestamptz - v.age, $4::timestamptz - v.age
+				FROM engagements e
+				JOIN (VALUES
+					(0, 'export', 'pending', 'Mükellefin yazılı başvurusu: sistemdeki kişisel verilerinin dökümü.', '', interval '2 days'),
+					(1, 'erasure', 'rejected', 'Mükellef telefonla silme istedi.', 'Yazılı başvuru olmadan işlem yapılamaz; mükellefe bilgi verildi.', interval '20 days'),
+					(2, 'export', 'completed', 'Yıllık KVKK bilgilendirmesi kapsamında döküm.', '', interval '40 days')
+				) v(slot, kind, status, reason, note, age) ON e.id % 5 = v.slot
+				WHERE e.id = ANY($1::bigint[])`, []any{engs, o.accountant(), o.owner(), w.now}},
 		}
 		for _, s := range steps {
 			tag, err := tx.Exec(ctx, s.sql, s.args...)
