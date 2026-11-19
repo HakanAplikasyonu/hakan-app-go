@@ -19,6 +19,10 @@ const imgDir = path.join(root, "frontend/public/yardim/img");
 // Sıra: Yardım sayfasındaki sıra. README yalnızca depoda okunur.
 const ORDER = ["ofis-yoneticisi", "ofis-calisani", "mizan-hafizasi", "mukellef", "masaustu", "whatsapp-uzantisi", "demo-senaryosu"];
 
+// Rol anahtarları (#522): ofis rolleri (`roles.slug`, docs/yetki-matrisi.md),
+// mükellef kullanıcısı ve platform yöneticisi.
+const ROLES = ["owner", "admin", "accountant", "intern", "member", "taxpayer", "platform"];
+
 const files = readdirSync(srcDir).filter((f) => f.endsWith(".md") && f !== "README.md");
 const slugs = files.map((f) => f.replace(/\.md$/, ""));
 const unknown = slugs.filter((s) => !ORDER.includes(s));
@@ -30,7 +34,21 @@ if (unknown.length || missing.length) {
 
 const problems = [];
 const guides = ORDER.map((slug) => {
-  const body = readFileSync(path.join(srcDir, `${slug}.md`), "utf8").replace(/\r\n?/g, "\n");
+  const raw = readFileSync(path.join(srcDir, `${slug}.md`), "utf8").replace(/\r\n?/g, "\n");
+  // Başlık (frontmatter, #522): `roles: [owner, admin]` kılavuzun kimin için
+  // olduğunu, `internal: true` son kullanıcıya gösterilmeyeceğini söyler.
+  const fm = /^---\n([\s\S]*?)\n---\n+/.exec(raw);
+  if (!fm) problems.push(`${slug}.md: başlık (--- roles: […] ---) yok`);
+  const body = fm ? raw.slice(fm[0].length) : raw;
+  const meta = fm ? fm[1] : "";
+  const rolesLine = /^roles:\s*\[(.*)\]\s*$/m.exec(meta);
+  const roles = rolesLine
+    ? rolesLine[1].split(",").map((r) => r.trim()).filter(Boolean)
+    : [];
+  const internal = /^internal:\s*true\s*$/m.test(meta);
+  const badRoles = roles.filter((r) => !ROLES.includes(r));
+  if (badRoles.length) problems.push(`${slug}.md: bilinmeyen rol: ${badRoles} (geçerli: ${ROLES})`);
+  if (!internal && roles.length === 0) problems.push(`${slug}.md: roles boş (iç belge değilse en az bir rol gerekir)`);
   const h1 = /^#\s+(.+)$/m.exec(body);
   if (!h1) problems.push(`${slug}.md: başlık (# …) yok`);
   const summary = /^>\s*(.+)$/m.exec(body);
@@ -42,7 +60,7 @@ const guides = ORDER.map((slug) => {
       problems.push(`${slug}.md: görsel yok: frontend/public/yardim/img/${name} (npm run docs:screenshots, e2e/)`);
     }
   }
-  return { slug, title: h1 ? h1[1].trim() : slug, summary: summary ? summary[1].trim() : "", body };
+  return { slug, title: h1 ? h1[1].trim() : slug, summary: summary ? summary[1].trim() : "", roles, internal, body };
 });
 if (problems.length) {
   console.error(problems.map((p) => `sync-kullanim: ${p}`).join("\n"));
@@ -56,6 +74,10 @@ export type HelpGuide = {
   slug: string;
   title: string;
   summary: string;
+  /** Kılavuzun kimin için olduğu: ofis rolü anahtarı, \`taxpayer\`, \`platform\`. */
+  roles: readonly string[];
+  /** İç belge (ör. demo senaryosu): son kullanıcıya gösterilmez. */
+  internal: boolean;
   body: string;
 };
 

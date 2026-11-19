@@ -1,3 +1,7 @@
+---
+roles: [owner, admin]
+---
+
 # Ofis yöneticisi kılavuzu
 
 > Ofisi kurun, ekibi davet edin, mükellef ekleyin; inceleme, yevmiye ve Luca / Zirve çıktısını yönetin.

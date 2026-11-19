@@ -1,3 +1,7 @@
+---
+roles: [taxpayer]
+---
+
 # Mükellef kılavuzu
 
 > Mobil uygulama ve web paneli: fiş gönderme, belge yükleme, görevler ve faturalarınız.

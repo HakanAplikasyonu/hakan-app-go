@@ -3,5 +3,7 @@
   "nav": "Yardım",
   "nav_label": "Kullanım kılavuzları",
   "description": "Ofis paneli, mükellef portalı ve mobil uygulama, masaüstü ajanı için adım adım kılavuzlar.",
-  "turkish_only": "Kılavuzlar yalnızca Türkçedir."
+  "turkish_only": "Kılavuzlar yalnızca Türkçedir.",
+  "for_you": "Size özel",
+  "all_guides": "Tüm kılavuzlar"
 }

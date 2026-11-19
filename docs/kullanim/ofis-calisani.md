@@ -1,3 +1,7 @@
+---
+roles: [accountant, intern, member]
+---
+
 # Ofis çalışanı kılavuzu
 
 > Günlük iş akışı: dosya yükleme, faturalar, inceleme kuyruğu, uyarılar ve yevmiye.

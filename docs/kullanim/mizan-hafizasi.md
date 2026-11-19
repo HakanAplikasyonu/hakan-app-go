@@ -1,3 +1,7 @@
+---
+roles: [owner, admin, accountant, member]
+---
+
 # Mizan hafızası nasıl çalışır
 
 > Mükellefin mizanını bir kez yükleyin; sistem kararlarınızdan öğrenir ve aynı firmanın faturalarını sonraki aylarda sizin yerinize doğru hesaba yazar.

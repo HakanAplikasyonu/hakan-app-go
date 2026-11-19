@@ -1,3 +1,7 @@
+---
+roles: [owner, admin, accountant, member]
+---
+
 # Masaüstü ajanı kılavuzu
 
 > Ofis bilgisayarına kurulan ajan: kurulum, klasör izleme, Logo / Mikro okuma ve sorun giderme.
