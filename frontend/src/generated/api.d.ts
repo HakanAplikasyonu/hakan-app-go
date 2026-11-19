@@ -36691,8 +36691,13 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        period: string;
-                        items: components["schemas"]["BankBalanceCheck"][];
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            period: string;
+                            items: components["schemas"]["BankBalanceCheck"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
                     };
                 };
             };

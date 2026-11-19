@@ -13702,12 +13702,18 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [period, items]
+                required: [success, data, meta]
                 properties:
-                  period: { type: string }
-                  items:
-                    type: array
-                    items: { $ref: "#/components/schemas/BankBalanceCheck" }
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [period, items]
+                    properties:
+                      period: { type: string }
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/BankBalanceCheck" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
@@ -16640,17 +16646,17 @@ components:
       properties:
         cash_box_uuid: { type: string, format: uuid }
         cash_box_name: { type: string }
-        iban: { type: string, nullable: true }
+        iban: { type: [string, "null"] }
         currency: { type: string }
         movements: { type: integer, format: int64 }
         first_date: { type: string, format: date }
         last_date: { type: string, format: date }
         in_total: { type: string, example: "2500.00" }
         out_total: { type: string, example: "1200.00" }
-        opening: { type: string, nullable: true }
-        expected_closing: { type: string, nullable: true }
-        closing: { type: string, nullable: true }
-        difference: { type: string, nullable: true, description: "closing − expected_closing" }
+        opening: { type: [string, "null"] }
+        expected_closing: { type: [string, "null"] }
+        closing: { type: [string, "null"] }
+        difference: { type: [string, "null"], description: "closing − expected_closing" }
         balanced: { type: boolean }
         without_balance: { type: integer, format: int64 }
     BillingPlan:
