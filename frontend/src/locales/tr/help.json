@@ -5,5 +5,20 @@
   "description": "Ofis paneli, mükellef portalı ve mobil uygulama, masaüstü ajanı için adım adım kılavuzlar.",
   "turkish_only": "Kılavuzlar yalnızca Türkçedir.",
   "for_you": "Size özel",
-  "all_guides": "Tüm kılavuzlar"
+  "all_guides": "Tüm kılavuzlar",
+  "search_label": "Kılavuzlarda ara",
+  "search_placeholder": "Kılavuzlarda ara: ör. UBL yükleme, mizan, fiş",
+  "search_results": "{{count}} sonuç",
+  "search_empty": "Sonuç yok. Başka bir sözcükle deneyin ya da aşağıdaki kılavuzlara göz atın.",
+  "topics": "Sık bakılan konular",
+  "toc": "Bu kılavuzda",
+  "pager": "Kılavuzlar arasında gezin",
+  "prev": "Önceki kılavuz",
+  "next": "Sonraki kılavuz",
+  "feedback_question": "Bu sayfa yardımcı oldu mu?",
+  "feedback_yes": "Evet",
+  "feedback_no": "Hayır",
+  "feedback_thanks": "Teşekkürler.",
+  "feedback_chat_opened": "Destek sohbeti açıldı; eksik olanı oradan yazabilirsiniz.",
+  "feedback_contact": "Eksik olanı ofis yöneticinize ya da destek ekibine iletin."
 }
