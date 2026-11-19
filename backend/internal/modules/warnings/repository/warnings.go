@@ -155,6 +155,15 @@ func (p *Warnings) List(ctx context.Context, f Filter) ([]Row, int64, error) {
 			id := uuid.UUID(r.CustomerUuid.Bytes)
 			row.EntityUUID = &id
 		}
+		// Banka hareketi, masraf, Z raporu, fiş, finansal hareket; fatura
+		// kalemi için faturası (#528).
+		for _, v := range []pgtype.UUID{r.BankTransactionUuid, r.ExpenseUuid, r.RetailSaleUuid,
+			r.ReceiptCaptureUuid, r.FinancialTransactionUuid, r.ItemInvoiceUuid} {
+			if row.EntityUUID == nil && v.Valid {
+				id := uuid.UUID(v.Bytes)
+				row.EntityUUID = &id
+			}
+		}
 		if r.ResolvedAt.Valid {
 			t := r.ResolvedAt.Time
 			row.ResolvedAt = &t

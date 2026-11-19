@@ -273,11 +273,22 @@ func (q *Queries) GroupTenantDataWarnings(ctx context.Context, arg GroupTenantDa
 const listTenantDataWarnings = `-- name: ListTenantDataWarnings :many
 SELECT w.id, w.uuid, w.engagement_id, e.uuid AS engagement_uuid, w.period, w.entity_type, w.entity_id,
        inv.uuid AS invoice_uuid, cust.uuid AS customer_uuid,
+       -- Diğer kayıt türlerinin genel kimliği (#528): arayüz uyarıdan kayda gider.
+       -- Fatura kalemi kendi faturasının kimliğini taşır.
+       bt.uuid AS bank_transaction_uuid, ex.uuid AS expense_uuid, rs.uuid AS retail_sale_uuid,
+       rc.uuid AS receipt_capture_uuid, ft.uuid AS financial_transaction_uuid, itinv.uuid AS item_invoice_uuid,
        w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at
 FROM data_warnings w
 JOIN engagements e ON e.organization_id = w.organization_id AND e.id = w.engagement_id
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 LEFT JOIN customers cust ON w.entity_type = 'customer' AND cust.id = w.entity_id AND cust.taxpayer_id = w.taxpayer_id
+LEFT JOIN bank_transactions bt ON w.entity_type = 'bank_transaction' AND bt.id = w.entity_id AND bt.taxpayer_id = w.taxpayer_id
+LEFT JOIN expenses ex ON w.entity_type = 'expense' AND ex.id = w.entity_id AND ex.taxpayer_id = w.taxpayer_id
+LEFT JOIN retail_sales rs ON w.entity_type = 'retail_sale' AND rs.id = w.entity_id AND rs.taxpayer_id = w.taxpayer_id
+LEFT JOIN receipt_captures rc ON w.entity_type = 'receipt_capture' AND rc.id = w.entity_id AND rc.taxpayer_id = w.taxpayer_id
+LEFT JOIN source_financial_transactions ft ON w.entity_type = 'financial_transaction' AND ft.id = w.entity_id AND ft.taxpayer_id = w.taxpayer_id
+LEFT JOIN invoice_items it ON w.entity_type = 'invoice_item' AND it.id = w.entity_id AND it.taxpayer_id = w.taxpayer_id
+LEFT JOIN invoices itinv ON itinv.id = it.invoice_id AND itinv.taxpayer_id = it.taxpayer_id
 WHERE w.organization_id = $1
   AND ($2::bigint IS NULL OR w.engagement_id = $2::bigint)
   AND ($3::bool OR w.engagement_id IN (
@@ -308,23 +319,29 @@ type ListTenantDataWarningsParams struct {
 }
 
 type ListTenantDataWarningsRow struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	EngagementID   int64              `json:"engagement_id"`
-	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
-	Period         pgtype.Text        `json:"period"`
-	EntityType     string             `json:"entity_type"`
-	EntityID       pgtype.Int8        `json:"entity_id"`
-	InvoiceUuid    pgtype.UUID        `json:"invoice_uuid"`
-	CustomerUuid   pgtype.UUID        `json:"customer_uuid"`
-	Code           string             `json:"code"`
-	Severity       string             `json:"severity"`
-	Params         []byte             `json:"params"`
-	Producer       string             `json:"producer"`
-	Status         string             `json:"status"`
-	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ID                       int64              `json:"id"`
+	Uuid                     uuid.UUID          `json:"uuid"`
+	EngagementID             int64              `json:"engagement_id"`
+	EngagementUuid           uuid.UUID          `json:"engagement_uuid"`
+	Period                   pgtype.Text        `json:"period"`
+	EntityType               string             `json:"entity_type"`
+	EntityID                 pgtype.Int8        `json:"entity_id"`
+	InvoiceUuid              pgtype.UUID        `json:"invoice_uuid"`
+	CustomerUuid             pgtype.UUID        `json:"customer_uuid"`
+	BankTransactionUuid      pgtype.UUID        `json:"bank_transaction_uuid"`
+	ExpenseUuid              pgtype.UUID        `json:"expense_uuid"`
+	RetailSaleUuid           pgtype.UUID        `json:"retail_sale_uuid"`
+	ReceiptCaptureUuid       pgtype.UUID        `json:"receipt_capture_uuid"`
+	FinancialTransactionUuid pgtype.UUID        `json:"financial_transaction_uuid"`
+	ItemInvoiceUuid          pgtype.UUID        `json:"item_invoice_uuid"`
+	Code                     string             `json:"code"`
+	Severity                 string             `json:"severity"`
+	Params                   []byte             `json:"params"`
+	Producer                 string             `json:"producer"`
+	Status                   string             `json:"status"`
+	ResolvedAt               pgtype.Timestamptz `json:"resolved_at"`
+	CreatedAt                pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 }
 
 // tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
@@ -359,6 +376,12 @@ func (q *Queries) ListTenantDataWarnings(ctx context.Context, arg ListTenantData
 			&i.EntityID,
 			&i.InvoiceUuid,
 			&i.CustomerUuid,
+			&i.BankTransactionUuid,
+			&i.ExpenseUuid,
+			&i.RetailSaleUuid,
+			&i.ReceiptCaptureUuid,
+			&i.FinancialTransactionUuid,
+			&i.ItemInvoiceUuid,
 			&i.Code,
 			&i.Severity,
 			&i.Params,

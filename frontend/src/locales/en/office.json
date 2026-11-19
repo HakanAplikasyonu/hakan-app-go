@@ -1801,5 +1801,10 @@
   "change_requests.apply_done": "Change applied.",
   "change_requests.reject_done": "Request rejected; the record is unchanged.",
   "change_requests.stale": "This request no longer applies (already decided or a newer source arrived).",
-  "change_requests.failed": "Action failed."
+  "change_requests.failed": "Action failed.",
+  "warnings_api.open_record": "Open {{record}}",
+  "warnings_api.entity_receipt_capture": "Receipt",
+  "tax_returns.blocking_title": "{{count}} open warnings affect this return",
+  "tax_returns.blocking_all": "All warnings",
+  "tax_returns.blocking_none": "No open warnings left for this period."
 }

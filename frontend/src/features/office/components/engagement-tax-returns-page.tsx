@@ -52,6 +52,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnWarnings } from "./tax-return-warnings";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 import { useEngagementScope } from "../engagement-scope";
@@ -285,6 +286,13 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             onReopen={() => reopen.mutate()}
             onFile={(v) => file.mutate(v)}
           />
+          {p.status === "draft" ? (
+            <TaxReturnWarnings
+              engagement={engagement}
+              period={period}
+              codes={p.open_warnings}
+            />
+          ) : null}
           <Checklist
             items={p.checklist}
             editable={editable}

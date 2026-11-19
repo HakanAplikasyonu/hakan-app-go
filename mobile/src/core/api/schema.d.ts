@@ -13282,7 +13282,7 @@ export interface components {
             entity_type: string;
             /**
              * Format: uuid
-             * @description Public id of the entity for invoice and customer warnings; null otherwise.
+             * @description Public id of the record: invoice, customer, bank_transaction, expense, retail_sale, receipt_capture, financial_transaction; for invoice_item the invoice. Null for period warnings.
              */
             entity_uuid: string | null;
             /** @example TAX_TOTAL_MISMATCH */
