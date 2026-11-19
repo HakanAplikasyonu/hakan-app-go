@@ -194,9 +194,12 @@ function useMatrixColumns(
                   row.original.engagement_uuid,
                 )}
                 onClick={() => setPeriod(p)}
-                aria-label={`${row.original.taxpayer_title} · ${monthLabel(p, locale)}`}
                 className="focus-visible:ring-ring block rounded-md transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none"
               >
+                {/* Ad görünen metni içerir (axe label-content-name-mismatch). */}
+                <span className="sr-only">
+                  {`${row.original.taxpayer_title} · ${monthLabel(p, locale)}: `}
+                </span>
                 <CellBadge cell={cell} />
               </Link>
             );
