@@ -24,6 +24,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { Hint } from "@/components/ui/hint";
 import { ErrorState } from "@/components/common/error-state";
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
@@ -503,18 +504,22 @@ function StatusBar({
       ) : null}
       <div className="ms-auto flex flex-wrap gap-2">
         {canWrite && p.status === "draft" ? (
-          <Button
-            size="sm"
-            className="max-md:min-h-11"
-            disabled={busy || open > 0}
-            title={
+          <Hint
+            label={
               open > 0 ? t("office.tax_returns.prepare_blocked") : undefined
             }
-            onClick={onPrepare}
+            wrap={busy || open > 0}
           >
-            <FileCheck2 className="size-4" aria-hidden />
-            {t("office.tax_returns.prepare")}
-          </Button>
+            <Button
+              size="sm"
+              className="max-md:min-h-11"
+              disabled={busy || open > 0}
+              onClick={onPrepare}
+            >
+              <FileCheck2 className="size-4" aria-hidden />
+              {t("office.tax_returns.prepare")}
+            </Button>
+          </Hint>
         ) : null}
         {canWrite && p.status === "prepared" ? (
           <>

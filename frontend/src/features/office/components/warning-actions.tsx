@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 
+import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -173,24 +174,26 @@ export function ApiWarningActions({
         />
       ) : (
         <div className="flex gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11 md:min-h-8"
-            title={t("office.warning_decision.acknowledge_hint")}
-            onClick={() => setAction("acknowledge")}
-          >
-            {t("office.warning_acknowledge")}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="min-h-11 md:min-h-8"
-            title={t("office.warning_decision.resolve_hint")}
-            onClick={() => setAction("resolve")}
-          >
-            {t("office.warning_resolve")}
-          </Button>
+          <Hint label={t("office.warning_decision.acknowledge_hint")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 md:min-h-8"
+              onClick={() => setAction("acknowledge")}
+            >
+              {t("office.warning_acknowledge")}
+            </Button>
+          </Hint>
+          <Hint label={t("office.warning_decision.resolve_hint")}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="min-h-11 md:min-h-8"
+              onClick={() => setAction("resolve")}
+            >
+              {t("office.warning_resolve")}
+            </Button>
+          </Hint>
         </div>
       )}
       {decide.error ? (

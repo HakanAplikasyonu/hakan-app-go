@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Controller, useFormContext } from "react-hook-form";
 import { z } from "zod";
 
+import { Hint } from "@/components/ui/hint";
 import { Label } from "@/components/ui/label";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
@@ -314,17 +315,21 @@ function RoleRowActions({
         {t("tenant.roles_edit")}
       </Button>
       {role.is_system ? null : (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          disabled={remove.isPending || inUse}
-          title={inUse ? t("tenant.roles_delete_in_use") : undefined}
-          onClick={() => void onDelete()}
+        <Hint
+          label={inUse ? t("tenant.roles_delete_in_use") : undefined}
+          wrap={remove.isPending || inUse}
         >
-          <Trash2 className="size-4" />
-          {t("tenant.roles_delete")}
-        </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={remove.isPending || inUse}
+            onClick={() => void onDelete()}
+          >
+            <Trash2 className="size-4" />
+            {t("tenant.roles_delete")}
+          </Button>
+        </Hint>
       )}
     </div>
   );
