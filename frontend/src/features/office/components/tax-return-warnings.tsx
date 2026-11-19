@@ -21,6 +21,7 @@ import { warningRecordHref, warningRecordKind } from "../lib/related-href";
 import type { RelatedSourceKind } from "../services/related.service";
 import type { ApiDataWarning as DataWarning } from "../services/warnings.service";
 import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
+import { InvoiceQuickView } from "./invoice-quick-view";
 import { SeverityBadge } from "./office-ui";
 import { RelatedRecordsTable } from "./related-records";
 import { ApiWarningActions } from "./warning-actions";
@@ -299,6 +300,9 @@ function RecordPanel({
           transaction={uuid}
           onChanged={onChanged}
         />
+      ) : null}
+      {kind === "invoice" ? (
+        <InvoiceQuickView engagement={engagement} invoice={uuid} />
       ) : null}
 
       <section className="space-y-2">
