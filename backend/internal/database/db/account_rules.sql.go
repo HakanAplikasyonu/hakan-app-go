@@ -379,7 +379,8 @@ func (q *Queries) GetCounterpartyAccount(ctx context.Context, arg GetCounterpart
 
 const getInvoiceForAccounting = `-- name: GetInvoiceForAccounting :one
 SELECT i.id, i.uuid, i.taxpayer_id, i.direction, i.type, i.period, i.customer_id,
-       i.customer_tax_number, i.customer_identity_number, i.customer_name
+       i.customer_tax_number, i.customer_identity_number, i.customer_name,
+       i.invoice_number, i.issue_date, i.payable_amount
 FROM invoices i
 WHERE i.taxpayer_id = $1 AND i.uuid = $2
 `
@@ -390,16 +391,19 @@ type GetInvoiceForAccountingParams struct {
 }
 
 type GetInvoiceForAccountingRow struct {
-	ID                     int64       `json:"id"`
-	Uuid                   uuid.UUID   `json:"uuid"`
-	TaxpayerID             int64       `json:"taxpayer_id"`
-	Direction              string      `json:"direction"`
-	Type                   string      `json:"type"`
-	Period                 string      `json:"period"`
-	CustomerID             pgtype.Int8 `json:"customer_id"`
-	CustomerTaxNumber      pgtype.Text `json:"customer_tax_number"`
-	CustomerIdentityNumber pgtype.Text `json:"customer_identity_number"`
-	CustomerName           pgtype.Text `json:"customer_name"`
+	ID                     int64          `json:"id"`
+	Uuid                   uuid.UUID      `json:"uuid"`
+	TaxpayerID             int64          `json:"taxpayer_id"`
+	Direction              string         `json:"direction"`
+	Type                   string         `json:"type"`
+	Period                 string         `json:"period"`
+	CustomerID             pgtype.Int8    `json:"customer_id"`
+	CustomerTaxNumber      pgtype.Text    `json:"customer_tax_number"`
+	CustomerIdentityNumber pgtype.Text    `json:"customer_identity_number"`
+	CustomerName           pgtype.Text    `json:"customer_name"`
+	InvoiceNumber          string         `json:"invoice_number"`
+	IssueDate              pgtype.Date    `json:"issue_date"`
+	PayableAmount          pgtype.Numeric `json:"payable_amount"`
 }
 
 func (q *Queries) GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error) {
@@ -416,6 +420,9 @@ func (q *Queries) GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceFor
 		&i.CustomerTaxNumber,
 		&i.CustomerIdentityNumber,
 		&i.CustomerName,
+		&i.InvoiceNumber,
+		&i.IssueDate,
+		&i.PayableAmount,
 	)
 	return i, err
 }

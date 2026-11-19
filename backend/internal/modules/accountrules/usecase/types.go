@@ -66,6 +66,9 @@ type InvoiceLine struct {
 	Name     string
 	LineType string
 	TaxRate  decimal.Decimal
+	// Amount: satırın KDV hariç tutarı; incelemede "hangi kalem" sorusu
+	// için (#569).
+	Amount decimal.Decimal
 }
 
 // Invoice is an invoice to code.
@@ -79,7 +82,11 @@ type Invoice struct {
 	TaxNumber      string
 	IdentityNumber string
 	CustomerName   string
-	Lines          []InvoiceLine
+	// Belge bilgisi incelemede gösterilir (#569).
+	Number    string
+	IssueDate string
+	Total     decimal.Decimal
+	Lines     []InvoiceLine
 }
 
 // HistoryRow is a code the counterparty's earlier lines were booked to.

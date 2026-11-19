@@ -133,6 +133,9 @@ func seedBig(ctx context.Context, pool *pgxpool.Pool, pass string, sc bigScale, 
 		if err := bigRealLife(ctx, pool, w, o, ms, cnt); err != nil {
 			return fmt.Errorf("%s real life: %w", o.def.Slug, err)
 		}
+		if err := bigAccountSuggest(ctx, pool, w, o, ms, cnt); err != nil {
+			return fmt.Errorf("%s account suggestions: %w", o.def.Slug, err)
+		}
 		fmt.Printf("big demo %-14s %d taxpayers (%s)\n", o.def.Slug, len(ms), time.Since(t0).Round(time.Millisecond))
 	}
 	if _, err := pool.Exec(ctx, `ANALYZE`); err != nil {

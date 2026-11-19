@@ -38,6 +38,7 @@ import { GuvenOlcegi, TacRozeti } from "@/components/hakan";
 import type { GuvenKaynagi } from "@/components/hakan";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   Command,
   CommandEmpty,
@@ -57,7 +58,9 @@ import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatMoney } from "@/lib/decimal";
 import { cn } from "@/lib/utils";
+import { date as formatDate } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
@@ -95,6 +98,10 @@ import {
 } from "../lib/suggestion-label";
 
 const ACCOUNT_KIND = "account_code";
+// Fişten okunan alan (#569): değer elle düzeltilir (tarih, tutar, fiş no).
+const RECEIPT_KIND = "receipt_field";
+const DATE_FIELDS = new Set(["date"]);
+const AMOUNT_FIELDS = new Set(["total", "tax", "cash_amount", "card_amount"]);
 
 type DecisionKind = "accepted" | "corrected" | "rejected";
 
@@ -299,6 +306,98 @@ function EvidenceChain({
  * Hesap kodu seçici: mükellefin etkin hesap planından arar; plan yoksa ya da
  * okunamıyorsa kod elle yazılır.
  */
+/**
+ * Fiş alanı düzeltme (#569): belgede yazan doğru değer yazılır; sunucu
+ * tarih ve tutarı Türkçe biçimden çevirir, geçersizse nedenini söyler.
+ */
+function ValueEditor({
+  field,
+  initial,
+  open,
+  onOpenChange,
+  onSave,
+  children,
+}: {
+  field: string;
+  initial: string;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSave: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  const { t } = useLocale();
+  const present = useIsPresent();
+  const [value, setValue] = useState(initial);
+  const [error, setError] = useState(false);
+  const hint = DATE_FIELDS.has(field)
+    ? t("office.review.value_hint_date")
+    : AMOUNT_FIELDS.has(field)
+      ? t("office.review.value_hint_amount")
+      : t("office.review.value_hint_text");
+  return (
+    <Popover
+      open={open && present}
+      onOpenChange={(v) => {
+        if (v) {
+          setValue(initial);
+          setError(false);
+        }
+        onOpenChange(v);
+      }}
+    >
+      <PopoverAnchor asChild>{children}</PopoverAnchor>
+      <PopoverContent className="w-80" align="start">
+        <form
+          className="flex flex-col gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const v = value.trim();
+            if (!v) {
+              setError(true);
+              return;
+            }
+            onSave(v);
+          }}
+        >
+          <Label htmlFor="review-value-input">
+            {t("office.review.value_label")}
+          </Label>
+          <Input
+            id="review-value-input"
+            autoFocus
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setError(false);
+            }}
+            aria-invalid={error || undefined}
+            aria-describedby="review-value-hint"
+          />
+          <p
+            id="review-value-hint"
+            className={cn(
+              "text-xs",
+              error ? "text-danger" : "text-muted-foreground",
+            )}
+          >
+            {error ? t("office.review.value_required") : hint}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => onOpenChange(false)}
+            >
+              {t("office.review.value_cancel")}
+            </Button>
+            <Button type="submit">{t("office.review.value_save")}</Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function CodePicker({
   engagement,
   open,
@@ -513,6 +612,7 @@ function ReviewWorkspaceInner() {
   const [pinned, setPinned] = useState<string>();
   const [log, setLog] = useState<Decision[]>([]);
   const [picking, setPicking] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [ruleOnCorrect, setRuleOnCorrect] = useState(false);
   const [help, setHelp] = useState(false);
   const [bulkAt, setBulkAt] = useState(95);
@@ -561,6 +661,8 @@ function ReviewWorkspaceInner() {
   const current = queue[index];
   const currentValue = current ? accountValue(current.proposed_value) : {};
   const canCorrect = !!current && current.kind === ACCOUNT_KIND;
+  const canCorrectValue = !!current && current.kind === RECEIPT_KIND;
+  const canFix = canCorrect || canCorrectValue;
   const cpKey = current ? counterpartyKeyOf(current) : undefined;
   const canRule =
     canCorrect && !!cpKey && can(permissions.tenant.accountRules.write);
@@ -591,7 +693,10 @@ function ReviewWorkspaceInner() {
   const { mutateAsync } = decision;
 
   const decide = useCallback(
-    (kind: DecisionKind, override?: { code: string; name?: string }) => {
+    (
+      kind: DecisionKind,
+      override?: { code: string; name?: string; raw?: boolean },
+    ) => {
       if (!current) return Promise.resolve(false);
       const s = current;
       const code = override?.code ?? valueLabel(s.proposed_value);
@@ -608,11 +713,15 @@ function ReviewWorkspaceInner() {
           ? {
               suggestion: s,
               action: "correct",
-              value: correctedAccountValue(
-                s.proposed_value,
-                override.code,
-                override.name,
-              ),
+              // Fiş alanı düz metin değer alır (#569); hesap kodu öneri
+              // biçimini korur.
+              value: override.raw
+                ? override.code
+                : correctedAccountValue(
+                    s.proposed_value,
+                    override.code,
+                    override.name,
+                  ),
               reason: t("office.review_api.reason_correct"),
             }
           : kind === "rejected"
@@ -762,6 +871,7 @@ function ReviewWorkspaceInner() {
     setCursor(i);
     setPinned(queue[i]?.uuid);
     setPicking(false);
+    setEditing(false);
     if (isMobile) {
       setDetailOpen(true);
       requestAnimationFrame(() => detailRef.current?.focus());
@@ -777,7 +887,8 @@ function ReviewWorkspaceInner() {
           ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))
       )
         return;
-      if (e.metaKey || e.ctrlKey || e.altKey || picking || bulkBusy) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || picking || editing || bulkBusy)
+        return;
       const k = e.key.toLowerCase();
       if (k === "j" || e.key === "ArrowDown") {
         setDirection("skip");
@@ -791,6 +902,7 @@ function ReviewWorkspaceInner() {
       else if (k === "r" || e.key === "Backspace") void decide("rejected");
       else if (k === "e") {
         if (canCorrect) setPicking(true);
+        else if (canCorrectValue) setEditing(true);
       } else if (k === "k") {
         if (canRule) void decideWithRule();
       } else if (k === "z" || k === "u") undo();
@@ -805,8 +917,10 @@ function ReviewWorkspaceInner() {
     decideWithRule,
     undo,
     picking,
+    editing,
     bulkBusy,
     canCorrect,
+    canCorrectValue,
     canRule,
     queue.length,
   ]);
@@ -838,6 +952,40 @@ function ReviewWorkspaceInner() {
   const dirKey = directionKey(ctx?.direction);
   const showDetail = !isMobile || detailOpen;
   const showList = !isMobile || !detailOpen;
+  // Önerilen değer düğmesi: hesap kodunda kod seçici, fiş alanında değer
+  // kutusu açar (#569).
+  const valueButton = current ? (
+    <Button
+      variant="ghost"
+      onClick={() =>
+        canCorrect ? setPicking(true) : canCorrectValue && setEditing(true)
+      }
+      className={cn(
+        "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-md border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
+        canFix && "hover:border-brand",
+      )}
+    >
+      {/* Erişilebilir ad görünen metinden (kod + hesap adı) oluşur;
+          ipucu yalnızca ekran okuyucuya (axe
+          label-content-name-mismatch, #383). */}
+      <span className="sr-only">{t("office.review.code_button_prefix")}</span>
+      <Figure className="text-2xl font-semibold break-all">
+        {valueLabel(current.proposed_value)}
+      </Figure>
+      {currentValue.name ? (
+        <span className="text-text-2 text-sm">{currentValue.name}</span>
+      ) : null}
+      {canFix ? (
+        <>
+          <span className="sr-only">{t("office.review.code_button_hint")}</span>
+          <Pencil
+            className="text-muted-foreground ms-auto size-3.5"
+            aria-hidden
+          />
+        </>
+      ) : null}
+    </Button>
+  ) : null;
 
   let detail: React.ReactNode;
   if (query.isLoading) {
@@ -1009,6 +1157,34 @@ function ReviewWorkspaceInner() {
                     .join(" · ")}
                 </Figure>
               ) : null}
+              {ctx.invoiceNumber || ctx.lineAmount || ctx.invoiceTotal ? (
+                // Belge bilgisi (#569): kayıt hangi faturadan, ne kadar.
+                <Figure className="text-text-2 mt-1 block text-xs">
+                  {[
+                    ctx.invoiceNumber
+                      ? t("office.review.document", {
+                          number: ctx.invoiceNumber,
+                        })
+                      : undefined,
+                    ctx.issueDate ? formatDate(ctx.issueDate) : undefined,
+                    ctx.counterpartyTaxId
+                      ? `VKN ${ctx.counterpartyTaxId}`
+                      : undefined,
+                    ctx.lineAmount
+                      ? t("office.review.line_amount", {
+                          amount: formatMoney(ctx.lineAmount, "TRY"),
+                        })
+                      : undefined,
+                    ctx.invoiceTotal
+                      ? t("office.review.document_total", {
+                          amount: formatMoney(ctx.invoiceTotal, "TRY"),
+                        })
+                      : undefined,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Figure>
+              ) : null}
             </section>
 
             <section className="bg-card rounded-lg border p-4">
@@ -1023,71 +1199,58 @@ function ReviewWorkspaceInner() {
                   className="ms-auto"
                 />
               </div>
-              <CodePicker
-                engagement={current.engagement_uuid ?? undefined}
-                open={picking}
-                onOpenChange={setPicking}
-                onPick={(code, name) => {
-                  setPicking(false);
-                  const withRule = ruleOnCorrect && canRule;
-                  setRuleOnCorrect(false);
-                  if (withRule) {
-                    void decideWithRule(
-                      code === currentValue.code ? undefined : { code, name },
-                    );
-                  } else if (code === currentValue.code) {
-                    void decide("accepted");
-                  } else {
-                    void decide("corrected", { code, name });
-                  }
-                }}
-                footer={
-                  canRule ? (
-                    <Label className="flex min-h-11 items-center gap-2 text-sm font-normal">
-                      <Checkbox
-                        checked={ruleOnCorrect}
-                        onCheckedChange={(v) => setRuleOnCorrect(v === true)}
-                      />
-                      {ruleLabel}
-                    </Label>
-                  ) : undefined
-                }
-              >
-                <Button
-                  variant="ghost"
-                  onClick={() => canCorrect && setPicking(true)}
-                  className={cn(
-                    "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-md border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
-                    canCorrect && "hover:border-brand",
-                  )}
+              {canCorrectValue ? (
+                <ValueEditor
+                  key={current.uuid}
+                  field={current.target_field}
+                  initial={valueLabel(current.proposed_value)}
+                  open={editing}
+                  onOpenChange={setEditing}
+                  onSave={(v) => {
+                    setEditing(false);
+                    if (v === valueLabel(current.proposed_value)) {
+                      void decide("accepted");
+                    } else {
+                      void decide("corrected", { code: v, raw: true });
+                    }
+                  }}
                 >
-                  {/* Erişilebilir ad görünen metinden (kod + hesap adı) oluşur;
-                      ipucu yalnızca ekran okuyucuya (axe
-                      label-content-name-mismatch, #383). */}
-                  <span className="sr-only">
-                    {t("office.review.code_button_prefix")}
-                  </span>
-                  <Figure className="text-2xl font-semibold break-all">
-                    {valueLabel(current.proposed_value)}
-                  </Figure>
-                  {currentValue.name ? (
-                    <span className="text-text-2 text-sm">
-                      {currentValue.name}
-                    </span>
-                  ) : null}
-                  {canCorrect ? (
-                    <>
-                      <span className="sr-only">
-                        {t("office.review.code_button_hint")}
-                      </span>
-                      <Pencil
-                        className="text-muted-foreground ms-auto size-3.5"
-                        aria-hidden
-                      />
-                    </>
-                  ) : null}
-                </Button>
-              </CodePicker>
+                  {valueButton}
+                </ValueEditor>
+              ) : (
+                <CodePicker
+                  engagement={current.engagement_uuid ?? undefined}
+                  open={picking}
+                  onOpenChange={setPicking}
+                  onPick={(code, name) => {
+                    setPicking(false);
+                    const withRule = ruleOnCorrect && canRule;
+                    setRuleOnCorrect(false);
+                    if (withRule) {
+                      void decideWithRule(
+                        code === currentValue.code ? undefined : { code, name },
+                      );
+                    } else if (code === currentValue.code) {
+                      void decide("accepted");
+                    } else {
+                      void decide("corrected", { code, name });
+                    }
+                  }}
+                  footer={
+                    canRule ? (
+                      <Label className="flex min-h-11 items-center gap-2 text-sm font-normal">
+                        <Checkbox
+                          checked={ruleOnCorrect}
+                          onCheckedChange={(v) => setRuleOnCorrect(v === true)}
+                        />
+                        {ruleLabel}
+                      </Label>
+                    ) : undefined
+                  }
+                >
+                  {valueButton}
+                </CodePicker>
+              )}
               <div className="mt-4">
                 <EvidenceChain s={current} threshold={threshold} />
               </div>
@@ -1131,15 +1294,27 @@ function ReviewWorkspaceInner() {
                 A
               </Kbd>
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setPicking(true)}
-              className="h-11"
-              disabled={!canCorrect || bulkBusy}
+            <Hint
+              label={
+                canFix ? undefined : t("office.review.correct_unavailable")
+              }
+              wrap={!canFix || bulkBusy}
             >
-              <Pencil className="size-4" />
-              {t("office.review.correct")} <Kbd>E</Kbd>
-            </Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  canCorrect ? setPicking(true) : setEditing(true)
+                }
+                className="h-11"
+                disabled={!canFix || bulkBusy}
+              >
+                <Pencil className="size-4" />
+                {canCorrectValue
+                  ? t("office.review.correct_value")
+                  : t("office.review.correct")}{" "}
+                <Kbd>E</Kbd>
+              </Button>
+            </Hint>
             {canRule ? (
               <Hint label={ruleLabel} wrap={bulkBusy || ruleBusy}>
                 <Button

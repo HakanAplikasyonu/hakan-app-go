@@ -413,11 +413,23 @@ func (s *Service) submit(ctx context.Context, sub Subject, inv Invoice, l *Invoi
 	if t := firstNonEmpty(inv.TaxNumber, inv.IdentityNumber); t != "" {
 		inputs["counterparty_tax_id"] = t
 	}
+	if inv.Number != "" {
+		inputs["invoice_number"] = inv.Number
+	}
+	if inv.IssueDate != "" {
+		inputs["issue_date"] = inv.IssueDate
+	}
+	if !inv.Total.IsZero() {
+		inputs["invoice_total"] = inv.Total.StringFixed(2)
+	}
 	if a.RuleID != 0 {
 		inputs["rule_id"] = a.RuleID
 	}
 	if l != nil {
 		inputs["item_name"], inputs["line_type"], inputs["tax_rate"], inputs["line_no"] = l.Name, l.LineType, l.TaxRate.String(), l.LineNo
+		if !l.Amount.IsZero() {
+			inputs["line_amount"] = l.Amount.StringFixed(2)
+		}
 	}
 	tid := targetID
 	sug, err := s.review.Submit(ctx, reviewusecase.Subject{OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID},
