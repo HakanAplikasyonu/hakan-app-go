@@ -247,6 +247,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedEasytrade(ctx, pool, eng.TaxpayerID); err != nil {
 				return fmt.Errorf("easytrade → %s: %w", tp.Key, err)
 			}
+			// Vakıfbank web servisi bağlantısı şubede bekliyor (#518).
+			if err := seedBankConnection(ctx, pool, eng.TaxpayerID); err != nil {
+				return fmt.Errorf("bank connection → %s: %w", tp.Key, err)
+			}
 			// Taxpayer report: charts, comment, schedule, history (#386).
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)

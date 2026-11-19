@@ -1779,5 +1779,6 @@
   "bank.luca.exported_again": "Exported to Luca {{count}} times",
   "bank.luca.error_NO_TRANSACTIONS": "The account has no movements in the range.",
   "bank.luca.error_VALIDATION_ERROR": "Check the dates (at most 366 days, start before end).",
-  "bank.luca.error_REQUIRED_FIELD_MISSING": "A movement has no date or amount; no file was made."
+  "bank.luca.error_REQUIRED_FIELD_MISSING": "A movement has no date or amount; no file was made.",
+  "engagement.tab_connections": "Connections"
 }
