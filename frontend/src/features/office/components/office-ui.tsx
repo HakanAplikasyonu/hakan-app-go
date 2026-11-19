@@ -113,12 +113,15 @@ export function useWarningText() {
 }
 
 export function Panel({
+  id,
   title,
   description,
   actions,
   children,
   className,
 }: {
+  /** Bağlantıyla doğrudan bölüme gelinir (#566). */
+  id?: string;
   title?: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
@@ -127,8 +130,10 @@ export function Panel({
 }) {
   return (
     <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
       className={cn(
-        "bg-card text-card-foreground rounded-xl border",
+        "bg-card text-card-foreground scroll-mt-20 rounded-xl border outline-none",
         className,
       )}
     >

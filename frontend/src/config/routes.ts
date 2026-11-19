@@ -1,5 +1,8 @@
 /** Mükellef özetinde açık belge istekleri bölümünün çapası (#563). */
 export const DOC_TASKS_ANCHOR = "belge-istekleri";
+/** Fişler ekranında taslak fiş kontrolü ve aktarım bölümleri (#566). */
+export const DRAFTS_ANCHOR = "taslak-fisler";
+export const EXPORT_ANCHOR = "aktarim";
 
 export const routes = {
   public: {

@@ -68,6 +68,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+base+"/journal-drafts", engaged(write, h.createDraft))
 	mux.Handle("GET "+base+"/journal-drafts/{draftUuid}", engaged(read, h.getDraft))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/approve", engaged(write, h.approve))
+	mux.Handle("PATCH "+base+"/journal-drafts/{draftUuid}/lines/{lineNo}", engaged(write, h.setLineAccount))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
 	mux.Handle("POST "+base+"/journal-exports", scoped(export, h.export))
@@ -155,6 +156,37 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
 	if err := h.svc.Approve(r.Context(), s, p.UserInternal, id); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	d, err := h.svc.GetDraft(r.Context(), s, id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, d)
+}
+
+// setLineAccount: kontrol ekranında satırın hesap kodu düzeltilir (#566).
+func (h *Handler) setLineAccount(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "draftUuid")
+	if !ok {
+		return
+	}
+	line, err := strconv.ParseInt(r.PathValue("lineNo"), 10, 32)
+	if err != nil || line < 1 {
+		response.BadRequest(w, r, "INVALID_LINE", "lineNo must be a positive integer")
+		return
+	}
+	var in struct {
+		Account string `json:"account"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "body must be {\"account\": \"770.01\"}")
+		return
+	}
+	s := engagementctx.Must(r.Context())
+	if err := h.svc.SetLineAccount(r.Context(), s, id, int32(line), in.Account); err != nil {
 		h.fail(w, r, err)
 		return
 	}
@@ -366,7 +398,18 @@ func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
 // error details (code = issue code, field = entry/line).
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var blocked *BlockedError
+	var draftBlocked *DraftBlockedError
 	switch {
+	case errors.As(err, &draftBlocked):
+		details := make([]response.Detail, 0, len(draftBlocked.Issues))
+		for _, is := range draftBlocked.Issues {
+			field := ""
+			if is.LineNo > 0 {
+				field = fmt.Sprintf("line %d", is.LineNo)
+			}
+			details = append(details, response.Detail{Field: field, Code: is.Code, Message: is.Account})
+		}
+		response.ErrorWithDetails(w, r, http.StatusUnprocessableEntity, "JOURNAL_BLOCKED", "the draft has blocking issues", details)
 	case errors.As(err, &blocked):
 		details := make([]response.Detail, 0, len(blocked.Issues))
 		for _, is := range blocked.Issues {

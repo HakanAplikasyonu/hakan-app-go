@@ -6963,13 +6963,45 @@ export interface paths {
         put?: never;
         /**
          * Approve a balanced draft
-         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`.
+         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
          */
         post: operations["approveJournalDraft"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/lines/{lineNo}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                lineNo: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Fix a draft line's account code
+         * @description Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
+         *     (#566): only drafts (not approved or exported entries) change. The
+         *     returned draft lists its remaining issues.
+         */
+        patch: operations["setJournalDraftLineAccount"];
         trace?: never;
     };
     "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse": {
@@ -17476,6 +17508,32 @@ export interface components {
             credit: string;
             /** Format: int32 */
             lines: number;
+            /**
+             * @description Problems found on a draft (#566); only on drafts. Approving a
+             *     draft with a blocking issue returns 422 JOURNAL_BLOCKED.
+             */
+            issues?: components["schemas"]["JournalDraftIssue"][];
+        };
+        JournalDraftIssue: {
+            /**
+             * @description true: the approval is refused (unbalanced, period_locked). false:
+             *     a warning to fix on the control screen (account codes; the
+             *     export's own check stops a code missing from the program's plan).
+             */
+            blocking: boolean;
+            /**
+             * @description unbalanced: debit and credit differ (or no lines);
+             *     unknown_account: the line's code is not in the imported plan;
+             *     parent_account: the line posts to an account that has sub-accounts;
+             *     period_locked: the period is closed.
+             * @enum {string}
+             */
+            code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked";
+            /** Format: int32 */
+            line_no?: number;
+            account?: string;
+            /** @description debit minus credit (unbalanced) */
+            difference?: string;
         };
         JournalDraftPage: {
             items: components["schemas"]["JournalDraft"][];
@@ -31099,7 +31157,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description Not balanced (`JOURNAL_UNBALANCED`) */
+            /** @description Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`) */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -31108,6 +31166,48 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setJournalDraftLineAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                lineNo: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 770.01 */
+                    account: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Draft with the changed line */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

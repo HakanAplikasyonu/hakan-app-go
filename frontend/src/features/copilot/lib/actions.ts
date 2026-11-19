@@ -1,18 +1,20 @@
 import { Permission, permissions } from "@/config/permissions";
-import { routes } from "@/config/routes";
+import { DRAFTS_ANCHOR, EXPORT_ANCHOR, routes } from "@/config/routes";
 
 import type {
   CopilotAction,
   CopilotStepKey,
 } from "../services/copilot.service";
 
-/** Plan-step actions: they change data and need the user's approval. */
+/**
+ * Plan-step actions: they change data and need the user's approval. Taslak
+ * fiş onayı ve aktarım burada değil (#566): ikisi de önce kontrol ekranına
+ * götürür; engelli fiş onaylanmaz, aktarılacaklar orada seçilir.
+ */
 export const WRITE_ACTIONS = new Set<CopilotAction>([
   "bank_suggest",
   "bank_approve",
   "bank_drafts",
-  "journals_approve",
-  "export_transfer",
   "report_send",
 ]);
 
@@ -57,6 +59,15 @@ export function actionHref(
       return routes.tenant.engagementBank(slug, engagement);
     case "report_send":
       return routes.tenant.engagementReport(slug, engagement);
+    case "journals_approve":
+    case "export_transfer": {
+      const anchor =
+        action === "journals_approve" ? DRAFTS_ANCHOR : EXPORT_ANCHOR;
+      const base = inEngagement
+        ? routes.tenant.engagementJournals(slug, engagement)
+        : `${routes.tenant.journals(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
+      return `${base}#${anchor}`;
+    }
     default:
       return inEngagement
         ? routes.tenant.engagementJournals(slug, engagement)

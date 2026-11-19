@@ -56,11 +56,22 @@ func (s *Service) ListDrafts(ctx context.Context, scope engagementctx.Scope, f D
 	if err != nil {
 		return DraftPage{}, err
 	}
+	var open []int64
+	for _, r := range rows {
+		if r.Status == "draft" {
+			open = append(open, r.ID)
+		}
+	}
+	issues, err := s.draftIssues(ctx, scope, open)
+	if err != nil {
+		return DraftPage{}, err
+	}
 	out := DraftPage{Items: make([]Draft, 0, len(rows)), Total: total, Limit: f.Limit, Offset: f.Offset}
 	for _, r := range rows {
 		out.Items = append(out.Items, Draft{
 			UUID: r.Uuid, Period: r.Period, EntryNo: r.EntryNo, Type: r.EntryType, Date: r.EntryDate.Time, Status: r.Status,
 			Debit: repository.Dec(r.TotalDebit), Credit: repository.Dec(r.TotalCredit), Lines: r.LineCount,
+			Issues: issues[r.ID],
 		})
 	}
 	return out, nil
@@ -131,6 +142,13 @@ func (s *Service) GetDraft(ctx context.Context, scope engagementctx.Scope, id uu
 		}
 		out.Debit, out.Credit = out.Debit.Add(d.Debit), out.Credit.Add(d.Credit)
 		out.Items = append(out.Items, d)
+	}
+	if row.Status == "draft" {
+		issues, err := s.draftIssues(ctx, scope, []int64{row.ID})
+		if err != nil {
+			return DraftDetail{}, err
+		}
+		out.Issues = issues[row.ID]
 	}
 	return out, nil
 }

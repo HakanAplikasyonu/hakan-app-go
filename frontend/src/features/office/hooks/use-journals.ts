@@ -109,6 +109,17 @@ export function useJournalActions(slug: string, engagement: string) {
         journalService.approve(slug, engagement, draft),
       onSuccess: refresh,
     }),
+    setLineAccount: useMutation({
+      mutationFn: (v: { draft: string; line: number; account: string }) =>
+        journalService.setLineAccount(
+          slug,
+          engagement,
+          v.draft,
+          v.line,
+          v.account,
+        ),
+      onSuccess: refresh,
+    }),
     reverse: useMutation({
       mutationFn: (v: { draft: string; reason: string }) =>
         journalService.reverse(slug, engagement, v.draft, v.reason),

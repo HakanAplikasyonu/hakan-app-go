@@ -96,3 +96,57 @@ WITH rev AS (
 UPDATE journal_drafts SET status = 'approved'
 WHERE journal_drafts.organization_id = @organization_id AND journal_drafts.engagement_id = @engagement_id
   AND journal_drafts.id IN (SELECT journal_draft_id FROM rev);
+
+-- name: JournalDraftIssues :many
+-- Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
+-- da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
+-- kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+WITH d AS (
+    SELECT jd.id, jd.period FROM journal_drafts jd
+    WHERE jd.organization_id = @organization_id AND jd.engagement_id = @engagement_id
+      AND jd.id = ANY(@draft_ids::bigint[])
+), has_plan AS (
+    SELECT EXISTS (
+        SELECT 1 FROM account_plan_accounts a
+        WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+    ) AS yes
+)
+SELECT d.id AS draft_id, 'unbalanced'::text AS code, 0::int AS line_no, ''::text AS account_code,
+       (COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0))::numeric AS difference
+FROM d
+LEFT JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.journal_draft_id = d.id
+GROUP BY d.id
+HAVING COUNT(l.id) = 0 OR COALESCE(SUM(l.debit), 0) <> COALESCE(SUM(l.credit), 0)
+UNION ALL
+SELECT d.id, 'unknown_account', l.line_no, l.account_code, 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.journal_draft_id = d.id
+WHERE (SELECT yes FROM has_plan)
+  AND NOT EXISTS (
+      SELECT 1 FROM account_plan_accounts a
+      WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id AND a.code = l.account_code
+  )
+UNION ALL
+SELECT d.id, 'parent_account', l.line_no, l.account_code, 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.journal_draft_id = d.id
+JOIN account_plan_accounts a
+  ON a.organization_id = @organization_id AND a.engagement_id = @engagement_id AND a.code = l.account_code AND NOT a.is_leaf
+UNION ALL
+SELECT d.id, 'period_locked', 0, '', 0::numeric
+FROM d
+JOIN period_locks pl
+  ON pl.organization_id = @organization_id AND pl.engagement_id = @engagement_id AND pl.period = d.period
+ORDER BY 1, 3;
+
+-- name: SetJournalDraftLineAccount :execrows
+-- Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
+UPDATE journal_draft_lines l SET account_code = @account_code
+FROM journal_drafts d
+WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id AND d.id = @draft_id
+  AND d.status = 'draft'
+  AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
+  AND l.journal_draft_id = d.id AND l.line_no = @line_no;

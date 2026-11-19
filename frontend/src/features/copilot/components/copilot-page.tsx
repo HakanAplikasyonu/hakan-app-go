@@ -26,7 +26,12 @@ import {
   isWriteAction,
   stepHref,
 } from "../lib/actions";
-import { actionLabel, periodLabel, stepDetail, stepLabel } from "../lib/labels";
+import {
+  nextActionLabel,
+  periodLabel,
+  stepDetail,
+  stepLabel,
+} from "../lib/labels";
 import { bulkSteps, fromTextField, nextStepOf } from "../lib/next-steps";
 import type {
   CopilotStepKey,
@@ -231,7 +236,7 @@ export function CopilotPage() {
                 ) : (
                   <ArrowRight aria-hidden className="size-3.5" />
                 )}
-                {actionLabel(t, step.action)}
+                {nextActionLabel(t, step.action)}
               </Button>
             </div>
           );

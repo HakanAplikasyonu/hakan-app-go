@@ -33,6 +33,15 @@ describe("actionHref", () => {
     );
   });
 
+  it("fiş onayı ve aktarım önce kontrol ekranına (#566)", () => {
+    expect(actionHref("demo", "journals_approve", "e1", true)).toBe(
+      "/t/demo/engagements/e1/journals#taslak-fisler",
+    );
+    expect(actionHref("demo", "export_transfer", "e1")).toBe(
+      "/t/demo/journals?taxpayer=e1#aktarim",
+    );
+  });
+
   it("adım rozetleri kendi ekranına (#562)", () => {
     expect(stepHref("demo", "bank", "e1")).toBe("/t/demo/engagements/e1/bank");
     expect(stepHref("demo", "review", "e1", true)).toBe(

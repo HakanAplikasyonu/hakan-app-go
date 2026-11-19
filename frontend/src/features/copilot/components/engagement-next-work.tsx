@@ -20,7 +20,12 @@ import {
   isWriteAction,
   stepHref,
 } from "../lib/actions";
-import { actionLabel, periodLabel, stepDetail, stepLabel } from "../lib/labels";
+import {
+  nextActionLabel,
+  periodLabel,
+  stepDetail,
+  stepLabel,
+} from "../lib/labels";
 import { bulkSteps, nextStepOf } from "../lib/next-steps";
 import { useOptionalCopilot } from "./copilot-provider";
 import { StepChain } from "./step-chain";
@@ -99,7 +104,7 @@ export function EngagementNextWork({
         ) : (
           <ArrowRight aria-hidden className="size-3.5" />
         )}
-        {actionLabel(t, step.action)}
+        {nextActionLabel(t, step.action)}
       </Button>
     </div>
   ) : (

@@ -44,8 +44,8 @@ describe("copilot next steps", () => {
       row("c", null, null),
       row("d", "report", "report_send"),
     ]);
+    // Taslak fiş onayı kontrol ekranına götürür, plana girmez (#566).
     expect(steps.map((s) => [s.engagement_uuid, s.action])).toEqual([
-      ["a", "journals_approve"],
       ["d", "report_send"],
     ]);
     expect(steps[0]?.period).toBe("2026-10");

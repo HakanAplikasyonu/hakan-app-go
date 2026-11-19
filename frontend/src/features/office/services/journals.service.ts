@@ -6,6 +6,7 @@ export type JournalDraft = components["schemas"]["JournalDraft"];
 export type JournalDraftPage = components["schemas"]["JournalDraftPage"];
 export type JournalDraftDetail = components["schemas"]["JournalDraftDetail"];
 export type JournalDraftInput = components["schemas"]["JournalDraftInput"];
+export type JournalDraftIssue = components["schemas"]["JournalDraftIssue"];
 export type JournalExport = components["schemas"]["JournalExport"];
 export type JournalExportSummary =
   components["schemas"]["JournalExportSummary"];
@@ -104,6 +105,21 @@ export const journalService = {
       slug,
       "POST",
       `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/approve`,
+    );
+  },
+  /** Kontrol ekranında satırın hesap kodu düzeltilir (#566). */
+  setLineAccount(
+    slug: string,
+    engagement: string,
+    draft: string,
+    line: number,
+    account: string,
+  ) {
+    return tenantRequest<JournalDraftDetail>(
+      slug,
+      "PATCH",
+      `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/lines/${line}`,
+      { body: { account } },
     );
   },
   reverse(slug: string, engagement: string, draft: string, reason: string) {
