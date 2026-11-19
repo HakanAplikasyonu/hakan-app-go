@@ -13,6 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api";
@@ -108,7 +110,9 @@ export function LetterResponsePage({ token }: { token: string }) {
   return (
     <Shell>
       <CardHeader>
-        <CardTitle role="heading" aria-level={1}>{t("reconciliation.title")}</CardTitle>
+        <CardTitle role="heading" aria-level={1}>
+          {t("reconciliation.title")}
+        </CardTitle>
         <CardDescription>
           {t("reconciliation.from", {
             taxpayer: l.taxpayer_title,
@@ -143,27 +147,29 @@ export function LetterResponsePage({ token }: { token: string }) {
               if (mode) respond.mutate();
             }}
           >
-            <fieldset className="grid gap-2 sm:grid-cols-2">
-              <legend className="mb-1 text-sm font-medium">
+            <div className="space-y-1">
+              <p id="letter-response-question" className="text-sm font-medium">
                 {t("reconciliation.question")}
-              </legend>
-              {(["agreed", "disputed"] as const).map((m) => (
-                <label
-                  key={m}
-                  className="border-line has-[:checked]:border-brand has-[:checked]:bg-brand-tint flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm"
-                >
-                  <input
-                    type="radio"
-                    name="response"
-                    checked={mode === m}
-                    onChange={() => setMode(m)}
-                  />
-                  {t(`reconciliation.choice_${m}`)}
-                </label>
-              ))}
-            </fieldset>
+              </p>
+              <RadioGroup
+                value={mode ?? ""}
+                onValueChange={(v) => setMode(v as "agreed" | "disputed")}
+                aria-labelledby="letter-response-question"
+                className="grid gap-2 sm:grid-cols-2"
+              >
+                {(["agreed", "disputed"] as const).map((m) => (
+                  <Label
+                    key={m}
+                    className="border-line has-[[data-state=checked]]:border-brand has-[[data-state=checked]]:bg-brand-tint flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm leading-normal font-normal"
+                  >
+                    <RadioGroupItem value={m} />
+                    {t(`reconciliation.choice_${m}`)}
+                  </Label>
+                ))}
+              </RadioGroup>
+            </div>
             {mode === "disputed" ? (
-              <label className="flex flex-col gap-1.5 text-sm">
+              <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
                 <span className="font-medium">
                   {t("reconciliation.your_balance")}
                 </span>
@@ -175,17 +181,17 @@ export function LetterResponsePage({ token }: { token: string }) {
                 <span className="text-text-3 text-xs">
                   {t("reconciliation.your_balance_hint")}
                 </span>
-              </label>
+              </Label>
             ) : null}
-            <label className="flex flex-col gap-1.5 text-sm">
+            <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
               <span className="font-medium">{t("reconciliation.name")}</span>
               <Input
                 autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-            </label>
-            <label className="flex flex-col gap-1.5 text-sm">
+            </Label>
+            <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
               <span className="font-medium">{t("reconciliation.note")}</span>
               <Textarea
                 rows={3}
@@ -193,7 +199,7 @@ export function LetterResponsePage({ token }: { token: string }) {
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
               />
-            </label>
+            </Label>
             {respond.isError ? (
               <p className="text-danger text-sm" role="alert">
                 {isApiError(respond.error)
