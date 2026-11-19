@@ -1,5 +1,8 @@
 {
   "pick_date": "Pick a date",
+  "pick_month": "Pick a month",
+  "prev_year": "Previous year",
+  "next_year": "Next year",
   "show_password": "Show password",
   "hide_password": "Hide password",
   "cancel": "Cancel",
