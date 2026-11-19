@@ -1,14 +1,19 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, Link2Off } from "lucide-react";
+import { Link2, Link2Off, Search } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -18,6 +23,7 @@ import { usePermission } from "@/providers/permission-provider";
 import {
   bankMatchingKeys,
   bankMatchingService,
+  type BankMatchCandidate,
   type BankTransactionMatching,
 } from "../services/bank-matching.service";
 import { relatedKeys } from "../services/related.service";
@@ -54,6 +60,8 @@ export function BankTransactionMatchingPanel({
   const qc = useQueryClient();
   const key = bankMatchingKeys.one(slug, engagement, transaction);
   const [picked, setPicked] = useState<string[]>([]);
+  const [term, setTerm] = useState("");
+  const deferred = useDeferredValue(term.trim());
 
   const q = useQuery({
     queryKey: key,
@@ -93,6 +101,13 @@ export function BankTransactionMatchingPanel({
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
   });
   const busy = match.isPending || unmatch.isPending;
+  // Elle arama (#565): aday penceresinin dışındaki faturalar.
+  const search = useQuery({
+    queryKey: bankMatchingKeys.search(slug, engagement, transaction, deferred),
+    queryFn: () =>
+      bankMatchingService.search(slug, engagement, transaction, deferred),
+    enabled: deferred.length >= 2 && !!q.data?.matchable,
+  });
 
   if (q.isPending) return <Skeleton className="h-32 w-full" />;
   if (q.isError || !q.data)
@@ -206,7 +221,7 @@ export function BankTransactionMatchingPanel({
             <h3 className="text-sm font-medium">
               {t("office.bank.matching.candidates_title")}
             </h3>
-            {canWrite && v.candidates.length > 0 && (
+            {canWrite && (
               <Button
                 size="sm"
                 disabled={busy || picked.length === 0}
@@ -228,56 +243,118 @@ export function BankTransactionMatchingPanel({
               {t("office.bank.matching.no_candidates")}
             </p>
           ) : (
-            <ul className="divide-y rounded-md border text-sm">
-              {v.candidates.map((c) => {
-                const id = `cand-${c.invoice_uuid}`;
-                return (
-                  <li
-                    key={c.invoice_uuid}
-                    className="flex flex-wrap items-center gap-3 px-3 py-2"
-                  >
-                    {canWrite && (
-                      <Checkbox
-                        id={id}
-                        checked={picked.includes(c.invoice_uuid)}
-                        onCheckedChange={(on) =>
-                          toggle(c.invoice_uuid, on === true)
-                        }
-                        aria-label={t("office.bank.matching.pick", {
-                          invoice: c.invoice_number,
-                        })}
-                      />
-                    )}
-                    <Link
-                      className="font-medium underline-offset-4 hover:underline"
-                      href={invoiceHref(c.invoice_uuid)}
-                    >
-                      <Figure>{c.invoice_number}</Figure>
-                    </Link>
-                    <span className="text-muted-foreground">
-                      {trDate(c.issue_date)} · {c.counterparty_name ?? "—"}
-                    </span>
-                    <span className="ms-auto">
-                      {t("office.bank.matching.open")}{" "}
-                      <Money value={c.open_amount} currency={v.currency} />
-                    </span>
-                    <Badge
-                      variant={c.score >= 80 ? "default" : "outline"}
-                      title={Object.entries(c.parts)
-                        .map(([k, n]) => `${k}: ${n}`)
-                        .join(", ")}
-                    >
-                      {t("office.bank.matching.score", {
-                        score: String(c.score),
-                      })}
-                    </Badge>
-                  </li>
-                );
-              })}
-            </ul>
+            <CandidateList
+              items={v.candidates}
+              currency={v.currency}
+              picked={picked}
+              onToggle={canWrite ? toggle : undefined}
+              invoiceHref={invoiceHref}
+            />
           )}
+          {canWrite ? (
+            <div className="space-y-2 pt-2">
+              <InputGroup className="max-w-md">
+                <InputGroupAddon>
+                  <Search className="size-4" aria-hidden />
+                </InputGroupAddon>
+                <InputGroupInput
+                  type="search"
+                  value={term}
+                  onChange={(e) => setTerm(e.target.value)}
+                  placeholder={t("office.bank.matching.search_placeholder")}
+                  aria-label={t("office.bank.matching.search_placeholder")}
+                />
+              </InputGroup>
+              {deferred.length >= 2 ? (
+                search.isLoading ? (
+                  <Skeleton className="h-16 w-full" />
+                ) : (search.data?.items ?? []).length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    {t("office.bank.matching.search_empty")}
+                  </p>
+                ) : (
+                  <CandidateList
+                    items={(search.data?.items ?? []).filter(
+                      (c) =>
+                        !v.candidates.some(
+                          (x) => x.invoice_uuid === c.invoice_uuid,
+                        ),
+                    )}
+                    currency={v.currency}
+                    picked={picked}
+                    onToggle={toggle}
+                    invoiceHref={invoiceHref}
+                  />
+                )
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {t("office.bank.matching.search_hint")}
+                </p>
+              )}
+            </div>
+          ) : null}
         </section>
       )}
     </div>
+  );
+}
+
+/** Aday ya da arama sonucu faturalar: seçilip eşleştirilir. */
+function CandidateList({
+  items,
+  currency,
+  picked,
+  onToggle,
+  invoiceHref,
+}: {
+  items: BankMatchCandidate[];
+  currency: string;
+  picked: string[];
+  onToggle?: (id: string, on: boolean) => void;
+  invoiceHref: (id: string) => string;
+}) {
+  const { t } = useLocale();
+  return (
+    <ul className="divide-y rounded-md border text-sm">
+      {items.map((c) => (
+        <li
+          key={c.invoice_uuid}
+          className="flex flex-wrap items-center gap-3 px-3 py-2"
+        >
+          {onToggle ? (
+            <Checkbox
+              checked={picked.includes(c.invoice_uuid)}
+              onCheckedChange={(on) => onToggle(c.invoice_uuid, on === true)}
+              aria-label={t("office.bank.matching.pick", {
+                invoice: c.invoice_number,
+              })}
+            />
+          ) : null}
+          <Link
+            className="font-medium underline-offset-4 hover:underline"
+            href={invoiceHref(c.invoice_uuid)}
+          >
+            <Figure>{c.invoice_number}</Figure>
+          </Link>
+          <span className="text-muted-foreground">
+            {trDate(c.issue_date)} · {c.counterparty_name ?? "—"}
+          </span>
+          <span className="ms-auto">
+            {t("office.bank.matching.open")}{" "}
+            <Money value={c.open_amount} currency={currency} />
+          </span>
+          {c.score > 0 ? (
+            <Badge
+              variant={c.score >= 80 ? "default" : "outline"}
+              title={Object.entries(c.parts)
+                .map(([k, n]) => `${k}: ${n}`)
+                .join(", ")}
+            >
+              {t("office.bank.matching.score", { score: String(c.score) })}
+            </Badge>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   );
 }

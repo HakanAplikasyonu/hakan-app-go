@@ -895,7 +895,7 @@
   "bank.export_failed": "Could not download the Excel file",
   "bank.in_total": "In",
   "bank.out_total": "Out",
-  "bank.unmatched_count": "Unmatched transactions",
+  "bank.unmatched_count": "Not matched to an invoice",
   "bank.filter_label": "Match status",
   "bank.filter_all": "All",
   "bank.match_unmatched": "Unmatched",
@@ -1243,7 +1243,7 @@
   "copilot.detail.documents_blocked": "Needs a look",
   "copilot.detail.documents_na": "None this period",
   "copilot.detail.bank_done": "Accounts of {{count}} movements approved",
-  "copilot.detail.bank_todo": "{{count}} movements waiting",
+  "copilot.detail.bank_todo": "{{count}} movements not yet in the bank entry",
   "copilot.detail.bank_waiting": "Waiting for the outcome",
   "copilot.detail.bank_blocked": "Needs a look",
   "copilot.detail.bank_na": "No bank movements this period",
@@ -1826,7 +1826,7 @@
   "bank.matching.candidates_title": "Candidate invoices (by score)",
   "bank.matching.match": "Match selected ({{count}})",
   "bank.matching.rematch": "Re-match with selected ({{count}})",
-  "bank.matching.no_candidates": "No open invoice fits this movement. The invoice may not have arrived yet; it will show here when it does.",
+  "bank.matching.no_candidates": "No open invoice with a matching date and amount. Search below by invoice no, name or tax id.",
   "bank.matching.pick": "Select invoice {{invoice}}",
   "bank.matching.open": "Open:",
   "bank.matching.score": "Score {{score}}",
@@ -2039,5 +2039,8 @@
   "shell.help": "Help and guides",
   "shell.theme_light": "Switch to light theme",
   "shell.theme_dark": "Switch to dark theme",
-  "copilot.step_filter": "Only: {{step}}"
+  "copilot.step_filter": "Only: {{step}}",
+  "bank.matching.search_placeholder": "Search by invoice no, name or tax id",
+  "bank.matching.search_hint": "Not in the list? Search: open invoices are found even when the date or amount differs (partial, late or combined payment).",
+  "bank.matching.search_empty": "No open invoice matches. If the invoice has not arrived, request it from the taxpayer; if the payment has no invoice, post the movement with an account code in the period's bank entry."
 }

@@ -262,6 +262,21 @@ func TestSampleMonth(t *testing.T) {
 	if err != nil || view.MatchStatus != "unmatched" || len(view.Matches) != 0 || undocumented() != "7000.00" {
 		t.Fatalf("unmatch d: %+v %v total=%q", view, err, undocumented())
 	}
+	// Manual search (#565): by name or number, payments find purchase
+	// invoices only; too short a term finds nothing.
+	found, err := svc.Search(ctx, sub, txUUID("d"), "geç ted")
+	if err != nil || len(found) != 1 || found[0].InvoiceUUID != late || found[0].OpenAmount != "7000.00" {
+		t.Fatalf("search by name: %+v %v", found, err)
+	}
+	if found, _ := svc.Search(ctx, sub, txUUID("d"), "ATL2026"); len(found) != 0 {
+		t.Fatalf("a payment must not find sales invoices: %+v", found)
+	}
+	if found, _ := svc.Search(ctx, sub, txUUID("d"), "X"); len(found) != 0 {
+		t.Fatalf("short term: %+v", found)
+	}
+	if _, err := svc.Search(ctx, sub, txUUID("f"), "geç"); !errors.Is(err, ErrNotMatchable) {
+		t.Fatalf("search on interest: %v", err)
+	}
 	// Interest is neither a collection nor a payment of an invoice.
 	if view, err := svc.Transaction(ctx, sub, txUUID("f")); err != nil || view.Matchable || len(view.Candidates) != 0 {
 		t.Fatalf("view f: %+v %v", view, err)

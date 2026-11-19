@@ -1290,6 +1290,10 @@ type Querier interface {
 	// verilmezse ofisin bütün aktif engagement'ları (ofis şablon kuralı).
 	// tenant-lint: org-wide engagement verilmezse ofisin bütün aktif engagement'ları; organization_id ile sınırlı
 	RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error)
+	// Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
+	// dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
+	// faturalar.
+	SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error

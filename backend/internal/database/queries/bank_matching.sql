@@ -92,3 +92,23 @@ WHERE i.taxpayer_id = @taxpayer_id
   AND i.status_normalized = 'active'
   AND (i.currency = @currency::text OR (@currency::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
 ORDER BY i.issue_date, i.id;
+
+-- name: SearchInvoicesForBankMatch :many
+-- Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
+-- dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
+-- faturalar.
+SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
+       (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = i.taxpayer_id AND m.target_type = 'invoice' AND m.target_id = i.id), 0)::numeric AS matched_amount
+FROM invoices i
+WHERE i.taxpayer_id = @taxpayer_id
+  AND i.direction = @direction
+  AND i.status_normalized = 'active'
+  AND (i.currency = @currency::text OR (@currency::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
+  AND (i.invoice_number ILIKE '%' || @term::text || '%'
+       OR i.customer_name ILIKE '%' || @term::text || '%'
+       OR i.customer_tax_number = @term::text
+       OR i.customer_identity_number = @term::text)
+ORDER BY i.issue_date DESC, i.id
+LIMIT 50;

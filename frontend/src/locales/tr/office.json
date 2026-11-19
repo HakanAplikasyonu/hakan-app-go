@@ -895,7 +895,7 @@
   "bank.export_failed": "Excel dosyası indirilemedi",
   "bank.in_total": "Giriş",
   "bank.out_total": "Çıkış",
-  "bank.unmatched_count": "Eşleşmemiş hareket",
+  "bank.unmatched_count": "Faturayla eşleşmemiş",
   "bank.filter_label": "Eşleşme durumu",
   "bank.filter_all": "Tümü",
   "bank.match_unmatched": "Eşleşmedi",
@@ -1243,7 +1243,7 @@
   "copilot.detail.documents_blocked": "Kontrol edin",
   "copilot.detail.documents_na": "Bu dönem yok",
   "copilot.detail.bank_done": "{{count}} hareketin hesabı onaylı",
-  "copilot.detail.bank_todo": "{{count}} hareket bekliyor",
+  "copilot.detail.bank_todo": "{{count}} hareket banka fişine işlenmedi",
   "copilot.detail.bank_waiting": "Sonuç bekleniyor",
   "copilot.detail.bank_blocked": "Kontrol edin",
   "copilot.detail.bank_na": "Bu dönem banka hareketi yok",
@@ -1826,7 +1826,7 @@
   "bank.matching.candidates_title": "Aday faturalar (puana göre)",
   "bank.matching.match": "Seçilenlerle eşleştir ({{count}})",
   "bank.matching.rematch": "Seçilenlerle yeniden eşleştir ({{count}})",
-  "bank.matching.no_candidates": "Bu harekete uyan açık fatura bulunamadı. Fatura henüz gelmemiş olabilir; geldiğinde burada görünür.",
+  "bank.matching.no_candidates": "Tarih ve tutarı uyan açık fatura yok. Aşağıdan fatura no, unvan ya da VKN ile arayabilirsiniz.",
   "bank.matching.pick": "{{invoice}} faturasını seç",
   "bank.matching.open": "Açık:",
   "bank.matching.score": "Puan {{score}}",
@@ -2039,5 +2039,8 @@
   "shell.help": "Yardım ve kılavuzlar",
   "shell.theme_light": "Açık temaya geç",
   "shell.theme_dark": "Koyu temaya geç",
-  "copilot.step_filter": "Yalnız: {{step}}"
+  "copilot.step_filter": "Yalnız: {{step}}",
+  "bank.matching.search_placeholder": "Fatura no, unvan ya da VKN ile ara",
+  "bank.matching.search_hint": "Fatura listede yoksa arayın: tarih ve tutar farklı olsa da açık faturalar bulunur (kısmi ödeme, geç ödeme, toplu ödeme).",
+  "bank.matching.search_empty": "Aramaya uyan açık fatura yok. Fatura henüz gelmediyse mükelleften isteyin; faturasız bir ödemeyse hareketi dönemin banka fişinde hesap koduyla kaydedin."
 }

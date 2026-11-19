@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -207,6 +208,46 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 		})
 	}
 	return v, nil
+}
+
+// Search finds open invoices for a manual match by number, name or tax
+// id, outside the candidates' date and amount window (#565). The movement
+// must be matchable; results carry no score.
+func (s *Service) Search(ctx context.Context, sub Subject, id uuid.UUID, term string) ([]CandidateView, error) {
+	q := database.QueriesFor(s.pool)
+	t, err := s.transaction(ctx, q, sub, id)
+	if err != nil {
+		return nil, err
+	}
+	if !matchable(t) {
+		return nil, ErrNotMatchable
+	}
+	term = strings.TrimSpace(term)
+	out := []CandidateView{}
+	if len([]rune(term)) < 2 {
+		return out, nil
+	}
+	rows, err := q.SearchInvoicesForBankMatch(ctx, db.SearchInvoicesForBankMatchParams{
+		Currency: t.Currency, TaxpayerID: sub.TaxpayerID, Term: term,
+		Direction: invoiceDirection(banking.Direction(t.DebitCredit)),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		open := dec(r.ComparableAmount).Sub(dec(r.MatchedAmount))
+		if !open.IsPositive() {
+			continue
+		}
+		out = append(out, CandidateView{
+			InvoiceUUID: r.Uuid, InvoiceNumber: r.InvoiceNumber, IssueDate: r.IssueDate.Time.Format("2006-01-02"),
+			Counterparty: textPtr(r.CustomerName), OpenAmount: open.StringFixed(2), Parts: map[string]int{},
+		})
+		if len(out) == maxCandidates {
+			break
+		}
+	}
+	return out, nil
 }
 
 // Match replaces the movement's matches with the chosen invoices (the
