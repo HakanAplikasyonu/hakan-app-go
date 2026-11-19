@@ -60,6 +60,18 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 
 	checkBigLedger(t, d)
 	checkBigReturns(t, d)
+	// #518 B2: kilitli döneme geç gelen fatura talep olarak bekler; talep
+	// tam fatura içeriğini taşır (uygulanınca gerçek fatura yazılır).
+	if n := count(t, d, `SELECT count(*) FROM change_requests c JOIN period_locks l
+		ON l.engagement_id = c.engagement_id AND l.period = c.period
+		WHERE c.status = 'open' AND c.entity_type = 'invoice' AND c.entity_id IS NULL
+		  AND c.new_payload->'invoice'->>'invoice_number' LIKE 'GEC%'
+		  AND c.diff->>'kind' = 'create'`); n == 0 {
+		t.Error("no open change request on a locked period")
+	}
+	if n := count(t, d, `SELECT count(*) FROM invoices WHERE invoice_number LIKE 'GEC%'`); n != 0 {
+		t.Errorf("held invoices were written: %d", n)
+	}
 
 	if err := dropDemo(ctx, d.Pool); err != nil {
 		t.Fatal(err)
