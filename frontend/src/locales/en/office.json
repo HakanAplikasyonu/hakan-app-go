@@ -1832,5 +1832,17 @@
   "bank.matching.matched": "Movement matched to the invoice; bank warnings refreshed.",
   "bank.matching.unmatched": "Match undone; bank warnings refreshed.",
   "bank.matching.failed": "Matching failed.",
-  "bank.matching.load_failed": "Could not load the movement."
+  "bank.matching.load_failed": "Could not load the movement.",
+  "tax_returns.blocking_hint": "Problems are grouped by record. Use \"Open and fix\" to open the record without leaving this screen; the list and the return update as you fix.",
+  "tax_returns.problem_period": "Whole period",
+  "tax_returns.problem_count": "{{count}} problems",
+  "tax_returns.open_fix": "Open and fix",
+  "tax_returns.panel_title": "{{record}}",
+  "tax_returns.panel_hint": "Fix the record here or decide on its warnings; the return is recalculated automatically.",
+  "tax_returns.panel_warnings": "Open warnings of this record",
+  "tax_returns.panel_no_warnings": "No open warnings left on this record.",
+  "tax_returns.panel_open_tab": "Open on the {{record}} page",
+  "tax_returns.summary_label": "Return summary",
+  "tax_returns.summary_ba": "Form Ba ({{count}} documents)",
+  "tax_returns.summary_bs": "Form Bs ({{count}} documents)"
 }

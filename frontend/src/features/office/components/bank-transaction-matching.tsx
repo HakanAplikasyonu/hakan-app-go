@@ -39,9 +39,12 @@ function trDate(iso: string) {
 export function BankTransactionMatchingPanel({
   engagement,
   transaction,
+  onChanged,
 }: {
   engagement: string;
   transaction: string;
+  /** Eşleşme değişince (beyan ekranı özetini yeniler). */
+  onChanged?: () => void;
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -72,6 +75,7 @@ export function BankTransactionMatchingPanel({
       queryKey: ["tenant", slug.toLowerCase(), "bank-transactions"],
     });
     toast.success(message);
+    onChanged?.();
   };
   const match = useMutation({
     mutationFn: (ids: string[]) =>
