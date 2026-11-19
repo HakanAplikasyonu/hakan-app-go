@@ -18,6 +18,10 @@ import { warningRecordKind } from "../lib/related-href";
 import { sheetPosition } from "../lib/warning-sheet-position";
 import type { ApiDataWarning } from "../services/warnings.service";
 import { Figure, SeverityBadge } from "./office-ui";
+import {
+  BALANCE_WARNING_CODE,
+  BankBalanceCheckPanel,
+} from "./bank-balance-check";
 import { RecordDetail } from "./record-detail";
 import { ApiWarningActions } from "./warning-actions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
@@ -194,6 +198,14 @@ export function WarningSheet({
                 </Button>
               ) : null}
             </section>
+            {current.code === BALANCE_WARNING_CODE &&
+            current.period &&
+            current.engagement_uuid ? (
+              <BankBalanceCheckPanel
+                engagement={current.engagement_uuid}
+                period={current.period}
+              />
+            ) : null}
             <RecordDetail
               engagement={current.engagement_uuid}
               entityType={current.entity_type}

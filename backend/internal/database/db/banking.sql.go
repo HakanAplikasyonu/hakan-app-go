@@ -12,6 +12,89 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bankBalanceCheck = `-- name: BankBalanceCheck :many
+WITH tx AS (
+    SELECT bt.cash_box_id, bt.debit_credit, bt.amount, bt.transaction_date, bt.balance_after,
+           COALESCE(bt.balance_before,
+                    bt.balance_after - CASE WHEN bt.debit_credit = 'A' THEN bt.amount ELSE -bt.amount END) AS before_balance,
+           row_number() OVER (PARTITION BY bt.cash_box_id
+                              ORDER BY bt.transaction_date, bt.booked_at, bt.bank_sequence NULLS LAST, bt.id) AS rn_first,
+           row_number() OVER (PARTITION BY bt.cash_box_id
+                              ORDER BY bt.transaction_date DESC, bt.booked_at DESC, bt.bank_sequence DESC NULLS LAST, bt.id DESC) AS rn_last
+    FROM bank_transactions bt
+    WHERE bt.taxpayer_id = $1 AND bt.period = $2::text AND NOT bt.is_cancelled
+)
+SELECT cb.uuid AS cash_box_uuid, cb.name AS cash_box_name, cb.iban, cb.currency,
+       count(*)::bigint AS movements,
+       count(*) FILTER (WHERE tx.balance_after IS NULL)::bigint AS without_balance,
+       COALESCE(sum(tx.amount) FILTER (WHERE tx.debit_credit = 'A'), 0)::numeric(18,4) AS in_total,
+       COALESCE(sum(tx.amount) FILTER (WHERE tx.debit_credit = 'B'), 0)::numeric(18,4) AS out_total,
+       max(tx.before_balance) FILTER (WHERE tx.rn_first = 1)::numeric(18,4) AS opening,
+       max(tx.balance_after) FILTER (WHERE tx.rn_last = 1)::numeric(18,4) AS closing,
+       min(tx.transaction_date)::date AS first_date,
+       max(tx.transaction_date)::date AS last_date
+FROM tx
+JOIN cash_boxes cb ON cb.id = tx.cash_box_id AND cb.taxpayer_id = $1
+GROUP BY cb.uuid, cb.name, cb.iban, cb.currency
+ORDER BY cb.name, cb.uuid
+`
+
+type BankBalanceCheckParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Period     string `json:"period"`
+}
+
+type BankBalanceCheckRow struct {
+	CashBoxUuid    uuid.UUID      `json:"cash_box_uuid"`
+	CashBoxName    string         `json:"cash_box_name"`
+	Iban           pgtype.Text    `json:"iban"`
+	Currency       string         `json:"currency"`
+	Movements      int64          `json:"movements"`
+	WithoutBalance int64          `json:"without_balance"`
+	InTotal        pgtype.Numeric `json:"in_total"`
+	OutTotal       pgtype.Numeric `json:"out_total"`
+	Opening        pgtype.Numeric `json:"opening"`
+	Closing        pgtype.Numeric `json:"closing"`
+	FirstDate      pgtype.Date    `json:"first_date"`
+	LastDate       pgtype.Date    `json:"last_date"`
+}
+
+// Dönemin ekstre bakiye kontrolü (#570): her hesapta ilk hareketin önceki
+// bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
+// Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
+func (q *Queries) BankBalanceCheck(ctx context.Context, arg BankBalanceCheckParams) ([]BankBalanceCheckRow, error) {
+	rows, err := q.db.Query(ctx, bankBalanceCheck, arg.TaxpayerID, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BankBalanceCheckRow{}
+	for rows.Next() {
+		var i BankBalanceCheckRow
+		if err := rows.Scan(
+			&i.CashBoxUuid,
+			&i.CashBoxName,
+			&i.Iban,
+			&i.Currency,
+			&i.Movements,
+			&i.WithoutBalance,
+			&i.InTotal,
+			&i.OutTotal,
+			&i.Opening,
+			&i.Closing,
+			&i.FirstDate,
+			&i.LastDate,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const clearPossibleDuplicateLinks = `-- name: ClearPossibleDuplicateLinks :exec
 UPDATE bank_transactions SET possible_duplicate_of = NULL
 WHERE taxpayer_id = $1 AND possible_duplicate_of = $2

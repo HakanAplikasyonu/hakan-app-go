@@ -2042,5 +2042,19 @@
   "copilot.step_filter": "Only: {{step}}",
   "bank.matching.search_placeholder": "Search by invoice no, name or tax id",
   "bank.matching.search_hint": "Not in the list? Search: open invoices are found even when the date or amount differs (partial, late or combined payment).",
-  "bank.matching.search_empty": "No open invoice matches. If the invoice has not arrived, request it from the taxpayer; if the payment has no invoice, post the movement with an account code in the period's bank entry."
+  "bank.matching.search_empty": "No open invoice matches. If the invoice has not arrived, request it from the taxpayer; if the payment has no invoice, post the movement with an account code in the period's bank entry.",
+  "balance_check.title": "Statement balance check",
+  "balance_check.open_bank": "Open bank movements",
+  "balance_check.empty": "No bank movements in this period; the statement may not be uploaded.",
+  "balance_check.col_account": "Account",
+  "balance_check.col_opening": "Opening",
+  "balance_check.col_in": "In",
+  "balance_check.col_out": "Out",
+  "balance_check.col_expected": "Expected closing",
+  "balance_check.col_closing": "Statement closing",
+  "balance_check.col_diff": "Difference",
+  "balance_check.movements": "{{count}} movements",
+  "balance_check.off": "The statement's closing balance does not match the movements: a missing day, a duplicate or a cancelled movement. Get the statement again and upload it; resolve the warning with a reason once the difference is gone.",
+  "balance_check.no_balance": "The statement has no balance column, so it cannot be checked. Upload a statement with balances (MT940 or the bank's Excel).",
+  "balance_check.ok": "The balance matches the movements. You can resolve the warning with a reason."
 }

@@ -47,6 +47,10 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	// Dönemin ekstre bakiye kontrolü (#570): her hesapta ilk hareketin önceki
+	// bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
+	// Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
+	BankBalanceCheck(ctx context.Context, arg BankBalanceCheckParams) ([]BankBalanceCheckRow, error)
 	// Banka ekranındaki "dışa aktarıldı" işareti: hareket başına çıktı sayısı
 	// ve son çıktı zamanı.
 	BankTransactionExportMarks(ctx context.Context, arg BankTransactionExportMarksParams) ([]BankTransactionExportMarksRow, error)

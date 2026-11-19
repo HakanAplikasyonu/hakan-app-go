@@ -2042,5 +2042,19 @@
   "copilot.step_filter": "Yalnız: {{step}}",
   "bank.matching.search_placeholder": "Fatura no, unvan ya da VKN ile ara",
   "bank.matching.search_hint": "Fatura listede yoksa arayın: tarih ve tutar farklı olsa da açık faturalar bulunur (kısmi ödeme, geç ödeme, toplu ödeme).",
-  "bank.matching.search_empty": "Aramaya uyan açık fatura yok. Fatura henüz gelmediyse mükelleften isteyin; faturasız bir ödemeyse hareketi dönemin banka fişinde hesap koduyla kaydedin."
+  "bank.matching.search_empty": "Aramaya uyan açık fatura yok. Fatura henüz gelmediyse mükelleften isteyin; faturasız bir ödemeyse hareketi dönemin banka fişinde hesap koduyla kaydedin.",
+  "balance_check.title": "Ekstre bakiye kontrolü",
+  "balance_check.open_bank": "Banka hareketlerini aç",
+  "balance_check.empty": "Bu dönemde banka hareketi yok; ekstre yüklenmemiş olabilir.",
+  "balance_check.col_account": "Hesap",
+  "balance_check.col_opening": "Açılış",
+  "balance_check.col_in": "Giren",
+  "balance_check.col_out": "Çıkan",
+  "balance_check.col_expected": "Beklenen kapanış",
+  "balance_check.col_closing": "Ekstre kapanışı",
+  "balance_check.col_diff": "Fark",
+  "balance_check.movements": "{{count}} hareket",
+  "balance_check.off": "Ekstrenin kapanış bakiyesi hareketlerle tutmuyor: eksik gün, mükerrer ya da iptal edilmiş hareket olabilir. Ekstreyi bankadan yeniden alıp yükleyin; fark kapanınca uyarıyı gerekçeyle çözün.",
+  "balance_check.no_balance": "Ekstrede bakiye sütunu yok; kontrol yapılamıyor. Bakiyeli ekstre (MT940 ya da bankanın Excel'i) yükleyin.",
+  "balance_check.ok": "Bakiye hareketlerle tutuyor. Uyarıyı gerekçeyle çözebilirsiniz."
 }

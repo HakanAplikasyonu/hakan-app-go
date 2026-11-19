@@ -57,6 +57,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	txs := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions"
 	mux.Handle("GET "+txs, middleware.Chain(http.HandlerFunc(h.listTransactions), authn, org, read, eng))
 	mux.Handle("GET "+txs+"/export", middleware.Chain(http.HandlerFunc(h.exportTransactions), authn, org, read, eng))
+	// Ekstre bakiye kontrolü (#570): açılış + giriş − çıkış = kapanış mı.
+	mux.Handle("GET /v1/tenant/engagements/{"+engagementctx.PathParam+"}/bank-balance-check", middleware.Chain(http.HandlerFunc(h.balanceChecks), authn, org, read, eng))
 	// Luca "Banka Ekstreleri" CSV (#465): file, history and mapping guide.
 	luca := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-statement-exports"
 	mux.Handle("POST "+luca, middleware.Chain(http.HandlerFunc(h.lucaExport), authn, org, read, eng))
