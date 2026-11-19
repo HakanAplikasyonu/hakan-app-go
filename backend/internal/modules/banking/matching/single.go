@@ -210,7 +210,8 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 }
 
 // Match replaces the movement's matches with the chosen invoices (the
-// accountant's decision, method manual), then refreshes the period's bank
+// accountant's decision, method manual), supersedes a pending bank_match
+// suggestion for it, then refreshes the period's bank
 // warnings so the ones it settles are resolved at once.
 func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices []uuid.UUID, userID int64) (TransactionView, error) {
 	q := database.QueriesFor(s.pool)
@@ -249,6 +250,14 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 	err = database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		tq := db.New(tx)
 		if err := tq.DeleteBankTransactionMatches(ctx, db.DeleteBankTransactionMatchesParams{TaxpayerID: sub.TaxpayerID, BankTransactionID: t.ID}); err != nil {
+			return err
+		}
+		// The accountant decided: a pending suggestion for this movement is
+		// moot and leaves the review queue (#529).
+		if _, err := tq.SupersedePendingSuggestions(ctx, db.SupersedePendingSuggestionsParams{
+			OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, Kind: SuggestionKind,
+			TargetType: "bank_transaction", TargetID: pgtype.Int8{Int64: t.ID, Valid: true}, TargetField: "match",
+		}); err != nil {
 			return err
 		}
 		return writeValue(ctx, tq, sub.TaxpayerID, v, "manual", &userID)
