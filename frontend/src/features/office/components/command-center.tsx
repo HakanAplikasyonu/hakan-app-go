@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { usePeriodMatrix } from "../hooks/use-office-data";
+import { useOfficePeriod } from "../period";
 import {
   cellAt,
   cellStatuses,
@@ -117,8 +118,9 @@ function useMatrixColumns(
   locale: string,
   onPick: (period: string) => void,
 ) {
-  // Mükellef adı mükellef detayına (#469).
+  // Mükellef adı mükellef detayına (#469), seçili dönemle (#567).
   const { slug } = useTenant();
+  const { setPeriod } = useOfficePeriod();
   return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
     () => [
       createColumn<PeriodMatrixRow>({
@@ -135,6 +137,7 @@ function useMatrixColumns(
                 slug,
                 row.original.engagement_uuid,
               )}
+              onClick={() => focus && setPeriod(focus)}
               className="block truncate font-medium hover:underline"
             >
               {row.original.taxpayer_title}
@@ -179,14 +182,29 @@ function useMatrixColumns(
             headerClassName: "px-1",
             cellClassName: cn("px-1", p === focus && "bg-muted/30"),
           },
+          // Hücre o dönemin işine götürür (#567): dönem seçilir, mükellef
+          // özeti o dönemle açılır.
           cell: ({ row }) => {
             const cell = cellAt(row.original, p);
-            return cell ? <CellBadge cell={cell} /> : null;
+            if (!cell) return null;
+            return (
+              <Link
+                href={routes.tenant.engagement(
+                  slug,
+                  row.original.engagement_uuid,
+                )}
+                onClick={() => setPeriod(p)}
+                aria-label={`${row.original.taxpayer_title} · ${monthLabel(p, locale)}`}
+                className="focus-visible:ring-ring block rounded-md transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <CellBadge cell={cell} />
+              </Link>
+            );
           },
         }),
       ),
     ],
-    [periods, focus, locale, onPick, slug],
+    [periods, focus, locale, onPick, slug, setPeriod],
   );
 }
 

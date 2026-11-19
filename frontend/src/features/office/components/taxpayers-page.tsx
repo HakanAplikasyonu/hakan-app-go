@@ -2,6 +2,7 @@
 
 import { Building2, Check, Plus, UsersRound } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -95,7 +96,7 @@ function Assignees({
             {t("office.assign")}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-1">
+        <PopoverContent align="end" className="w-64 p-1" data-no-row-click>
           <p className="text-muted-foreground px-2 py-1.5 text-xs">
             {t("office.assign_hint")}
           </p>
@@ -205,6 +206,7 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
 export function TaxpayersPage() {
   const { t } = useLocale();
   const { slug, permissions: perms } = useTenant();
+  const router = useRouter();
   const matrix = usePeriodMatrix(2);
   const members = useAssignableMembers();
   const canWrite = perms.includes(permissions.tenant.engagements.write);
@@ -250,6 +252,10 @@ export function TaxpayersPage() {
         columns={columns}
         data={rows}
         getRowId={(r) => r.engagement_uuid}
+        // Satırın tamamı mükellefe götürür (#567).
+        onRowClick={(r) =>
+          router.push(routes.tenant.engagement(slug, r.engagement_uuid))
+        }
         isLoading={matrix.isLoading}
         isError={matrix.isError}
         errorTitle={t("office.load_failed")}
