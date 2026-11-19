@@ -37,27 +37,36 @@ func bigAccountSuggest(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *
 	svc := accountrulesusecase.New(accountrulesrepository.New(pool, q), review)
 	run := accountrulesmodule.RunAutoSuggest(pool, svc, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	p := w.periods[len(w.periods)-1]
-	return parallelClients(ms, func(_ int, m *clientModel) error {
-		var ids []uuid.UUID
-		err := rls.System(ctx, pool, "demo-seed: invoices to suggest", func(ctx context.Context, tx pgx.Tx) error {
-			rows, err := tx.Query(ctx, `
+	// Sıralı: öneri işi kendi kapsam işlemini açar ve içinde havuzdan ikinci
+	// bağlantı ister; paralel işçiler havuzu tüketip birbirini bekler.
+	for _, m := range ms {
+		if err := suggestClient(ctx, pool, run, o, m, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func suggestClient(ctx context.Context, pool *pgxpool.Pool, run func(context.Context, queue.AccountSuggestPayload) error, o *bigOffice, m *clientModel, p string) error {
+	var ids []uuid.UUID
+	err := rls.System(ctx, pool, "demo-seed: invoices to suggest", func(ctx context.Context, tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `
 				SELECT uuid FROM invoices
 				WHERE taxpayer_id = $1 AND period = $2 AND direction = 'incoming' AND has_items
 				ORDER BY issue_date DESC, id DESC LIMIT $3`, m.c.taxpayerID, p, bigAccountSuggestPerClient)
-			if err != nil {
-				return err
-			}
-			ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-			return err
-		})
 		if err != nil {
-			return fmt.Errorf("invoices to suggest: %w", err)
+			return err
 		}
-		if len(ids) == 0 {
-			return nil
-		}
-		return run(ctx, queue.AccountSuggestPayload{
-			OrganizationID: o.orgID, EngagementID: m.c.engagementID, TaxpayerID: m.c.taxpayerID, Invoices: ids,
-		})
+		ids, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+		return err
+	})
+	if err != nil {
+		return fmt.Errorf("invoices to suggest: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	return run(ctx, queue.AccountSuggestPayload{
+		OrganizationID: o.orgID, EngagementID: m.c.engagementID, TaxpayerID: m.c.taxpayerID, Invoices: ids,
 	})
 }
