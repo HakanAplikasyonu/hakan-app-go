@@ -42,8 +42,9 @@ export function actionHref(
   inEngagement = false,
 ): string {
   switch (action) {
+    // Eksik belge: dosya listesi değil, açık belge istekleri (#563).
     case "open_documents":
-      return routes.tenant.engagementDocuments(slug, engagement);
+      return routes.tenant.engagementDocTasks(slug, engagement);
     case "open_review":
       return inEngagement
         ? routes.tenant.engagementReview(slug, engagement)

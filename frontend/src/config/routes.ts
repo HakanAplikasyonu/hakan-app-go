@@ -1,3 +1,6 @@
+/** Mükellef özetinde açık belge istekleri bölümünün çapası (#563). */
+export const DOC_TASKS_ANCHOR = "belge-istekleri";
+
 export const routes = {
   public: {
     root: "/",
@@ -140,6 +143,9 @@ export const routes = {
     /** One engagement; opens on its documents. */
     engagement: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}`,
+    /** Mükellef özetindeki açık belge istekleri listesi (#563). */
+    engagementDocTasks: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}#${DOC_TASKS_ANCHOR}`,
     /** Mizan hafızası: account plan, rule candidates, rules (#310). */
     accountPlan: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/account-plan`,

@@ -23,4 +23,13 @@ describe("actionHref", () => {
       "/t/demo/engagements/e1/bank",
     );
   });
+
+  it("eksik belge açık belge isteklerine gider (#563)", () => {
+    expect(actionHref("demo", "open_documents", "e1")).toBe(
+      "/t/demo/engagements/e1#belge-istekleri",
+    );
+    expect(actionHref("demo", "open_documents", "e1", true)).toBe(
+      "/t/demo/engagements/e1#belge-istekleri",
+    );
+  });
 });

@@ -751,6 +751,7 @@
   "engagement.tasks_empty": "No open document requests",
   "engagement.task_overdue": "Overdue",
   "engagement.task_waiting": "Waiting",
+  "engagement.task_submitted": "Received, check it",
   "engagement.task_undocumented_payment": "Document for a payment",
   "engagement.task_uninvoiced_collection": "Invoice for a collection",
   "engagement.task_generic": "Missing document",
