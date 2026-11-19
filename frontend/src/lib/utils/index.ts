@@ -16,3 +16,4 @@ export {
   dateFnsLocale,
   dayPickerLocale,
 } from "./format";
+export { trPossessive } from "./tr-suffix";

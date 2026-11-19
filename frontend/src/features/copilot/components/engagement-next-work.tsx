@@ -14,7 +14,12 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { useEngagementWorkflow } from "../hooks/use-copilot";
-import { ACTION_PERMISSIONS, actionHref, isWriteAction } from "../lib/actions";
+import {
+  ACTION_PERMISSIONS,
+  actionHref,
+  isWriteAction,
+  stepHref,
+} from "../lib/actions";
 import { actionLabel, periodLabel, stepDetail, stepLabel } from "../lib/labels";
 import { bulkSteps, nextStepOf } from "../lib/next-steps";
 import { useOptionalCopilot } from "./copilot-provider";
@@ -133,7 +138,11 @@ export function EngagementNextWork({
             {t("office.copilot.all_taxpayers")}
           </Link>
         </div>
-        <StepChain steps={row.steps} next={row.next_step} />
+        <StepChain
+          steps={row.steps}
+          next={row.next_step}
+          hrefFor={(k) => stepHref(slug, k, engagement, true)}
+        />
         <p className="text-text-3 text-xs tabular-nums">
           {t("office.copilot.progress", {
             done: row.done_steps,
@@ -161,7 +170,12 @@ export function EngagementNextWork({
           <Sparkles aria-hidden className="text-brand size-4" />
           {title}
         </Link>
-        <StepChain steps={row.steps} next={row.next_step} compact />
+        <StepChain
+          steps={row.steps}
+          next={row.next_step}
+          compact
+          hrefFor={(k) => stepHref(slug, k, engagement, true)}
+        />
       </div>
       {next}
     </section>

@@ -1264,7 +1264,7 @@
   "copilot.detail.transfer_na": "No entries to transfer",
   "copilot.detail.report_done": "Monthly report sent",
   "copilot.detail.report_todo": "Monthly report not sent",
-  "copilot.detail.report_waiting": "Report email queued",
+  "copilot.detail.report_waiting": "Queued: sent once the earlier steps are done",
   "copilot.detail.report_blocked": "The report could not be sent",
   "copilot.detail.report_na": "None this period",
   "copilot.action.bank_suggest": "Propose accounts for bank movements",
@@ -2038,5 +2038,6 @@
   "shell.switch_office": "Switch office",
   "shell.help": "Help and guides",
   "shell.theme_light": "Switch to light theme",
-  "shell.theme_dark": "Switch to dark theme"
+  "shell.theme_dark": "Switch to dark theme",
+  "copilot.step_filter": "Only: {{step}}"
 }

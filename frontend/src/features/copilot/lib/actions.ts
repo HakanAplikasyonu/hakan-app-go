@@ -1,7 +1,10 @@
 import { Permission, permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 
-import type { CopilotAction } from "../services/copilot.service";
+import type {
+  CopilotAction,
+  CopilotStepKey,
+} from "../services/copilot.service";
 
 /** Plan-step actions: they change data and need the user's approval. */
 export const WRITE_ACTIONS = new Set<CopilotAction>([
@@ -58,6 +61,27 @@ export function actionHref(
       return inEngagement
         ? routes.tenant.engagementJournals(slug, engagement)
         : `${routes.tenant.journals(slug)}?taxpayer=${encodeURIComponent(engagement)}`;
+  }
+}
+
+/** Ekranı bir zincir adımının: adım rozeti oraya götürür (#562). */
+export function stepHref(
+  slug: string,
+  key: CopilotStepKey,
+  engagement: string,
+  inEngagement = false,
+): string {
+  switch (key) {
+    case "documents":
+      return routes.tenant.engagementDocTasks(slug, engagement);
+    case "bank":
+      return routes.tenant.engagementBank(slug, engagement);
+    case "review":
+      return actionHref(slug, "open_review", engagement, inEngagement);
+    case "report":
+      return routes.tenant.engagementReport(slug, engagement);
+    default:
+      return actionHref(slug, "open_journals", engagement, inEngagement);
   }
 }
 

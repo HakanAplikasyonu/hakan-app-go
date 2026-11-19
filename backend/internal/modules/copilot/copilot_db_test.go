@@ -106,7 +106,8 @@ func TestWorkflowDB(t *testing.T) {
 		if s := stepOf(t, r.Steps, StepTransfer); actionOf(s) != ActionExportTransfer || s.Count != 1 {
 			t.Fatalf("transfer: %+v", s)
 		}
-		if s := stepOf(t, r.Steps, StepReport); s.Status != StatusBlocked {
+		// Fişler open: the failed report waits for them (#562).
+		if s := stepOf(t, r.Steps, StepReport); s.Status != StatusWaiting {
 			t.Fatalf("report: %+v", s)
 		}
 		if r.NextStep == nil || *r.NextStep != StepReview {

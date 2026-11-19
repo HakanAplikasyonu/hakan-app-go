@@ -158,8 +158,18 @@ func Chain(c Counts) []Step {
 	default:
 		steps = append(steps, Step{Key: StepTransfer, Status: StatusNA})
 	}
-	// Report: the monthly report emailed to the taxpayer.
+	// Report: the monthly report emailed to the taxpayer. It closes the
+	// chain: while an earlier step is open the report waits (a report sent
+	// before the books are done is sent again after them, #562).
+	earlierOpen := false
+	for _, s := range steps {
+		if s.Status == StatusTodo || s.Status == StatusBlocked || s.Status == StatusWaiting {
+			earlierOpen = true
+		}
+	}
 	switch {
+	case earlierOpen:
+		steps = append(steps, Step{Key: StepReport, Status: StatusWaiting, Count: c.ReportSent + c.ReportPending + c.ReportFailed})
 	case c.ReportSent > 0:
 		steps = append(steps, Step{Key: StepReport, Status: StatusDone, Count: c.ReportSent})
 	case c.ReportPending > 0:
