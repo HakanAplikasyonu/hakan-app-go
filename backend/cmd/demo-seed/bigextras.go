@@ -121,11 +121,12 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				FROM expenses x JOIN engagements e ON e.taxpayer_id = x.taxpayer_id AND e.id = ANY($1::bigint[])
 				WHERE x.source_system = $2 AND x.approval_status = 'pending'`, []any{engs, bigSource}},
 			// Faturalar: olağan dışı tutar (geçmişte çözülmüş, bu ay açık).
+			// Mükerrer fatura uyarısı gerçek bir kopyaya bağlı (bigreal.go).
 			{"data_warnings (fatura)", `
 				INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity,
 					params, producer, status, resolved_by, resolved_at, created_at, updated_at)
 				SELECT e.organization_id, e.id, i.taxpayer_id, i.period, 'invoice', i.id,
-				       (ARRAY['UNUSUAL_AMOUNT', 'NEW_PARTY_HIGH_AMOUNT', 'POSSIBLE_DUPLICATE', 'OUT_OF_PERIOD'])[1 + i.id % 4], 'warning',
+				       (ARRAY['UNUSUAL_AMOUNT', 'NEW_PARTY_HIGH_AMOUNT', 'OUT_OF_PERIOD'])[1 + i.id % 3], 'warning',
 				       jsonb_build_object('amount', i.payable_amount::numeric(18,2)::text), 'invoice_rules',
 				       CASE WHEN i.period >= $3 THEN 'open' WHEN i.id % 2 = 0 THEN 'resolved' ELSE 'acknowledged' END,
 				       CASE WHEN i.period < $3 THEN $4::bigint END, CASE WHEN i.period < $3 THEN i.created_at + interval '4 days' END,

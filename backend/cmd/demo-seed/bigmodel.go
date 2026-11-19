@@ -803,6 +803,8 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 	}
 	first := periodStart(m.periods[0])
 	m.opening = kr(m.salesFor(w, m.periods[0]) * (1.2 + r.Float64()))
+	// rx: rutin dışı işlemler (#568); r'nin akışını değiştirmez.
+	rx := demo.Rand(m.c.Office, m.c.Index, 568)
 	for i := range m.invoices {
 		d := &m.invoices[i]
 		if d.paidOn.IsZero() || d.cp < 0 {
@@ -812,8 +814,27 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 		amt := d.try(d.payable())
 		if d.dir == "outgoing" {
 			kind := []string{"EFT", "FAST", "HAVALE"}[r.IntN(3)]
+			who := strings.ToUpper(slugASCII(cp.Name))
+			switch u := rx.IntN(20); {
+			case u == 0 && amt >= 500000:
+				// Kısmi ödeme: müşteri faturayı iki parçada öder.
+				first := amt * 6 / 10 / 100 * 100
+				add(bankTxn{date: d.paidOn.AddDate(0, 0, -12), dir: "A", amount: first, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
+					desc: fmt.Sprintf("%s GELEN GONDEREN: %s FT %s KISMI ODEME", kind, who, d.number),
+					kind: kind, kindDetail: "customer_collection", account: "120.01", invoice: i})
+				add(bankTxn{date: d.paidOn, dir: "A", amount: amt - first, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
+					desc: fmt.Sprintf("%s GELEN GONDEREN: %s FT %s KALAN", kind, who, d.number),
+					kind: kind, kindDetail: "customer_collection", account: "120.01", invoice: i})
+				continue
+			case u == 1 && !m.c.Sector.Retail:
+				// Sipariş avansı: tahsilat faturadan önce gelir (340).
+				add(bankTxn{date: d.date.AddDate(0, 0, -6), dir: "A", amount: amt, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
+					desc: fmt.Sprintf("%s GELEN GONDEREN: %s SIPARIS AVANSI", kind, who),
+					kind: kind, kindDetail: "customer_collection", account: "340.01", invoice: i})
+				continue
+			}
 			add(bankTxn{date: d.paidOn, dir: "A", amount: amt, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
-				desc: fmt.Sprintf("%s GELEN GONDEREN: %s FT %s", kind, strings.ToUpper(slugASCII(cp.Name)), d.number),
+				desc: fmt.Sprintf("%s GELEN GONDEREN: %s FT %s", kind, who, d.number),
 				kind: kind, kindDetail: "customer_collection", account: "120.01", invoice: i})
 		} else if d.typ == "IADE" {
 			add(bankTxn{date: d.paidOn, dir: "B", amount: amt, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
@@ -902,6 +923,30 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 		}
 		add(bankTxn{date: next.AddDate(0, 0, -1), dir: "B", amount: 15000 + kurus(r.IntN(10000)), desc: "HESAP ISLETIM UCRETI",
 			kind: "UCRET_KOMISYON_FAIZ", kindDetail: "bank_fee", account: "780.01", invoice: -1})
+	}
+	// Rutin dışı işlemler (#568): vadeli hesaba virman ve faizi, şirket
+	// ortağından borç alınıp geri ödenmesi.
+	for pi, p := range m.periods {
+		ps := periodStart(p)
+		if pi%4 == 1 {
+			amt := kr(m.salesFor(w, p)*0.15) / 100000 * 100000
+			add(bankTxn{date: ps.AddDate(0, 0, 2), dir: "B", amount: amt, desc: "VADELI HESABA VIRMAN 32 GUN",
+				kind: "HAVALE", kindDetail: "own_account_transfer", account: "102.02", invoice: -1})
+			add(bankTxn{date: ps.AddDate(0, 0, 34), dir: "A", amount: amt, desc: "VADELI HESAPTAN VIRMAN ANAPARA",
+				kind: "HAVALE", kindDetail: "own_account_transfer", account: "102.02", invoice: -1})
+			add(bankTxn{date: ps.AddDate(0, 0, 34), dir: "A", amount: pct(amt, 3.4), desc: "VADELI MEVDUAT FAIZ TAHAKKUKU",
+				kind: "UCRET_KOMISYON_FAIZ", kindDetail: "interest_income", account: "642.01", invoice: -1})
+		}
+		if m.c.Kind == "legal" && pi%9 == 4 {
+			partner := demo.FirstNames[rx.IntN(len(demo.FirstNames))] + " " + demo.LastNames[rx.IntN(len(demo.LastNames))]
+			amt := kr(m.salesFor(w, p)*0.3) / 100000 * 100000
+			add(bankTxn{date: ps.AddDate(0, 0, 8), dir: "A", amount: amt, cpName: partner,
+				desc: "HAVALE GELEN GONDEREN: " + strings.ToUpper(slugASCII(partner)) + " ORTAK CARI HESAP",
+				kind: "HAVALE", kindDetail: "unknown", account: "331.01", invoice: -1})
+			add(bankTxn{date: ps.AddDate(0, 2, 10), dir: "B", amount: amt, cpName: partner,
+				desc: "HAVALE GIDEN ALICI: " + strings.ToUpper(slugASCII(partner)) + " ORTAGA BORC IADESI",
+				kind: "HAVALE", kindDetail: "unknown", account: "331.01", invoice: -1})
+		}
 	}
 	// Attention items: the problem clients have unexplained lines in the
 	// last weeks (no invoice, no rule): a collection and a payment.
@@ -1175,16 +1220,17 @@ func dropZero(ls []jLine) []jLine {
 }
 
 var accountNames = map[string]string{
-	"100": "KASA", "100.01": "MERKEZ KASA TL", "102": "BANKALAR", "102.01": "BANKA TL VADESİZ",
+	"100": "KASA", "100.01": "MERKEZ KASA TL", "102": "BANKALAR", "102.01": "BANKA TL VADESİZ", "102.02": "BANKA TL VADELİ",
 	"108": "DİĞER HAZIR DEĞERLER", "108.01": "KREDİ KARTI SLİP ALACAKLARI", "120": "ALICILAR", "120.01": "YURTİÇİ ALICILAR",
 	"150": "İLK MADDE VE MALZEME", "150.01": "GIDA MALZEMESİ", "153": "TİCARİ MALLAR", "153.01": "TİCARİ MALLAR", "621": "SATILAN TİCARİ MALLAR MALİYETİ", "621.01": "SATILAN TİCARİ MALLAR MALİYETİ",
 	"190": "DEVREDEN KDV", "190.01": "DEVREDEN KDV", "191": "İNDİRİLECEK KDV", "191.01": "İNDİRİLECEK KDV",
 	"300": "BANKA KREDİLERİ", "300.01": "TİCARİ KREDİLER", "320": "SATICILAR", "320.01": "YURTİÇİ SATICILAR",
+	"331": "ORTAKLARA BORÇLAR", "331.01": "ORTAKLARA BORÇLAR", "340": "ALINAN SİPARİŞ AVANSLARI", "340.01": "ALINAN SİPARİŞ AVANSLARI",
 	"335": "PERSONELE BORÇLAR", "335.01": "PERSONELE BORÇLAR", "360": "ÖDENECEK VERGİ VE FONLAR",
 	"360.01": "ÖDENECEK KDV", "360.02": "ÖDENECEK GELİR VE DAMGA VERGİSİ", "361": "ÖDENECEK SOSYAL GÜVENLİK KESİNTİLERİ",
 	"361.01": "ÖDENECEK SGK PRİMLERİ", "391": "HESAPLANAN KDV", "391.01": "HESAPLANAN KDV", "500": "SERMAYE", "500.01": "SERMAYE",
 	"600": "YURTİÇİ SATIŞLAR", "600.01": "YURTİÇİ SATIŞLAR", "601": "YURTDIŞI SATIŞLAR", "601.01": "YURTDIŞI SATIŞLAR",
-	"610": "SATIŞTAN İADELER", "610.01": "SATIŞTAN İADELER", "646": "KAMBİYO KARLARI", "646.01": "KAMBİYO KARLARI",
+	"610": "SATIŞTAN İADELER", "610.01": "SATIŞTAN İADELER", "642": "FAİZ GELİRLERİ", "642.01": "MEVDUAT FAİZ GELİRLERİ", "646": "KAMBİYO KARLARI", "646.01": "KAMBİYO KARLARI",
 	"679": "DİĞER OLAĞANDIŞI GELİR VE KARLAR", "679.01": "DİĞER OLAĞANDIŞI GELİRLER",
 	"689": "DİĞER OLAĞANDIŞI GİDER VE ZARARLAR", "689.01": "DİĞER OLAĞANDIŞI GİDERLER",
 	"740": "HİZMET ÜRETİM MALİYETİ", "740.01": "HİZMET ÜRETİM MALİYETİ", "770": "GENEL YÖNETİM GİDERLERİ",
