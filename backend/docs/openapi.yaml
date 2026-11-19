@@ -11551,6 +11551,102 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matching:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Bank]
+      operationId: getTenantBankTransactionMatching
+      summary: One bank movement with its invoice matches and scored candidates
+      description: |
+        Requires `tenant.bank.read` (#528). `candidates` are the open invoices
+        of the same direction the movement could close, scored by 21 §6.2
+        (best first, at most 20, already matched ones left out). A movement
+        that is cancelled or neither a collection nor a payment is not
+        `matchable` and has no candidates.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The movement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: matchTenantBankTransaction
+      summary: Match the movement to the chosen invoices (by hand)
+      description: |
+        Requires `tenant.bank.write` (#528). Replaces the movement's matches
+        with the chosen invoices (method `manual`); each closes up to its
+        open amount, in the given order of issue date, until the movement's
+        amount is used up. The period's bank warnings are refreshed at once,
+        so the ones this match settles are resolved. 422 when an invoice is
+        missing, inactive, of the other direction or currency, already paid,
+        or the amount is used up before it; 409
+        `BANK_TRANSACTION_NOT_MATCHABLE` for a movement that closes no
+        invoice.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice_uuids]
+              additionalProperties: false
+              properties:
+                invoice_uuids: { type: array, minItems: 1, maxItems: 10, items: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The movement after the match
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: an invoice cannot be matched to this movement"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Bank]
+      operationId: unmatchTenantBankTransaction
+      summary: Remove the movement's invoice matches
+      description: |
+        Requires `tenant.bank.write` (#528). The movement is `unmatched`
+        again and the period's bank warnings are refreshed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The movement after the undo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -20940,6 +21036,55 @@ components:
             no_suggestion: { type: integer }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
+    EnvelopeBankTransactionMatching:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/BankTransactionMatching" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    BankTransactionMatching:
+      type: object
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        debit_credit: { type: string, enum: [A, B], description: "A: money in, B: money out" }
+        amount: { type: string }
+        currency: { type: string }
+        description: { type: string }
+        counterparty_name: { type: string, nullable: true }
+        counterparty_iban: { type: string, nullable: true }
+        kind_detail: { type: string }
+        period: { type: string }
+        match_status: { type: string, enum: [unmatched, suggested, matched, ignored] }
+        matchable: { type: boolean }
+        matches:
+          type: array
+          items:
+            type: object
+            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, amount, method, score]
+            properties:
+              invoice_uuid: { type: string, format: uuid }
+              invoice_number: { type: string }
+              issue_date: { type: string, format: date }
+              counterparty_name: { type: string, nullable: true }
+              amount: { type: string }
+              method: { type: string, enum: [auto, suggested_accepted, manual] }
+              score: { type: integer }
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, open_amount, score, parts]
+            properties:
+              invoice_uuid: { type: string, format: uuid }
+              invoice_number: { type: string }
+              issue_date: { type: string, format: date }
+              counterparty_name: { type: string, nullable: true }
+              open_amount: { type: string }
+              score: { type: integer }
+              parts: { type: object, additionalProperties: { type: integer } }
     EnvelopeBankPostingApproval:
       type: object
       required: [success, data, meta]

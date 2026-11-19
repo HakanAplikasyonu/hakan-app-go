@@ -128,51 +128,9 @@ func (s *Service) Run(ctx context.Context, sub Subject, period string) (Result, 
 }
 
 func (s *Service) matchOne(ctx context.Context, q *db.Queries, sub Subject, t db.BankTransaction) (Outcome, error) {
-	m := Movement{
-		ID: t.ID, Date: t.TransactionDate.Time, Direction: banking.Direction(t.DebitCredit),
-		Amount: dec(t.Amount), IBAN: t.CounterpartyIban.String, Name: t.CounterpartyName.String,
-		TaxID:       t.CounterpartyTaxNumber.String + t.CounterpartyIdentityNumber.String,
-		Description: t.Description + " " + t.DescriptionExtra.String,
-	}
-	direction := "incoming" // a payment closes a purchase invoice
-	if m.Direction == banking.DirIn {
-		direction = "outgoing"
-	}
-	numbers := InvoiceNumbers(m.Description)
-	if numbers == nil {
-		numbers = []string{}
-	}
-	rows, err := q.ListInvoiceMatchCandidates(ctx, db.ListInvoiceMatchCandidatesParams{
-		Currency: t.Currency, TaxpayerID: sub.TaxpayerID, Direction: direction,
-		DateFrom: pgtype.Date{Time: m.Date.Add(-windowBefore), Valid: true},
-		DateTo:   pgtype.Date{Time: m.Date.Add(windowAfter), Valid: true},
-		Amount:   t.Amount, Tolerance: numeric(s.opt.FeeTolerance.Add(cent)),
-		TaxNumber: t.CounterpartyTaxNumber, IdentityNumber: t.CounterpartyIdentityNumber,
-		InvoiceNumbers: numbers, Iban: t.CounterpartyIban,
-	})
+	m, cands, _, err := s.candidates(ctx, q, sub, t)
 	if err != nil {
 		return OutcomeNone, err
-	}
-	cands := make([]Candidate, 0, len(rows))
-	for _, r := range rows {
-		c := Candidate{
-			ID: r.ID, Number: r.InvoiceNumber, IssueDate: r.IssueDate.Time,
-			Open:  dec(r.ComparableAmount).Sub(dec(r.MatchedAmount)),
-			TaxID: r.CustomerTaxNumber.String + r.CustomerIdentityNumber.String, Name: r.CustomerName.String,
-		}
-		if r.PaymentDueDate.Valid {
-			d := r.PaymentDueDate.Time
-			c.DueDate = &d
-		}
-		var accounts []map[string]any
-		if json.Unmarshal(r.BankAccounts, &accounts) == nil {
-			for _, a := range accounts {
-				if iban, ok := a["iban"].(string); ok {
-					c.IBANs = append(c.IBANs, iban)
-				}
-			}
-		}
-		cands = append(cands, c)
 	}
 	d := Decide(m, cands, s.opt)
 	switch d.Outcome {

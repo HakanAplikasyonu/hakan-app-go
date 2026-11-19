@@ -375,6 +375,8 @@ type Querier interface {
 	GetBankPosting(ctx context.Context, arg GetBankPostingParams) (BankTransactionPosting, error)
 	GetBankPostingView(ctx context.Context, arg GetBankPostingViewParams) (GetBankPostingViewRow, error)
 	GetBankTransaction(ctx context.Context, arg GetBankTransactionParams) (BankTransaction, error)
+	// Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
+	GetBankTransactionByUUID(ctx context.Context, arg GetBankTransactionByUUIDParams) (BankTransaction, error)
 	GetBankTransactionForPosting(ctx context.Context, arg GetBankTransactionForPostingParams) (GetBankTransactionForPostingRow, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
 	GetBillingPlanByCode(ctx context.Context, code string) (BillingPlan, error)
@@ -736,6 +738,7 @@ type Querier interface {
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
+	ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
@@ -864,6 +867,9 @@ type Querier interface {
 	// Faturanın ve satırlarının bu engagement'taki uyarıları.
 	ListInvoiceWarnings(ctx context.Context, arg ListInvoiceWarningsParams) ([]DataWarning, error)
 	ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPeriodParams) ([]Invoice, error)
+	// Elle eşleştirmede seçilen faturalar: aynı yön, aktif; açık tutar bu
+	// hareketin eski eşleşmeleri hariç (yeniden eşleştirme).
+	ListInvoicesForManualMatch(ctx context.Context, arg ListInvoicesForManualMatchParams) ([]ListInvoicesForManualMatchRow, error)
 	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
 	// Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
 	ListJournalDrafts(ctx context.Context, arg ListJournalDraftsParams) ([]ListJournalDraftsRow, error)

@@ -15,6 +15,7 @@ import type {
   RelatedRecord,
   RelatedSourceKind,
 } from "../services/related.service";
+import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
 import { Figure, Money, Panel, SeverityBadge } from "./office-ui";
 
 /** Çeviri yoksa ham değer (bilinmeyen durum ya da öneri türü). */
@@ -243,6 +244,14 @@ export function FocusedRecord({ engagement }: { engagement: string }) {
           </Button>
         }
       >
+        {focus.kind === "bank_transaction" && (
+          <div className="mb-6">
+            <BankTransactionMatchingPanel
+              engagement={engagement}
+              transaction={focus.uuid}
+            />
+          </div>
+        )}
         <RelatedRecordsTable
           engagement={engagement}
           kind={focus.kind}

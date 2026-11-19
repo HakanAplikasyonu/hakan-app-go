@@ -8666,6 +8666,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matching": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One bank movement with its invoice matches and scored candidates
+         * @description Requires `tenant.bank.read` (#528). `candidates` are the open invoices
+         *     of the same direction the movement could close, scored by 21 §6.2
+         *     (best first, at most 20, already matched ones left out). A movement
+         *     that is cancelled or neither a collection nor a payment is not
+         *     `matchable` and has no candidates.
+         */
+        get: operations["getTenantBankTransactionMatching"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Match the movement to the chosen invoices (by hand)
+         * @description Requires `tenant.bank.write` (#528). Replaces the movement's matches
+         *     with the chosen invoices (method `manual`); each closes up to its
+         *     open amount, in the given order of issue date, until the movement's
+         *     amount is used up. The period's bank warnings are refreshed at once,
+         *     so the ones this match settles are resolved. 422 when an invoice is
+         *     missing, inactive, of the other direction or currency, already paid,
+         *     or the amount is used up before it; 409
+         *     `BANK_TRANSACTION_NOT_MATCHABLE` for a movement that closes no
+         *     invoice.
+         */
+        put: operations["matchTenantBankTransaction"];
+        post?: never;
+        /**
+         * Remove the movement's invoice matches
+         * @description Requires `tenant.bank.write` (#528). The movement is `unmatched`
+         *     again and the period's bank warnings are refreshed.
+         */
+        delete: operations["unmatchTenantBankTransaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
         parameters: {
             query?: never;
@@ -16284,6 +16359,58 @@ export interface components {
                 no_suggestion: number;
             };
             meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBankTransactionMatching: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BankTransactionMatching"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        BankTransactionMatching: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: date */
+            transaction_date: string;
+            /**
+             * @description A: money in, B: money out
+             * @enum {string}
+             */
+            debit_credit: "A" | "B";
+            amount: string;
+            currency: string;
+            description: string;
+            counterparty_name: string | null;
+            counterparty_iban: string | null;
+            kind_detail: string;
+            period: string;
+            /** @enum {string} */
+            match_status: "unmatched" | "suggested" | "matched" | "ignored";
+            matchable: boolean;
+            matches: {
+                /** Format: uuid */
+                invoice_uuid: string;
+                invoice_number: string;
+                /** Format: date */
+                issue_date: string;
+                counterparty_name: string | null;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "suggested_accepted" | "manual";
+                score: number;
+            }[];
+            candidates: {
+                /** Format: uuid */
+                invoice_uuid: string;
+                invoice_number: string;
+                /** Format: date */
+                issue_date: string;
+                counterparty_name: string | null;
+                open_amount: string;
+                score: number;
+                parts: {
+                    [key: string]: number;
+                };
+            }[];
         };
         EnvelopeBankPostingApproval: {
             /** @enum {boolean} */
@@ -33742,6 +33869,122 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankTransactionMatching: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The movement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    matchTenantBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    invoice_uuids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The movement after the match */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `VALIDATION_ERROR`: an invoice cannot be matched to this movement */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unmatchTenantBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The movement after the undo */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

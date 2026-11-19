@@ -2,6 +2,7 @@ package matching
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"testing"
 
@@ -195,6 +196,63 @@ func TestSampleMonth(t *testing.T) {
 	}
 	if m := matches("c"); len(m) != 0 {
 		t.Fatalf("revert left matches: %v", m)
+	}
+
+	// One movement by hand (#528): the undocumented payment "d" gets its
+	// invoice later; matching it resolves the warning, undoing reopens it.
+	txUUID := func(src string) uuid.UUID {
+		var id uuid.UUID
+		if err := d.Pool.QueryRow(ctx, `SELECT uuid FROM bank_transactions WHERE source_id = $1 AND taxpayer_id = $2`, src, tp).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	invUUID := func(id int64) uuid.UUID {
+		var u uuid.UUID
+		_ = d.Pool.QueryRow(ctx, `SELECT uuid FROM invoices WHERE id = $1`, id).Scan(&u)
+		return u
+	}
+	late := invUUID(inv("XYZ2026000000500", "incoming", "9300000049", "Geç Tedarikçi", "7000", 11))
+	// "c" was reverted above: the accountant matches it by hand to KRT.
+	undocumented := func() string {
+		var total string
+		_ = d.Pool.QueryRow(ctx, `SELECT string_agg(params->>'total', ',') FROM data_warnings WHERE engagement_id = $1 AND code = $2 AND status = 'open'`,
+			eng, CodeUndocumentedPayment).Scan(&total)
+		return total
+	}
+	if view, err := svc.Match(ctx, sub, txUUID("c"), []uuid.UUID{invUUID(invKrt)}, user); err != nil || view.MatchStatus != "matched" {
+		t.Fatalf("match c: %+v %v", view, err)
+	}
+	if got := undocumented(); got != "7000.00" {
+		t.Fatalf("undocumented before matching d = %q", got)
+	}
+	view, err := svc.Transaction(ctx, sub, txUUID("d"))
+	if err != nil || !view.Matchable || len(view.Matches) != 0 || len(view.Candidates) == 0 || view.Candidates[0].InvoiceUUID != late {
+		t.Fatalf("view d: %+v %v", view, err)
+	}
+	if _, err := svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{invUUID(inv101)}, user); !errors.Is(err, ErrInvalidInvoices) {
+		t.Fatalf("sales invoice on a payment: %v", err)
+	}
+	view, err = svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{late}, user)
+	if err != nil || view.MatchStatus != "matched" || len(view.Matches) != 1 || view.Matches[0].Method != "manual" || view.Matches[0].Amount != "7000.00" {
+		t.Fatalf("match d: %+v %v", view, err)
+	}
+	if got := undocumented(); got != "" {
+		t.Fatalf("manual match must resolve the undocumented payment warning: %q", got)
+	}
+	view, err = svc.Unmatch(ctx, sub, txUUID("d"))
+	if err != nil || view.MatchStatus != "unmatched" || len(view.Matches) != 0 || undocumented() != "7000.00" {
+		t.Fatalf("unmatch d: %+v %v total=%q", view, err, undocumented())
+	}
+	// Interest is neither a collection nor a payment of an invoice.
+	if view, err := svc.Transaction(ctx, sub, txUUID("f")); err != nil || view.Matchable || len(view.Candidates) != 0 {
+		t.Fatalf("view f: %+v %v", view, err)
+	}
+	if _, err := svc.Match(ctx, sub, txUUID("f"), []uuid.UUID{late}, user); !errors.Is(err, ErrNotMatchable) {
+		t.Fatalf("match f: %v", err)
+	}
+	if _, err := svc.Transaction(ctx, sub, uuid.New()); !errors.Is(err, ErrTransactionNotFound) {
+		t.Fatalf("unknown: %v", err)
 	}
 }
 
