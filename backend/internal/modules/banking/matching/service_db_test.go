@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
@@ -220,8 +221,25 @@ func TestSampleMonth(t *testing.T) {
 			eng, CodeUndocumentedPayment).Scan(&total)
 		return total
 	}
+	// A rerun may have queued a new suggestion for "c"; the manual match
+	// supersedes it so it leaves the review queue (#529).
+	var cID int64
+	_ = d.Pool.QueryRow(ctx, `SELECT id FROM bank_transactions WHERE source_id = 'c' AND taxpayer_id = $1`, tp).Scan(&cID)
+	pending, err := review.Submit(ctx, rsub, reviewusecase.Input{
+		Kind: SuggestionKind, TargetType: "bank_transaction", TargetID: &cID, TargetField: "match",
+		Value: []byte(`{}`), Confidence: decimal.RequireFromString("0.5"), Rationale: "yeniden önerildi",
+		Provenance: reviewusecase.Provenance{Origin: reviewusecase.OriginRule, RuleRef: "bank_match:21-6.2"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if view, err := svc.Match(ctx, sub, txUUID("c"), []uuid.UUID{invUUID(invKrt)}, user); err != nil || view.MatchStatus != "matched" {
 		t.Fatalf("match c: %+v %v", view, err)
+	}
+	var pendingStatus string
+	_ = d.Pool.QueryRow(ctx, `SELECT status FROM suggestions WHERE uuid = $1`, pending.UUID).Scan(&pendingStatus)
+	if pendingStatus != "superseded" {
+		t.Fatalf("manual match must supersede the pending suggestion, status %q", pendingStatus)
 	}
 	if got := undocumented(); got != "7000.00" {
 		t.Fatalf("undocumented before matching d = %q", got)

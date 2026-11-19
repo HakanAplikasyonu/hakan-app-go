@@ -21,6 +21,7 @@ import {
   type BankTransactionMatching,
 } from "../services/bank-matching.service";
 import { relatedKeys } from "../services/related.service";
+import { reviewKeys } from "../services/review.service";
 import { warningKeys } from "../services/warnings.service";
 import { errText } from "./engagement-expenses-page";
 import { Figure, Money } from "./office-ui";
@@ -63,6 +64,8 @@ export function BankTransactionMatchingPanel({
     qc.setQueryData(key, v);
     setPicked([]);
     void qc.invalidateQueries({ queryKey: warningKeys.all(slug) });
+    // Elle eşleştirme bekleyen öneriyi kuyruktan düşürür (#529).
+    void qc.invalidateQueries({ queryKey: reviewKeys.all(slug) });
     void qc.invalidateQueries({
       queryKey: relatedKeys.one(
         slug,
