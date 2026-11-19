@@ -18,6 +18,7 @@ import (
 var boundedLists = map[string]string{
 	"GET /v1/tenant/roles":                                                    "office roles (system + custom, a handful)",
 	"GET /v1/tenant/role-permissions":                                         "permission catalog",
+	"GET /v1/tenant/einvoice-integrators":                                     "e-invoice integrator catalog (go-ubltr registry)",
 	"GET /v1/tenant/petition-templates":                                       "petition template catalog",
 	"GET /v1/tenant/warning-rules":                                            "warning rule catalog",
 	"GET /v1/tenant/engagements/{engagementUuid}/warning-rules":               "warning rule catalog",

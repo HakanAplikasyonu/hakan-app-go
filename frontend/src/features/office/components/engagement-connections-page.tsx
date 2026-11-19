@@ -47,6 +47,8 @@ import {
 } from "../hooks/use-bank-connections";
 import type { EasytradeConnection } from "../hooks/use-easytrade";
 
+import { EinvoiceSection } from "./einvoice-connections-section";
+
 type BC = ReturnType<typeof useBankConnections>;
 
 const STEPS: BankStep[] = ["instruction", "submit", "credentials", "active"];
@@ -74,8 +76,8 @@ export function lastDays(n: number, today = new Date()) {
 
 /**
  * `/t/{slug}/engagements/{uuid}/connections` (#518): mükellefe özgü bütün
- * dış bağlantılar tek yerde. Banka web servisi burada kurulur (talimat →
- * şube → servis kullanıcısı → aktif); Easytrade, muhasebe programı aktarımı
+ * dış bağlantılar tek yerde. Banka web servisi (talimat → şube → servis
+ * kullanıcısı → aktif) ve e-fatura entegratörü burada kurulur; Easytrade, muhasebe programı aktarımı
  * ve WhatsApp kendi sekmelerine bağlanır.
  */
 export function EngagementConnectionsPage({
@@ -98,6 +100,9 @@ export function EngagementConnectionsPage({
       </div>
       {can(Permission.TenantBankRead) ? (
         <BankSection engagement={engagement} />
+      ) : null}
+      {can(Permission.TenantInvoicesRead) ? (
+        <EinvoiceSection engagement={engagement} />
       ) : null}
       <OtherConnections engagement={engagement} />
     </div>

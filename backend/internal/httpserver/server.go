@@ -56,6 +56,7 @@ import (
 	copilotmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/copilot"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	excelmapping "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
@@ -488,6 +489,16 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		}
 	}
 	easytrade.RegisterWebhook(mux, easytrade.NewWebhook(easytradeSvc, cfg.Easytrade.WebhookSecret, easytradeEnqueue))
+	// e-Fatura entegratör bağlantısı (#518): kimlik kasada, ilk çekim
+	// sabit IP'li işçide.
+	var entegratorEnqueue entegrator.Enqueuer
+	if deps.Queue != nil {
+		entegratorEnqueue = func(_ context.Context, taxpayerID int64, id uuid.UUID, kind string) error {
+			return queue.EnqueueEntegratorSync(deps.Queue, queue.EntegratorSyncPayload{TaxpayerID: taxpayerID, ConnectionUUID: id, Kind: kind})
+		}
+	}
+	entegrator.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+		entegrator.NewHandler(entegrator.NewConnections(deps.DB, sourceVault, entegratorEnqueue)))
 	// KolayBi adaptörü (issue #48).
 	kolaybi.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		kolaybi.NewHandler(kolaybi.NewService(deps.DB, sourceVault, kolaybi.App{BaseURL: cfg.KolayBi.BaseURL, Channel: cfg.KolayBi.Channel}, nil)))

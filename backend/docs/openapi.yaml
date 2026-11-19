@@ -12548,6 +12548,189 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/einvoice-integrators:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Sources]
+      operationId: listTenantEinvoiceIntegrators
+      summary: e-Invoice integrators that can be connected
+      description: |
+        Requires `tenant.invoices.read`. The integrators of the go-ubltr
+        registry (#518) and the web-service fields their form needs. `ip_filtered`
+        integrators (İşNet) authorise by the fixed egress IP and the VKN: no
+        fields.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Integrators
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceIntegratorList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/einvoice-connections:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Sources]
+      operationId: listTenantEinvoiceConnections
+      summary: The taxpayer's e-invoice integrator connections
+      description: Requires `tenant.invoices.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connections
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnectionList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Sources]
+      operationId: createTenantEinvoiceConnection
+      summary: Start connecting an e-invoice integrator
+      description: |
+        Requires `tenant.invoices.write`. Opens a `draft` connection
+        (`source_system = entegrator_<id>`), one per integrator and taxpayer.
+        An `ip_filtered` integrator needs no user: its first sync is queued at
+        once (when the job queue is on). `environment` is `production` (default) or `test`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [integrator_id]
+              properties:
+                integrator_id: { type: string, example: izibiz }
+                environment: { type: string, enum: [production, test] }
+      responses:
+        "201":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INTEGRATOR_NOT_SUPPORTED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    get:
+      tags: [Sources]
+      operationId: getTenantEinvoiceConnection
+      summary: One e-invoice integrator connection
+      description: Requires `tenant.invoices.read`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/credentials:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    put:
+      tags: [Sources]
+      operationId: setTenantEinvoiceConnectionCredentials
+      summary: Enter the integrator's web-service user
+      description: |
+        Requires `tenant.invoices.write`. `values` holds the integrator's
+        `fields`. They go to the credential vault (never to the connection
+        row or logs), the last error is cleared and the first sync
+        (backfill) is queued on the fixed-egress worker. The connection is
+        `waiting` until that run marks it `active` or `auth_failed`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [values]
+              properties:
+                values: { type: object, additionalProperties: { type: string } }
+      responses:
+        "200":
+          description: Connection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`CREDENTIALS_INCOMPLETE`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: "`VAULT_NOT_CONFIGURED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/sync:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/SourceConnectionUuid"
+    post:
+      tags: [Sources]
+      operationId: syncTenantEinvoiceConnection
+      summary: Queue a manual sync ("şimdi çek")
+      description: |
+        Requires `tenant.invoices.write` and entered credentials. The worker
+        skips the run when the integrator's minimum interval has not passed.
+        409: `INTEGRATOR_CONNECTION_STATE` (no credentials yet) or
+        `QUEUE_NOT_CONFIGURED` (QUEUE_ENABLED is off on this server).
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeEinvoiceConnection" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statements:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16413,6 +16596,85 @@ components:
           required: [items]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/BankConnection" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EinvoiceIntegratorField:
+      type: object
+      required: [key, label, secret, required]
+      properties:
+        key: { type: string, description: "username, password, api_key or an option key" }
+        label: { type: string }
+        secret: { type: boolean }
+        required: { type: boolean }
+        option: { type: boolean, description: "The value is an integrator option (Sovos aliases)" }
+        help: { type: string }
+    EinvoiceIntegrator:
+      type: object
+      required: [id, name, fields, ip_filtered]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        fields: { type: array, items: { $ref: "#/components/schemas/EinvoiceIntegratorField" } }
+        ip_filtered: { type: boolean }
+    EnvelopeEinvoiceIntegratorList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/EinvoiceIntegrator" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EinvoiceConnection:
+      type: object
+      required: [uuid, integrator_id, integrator_name, environment, state, has_credentials, ip_filtered, fields, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        integrator_id: { type: string }
+        integrator_name: { type: string }
+        environment: { type: string, enum: [production, test] }
+        state: { type: string, enum: [draft, waiting, active, auth_failed, rate_limited, disabled] }
+        has_credentials: { type: boolean }
+        ip_filtered: { type: boolean }
+        fields: { type: array, items: { $ref: "#/components/schemas/EinvoiceIntegratorField" } }
+        error:
+          type: object
+          required: [message]
+          properties:
+            kind: { type: string }
+            message: { type: string }
+        last_success_at: { type: string, format: date-time }
+        last_run:
+          type: object
+          required: [kind, status, started_at, counters]
+          properties:
+            kind: { type: string, enum: [backfill, incremental, full_scan, manual] }
+            status: { type: string }
+            started_at: { type: string, format: date-time }
+            finished_at: { type: string, format: date-time }
+            counters:
+              type: object
+              description: "listed, new, status_changed, ubl_fetched … per run"
+              additionalProperties: { type: integer }
+        created_at: { type: string, format: date-time }
+    EnvelopeEinvoiceConnection:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/EinvoiceConnection" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeEinvoiceConnectionList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/EinvoiceConnection" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeBankSyncResult:
       type: object

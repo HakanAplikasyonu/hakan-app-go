@@ -9415,6 +9415,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/einvoice-integrators": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * e-Invoice integrators that can be connected
+         * @description Requires `tenant.invoices.read`. The integrators of the go-ubltr
+         *     registry (#518) and the web-service fields their form needs. `ip_filtered`
+         *     integrators (İşNet) authorise by the fixed egress IP and the VKN: no
+         *     fields.
+         */
+        get: operations["listTenantEinvoiceIntegrators"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The taxpayer's e-invoice integrator connections
+         * @description Requires `tenant.invoices.read`.
+         */
+        get: operations["listTenantEinvoiceConnections"];
+        put?: never;
+        /**
+         * Start connecting an e-invoice integrator
+         * @description Requires `tenant.invoices.write`. Opens a `draft` connection
+         *     (`source_system = entegrator_<id>`), one per integrator and taxpayer.
+         *     An `ip_filtered` integrator needs no user: its first sync is queued at
+         *     once (when the job queue is on). `environment` is `production` (default) or `test`.
+         */
+        post: operations["createTenantEinvoiceConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * One e-invoice integrator connection
+         * @description Requires `tenant.invoices.read`.
+         */
+        get: operations["getTenantEinvoiceConnection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/credentials": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enter the integrator's web-service user
+         * @description Requires `tenant.invoices.write`. `values` holds the integrator's
+         *     `fields`. They go to the credential vault (never to the connection
+         *     row or logs), the last error is cleared and the first sync
+         *     (backfill) is queued on the fixed-egress worker. The connection is
+         *     `waiting` until that run marks it `active` or `auth_failed`.
+         */
+        put: operations["setTenantEinvoiceConnectionCredentials"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/einvoice-connections/{connectionUuid}/sync": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Queue a manual sync ("şimdi çek")
+         * @description Requires `tenant.invoices.write` and entered credentials. The worker
+         *     skips the run when the integrator's minimum interval has not passed.
+         *     409: `INTEGRATOR_CONNECTION_STATE` (no credentials yet) or
+         *     `QUEUE_NOT_CONFIGURED` (QUEUE_ENABLED is off on this server).
+         */
+        post: operations["syncTenantEinvoiceConnection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-statements": {
         parameters: {
             query?: never;
@@ -12503,6 +12661,78 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["BankConnection"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EinvoiceIntegratorField: {
+            /** @description username, password, api_key or an option key */
+            key: string;
+            label: string;
+            secret: boolean;
+            required: boolean;
+            /** @description The value is an integrator option (Sovos aliases) */
+            option?: boolean;
+            help?: string;
+        };
+        EinvoiceIntegrator: {
+            id: string;
+            name: string;
+            fields: components["schemas"]["EinvoiceIntegratorField"][];
+            ip_filtered: boolean;
+        };
+        EnvelopeEinvoiceIntegratorList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["EinvoiceIntegrator"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EinvoiceConnection: {
+            /** Format: uuid */
+            uuid: string;
+            integrator_id: string;
+            integrator_name: string;
+            /** @enum {string} */
+            environment: "production" | "test";
+            /** @enum {string} */
+            state: "draft" | "waiting" | "active" | "auth_failed" | "rate_limited" | "disabled";
+            has_credentials: boolean;
+            ip_filtered: boolean;
+            fields: components["schemas"]["EinvoiceIntegratorField"][];
+            error?: {
+                kind?: string;
+                message: string;
+            };
+            /** Format: date-time */
+            last_success_at?: string;
+            last_run?: {
+                /** @enum {string} */
+                kind: "backfill" | "incremental" | "full_scan" | "manual";
+                status: string;
+                /** Format: date-time */
+                started_at: string;
+                /** Format: date-time */
+                finished_at?: string;
+                /** @description listed, new, status_changed, ubl_fetched … per run */
+                counters: {
+                    [key: string]: number;
+                };
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
+        EnvelopeEinvoiceConnection: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["EinvoiceConnection"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeEinvoiceConnectionList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["EinvoiceConnection"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -34782,6 +35012,246 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+        };
+    };
+    listTenantEinvoiceIntegrators: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Integrators */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceIntegratorList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantEinvoiceConnections: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connections */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnectionList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTenantEinvoiceConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example izibiz */
+                    integrator_id: string;
+                    /** @enum {string} */
+                    environment?: "production" | "test";
+                };
+            };
+        };
+        responses: {
+            /** @description Connection */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INTEGRATOR_NOT_SUPPORTED` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantEinvoiceConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnection"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantEinvoiceConnectionCredentials: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    values: {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Connection */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `CREDENTIALS_INCOMPLETE` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `VAULT_NOT_CONFIGURED` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    syncTenantEinvoiceConnection: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                connectionUuid: components["parameters"]["SourceConnectionUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeEinvoiceConnection"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
         };
     };
     importTenantBankStatement: {

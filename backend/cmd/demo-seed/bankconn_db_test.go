@@ -7,6 +7,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -36,5 +37,28 @@ func TestDemoBankConnection(t *testing.T) {
 	}
 	if m.BankID != "vakifbank" || len(m.IBANs) != 1 || m.IBANs[0] != DemoVakifbankIBAN || m.SubmittedAt == nil {
 		t.Errorf("meta = %+v", m)
+	}
+}
+
+// TestDemoEinvoiceConnection (#518 A1): Atlas Gıda'nın İzibiz bağlantısı
+// bağlı görünür, ilk çekimi bitmiştir; kimlik bilgisi yoktur.
+func TestDemoEinvoiceConnection(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
+		t.Fatal(err)
+	}
+	atlas := demoScope(t, d, "atlas")
+	list, err := entegrator.NewConnections(d.Pool, nil, nil).List(ctx, atlas.TaxpayerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 {
+		t.Fatalf("connections = %d", len(list))
+	}
+	c := list[0]
+	if c.IntegratorID != "izibiz" || c.State != "active" || c.HasCredentials || c.LastSuccessAt == nil ||
+		c.LastRun == nil || c.LastRun.Status != "success" || c.LastRun.Counters.New != 148 {
+		t.Errorf("connection = %+v run=%+v", c, c.LastRun)
 	}
 }
