@@ -136,6 +136,11 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementReport(slug, engagement),
       label: t("office.engagement.tab_report"),
     },
+    // Banka, entegratör ve diğer dış bağlantılar (#518).
+    {
+      href: routes.tenant.engagementConnections(slug, engagement),
+      label: t("office.engagement.tab_connections"),
+    },
   ];
 }
 

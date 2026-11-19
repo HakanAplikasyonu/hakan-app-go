@@ -1779,5 +1779,6 @@
   "bank.luca.exported_again": "Luca'ya {{count}} kez aktarıldı",
   "bank.luca.error_NO_TRANSACTIONS": "Seçilen aralıkta bu hesapta hareket yok.",
   "bank.luca.error_VALIDATION_ERROR": "Tarihleri kontrol edin (en çok 366 gün, başlangıç bitişten önce).",
-  "bank.luca.error_REQUIRED_FIELD_MISSING": "Bir hareketin tarihi ya da tutarı eksik; dosya üretilmedi."
+  "bank.luca.error_REQUIRED_FIELD_MISSING": "Bir hareketin tarihi ya da tutarı eksik; dosya üretilmedi.",
+  "engagement.tab_connections": "Bağlantılar"
 }
