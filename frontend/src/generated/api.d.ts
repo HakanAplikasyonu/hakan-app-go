@@ -3705,7 +3705,7 @@ export interface paths {
          *     (in `period` when given) to acknowledged, recording who and when on
          *     each row as the single acknowledge does. Only engagements the caller
          *     may see are touched (without `tenant.engagements.read_all`: assigned
-         *     ones), and only active engagements. The note goes to the activity log.
+         *     ones), and only active engagements. The note goes to the activity log and onto each warning (`resolution_note`, #529).
          *     Returns how many warnings changed (0 is not an error).
          */
         post: operations["acknowledgeOfficeWarningsBulk"];
@@ -3794,7 +3794,7 @@ export interface paths {
          * @description Requires `tenant.warnings.write` and engagement access. Sets every
          *     open warning of `code` (in `period` when given) of the engagement to
          *     acknowledged, recording who and when on each row as the single
-         *     acknowledge does. The note goes to the activity log. Returns how many
+         *     acknowledge does. The note goes to the activity log and onto each warning (`resolution_note`, #529). Returns how many
          *     warnings changed (0 is not an error).
          */
         post: operations["acknowledgeEngagementWarningsBulk"];
@@ -3825,7 +3825,8 @@ export interface paths {
         /**
          * Mark an open warning acknowledged
          * @description Requires `tenant.warnings.write` and engagement access. Only an open
-         *     warning can be decided; the decision (who, when) is stored on the row.
+         *     warning can be decided; the decision (who, when, and the optional
+         *     `note`) is stored on the row.
          *     A later sync with the same condition does not reopen it.
          */
         post: operations["acknowledgeEngagementWarning"];
@@ -3856,7 +3857,8 @@ export interface paths {
         /**
          * Mark an open warning resolved
          * @description Requires `tenant.warnings.write` and engagement access. Only an open
-         *     warning can be decided; the decision (who, when) is stored on the row.
+         *     warning can be decided; the decision (who, when, and the optional
+         *     `note`) is stored on the row.
          *     A later sync with the same condition does not reopen it.
          */
         post: operations["resolveEngagementWarning"];
@@ -13406,6 +13408,10 @@ export interface components {
             resolved_at: string | null;
             /** Format: date-time */
             created_at: string;
+            /** @description Who acknowledged or resolved it (#529); null while open or auto-resolved */
+            resolved_by_name: string | null;
+            /** @description The reason given with the decision (#529) */
+            resolution_note: string | null;
             /** Format: date-time */
             updated_at: string;
         };
@@ -26034,7 +26040,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Optional reason (#529); the web panel asks for it, older clients may send no body. */
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
         responses: {
             /** @description Decided */
             200: {
@@ -26068,7 +26081,14 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Optional reason (#529); the web panel asks for it, older clients may send no body. */
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
         responses: {
             /** @description Decided */
             200: {

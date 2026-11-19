@@ -14,13 +14,14 @@ import (
 
 const decideDataWarning = `-- name: DecideDataWarning :execrows
 UPDATE data_warnings
-SET status = $1, resolved_by = $2, resolved_at = NOW()
-WHERE organization_id = $3 AND engagement_id = $4 AND uuid = $5 AND status = 'open'
+SET status = $1, resolved_by = $2, resolved_at = NOW(), resolution_note = $3
+WHERE organization_id = $4 AND engagement_id = $5 AND uuid = $6 AND status = 'open'
 `
 
 type DecideDataWarningParams struct {
 	Status         string      `json:"status"`
 	ResolvedBy     pgtype.Int8 `json:"resolved_by"`
+	Note           pgtype.Text `json:"note"`
 	OrganizationID int64       `json:"organization_id"`
 	EngagementID   int64       `json:"engagement_id"`
 	Uuid           uuid.UUID   `json:"uuid"`
@@ -30,6 +31,7 @@ func (q *Queries) DecideDataWarning(ctx context.Context, arg DecideDataWarningPa
 	result, err := q.db.Exec(ctx, decideDataWarning,
 		arg.Status,
 		arg.ResolvedBy,
+		arg.Note,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.Uuid,
@@ -41,7 +43,7 @@ func (q *Queries) DecideDataWarning(ctx context.Context, arg DecideDataWarningPa
 }
 
 const listDataWarnings = `-- name: ListDataWarnings :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at FROM data_warnings
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at, resolution_note FROM data_warnings
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR status = $3)
   AND ($4::text IS NULL OR period = $4)
@@ -92,6 +94,7 @@ func (q *Queries) ListDataWarnings(ctx context.Context, arg ListDataWarningsPara
 			&i.ResolvedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ResolutionNote,
 		); err != nil {
 			return nil, err
 		}
@@ -104,7 +107,7 @@ func (q *Queries) ListDataWarnings(ctx context.Context, arg ListDataWarningsPara
 }
 
 const listEntityDataWarnings = `-- name: ListEntityDataWarnings :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at FROM data_warnings
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at, resolution_note FROM data_warnings
 WHERE organization_id = $1 AND engagement_id = $2
   AND entity_type = $3 AND entity_id = $4
 ORDER BY id
@@ -149,6 +152,7 @@ func (q *Queries) ListEntityDataWarnings(ctx context.Context, arg ListEntityData
 			&i.ResolvedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ResolutionNote,
 		); err != nil {
 			return nil, err
 		}
@@ -165,7 +169,7 @@ INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, 
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (engagement_id, entity_type, COALESCE(entity_id, 0), code, COALESCE(period, '')) WHERE status = 'open'
 DO UPDATE SET params = EXCLUDED.params, severity = EXCLUDED.severity, updated_at = NOW()
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at, resolution_note
 `
 
 type UpsertOpenDataWarningParams struct {
@@ -214,6 +218,7 @@ func (q *Queries) UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataW
 		&i.ResolvedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ResolutionNote,
 	)
 	return i, err
 }

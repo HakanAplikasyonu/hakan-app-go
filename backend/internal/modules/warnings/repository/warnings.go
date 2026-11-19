@@ -97,7 +97,9 @@ type Filter struct {
 	Severity       string
 	Status         string
 	EntityType     string
-	Limit, Offset  int32
+	// Note is the reason of a bulk acknowledgement (#529).
+	Note          string
+	Limit, Offset int32
 }
 
 // Row is one listed warning.
@@ -113,8 +115,11 @@ type Row struct {
 	Producer       string          `json:"producer"`
 	Status         string          `json:"status"`
 	ResolvedAt     *time.Time      `json:"resolved_at"`
-	CreatedAt      time.Time       `json:"created_at"`
-	UpdatedAt      time.Time       `json:"updated_at"`
+	// ResolvedByName and ResolutionNote: who decided and why (#529).
+	ResolvedByName *string   `json:"resolved_by_name"`
+	ResolutionNote *string   `json:"resolution_note"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // List returns one page of warnings and the total.
@@ -168,6 +173,14 @@ func (p *Warnings) List(ctx context.Context, f Filter) ([]Row, int64, error) {
 			t := r.ResolvedAt.Time
 			row.ResolvedAt = &t
 		}
+		if r.ResolvedByName != "" {
+			v := r.ResolvedByName
+			row.ResolvedByName = &v
+		}
+		if r.ResolutionNote.Valid {
+			v := r.ResolutionNote.String
+			row.ResolutionNote = &v
+		}
 		out = append(out, row)
 	}
 	return out, total, nil
@@ -175,13 +188,14 @@ func (p *Warnings) List(ctx context.Context, f Filter) ([]Row, int64, error) {
 
 // Decide records the accountant's decision (acknowledged / resolved) on an
 // open warning; false when no open warning has that uuid in the engagement.
-func (p *Warnings) Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64) (bool, error) {
+func (p *Warnings) Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64, note string) (bool, error) {
 	by := pgtype.Int8{}
 	if userID > 0 {
 		by = pgtype.Int8{Int64: userID, Valid: true}
 	}
 	n, err := p.q.DecideDataWarning(ctx, db.DecideDataWarningParams{
 		Status: string(status), ResolvedBy: by, OrganizationID: organizationID, EngagementID: engagementID, Uuid: id,
+		Note: optText(note),
 	})
 	if err != nil {
 		return false, fmt.Errorf("decide data warning: %w", err)
@@ -232,6 +246,7 @@ func (p *Warnings) AcknowledgeByCode(ctx context.Context, f Filter) (int64, erro
 	n, err := p.q.AcknowledgeTenantDataWarningsByCode(ctx, db.AcknowledgeTenantDataWarningsByCodeParams{
 		ResolvedBy: by, OrganizationID: f.OrganizationID, EngagementID: optID(f.EngagementID),
 		AllEngagements: f.AllEngagements, UserID: f.UserID, Code: f.Code, Period: optText(f.Period),
+		Note: optText(f.Note),
 	})
 	if err != nil {
 		return 0, fmt.Errorf("acknowledge data warnings: %w", err)

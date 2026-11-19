@@ -408,7 +408,7 @@ func (q *Queries) ListEngagementInvoicesAfter(ctx context.Context, arg ListEngag
 }
 
 const listInvoiceWarnings = `-- name: ListInvoiceWarnings :many
-SELECT w.id, w.uuid, w.organization_id, w.engagement_id, w.taxpayer_id, w.period, w.entity_type, w.entity_id, w.code, w.severity, w.params, w.producer, w.status, w.resolved_by, w.resolved_at, w.created_at, w.updated_at FROM data_warnings w
+SELECT w.id, w.uuid, w.organization_id, w.engagement_id, w.taxpayer_id, w.period, w.entity_type, w.entity_id, w.code, w.severity, w.params, w.producer, w.status, w.resolved_by, w.resolved_at, w.created_at, w.updated_at, w.resolution_note FROM data_warnings w
 WHERE w.organization_id = $1 AND w.engagement_id = $2
   AND ((w.entity_type = 'invoice' AND w.entity_id = $3)
     OR (w.entity_type = 'invoice_item' AND w.entity_id IN (
@@ -456,6 +456,7 @@ func (q *Queries) ListInvoiceWarnings(ctx context.Context, arg ListInvoiceWarnin
 			&i.ResolvedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ResolutionNote,
 		); err != nil {
 			return nil, err
 		}

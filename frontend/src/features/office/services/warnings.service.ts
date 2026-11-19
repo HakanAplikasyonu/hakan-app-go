@@ -81,18 +81,19 @@ export const warningService = {
       "/v1/tenant/warning-rules",
     );
   },
-  /** Only an open warning can be decided; no request body. */
+  /** Only an open warning can be decided; `note` is the reason (#529). */
   decide(
     slug: string,
     engagement: string,
     warning: string,
     action: WarningDecisionAction,
+    note: string,
   ) {
     return tenantRequest<ApiWarningDecision>(
       slug,
       "POST",
       `/v1/tenant/engagements/${encodeURIComponent(engagement)}/warnings/${encodeURIComponent(warning)}/${action}`,
-      { silent: true },
+      { body: { note }, silent: true },
     );
   },
   /** Koda göre özet (arayüz 6/9, #329): ofis geneli ya da tek engagement. */
@@ -107,7 +108,7 @@ export const warningService = {
   /** "Tümünü gördüm": bir koddaki bütün açık uyarıları görüldü yapar. */
   acknowledgeBulk(
     slug: string,
-    body: { code: string; period?: string },
+    body: { code: string; period?: string; note: string },
     engagement?: string,
   ) {
     const base = engagement

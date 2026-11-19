@@ -715,6 +715,7 @@ type DataWarning struct {
 	ResolvedAt     pgtype.Timestamptz `json:"resolved_at"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ResolutionNote pgtype.Text        `json:"resolution_note"`
 }
 
 type DesktopAgent struct {

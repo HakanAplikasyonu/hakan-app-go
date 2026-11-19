@@ -5332,7 +5332,7 @@ paths:
         (in `period` when given) to acknowledged, recording who and when on
         each row as the single acknowledge does. Only engagements the caller
         may see are touched (without `tenant.engagements.read_all`: assigned
-        ones), and only active engagements. The note goes to the activity log.
+        ones), and only active engagements. The note goes to the activity log and onto each warning (`resolution_note`, #529).
         Returns how many warnings changed (0 is not an error).
       security:
         - bearerAuth: []
@@ -5425,7 +5425,7 @@ paths:
         Requires `tenant.warnings.write` and engagement access. Sets every
         open warning of `code` (in `period` when given) of the engagement to
         acknowledged, recording who and when on each row as the single
-        acknowledge does. The note goes to the activity log. Returns how many
+        acknowledge does. The note goes to the activity log and onto each warning (`resolution_note`, #529). Returns how many
         warnings changed (0 is not an error).
       security:
         - bearerAuth: []
@@ -5458,10 +5458,21 @@ paths:
       summary: Mark an open warning acknowledged
       description: |
         Requires `tenant.warnings.write` and engagement access. Only an open
-        warning can be decided; the decision (who, when) is stored on the row.
+        warning can be decided; the decision (who, when, and the optional
+        `note`) is stored on the row.
         A later sync with the same condition does not reopen it.
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        description: Optional reason (#529); the web panel asks for it, older clients may send no body.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 500 }
       responses:
         "200":
           description: Decided
@@ -5485,10 +5496,21 @@ paths:
       summary: Mark an open warning resolved
       description: |
         Requires `tenant.warnings.write` and engagement access. Only an open
-        warning can be decided; the decision (who, when) is stored on the row.
+        warning can be decided; the decision (who, when, and the optional
+        `note`) is stored on the row.
         A later sync with the same condition does not reopen it.
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        description: Optional reason (#529); the web panel asks for it, older clients may send no body.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 500 }
       responses:
         "200":
           description: Decided
@@ -17426,7 +17448,7 @@ components:
 
     DataWarning:
       type: object
-      required: [uuid, engagement_uuid, period, entity_type, entity_uuid, code, severity, params, producer, status, resolved_at, created_at, updated_at]
+      required: [uuid, engagement_uuid, period, entity_type, entity_uuid, code, severity, params, producer, status, resolved_at, resolved_by_name, resolution_note, created_at, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         engagement_uuid: { type: string, format: uuid }
@@ -17443,6 +17465,8 @@ components:
         status: { type: string, enum: [open, acknowledged, resolved, auto_resolved] }
         resolved_at: { type: [string, "null"], format: date-time }
         created_at: { type: string, format: date-time }
+        resolved_by_name: { type: [string, "null"], description: "Who acknowledged or resolved it (#529); null while open or auto-resolved" }
+        resolution_note: { type: [string, "null"], description: "The reason given with the decision (#529)" }
         updated_at: { type: string, format: date-time }
 
     EnvelopeDataWarningPage:

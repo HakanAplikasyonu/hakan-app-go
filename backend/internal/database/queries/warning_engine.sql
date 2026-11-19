@@ -30,9 +30,12 @@ SELECT w.id, w.uuid, w.engagement_id, e.uuid AS engagement_uuid, w.period, w.ent
        -- Fatura kalemi kendi faturasının kimliğini taşır.
        bt.uuid AS bank_transaction_uuid, ex.uuid AS expense_uuid, rs.uuid AS retail_sale_uuid,
        rc.uuid AS receipt_capture_uuid, ft.uuid AS financial_transaction_uuid, itinv.uuid AS item_invoice_uuid,
-       w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at
+       w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at,
+       -- Kararı veren ve gerekçesi (#529).
+       w.resolution_note, trim(concat_ws(' ', ru.name, ru.surname))::text AS resolved_by_name
 FROM data_warnings w
 JOIN engagements e ON e.organization_id = w.organization_id AND e.id = w.engagement_id
+LEFT JOIN users ru ON ru.id = w.resolved_by
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 LEFT JOIN customers cust ON w.entity_type = 'customer' AND cust.id = w.entity_id AND cust.taxpayer_id = w.taxpayer_id
 LEFT JOIN bank_transactions bt ON w.entity_type = 'bank_transaction' AND bt.id = w.entity_id AND bt.taxpayer_id = w.taxpayer_id
@@ -97,7 +100,7 @@ ORDER BY max(CASE w.severity WHEN 'blocker' THEN 3 WHEN 'warning' THEN 2 ELSE 1 
 -- name: AcknowledgeTenantDataWarningsByCode :execrows
 -- DecideDataWarning'in toplu hâli: kapsamdaki bu kodlu bütün açık uyarılar.
 UPDATE data_warnings w
-SET status = 'acknowledged', resolved_by = sqlc.narg(resolved_by), resolved_at = NOW()
+SET status = 'acknowledged', resolved_by = sqlc.narg(resolved_by), resolved_at = NOW(), resolution_note = sqlc.narg(note)
 WHERE w.organization_id = @organization_id
   AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
   AND (@all_engagements::bool OR w.engagement_id IN (

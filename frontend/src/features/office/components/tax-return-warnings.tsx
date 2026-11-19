@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, PanelRightOpen } from "lucide-react";
+import { PanelRightOpen } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -20,10 +20,8 @@ import { useWarnings } from "../hooks/use-warnings";
 import { warningRecordHref, warningRecordKind } from "../lib/related-href";
 import type { RelatedSourceKind } from "../services/related.service";
 import type { ApiDataWarning as DataWarning } from "../services/warnings.service";
-import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
-import { InvoiceQuickView } from "./invoice-quick-view";
 import { SeverityBadge } from "./office-ui";
-import { RelatedRecordsTable } from "./related-records";
+import { RecordDetail } from "./record-detail";
 import { ApiWarningActions } from "./warning-actions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
 
@@ -271,18 +269,9 @@ function RecordPanel({
   onChanged?: () => void;
 }) {
   const { t } = useLocale();
-  const { slug } = useTenant();
   const text = useApiWarningText();
   const entity = useEntityLabel();
   const record = entity(group.entityType);
-  const href =
-    kind === "invoice"
-      ? routes.tenant.engagementInvoice(slug, engagement, uuid)
-      : warningRecordHref(slug, {
-          engagement_uuid: engagement,
-          entity_type: group.entityType,
-          entity_uuid: uuid,
-        });
   return (
     <div className="space-y-5">
       <SheetHeader className="text-left">
@@ -293,44 +282,26 @@ function RecordPanel({
           {t("office.tax_returns.panel_hint")}
         </SheetDescription>
       </SheetHeader>
-
-      {kind === "bank_transaction" ? (
-        <BankTransactionMatchingPanel
-          engagement={engagement}
-          transaction={uuid}
-          onChanged={onChanged}
-        />
-      ) : null}
-      {kind === "invoice" ? (
-        <InvoiceQuickView engagement={engagement} invoice={uuid} />
-      ) : null}
-
-      <section className="space-y-2">
-        <h4 className="text-sm font-semibold">
-          {t("office.tax_returns.panel_warnings")}
-        </h4>
-        {group.items.length === 0 ? (
-          <p className="text-text-3 text-sm">
-            {t("office.tax_returns.panel_no_warnings")}
-          </p>
-        ) : (
-          <WarningRows items={group.items} text={text} />
-        )}
-      </section>
-
-      <section className="space-y-2">
-        <h4 className="text-sm font-semibold">{t("office.related.title")}</h4>
-        <RelatedRecordsTable engagement={engagement} kind={kind} uuid={uuid} />
-      </section>
-
-      {href ? (
-        <Button asChild variant="outline" size="sm">
-          <Link href={href}>
-            <ExternalLink className="size-4" aria-hidden />
-            {t("office.tax_returns.panel_open_tab", { record })}
-          </Link>
-        </Button>
-      ) : null}
+      <RecordDetail
+        engagement={engagement}
+        entityType={group.entityType}
+        kind={kind}
+        uuid={uuid}
+        onChanged={onChanged}
+      >
+        <section className="space-y-2">
+          <h4 className="text-sm font-semibold">
+            {t("office.tax_returns.panel_warnings")}
+          </h4>
+          {group.items.length === 0 ? (
+            <p className="text-text-3 text-sm">
+              {t("office.tax_returns.panel_no_warnings")}
+            </p>
+          ) : (
+            <WarningRows items={group.items} text={text} />
+          )}
+        </section>
+      </RecordDetail>
     </div>
   );
 }

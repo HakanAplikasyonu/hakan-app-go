@@ -14,21 +14,22 @@ import (
 
 const acknowledgeTenantDataWarningsByCode = `-- name: AcknowledgeTenantDataWarningsByCode :execrows
 UPDATE data_warnings w
-SET status = 'acknowledged', resolved_by = $1, resolved_at = NOW()
-WHERE w.organization_id = $2
-  AND ($3::bigint IS NULL OR w.engagement_id = $3::bigint)
-  AND ($4::bool OR w.engagement_id IN (
+SET status = 'acknowledged', resolved_by = $1, resolved_at = NOW(), resolution_note = $2
+WHERE w.organization_id = $3
+  AND ($4::bigint IS NULL OR w.engagement_id = $4::bigint)
+  AND ($5::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
-        WHERE a.organization_id = $2 AND a.user_id = $5))
+        WHERE a.organization_id = $3 AND a.user_id = $6))
   AND w.engagement_id IN (
         SELECT e.id FROM engagements e
-        WHERE e.organization_id = $2 AND e.status = 'active')
-  AND w.code = $6 AND w.status = 'open'
-  AND ($7::text IS NULL OR w.period = $7::text)
+        WHERE e.organization_id = $3 AND e.status = 'active')
+  AND w.code = $7 AND w.status = 'open'
+  AND ($8::text IS NULL OR w.period = $8::text)
 `
 
 type AcknowledgeTenantDataWarningsByCodeParams struct {
 	ResolvedBy     pgtype.Int8 `json:"resolved_by"`
+	Note           pgtype.Text `json:"note"`
 	OrganizationID int64       `json:"organization_id"`
 	EngagementID   pgtype.Int8 `json:"engagement_id"`
 	AllEngagements bool        `json:"all_engagements"`
@@ -42,6 +43,7 @@ type AcknowledgeTenantDataWarningsByCodeParams struct {
 func (q *Queries) AcknowledgeTenantDataWarningsByCode(ctx context.Context, arg AcknowledgeTenantDataWarningsByCodeParams) (int64, error) {
 	result, err := q.db.Exec(ctx, acknowledgeTenantDataWarningsByCode,
 		arg.ResolvedBy,
+		arg.Note,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.AllEngagements,
@@ -143,7 +145,7 @@ func (q *Queries) CountTenantDataWarnings(ctx context.Context, arg CountTenantDa
 
 const getLatestDataWarning = `-- name: GetLatestDataWarning :one
 
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at FROM data_warnings
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer, status, resolved_by, resolved_at, created_at, updated_at, resolution_note FROM data_warnings
 WHERE organization_id = $1 AND engagement_id = $2
   AND entity_type = $3
   AND entity_id IS NOT DISTINCT FROM $4::bigint
@@ -191,6 +193,7 @@ func (q *Queries) GetLatestDataWarning(ctx context.Context, arg GetLatestDataWar
 		&i.ResolvedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ResolutionNote,
 	)
 	return i, err
 }
@@ -277,9 +280,12 @@ SELECT w.id, w.uuid, w.engagement_id, e.uuid AS engagement_uuid, w.period, w.ent
        -- Fatura kalemi kendi faturasının kimliğini taşır.
        bt.uuid AS bank_transaction_uuid, ex.uuid AS expense_uuid, rs.uuid AS retail_sale_uuid,
        rc.uuid AS receipt_capture_uuid, ft.uuid AS financial_transaction_uuid, itinv.uuid AS item_invoice_uuid,
-       w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at
+       w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at,
+       -- Kararı veren ve gerekçesi (#529).
+       w.resolution_note, trim(concat_ws(' ', ru.name, ru.surname))::text AS resolved_by_name
 FROM data_warnings w
 JOIN engagements e ON e.organization_id = w.organization_id AND e.id = w.engagement_id
+LEFT JOIN users ru ON ru.id = w.resolved_by
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 LEFT JOIN customers cust ON w.entity_type = 'customer' AND cust.id = w.entity_id AND cust.taxpayer_id = w.taxpayer_id
 LEFT JOIN bank_transactions bt ON w.entity_type = 'bank_transaction' AND bt.id = w.entity_id AND bt.taxpayer_id = w.taxpayer_id
@@ -342,6 +348,8 @@ type ListTenantDataWarningsRow struct {
 	ResolvedAt               pgtype.Timestamptz `json:"resolved_at"`
 	CreatedAt                pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
+	ResolutionNote           pgtype.Text        `json:"resolution_note"`
+	ResolvedByName           string             `json:"resolved_by_name"`
 }
 
 // tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
@@ -390,6 +398,8 @@ func (q *Queries) ListTenantDataWarnings(ctx context.Context, arg ListTenantData
 			&i.ResolvedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ResolutionNote,
+			&i.ResolvedByName,
 		); err != nil {
 			return nil, err
 		}

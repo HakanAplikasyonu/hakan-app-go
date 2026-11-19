@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,7 @@ type fakeWarnings struct {
 	got     repository.Filter
 	decided catalog.Status
 	eng     int64
+	note    string
 }
 
 func (f *fakeWarnings) List(_ context.Context, flt repository.Filter) ([]repository.Row, int64, error) {
@@ -28,8 +30,8 @@ func (f *fakeWarnings) List(_ context.Context, flt repository.Filter) ([]reposit
 	return nil, 0, nil
 }
 
-func (f *fakeWarnings) Decide(_ context.Context, _, eng int64, _ uuid.UUID, s catalog.Status, _ int64) error {
-	f.decided, f.eng = s, eng
+func (f *fakeWarnings) Decide(_ context.Context, _, eng int64, _ uuid.UUID, s catalog.Status, _ int64, note string) error {
+	f.decided, f.eng, f.note = s, eng, note
 	return nil
 }
 
@@ -86,6 +88,25 @@ func TestEngagementListAndDecide(t *testing.T) {
 	h.AcknowledgeWarning(rec, r)
 	if rec.Code != http.StatusOK || fw.decided != catalog.StatusAcknowledged || fw.eng != 9 {
 		t.Fatalf("status %d decided %s", rec.Code, fw.decided)
+	}
+	// The reason travels with the decision (#529); unknown fields are refused.
+	r = req(http.MethodPost, "/x", orgctx.Scope{ID: 1}, 9)
+	r.Body = io.NopCloser(strings.NewReader(`{"note":"fark doğru, sözleşmeye göre"}`))
+	r.ContentLength = -1
+	r.SetPathValue("warningUuid", uuid.NewString())
+	rec = httptest.NewRecorder()
+	h.ResolveWarning(rec, r)
+	if rec.Code != http.StatusOK || fw.decided != catalog.StatusResolved || fw.note != "fark doğru, sözleşmeye göre" {
+		t.Fatalf("with note: status %d decided %s note %q", rec.Code, fw.decided, fw.note)
+	}
+	r = req(http.MethodPost, "/x", orgctx.Scope{ID: 1}, 9)
+	r.Body = io.NopCloser(strings.NewReader(`{"reason":"x"}`))
+	r.ContentLength = -1
+	r.SetPathValue("warningUuid", uuid.NewString())
+	rec = httptest.NewRecorder()
+	h.ResolveWarning(rec, r)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("unknown field status = %d", rec.Code)
 	}
 	r = req(http.MethodPost, "/x", orgctx.Scope{ID: 1}, 9)
 	r.SetPathValue("warningUuid", "nope")
