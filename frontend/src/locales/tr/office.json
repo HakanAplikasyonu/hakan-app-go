@@ -1844,5 +1844,8 @@
   "tax_returns.panel_open_tab": "{{record}} sayfasında aç",
   "tax_returns.summary_label": "Beyan özeti",
   "tax_returns.summary_ba": "Form Ba ({{count}} belge)",
-  "tax_returns.summary_bs": "Form Bs ({{count}} belge)"
+  "tax_returns.summary_bs": "Form Bs ({{count}} belge)",
+  "invoice_pdf.download": "PDF indir",
+  "invoice_pdf.failed": "PDF indirilemedi.",
+  "invoice_pdf.load_failed": "Fatura yüklenemedi."
 }

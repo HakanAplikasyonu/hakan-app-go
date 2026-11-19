@@ -6785,6 +6785,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/pdf": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The invoice as a PDF drawn from the stored record (office copy)
+         * @description Requires `tenant.invoices.read` and engagement access (#528). Drawn
+         *     from the record (header, counterparty, lines, KDV summary, totals)
+         *     for every invoice, with or without a stored UBL; it says it is an
+         *     office copy, not the GİB image (that is the UBL's own XSLT).
+         */
+        get: operations["getEngagementInvoicePDF"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/export-drivers": {
         parameters: {
             query?: never;
@@ -30680,6 +30712,39 @@ export interface operations {
                 };
                 content: {
                     "application/xml": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementInvoicePDF: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description PDF (attachment, `fatura-<number>.pdf`) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
                 };
             };
             401: components["responses"]["Unauthenticated"];

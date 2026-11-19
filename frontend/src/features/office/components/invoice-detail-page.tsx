@@ -33,6 +33,7 @@ import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
+import { InvoicePdfButton } from "./invoice-quick-view";
 import { RelatedRecordsPanel } from "./related-records";
 import { InvoiceStateBadge } from "./invoices-page";
 import {
@@ -320,6 +321,13 @@ function InvoiceDetailInner({ id }: { id: string }) {
         <Panel
           title={t("office.preview_title")}
           className="min-w-0 xl:sticky xl:top-4 xl:self-start"
+          actions={
+            <InvoicePdfButton
+              engagement={engagement}
+              invoice={id}
+              number={d.invoice_number}
+            />
+          }
         >
           {d.has_ubl && ubl.isLoading ? (
             <Skeleton className="m-4 h-96" />

@@ -1844,5 +1844,8 @@
   "tax_returns.panel_open_tab": "Open on the {{record}} page",
   "tax_returns.summary_label": "Return summary",
   "tax_returns.summary_ba": "Form Ba ({{count}} documents)",
-  "tax_returns.summary_bs": "Form Bs ({{count}} documents)"
+  "tax_returns.summary_bs": "Form Bs ({{count}} documents)",
+  "invoice_pdf.download": "Download PDF",
+  "invoice_pdf.failed": "Could not download the PDF.",
+  "invoice_pdf.load_failed": "Could not load the invoice."
 }

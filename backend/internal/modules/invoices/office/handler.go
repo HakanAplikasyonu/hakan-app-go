@@ -63,6 +63,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base, chain(h.list))
 	mux.Handle("GET "+base+"/{invoiceUuid}", chain(h.get))
 	mux.Handle("GET "+base+"/{invoiceUuid}/ubl", chain(h.ubl))
+	mux.Handle("GET "+base+"/{invoiceUuid}/pdf", chain(h.pdf))
 }
 
 // Row is a list row: the invoice plus its open warning count.
