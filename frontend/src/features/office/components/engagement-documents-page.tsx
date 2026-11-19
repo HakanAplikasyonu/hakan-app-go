@@ -32,6 +32,8 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { EngagementNextWork } from "@/features/copilot";
 
+import { InvoiceDrawer } from "./invoice-drawer";
+
 const PAGE_SIZE = 25;
 
 function useDocumentColumns() {
@@ -128,6 +130,12 @@ function DocumentsSection({
   );
   const columns = useDocumentColumns();
   const items = query.data?.items ?? [];
+  // Satır belgenin yan panelini açar (#571): uyarılar, kalemler, ilişkili
+  // kayıtlar ve mükelleften düzeltme isteme. Açık belge adreste; geri tuşu
+  // ve paylaşılan bağlantı çalışır.
+  const open = listState.getParam("belge");
+  const openDocument = (uuid: string | null) =>
+    listState.setParams({ belge: uuid }, { resetPage: false });
 
   return (
     <EntitySectionCard title={t("office.engagement_documents_title")}>
@@ -147,6 +155,8 @@ function DocumentsSection({
           onPaginationChange: listState.onPaginationChange,
         }}
         hasNextPage={!query.isFetching && items.length >= limit}
+        onRowClick={(doc) => openDocument(doc.uuid)}
+        isRowActive={(doc) => doc.uuid === open}
         pageSizeOptions={[25, 50, 100]}
         // Kart içinde gömülü liste: araç çubuğu ve seçim yok; sunucu
         // sıralama sunmuyor.
@@ -164,6 +174,11 @@ function DocumentsSection({
           columnOrdering: false,
           density: false,
         }}
+      />
+      <InvoiceDrawer
+        engagement={engagement}
+        invoice={open}
+        onClose={() => openDocument(null)}
       />
     </EntitySectionCard>
   );
