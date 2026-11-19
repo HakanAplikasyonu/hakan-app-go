@@ -1,15 +1,31 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  RECEIPT_CORRECTION_FIELDS,
+  buildCorrections,
   taxpayerPanelKeys,
   taxpayerPanelService,
+  type ReceiptCorrection,
 } from "@/features/taxpayer/services/taxpayer.service";
+import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
 
 import { formatDate, formatMoney } from "./format";
@@ -37,6 +53,7 @@ export function TaxpayerReceiptsPage({ taxpayer }: { taxpayer: string }) {
       taxpayerPanelService.receipts(taxpayer, { limit: PAGE, offset }),
   });
   const data = q.data;
+  const [fixing, setFixing] = useState<string | null>(null);
   return (
     <Card>
       <CardHeader>
@@ -77,6 +94,15 @@ export function TaxpayerReceiptsPage({ taxpayer }: { taxpayer: string }) {
                     <Badge variant={statusVariant[r.status] ?? "secondary"}>
                       {t(`taxpayer.receipt_status_${r.status}`)}
                     </Badge>
+                    {r.status === "draft" || r.status === "approved" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setFixing(r.uuid)}
+                      >
+                        {t("taxpayer.receipt_fix")}
+                      </Button>
+                    ) : null}
                   </div>
                 </li>
               ))}
@@ -105,6 +131,113 @@ export function TaxpayerReceiptsPage({ taxpayer }: { taxpayer: string }) {
           </>
         )}
       </CardContent>
+      <CorrectionDialog
+        taxpayer={taxpayer}
+        receipt={fixing}
+        onClose={() => setFixing(null)}
+      />
     </Card>
+  );
+}
+
+/**
+ * Fişte yanlış okunan alanı mükellef düzeltir (#518 C1). Değerler fişe
+ * yazılmaz: ofisin inceleme kuyruğuna öneri olarak gider.
+ */
+function CorrectionDialog({
+  taxpayer,
+  receipt,
+  onClose,
+}: {
+  taxpayer: string;
+  receipt: string | null;
+  onClose: () => void;
+}) {
+  const { t } = useLocale();
+  const [values, setValues] = useState<
+    Partial<Record<ReceiptCorrection["field"], string>>
+  >({});
+  const [note, setNote] = useState("");
+  const corrections = buildCorrections(values, note);
+  const send = useMutation({
+    mutationFn: () =>
+      taxpayerPanelService.correctReceipt(taxpayer, receipt!, corrections),
+    onSuccess: () => {
+      toast.success(t("taxpayer.receipt_fix_sent"));
+      setValues({});
+      setNote("");
+      onClose();
+    },
+    onError: (err) =>
+      toast.error(
+        isApiError(err) && err.status === 409
+          ? t("taxpayer.receipt_fix_not_allowed")
+          : t("taxpayer.receipt_fix_failed"),
+      ),
+  });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (corrections.length > 0) send.mutate();
+  };
+  return (
+    <Dialog
+      open={receipt !== null}
+      onOpenChange={(v) => (v ? null : onClose())}
+    >
+      <DialogContent>
+        <form onSubmit={submit} className="space-y-4">
+          <DialogHeader>
+            <DialogTitle>{t("taxpayer.receipt_fix_title")}</DialogTitle>
+            <DialogDescription>
+              {t("taxpayer.receipt_fix_hint")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {RECEIPT_CORRECTION_FIELDS.map((f) => (
+              <div key={f} className="space-y-1.5">
+                <Label htmlFor={`fix-${f}`}>
+                  {t(`taxpayer.receipt_field_${f}`)}
+                </Label>
+                <Input
+                  id={`fix-${f}`}
+                  type={f === "date" ? "date" : "text"}
+                  inputMode={
+                    f === "total_amount" || f === "tax_amount"
+                      ? "decimal"
+                      : undefined
+                  }
+                  maxLength={200}
+                  value={values[f] ?? ""}
+                  onChange={(e) =>
+                    setValues({ ...values, [f]: e.target.value })
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="fix-note">{t("taxpayer.receipt_fix_note")}</Label>
+            <Textarea
+              id="fix-note"
+              rows={2}
+              maxLength={500}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="submit"
+              disabled={corrections.length === 0 || send.isPending}
+            >
+              {t("taxpayer.receipt_fix_send")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

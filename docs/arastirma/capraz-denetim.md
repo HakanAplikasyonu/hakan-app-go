@@ -49,7 +49,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 | # | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|
 | B1 | Mükellef detayı → Belgeler / Yükleme | Genel Excel içe aktarma sihirbazı: yükle → sütun eşle → doğrula → satır düzelt → işle / geri al; şablonlar | 12 uç var (`/excel-imports…`, `/v1/tenant/excel-import-templates`, `/excel-import-data-types`); ekran yok. Demo verisi var (`demo-seed/excelimport.go`) | P1 | L |
-| B2 | Mükellef detayı → dönem şeridi | Kilitli döneme gelen değişiklik talepleri: liste, uygula, reddet | `/change-requests` (4 uç) ekransız; kilitli döneme düşen kayıtlar sessizce bekliyor | P1 | M |
+| B2 ✅ | Mükellef detayı → dönem şeridi | Kilitli döneme gelen değişiklik talepleri: liste, uygula, reddet | `/change-requests` (4 uç) ekransız; kilitli döneme düşen kayıtlar sessizce bekliyor. **Yapıldı (#518):** dönem şeridinin altında açık talep paneli (alan farkı eski→yeni, kaynak, faturayı aç, uygula/reddet; `tenant.periods.read` / `tenant.change_requests.decide`). Kalan: demo verisinde talep yok | P1 | M |
 | B3 | Mükellef detayı (yeni sekme ya da Ayarlar) | KVKK ilgili kişi talepleri: oluştur, onayla/reddet, dışa aktar | `/privacy-requests` (6 uç) ekransız; yetki matrisi bunu `azTenantReadPriv` olarak ayırmış | P1 | M |
 | B4 | Mükellef detayı → Rapor | Yapay zekâ dönem özeti: taslak, düzenle, onayla | `/period-summaries` (5 uç) ekransız; demo verisinde yalnızca dolaylı geçiyor | P2 | M |
 | B5 | Mükellef detayı → Uyarılar | "Kontrolleri çalıştır" düğmesi | `POST /controls/run` ekransız | P2 | S |
@@ -62,7 +62,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 | # | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|
-| C1 | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte) | P1 | S |
+| C1 ◐ | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte). **Web yapıldı (#518):** fiş listesinde "Düzeltme öner" penceresi (satıcı, tarih, toplam, KDV, fiş no, not). Kalan: mobil uygulama | P1 | S |
 | C2 | `mobile/` | Rapor, yükleme geçmişi, geçmiş paylaşımı (history-shares) | Web mükellef panelinde var (`/m/.../report`, `/uploads`), mobilde yok | P2 | M |
 | C3 | `mobile/`, `mobile-office/` | Çıkışta push cihaz kaydını silme | `DELETE /v1/push-devices/{token}` hiçbir istemcide yok; çıkıştan sonra bildirim gelmeye devam edebilir (doğrulanmalı) | P2 | S |
 
