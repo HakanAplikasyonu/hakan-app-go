@@ -1921,5 +1921,20 @@
   "privacy.download": "Dosyayı indir",
   "privacy.download_failed": "Dosya indirilemedi; süresi dolmuş olabilir",
   "privacy.export_until": "{{date}} tarihine kadar indirilebilir",
-  "privacy.export_expired": "İndirme süresi doldu"
+  "privacy.export_expired": "İndirme süresi doldu",
+  "review_override.title": "Bu mükellefe özel onay eşiği",
+  "review_override.inherits": "Ofis ayarı geçerli: {{policy}}",
+  "review_override.custom": "Bu mükellefe özel: {{policy}}",
+  "review_override.policy_on": "otomatik onay açık, eşik %{{threshold}}",
+  "review_override.policy_off": "otomatik onay kapalı",
+  "review_override.edit": "Bu mükellef için değiştir",
+  "review_override.hide": "Kapat",
+  "review_override.auto": "Güven eşiğin üstündeyse otomatik onayla",
+  "review_override.threshold": "Eşik",
+  "review_override.save": "Bu mükellef için kaydet",
+  "review_override.reset": "Ofis ayarına dön",
+  "review_override.saved": "Mükellefe özel eşik kaydedildi",
+  "review_override.reset_done": "Ofis ayarına dönüldü",
+  "review_override.failed": "Eşik kaydedilemedi",
+  "review_override.hint": "Riskli ya da yeni bir mükellefte eşiği yükseltin ya da otomatik onayı kapatın; her öneri incelemeye düşer."
 }

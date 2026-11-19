@@ -37,7 +37,7 @@ Sınırlar: Uygulama çalıştırılmadı, ekran görüntüsü alınmadı; tespi
 | A2 ✅ | Backend↔arayüz | Mükellef detayı → Bağlantılar sekmesi | Banka web servis bağlantısı: banka seçimi (`GET /v1/tenant/bank-services`), şube talimatı, kimlik bilgisi, senkron | 7 uç var (`/bank-connections`, `/instruction`, `/submitted`, `/credentials`, `/sync`); **ekran yok**. Banka sekmesi yalnızca ekstre yükleme ve eşleştirme. **Yapıldı (#518):** Bağlantılar sekmesinde dört adımlı kurulum (talimat PDF, şubeye teslim, servis kullanıcısı, şimdi çek); demo verisinde şubede bekleyen Vakıfbank bağlantısı | P0 | M |
 | A3 ✅ | Backend↔arayüz | Mükellef detayı | Paraşüt bağlantısı (OAuth yetkilendirme, şirket seçimi, senkron) | 6 uç var (`/parasut-connections…`), ekran yok. **Yapıldı (#518):** Bağlantılar sekmesinde "Ön muhasebe programı" kartı (onay, şirket seçimi, son 30 günü çek, son çekimin sayıları) ve `/parasut/callback` dönüş sayfası (`PARASUT_REDIRECT_URL` bu yolu göstermeli); demo verisinde bağlı Paraşüt | P1 | M |
 | A4 ✅ | Backend↔arayüz | Mükellef detayı | KolayBi bağlantısı (şirket seçimi, senkron) | 4 uç var (`/kolaybi-connections…`), ekran yok. **Yapıldı (#518):** aynı kartta API anahtarıyla bağlanma, şirket seçimi, yeniden bağlanma ve çekim | P1 | S–M |
-| A5 | Ofis↔mükellef | Mükellef detayı → İnceleme | Mükellefe özel inceleme eşikleri (ofis varsayılanını ezme) | `GET/PUT/DELETE /review-settings` var; web yalnızca ofis düzeyini gösteriyor (`AiApprovalSettings`, `tenant/review/settings`) | P1 | S |
+| A5 ✅ | Ofis↔mükellef | Mükellef detayı → İnceleme | Mükellefe özel inceleme eşikleri (ofis varsayılanını ezme) | `GET/PUT/DELETE /review-settings` var; web yalnızca ofis düzeyini gösteriyor (`AiApprovalSettings`, `tenant/review/settings`) **Yapıldı (#518):** İnceleme sekmesinin üstünde "Bu mükellefe özel onay eşiği" kartı: geçerli ayar (ofis / özel), otomatik onay aç-kapat, eşik, "Ofis ayarına dön"; yazma `tenant.review.settings.write`; demo verisi eklendi. Tür bazında (kind) ezme arayüzde yok, yalnızca genel (`*`) | P1 | S |
 | A6 | Ofis↔mükellef | Ofis ayarları → Hesap kuralları | Ofis düzeyi hesap kuralları (bütün mükelleflere şablon) | `/v1/tenant/account-rules` (6 uç) kullanılmıyor; web yalnızca mükellef düzeyini kullanıyor (`account-memory.service.ts`) | P2 | M |
 | A7 | Bilinçli olarak yok | — | e-Tebligat, Dijital Vergi Dairesi, SGK | `docs/04`, `docs/05` kararı: ilk dilimde otomatik bağlantı yok. Arayüzde de yok; tutarlı | — | — |
 | A8 | Ofis↔mükellef | Mükellef detayı | Bildirim tercihleri mükellef bazında | Yalnızca kullanıcı düzeyi (`/v1/notification-preferences`); mükellef bazında backend ucu da yok. Ürün kararı gerekir | P2 | — |
@@ -62,7 +62,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 | # | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|
-| C1 ◐ | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte). **Web yapıldı (#518):** fiş listesinde "Düzeltme öner" penceresi (satıcı, tarih, toplam, KDV, fiş no, not). Kalan: mobil uygulama | P1 | S |
+| C1 ✅ | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte). **Web yapıldı (#518):** fiş listesinde "Düzeltme öner" penceresi (satıcı, tarih, toplam, KDV, fiş no, not). **Mobil zaten var** (denetim yanlış saymış: `mobile/src/features/receipts/api.ts` `sendCorrections`, fiş ayrıntısında alan alan "Düzelt", çevrimdışı kuyrukla gönderim) | P1 | S |
 | C2 | `mobile/` | Rapor, yükleme geçmişi, geçmiş paylaşımı (history-shares) | Web mükellef panelinde var (`/m/.../report`, `/uploads`), mobilde yok | P2 | M |
 | C3 | `mobile/`, `mobile-office/` | Çıkışta push cihaz kaydını silme | `DELETE /v1/push-devices/{token}` hiçbir istemcide yok; çıkıştan sonra bildirim gelmeye devam edebilir (doğrulanmalı) | P2 | S |
 
@@ -98,17 +98,17 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 ## Önerilen uygulama sırası (#518)
 
-Durum: 1–7 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sıradaki: 8.
+Durum: 1–7 ve 9'un A5'i yapıldı (D4 ertelendi: platform paneli P2; C1 mobil zaten vardı; B2 demo verisi kaldı: talebin `new_payload` alanı tam fatura modeli ister, seed gerçek kilit yolundan üretmeli). Sıradaki: 8.
 
 1. ✅ **Mükellef detayına "Bağlantılar" sekmesi** iskeleti: bütün mükellef düzeyi bağlantıları (entegratör, banka, Easytrade, Paraşüt, KolayBi, WhatsApp, muhasebe aktarımı) tek yerde, durum rozeti ve son senkron saatiyle. Easytrade ve aktarım ayarı buraya bağlanır.
 2. ✅ **A2 banka web servis bağlantısı** (API hazır) + D4 çıkış IP'si bilgisi.
 3. **A1 e-Fatura entegratörü**: önce backend uçları (oluştur, kimlik bilgisini kasaya yaz, test et, senkron başlat, durum), sonra sekmeye ekran.
 4. **A3 Paraşüt, A4 KolayBi** (API hazır).
-5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte). (C1 mobil kaldı.)
+5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte).
 6. ✅ **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
 7. ✅ **B3 KVKK talepleri.**
 8. **B1 genel Excel içe aktarma sihirbazı.**
-9. **A5 inceleme eşiği**, ardından B4–B9, C2–C3, D1–D3, A6 (P2'ler).
+9. ✅ **A5 inceleme eşiği**, ardından B4–B9, C2–C3, D1–D3, A6 (P2'ler).
 
 Her adımda demo verisi (G) aynı PR'da doldurulur.
 

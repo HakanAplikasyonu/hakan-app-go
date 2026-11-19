@@ -48,6 +48,8 @@ export const reviewKeys = {
       uuid.toLowerCase(),
     ] as const,
   settings: (slug: string) => [...reviewKeys.all(slug), "settings"] as const,
+  engagementSettings: (slug: string, engagement: string) =>
+    [...reviewKeys.all(slug), "settings", engagement] as const,
   accounts: (slug: string, engagement: string, q: string) =>
     [
       "tenant",
@@ -103,6 +105,38 @@ export const reviewService = {
       "POST",
       `${suggestionPath(engagement, uuid)}/${action}`,
       { body, silent: true },
+    );
+  },
+  /** Mükellefe özel eşik (#518 A5): ofis ayarını ezer. */
+  engagementSettings(slug: string, engagement: string) {
+    return tenantRequest<ReviewSettings>(
+      slug,
+      "GET",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/review-settings`,
+    );
+  },
+  putEngagementSetting(
+    slug: string,
+    engagement: string,
+    input: {
+      kind?: string;
+      auto_accept: boolean | null;
+      threshold: string | null;
+    },
+  ) {
+    return tenantRequest<ReviewSettings>(
+      slug,
+      "PUT",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/review-settings`,
+      { body: input, silent: true },
+    );
+  },
+  deleteEngagementSetting(slug: string, engagement: string, kind = "*") {
+    return tenantRequest<void>(
+      slug,
+      "DELETE",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/review-settings/${encodeURIComponent(kind)}`,
+      { silent: true },
     );
   },
   settings(slug: string) {

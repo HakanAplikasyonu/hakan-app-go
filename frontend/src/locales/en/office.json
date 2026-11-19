@@ -1921,5 +1921,20 @@
   "privacy.download": "Download file",
   "privacy.download_failed": "Could not download; the file may have expired",
   "privacy.export_until": "Downloadable until {{date}}",
-  "privacy.export_expired": "The download period has ended"
+  "privacy.export_expired": "The download period has ended",
+  "review_override.title": "Approval threshold for this taxpayer",
+  "review_override.inherits": "Office setting applies: {{policy}}",
+  "review_override.custom": "Custom for this taxpayer: {{policy}}",
+  "review_override.policy_on": "auto-accept on, threshold {{threshold}}%",
+  "review_override.policy_off": "auto-accept off",
+  "review_override.edit": "Change for this taxpayer",
+  "review_override.hide": "Close",
+  "review_override.auto": "Auto-accept when confidence is above the threshold",
+  "review_override.threshold": "Threshold",
+  "review_override.save": "Save for this taxpayer",
+  "review_override.reset": "Back to the office setting",
+  "review_override.saved": "Custom threshold saved",
+  "review_override.reset_done": "Back on the office setting",
+  "review_override.failed": "Could not save the threshold",
+  "review_override.hint": "For a risky or new taxpayer raise the threshold or turn auto-accept off; every suggestion then goes to review."
 }
