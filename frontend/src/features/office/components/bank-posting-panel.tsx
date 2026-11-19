@@ -20,6 +20,7 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   Dialog,
   DialogContent,
@@ -309,25 +310,18 @@ export function BankPostingPanel({
           className="flex flex-wrap gap-2"
         >
           {filters.map((f) => (
-            <button
+            <FilterChip
               key={f.key}
-              type="button"
-              aria-pressed={filter === f.key}
-              onClick={() =>
+              pressed={filter === f.key}
+              onPressedChange={() =>
                 listState.setParams({ posting: f.key === "all" ? null : f.key })
               }
-              className={cn(
-                "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-                filter === f.key
-                  ? "border-brand bg-brand text-on-brand"
-                  : "border-line bg-surface text-text-2 hover:text-foreground",
-              )}
             >
               {f.label}
               {f.count !== undefined ? (
                 <span className="ms-1.5 tabular-nums">{f.count}</span>
               ) : null}
-            </button>
+            </FilterChip>
           ))}
         </div>
         {canWrite ? (

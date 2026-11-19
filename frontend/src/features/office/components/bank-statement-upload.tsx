@@ -23,6 +23,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
@@ -57,6 +65,9 @@ const NONE = "__none";
  * önerileri (AI ya da başlık adlarından) müşavire gösterilir, onaylanınca
  * şablon kaydedilir ve dosya yeniden yüklenir.
  */
+/** Sütun eşleme tablosunun başlık hücresi (önceki görünümle aynı). */
+const HEAD = "text-foreground h-auto px-2 py-1.5 text-start font-bold";
+
 /** Backend hata kodları: Türkçe ileti (ham İngilizce ileti gösterilmez). */
 const UPLOAD_ERRORS = [
   "BANK_ACCOUNT_REQUIRED",
@@ -198,25 +209,30 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
                 </p>
               ))}
               <div className="max-h-80 overflow-auto rounded-lg border">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-2">
-                    <tr>
-                      <th className="px-2 py-1.5 text-start">
+                <Table containerClassName="overflow-visible">
+                  <TableHeader className="bg-surface-2 [&_tr]:border-b-0">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className={HEAD}>
                         {t("office.bank.upload.col_header")}
-                      </th>
-                      <th className="px-2 py-1.5 text-start">
+                      </TableHead>
+                      <TableHead className={HEAD}>
                         {t("office.bank.upload.col_field")}
-                      </th>
-                      <th className="px-2 py-1.5 text-start">
+                      </TableHead>
+                      <TableHead className={HEAD}>
                         {t("office.bank.upload.col_sample")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="[&_tr:last-child]:border-t">
                     {analysis.columns.map((c, i) => (
-                      <tr key={`${c.index}-${c.header}`} className="border-t">
-                        <td className="px-2 py-1.5 font-medium">{c.header}</td>
-                        <td className="px-2 py-1.5">
+                      <TableRow
+                        key={`${c.index}-${c.header}`}
+                        className="border-t border-b-0 hover:bg-transparent"
+                      >
+                        <TableCell className="px-2 py-1.5 font-medium">
+                          {c.header}
+                        </TableCell>
+                        <TableCell className="px-2 py-1.5">
                           <Select
                             value={fields[i] || NONE}
                             onValueChange={(v) => {
@@ -244,14 +260,14 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
                               ))}
                             </SelectContent>
                           </Select>
-                        </td>
-                        <td className="text-text-2 max-w-48 truncate px-2 py-1.5">
+                        </TableCell>
+                        <TableCell className="text-text-2 max-w-48 truncate px-2 py-1.5">
                           {analysis.sample[0]?.[i] ?? ""}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="template-name">

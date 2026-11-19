@@ -16,6 +16,8 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { TabStrip, TabStripItem } from "@/components/ui/tab-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { components } from "@/generated/api";
 import { EngagementNextWork } from "@/features/copilot";
@@ -286,31 +288,19 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
         </div>
       </div>
       <EngagementNextWork engagement={engagement} />
-      <div
-        role="tablist"
-        aria-label={t("office.bank.view_label")}
-        className="border-line flex gap-1 overflow-x-auto border-b"
-      >
+      <TabStrip aria-label={t("office.bank.view_label")}>
         {VIEWS.map((v) => (
-          <button
+          <TabStripItem
             key={v}
-            type="button"
-            role="tab"
-            aria-selected={view === v}
+            selected={view === v}
             onClick={() =>
               listState.setParams({ view: v === "movements" ? null : v })
             }
-            className={cn(
-              "focus-visible:ring-ring -mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-              view === v
-                ? "border-brand text-foreground"
-                : "text-text-2 hover:text-foreground border-transparent",
-            )}
           >
             {t(`office.bank.view_${v}`)}
-          </button>
+          </TabStripItem>
         ))}
-      </div>
+      </TabStrip>
     </>
   );
 
@@ -383,23 +373,16 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
         className="flex flex-wrap gap-2"
       >
         {filters.map((f) => (
-          <button
+          <FilterChip
             key={f.key}
-            type="button"
-            aria-pressed={match === f.key}
-            onClick={() => setMatch(f.key)}
-            className={cn(
-              "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-              match === f.key
-                ? "border-brand bg-brand text-on-brand"
-                : "border-line bg-surface text-text-2 hover:text-foreground",
-            )}
+            pressed={match === f.key}
+            onPressedChange={() => setMatch(f.key)}
           >
             {f.label}
             {f.count !== undefined ? (
               <span className="ms-1.5 tabular-nums">{f.count}</span>
             ) : null}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
