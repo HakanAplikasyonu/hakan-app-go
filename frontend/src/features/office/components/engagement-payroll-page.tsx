@@ -29,7 +29,10 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MonthPicker } from "@/components/ui/month-picker";
 import { Permission } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
@@ -50,6 +53,9 @@ import {
 } from "../services/payroll.service";
 import { Money } from "./office-ui";
 import { useRelatedColumn } from "./related-column";
+
+/** Form alanı etiketi: normal kalınlıkta (önceki görünümle aynı). */
+const FIELD_LABEL = "leading-normal font-normal";
 
 type View = "runs" | "employees" | "sgk" | "documents";
 const VIEWS: View[] = ["runs", "employees", "sgk", "documents"];
@@ -573,9 +579,12 @@ function ImportPanel({
         <p className="text-text-2 text-sm">{t("office.payroll.import_hint")}</p>
       </div>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="flex min-w-0 flex-col gap-1 text-sm">
-          <span>{t("office.payroll.import_file")}</span>
+        <div className="flex min-w-0 flex-col gap-1 text-sm">
+          <Label htmlFor="payroll-import-file" className={FIELD_LABEL}>
+            {t("office.payroll.import_file")}
+          </Label>
           <Input
+            id="payroll-import-file"
             ref={fileRef}
             type="file"
             accept=".xlsx,.csv,.txt"
@@ -584,16 +593,18 @@ function ImportPanel({
               setPreview(null);
             }}
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span>{t("office.payroll.import_period")}</span>
-          <Input
-            type="month"
+        </div>
+        <div className="flex flex-col gap-1 text-sm">
+          <Label htmlFor="payroll-import-period" className={FIELD_LABEL}>
+            {t("office.payroll.import_period")}
+          </Label>
+          <MonthPicker
+            id="payroll-import-period"
             value={period}
-            onChange={(e) => setPeriod(e.target.value)}
+            onChange={setPeriod}
             className="w-44"
           />
-        </label>
+        </div>
         <Button
           variant="outline"
           disabled={!file || run.isPending}
@@ -1033,33 +1044,36 @@ function DocumentsView({ engagement }: { engagement: string }) {
     <div className="space-y-3">
       {canWrite ? (
         <section className="bg-surface border-line flex flex-wrap items-end gap-2 rounded-xl border p-4">
-          <label className="flex min-w-0 flex-col gap-1 text-sm">
-            <span>{t("office.payroll.document_file")}</span>
+          <div className="flex min-w-0 flex-col gap-1 text-sm">
+            <Label htmlFor="payroll-document-file" className={FIELD_LABEL}>
+              {t("office.payroll.document_file")}
+            </Label>
             <Input
+              id="payroll-document-file"
               ref={fileRef}
               type="file"
               accept="application/pdf,.pdf"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span>{t("office.payroll.import_period")}</span>
-            <Input
-              type="month"
+          </div>
+          <div className="flex flex-col gap-1 text-sm">
+            <Label htmlFor="payroll-document-period" className={FIELD_LABEL}>
+              {t("office.payroll.import_period")}
+            </Label>
+            <MonthPicker
+              id="payroll-document-period"
               value={docPeriod || focus}
-              onChange={(e) => setDocPeriod(e.target.value)}
+              onChange={setDocPeriod}
               className="w-44"
             />
-          </label>
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+          </div>
+          <Label className="flex min-h-11 items-center gap-2 text-sm font-normal">
+            <Checkbox
               checked={visible}
-              onChange={(e) => setVisible(e.target.checked)}
-              className="size-4"
+              onCheckedChange={(v) => setVisible(v === true)}
             />
             {t("office.payroll.document_visible")}
-          </label>
+          </Label>
           <Button disabled={!file || up.isPending} onClick={() => up.mutate()}>
             <Upload aria-hidden className="size-4" />
             {t("office.payroll.document_upload")}

@@ -135,7 +135,13 @@ test.describe("bordro", () => {
       mimeType: "text/csv",
       buffer: Buffer.from(csv, "utf8"),
     });
-    await upload.getByRole("textbox", { name: "Dönem" }).fill("2025-06");
+    // Dönem: ay seçici (#520). Yıl 2025'e çekilir, Haziran seçilir.
+    await upload.locator("#payroll-import-period").click();
+    const picker = page.locator('[data-slot="popover-content"]').last();
+    for (let i = 0; i < 6 && !(await picker.getByText("2025", { exact: true }).isVisible()); i++) {
+      await picker.getByRole("button", { name: "Önceki yıl" }).click();
+    }
+    await picker.getByRole("button", { name: "Haz", exact: true }).click();
     await upload.getByRole("button", { name: "Önizle" }).click();
     // Önizleme: personel sayısı, dönem ve kolon eşlemesi.
     await expect(upload.getByText("1 personel", { exact: false })).toContainText("Haziran 2025");

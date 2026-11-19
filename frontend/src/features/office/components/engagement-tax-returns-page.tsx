@@ -34,8 +34,20 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DatePicker } from "@/components/ui/date-picker";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Permission } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
@@ -64,6 +76,9 @@ import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 import { useEngagementScope } from "../engagement-scope";
 import { checklistHref } from "../lib/related-href";
+
+/** Form alanı etiketi: soluk, normal kalınlıkta (önceki görünümle aynı). */
+const FIELD_LABEL = "text-text-2 leading-normal font-normal";
 
 const statusVariants: Record<string, StatusVariant> = {
   draft: { labelKey: "office.tax_returns.status_draft", tone: "neutral" },
@@ -252,22 +267,15 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
         className="flex flex-wrap gap-2"
       >
         {TAX_RETURN_KINDS.map((k) => (
-          <button
+          <FilterChip
             key={k}
-            type="button"
-            aria-pressed={kind === k}
-            onClick={() =>
+            pressed={kind === k}
+            onPressedChange={() =>
               listState.setParams({ kind: k === "kdv1" ? null : k })
             }
-            className={cn(
-              "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-              kind === k
-                ? "border-brand bg-brand text-on-brand"
-                : "border-line bg-surface text-text-2 hover:text-foreground",
-            )}
           >
             {t(`office.tax_returns.kind_${k}`)}
-          </button>
+          </FilterChip>
         ))}
       </div>
 
@@ -548,22 +556,23 @@ function StatusBar({
           }}
         >
           <div className="flex flex-col gap-1 text-sm">
-            <label htmlFor={filedOnId} className="text-text-2">
+            <Label htmlFor={filedOnId} className={FIELD_LABEL}>
               {t("office.tax_returns.filed_on_label")}
-            </label>
+            </Label>
             <DatePicker id={filedOnId} value={filedOn} onChange={setFiledOn} />
           </div>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-text-2">
+          <div className="flex flex-col gap-1 text-sm">
+            <Label htmlFor={`${filedOnId}-accrual`} className={FIELD_LABEL}>
               {t("office.tax_returns.accrual_number")}
-            </span>
-            <input
+            </Label>
+            <Input
+              id={`${filedOnId}-accrual`}
               maxLength={64}
-              className="bg-background focus-visible:ring-ring h-9 w-56 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+              className="w-56"
               value={accrual}
               onChange={(e) => setAccrual(e.target.value)}
             />
-          </label>
+          </div>
           <Button
             type="submit"
             size="sm"
@@ -651,16 +660,14 @@ function Checklist({
                   ) : null;
                 })()}
                 {warn ? (
-                  <label className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
-                    <input
-                      type="checkbox"
-                      className="size-4"
+                  <Label className="flex min-h-11 items-center gap-2 text-sm font-normal md:min-h-0">
+                    <Checkbox
                       checked={c.acknowledged}
                       disabled={!editable || busy}
-                      onChange={(e) => onToggle(c.code, e.target.checked)}
+                      onCheckedChange={(v) => onToggle(c.code, v === true)}
                     />
                     {t("office.tax_returns.acknowledge")}
-                  </label>
+                  </Label>
                 ) : null}
               </li>
             );
@@ -702,40 +709,41 @@ function Grid({
 }) {
   if (rows.length === 0) return <p className="text-text-2 text-sm">{empty}</p>;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[32rem] text-sm">
-        <thead>
-          <tr className="text-text-2 border-line border-b text-left text-xs">
-            {head.map((h, i) => (
-              <th
-                key={h}
-                scope="col"
-                className={cn("py-2 pe-3 font-medium", i > 0 && "text-right")}
-              >
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={i} className="border-line border-b last:border-0">
-              {r.map((c, j) => (
-                <td
-                  key={j}
-                  className={cn(
-                    "py-2 pe-3",
-                    j > 0 && "text-right tabular-nums",
-                  )}
-                >
-                  {c}
-                </td>
-              ))}
-            </tr>
+    <Table className="min-w-[32rem]">
+      <TableHeader className="[&_tr]:border-line">
+        <TableRow className="hover:bg-transparent">
+          {head.map((h, i) => (
+            <TableHead
+              key={h}
+              scope="col"
+              className={cn(
+                "text-text-2 h-auto px-0 py-2 pe-3 text-xs",
+                i > 0 && "text-right",
+              )}
+            >
+              {h}
+            </TableHead>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((r, i) => (
+          <TableRow key={i} className="border-line hover:bg-transparent">
+            {r.map((c, j) => (
+              <TableCell
+                key={j}
+                className={cn(
+                  "px-0 py-2 pe-3",
+                  j > 0 && "text-right tabular-nums",
+                )}
+              >
+                {c}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -778,6 +786,7 @@ function AdjustmentsForm({
   // Sunucu tutarı "1250.50" döner; alan Türkçe yazılır ("1250,50"). Nokta
   // olduğu gibi kalırsa kaydederken binlik ayırıcı sayılır ve tutar 100 katına
   // çıkar (#452).
+  const formId = useId();
   const [draft, setDraft] = useState<Record<string, string>>(() =>
     Object.fromEntries(
       fields.map((f) => [f, (value[f] ?? "").replace(".", ",")]),
@@ -810,18 +819,19 @@ function AdjustmentsForm({
         {t("office.tax_returns.adjust_hint")}
       </p>
       {fields.map((f) => (
-        <label key={f} className="flex flex-col gap-1 text-sm">
-          <span className="text-text-2">
+        <div key={f} className="flex flex-col gap-1 text-sm">
+          <Label htmlFor={`${formId}-${f}`} className={FIELD_LABEL}>
             {t(`office.tax_returns.adj_${f}`)}
-          </span>
-          <input
+          </Label>
+          <Input
+            id={`${formId}-${f}`}
             inputMode="decimal"
             placeholder="0,00"
-            className="bg-background focus-visible:ring-ring h-9 rounded-md border px-2 text-right tabular-nums focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+            className="text-right tabular-nums"
             value={draft[f] ?? ""}
             onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))}
           />
-        </label>
+        </div>
       ))}
       {error ? (
         <p role="alert" className="text-danger text-sm sm:col-span-3">
