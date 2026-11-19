@@ -28,10 +28,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 
 import {
@@ -260,16 +263,20 @@ function NewDraft({ engagement }: { engagement: string }) {
     <Panel title={t("office.journals.new_title")}>
       <div className="space-y-3 p-4">
         <div className="flex flex-wrap gap-3">
-          <label className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs">
+            <Label
+              htmlFor="journal-new-date"
+              className="text-muted-foreground text-xs font-normal"
+            >
               {t("office.col_date")}
-            </span>
+            </Label>
             <DatePicker
+              id="journal-new-date"
               className="h-8 w-40"
               value={date}
               onChange={(v) => setDate(v)}
             />
-          </label>
+          </div>
           <Input
             className="h-8 max-w-md flex-1"
             placeholder={t("office.journals.description")}
@@ -593,6 +600,7 @@ function SendToAgent({
 
 function JournalsInner() {
   const { t, locale } = useLocale();
+  const { prompt } = useDialogs();
   const { slug } = useTenant();
   // Mükellef detayının Fişler sekmesinde mükellef sabit (#468).
   const scope = useEngagementScope();
@@ -687,10 +695,12 @@ function JournalsInner() {
               size="sm"
               variant="ghost"
               disabled={reversing}
-              onClick={() => {
-                const reason = window.prompt(
-                  t("office.journals.reverse_prompt"),
-                );
+              onClick={async () => {
+                const reason = await prompt({
+                  title: t("office.journals.reverse"),
+                  description: t("office.journals.reverse_prompt"),
+                  confirmLabel: t("office.journals.reverse"),
+                });
                 if (reason?.trim()) reverseDraft({ draft: d.uuid, reason });
               }}
             >
@@ -700,7 +710,7 @@ function JournalsInner() {
           ) : null,
       }),
     ],
-    [approveDraft, approving, reverseDraft, reversing, t],
+    [approveDraft, approving, prompt, reverseDraft, reversing, t],
   );
   // Fişin ilişkili kayıtları: kaynak belge ve hareketler (#469).
   const relatedColumn = useRelatedColumn<JournalDraft>(
@@ -757,17 +767,20 @@ function JournalsInner() {
             onSelect={select}
           />
         )}
-        <label className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs">
+          <Label
+            htmlFor="journals-period"
+            className="text-muted-foreground text-xs font-normal"
+          >
             {t("office.api.col_period")}
-          </span>
-          <Input
-            type="month"
+          </Label>
+          <MonthPicker
+            id="journals-period"
             className="h-8 w-40"
             value={period}
-            onChange={(e) => setPeriod(e.target.value)}
+            onChange={setPeriod}
           />
-        </label>
+        </div>
       </div>
 
       <NewDraft engagement={engagement} />
