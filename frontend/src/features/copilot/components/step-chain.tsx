@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   BookOpenCheck,
   ClipboardCheck,
@@ -52,10 +53,13 @@ export function StepChain({
   steps,
   next,
   compact = false,
+  hrefFor,
 }: {
   steps: CopilotStep[];
   next?: CopilotStepKey | null;
   compact?: boolean;
+  /** Verilirse her rozet adımın ekranına bağlantı olur (#562). */
+  hrefFor?: (key: CopilotStepKey) => string;
 }) {
   const { t } = useLocale();
   return (
@@ -66,33 +70,47 @@ export function StepChain({
       {steps.map((s) => {
         const Icon = STEP_ICON[s.key];
         const label = `${stepLabel(t, s.key)}: ${stepDetail(t, s.key, s.status, s.count)}`;
+        const chipClass = cn(
+          "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium",
+          statusToneClass[STATUS_TONE[s.status]],
+          s.status === "na" &&
+            "border-border border border-dashed bg-transparent",
+          next === s.key && "ring-ring ring-2 ring-offset-1",
+          hrefFor && "hover:brightness-95 dark:hover:brightness-125",
+        );
+        const chipBody = (
+          <>
+            <Icon aria-hidden className="size-3.5" />
+            <span className="sr-only">{label}</span>
+            {compact ? null : (
+              <span aria-hidden className="hidden @3xl/content:inline">
+                {stepLabel(t, s.key)}
+              </span>
+            )}
+            {s.count > 0 && s.status !== "done" ? (
+              <span aria-hidden className="tabular-nums">
+                {s.count}
+              </span>
+            ) : null}
+          </>
+        );
         return (
           <li key={s.key}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <span
-                  tabIndex={0}
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium",
-                    statusToneClass[STATUS_TONE[s.status]],
-                    s.status === "na" &&
-                      "border-border border border-dashed bg-transparent",
-                    next === s.key && "ring-ring ring-2 ring-offset-1",
-                  )}
-                >
-                  <Icon aria-hidden className="size-3.5" />
-                  <span className="sr-only">{label}</span>
-                  {compact ? null : (
-                    <span aria-hidden className="hidden @3xl/content:inline">
-                      {stepLabel(t, s.key)}
-                    </span>
-                  )}
-                  {s.count > 0 && s.status !== "done" ? (
-                    <span aria-hidden className="tabular-nums">
-                      {s.count}
-                    </span>
-                  ) : null}
-                </span>
+                {hrefFor && s.status !== "na" ? (
+                  <Link
+                    href={hrefFor(s.key)}
+                    className={chipClass}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {chipBody}
+                  </Link>
+                ) : (
+                  <span tabIndex={0} className={chipClass}>
+                    {chipBody}
+                  </span>
+                )}
               </TooltipTrigger>
               <TooltipContent>
                 <p className="font-medium">

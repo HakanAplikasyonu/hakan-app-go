@@ -1,9 +1,9 @@
 "use client";
 
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
-import { ArrowRight, ListChecks, Play } from "lucide-react";
+import { ArrowRight, ListChecks, Play, X } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Label } from "@/components/ui/label";
@@ -20,10 +20,18 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { useCopilotWorkflow } from "../hooks/use-copilot";
-import { ACTION_PERMISSIONS, actionHref, isWriteAction } from "../lib/actions";
+import {
+  ACTION_PERMISSIONS,
+  actionHref,
+  isWriteAction,
+  stepHref,
+} from "../lib/actions";
 import { actionLabel, periodLabel, stepDetail, stepLabel } from "../lib/labels";
 import { bulkSteps, fromTextField, nextStepOf } from "../lib/next-steps";
-import type { CopilotWorkflowRow } from "../services/copilot.service";
+import type {
+  CopilotStepKey,
+  CopilotWorkflowRow,
+} from "../services/copilot.service";
 import { CommandBar } from "./command-bar";
 import { RecentPlans } from "./recent-plans";
 import { useCopilot } from "./copilot-provider";
@@ -32,6 +40,10 @@ import { StepChain } from "./step-chain";
 type Row = CopilotWorkflowRow;
 
 const PAGE_SIZE = 100;
+
+/** `?adim=documents`: yalnız o adımı bekleyen mükellefler (#562). */
+export const STEP_PARAM = "adim";
+const STEP_KEYS: CopilotStepKey[] = ["documents", "bank", "review"];
 
 /**
  * `/t/{slug}/copilot` (#392): "Sıradaki iş". Every engagement walks the
@@ -56,10 +68,20 @@ export function CopilotPage() {
     limit: PAGE_SIZE,
     offset: 0,
   });
+  const params = useSearchParams();
+  const pathname = usePathname();
+  const rawStep = params.get(STEP_PARAM) as CopilotStepKey | null;
+  const stepFilter = rawStep && STEP_KEYS.includes(rawStep) ? rawStep : null;
   const all = useMemo(() => query.data?.items ?? [], [query.data]);
   const rows = useMemo(
-    () => (onlyOpen ? all.filter((r) => r.next_step) : all),
-    [all, onlyOpen],
+    () =>
+      all.filter(
+        (r) =>
+          (!onlyOpen || r.next_step) &&
+          (!stepFilter ||
+            r.steps.some((s) => s.key === stepFilter && s.status === "todo")),
+      ),
+    [all, onlyOpen, stepFilter],
   );
   // The keyboard cursor stays on the list when it shrinks.
   const active = Math.max(0, Math.min(activeRaw, rows.length - 1));
@@ -160,6 +182,7 @@ export function CopilotPage() {
             <StepChain
               steps={row.original.steps}
               next={row.original.next_step}
+              hrefFor={(k) => stepHref(slug, k, row.original.engagement_uuid)}
             />
             <p className="text-text-3 text-xs tabular-nums">
               {t("office.copilot.progress", {
@@ -258,6 +281,18 @@ export function CopilotPage() {
                 <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
                 {t("office.copilot.only_open")}
               </Label>
+              {stepFilter ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => router.replace(pathname, { scroll: false })}
+                >
+                  {t("office.copilot.step_filter", {
+                    step: stepLabel(t, stepFilter),
+                  })}
+                  <X aria-hidden className="size-3.5" />
+                </Button>
+              ) : null}
               {closed > 0 ? (
                 <span className="text-text-3 text-xs">
                   {t("office.copilot.closed_count", { count: closed })}

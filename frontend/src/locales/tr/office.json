@@ -591,7 +591,7 @@
   "home.crown_data": "İstenen belge",
   "home.crown_ready": "Beyana hazır",
   "home.crown_ready_line": "/ {{total}} mükellef beyana hazır",
-  "home.crown_summary_approval": "Önerilerin %{{pct}}'i karara bağlandı.",
+  "home.crown_summary_approval": "Önerilerin %{{pct}} karara bağlandı.",
   "home.crown_summary_left": "Kalan {{left}} mükellefin {{blocked}} tanesinde engelleyici uyarı var.",
   "home.crown_title": "Dönem tacı · {{period}}",
   "home.days_to_declaration": "{{month}} beyanına {{count}} gün var.",
@@ -1264,7 +1264,7 @@
   "copilot.detail.transfer_na": "Aktarılacak fiş yok",
   "copilot.detail.report_done": "Aylık rapor gönderildi",
   "copilot.detail.report_todo": "Aylık rapor gönderilmedi",
-  "copilot.detail.report_waiting": "Rapor e-postası kuyrukta",
+  "copilot.detail.report_waiting": "Sırada: önceki adımlar bitince gönderilir",
   "copilot.detail.report_blocked": "Rapor gönderilemedi",
   "copilot.detail.report_na": "Bu dönem yok",
   "copilot.action.bank_suggest": "Banka hareketlerine hesap öner",
@@ -2038,5 +2038,6 @@
   "shell.switch_office": "Ofis değiştir",
   "shell.help": "Yardım ve kılavuzlar",
   "shell.theme_light": "Açık temaya geç",
-  "shell.theme_dark": "Koyu temaya geç"
+  "shell.theme_dark": "Koyu temaya geç",
+  "copilot.step_filter": "Yalnız: {{step}}"
 }

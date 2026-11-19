@@ -53,7 +53,7 @@
   "invites_failed_title": "Başarısız satırlar",
   "invites_col_error": "Hata",
   "card_title": "Ofis kurulumunu tamamlayın",
-  "card_progress": "{{total}} adımdan {{done}}'si tamam",
+  "card_progress": "{{total}} adımdan {{done}} tamam",
   "card_continue": "Kuruluma devam et",
   "progress": "{{done}} / {{total}} adım tamam",
   "resume_hint": "Yarıda bırakabilirsiniz; Genel bakış'taki kurulum kartından devam edersiniz.",

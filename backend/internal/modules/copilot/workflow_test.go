@@ -66,6 +66,11 @@ func TestChain(t *testing.T) {
 	if tr := stepOf(t, r.Steps, StepTransfer); tr.Status != StatusBlocked || *r.NextStep != StepTransfer {
 		t.Fatalf("blocked: %+v", tr)
 	}
+	// The report waits while an earlier step is open, even once sent.
+	fill(&r, Counts{BankTotal: 8, JournalDraft: 2, ReportSent: 1})
+	if rp := stepOf(t, r.Steps, StepReport); rp.Status != StatusWaiting || rp.Action != nil || *r.NextStep != StepJournals {
+		t.Fatalf("report before journals: %+v", rp)
+	}
 	// Closed: everything done.
 	fill(&r, Counts{BankTotal: 8, JournalExported: 2, TransferImported: 1, ReportSent: 1})
 	if r.NextStep != nil || r.DoneSteps != r.ActiveSteps || r.ActiveSteps != 6 {

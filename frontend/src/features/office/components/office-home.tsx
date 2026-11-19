@@ -3,6 +3,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { trPossessive } from "@/lib/utils";
 import { useAuth } from "@/providers/auth-provider";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -161,13 +163,24 @@ function useBehindColumns(focus: string) {
         enableHiding: false,
         cell: ({ row }) => {
           const crown = cellCrown(cellAt(row.original, focus));
-          return (
+          const badge = (
             <TacRozeti
               durum={crown}
               etiket
               metin={t(cellKey[crown])}
               className="text-xs"
             />
+          );
+          // "Engel var": doğrudan o mükellefin engelleyici uyarılarına (#562).
+          if (crown !== "sorun") return badge;
+          return (
+            <Link
+              href={`${routes.tenant.engagementWarnings(slug, row.original.engagement_uuid)}?severity=blocker`}
+              className="inline-flex rounded-md hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {badge}
+            </Link>
           );
         },
       }),
@@ -235,6 +248,7 @@ export function OfficeHome() {
   const periodText = usePeriodText();
   const { slug } = useTenant();
   const { user } = useAuth();
+  const router = useRouter();
   const { focus } = useOfficePeriod();
   const matrix = usePeriodMatrixAt(focus);
   const dashboard = useOfficeDashboard();
@@ -288,6 +302,8 @@ export function OfficeHome() {
   }).format(new Date());
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "";
   const month = monthName(focus, locale);
+  // Engelleyiciler: uyarılar yalnız engelleyici süzgeciyle açılır (#562).
+  const blockersHref = `${routes.tenant.warnings(slug)}?severity=blocker`;
 
   return (
     <div className="space-y-5">
@@ -337,7 +353,10 @@ export function OfficeHome() {
           ozet={[
             approval !== null
               ? t("office.home.crown_summary_approval", {
-                  pct: Math.round(approval * 100),
+                  pct:
+                    locale === "tr"
+                      ? trPossessive(Math.round(approval * 100))
+                      : Math.round(approval * 100),
                 })
               : undefined,
             rows.length - ready > 0
@@ -362,7 +381,7 @@ export function OfficeHome() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-11">
-                <Link href={routes.tenant.warnings(slug)}>
+                <Link href={blockersHref}>
                   {t("office.home.see_blockers")}
                 </Link>
               </Button>
@@ -388,7 +407,7 @@ export function OfficeHome() {
                 })
               : undefined
           }
-          href={routes.tenant.warnings(slug)}
+          href={blockersHref}
           danger={!!d?.warnings?.blocker}
         />
         <Kpi
@@ -401,7 +420,7 @@ export function OfficeHome() {
                 })
               : undefined
           }
-          href={routes.tenant.taxpayers(slug)}
+          href={`${routes.tenant.copilot(slug)}?adim=documents`}
         />
         <Kpi
           label={t("office.home.kpi_today")}
@@ -447,6 +466,9 @@ export function OfficeHome() {
               columns={behindColumns}
               data={behind}
               getRowId={(r) => r.engagement_uuid}
+              onRowClick={(r) =>
+                router.push(routes.tenant.engagement(slug, r.engagement_uuid))
+              }
               bordered={false}
               features={{
                 toolbar: false,

@@ -12,7 +12,7 @@ import { usePermission } from "@/providers/permission-provider";
 
 import { useOfficeSetup } from "../hooks/use-office-setup";
 import { SETUP_STEPS, settledCount } from "../lib/steps";
-import { trPossessive } from "../lib/format";
+import { trPossessive } from "@/lib/utils";
 
 /**
  * Office home: a non-blocking reminder while the setup wizard is not

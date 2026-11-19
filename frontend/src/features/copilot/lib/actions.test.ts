@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { actionHref } from "./actions";
+import { actionHref, stepHref } from "./actions";
 
 describe("actionHref", () => {
   it("genel ekranda ofis düzeyi sayfa, mükellef süzgeciyle", () => {
@@ -30,6 +30,16 @@ describe("actionHref", () => {
     );
     expect(actionHref("demo", "open_documents", "e1", true)).toBe(
       "/t/demo/engagements/e1#belge-istekleri",
+    );
+  });
+
+  it("adım rozetleri kendi ekranına (#562)", () => {
+    expect(stepHref("demo", "bank", "e1")).toBe("/t/demo/engagements/e1/bank");
+    expect(stepHref("demo", "review", "e1", true)).toBe(
+      "/t/demo/engagements/e1/review",
+    );
+    expect(stepHref("demo", "transfer", "e1")).toBe(
+      "/t/demo/journals?taxpayer=e1",
     );
   });
 });
