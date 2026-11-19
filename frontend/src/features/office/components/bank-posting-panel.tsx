@@ -11,6 +11,7 @@ import { CheckCheck, FileText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { Hint } from "@/components/ui/hint";
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
   createColumn,
@@ -326,15 +327,19 @@ export function BankPostingPanel({
         </div>
         {canWrite ? (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={!period || suggest.isPending}
-              title={period ? undefined : t("office.bank.posting.need_period")}
-              onClick={() => suggest.mutate()}
+            <Hint
+              label={period ? undefined : t("office.bank.posting.need_period")}
+              wrap={!period || suggest.isPending}
             >
-              <Sparkles className="size-4" aria-hidden />
-              {t("office.bank.posting.suggest")}
-            </Button>
+              <Button
+                variant="outline"
+                disabled={!period || suggest.isPending}
+                onClick={() => suggest.mutate()}
+              >
+                <Sparkles className="size-4" aria-hidden />
+                {t("office.bank.posting.suggest")}
+              </Button>
+            </Hint>
             <Button
               disabled={!sum?.approved || drafts.isPending}
               onClick={() => drafts.mutate()}

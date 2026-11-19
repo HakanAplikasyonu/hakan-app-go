@@ -30,6 +30,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { Hint } from "@/components/ui/hint";
 import { EmptyState } from "@/components/common/empty-state";
 import { ErrorState } from "@/components/common/error-state";
 import { Loading } from "@/components/common/loading";
@@ -1144,16 +1145,17 @@ function ReviewWorkspaceInner() {
               {t("office.review.correct")} <Kbd>E</Kbd>
             </Button>
             {canRule ? (
-              <Button
-                variant="outline"
-                onClick={() => void decideWithRule()}
-                className="h-11"
-                disabled={bulkBusy || ruleBusy}
-                title={ruleLabel}
-              >
-                <Wand2 className="size-4" />
-                {t("office.review.make_rule")} <Kbd>K</Kbd>
-              </Button>
+              <Hint label={ruleLabel} wrap={bulkBusy || ruleBusy}>
+                <Button
+                  variant="outline"
+                  onClick={() => void decideWithRule()}
+                  className="h-11"
+                  disabled={bulkBusy || ruleBusy}
+                >
+                  <Wand2 className="size-4" />
+                  {t("office.review.make_rule")} <Kbd>K</Kbd>
+                </Button>
+              </Hint>
             ) : null}
             <Button
               variant="ghost"
@@ -1265,17 +1267,21 @@ function ReviewWorkspaceInner() {
               <Link href="?">{t("office.clear_invoice_filter")}</Link>
             </Button>
           ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={undo}
-            disabled={!undoTarget || undoBusy}
-            title={t("office.review_api.undo_hint")}
-            className="pointer-coarse:h-11"
+          <Hint
+            label={t("office.review_api.undo_hint")}
+            wrap={!undoTarget || undoBusy}
           >
-            <Undo2 className="size-4" />
-            {t("office.studio.undo")} <Kbd>Z</Kbd>
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={undo}
+              disabled={!undoTarget || undoBusy}
+              className="pointer-coarse:h-11"
+            >
+              <Undo2 className="size-4" />
+              {t("office.studio.undo")} <Kbd>Z</Kbd>
+            </Button>
+          </Hint>
           <Button
             variant="ghost"
             size="icon"

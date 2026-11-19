@@ -71,6 +71,7 @@ import {
   type GridModelInput,
   type NormalizedRange,
 } from "@/components/tables/grid-model";
+import { Hint } from "@/components/ui/hint";
 import type { ColumnAlign } from "@/components/tables/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -732,40 +733,43 @@ export function EditableGrid<TData>({
               {t("table.grid_unsaved", { count: dirtyIds.length })}
             </span>
           ) : null}
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={undo}
-            disabled={!canUndo}
-            aria-label={t("table.grid_undo")}
-            title={`${t("table.grid_undo")} (Ctrl+Z)`}
-          >
-            <Undo2 aria-hidden />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={redo}
-            disabled={!canRedo}
-            aria-label={t("table.grid_redo")}
-            title={`${t("table.grid_redo")} (Ctrl+Y)`}
-          >
-            <Redo2 aria-hidden />
-          </Button>
+          <Hint label={`${t("table.grid_undo")} (Ctrl+Z)`} wrap={!canUndo}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={undo}
+              disabled={!canUndo}
+              aria-label={t("table.grid_undo")}
+            >
+              <Undo2 aria-hidden />
+            </Button>
+          </Hint>
+          <Hint label={`${t("table.grid_redo")} (Ctrl+Y)`} wrap={!canRedo}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={redo}
+              disabled={!canRedo}
+              aria-label={t("table.grid_redo")}
+            >
+              <Redo2 aria-hidden />
+            </Button>
+          </Hint>
           {onSaveRow ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!activeDirty}
-                onClick={() => activeRowId && void saveRow(activeRowId)}
-                title="Ctrl+S"
-              >
-                {t("table.grid_save_row")}
-              </Button>
+              <Hint label={"Ctrl+S"} wrap={!activeDirty}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!activeDirty}
+                  onClick={() => activeRowId && void saveRow(activeRowId)}
+                >
+                  {t("table.grid_save_row")}
+                </Button>
+              </Hint>
               <Button
                 type="button"
                 size="sm"
