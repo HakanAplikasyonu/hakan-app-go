@@ -3,5 +3,7 @@
   "nav": "Help",
   "nav_label": "User guides",
   "description": "Step-by-step guides for the office panel, the taxpayer portal and mobile app, and the desktop agent.",
-  "turkish_only": "The guides are available in Turkish only."
+  "turkish_only": "The guides are available in Turkish only.",
+  "for_you": "For you",
+  "all_guides": "All guides"
 }

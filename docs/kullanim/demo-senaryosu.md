@@ -1,3 +1,8 @@
+---
+roles: []
+internal: true
+---
+
 # Demo senaryosu
 
 > Pilot ofise gösterim: tek komutla kurulan demo ofisinde bir mükellefin Ekim kapanışı, ekran ekran.

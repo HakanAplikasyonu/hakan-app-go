@@ -1,3 +1,7 @@
+---
+roles: [owner, admin, accountant, intern, member]
+---
+
 # WhatsApp Web uzantısı kılavuzu
 
 > Mükelleften WhatsApp'la gelen fiş, fatura ve belgeleri tek tıkla gider, gelir ya da belge olarak kaydedin: kurulum, eşleştirme, kullanım ve gizlilik.
