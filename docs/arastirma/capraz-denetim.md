@@ -33,7 +33,7 @@ Sınırlar: Uygulama çalıştırılmadı, ekran görüntüsü alınmadı; tespi
 
 | # | Eksen | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|---|
-| A1 | Ofis↔mükellef | Mükellef detayı | e-Fatura/e-Arşiv entegratörü (QNB EDM, İzibiz, İşNet, Nilvera, Uyumsoft …) mükellef bazında bağlanır, test edilir, son senkron ve hata görünür | Backend senkron var (`modules/entegrator`, `queue/entegrator_sync.go`); **API ucu ve arayüz yok**. `source_connections` yalnızca demo/testte oluşuyor | P0 | L (API + ekran) |
+| A1 ✅ | Ofis↔mükellef | Mükellef detayı | e-Fatura/e-Arşiv entegratörü (QNB EDM, İzibiz, İşNet, Nilvera, Uyumsoft …) mükellef bazında bağlanır, test edilir, son senkron ve hata görünür | Backend senkron var (`modules/entegrator`, `queue/entegrator_sync.go`); **API ucu ve arayüz yok**. `source_connections` yalnızca demo/testte oluşuyor. **Yapıldı (#518):** `/v1/tenant/einvoice-integrators` ve `/einvoice-connections` uçları (oluştur, kimlik kasaya, ilk çekim sabit IP'li işçide, şimdi çek, son çalışma); Bağlantılar sekmesinde entegratör kartı; demo verisinde bağlı İzibiz. Kalan: entegratör senkronunu düzenli çalıştıran zamanlayıcı yok (bugün yalnızca kurulum ve "şimdi çek" kuyruğa atar) | P0 | L (API + ekran) |
 | A2 ✅ | Backend↔arayüz | Mükellef detayı → Bağlantılar sekmesi | Banka web servis bağlantısı: banka seçimi (`GET /v1/tenant/bank-services`), şube talimatı, kimlik bilgisi, senkron | 7 uç var (`/bank-connections`, `/instruction`, `/submitted`, `/credentials`, `/sync`); **ekran yok**. Banka sekmesi yalnızca ekstre yükleme ve eşleştirme. **Yapıldı (#518):** Bağlantılar sekmesinde dört adımlı kurulum (talimat PDF, şubeye teslim, servis kullanıcısı, şimdi çek); demo verisinde şubede bekleyen Vakıfbank bağlantısı | P0 | M |
 | A3 | Backend↔arayüz | Mükellef detayı | Paraşüt bağlantısı (OAuth yetkilendirme, şirket seçimi, senkron) | 6 uç var (`/parasut-connections…`), ekran yok | P1 | M |
 | A4 | Backend↔arayüz | Mükellef detayı | KolayBi bağlantısı (şirket seçimi, senkron) | 4 uç var (`/kolaybi-connections…`), ekran yok | P1 | S–M |
@@ -98,7 +98,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 ## Önerilen uygulama sırası (#518)
 
-Durum: 1 ve 2 yapıldı (D4 ertelendi: platform paneli P2). Sıradaki: 3.
+Durum: 1, 2 ve 3 yapıldı (D4 ertelendi: platform paneli P2). Sıradaki: 4.
 
 1. ✅ **Mükellef detayına "Bağlantılar" sekmesi** iskeleti: bütün mükellef düzeyi bağlantıları (entegratör, banka, Easytrade, Paraşüt, KolayBi, WhatsApp, muhasebe aktarımı) tek yerde, durum rozeti ve son senkron saatiyle. Easytrade ve aktarım ayarı buraya bağlanır.
 2. ✅ **A2 banka web servis bağlantısı** (API hazır) + D4 çıkış IP'si bilgisi.
