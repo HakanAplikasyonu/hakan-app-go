@@ -1,5 +1,8 @@
 {
   "pick_date": "Tarih seçin",
+  "pick_month": "Ay seçin",
+  "prev_year": "Önceki yıl",
+  "next_year": "Sonraki yıl",
   "show_password": "Şifreyi göster",
   "hide_password": "Şifreyi gizle",
   "cancel": "Vazgeç",
