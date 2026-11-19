@@ -6,11 +6,21 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { apiConfig } from "@/config/api";
 import type { components } from "@/generated/api";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError, unwrap } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 import { datetime } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
@@ -22,6 +32,9 @@ type LucaExport = components["schemas"]["LucaBankStatementExport"];
 type Guide = components["schemas"]["EnvelopeLucaBankStatementGuide"]["data"];
 type Layout = "signed" | "two_columns";
 type Delimiter = ";" | ",";
+
+/** Sütun kılavuzu tablosunun başlık hücresi (önceki görünümle aynı). */
+const HEAD = "h-auto px-0 py-1 pe-3";
 
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
@@ -195,26 +208,34 @@ export function LucaBankExportPanel({
                   label: b.name || b.iban || b.uuid,
                 }))}
               />
-              <label className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs">
+                <Label
+                  htmlFor="luca-export-from"
+                  className="text-muted-foreground text-xs font-normal"
+                >
                   {t("office.bank.luca.from")}
-                </span>
+                </Label>
                 <DatePicker
+                  id="luca-export-from"
                   className="h-8 w-40"
                   value={from}
                   onChange={(v) => setFrom(v)}
                 />
-              </label>
-              <label className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Label
+                  htmlFor="luca-export-to"
+                  className="text-muted-foreground text-xs font-normal"
+                >
                   {t("office.bank.luca.to")}
-                </span>
+                </Label>
                 <DatePicker
+                  id="luca-export-to"
                   className="h-8 w-40"
                   value={to}
                   onChange={(v) => setTo(v)}
                 />
-              </label>
+              </div>
               <FilterSelect<Layout>
                 label={t("office.bank.luca.layout")}
                 value={layout}
@@ -298,36 +319,38 @@ export function LucaBankExportPanel({
           {guide.isLoading ? (
             <Skeleton className="h-24" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-muted-foreground text-left">
-                    <th className="py-1 pe-3 font-medium">#</th>
-                    <th className="py-1 pe-3 font-medium">
-                      {t("office.bank.luca.col_header")}
-                    </th>
-                    <th className="py-1 pe-3 font-medium">
-                      {t("office.bank.luca.col_field")}
-                    </th>
-                    <th className="py-1 font-medium">
-                      {t("office.bank.luca.col_type")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {columns.map((c, i) => (
-                    <tr key={c.header}>
-                      <td className="py-1 pe-3 tabular-nums">{i + 1}</td>
-                      <td className="py-1 pe-3">
-                        <Figure>{c.header}</Figure>
-                      </td>
-                      <td className="py-1 pe-3">{c.program_field}</td>
-                      <td className="py-1">{c.data_type}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table className="text-xs">
+              <TableHeader className="[&_tr]:border-b-0">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className={HEAD}>#</TableHead>
+                  <TableHead className={HEAD}>
+                    {t("office.bank.luca.col_header")}
+                  </TableHead>
+                  <TableHead className={HEAD}>
+                    {t("office.bank.luca.col_field")}
+                  </TableHead>
+                  <TableHead className={cn(HEAD, "pe-0")}>
+                    {t("office.bank.luca.col_type")}
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {columns.map((c, i) => (
+                  <TableRow key={c.header} className="hover:bg-transparent">
+                    <TableCell className="px-0 py-1 pe-3 tabular-nums">
+                      {i + 1}
+                    </TableCell>
+                    <TableCell className="px-0 py-1 pe-3">
+                      <Figure>{c.header}</Figure>
+                    </TableCell>
+                    <TableCell className="px-0 py-1 pe-3">
+                      {c.program_field}
+                    </TableCell>
+                    <TableCell className="px-0 py-1">{c.data_type}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
           <p className="text-muted-foreground text-xs">
             {layout === "signed"
