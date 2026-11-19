@@ -252,8 +252,10 @@ test.describe("yardım sayfaları (#274)", () => {
 
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath());
+    // Ofis sahibi kendi kılavuzuna gider (#522).
     await page.getByRole("link", { name: "Yardım" }).first().click();
-    await expect(page).toHaveURL(/\/yardim$/);
+    await expect(page).toHaveURL(/\/yardim\/ofis-yoneticisi$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Ofis yöneticisi kılavuzu" })).toBeVisible();
 
     // Mükellef ayrı bir tarayıcı bağlamında: çerez silmek oturumu her zaman
     // hemen kapatmıyordu, giriş formu bazen hiç görünmüyordu.

@@ -244,6 +244,8 @@ export const routes = {
   /** Public usage guides (#274, docs/kullanim/). */
   help: {
     index: () => "/yardim",
+    /** Kullanıcıyı rolünün kılavuzuna yönlendirir (#522). */
+    mine: () => "/yardim/benim",
     guide: (slug: string) => `/yardim/${encodeURIComponent(slug)}`,
   },
   errors: {
