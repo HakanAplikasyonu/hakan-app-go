@@ -1801,5 +1801,10 @@
   "change_requests.apply_done": "Değişiklik uygulandı.",
   "change_requests.reject_done": "Talep reddedildi; kayıt değişmedi.",
   "change_requests.stale": "Bu talep artık geçerli değil (karar verilmiş ya da daha güncel bir kaynak gelmiş).",
-  "change_requests.failed": "İşlem yapılamadı."
+  "change_requests.failed": "İşlem yapılamadı.",
+  "warnings_api.open_record": "{{record}} kaydını aç",
+  "warnings_api.entity_receipt_capture": "Fiş",
+  "tax_returns.blocking_title": "Beyanı etkileyen {{count}} açık uyarı",
+  "tax_returns.blocking_all": "Tüm uyarılar",
+  "tax_returns.blocking_none": "Bu dönemde listelenecek açık uyarı kalmadı."
 }

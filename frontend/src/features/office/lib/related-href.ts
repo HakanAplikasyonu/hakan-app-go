@@ -162,3 +162,38 @@ export function checklistHref(
   const hit = CHECKLIST_TAB.find(([re]) => re.test(code));
   return hit ? CHECKLIST_ROUTES[hit[1]](slug, engagement) : null;
 }
+
+/** Uyarının kayıt türü → mükellef detayındaki kayıt türü (#528). */
+const WARNING_KIND: Record<string, RelatedSourceKind> = {
+  invoice: "invoice",
+  invoice_item: "invoice",
+  bank_transaction: "bank_transaction",
+  expense: "expense",
+  retail_sale: "retail_sale",
+  financial_transaction: "financial_transaction",
+};
+
+/**
+ * Uyarının işaret ettiği kaydın adresi (#528): fatura (kalem uyarısında
+ * faturası) detayına, diğerleri sekmesinde `?kayit=` ile seçili; fişler
+ * inceleme kuyruğuna. Kaydı olmayan (dönem) uyarıda null.
+ */
+export function warningRecordHref(
+  slug: string,
+  w: {
+    engagement_uuid: string;
+    entity_type: string;
+    entity_uuid?: string | null;
+  },
+): string | null {
+  if (!w.entity_uuid) return null;
+  if (w.entity_type === "receipt_capture")
+    return routes.tenant.engagementReview(slug, w.engagement_uuid);
+  const kind = WARNING_KIND[w.entity_type];
+  if (!kind) return null;
+  return relatedHref(slug, w.engagement_uuid, {
+    kind,
+    uuid: w.entity_uuid,
+    label: "",
+  });
+}

@@ -26,11 +26,22 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
 -- name: ListTenantDataWarnings :many
 SELECT w.id, w.uuid, w.engagement_id, e.uuid AS engagement_uuid, w.period, w.entity_type, w.entity_id,
        inv.uuid AS invoice_uuid, cust.uuid AS customer_uuid,
+       -- Diğer kayıt türlerinin genel kimliği (#528): arayüz uyarıdan kayda gider.
+       -- Fatura kalemi kendi faturasının kimliğini taşır.
+       bt.uuid AS bank_transaction_uuid, ex.uuid AS expense_uuid, rs.uuid AS retail_sale_uuid,
+       rc.uuid AS receipt_capture_uuid, ft.uuid AS financial_transaction_uuid, itinv.uuid AS item_invoice_uuid,
        w.code, w.severity, w.params, w.producer, w.status, w.resolved_at, w.created_at, w.updated_at
 FROM data_warnings w
 JOIN engagements e ON e.organization_id = w.organization_id AND e.id = w.engagement_id
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 LEFT JOIN customers cust ON w.entity_type = 'customer' AND cust.id = w.entity_id AND cust.taxpayer_id = w.taxpayer_id
+LEFT JOIN bank_transactions bt ON w.entity_type = 'bank_transaction' AND bt.id = w.entity_id AND bt.taxpayer_id = w.taxpayer_id
+LEFT JOIN expenses ex ON w.entity_type = 'expense' AND ex.id = w.entity_id AND ex.taxpayer_id = w.taxpayer_id
+LEFT JOIN retail_sales rs ON w.entity_type = 'retail_sale' AND rs.id = w.entity_id AND rs.taxpayer_id = w.taxpayer_id
+LEFT JOIN receipt_captures rc ON w.entity_type = 'receipt_capture' AND rc.id = w.entity_id AND rc.taxpayer_id = w.taxpayer_id
+LEFT JOIN source_financial_transactions ft ON w.entity_type = 'financial_transaction' AND ft.id = w.entity_id AND ft.taxpayer_id = w.taxpayer_id
+LEFT JOIN invoice_items it ON w.entity_type = 'invoice_item' AND it.id = w.entity_id AND it.taxpayer_id = w.taxpayer_id
+LEFT JOIN invoices itinv ON itinv.id = it.invoice_id AND itinv.taxpayer_id = it.taxpayer_id
 WHERE w.organization_id = @organization_id
   AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
   AND (@all_engagements::bool OR w.engagement_id IN (

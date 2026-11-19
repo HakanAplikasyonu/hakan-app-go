@@ -26,6 +26,7 @@ import {
   useWarningRules,
   useWarnings,
 } from "../hooks/use-warnings";
+import { warningRecordHref } from "../lib/related-href";
 import { formatAmount } from "../lib/decimal";
 import type {
   ApiDataWarning,
@@ -69,7 +70,7 @@ function paramText(value: unknown): string {
  * Message from the frontend catalog (`office.warning.<CODE>`, paket 05).
  * The API's rule catalog carries no titles, so an unknown code is shown raw.
  */
-function useApiWarningText() {
+export function useApiWarningText() {
   const { t } = useLocale();
   return (w: Pick<ApiDataWarning, "code" | "params">) => {
     const key = `office.warning.${w.code}`;
@@ -81,7 +82,7 @@ function useApiWarningText() {
   };
 }
 
-function useEntityLabel() {
+export function useEntityLabel() {
   const { t } = useLocale();
   return (type: string) => {
     const key = `office.warnings_api.entity_${type}`;
@@ -165,12 +166,15 @@ function useWarningColumns() {
         accessorKey: "entity_type",
         cell: ({ row }) => {
           const w = row.original;
-          return w.entity_type === "invoice" && w.entity_uuid ? (
-            <Link
-              href={invoiceHref(w.entity_uuid, w.engagement_uuid)}
-              className="text-brand hover:underline"
-            >
-              {t("office.warnings_api.open_invoice")}
+          const href =
+            w.entity_type === "invoice" && w.entity_uuid
+              ? invoiceHref(w.entity_uuid, w.engagement_uuid)
+              : warningRecordHref(slug, w);
+          return href ? (
+            <Link href={href} className="text-brand hover:underline">
+              {t("office.warnings_api.open_record", {
+                record: entityLabel(w.entity_type),
+              })}
             </Link>
           ) : (
             <span className="text-muted-foreground">
@@ -371,6 +375,10 @@ function WarningGroupCard({
   const warningText = useApiWarningText();
   const entityLabel = useEntityLabel();
   const groupTitle = useGroupTitle();
+  const recordHref = (w: ApiDataWarning) =>
+    w.entity_type === "invoice" && w.entity_uuid
+      ? invoiceHref(w.entity_uuid, w.engagement_uuid)
+      : warningRecordHref(slug, w);
   const [expanded, setExpanded] = useState(false);
   const rows = useWarnings(
     slug,
@@ -478,17 +486,17 @@ function WarningGroupCard({
                   {date(w.updated_at, "dd.MM.yyyy", locale)}
                 </time>
                 <div className="flex flex-wrap items-center gap-2">
-                  {w.entity_type === "invoice" && w.entity_uuid ? (
+                  {recordHref(w) ? (
                     <Button
                       asChild
                       size="sm"
                       variant="outline"
                       className="min-h-11 md:min-h-8"
                     >
-                      <Link
-                        href={invoiceHref(w.entity_uuid, w.engagement_uuid)}
-                      >
-                        {t("office.warnings_api.open_invoice")}
+                      <Link href={recordHref(w)!}>
+                        {t("office.warnings_api.open_record", {
+                          record: entityLabel(w.entity_type),
+                        })}
                       </Link>
                     </Button>
                   ) : null}

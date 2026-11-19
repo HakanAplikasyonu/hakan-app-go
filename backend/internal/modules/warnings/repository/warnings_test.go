@@ -163,3 +163,32 @@ func TestEngineAgainstPostgres(t *testing.T) {
 		t.Fatalf("changed condition = %+v", rep)
 	}
 }
+
+// TestListLinksEveryRecordType: a warning on a bank transaction carries the
+// transaction's public uuid so the office can open the record (#528).
+func TestListLinksEveryRecordType(t *testing.T) {
+	ctx, f := setup(t)
+	store := NewWarnings(db.New(f.pool))
+	var box, txn int64
+	var txnUUID string
+	if err := f.pool.QueryRow(ctx, `INSERT INTO cash_boxes (taxpayer_id, name, currency) VALUES ($1, 'Banka', 'TRY') RETURNING id`, f.tp).Scan(&box); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.pool.QueryRow(ctx, `INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at,
+			transaction_date, debit_credit, amount, currency, description, period)
+		VALUES ($1, $2, 'bank_test', 'w1', 'api', '2026-10-20', '2026-10-20', 'A', 100, 'TRY', 'x', '2026-10') RETURNING id, uuid::text`, f.tp, box).Scan(&txn, &txnUUID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.pool.Exec(ctx, `INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, entity_type, entity_id,
+			code, severity, params, producer, status)
+		VALUES ($1, $2, $3, 'bank_transaction', $4, 'TEST_BANK', 'warning', '{}', 'test', 'open')`, f.org, f.eng, f.tp, txn); err != nil {
+		t.Fatal(err)
+	}
+	rows, _, err := store.List(ctx, Filter{OrganizationID: f.org, EngagementID: f.eng, AllEngagements: true, Status: "open", EntityType: "bank_transaction", Limit: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].EntityUUID == nil || rows[0].EntityUUID.String() != txnUUID {
+		t.Fatalf("rows = %+v, want entity uuid %s", rows, txnUUID)
+	}
+}

@@ -5,6 +5,7 @@ import {
   parseFocus,
   reconciliationItemHref,
   relatedHref,
+  warningRecordHref,
 } from "./related-href";
 
 const U = "0b5e2c1a-8f0e-4c3b-9d2a-1e2f3a4b5c6d";
@@ -92,5 +93,28 @@ describe("checklistHref", () => {
       `${base}/payroll`,
     );
     expect(checklistHref("demo", "e1", "NO_DATA")).toBeNull();
+  });
+});
+
+describe("warningRecordHref", () => {
+  const w = (entity_type: string, entity_uuid: string | null = U) => ({
+    engagement_uuid: "e1",
+    entity_type,
+    entity_uuid,
+  });
+  it("her kayıt türü kendi yerine açılır (#528)", () => {
+    expect(warningRecordHref("demo", w("bank_transaction"))).toBe(
+      `${base}/bank?kayit=bank_transaction%3A${U}`,
+    );
+    expect(warningRecordHref("demo", w("invoice_item"))).toBe(
+      `${base}/invoices/${U}`,
+    );
+    expect(warningRecordHref("demo", w("receipt_capture"))).toMatch(
+      /\/engagements\/e1\//,
+    );
+  });
+  it("kaydı olmayan ya da bilinmeyen türde bağlantı yok", () => {
+    expect(warningRecordHref("demo", w("period", null))).toBeNull();
+    expect(warningRecordHref("demo", w("unknown"))).toBeNull();
   });
 });
