@@ -1,7 +1,13 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { CircleAlert, Info, Link2, TriangleAlert } from "lucide-react";
+import {
+  CircleAlert,
+  Info,
+  Link2,
+  PanelRightOpen,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
@@ -43,11 +49,13 @@ import {
 } from "./office-ui";
 import {
   ApiWarningActions,
+  DecisionNoteForm,
   WARNINGS_WRITE_PERMISSION,
 } from "./warning-actions";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { useFocusHref, useRelatedColumn } from "./related-column";
 import { useOfficePeriod } from "../period";
+import { useWarningSheet, WarningSheet } from "./warning-sheet";
 
 const PAGE_SIZE = 25;
 const ALL = "all";
@@ -261,6 +269,7 @@ function WarningsTable({
   const list = useWarnings(slug, query, engagement);
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
+  const sheet = useWarningSheet();
   const codes = [
     ...new Set((rules.data?.items ?? []).map((r) => r.code)),
   ].sort();
@@ -282,6 +291,8 @@ function WarningsTable({
         columns={columns}
         data={items}
         getRowId={(w) => w.uuid}
+        // Satır uyarıyı yan panelde açar: kayıt, karar, sıradaki (#529).
+        onRowClick={(w) => sheet.open(w, items.indexOf(w))}
         isLoading={list.isLoading}
         isError={list.isError}
         errorTitle={t("office.warnings_api.load_error")}
@@ -303,6 +314,7 @@ function WarningsTable({
           persistKey: "office.warnings.table",
         }}
       />
+      <WarningSheet items={items} sheet={sheet} />
     </div>
   );
 }
@@ -393,6 +405,8 @@ function WarningGroupCard({
     engagement,
   );
   const ack = useAcknowledgeWarningGroup(slug, engagement);
+  const [bulk, setBulk] = useState(false);
+  const sheet = useWarningSheet();
   const titleId = `warning-group-${group.code}-${group.severity}`;
   const items = rows.data?.items ?? [];
   return (
@@ -412,17 +426,35 @@ function WarningGroupCard({
         >
           {group.count}
         </span>
-        {status === "open" && can(WARNINGS_WRITE_PERMISSION) ? (
+        {status === "open" && can(WARNINGS_WRITE_PERMISSION) && !bulk ? (
           <Button
             type="button"
             size="sm"
             variant="outline"
             className="min-h-11 md:min-h-8"
             disabled={ack.isPending}
-            onClick={() => ack.mutate({ code: group.code, period })}
+            onClick={() => setBulk(true)}
           >
             {t("office.warnings_ack_all")}
           </Button>
+        ) : null}
+        {bulk ? (
+          <div className="w-full">
+            <DecisionNoteForm
+              label={t("office.warning_decision.reason_bulk", {
+                count: group.count,
+              })}
+              confirmLabel={t("office.warnings_ack_all")}
+              busy={ack.isPending}
+              onConfirm={(note) =>
+                ack.mutate(
+                  { code: group.code, period, note },
+                  { onSuccess: () => setBulk(false) },
+                )
+              }
+              onCancel={() => setBulk(false)}
+            />
+          </div>
         ) : null}
       </div>
       {ack.error ? (
@@ -440,7 +472,7 @@ function WarningGroupCard({
         </p>
       ) : (
         <ul className="divide-line divide-y">
-          {items.map((w) => {
+          {items.map((w, i) => {
             const tp = directory.entries.get(w.engagement_uuid);
             return (
               <li
@@ -486,6 +518,18 @@ function WarningGroupCard({
                   {date(w.updated_at, "dd.MM.yyyy", locale)}
                 </time>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="min-h-11 md:min-h-8"
+                    onClick={() => {
+                      // Gezinme grubun tamamında olsun.
+                      setExpanded(true);
+                      sheet.open(w, i);
+                    }}
+                  >
+                    <PanelRightOpen className="size-4" aria-hidden />
+                    {t("office.warning_sheet.open")}
+                  </Button>
                   {recordHref(w) ? (
                     <Button
                       asChild
@@ -524,6 +568,7 @@ function WarningGroupCard({
           })}
         </ul>
       )}
+      <WarningSheet items={items} sheet={sheet} />
       {group.count > GROUP_PREVIEW ? (
         <div className="border-line border-t px-4 py-2 md:px-5">
           <Button

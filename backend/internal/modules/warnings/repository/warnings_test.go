@@ -146,11 +146,17 @@ func TestEngineAgainstPostgres(t *testing.T) {
 	if len(rows) != 1 {
 		t.Fatalf("reopened rows = %d", len(rows))
 	}
-	ok, err := store.Decide(ctx, f.org, f.eng, rows[0].UUID, catalog.StatusAcknowledged, f.user)
+	ok, err := store.Decide(ctx, f.org, f.eng, rows[0].UUID, catalog.StatusAcknowledged, f.user, "fark bilerek kabul edildi")
 	if err != nil || !ok {
 		t.Fatalf("decide = %v %v", ok, err)
 	}
-	if ok, _ := store.Decide(ctx, f.org, f.eng2, rows[0].UUID, catalog.StatusResolved, f.user); ok {
+	// Who decided and why are listed with the warning (#529).
+	acked, _, _ := store.List(ctx, Filter{OrganizationID: f.org, EngagementID: f.eng, AllEngagements: true, Status: "acknowledged", Limit: 20})
+	if len(acked) != 1 || acked[0].ResolutionNote == nil || *acked[0].ResolutionNote != "fark bilerek kabul edildi" ||
+		acked[0].ResolvedByName == nil || *acked[0].ResolvedByName != "A B" || acked[0].ResolvedAt == nil {
+		t.Fatalf("decided row = %+v", acked)
+	}
+	if ok, _ := store.Decide(ctx, f.org, f.eng2, rows[0].UUID, catalog.StatusResolved, f.user, ""); ok {
 		t.Fatal("decision through another engagement must not apply")
 	}
 	if rep, _ = engine.Run(ctx, e, subj, rules.InvoiceTotals{}, bad); rep.Suppressed != 1 || count("open") != 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/catalog"
@@ -22,7 +23,7 @@ import (
 // Warnings is what the handler needs from the warnings service.
 type Warnings interface {
 	List(ctx context.Context, f repository.Filter) ([]repository.Row, int64, error)
-	Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64) error
+	Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64, note string) error
 	Groups(ctx context.Context, f repository.Filter) ([]repository.Group, error)
 	AcknowledgeBulk(ctx context.Context, f repository.Filter, in *usecase.BulkInput) (int64, error)
 }
@@ -161,7 +162,20 @@ func (h *Handler) decide(w http.ResponseWriter, r *http.Request, status catalog.
 		response.BadRequest(w, r, response.CodeValidationError, "warningUuid is invalid")
 		return
 	}
-	err = h.warnings.Decide(r.Context(), s.ID, engagementctx.Must(r.Context()).ID, id, status, userID(r))
+	// Optional body {"note": "..."}: the reason (#529). An empty body keeps
+	// older clients (mobile) working.
+	var in struct {
+		Note string `json:"note"`
+	}
+	if r.ContentLength != 0 {
+		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+			response.BadRequest(w, r, response.CodeValidationError, "Invalid request body")
+			return
+		}
+	}
+	err = h.warnings.Decide(r.Context(), s.ID, engagementctx.Must(r.Context()).ID, id, status, userID(r), in.Note)
 	if errors.Is(err, usecase.ErrWarningNotFound) {
 		response.NotFound(w, r, "Open warning not found")
 		return

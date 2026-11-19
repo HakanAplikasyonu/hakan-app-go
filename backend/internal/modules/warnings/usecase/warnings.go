@@ -15,7 +15,7 @@ import (
 // WarningStore is what the service needs from the repository.
 type WarningStore interface {
 	List(ctx context.Context, f repository.Filter) ([]repository.Row, int64, error)
-	Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64) (bool, error)
+	Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64, note string) (bool, error)
 	Groups(ctx context.Context, f repository.Filter) ([]repository.Group, error)
 	AcknowledgeByCode(ctx context.Context, f repository.Filter) (int64, error)
 }
@@ -61,11 +61,16 @@ func validateFilter(f repository.Filter) error {
 }
 
 // Decide sets an open warning to acknowledged or resolved.
-func (s *Warnings) Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64) error {
+// note is the reason (#529); at most MaxNoteLen characters.
+func (s *Warnings) Decide(ctx context.Context, organizationID, engagementID int64, id uuid.UUID, status catalog.Status, userID int64, note string) error {
 	if status != catalog.StatusAcknowledged && status != catalog.StatusResolved {
 		return fmt.Errorf("%w: decision must be acknowledged or resolved", ErrInvalid)
 	}
-	ok, err := s.store.Decide(ctx, organizationID, engagementID, id, status, userID)
+	note = strings.TrimSpace(note)
+	if utf8.RuneCountInString(note) > MaxNoteLen {
+		return fmt.Errorf("%w: note must be at most %d characters", ErrInvalid, MaxNoteLen)
+	}
+	ok, err := s.store.Decide(ctx, organizationID, engagementID, id, status, userID, note)
 	if err != nil {
 		return err
 	}
@@ -117,6 +122,6 @@ func (s *Warnings) AcknowledgeBulk(ctx context.Context, f repository.Filter, in 
 	if utf8.RuneCountInString(in.Note) > MaxNoteLen {
 		return 0, fmt.Errorf("%w: note must be at most %d characters", ErrInvalid, MaxNoteLen)
 	}
-	f.Code, f.Period = in.Code, in.Period
+	f.Code, f.Period, f.Note = in.Code, in.Period, in.Note
 	return s.store.AcknowledgeByCode(ctx, f)
 }

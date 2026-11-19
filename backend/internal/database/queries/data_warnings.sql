@@ -22,5 +22,5 @@ ORDER BY id;
 
 -- name: DecideDataWarning :execrows
 UPDATE data_warnings
-SET status = @status, resolved_by = sqlc.narg(resolved_by), resolved_at = NOW()
+SET status = @status, resolved_by = sqlc.narg(resolved_by), resolved_at = NOW(), resolution_note = sqlc.narg(note)
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid AND status = 'open';
