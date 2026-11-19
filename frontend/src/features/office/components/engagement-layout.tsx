@@ -15,6 +15,8 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { EngagementScopeProvider } from "../engagement-scope";
+
+import { ChangeRequestsPanel } from "./change-requests-panel";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
@@ -342,6 +344,10 @@ export function EngagementLayout({
         </div>
         <EngagementTabs engagement={engagement} />
         <PeriodStrip cells={cells} focus={period ?? focus} onPick={setPeriod} />
+        <ChangeRequestsPanel
+          engagement={engagement}
+          open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}
+        />
         {/* Seçili kayıt (?kayit=tür:uuid) ve ilişkili kayıtları (#469). */}
         <Suspense fallback={null}>
           <FocusedRecord engagement={engagement} />

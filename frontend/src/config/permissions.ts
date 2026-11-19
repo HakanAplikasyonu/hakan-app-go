@@ -75,6 +75,9 @@ export const Permission = {
   TenantReconciliationRead: "tenant.reconciliation.read",
   TenantReconciliationWrite: "tenant.reconciliation.write",
   /** Beyanname önizlemesi ve beyan kayıtları (issue #390). */
+  /** Dönem kilidi ve kilitli döneme gelen değişiklik talepleri (#32, #518). */
+  TenantPeriodsRead: "tenant.periods.read",
+  TenantChangeRequestsDecide: "tenant.change_requests.decide",
   TenantTaxReturnsRead: "tenant.tax_returns.read",
   TenantTaxReturnsWrite: "tenant.tax_returns.write",
   /** Belge arşivi ve İSG evrakları (issue #393). */

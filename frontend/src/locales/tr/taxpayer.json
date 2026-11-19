@@ -199,5 +199,18 @@
   "requests_empty_open": "Bekleyen istek yok.",
   "requests_empty_submitted": "Kontrol bekleyen gönderim yok.",
   "requests_empty_matched": "Tamamlanan istek yok.",
-  "requests_empty_all": "Henüz istek yok."
+  "requests_empty_all": "Henüz istek yok.",
+  "receipt_fix": "Düzeltme öner",
+  "receipt_fix_title": "Fişte düzeltme öner",
+  "receipt_fix_hint": "Yanlış okunan alanların doğrusunu yazın; boş bıraktıklarınız değişmez. Öneriniz müşavirinize gider, o onaylayınca fişe işlenir.",
+  "receipt_field_vendor_name": "Satıcı adı",
+  "receipt_field_date": "Fiş tarihi",
+  "receipt_field_total_amount": "Toplam tutar",
+  "receipt_field_tax_amount": "KDV tutarı",
+  "receipt_field_receipt_number": "Fiş numarası",
+  "receipt_fix_note": "Not (isteğe bağlı)",
+  "receipt_fix_send": "Müşavire gönder",
+  "receipt_fix_sent": "Öneriniz müşavirinize gönderildi.",
+  "receipt_fix_not_allowed": "Bu fiş için düzeltme önerilemiyor (okunamamış ya da mükerrer).",
+  "receipt_fix_failed": "Öneri gönderilemedi."
 }

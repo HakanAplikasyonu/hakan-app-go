@@ -103,6 +103,35 @@ function query(params: Record<string, string | number | undefined>) {
   return s ? `?${s}` : "";
 }
 
+/** Mükellefin önerebildiği fiş alanları (API'deki listenin sık kullanılanları). */
+export const RECEIPT_CORRECTION_FIELDS = [
+  "vendor_name",
+  "date",
+  "total_amount",
+  "tax_amount",
+  "receipt_number",
+] as const;
+
+export type ReceiptCorrection = {
+  field: (typeof RECEIPT_CORRECTION_FIELDS)[number];
+  value: string;
+  note?: string;
+};
+
+/** Doldurulan alanlardan öneri listesi; not her öneriye eklenir. */
+export function buildCorrections(
+  values: Partial<Record<ReceiptCorrection["field"], string>>,
+  note: string,
+): ReceiptCorrection[] {
+  const n = note.trim();
+  const out: ReceiptCorrection[] = [];
+  for (const field of RECEIPT_CORRECTION_FIELDS) {
+    const value = values[field]?.trim();
+    if (value) out.push(n ? { field, value, note: n } : { field, value });
+  }
+  return out;
+}
+
 export const taxpayerPanelService = {
   invoices: (
     taxpayer: string,
@@ -129,6 +158,17 @@ export const taxpayerPanelService = {
       "GET",
       `/v1/taxpayer/receipts${query(params)}`,
       { taxpayer },
+    ),
+  /** Fiş alanları için düzeltme önerisi (#199, #518 C1): ofisin kuyruğuna gider. */
+  correctReceipt: (
+    taxpayer: string,
+    receipt: string,
+    corrections: ReceiptCorrection[],
+  ) =>
+    taxpayerRequest<unknown>(
+      "POST",
+      `/v1/taxpayer/receipts/${encodeURIComponent(receipt)}/corrections`,
+      { taxpayer, body: { corrections }, silent: true },
     ),
   uploads: (taxpayer: string) =>
     taxpayerRequest<TaxpayerUploadPage>(

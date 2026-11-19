@@ -199,5 +199,18 @@
   "requests_empty_open": "No waiting requests.",
   "requests_empty_submitted": "Nothing waiting for review.",
   "requests_empty_matched": "No completed requests.",
-  "requests_empty_all": "No requests yet."
+  "requests_empty_all": "No requests yet.",
+  "receipt_fix": "Suggest a fix",
+  "receipt_fix_title": "Suggest a receipt fix",
+  "receipt_fix_hint": "Write the correct value of the misread fields; empty ones stay as they are. Your suggestion goes to your accountant and is applied once they approve.",
+  "receipt_field_vendor_name": "Vendor name",
+  "receipt_field_date": "Receipt date",
+  "receipt_field_total_amount": "Total amount",
+  "receipt_field_tax_amount": "VAT amount",
+  "receipt_field_receipt_number": "Receipt number",
+  "receipt_fix_note": "Note (optional)",
+  "receipt_fix_send": "Send to accountant",
+  "receipt_fix_sent": "Your suggestion was sent to your accountant.",
+  "receipt_fix_not_allowed": "A fix cannot be suggested for this receipt (unreadable or duplicate).",
+  "receipt_fix_failed": "Could not send the suggestion."
 }
