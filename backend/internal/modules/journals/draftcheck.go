@@ -25,9 +25,13 @@ const (
 	IssuePeriodLocked   = "period_locked"
 )
 
-// DraftIssue is one reason a draft cannot be approved.
+// DraftIssue is a problem the control screen shows on a draft. Blocking
+// ones (unbalanced, locked period) stop the approval; account code problems
+// are warnings fixed here with "Hesabı düzelt" (the export's own check
+// stops a code that is not in the program's plan).
 type DraftIssue struct {
-	Code string `json:"code"`
+	Code     string `json:"code"`
+	Blocking bool   `json:"blocking"`
 	// LineNo and Account: the line with the wrong account code.
 	LineNo  int32  `json:"line_no,omitempty"`
 	Account string `json:"account,omitempty"`
@@ -35,7 +39,18 @@ type DraftIssue struct {
 	Difference *decimal.Decimal `json:"difference,omitempty"`
 }
 
-// DraftBlockedError: the draft has issues; approval is refused.
+// blocking keeps the issues that stop an approval.
+func blocking(issues []DraftIssue) []DraftIssue {
+	var out []DraftIssue
+	for _, is := range issues {
+		if is.Blocking {
+			out = append(out, is)
+		}
+	}
+	return out
+}
+
+// DraftBlockedError: the draft has blocking issues; approval is refused.
 type DraftBlockedError struct{ Issues []DraftIssue }
 
 func (e *DraftBlockedError) Error() string {
@@ -55,7 +70,8 @@ func (s *Service) draftIssues(ctx context.Context, scope engagementctx.Scope, id
 		return nil, fmt.Errorf("draft issues: %w", err)
 	}
 	for _, r := range rows {
-		is := DraftIssue{Code: r.Code, LineNo: r.LineNo, Account: r.AccountCode}
+		is := DraftIssue{Code: r.Code, LineNo: r.LineNo, Account: r.AccountCode,
+			Blocking: r.Code == IssueUnbalanced || r.Code == IssuePeriodLocked}
 		if r.Code == IssueUnbalanced {
 			d := repository.Dec(r.Difference)
 			is.Difference = &d

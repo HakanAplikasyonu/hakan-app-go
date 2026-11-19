@@ -44,6 +44,16 @@ export function actionLabel(t: Translate, action: CopilotAction) {
   return t(`office.copilot.action.${action}`);
 }
 
+/**
+ * Sıradaki iş düğmesinin etiketi (#566): fiş onayı ve aktarım burada
+ * çalışmaz, kontrol ekranına götürür; düğme bunu söyler.
+ */
+export function nextActionLabel(t: Translate, action: CopilotAction) {
+  return action === "journals_approve" || action === "export_transfer"
+    ? t(`office.copilot.next.${action}`)
+    : actionLabel(t, action);
+}
+
 /** Outcome sentence of a finished step. */
 export function outcomeLabel(
   t: Translate,

@@ -6963,7 +6963,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a balanced draft
-         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft with other issues (account not in the plan, parent account, locked period;
+         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
          */
         post: operations["approveJournalDraft"];
         delete?: never;
@@ -17509,12 +17509,18 @@ export interface components {
             /** Format: int32 */
             lines: number;
             /**
-             * @description Why a draft cannot be approved yet (#566); only on drafts with
-             *     issues. Approving such a draft returns 422 JOURNAL_BLOCKED.
+             * @description Problems found on a draft (#566); only on drafts. Approving a
+             *     draft with a blocking issue returns 422 JOURNAL_BLOCKED.
              */
             issues?: components["schemas"]["JournalDraftIssue"][];
         };
         JournalDraftIssue: {
+            /**
+             * @description true: the approval is refused (unbalanced, period_locked). false:
+             *     a warning to fix on the control screen (account codes; the
+             *     export's own check stops a code missing from the program's plan).
+             */
+            blocking: boolean;
             /**
              * @description unbalanced: debit and credit differ (or no lines);
              *     unknown_account: the line's code is not in the imported plan;

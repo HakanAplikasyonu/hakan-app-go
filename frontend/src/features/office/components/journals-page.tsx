@@ -344,6 +344,9 @@ function NewDraft({ engagement }: { engagement: string }) {
   );
 }
 
+/** Onayı durduran engel var mı (#566); hesap kodu sorunları uyarıdır. */
+const isBlocked = (d: JournalDraft) => !!d.issues?.some((i) => i.blocking);
+
 function issueText(
   t: (key: string, vars?: Record<string, string | number>) => string,
   is: JournalDraftIssue,
@@ -410,7 +413,12 @@ function DraftCheck({
     <ul className="space-y-1 text-xs">
       {issues.map((is, i) => (
         <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-status-blocking inline-flex items-center gap-1">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1",
+              is.blocking ? "text-status-blocking" : "text-status-warning",
+            )}
+          >
             <CircleAlert className="size-3.5 shrink-0" aria-hidden />
             {issueText(t, is)}
           </span>
@@ -448,7 +456,7 @@ function ApproveClean({
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
-  const clean = open.filter((d) => !d.issues?.length);
+  const clean = open.filter((d) => !isBlocked(d));
   if (!clean.length) return null;
   const run = async () => {
     const ok = await confirm({
@@ -866,7 +874,7 @@ function JournalsInner() {
             // Engelli fiş onaylanmaz (#566); nedeni ipucunda.
             <Hint
               label={
-                d.issues?.length
+                isBlocked(d)
                   ? t("office.journals.check.approve_blocked")
                   : undefined
               }
@@ -875,7 +883,7 @@ function JournalsInner() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled={approving || !!d.issues?.length}
+                disabled={approving || isBlocked(d)}
                 onClick={() => approveDraft(d.uuid)}
               >
                 <Check className="size-4" />
@@ -949,6 +957,7 @@ function JournalsInner() {
   const rows = drafts.data?.items ?? [];
   const openDrafts = rows.filter((d) => d.status === "draft");
   const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
+  const stoppedDrafts = openDrafts.filter(isBlocked).length;
   const actionError = approve.error ?? reverse.error;
   return (
     <div className="space-y-4">
@@ -988,6 +997,7 @@ function JournalsInner() {
               ? t("office.journals.check.summary", {
                   drafts: openDrafts.length,
                   blocked: blockedDrafts,
+                  stopped: stoppedDrafts,
                 })
               : t("office.journals.check.summary_clean", {
                   drafts: openDrafts.length,

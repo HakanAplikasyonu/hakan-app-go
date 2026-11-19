@@ -186,6 +186,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/legal/dpa/accept":                                                                     {body: `{"version":1}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/ubl-uploads":                                             {file: "file", fileName: "atlas-04-istisna.xml", fileBody: "@ubl:atlas-04-istisna.xml"},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts":                                          {body: `{"entry_date":"2026-10-15T00:00:00Z","description":"Tarama fişi","lines":[{"account":"100","debit":"100.00","credit":"0"},{"account":"600","debit":"0","credit":"100.00"}]}`},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/lines/{lineNo}":              {body: `{"account":"770.01"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve":                      {},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse":                      {body: `{"reason":"tarama"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-exports":                                         {body: `{"driver":"luca","period":"2026-10"}`},
@@ -692,7 +693,7 @@ func (e *sweepEnv) param(t *testing.T, name, path string) string {
 		return e.one(t, `SELECT uuid::text FROM engagements WHERE id = $2 AND $1 > 0 AND $3 > 0`, name)
 	case "period":
 		return "2026-10"
-	case "rowNo":
+	case "rowNo", "lineNo":
 		return "1"
 	case "returnKind":
 		return "kdv1"

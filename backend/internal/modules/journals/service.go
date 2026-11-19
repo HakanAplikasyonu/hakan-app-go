@@ -214,14 +214,14 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	if tot.Lines == 0 || !repository.Dec(tot.Debit).Equal(repository.Dec(tot.Credit)) {
 		return fmt.Errorf("%w: debit %s, credit %s", ErrUnbalanced, repository.Dec(tot.Debit).StringFixed(2), repository.Dec(tot.Credit).StringFixed(2))
 	}
-	// Kontrol edilmemiş fiş onaylanmaz (#566): hesap planında olmayan ya da
-	// ana hesaba kayıt, kilitli dönem.
+	// Engelli fiş onaylanmaz (#566): kilitli dönem. Hesap kodu sorunları
+	// uyarıdır; kontrol ekranında görünür.
 	issues, err := s.draftIssues(ctx, scope, []int64{row.ID})
 	if err != nil {
 		return err
 	}
-	if len(issues[row.ID]) > 0 {
-		return &DraftBlockedError{Issues: issues[row.ID]}
+	if b := blocking(issues[row.ID]); len(b) > 0 {
+		return &DraftBlockedError{Issues: b}
 	}
 	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID)})
 	if err != nil {

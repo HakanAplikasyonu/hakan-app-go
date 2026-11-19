@@ -9313,7 +9313,7 @@ paths:
       tags: [Journals]
       operationId: approveJournalDraft
       summary: Approve a balanced draft
-      description: Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft with other issues (account not in the plan, parent account, locked period; #566) with `422 JOURNAL_BLOCKED` listing them as error details.
+      description: Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
       security:
         - bearerAuth: []
       responses:
@@ -22291,14 +22291,20 @@ components:
         issues:
           type: array
           description: |
-            Why a draft cannot be approved yet (#566); only on drafts with
-            issues. Approving such a draft returns 422 JOURNAL_BLOCKED.
+            Problems found on a draft (#566); only on drafts. Approving a
+            draft with a blocking issue returns 422 JOURNAL_BLOCKED.
           items: { $ref: "#/components/schemas/JournalDraftIssue" }
 
     JournalDraftIssue:
       type: object
-      required: [code]
+      required: [code, blocking]
       properties:
+        blocking:
+          type: boolean
+          description: |
+            true: the approval is refused (unbalanced, period_locked). false:
+            a warning to fix on the control screen (account codes; the
+            export's own check stops a code missing from the program's plan).
         code:
           type: string
           enum: [unbalanced, unknown_account, parent_account, period_locked]

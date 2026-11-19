@@ -50,10 +50,10 @@ func TestDraftIssuesBlockApproval(t *testing.T) {
 		t.Fatalf("bad draft issues %+v", is)
 	}
 
-	var blocked *DraftBlockedError
-	if err := e.svc.Approve(ctx, e.scope, e.actor, bad.UUID); !errors.As(err, &blocked) || len(blocked.Issues) != 2 {
-		t.Fatalf("approve blocked draft err = %v", err)
+	if is[0].Blocking || is[1].Blocking {
+		t.Fatalf("account issues are warnings, not blockers: %+v", is)
 	}
+	var blocked *DraftBlockedError
 
 	// Kontrol ekranında hesaplar düzeltilir, engel kalkar, onay geçer.
 	if err := e.svc.SetLineAccount(ctx, e.scope, bad.UUID, 1, "770.01"); err != nil {
@@ -83,7 +83,7 @@ func TestDraftIssuesBlockApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := e.svc.Approve(ctx, e.scope, e.actor, ok.UUID); !errors.As(err, &blocked) || blocked.Issues[0].Code != IssuePeriodLocked {
+	if err := e.svc.Approve(ctx, e.scope, e.actor, ok.UUID); !errors.As(err, &blocked) || blocked.Issues[0].Code != IssuePeriodLocked || !blocked.Issues[0].Blocking {
 		t.Fatalf("approve in locked period err = %v", err)
 	}
 }
