@@ -183,6 +183,9 @@ export const routes = {
     /** Mükellefe özgü dış bağlantılar: banka web servisi, Easytrade … (#518). */
     engagementConnections: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/connections`,
+    /** Genel Excel / CSV içe aktarma sihirbazı (#395, #518). */
+    engagementExcelImports: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/excel-imports`,
     /** KVKK ilgili kişi talepleri (#193, #518). */
     engagementPrivacy: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/privacy`,

@@ -127,6 +127,12 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementUpload(slug, engagement),
       label: t("office.engagement.tab_upload"),
     },
+    // Genel Excel / CSV içe aktarma (#518 B1).
+    {
+      href: routes.tenant.engagementExcelImports(slug, engagement),
+      label: t("office.engagement.tab_excel"),
+      permission: Permission.TenantExcelImportsRead,
+    },
     // MUHSGK bordrodan beslenir: izni olmayan (stajyer) sekmeyi görmez (#390).
     {
       href: routes.tenant.engagementTaxReturns(slug, engagement),
