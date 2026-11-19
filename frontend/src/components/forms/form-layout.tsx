@@ -117,7 +117,7 @@ export function FormNav({
               onClick={() => scrollTo(item.id)}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "h-auto shrink-0 gap-2 rounded-full border px-3 py-1.5 text-sm font-normal transition-colors has-[>svg]:px-3",
+                "h-auto shrink-0 gap-2 rounded-md border px-3 py-1.5 text-sm font-normal transition-colors has-[>svg]:px-3",
                 active
                   ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary font-medium"
                   : "border-border bg-card text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground",

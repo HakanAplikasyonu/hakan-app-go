@@ -36,7 +36,7 @@ export function ErrorState({
     >
       <span
         aria-hidden="true"
-        className="bg-danger-tint text-danger flex size-16 items-center justify-center rounded-[18px]"
+        className="bg-danger-tint text-danger flex size-16 items-center justify-center rounded-xl"
       >
         <CloudOff className="size-7" strokeWidth={1.75} />
       </span>

@@ -100,7 +100,7 @@ export function OfficeMenu({
                           isActive={active}
                           tooltip={count ? `${title} · ${fmt(count)}` : title}
                           className={cn(
-                            "h-9 gap-2.5 rounded-[10px] max-md:h-11 pointer-coarse:h-11",
+                            "h-9 gap-2.5 rounded-md max-md:h-11 pointer-coarse:h-11",
                             "data-[active=true]:bg-brand-tint data-[active=true]:text-brand-text",
                             "group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:w-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-xl",
                           )}
@@ -188,7 +188,7 @@ function AgentStatus({
   return (
     <Link
       href={routes.tenant.agents(slug)}
-      className="bg-surface-2 hover:border-line-strong flex min-h-11 items-center gap-2 rounded-[10px] border px-3 py-2 text-xs transition-colors"
+      className="bg-surface-2 hover:border-line-strong flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-xs transition-colors"
     >
       {dot}
       <span className="font-semibold">{label}</span>

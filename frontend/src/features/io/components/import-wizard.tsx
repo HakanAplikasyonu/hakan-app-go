@@ -95,7 +95,7 @@ function StepIndicator({ step, t }: { step: Step; t: (k: string) => string }) {
         <li
           key={s}
           className={cn(
-            "rounded-full border px-2.5 py-0.5",
+            "rounded-md border px-2.5 py-0.5",
             index === activeIndex
               ? "border-primary bg-primary/10 text-primary font-medium"
               : index < activeIndex

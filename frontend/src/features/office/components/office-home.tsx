@@ -73,7 +73,7 @@ function Kpi({
     </>
   );
   const cls =
-    "bg-card group flex flex-col gap-1 rounded-[14px] border p-4 transition-colors";
+    "bg-card group flex flex-col gap-1 rounded-lg border p-4 transition-colors";
   return href ? (
     <Link href={href} className={`${cls} hover:border-line-strong`}>
       {body}
@@ -318,7 +318,7 @@ export function OfficeHome() {
       <OfflineAgentsCard />
 
       {matrix.isLoading ? (
-        <Skeleton className="h-64 w-full rounded-[14px]" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       ) : (
         <DonemTaci
           baslik={t("office.home.crown_title", { period: periodText(focus) })}
@@ -468,7 +468,7 @@ export function OfficeHome() {
         </Panel>
 
         <div className="flex flex-col gap-4">
-          <section className="bg-card rounded-[14px] border p-4">
+          <section className="bg-card rounded-lg border p-4">
             <h2 className="mb-3 text-base font-semibold">
               {t("office.home_vat_title", { period: periodText(focus) })}
             </h2>
@@ -505,7 +505,7 @@ export function OfficeHome() {
             ) : null}
           </section>
 
-          <section className="bg-card rounded-[14px] border p-4">
+          <section className="bg-card rounded-lg border p-4">
             <h2 className="mb-3 text-base font-semibold">
               {t("office.home.feed_title")}
             </h2>

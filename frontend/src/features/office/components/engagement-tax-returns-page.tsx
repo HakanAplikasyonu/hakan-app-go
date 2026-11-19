@@ -464,7 +464,7 @@ function StatusBar({
       </div>
       <span
         className={cn(
-          "rounded-full px-2.5 py-1 text-xs font-semibold",
+          "rounded-md px-2.5 py-1 text-xs font-semibold",
           tone === "ok"
             ? "bg-ok-tint text-ok"
             : tone === "info"

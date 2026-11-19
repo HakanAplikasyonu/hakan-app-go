@@ -253,7 +253,7 @@ export function RuleEditor({ engagement }: { engagement: string }) {
           <section
             aria-labelledby="rule-preview-title"
             aria-live="polite"
-            className="bg-surface-2 rounded-[14px] border p-4 text-sm"
+            className="bg-surface-2 rounded-lg border p-4 text-sm"
           >
             <h3 id="rule-preview-title" className="mb-2 font-semibold">
               {t("office.rules.preview_title")}

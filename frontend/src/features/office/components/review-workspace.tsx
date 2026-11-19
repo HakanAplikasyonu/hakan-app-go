@@ -845,7 +845,7 @@ function ReviewWorkspaceInner() {
   let detail: React.ReactNode;
   if (query.isLoading) {
     detail = (
-      <div className="bg-card flex h-full min-h-80 items-center justify-center rounded-[14px] border">
+      <div className="bg-card flex h-full min-h-80 items-center justify-center rounded-lg border">
         <Loading label={t("common.loading")} />
       </div>
     );
@@ -862,7 +862,7 @@ function ReviewWorkspaceInner() {
   } else if (!current || !ctx) {
     detail = (
       <EmptyState
-        className="bg-card h-full min-h-80 rounded-[14px] border"
+        className="bg-card h-full min-h-80 rounded-lg border"
         title={
           active.length
             ? t("office.studio.done_title")
@@ -913,7 +913,7 @@ function ReviewWorkspaceInner() {
               </Button>
             ) : null}
             {ctx.invoiceType ? (
-              <span className="bg-brand-tint text-brand-text rounded-full px-2.5 py-0.5 font-semibold">
+              <span className="bg-brand-tint text-brand-text rounded-md px-2.5 py-0.5 font-semibold">
                 {invoiceTypeLabel(ctx.invoiceType, t)}
               </span>
             ) : null}
@@ -981,7 +981,7 @@ function ReviewWorkspaceInner() {
           </div>
 
           <div className="grid gap-3 xl:grid-cols-2">
-            <section className="bg-card rounded-[14px] border p-4">
+            <section className="bg-card rounded-lg border p-4">
               <h3 className="mb-2 text-sm font-semibold">
                 {t("office.studio.ev_line")}
               </h3>
@@ -1014,7 +1014,7 @@ function ReviewWorkspaceInner() {
               ) : null}
             </section>
 
-            <section className="bg-card rounded-[14px] border p-4">
+            <section className="bg-card rounded-lg border p-4">
               <div className="mb-2 flex items-center gap-2">
                 <h3 className="text-sm font-semibold">
                   {t("office.studio.why")}
@@ -1060,7 +1060,7 @@ function ReviewWorkspaceInner() {
                   variant="ghost"
                   onClick={() => canCorrect && setPicking(true)}
                   className={cn(
-                    "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-[10px] border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
+                    "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-md border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
                     canCorrect && "hover:border-brand",
                   )}
                 >
@@ -1098,7 +1098,7 @@ function ReviewWorkspaceInner() {
           </div>
 
           {canCorrect ? (
-            <section className="bg-card rounded-[14px] border p-4">
+            <section className="bg-card rounded-lg border p-4">
               <h3 className="mb-2 text-sm font-semibold">
                 {t("office.studio.ev_history")}
               </h3>
@@ -1107,7 +1107,7 @@ function ReviewWorkspaceInner() {
                   {history.map(([code, n]) => (
                     <li
                       key={code}
-                      className="bg-surface-2 rounded-full border px-2.5 py-1 text-xs"
+                      className="bg-surface-2 rounded-md border px-2.5 py-1 text-xs"
                     >
                       <Figure className="font-semibold">{code}</Figure>
                       <span className="text-text-2"> · {n}×</span>
@@ -1178,7 +1178,7 @@ function ReviewWorkspaceInner() {
       <header className="flex flex-wrap items-center gap-3">
         <ReviewHeading scoped={!!scope} />
         <span
-          className="bg-surface-2 rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums"
+          className="bg-surface-2 rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums"
           aria-live="polite"
         >
           {t("office.review_pending", { count: left })}
@@ -1290,7 +1290,7 @@ function ReviewWorkspaceInner() {
       </header>
 
       {help ? (
-        <div className="bg-card text-text-2 flex flex-wrap gap-x-5 gap-y-1 rounded-[10px] border px-4 py-2 text-xs">
+        <div className="bg-card text-text-2 flex flex-wrap gap-x-5 gap-y-1 rounded-md border px-4 py-2 text-xs">
           {[
             ["J / ↓", t("office.studio.key_next")],
             ["↑", t("office.studio.key_prev")],
@@ -1310,7 +1310,7 @@ function ReviewWorkspaceInner() {
       ) : null}
 
       {queue.length && showList ? (
-        <div className="bg-card flex flex-wrap items-center gap-3 rounded-[14px] border px-4 py-3">
+        <div className="bg-card flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
           <GuvenOlcegi deger={bulkAt / 100} />
           <p className="min-w-0 flex-1 text-sm">
             {t("office.review.bulk_text", {
@@ -1347,7 +1347,7 @@ function ReviewWorkspaceInner() {
         {showList ? (
           <section
             aria-labelledby="review-queue-title"
-            className="bg-card flex min-h-0 flex-col rounded-[14px] border md:max-h-[calc(100svh-15rem)]"
+            className="bg-card flex min-h-0 flex-col rounded-lg border md:max-h-[calc(100svh-15rem)]"
           >
             <div className="text-muted-foreground flex items-center gap-1.5 border-b px-4 py-2 text-xs">
               <h2 id="review-queue-title" className="flex-1 font-medium">
@@ -1391,7 +1391,7 @@ function ReviewWorkspaceInner() {
                           aria-current={on ? "true" : undefined}
                           onClick={() => select(i)}
                           className={cn(
-                            "h-auto min-h-14 w-full justify-start gap-3 rounded-[10px] px-3 py-2 text-start font-normal whitespace-normal transition-colors has-[>svg]:px-3",
+                            "h-auto min-h-14 w-full justify-start gap-3 rounded-md px-3 py-2 text-start font-normal whitespace-normal transition-colors has-[>svg]:px-3",
                             on
                               ? "bg-brand-tint hover:bg-brand-tint shadow-[inset_3px_0_0_var(--color-brand)]"
                               : "hover:bg-surface-2",

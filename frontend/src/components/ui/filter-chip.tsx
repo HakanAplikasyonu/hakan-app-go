@@ -20,7 +20,7 @@ export function FilterChip({
       data-slot="filter-chip"
       type={type ?? "button"}
       className={cn(
-        "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 md:min-h-9",
+        "focus-visible:ring-ring min-h-11 rounded-md border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 md:min-h-9",
         "data-[state=on]:border-brand data-[state=on]:bg-brand data-[state=on]:text-on-brand",
         "data-[state=off]:border-line data-[state=off]:bg-surface data-[state=off]:text-text-2 data-[state=off]:hover:text-foreground",
         className,
