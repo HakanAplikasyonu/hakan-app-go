@@ -8,7 +8,7 @@ import { ErrorState } from "@/components/common/error-state";
 import { BosDurum } from "@/components/hakan";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EngagementNextWork } from "@/features/copilot";
-import { routes } from "@/config/routes";
+import { DOC_TASKS_ANCHOR, routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
@@ -63,6 +63,9 @@ function Stat({
   );
 }
 
+/** Bekleyen istek: açık ya da gönderilmiş ama henüz eşleşmemiş. */
+const PENDING_TASK = new Set(["open", "submitted"]);
+
 type DocTask = {
   uuid: string;
   kind: string;
@@ -102,15 +105,19 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
     { period, status: "open" },
     engagement,
   );
+  // Seçili dönemin bekleyen istekleri: açık olanlar ve mükellefin gönderip
+  // kontrol bekleyenleri. "Sıradaki iş" kartı da aynı ikisini sayar (#563).
   const tasks = useQuery({
-    queryKey: ["tenant", slug.toLowerCase(), "doc-tasks", engagement, "open"],
+    queryKey: ["tenant", slug.toLowerCase(), "doc-tasks", engagement, period],
     queryFn: () =>
       tenantRequest<{ items: DocTask[]; total: number }>(
         slug,
         "GET",
         `/v1/tenant/engagements/${encodeURIComponent(engagement)}/document-tasks`,
-        { query: { status: "open", limit: 20 } },
+        { query: { status: "all", period, limit: 100 } },
       ),
+    select: (d) => d.items.filter((x) => PENDING_TASK.has(x.status)),
+    enabled: !!period,
   });
   const openWarnings = (warnings.data?.items ?? []).reduce(
     (n, g) => n + g.count,
@@ -189,14 +196,17 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
             />
             <Stat
               label={t("office.engagement.stat_tasks")}
-              value={tasks.isLoading ? "–" : (tasks.data?.total ?? 0)}
+              value={tasks.isLoading ? "–" : (tasks.data?.length ?? 0)}
+              href={`#${DOC_TASKS_ANCHOR}`}
             />
           </ul>
         </section>
 
         <section
+          id={DOC_TASKS_ANCHOR}
+          tabIndex={-1}
           aria-labelledby="tasks-title"
-          className="bg-surface border-line rounded-xl border p-4 md:p-5"
+          className="bg-surface border-line scroll-mt-20 rounded-xl border p-4 outline-none md:p-5"
         >
           <h2
             id="tasks-title"
@@ -206,26 +216,30 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           </h2>
           {tasks.isLoading ? (
             <Skeleton className="h-24 w-full" />
-          ) : (tasks.data?.items ?? []).length === 0 ? (
+          ) : (tasks.data ?? []).length === 0 ? (
             <BosDurum
               className="border-0 py-4"
               baslik={t("office.engagement.tasks_empty")}
             />
           ) : (
             <ul className="divide-line divide-y">
-              {tasks.data!.items.map((x) => (
+              {tasks.data!.map((x) => (
                 <li key={x.uuid} className="flex items-center gap-3 py-2.5">
                   <span
                     className={cn(
                       "rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
-                      x.overdue
-                        ? "bg-danger-tint text-danger"
-                        : "bg-warn-tint text-warn",
+                      x.status === "submitted"
+                        ? "bg-brand-tint text-brand-text"
+                        : x.overdue
+                          ? "bg-danger-tint text-danger"
+                          : "bg-warn-tint text-warn",
                     )}
                   >
-                    {x.overdue
-                      ? t("office.engagement.task_overdue")
-                      : t("office.engagement.task_waiting")}
+                    {x.status === "submitted"
+                      ? t("office.engagement.task_submitted")
+                      : x.overdue
+                        ? t("office.engagement.task_overdue")
+                        : t("office.engagement.task_waiting")}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {taskTitle(x)}

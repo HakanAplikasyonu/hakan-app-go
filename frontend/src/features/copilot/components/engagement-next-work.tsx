@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { routes } from "@/config/routes";
+import { DOC_TASKS_ANCHOR, routes } from "@/config/routes";
 import { useOfficePeriod } from "@/features/office/period";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
@@ -56,9 +56,23 @@ export function EngagementNextWork({
 
   const run = () => {
     if (!step?.action) return;
-    if (write) copilot?.review(bulkSteps([row]));
+    if (write) {
+      copilot?.review(bulkSteps([row]));
+      return;
+    }
+    // Belge istekleri aynı sayfadaysa oraya kaydır: adres aynı kaldığında
+    // gezinme hiçbir şey yapmaz, kullanıcı tıklamanın boşa gittiğini sanır (#563).
+    const anchor =
+      step.action === "open_documents"
+        ? document.getElementById(DOC_TASKS_ANCHOR)
+        : null;
+    if (anchor) {
+      anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+      anchor.focus({ preventScroll: true });
+      return;
+    }
     // Mükellef sayfalarındaki kart: hedef mükellef sekmesinde açılır (#468).
-    else router.push(actionHref(slug, step.action, engagement, true));
+    router.push(actionHref(slug, step.action, engagement, true));
   };
 
   const next = step?.action ? (

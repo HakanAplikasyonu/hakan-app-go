@@ -751,6 +751,7 @@
   "engagement.tasks_empty": "Açık belge isteği yok",
   "engagement.task_overdue": "Gecikti",
   "engagement.task_waiting": "Bekliyor",
+  "engagement.task_submitted": "Geldi, kontrol et",
   "engagement.task_undocumented_payment": "Ödeme için belge",
   "engagement.task_uninvoiced_collection": "Tahsilat için fatura",
   "engagement.task_generic": "Eksik belge",
