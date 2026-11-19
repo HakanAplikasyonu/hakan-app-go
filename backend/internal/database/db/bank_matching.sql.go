@@ -565,6 +565,77 @@ func (q *Queries) ListInvoicesForManualMatch(ctx context.Context, arg ListInvoic
 	return items, nil
 }
 
+const searchInvoicesForBankMatch = `-- name: SearchInvoicesForBankMatch :many
+SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
+       (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = i.taxpayer_id AND m.target_type = 'invoice' AND m.target_id = i.id), 0)::numeric AS matched_amount
+FROM invoices i
+WHERE i.taxpayer_id = $2
+  AND i.direction = $3
+  AND i.status_normalized = 'active'
+  AND (i.currency = $1::text OR ($1::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
+  AND (i.invoice_number ILIKE '%' || $4::text || '%'
+       OR i.customer_name ILIKE '%' || $4::text || '%'
+       OR i.customer_tax_number = $4::text
+       OR i.customer_identity_number = $4::text)
+ORDER BY i.issue_date DESC, i.id
+LIMIT 50
+`
+
+type SearchInvoicesForBankMatchParams struct {
+	Currency   string `json:"currency"`
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Direction  string `json:"direction"`
+	Term       string `json:"term"`
+}
+
+type SearchInvoicesForBankMatchRow struct {
+	ID               int64          `json:"id"`
+	Uuid             uuid.UUID      `json:"uuid"`
+	InvoiceNumber    string         `json:"invoice_number"`
+	IssueDate        pgtype.Date    `json:"issue_date"`
+	CustomerName     pgtype.Text    `json:"customer_name"`
+	ComparableAmount pgtype.Numeric `json:"comparable_amount"`
+	MatchedAmount    pgtype.Numeric `json:"matched_amount"`
+}
+
+// Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
+// dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
+// faturalar.
+func (q *Queries) SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, searchInvoicesForBankMatch,
+		arg.Currency,
+		arg.TaxpayerID,
+		arg.Direction,
+		arg.Term,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchInvoicesForBankMatchRow{}
+	for rows.Next() {
+		var i SearchInvoicesForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.InvoiceNumber,
+			&i.IssueDate,
+			&i.CustomerName,
+			&i.ComparableAmount,
+			&i.MatchedAmount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setBankTransactionMatchStatus = `-- name: SetBankTransactionMatchStatus :exec
 UPDATE bank_transactions SET match_status = $1
 WHERE taxpayer_id = $2 AND id = $3

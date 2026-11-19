@@ -8733,6 +8733,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Search open invoices for a manual match
+         * @description Requires `tenant.bank.read` (#565). Open invoices of the movement's
+         *     direction and currency whose number or counterparty name contains
+         *     `q`, or whose VKN/TCKN equals it, outside the candidates' date and
+         *     amount window; newest first, at most 20, fully paid ones left out.
+         *     Fewer than two characters find nothing. Results carry score 0.
+         */
+        get: operations["searchTenantBankTransactionInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches": {
         parameters: {
             query?: never;
@@ -16436,19 +16469,20 @@ export interface components {
                 method: "auto" | "suggested_accepted" | "manual";
                 score: number;
             }[];
-            candidates: {
-                /** Format: uuid */
-                invoice_uuid: string;
-                invoice_number: string;
-                /** Format: date */
-                issue_date: string;
-                counterparty_name: string | null;
-                open_amount: string;
-                score: number;
-                parts: {
-                    [key: string]: number;
-                };
-            }[];
+            candidates: components["schemas"]["BankMatchCandidate"][];
+        };
+        BankMatchCandidate: {
+            /** Format: uuid */
+            invoice_uuid: string;
+            invoice_number: string;
+            /** Format: date */
+            issue_date: string;
+            counterparty_name: string | null;
+            open_amount: string;
+            score: number;
+            parts: {
+                [key: string]: number;
+            };
         };
         EnvelopeBankPostingApproval: {
             /** @enum {boolean} */
@@ -33992,6 +34026,49 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    searchTenantBankTransactionInvoices: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching open invoices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["BankMatchCandidate"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

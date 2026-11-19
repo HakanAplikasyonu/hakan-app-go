@@ -11628,6 +11628,49 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Bank]
+      operationId: searchTenantBankTransactionInvoices
+      summary: Search open invoices for a manual match
+      description: |
+        Requires `tenant.bank.read` (#565). Open invoices of the movement's
+        direction and currency whose number or counterparty name contains
+        `q`, or whose VKN/TCKN equals it, outside the candidates' date and
+        amount window; newest first, at most 20, fully paid ones left out.
+        Fewer than two characters find nothing. Results carry score 0.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Matching open invoices
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/BankMatchCandidate" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21125,17 +21168,18 @@ components:
               score: { type: integer }
         candidates:
           type: array
-          items:
-            type: object
-            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, open_amount, score, parts]
-            properties:
-              invoice_uuid: { type: string, format: uuid }
-              invoice_number: { type: string }
-              issue_date: { type: string, format: date }
-              counterparty_name: { type: [string, "null"] }
-              open_amount: { type: string }
-              score: { type: integer }
-              parts: { type: object, additionalProperties: { type: integer } }
+          items: { $ref: "#/components/schemas/BankMatchCandidate" }
+    BankMatchCandidate:
+      type: object
+      required: [invoice_uuid, invoice_number, issue_date, counterparty_name, open_amount, score, parts]
+      properties:
+        invoice_uuid: { type: string, format: uuid }
+        invoice_number: { type: string }
+        issue_date: { type: string, format: date }
+        counterparty_name: { type: [string, "null"] }
+        open_amount: { type: string }
+        score: { type: integer }
+        parts: { type: object, additionalProperties: { type: integer } }
     EnvelopeBankPostingApproval:
       type: object
       required: [success, data, meta]

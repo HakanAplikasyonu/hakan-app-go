@@ -42,6 +42,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	// One movement (#528): its matches and candidates; match by hand, undo.
 	tx := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions/{transactionUuid}"
 	mux.Handle("GET "+tx+"/matching", middleware.Chain(http.HandlerFunc(h.transaction), authn, org, read, eng))
+	mux.Handle("GET "+tx+"/invoice-search", middleware.Chain(http.HandlerFunc(h.search), authn, org, read, eng))
 	mux.Handle("PUT "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.match), authn, org, write, eng))
 	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
 }
@@ -59,6 +60,17 @@ func (h *Handler) transaction(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := h.svc.Transaction(r.Context(), subjectOf(r), id)
 	h.reply(w, r, v, err)
+}
+
+// search: GET .../invoice-search?q= (#565).
+func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	items, err := h.svc.Search(r.Context(), subjectOf(r), id, r.URL.Query().Get("q"))
+	h.reply(w, r, map[string]any{"items": items}, err)
 }
 
 type matchBody struct {
@@ -93,7 +105,7 @@ func (h *Handler) unmatch(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
-func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v TransactionView, err error) {
+func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error) {
 	switch {
 	case err == nil:
 		response.JSON(w, r, http.StatusOK, v)
