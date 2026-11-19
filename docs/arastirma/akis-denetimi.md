@@ -75,7 +75,7 @@ kullanıcıda şüphe uyandırıyor.
 |---|---|---|---|
 | 7.1 | Kenar çubuğu "Uyarılar 2", sayfa "Açık 209 · Engelleyici 3". | Güven | #576 |
 | 7.2 | Engelleyici "Banka bakiyesi hareketlerle tutmuyor" panelinde fark yok: açılış, hareket toplamı, ekstre kapanışı ve fark gösterilmiyor; ekstreye bağlantı yok. Panel "kaydı burada düzelt" diyor ama düzeltilecek bir şey yok. | Eksik | #570 |
-| 7.3 | Hiçbir şey düzeltilmeden engelleyici "Çözüldü" yapılabiliyor; gerekçe zorunlu değil. Denetim izi açısından en ciddi bulgu. | Kırık | #570 |
+| 7.3 | ~~Engelleyici gerekçesiz "Çözüldü" yapılabiliyor.~~ Düzeltme (#570 çalışması sırasında doğrulandı): "Çözüldü" gerekçe ister; ancak fark görünmeden gerekçe yazılıyordu. Panel artık ekstre bakiye kontrolünü (açılış, giren, çıkan, kapanış, fark) gösteriyor. | Eksik | #570 |
 | 7.4 | "İlişkili kayıtlar" tablosunda `Kural BNK_BALANCE_MISMATCH` satırı, tarih ve tutar "—". | Güven | #570, #576 |
 
 ## 8. Komuta merkezi

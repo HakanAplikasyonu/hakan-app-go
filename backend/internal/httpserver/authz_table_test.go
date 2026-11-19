@@ -305,6 +305,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-statements":                                              azTenantWrite,
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}":                                 azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions":                                             azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/bank-balance-check":                                            azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/export":                                      azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-statement-exports":                                        azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-statement-exports":                                       azTenantReadAction,

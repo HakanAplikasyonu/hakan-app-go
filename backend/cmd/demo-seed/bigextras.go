@@ -132,6 +132,20 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				       i.created_at, i.created_at
 				FROM invoices i JOIN engagements e ON e.taxpayer_id = i.taxpayer_id AND e.id = ANY($1::bigint[])
 				WHERE i.source_system = $2 AND i.id % 41 = 0`, []any{engs, bigSource, prev, o.accountant()}},
+			// Sorunlu mükelleflerde ekstre gerçekten tutmaz (#570): bankanın
+			// bakiyesine giren bir çıkış hareketi iptal işaretli kalmış; açılış +
+			// giren − çıkan, ekstre kapanışından bu tutar kadar sapar. Uyarı
+			// boşuna değil, bakiye kontrolü farkı gösterir.
+			{"bank_transactions (bakiye farkı)", `
+				UPDATE bank_transactions bt SET is_cancelled = TRUE
+				FROM (
+					SELECT DISTINCT ON (x.taxpayer_id) x.id
+					FROM bank_transactions x JOIN engagements e ON e.taxpayer_id = x.taxpayer_id
+					WHERE e.id = ANY($1::bigint[]) AND x.period = $2 AND x.debit_credit = 'B'
+					  AND x.balance_after IS NOT NULL AND x.match_status = 'unmatched' AND NOT x.is_cancelled
+					ORDER BY x.taxpayer_id, x.transaction_date, x.id
+				) pick
+				WHERE bt.id = pick.id`, []any{problem, prev}},
 			// Beyan son günü yaklaşıyor (geçen ay, hazırlanmamışlar) ve sorunlu
 			// mükelleflerde dönemi kilitleyen engelleyiciler.
 			{"data_warnings (dönem)", `

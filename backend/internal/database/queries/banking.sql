@@ -244,3 +244,32 @@ WHERE bt.taxpayer_id = @taxpayer_id AND NOT bt.is_cancelled
   AND (sqlc.narg(cash_box_uuid)::uuid IS NULL OR cb.uuid = sqlc.narg(cash_box_uuid)::uuid)
 ORDER BY cb.id, bt.transaction_date, bt.booked_at, bt.id
 LIMIT @lim;
+
+-- name: BankBalanceCheck :many
+-- Dönemin ekstre bakiye kontrolü (#570): her hesapta ilk hareketin önceki
+-- bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
+-- Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
+WITH tx AS (
+    SELECT bt.cash_box_id, bt.debit_credit, bt.amount, bt.transaction_date, bt.balance_after,
+           COALESCE(bt.balance_before,
+                    bt.balance_after - CASE WHEN bt.debit_credit = 'A' THEN bt.amount ELSE -bt.amount END) AS before_balance,
+           row_number() OVER (PARTITION BY bt.cash_box_id
+                              ORDER BY bt.transaction_date, bt.booked_at, bt.bank_sequence NULLS LAST, bt.id) AS rn_first,
+           row_number() OVER (PARTITION BY bt.cash_box_id
+                              ORDER BY bt.transaction_date DESC, bt.booked_at DESC, bt.bank_sequence DESC NULLS LAST, bt.id DESC) AS rn_last
+    FROM bank_transactions bt
+    WHERE bt.taxpayer_id = @taxpayer_id AND bt.period = @period::text AND NOT bt.is_cancelled
+)
+SELECT cb.uuid AS cash_box_uuid, cb.name AS cash_box_name, cb.iban, cb.currency,
+       count(*)::bigint AS movements,
+       count(*) FILTER (WHERE tx.balance_after IS NULL)::bigint AS without_balance,
+       COALESCE(sum(tx.amount) FILTER (WHERE tx.debit_credit = 'A'), 0)::numeric(18,4) AS in_total,
+       COALESCE(sum(tx.amount) FILTER (WHERE tx.debit_credit = 'B'), 0)::numeric(18,4) AS out_total,
+       max(tx.before_balance) FILTER (WHERE tx.rn_first = 1)::numeric(18,4) AS opening,
+       max(tx.balance_after) FILTER (WHERE tx.rn_last = 1)::numeric(18,4) AS closing,
+       min(tx.transaction_date)::date AS first_date,
+       max(tx.transaction_date)::date AS last_date
+FROM tx
+JOIN cash_boxes cb ON cb.id = tx.cash_box_id AND cb.taxpayer_id = @taxpayer_id
+GROUP BY cb.uuid, cb.name, cb.iban, cb.currency
+ORDER BY cb.name, cb.uuid;

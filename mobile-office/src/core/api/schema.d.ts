@@ -10313,6 +10313,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-balance-check": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Statement balance check of a period
+         * @description Requires `tenant.bank.read` (#570). Per account: the first movement's
+         *     balance before (derived from the balance after when missing) plus
+         *     credits minus debits gives the expected closing balance, compared
+         *     with the last movement's balance after. A non-zero `difference`
+         *     means missing, duplicate or cancelled-but-booked movements.
+         *     Without bank balances on the statement the opening, closing and
+         *     difference are null and `balanced` is false.
+         */
+        get: operations["checkTenantBankBalances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions": {
         parameters: {
             query?: never;
@@ -12638,6 +12672,31 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BankBalanceCheck: {
+            /** Format: uuid */
+            cash_box_uuid: string;
+            cash_box_name: string;
+            iban: string | null;
+            currency: string;
+            /** Format: int64 */
+            movements: number;
+            /** Format: date */
+            first_date: string;
+            /** Format: date */
+            last_date: string;
+            /** @example 2500.00 */
+            in_total: string;
+            /** @example 1200.00 */
+            out_total: string;
+            opening: string | null;
+            expected_closing: string | null;
+            closing: string | null;
+            /** @description closing − expected_closing */
+            difference: string | null;
+            balanced: boolean;
+            /** Format: int64 */
+            without_balance: number;
+        };
         BillingPlan: {
             readonly code?: string;
             name: string;
@@ -36597,6 +36656,49 @@ export interface operations {
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    checkTenantBankBalances: {
+        parameters: {
+            query: {
+                period: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            period: string;
+                            items: components["schemas"]["BankBalanceCheck"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
