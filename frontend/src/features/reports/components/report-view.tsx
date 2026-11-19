@@ -1,6 +1,6 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import {
   Bar,
@@ -14,6 +14,7 @@ import {
 } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
@@ -22,7 +23,21 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type {
   ReportCategory,
   TaxpayerReport,
@@ -484,18 +499,32 @@ export function ReportView({
         </Card>
       ) : null}
 
-      <details className="border-line rounded-lg border">
-        <summary className="text-text-2 hover:text-foreground cursor-pointer px-4 py-3 text-sm font-medium">
-          {t("reports.table_toggle")}
-        </summary>
-        <div className="overflow-x-auto px-4 pb-4">
-          <table className="w-full text-sm">
-            <caption className="sr-only">{t("reports.table_caption")}</caption>
-            <thead>
-              <tr className="text-text-2 border-line border-b text-left text-xs">
-                <th scope="col" className="py-2 pr-3 font-medium">
+      <Collapsible className="border-line rounded-lg border">
+        <CollapsibleTrigger asChild>
+          <Button
+            variant="ghost"
+            className="group text-text-2 hover:text-foreground h-auto w-full justify-start gap-1.5 rounded-lg px-4 py-3 text-sm font-medium hover:bg-transparent has-[>svg]:px-4"
+          >
+            <ChevronRight
+              aria-hidden
+              className="size-4 transition-transform group-data-[state=open]:rotate-90"
+            />
+            {t("reports.table_toggle")}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="px-4 pb-4">
+          <Table className="w-full text-sm">
+            <TableCaption className="sr-only">
+              {t("reports.table_caption")}
+            </TableCaption>
+            <TableHeader>
+              <TableRow className="border-line text-xs hover:bg-transparent">
+                <TableHead
+                  scope="col"
+                  className="text-text-2 h-auto py-2 pr-3 pl-0 font-medium"
+                >
                   {t("reports.col_month")}
-                </th>
+                </TableHead>
                 {(
                   [
                     "series_revenue",
@@ -505,25 +534,28 @@ export function ReportView({
                     "series_vat_deductible",
                   ] as const
                 ).map((k) => (
-                  <th
+                  <TableHead
                     key={k}
                     scope="col"
-                    className="py-2 pl-3 text-right font-medium"
+                    className="text-text-2 h-auto py-2 pr-0 pl-3 text-right font-medium"
                   >
                     {t(`reports.${k}`)}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {report.months.map((m) => (
-                <tr
+                <TableRow
                   key={m.period}
-                  className="border-line border-b last:border-0"
+                  className="border-line hover:bg-transparent"
                 >
-                  <th scope="row" className="py-1.5 pr-3 text-left font-normal">
+                  <TableHead
+                    scope="row"
+                    className="text-foreground h-auto py-1.5 pr-3 pl-0 font-normal"
+                  >
                     {m.label}
-                  </th>
+                  </TableHead>
                   {[
                     m.revenue,
                     m.expenses,
@@ -531,22 +563,22 @@ export function ReportView({
                     m.vat_calculated,
                     m.vat_deductible,
                   ].map((v, i) => (
-                    <td
+                    <TableCell
                       key={i}
                       className={cn(
-                        "py-1.5 pl-3 text-right font-mono tabular-nums",
+                        "py-1.5 pr-0 pl-3 text-right font-mono tabular-nums",
                         num(v) < 0 && "text-danger",
                       )}
                     >
                       {money(v, locale)}
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+            </TableBody>
+          </Table>
+        </CollapsibleContent>
+      </Collapsible>
 
       <ul className="text-text-2 list-disc space-y-0.5 pl-5 text-xs">
         {report.notes.map((n) => (

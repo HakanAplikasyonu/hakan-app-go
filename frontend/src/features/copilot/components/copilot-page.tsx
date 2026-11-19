@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { Label } from "@/components/ui/label";
 import { EntityTable } from "@/components/entity";
 import { createColumn, createSelectColumnDef } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -253,10 +254,10 @@ export function CopilotPage() {
                 aria-label={t("office.copilot.search")}
                 className="w-64 max-w-full"
               />
-              <label className="flex items-center gap-2 text-sm">
+              <Label className="flex items-center gap-2 text-sm leading-normal font-normal">
                 <Switch checked={onlyOpen} onCheckedChange={setOnlyOpen} />
                 {t("office.copilot.only_open")}
-              </label>
+              </Label>
               {closed > 0 ? (
                 <span className="text-text-3 text-xs">
                   {t("office.copilot.closed_count", { count: closed })}

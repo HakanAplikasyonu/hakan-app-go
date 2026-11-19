@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { Star } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { DataTable, createColumn, createDateColumn } from "@/components/tables";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,9 +70,9 @@ export function StorageFileList({
         cell: ({ row }) => {
           const item = row.original;
           return (
-            <button
-              type="button"
-              className="flex max-w-md items-center gap-2 text-start"
+            <Button
+              variant="ghost"
+              className="h-auto max-w-md justify-start gap-2 p-0 text-start font-normal hover:bg-transparent has-[>svg]:px-0"
               onClick={() => onOpen(item)}
               data-storage-key={item.key}
             >
@@ -84,7 +85,7 @@ export function StorageFileList({
               {item.is_starred ? (
                 <Star className="size-3.5 fill-amber-400 text-amber-400" />
               ) : null}
-            </button>
+            </Button>
           );
         },
       }),

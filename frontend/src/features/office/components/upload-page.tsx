@@ -5,6 +5,7 @@ import { FileUp, Loader2, Upload } from "lucide-react";
 import Link from "next/link";
 import { Suspense, useMemo, useRef, useState } from "react";
 
+import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/common/empty-state";
 import { DataTable, createColumn } from "@/components/tables";
 import { PageHeader } from "@/components/layout/page-header";
@@ -292,7 +293,7 @@ function UploadInner() {
               }}
             />
           )}
-          <label
+          <Label
             onDragOver={(e) => {
               e.preventDefault();
               setDragging(true);
@@ -304,7 +305,7 @@ function UploadInner() {
               accept(e.dataTransfer.files);
             }}
             className={cn(
-              "hover:border-brand/60 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors",
+              "hover:border-brand/60 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-6 py-10 text-center text-base leading-normal font-normal transition-colors",
               dragging && "border-brand bg-brand/5",
             )}
           >
@@ -322,7 +323,7 @@ function UploadInner() {
               onChange={(e) => accept(e.target.files)}
               data-testid="ubl-input"
             />
-          </label>
+          </Label>
           {files.length ? (
             <ul className="text-sm">
               {files.map((f) => (

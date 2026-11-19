@@ -74,6 +74,14 @@ import {
 import type { ColumnAlign } from "@/components/tables/types";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -776,8 +784,9 @@ export function EditableGrid<TData>({
         className="border-border relative w-full overflow-auto rounded-lg border"
         style={maxHeight != null ? { maxHeight } : undefined}
       >
-        <table
+        <Table
           ref={tableRef}
+          containerClassName="overflow-visible"
           role="grid"
           aria-label={label}
           aria-rowcount={rows.length + 1}
@@ -791,25 +800,29 @@ export function EditableGrid<TData>({
           onPaste={onPaste}
           onBlur={onBlur}
         >
-          <thead className="bg-muted sticky top-0 z-20">
-            <tr role="row" aria-rowindex={1}>
-              <th
+          <TableHeader className="bg-muted sticky top-0 z-20 [&_tr]:border-b-0">
+            <TableRow
+              role="row"
+              aria-rowindex={1}
+              className="border-0 transition-none hover:bg-transparent"
+            >
+              <TableHead
                 role="columnheader"
                 aria-colindex={1}
                 scope="col"
-                className="border-border text-muted-foreground w-14 border-e border-b px-2 py-1.5 text-start text-xs font-medium"
+                className="border-border text-muted-foreground h-auto w-14 border-e border-b px-2 py-1.5 text-start text-xs font-medium"
               >
                 <span className="sr-only">{t("table.grid_status")}</span>#
-              </th>
+              </TableHead>
               {columns.map((col, ci) => (
-                <th
+                <TableHead
                   key={col.id}
                   role="columnheader"
                   aria-colindex={ci + 2}
                   scope="col"
                   style={col.width != null ? { width: col.width } : undefined}
                   className={cn(
-                    "border-border text-muted-foreground border-e border-b px-2 py-1.5 text-start text-xs font-medium whitespace-nowrap last:border-e-0",
+                    "border-border text-muted-foreground h-auto border-e border-b px-2 py-1.5 text-start text-xs font-medium whitespace-nowrap last:border-e-0",
                     col.align && alignClass[col.align],
                     !col.editor && "bg-muted/60",
                   )}
@@ -820,14 +833,18 @@ export function EditableGrid<TData>({
                       *
                     </span>
                   ) : null}
-                </th>
+                </TableHead>
               ))}
-            </tr>
-          </thead>
-          <tbody>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.length === 0 ? (
-              <tr role="row" aria-rowindex={2}>
-                <td
+              <TableRow
+                role="row"
+                aria-rowindex={2}
+                className="border-0 transition-none hover:bg-transparent"
+              >
+                <TableCell
                   role="gridcell"
                   aria-colindex={1}
                   colSpan={columns.length + 1}
@@ -841,8 +858,8 @@ export function EditableGrid<TData>({
                       {emptyDescription}
                     </p>
                   ) : null}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
               rows.map((row, ri) => {
                 const rowId = rowIds[ri]!;
@@ -851,22 +868,23 @@ export function EditableGrid<TData>({
                 const rowErr = errors[rowId];
                 const rowSelected = ri >= range.top && ri <= range.bottom;
                 return (
-                  <tr
+                  <TableRow
                     key={rowId}
                     role="row"
                     aria-rowindex={ri + 2}
                     data-dirty={dirty || undefined}
                     className={cn(
-                      "border-border border-b last:border-b-0",
-                      dirty && "bg-amber-50/60 dark:bg-amber-950/20",
+                      "border-border border-b transition-none last:border-b-0 hover:bg-transparent",
+                      dirty &&
+                        "bg-amber-50/60 hover:bg-amber-50/60 dark:bg-amber-950/20 dark:hover:bg-amber-950/20",
                     )}
                   >
-                    <th
+                    <TableHead
                       role="rowheader"
                       scope="row"
                       aria-colindex={1}
                       className={cn(
-                        "border-border text-muted-foreground border-e px-2 py-1 text-start text-xs font-normal tabular-nums",
+                        "border-border text-muted-foreground h-auto border-e px-2 py-1 text-start text-xs font-normal whitespace-normal tabular-nums",
                         rowSelected && "bg-muted",
                       )}
                       title={st?.state === "error" ? st.message : undefined}
@@ -890,7 +908,7 @@ export function EditableGrid<TData>({
                                 ? t("table.grid_dirty")
                                 : null}
                       </span>
-                    </th>
+                    </TableHead>
                     {columns.map((col, ci) => {
                       const c = { row: ri, col: ci };
                       const isActive = ri === active.row && ci === active.col;
@@ -912,7 +930,7 @@ export function EditableGrid<TData>({
                         editable;
                       const errId = err ? `${gridId}-e-${ri}-${ci}` : undefined;
                       return (
-                        <td
+                        <TableCell
                           key={col.id}
                           ref={(el) => {
                             const k = `${ri}:${ci}`;
@@ -997,15 +1015,15 @@ export function EditableGrid<TData>({
                               className="bg-primary border-background absolute -end-1 -bottom-1 z-20 size-2 cursor-crosshair border"
                             />
                           ) : null}
-                        </td>
+                        </TableCell>
                       );
                     })}
-                  </tr>
+                  </TableRow>
                 );
               })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       <p id={`${gridId}-help`} className="sr-only">
         {t("table.grid_help")}

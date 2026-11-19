@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import type { ReportRange } from "@/features/reports/services/reports.service";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -63,9 +64,9 @@ export function ReportRangePicker({
         className="border-line bg-surface-2 inline-flex rounded-md border p-0.5"
       >
         {(["month", "year"] as const).map((kind) => (
-          <button
+          <Button
             key={kind}
-            type="button"
+            variant="ghost"
             role="radio"
             aria-checked={value.kind === kind}
             onClick={() =>
@@ -90,16 +91,16 @@ export function ReportRangePicker({
               )
             }
             className={cn(
-              "focus-visible:ring-ring min-h-9 rounded px-3 text-sm focus-visible:ring-2 focus-visible:outline-none",
+              "h-auto min-h-9 rounded px-3 py-0 text-sm font-normal",
               value.kind === kind
-                ? "bg-surface text-foreground font-semibold shadow-sm"
-                : "text-text-2 hover:text-foreground",
+                ? "bg-surface text-foreground hover:bg-surface hover:text-foreground font-semibold shadow-sm"
+                : "text-text-2 hover:text-foreground hover:bg-transparent",
             )}
           >
             {kind === "month"
               ? t("reports.kind_month")
               : t("reports.kind_year")}
-          </button>
+          </Button>
         ))}
       </div>
       <Select

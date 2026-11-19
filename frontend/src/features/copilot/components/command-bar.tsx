@@ -3,6 +3,7 @@
 import { CornerDownLeft, Sparkles } from "lucide-react";
 import { useState } from "react";
 
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/providers/locale-provider";
@@ -35,9 +36,9 @@ export function CommandBar() {
         submit(text);
       }}
     >
-      <label htmlFor="copilot-command" className="text-sm font-medium">
+      <Label htmlFor="copilot-command" className="leading-normal">
         {t("office.copilot.command.label")}
-      </label>
+      </Label>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Sparkles
@@ -64,14 +65,14 @@ export function CommandBar() {
           {t("office.copilot.command.examples")}
         </span>
         {EXAMPLES.map((k) => (
-          <button
+          <Button
             key={k}
-            type="button"
-            className="bg-surface-2 hover:bg-surface-3 rounded-full border px-2.5 py-1"
+            variant="ghost"
+            className="bg-surface-2 hover:bg-surface-3 h-auto rounded-full border px-2.5 py-1 text-xs font-normal"
             onClick={() => submit(t(`office.copilot.command.${k}`))}
           >
             {t(`office.copilot.command.${k}`)}
-          </button>
+          </Button>
         ))}
       </div>
       <p className="text-text-3 text-xs">{t("office.copilot.command.hint")}</p>

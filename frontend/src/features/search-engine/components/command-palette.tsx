@@ -4,6 +4,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 
+import { Button } from "@/components/ui/button";
 import type { NavCatalog } from "@/features/nav-engine/types";
 import {
   CommandDialog,
@@ -70,12 +71,13 @@ export function CommandPalette({
             const active = data.effectiveSpec === spec.id;
             const Icon = spec.icon;
             return (
-              <button
+              <Button
                 key={spec.id}
-                type="button"
+                variant="ghost"
+                aria-pressed={active}
                 onClick={() => data.setActiveSpec(active ? undefined : spec.id)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  "h-auto gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors has-[>svg]:px-2.5",
                   active
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-muted/40 text-muted-foreground hover:bg-muted",
@@ -83,7 +85,7 @@ export function CommandPalette({
               >
                 <Icon className="size-3.5" />
                 {spec.label}
-              </button>
+              </Button>
             );
           })}
         </div>
