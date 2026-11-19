@@ -50,7 +50,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 |---|---|---|---|---|---|
 | B1 | Mükellef detayı → Belgeler / Yükleme | Genel Excel içe aktarma sihirbazı: yükle → sütun eşle → doğrula → satır düzelt → işle / geri al; şablonlar | 12 uç var (`/excel-imports…`, `/v1/tenant/excel-import-templates`, `/excel-import-data-types`); ekran yok. Demo verisi var (`demo-seed/excelimport.go`) | P1 | L |
 | B2 ✅ | Mükellef detayı → dönem şeridi | Kilitli döneme gelen değişiklik talepleri: liste, uygula, reddet | `/change-requests` (4 uç) ekransız; kilitli döneme düşen kayıtlar sessizce bekliyor. **Yapıldı (#518):** dönem şeridinin altında açık talep paneli (alan farkı eski→yeni, kaynak, faturayı aç, uygula/reddet; `tenant.periods.read` / `tenant.change_requests.decide`). Kalan: demo verisinde talep yok | P1 | M |
-| B3 | Mükellef detayı (yeni sekme ya da Ayarlar) | KVKK ilgili kişi talepleri: oluştur, onayla/reddet, dışa aktar | `/privacy-requests` (6 uç) ekransız; yetki matrisi bunu `azTenantReadPriv` olarak ayırmış | P1 | M |
+| B3 ✅ | Mükellef detayı (yeni sekme ya da Ayarlar) | KVKK ilgili kişi talepleri: oluştur, onayla/reddet, dışa aktar | `/privacy-requests` (6 uç) ekransız; yetki matrisi bunu `azTenantReadPriv` olarak ayırmış **Yapıldı (#518):** mükellef detayında "KVKK" sekmesi (`tenant.privacy.request`): talep aç (dışa aktarım / silme, gerekçe), liste, onayla (silmede geri alınamaz uyarısı) / gerekçeyle reddet (`tenant.privacy.approve`), süresi dolana kadar ZIP indir; demo verisi eklendi. Kalan: tek kullanıcı için talep (`subject_type: user`) — mükellef kullanıcı listesi ucu gerekir | P1 | M |
 | B4 | Mükellef detayı → Rapor | Yapay zekâ dönem özeti: taslak, düzenle, onayla | `/period-summaries` (5 uç) ekransız; demo verisinde yalnızca dolaylı geçiyor | P2 | M |
 | B5 | Mükellef detayı → Uyarılar | "Kontrolleri çalıştır" düğmesi | `POST /controls/run` ekransız | P2 | S |
 | B6 | Mükellef detayı → Banka | "Faturalarla eşleştir" düğmesi | `POST /bank-matching` ekransız | P2 | S |
@@ -98,7 +98,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 ## Önerilen uygulama sırası (#518)
 
-Durum: 1–6 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sıradaki: 7.
+Durum: 1–7 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sıradaki: 8.
 
 1. ✅ **Mükellef detayına "Bağlantılar" sekmesi** iskeleti: bütün mükellef düzeyi bağlantıları (entegratör, banka, Easytrade, Paraşüt, KolayBi, WhatsApp, muhasebe aktarımı) tek yerde, durum rozeti ve son senkron saatiyle. Easytrade ve aktarım ayarı buraya bağlanır.
 2. ✅ **A2 banka web servis bağlantısı** (API hazır) + D4 çıkış IP'si bilgisi.
@@ -106,7 +106,7 @@ Durum: 1–6 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sır
 4. **A3 Paraşüt, A4 KolayBi** (API hazır).
 5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte). (C1 mobil kaldı.)
 6. ✅ **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
-7. **B3 KVKK talepleri.**
+7. ✅ **B3 KVKK talepleri.**
 8. **B1 genel Excel içe aktarma sihirbazı.**
 9. **A5 inceleme eşiği**, ardından B4–B9, C2–C3, D1–D3, A6 (P2'ler).
 

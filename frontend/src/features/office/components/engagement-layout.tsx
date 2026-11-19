@@ -146,6 +146,12 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementConnections(slug, engagement),
       label: t("office.engagement.tab_connections"),
     },
+    // KVKK ilgili kişi talepleri (#518 B3).
+    {
+      href: routes.tenant.engagementPrivacy(slug, engagement),
+      label: t("office.engagement.tab_privacy"),
+      permission: Permission.TenantPrivacyRequest,
+    },
   ];
   return visibleTabs(tabs, can);
 }
