@@ -40,6 +40,7 @@ import { usePermission } from "@/providers/permission-provider";
 
 import {
   bankStep,
+  lastDays,
   splitIBANs,
   useBankConnections,
   type BankConnection,
@@ -47,6 +48,7 @@ import {
 } from "../hooks/use-bank-connections";
 import type { EasytradeConnection } from "../hooks/use-easytrade";
 
+import { AccountingSection } from "./accounting-connections-section";
 import { EinvoiceSection } from "./einvoice-connections-section";
 
 type BC = ReturnType<typeof useBankConnections>;
@@ -63,15 +65,6 @@ const statusTone: Record<string, "ok" | "warn" | "danger" | "neutral"> = {
 
 function errText(err: unknown, fallback: string) {
   return isApiError(err) ? err.message : fallback;
-}
-
-/** Son 7 gün (bugün dahil), YYYY-MM-DD: "şimdi çek" aralığı. */
-export function lastDays(n: number, today = new Date()) {
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const from = new Date(today);
-  from.setDate(from.getDate() - (n - 1));
-  return { from: iso(from), to: iso(today) };
 }
 
 /**
@@ -103,6 +96,9 @@ export function EngagementConnectionsPage({
       ) : null}
       {can(Permission.TenantInvoicesRead) ? (
         <EinvoiceSection engagement={engagement} />
+      ) : null}
+      {can(Permission.TenantInvoicesRead) ? (
+        <AccountingSection engagement={engagement} />
       ) : null}
       <OtherConnections engagement={engagement} />
     </div>

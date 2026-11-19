@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/parasut"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
@@ -37,6 +40,34 @@ func seedEinvoiceConnection(ctx context.Context, pool *pgxpool.Pool, taxpayerID 
 		if _, err := q.FinishSyncRun(ctx, db.FinishSyncRunParams{
 			TaxpayerID: taxpayerID, ID: run.ID, Status: "success", Counters: counters,
 		}); err != nil {
+			return err
+		}
+		_, err = q.SetSourceConnectionStatus(ctx, db.SetSourceConnectionStatusParams{
+			TaxpayerID: taxpayerID, ID: conn.ID, Status: "active",
+		})
+		return err
+	})
+}
+
+// seedParasutConnection gives the taxpayer a connected Paraşüt company with
+// the last sync's counts (#518 A3). No tokens: "son 30 günü çek" answers the
+// Paraşüt error, the demo never calls Paraşüt.
+func seedParasutConnection(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64) error {
+	return rls.System(ctx, pool, "demo-seed: Paraşüt connection", func(ctx context.Context, tx pgx.Tx) error {
+		q := database.QueriesFor(pool)
+		synced := time.Now().UTC().Add(-26 * time.Hour)
+		meta, _ := json.Marshal(map[string]any{
+			"company_name": "Atlas Gıda Ticaret A.Ş.", "last_sync_at": synced,
+			"last_report": map[string]any{
+				"invoices_created": 37, "invoices_existing": 4, "expenses_created": 12, "expenses_updated": 1,
+				"expenses_unchanged": 0, "possible_duplicates": 2, "excluded": map[string]int{"cancelled": 1},
+			},
+		})
+		conn, err := q.CreateSourceConnection(ctx, db.CreateSourceConnectionParams{
+			TaxpayerID: taxpayerID, SourceSystem: parasut.SourceSystem, SetupState: "active", Meta: meta,
+			ExternalCompanyID: pgtype.Text{String: "112233", Valid: true},
+		})
+		if err != nil {
 			return err
 		}
 		_, err = q.SetSourceConnectionStatus(ctx, db.SetSourceConnectionStatusParams{

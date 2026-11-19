@@ -108,6 +108,8 @@ export const routes = {
   tenant: {
     /** Organization picker for users with several memberships. */
     picker: "/t",
+    /** Paraşüt OAuth dönüşü; PARASUT_REDIRECT_URL bu yolu gösterir (#518). */
+    parasutCallback: "/parasut/callback",
     home: (slug: string) => `/t/${encodeURIComponent(slug)}`,
     members: (slug: string) => `/t/${encodeURIComponent(slug)}/members`,
     roles: (slug: string) => `/t/${encodeURIComponent(slug)}/roles`,

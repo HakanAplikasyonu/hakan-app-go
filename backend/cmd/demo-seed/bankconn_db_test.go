@@ -8,6 +8,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/webservice/vakifbank"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/parasut"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -60,5 +61,24 @@ func TestDemoEinvoiceConnection(t *testing.T) {
 	if c.IntegratorID != "izibiz" || c.State != "active" || c.HasCredentials || c.LastSuccessAt == nil ||
 		c.LastRun == nil || c.LastRun.Status != "success" || c.LastRun.Counters.New != 148 {
 		t.Errorf("connection = %+v run=%+v", c, c.LastRun)
+	}
+}
+
+// TestDemoParasutConnection (#518 A3): Paraşüt bağlı, şirketi seçili, son
+// çekimin sayıları görünür.
+func TestDemoParasutConnection(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	if err := seed(ctx, d.Pool, "Demo-Test-1!", ""); err != nil {
+		t.Fatal(err)
+	}
+	atlas := demoScope(t, d, "atlas")
+	list, err := parasut.NewService(d.Pool, nil, parasut.App{}, nil).List(ctx, atlas.TaxpayerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Status != "active" || list[0].CompanyID == "" || list[0].CompanyName == "" ||
+		list[0].LastReport == nil || list[0].LastReport.InvoicesCreated != 37 || list[0].AuthorizeURL != "" {
+		t.Fatalf("parasut = %+v", list)
 	}
 }
