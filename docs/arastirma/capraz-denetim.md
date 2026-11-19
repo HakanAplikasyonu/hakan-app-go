@@ -48,7 +48,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 | # | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|
-| B1 ◐ | Mükellef detayı → Belgeler / Yükleme | Genel Excel içe aktarma sihirbazı: yükle → sütun eşle → doğrula → satır düzelt → işle / geri al; şablonlar | 12 uç var (`/excel-imports…`, `/v1/tenant/excel-import-templates`, `/excel-import-data-types`); ekran yok. Demo verisi var (`demo-seed/excelimport.go`) **Yapıldı (#518):** mükellef detayında "Excel aktarımı" sekmesi (`tenant.excel_imports.read`): yükle (tür, dönem), aktarım listesi, durum ve sayılar, sütun eşleme (zorunlu alan / çift alan denetimi, şablon olarak sakla), satır sonuçları (süzgeç, atla / geri al), yeniden denetle, kayda işle (`tenant.excel_imports.commit`), fatura aktarımını geri al. BFF artık `Idempotency-Key` başlığını iletiyor (işleme bunsuz çalışmıyordu). Kalan: şablon yönetimi (liste / sil), sayfa (sheet) seçimi, e2e testi | P1 | L |
+| B1 ✅ | Mükellef detayı → Belgeler / Yükleme | Genel Excel içe aktarma sihirbazı: yükle → sütun eşle → doğrula → satır düzelt → işle / geri al; şablonlar | 12 uç var (`/excel-imports…`, `/v1/tenant/excel-import-templates`, `/excel-import-data-types`); ekran yok. Demo verisi var (`demo-seed/excelimport.go`) **Yapıldı (#518):** mükellef detayında "Excel aktarımı" sekmesi (`tenant.excel_imports.read`): yükle (tür, dönem), aktarım listesi, durum ve sayılar, sütun eşleme (zorunlu alan / çift alan denetimi, şablon olarak sakla), satır sonuçları (süzgeç, atla / geri al), yeniden denetle, kayda işle (`tenant.excel_imports.commit`), fatura aktarımını geri al. BFF artık `Idempotency-Key` başlığını iletiyor (işleme bunsuz çalışmıyordu). Kayıtlı şablonlar listelenir ve silinir; yüklemede sayfa adı verilebilir (API sayfa listesi sunmuyor). Kalan: e2e testi | P1 | L |
 | B2 ✅ | Mükellef detayı → dönem şeridi | Kilitli döneme gelen değişiklik talepleri: liste, uygula, reddet | `/change-requests` (4 uç) ekransız; kilitli döneme düşen kayıtlar sessizce bekliyor. **Yapıldı (#518):** dönem şeridinin altında açık talep paneli (alan farkı eski→yeni, kaynak, faturayı aç, uygula/reddet; `tenant.periods.read` / `tenant.change_requests.decide`). Kalan: demo verisinde talep yok | P1 | M |
 | B3 ✅ | Mükellef detayı (yeni sekme ya da Ayarlar) | KVKK ilgili kişi talepleri: oluştur, onayla/reddet, dışa aktar | `/privacy-requests` (6 uç) ekransız; yetki matrisi bunu `azTenantReadPriv` olarak ayırmış **Yapıldı (#518):** mükellef detayında "KVKK" sekmesi (`tenant.privacy.request`): talep aç (dışa aktarım / silme, gerekçe), liste, onayla (silmede geri alınamaz uyarısı) / gerekçeyle reddet (`tenant.privacy.approve`), süresi dolana kadar ZIP indir; demo verisi eklendi. Kalan: tek kullanıcı için talep (`subject_type: user`) — mükellef kullanıcı listesi ucu gerekir | P1 | M |
 | B4 | Mükellef detayı → Rapor | Yapay zekâ dönem özeti: taslak, düzenle, onayla | `/period-summaries` (5 uç) ekransız; demo verisinde yalnızca dolaylı geçiyor | P2 | M |
@@ -107,7 +107,7 @@ Durum: 1–7 ve 9'un A5'i yapıldı (D4 ertelendi: platform paneli P2; C1 mobil 
 5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte).
 6. ✅ **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
 7. ✅ **B3 KVKK talepleri.**
-8. ◐ **B1 genel Excel içe aktarma sihirbazı.** (Şablon yönetimi ve e2e kaldı.)
+8. ✅ **B1 genel Excel içe aktarma sihirbazı.** (e2e kaldı.)
 9. ✅ **A5 inceleme eşiği**, ardından B4–B9, C2–C3, D1–D3, A6 (P2'ler).
 
 Her adımda demo verisi (G) aynı PR'da doldurulur.

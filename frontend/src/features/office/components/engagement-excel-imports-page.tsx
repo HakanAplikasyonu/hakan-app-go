@@ -210,7 +210,121 @@ function Inner({ engagement }: { engagement: string }) {
           </ul>
         )}
       </section>
+
+      <TemplatesSection dataTypes={dataTypes} canWrite={canWrite} />
     </div>
+  );
+}
+
+/**
+ * Kayıtlı sütun şablonları: aynı düzendeki dosya bir dahaki sefere yapay
+ * zekâsız eşlenir. Ofis şablonları silinebilir; genel şablonlar silinemez.
+ */
+function TemplatesSection({
+  dataTypes,
+  canWrite,
+}: {
+  dataTypes: ExcelImportDataType[];
+  canWrite: boolean;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { confirmDelete } = useDialogs();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const q = useQuery({
+    queryKey: excelImportKeys.templates(slug),
+    queryFn: () => excelImportsService.templates(slug),
+    enabled: open,
+  });
+  const remove = useMutation({
+    mutationFn: (uuid: string) =>
+      excelImportsService.deleteTemplate(slug, uuid),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: excelImportKeys.templates(slug) });
+      toast.success(t("office.excel.template_deleted"));
+    },
+    onError: (e) => toast.error(errText(e, t("office.excel.action_failed"))),
+  });
+  const items = q.data?.items ?? [];
+  return (
+    <section aria-labelledby="excel-templates-title" className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 id="excel-templates-title" className="flex-1 text-sm font-semibold">
+          {t("office.excel.templates_title")}
+        </h3>
+        <Button
+          variant="outline"
+          size="sm"
+          aria-expanded={open}
+          aria-controls="excel-templates-list"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open
+            ? t("office.excel.templates_hide")
+            : t("office.excel.templates_show")}
+        </Button>
+      </div>
+      {open ? (
+        <div id="excel-templates-list">
+          {q.isLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : q.isError ? (
+            <p role="alert" className="text-danger text-sm">
+              {q.error.message}
+            </p>
+          ) : items.length === 0 ? (
+            <p className="text-text-3 text-sm">
+              {t("office.excel.templates_empty")}
+            </p>
+          ) : (
+            <ul className="bg-surface border-line divide-line divide-y rounded-xl border">
+              {items.map((x) => (
+                <li
+                  key={x.uuid}
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
+                >
+                  <span className="min-w-40 flex-1 text-sm">
+                    <span className="font-medium">
+                      {typeLabel(dataTypes, x.data_type) ??
+                        t("office.excel.type_unknown")}
+                    </span>
+                    {x.source_system ? (
+                      <span className="text-text-2"> · {x.source_system}</span>
+                    ) : null}
+                    <span className="text-text-3 block text-xs">
+                      {t("office.excel.template_columns", {
+                        count: (x.columns ?? []).filter((c) => c.field).length,
+                      })}
+                    </span>
+                  </span>
+                  <StatusPill tone={x.scope === "global" ? "neutral" : "info"}>
+                    {t(`office.excel.scope_${x.scope ?? "tenant"}`)}
+                  </StatusPill>
+                  {canWrite && x.scope !== "global" && x.uuid ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="max-md:min-h-11"
+                      disabled={remove.isPending}
+                      onClick={async () => {
+                        const ok = await confirmDelete({
+                          title: t("office.excel.template_delete_title"),
+                          description: t("office.excel.template_delete_body"),
+                        });
+                        if (ok && x.uuid) remove.mutate(x.uuid);
+                      }}
+                    >
+                      {t("office.excel.template_delete")}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -234,6 +348,7 @@ function UploadForm({
   const input = useRef<HTMLInputElement>(null);
   const [dataType, setDataType] = useState<string>(AUTO);
   const [period, setPeriod] = useState("");
+  const [sheet, setSheet] = useState("");
   const upload = useMutation({
     mutationFn: (file: File) =>
       excelImportsService.upload(slug, engagement, {
@@ -241,6 +356,7 @@ function UploadForm({
         dataType:
           dataType === AUTO ? undefined : (dataType as ExcelDataTypeKey),
         period: /^\d{4}-(0[1-9]|1[0-2])$/.test(period) ? period : undefined,
+        sheet: sheet.trim() || undefined,
       }),
     onSuccess: (x) => {
       void qc.invalidateQueries({
@@ -260,7 +376,7 @@ function UploadForm({
       <h3 id={`${id}-title`} className="text-sm font-semibold">
         {t("office.excel.new_title")}
       </h3>
-      <div className="grid gap-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
+      <div className="grid gap-3 sm:grid-cols-[1fr_10rem_12rem_auto] sm:items-end">
         <div className="space-y-1">
           <Label htmlFor={`${id}-type`}>{t("office.excel.data_type")}</Label>
           <Select value={dataType} onValueChange={setDataType}>
@@ -290,6 +406,15 @@ function UploadForm({
             pattern="\d{4}-(0[1-9]|1[0-2])"
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-sheet`}>{t("office.excel.sheet")}</Label>
+          <Input
+            id={`${id}-sheet`}
+            placeholder={t("office.excel.sheet_placeholder")}
+            value={sheet}
+            onChange={(e) => setSheet(e.target.value)}
           />
         </div>
         {/* Dosya seçimi gizli girişle; tetikleyen düğme görünür. */}

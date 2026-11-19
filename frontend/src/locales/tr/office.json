@@ -2013,5 +2013,19 @@
   "excel.action_failed": "İşlem tamamlanamadı",
   "excel.close": "Kapat",
   "excel.prev": "Önceki",
-  "excel.next": "Sonraki"
+  "excel.next": "Sonraki",
+  "excel.sheet": "Sayfa (isteğe bağlı)",
+  "excel.sheet_placeholder": "İlk sayfa",
+  "excel.templates_title": "Kayıtlı sütun şablonları",
+  "excel.templates_show": "Şablonları göster",
+  "excel.templates_hide": "Gizle",
+  "excel.templates_empty": "Kayıtlı şablon yok. Bir aktarımda eşlemeyi kaydederken \"şablon olarak sakla\"yı işaretleyin.",
+  "excel.template_columns": "{{count}} sütun eşli",
+  "excel.scope_company": "Mükellef",
+  "excel.scope_tenant": "Ofis",
+  "excel.scope_global": "Genel",
+  "excel.template_delete": "Sil",
+  "excel.template_delete_title": "Şablon silinsin mi?",
+  "excel.template_delete_body": "Aynı düzendeki dosyalar bundan sonra yeniden eşlenir. Yapılmış aktarımlar etkilenmez.",
+  "excel.template_deleted": "Şablon silindi"
 }

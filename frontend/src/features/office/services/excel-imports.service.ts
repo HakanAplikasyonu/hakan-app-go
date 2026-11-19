@@ -8,6 +8,7 @@ export type ExcelImportRow = components["schemas"]["ExcelImportRow"];
 export type ExcelImportDataType = components["schemas"]["ExcelImportDataType"];
 export type ExcelImportMappingInput =
   components["schemas"]["ExcelImportMappingInput"];
+export type ExcelImportTemplate = components["schemas"]["ExcelImportTemplate"];
 export type ExcelDataTypeKey = ExcelImportDataType["data_type"];
 export type ExcelRowResult = ExcelImportRow["result"];
 
@@ -35,12 +36,16 @@ export const excelImportKeys = {
     [...root(slug, engagement), "one", uuid, "rows", result, offset] as const,
   dataTypes: (slug: string) =>
     ["tenant", slug.toLowerCase(), "excel-import-data-types"] as const,
+  templates: (slug: string) =>
+    ["tenant", slug.toLowerCase(), "excel-import-templates"] as const,
 };
 
 export type ExcelUploadInput = {
   file: File;
   dataType?: ExcelDataTypeKey;
   period?: string;
+  /** Çok sayfalı dosyada okunacak sayfanın adı; boşsa ilk sayfa. */
+  sheet?: string;
 };
 
 /** Genel Excel / CSV içe aktarma (#395; ekran #518 B1). */
@@ -50,6 +55,21 @@ export const excelImportsService = {
       slug,
       "GET",
       "/v1/tenant/excel-import-data-types",
+    );
+  },
+  templates(slug: string) {
+    return tenantRequest<{ items: ExcelImportTemplate[] }>(
+      slug,
+      "GET",
+      "/v1/tenant/excel-import-templates",
+    );
+  },
+  deleteTemplate(slug: string, uuid: string) {
+    return tenantRequest<void>(
+      slug,
+      "DELETE",
+      `/v1/tenant/excel-import-templates/${encodeURIComponent(uuid)}`,
+      { silent: true },
     );
   },
   list(slug: string, engagement: string) {
@@ -69,6 +89,7 @@ export const excelImportsService = {
     form.append("file", input.file);
     if (input.dataType) form.append("data_type", input.dataType);
     if (input.period) form.append("period", input.period);
+    if (input.sheet) form.append("sheet", input.sheet);
     const response = await fetch(
       `${apiConfig.baseUrl.replace(/\/$/, "")}${base(engagement)}`,
       {

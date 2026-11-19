@@ -2013,5 +2013,19 @@
   "excel.action_failed": "Could not complete the action",
   "excel.close": "Close",
   "excel.prev": "Previous",
-  "excel.next": "Next"
+  "excel.next": "Next",
+  "excel.sheet": "Sheet (optional)",
+  "excel.sheet_placeholder": "First sheet",
+  "excel.templates_title": "Saved column templates",
+  "excel.templates_show": "Show templates",
+  "excel.templates_hide": "Hide",
+  "excel.templates_empty": "No saved template. Tick \"keep as a template\" when saving a mapping.",
+  "excel.template_columns": "{{count}} columns mapped",
+  "excel.scope_company": "Taxpayer",
+  "excel.scope_tenant": "Office",
+  "excel.scope_global": "Global",
+  "excel.template_delete": "Delete",
+  "excel.template_delete_title": "Delete this template?",
+  "excel.template_delete_body": "Files with the same layout will be mapped again from now on. Finished imports are not affected.",
+  "excel.template_deleted": "Template deleted"
 }
