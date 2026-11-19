@@ -1832,5 +1832,17 @@
   "bank.matching.matched": "Hareket faturayla eşleşti; banka uyarıları güncellendi.",
   "bank.matching.unmatched": "Eşleşme geri alındı; banka uyarıları güncellendi.",
   "bank.matching.failed": "Eşleştirme yapılamadı.",
-  "bank.matching.load_failed": "Hareketin ayrıntısı yüklenemedi."
+  "bank.matching.load_failed": "Hareketin ayrıntısı yüklenemedi.",
+  "tax_returns.blocking_hint": "Sorunlar kayıt kayıt gruplu. \"Aç ve düzelt\" ile kaydı bu ekrandan çıkmadan açın; düzelttikçe liste ve beyan güncellenir.",
+  "tax_returns.problem_period": "Dönem geneli",
+  "tax_returns.problem_count": "{{count}} sorun",
+  "tax_returns.open_fix": "Aç ve düzelt",
+  "tax_returns.panel_title": "{{record}}",
+  "tax_returns.panel_hint": "Kaydı burada düzeltin ya da uyarıya karar verin; beyan kendiliğinden yeniden hesaplanır.",
+  "tax_returns.panel_warnings": "Bu kaydın açık uyarıları",
+  "tax_returns.panel_no_warnings": "Bu kayıtta açık uyarı kalmadı.",
+  "tax_returns.panel_open_tab": "{{record}} sayfasında aç",
+  "tax_returns.summary_label": "Beyan özeti",
+  "tax_returns.summary_ba": "Form Ba ({{count}} belge)",
+  "tax_returns.summary_bs": "Form Bs ({{count}} belge)"
 }

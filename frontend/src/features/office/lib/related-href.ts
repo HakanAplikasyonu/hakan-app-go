@@ -174,6 +174,16 @@ const WARNING_KIND: Record<string, RelatedSourceKind> = {
 };
 
 /**
+ * Uyarının kaydı ilişkili kayıt türü olarak (#528, yan panel); fiş ve
+ * dönem uyarısında null.
+ */
+export function warningRecordKind(
+  entityType: string,
+): RelatedSourceKind | null {
+  return WARNING_KIND[entityType] ?? null;
+}
+
+/**
  * Uyarının işaret ettiği kaydın adresi (#528): fatura (kalem uyarısında
  * faturası) detayına, diğerleri sekmesinde `?kayit=` ile seçili; fişler
  * inceleme kuyruğuna. Kaydı olmayan (dönem) uyarıda null.

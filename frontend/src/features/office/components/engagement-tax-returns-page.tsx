@@ -14,7 +14,14 @@ import {
   Landmark,
   RotateCcw,
 } from "lucide-react";
-import { type ReactNode, Suspense, useId, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  Suspense,
+  useCallback,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -152,6 +159,11 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
     });
   };
 
+  // Bir sorun düzelince beyan yeniden hesaplanır (#528).
+  const recompute = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: key });
+  }, [qc, key]);
+
   const p = preview.data;
   const isDraft = !p || p.status === "draft";
   const editable = canWrite && isDraft;
@@ -286,11 +298,13 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             onReopen={() => reopen.mutate()}
             onFile={(v) => file.mutate(v)}
           />
+          <TaxReturnSummary p={p} />
           {p.status === "draft" ? (
             <TaxReturnWarnings
               engagement={engagement}
               period={period}
               codes={p.open_warnings}
+              onChanged={recompute}
             />
           ) : null}
           <Checklist
@@ -323,6 +337,78 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Beyanın özeti (#528): sorunlar düzeltildikçe yeniden hesaplanan ana
+ * tutarlar, sayfanın başında.
+ */
+function TaxReturnSummary({ p }: { p: TaxReturnPreview }) {
+  const { t } = useLocale();
+  const figures: { label: string; value: string; strong?: boolean }[] = [];
+  if (p.kdv1) {
+    const x = p.kdv1.totals;
+    figures.push(
+      { label: t("office.tax_returns.base_total"), value: x.base_total },
+      { label: t("office.tax_returns.calculated_vat"), value: x.total_vat },
+      {
+        label: t("office.tax_returns.total_deductions"),
+        value: x.total_deductions,
+      },
+      {
+        label: t("office.tax_returns.payable"),
+        value: x.payable,
+        strong: true,
+      },
+      { label: t("office.tax_returns.carry_out"), value: x.carry_out },
+    );
+  } else if (p.muhsgk) {
+    const x = p.muhsgk.totals;
+    figures.push(
+      {
+        label: t("office.tax_returns.tax_payable"),
+        value: x.tax_payable,
+        strong: true,
+      },
+      {
+        label: t("office.tax_returns.premium_payable"),
+        value: x.premium_payable,
+      },
+    );
+  } else if (p.babs) {
+    figures.push(
+      {
+        label: t("office.tax_returns.summary_ba", {
+          count: p.babs.ba.document_count,
+        }),
+        value: p.babs.ba.amount,
+      },
+      {
+        label: t("office.tax_returns.summary_bs", {
+          count: p.babs.bs.document_count,
+        }),
+        value: p.babs.bs.amount,
+      },
+    );
+  }
+  if (figures.length === 0) return null;
+  return (
+    <section
+      aria-label={t("office.tax_returns.summary_label")}
+      data-testid="tax-return-summary"
+      className="bg-surface border-line grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl border p-4 sm:grid-cols-3 lg:grid-cols-5"
+    >
+      {figures.map((f) => (
+        <div key={f.label} className="flex min-w-0 flex-col">
+          <span className="text-text-2 truncate text-xs">{f.label}</span>
+          <Money
+            value={f.value}
+            className={cn("text-base", f.strong && "font-display font-bold")}
+          />
+        </div>
+      ))}
+    </section>
   );
 }
 
