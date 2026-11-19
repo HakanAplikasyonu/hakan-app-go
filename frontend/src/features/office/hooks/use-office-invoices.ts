@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  keepPreviousData,
   useMutation,
   useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+
+import { keepPreviousWithin } from "@/lib/query/keep-previous";
 
 import {
   officeInvoiceKeys,
@@ -59,7 +60,7 @@ export function useEngagementInvoices(
   return useQuery({
     queryKey: officeInvoiceKeys.invoices(slug, engagement, filter),
     queryFn: () => officeInvoiceService.invoices(slug, engagement, filter),
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousWithin(engagement),
     enabled: !!engagement,
   });
 }
