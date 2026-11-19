@@ -1871,5 +1871,14 @@
   "expense_view.load_failed": "Could not load the expense.",
   "expense_view.decide_hint": "Deciding closes the \"unapproved expense\" warning by itself.",
   "col_open_warnings": "Open warnings",
-  "engagement.strip_open_warnings": "{{count}} open warnings"
+  "engagement.strip_open_warnings": "{{count}} open warnings",
+  "zreport_view.title": "Z report",
+  "zreport_view.load_failed": "Could not load the Z report.",
+  "zreport_view.z_number": "Z number",
+  "zreport_view.date": "Date",
+  "zreport_view.save": "Fix and re-check",
+  "zreport_view.saved": "Fixed; continuity re-checked",
+  "zreport_view.save_failed": "Could not save the Z report",
+  "zreport_view.edit_hint": "If the number or date was misread, fix it here; the warning closes by itself. If a report is really missing, ask the taxpayer for it.",
+  "zreport_view.locked_hint": "An approved or rejected report cannot be changed here."
 }

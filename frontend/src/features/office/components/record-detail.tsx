@@ -15,11 +15,12 @@ import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
 import { ExpenseQuickView } from "./expense-quick-view";
 import { InvoiceQuickView } from "./invoice-quick-view";
 import { RelatedRecordsTable } from "./related-records";
+import { ZReportQuickView } from "./zreport-quick-view";
 import { useEntityLabel } from "./warnings-page";
 
 /**
  * Bir kaydın yan paneldeki gövdesi (#528, #529): düzeltme alanı (banka
- * hareketinde fatura eşleştirme, faturada görüntü ve PDF, masrafta onay), araya konan
+ * hareketinde fatura eşleştirme, faturada görüntü ve PDF, masrafta onay, Z raporunda düzeltme), araya konan
  * içerik (uyarılar), ilişkili kayıtlar ve kaydın kendi sayfasına bağlantı.
  * Kaydı olmayan uyarıda (`kind` null) ilişkili kayıtlar uyarının kendisinden.
  */
@@ -71,6 +72,13 @@ export function RecordDetail({
       ) : null}
       {kind === "invoice" && uuid ? (
         <InvoiceQuickView engagement={engagement} invoice={uuid} />
+      ) : null}
+      {kind === "retail_sale" && uuid ? (
+        <ZReportQuickView
+          engagement={engagement}
+          sale={uuid}
+          onChanged={onChanged}
+        />
       ) : null}
       {kind === "expense" && uuid ? (
         <ExpenseQuickView

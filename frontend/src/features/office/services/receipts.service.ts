@@ -38,6 +38,8 @@ export const receiptKeys = {
     [...base(slug, engagement), "expense-categories"] as const,
   retail: (slug: string, engagement: string) =>
     [...base(slug, engagement), "retail-sales"] as const,
+  retailSale: (slug: string, engagement: string, sale: string) =>
+    [...base(slug, engagement), "retail-sales", sale] as const,
 };
 
 export type ExpenseQuery = {
@@ -169,6 +171,13 @@ export const receiptsService = {
       "GET",
       `${eng(engagement)}/retail-sales`,
       { query: q },
+    );
+  },
+  retailSale(slug: string, engagement: string, sale: string) {
+    return tenantRequest<RetailSale>(
+      slug,
+      "GET",
+      `${eng(engagement)}/retail-sales/${encodeURIComponent(sale)}`,
     );
   },
   updateRetailSale(
