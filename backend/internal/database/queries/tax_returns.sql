@@ -209,4 +209,5 @@ SELECT
     COALESCE((ARRAY_AGG(COALESCE(NULLIF(title, ''), kind) ORDER BY due_at NULLS LAST, id)
         FILTER (WHERE status = 'open'))[1], '')::text AS first_open
 FROM document_tasks
-WHERE engagement_id = @engagement_id AND period = @period AND status IN ('open', 'submitted');
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND period = @period
+  AND status IN ('open', 'submitted');

@@ -354,12 +354,14 @@ SELECT
     COALESCE((ARRAY_AGG(COALESCE(NULLIF(title, ''), kind) ORDER BY due_at NULLS LAST, id)
         FILTER (WHERE status = 'open'))[1], '')::text AS first_open
 FROM document_tasks
-WHERE engagement_id = $1 AND period = $2 AND status IN ('open', 'submitted')
+WHERE organization_id = $1 AND engagement_id = $2 AND period = $3
+  AND status IN ('open', 'submitted')
 `
 
 type TaxReturnDocumentTaskStatsParams struct {
-	EngagementID int64  `json:"engagement_id"`
-	Period       string `json:"period"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Period         string `json:"period"`
 }
 
 type TaxReturnDocumentTaskStatsRow struct {
@@ -371,7 +373,7 @@ type TaxReturnDocumentTaskStatsRow struct {
 // Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
 // işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
 func (q *Queries) TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnDocumentTaskStatsParams) (TaxReturnDocumentTaskStatsRow, error) {
-	row := q.db.QueryRow(ctx, taxReturnDocumentTaskStats, arg.EngagementID, arg.Period)
+	row := q.db.QueryRow(ctx, taxReturnDocumentTaskStats, arg.OrganizationID, arg.EngagementID, arg.Period)
 	var i TaxReturnDocumentTaskStatsRow
 	err := row.Scan(&i.Open, &i.Submitted, &i.FirstOpen)
 	return i, err

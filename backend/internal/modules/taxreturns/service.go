@@ -258,7 +258,7 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 // return may change when it arrives); one that arrived but was not processed
 // yet is a warning too. Both apply to every return kind.
 func (s *Service) documentItems(ctx context.Context, sc engagementctx.Scope, period string) ([]CheckItem, error) {
-	st, err := s.q.TaxReturnDocumentTaskStats(ctx, db.TaxReturnDocumentTaskStatsParams{EngagementID: sc.ID, Period: period})
+	st, err := s.q.TaxReturnDocumentTaskStats(ctx, db.TaxReturnDocumentTaskStatsParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Period: period})
 	if err != nil {
 		return nil, fmt.Errorf("tax return document tasks: %w", err)
 	}
