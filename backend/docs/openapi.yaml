@@ -21053,8 +21053,8 @@ components:
         amount: { type: string }
         currency: { type: string }
         description: { type: string }
-        counterparty_name: { type: string, nullable: true }
-        counterparty_iban: { type: string, nullable: true }
+        counterparty_name: { type: [string, "null"] }
+        counterparty_iban: { type: [string, "null"] }
         kind_detail: { type: string }
         period: { type: string }
         match_status: { type: string, enum: [unmatched, suggested, matched, ignored] }
@@ -21068,7 +21068,7 @@ components:
               invoice_uuid: { type: string, format: uuid }
               invoice_number: { type: string }
               issue_date: { type: string, format: date }
-              counterparty_name: { type: string, nullable: true }
+              counterparty_name: { type: [string, "null"] }
               amount: { type: string }
               method: { type: string, enum: [auto, suggested_accepted, manual] }
               score: { type: integer }
@@ -21081,7 +21081,7 @@ components:
               invoice_uuid: { type: string, format: uuid }
               invoice_number: { type: string }
               issue_date: { type: string, format: date }
-              counterparty_name: { type: string, nullable: true }
+              counterparty_name: { type: [string, "null"] }
               open_amount: { type: string }
               score: { type: integer }
               parts: { type: object, additionalProperties: { type: integer } }
