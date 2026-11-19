@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Permission } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { datetime } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
@@ -15,7 +16,7 @@ import type {
 } from "../services/warnings.service";
 
 /** Acknowledge / resolve on the API need this tenant permission. */
-export const WARNINGS_WRITE_PERMISSION = "tenant.warnings.write";
+export const WARNINGS_WRITE_PERMISSION = Permission.TenantWarningsWrite;
 
 /** A reason shorter than this is not a reason (#529). */
 export const MIN_NOTE = 3;

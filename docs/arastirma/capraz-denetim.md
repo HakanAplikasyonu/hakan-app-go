@@ -79,8 +79,8 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 | # | Bulgu | Önem | İş |
 |---|---|---|---|
-| E1 | Backend'in kullandığı şu izinler web'in izin kataloğunda hiç geçmiyor: `tenant.periods.lock`, `tenant.periods.read`, `tenant.warnings.read`, `tenant.warning_rules.write`, `tenant.doc_tasks.read`, `tenant.vat.read/write`, `tenant.change_requests.decide`, `tenant.excel_imports.*`, `tenant.summaries.*`, `tenant.billing.write`. Sonuç: ilgili düğmeler (ör. dönem kilitle) yetkisiz kullanıcıya da görünüyor, tıklayınca 403 alıyor. Bu yetkiler rol düzenleme ekranında görünüyor mu, ayrıca doğrulanmalı | P1 | M |
-| E2 | Sekmelerin çoğu (`engagement-layout.tsx`) yalnızca Bordro, Yevmiye ve Beyanname için izin kontrolü yapıyor. Uyarılar, Banka, Masraflar, Mutabakat gibi sekmeler izinsiz rolde açılıp boş/hata durumuna düşüyor (doğrulanmalı) | P2 | S |
+| E1 ✅ | Backend'in kullandığı şu izinler web'in izin kataloğunda hiç geçmiyor: `tenant.periods.lock`, `tenant.periods.read`, `tenant.warnings.read`, `tenant.warning_rules.write`, `tenant.doc_tasks.read`, `tenant.vat.read/write`, `tenant.change_requests.decide`, `tenant.excel_imports.*`, `tenant.summaries.*`, `tenant.billing.write`. Sonuç: ilgili düğmeler (ör. dönem kilitle) yetkisiz kullanıcıya da görünüyor, tıklayınca 403 alıyor. Bu yetkiler rol düzenleme ekranında görünüyor mu, ayrıca doğrulanmalı **Yapıldı (#518):** eksik 15 kiracı izni web kataloğuna eklendi; bir test backend (`rbac.go`) ile kataloğu karşılaştırır, yeni izin eklenip katalog unutulursa kırılır. Dönem kilitleme, uyarı kuralı, KDV ve belge görevi yazma düğmeleri web'de henüz yok; ekranları yapılınca katalogdaki izinle gizlenir | P1 | M |
+| E2 ✅ | Sekmelerin çoğu (`engagement-layout.tsx`) yalnızca Bordro, Yevmiye ve Beyanname için izin kontrolü yapıyor. Uyarılar, Banka, Masraflar, Mutabakat gibi sekmeler izinsiz rolde açılıp boş/hata durumuna düşüyor (doğrulanmalı) **Yapıldı (#518):** Faturalar, Uyarılar, İnceleme, Banka, Masraflar, Z raporları, Mutabakat ve Belgeler sekmeleri de ana listelerinin okuma iznine bağlandı (`visibleTabs`) | P2 | S |
 
 ### F. Platformlar arası (bilinçli kapsam farkları dışında)
 
@@ -98,14 +98,14 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 ## Önerilen uygulama sırası (#518)
 
-Durum: 1–4 yapıldı (D4 ertelendi: platform paneli P2). Sıradaki: 5.
+Durum: 1–6 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sıradaki: 7.
 
 1. ✅ **Mükellef detayına "Bağlantılar" sekmesi** iskeleti: bütün mükellef düzeyi bağlantıları (entegratör, banka, Easytrade, Paraşüt, KolayBi, WhatsApp, muhasebe aktarımı) tek yerde, durum rozeti ve son senkron saatiyle. Easytrade ve aktarım ayarı buraya bağlanır.
 2. ✅ **A2 banka web servis bağlantısı** (API hazır) + D4 çıkış IP'si bilgisi.
 3. **A1 e-Fatura entegratörü**: önce backend uçları (oluştur, kimlik bilgisini kasaya yaz, test et, senkron başlat, durum), sonra sekmeye ekran.
 4. **A3 Paraşüt, A4 KolayBi** (API hazır).
-5. **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte).
-6. **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
+5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte). (C1 mobil kaldı.)
+6. ✅ **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
 7. **B3 KVKK talepleri.**
 8. **B1 genel Excel içe aktarma sihirbazı.**
 9. **A5 inceleme eşiği**, ardından B4–B9, C2–C3, D1–D3, A6 (P2'ler).

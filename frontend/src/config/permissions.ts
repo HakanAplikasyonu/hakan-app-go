@@ -102,6 +102,22 @@ export const Permission = {
   TenantReceiptsApprove: "tenant.receipts.approve",
   TenantPrivacyRequest: "tenant.privacy.request",
   TenantPrivacyApprove: "tenant.privacy.approve",
+  /** Backend'in kullandığı, katalogda eksik kalan izinler (#518 E1). */
+  TenantPeriodsLock: "tenant.periods.lock",
+  TenantWarningsRead: "tenant.warnings.read",
+  TenantWarningsWrite: "tenant.warnings.write",
+  TenantWarningRulesWrite: "tenant.warning_rules.write",
+  TenantDocTasksRead: "tenant.doc_tasks.read",
+  TenantDocTasksWrite: "tenant.doc_tasks.write",
+  TenantVATRead: "tenant.vat.read",
+  TenantVATWrite: "tenant.vat.write",
+  TenantExcelImportsRead: "tenant.excel_imports.read",
+  TenantExcelImportsWrite: "tenant.excel_imports.write",
+  TenantExcelImportsCommit: "tenant.excel_imports.commit",
+  TenantSummariesRead: "tenant.summaries.read",
+  TenantSummariesWrite: "tenant.summaries.write",
+  TenantSummariesApprove: "tenant.summaries.approve",
+  TenantAIUsageRead: "tenant.ai.usage.read",
 } as const;
 
 export type PermissionSlug = (typeof Permission)[keyof typeof Permission];
@@ -251,6 +267,48 @@ export const permissions = {
     privacy: {
       request: Permission.TenantPrivacyRequest,
       approve: Permission.TenantPrivacyApprove,
+    },
+    invoices: {
+      read: Permission.TenantInvoicesRead,
+      write: Permission.TenantInvoicesWrite,
+    },
+    bank: {
+      read: Permission.TenantBankRead,
+      write: Permission.TenantBankWrite,
+    },
+    documents: {
+      read: Permission.TenantDocumentsRead,
+      write: Permission.TenantDocumentsWrite,
+    },
+    periods: {
+      read: Permission.TenantPeriodsRead,
+      lock: Permission.TenantPeriodsLock,
+    },
+    warnings: {
+      read: Permission.TenantWarningsRead,
+      write: Permission.TenantWarningsWrite,
+      rulesWrite: Permission.TenantWarningRulesWrite,
+    },
+    docTasks: {
+      read: Permission.TenantDocTasksRead,
+      write: Permission.TenantDocTasksWrite,
+    },
+    vat: {
+      read: Permission.TenantVATRead,
+      write: Permission.TenantVATWrite,
+    },
+    excelImports: {
+      read: Permission.TenantExcelImportsRead,
+      write: Permission.TenantExcelImportsWrite,
+      commit: Permission.TenantExcelImportsCommit,
+    },
+    summaries: {
+      read: Permission.TenantSummariesRead,
+      write: Permission.TenantSummariesWrite,
+      approve: Permission.TenantSummariesApprove,
+    },
+    ai: {
+      usageRead: Permission.TenantAIUsageRead,
     },
   },
 } as const;
