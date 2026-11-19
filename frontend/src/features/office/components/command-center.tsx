@@ -76,7 +76,7 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
       {cell.locked ? <Lock className="size-3" aria-hidden /> : null}
       {t(`office.command.status_${status}`)}
       {cell.open_warnings > 0 ? (
-        <span className="tabular-nums opacity-80" aria-hidden>
+        <span className="tabular-nums" aria-hidden>
           · {cell.open_warnings}
         </span>
       ) : null}
