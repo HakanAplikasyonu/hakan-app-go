@@ -2027,5 +2027,15 @@
   "excel.template_delete": "Delete",
   "excel.template_delete_title": "Delete this template?",
   "excel.template_delete_body": "Files with the same layout will be mapped again from now on. Finished imports are not affected.",
-  "excel.template_deleted": "Template deleted"
+  "excel.template_deleted": "Template deleted",
+  "shell.breadcrumb_label": "Location",
+  "shell.taxpayer_switch": "Switch taxpayer: {{name}}",
+  "shell.taxpayer_search": "Search taxpayers…",
+  "shell.taxpayer_none": "No taxpayer found",
+  "shell.taxpayer_unknown": "Taxpayer",
+  "shell.secondary_actions": "Support and notifications",
+  "shell.switch_office": "Switch office",
+  "shell.help": "Help and guides",
+  "shell.theme_light": "Switch to light theme",
+  "shell.theme_dark": "Switch to dark theme"
 }

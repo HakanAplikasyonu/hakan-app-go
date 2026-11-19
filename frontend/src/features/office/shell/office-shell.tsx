@@ -59,7 +59,7 @@ export function OfficeShell({
             counts={counts}
           />
           <SidebarInset className="@container/content min-w-0">
-            <OfficeTopbar />
+            <OfficeTopbar catalog={nav.catalog} />
             <main
               id="main"
               className="flex min-w-0 flex-1 flex-col gap-4 px-4 pt-4 pb-24 md:px-6 md:pb-8"
