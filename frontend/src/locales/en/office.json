@@ -2080,5 +2080,8 @@
   "journals.check.summary_clean": "{{drafts}} drafts · all passed the check",
   "journals.error_JOURNAL_BLOCKED": "The entry has issues to fix; see the Check column.",
   "copilot.next.journals_approve": "Check draft entries",
-  "copilot.next.export_transfer": "Check the transfer"
+  "copilot.next.export_transfer": "Check the transfer",
+  "picker.choose": "Choose a taxpayer",
+  "picker.search": "Search by name or tax ID",
+  "picker.empty": "No taxpayer found."
 }
