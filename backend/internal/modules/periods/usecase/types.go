@@ -148,7 +148,9 @@ type MatrixEngagement struct {
 
 // MatrixCounts are the per (engagement, period) counts of the matrix.
 type MatrixCounts struct {
-	Blockers       map[MatrixKey]int64
+	Blockers map[MatrixKey]int64
+	// Warnings: every open data warning, whatever its severity (#529).
+	Warnings       map[MatrixKey]int64
 	ChangeRequests map[MatrixKey]int64
 	Locks          map[MatrixKey]time.Time
 }
@@ -166,6 +168,7 @@ type Cell struct {
 	Locked             bool       `json:"locked"`
 	LockedAt           *time.Time `json:"locked_at"`
 	OpenBlockers       int64      `json:"open_blockers"`
+	OpenWarnings       int64      `json:"open_warnings"`
 	OpenChangeRequests int64      `json:"open_change_requests"`
 }
 

@@ -18701,6 +18701,11 @@ export interface components {
             locked_at: string | null;
             /** Format: int64 */
             open_blockers: number;
+            /**
+             * Format: int64
+             * @description Every open data warning of the period, whatever its severity (blockers included)
+             */
+            open_warnings: number;
             /** Format: int64 */
             open_change_requests: number;
         };

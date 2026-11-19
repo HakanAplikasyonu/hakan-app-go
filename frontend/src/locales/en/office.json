@@ -249,7 +249,7 @@
   "command.tip_invoices": "{{count}} invoices",
   "command.tip_pending": "{{count}} pending suggestions",
   "command.tip_blockers": "{{count}} blocking warnings",
-  "command.tip_warnings": "{{count}} warnings",
+  "command.tip_warnings": "{{count}} open warnings",
   "command.tip_regressed": "A blocking warning was opened after this stage",
   "command.regressed": "{{count}} taxpayers got a blocking warning after the period moved on; recheck the cells outlined in red.",
   "command.matrix_title": "Taxpayers · {{shown}} / {{total}}",
@@ -1869,5 +1869,7 @@
   "warning_sheet.closed": "This warning is closed.",
   "expense_view.title": "Expense",
   "expense_view.load_failed": "Could not load the expense.",
-  "expense_view.decide_hint": "Deciding closes the \"unapproved expense\" warning by itself."
+  "expense_view.decide_hint": "Deciding closes the \"unapproved expense\" warning by itself.",
+  "col_open_warnings": "Open warnings",
+  "engagement.strip_open_warnings": "{{count}} open warnings"
 }

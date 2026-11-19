@@ -1144,6 +1144,8 @@ type Querier interface {
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
 	PartySeenBefore(ctx context.Context, arg PartySeenBeforeParams) (bool, error)
 	PayrollRunNetPaid(ctx context.Context, arg PayrollRunNetPaidParams) (pgtype.Numeric, error)
+	// n: engelleyen açık uyarılar; open_warnings: seviyesi ne olursa olsun
+	// açık uyarıların tamamı (#529: mükellef ve dönem bazında açık uyarı sayısı).
 	PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error)
 	PeriodMatrixChangeRequests(ctx context.Context, arg PeriodMatrixChangeRequestsParams) ([]PeriodMatrixChangeRequestsRow, error)
 	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)

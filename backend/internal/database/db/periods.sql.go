@@ -689,11 +689,13 @@ func (q *Queries) LockChangeRequest(ctx context.Context, arg LockChangeRequestPa
 }
 
 const periodMatrixBlockers = `-- name: PeriodMatrixBlockers :many
-SELECT w.engagement_id, COALESCE(w.period, inv.period)::text AS period, count(*)::bigint AS n
+SELECT w.engagement_id, COALESCE(w.period, inv.period)::text AS period,
+       (count(*) FILTER (WHERE w.severity = 'blocker'))::bigint AS n,
+       count(*)::bigint AS open_warnings
 FROM data_warnings w
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.taxpayer_id = w.taxpayer_id AND inv.id = w.entity_id
 WHERE w.organization_id = $1 AND w.engagement_id = ANY($2::bigint[])
-  AND w.status = 'open' AND w.severity = 'blocker'
+  AND w.status = 'open'
   AND COALESCE(w.period, inv.period) = ANY($3::text[])
 GROUP BY w.engagement_id, COALESCE(w.period, inv.period)
 `
@@ -708,8 +710,11 @@ type PeriodMatrixBlockersRow struct {
 	EngagementID int64  `json:"engagement_id"`
 	Period       string `json:"period"`
 	N            int64  `json:"n"`
+	OpenWarnings int64  `json:"open_warnings"`
 }
 
+// n: engelleyen açık uyarılar; open_warnings: seviyesi ne olursa olsun
+// açık uyarıların tamamı (#529: mükellef ve dönem bazında açık uyarı sayısı).
 func (q *Queries) PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error) {
 	rows, err := q.db.Query(ctx, periodMatrixBlockers, arg.OrganizationID, arg.EngagementIds, arg.Periods)
 	if err != nil {
@@ -719,7 +724,12 @@ func (q *Queries) PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBloc
 	items := []PeriodMatrixBlockersRow{}
 	for rows.Next() {
 		var i PeriodMatrixBlockersRow
-		if err := rows.Scan(&i.EngagementID, &i.Period, &i.N); err != nil {
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.N,
+			&i.OpenWarnings,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

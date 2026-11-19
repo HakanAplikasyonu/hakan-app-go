@@ -181,6 +181,14 @@ function useBehindColumns(focus: string) {
         meta: { align: "end", cardHidden: true },
         cell: ({ getValue }) => <Figure>{getValue() as number}</Figure>,
       }),
+      // Açık uyarıların tamamı (engelleyenler dâhil, #529).
+      createColumn<PeriodMatrixRow>({
+        id: "open_warnings",
+        labelKey: "office.col_open_warnings",
+        accessorFn: (r) => cellAt(r, focus)?.open_warnings ?? 0,
+        meta: { align: "end", cardHidden: true },
+        cell: ({ getValue }) => <Figure>{getValue() as number}</Figure>,
+      }),
       createColumn<PeriodMatrixRow>({
         id: "change_requests",
         labelKey: "office.col_change_requests",

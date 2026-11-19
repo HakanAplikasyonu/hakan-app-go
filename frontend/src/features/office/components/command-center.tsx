@@ -48,13 +48,17 @@ export function monthLabel(period: string, locale: string) {
   }).format(new Date(Date.UTC(y, m - 1, 1)));
 }
 
-/** One period of one taxpayer: status, lock and open blockers / requests. */
+/** One period of one taxpayer: status, lock, open warnings and requests. */
 export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
   const { t } = useLocale();
   const status = statusOf(cell);
   const parts = [t(`office.command.status_${status}`)];
   if (cell.open_blockers)
     parts.push(t("office.command.tip_blockers", { count: cell.open_blockers }));
+  // Engellemeyen açık uyarılar da iş: sayısı hücrede görünür (#529).
+  const others = cell.open_warnings - cell.open_blockers;
+  if (others > 0)
+    parts.push(t("office.command.tip_warnings", { count: others }));
   if (cell.open_change_requests)
     parts.push(
       t("office.command.tip_change_requests", {
@@ -71,6 +75,14 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
     >
       {cell.locked ? <Lock className="size-3" aria-hidden /> : null}
       {t(`office.command.status_${status}`)}
+      {cell.open_warnings > 0 ? (
+        <span className="tabular-nums opacity-80" aria-hidden>
+          · {cell.open_warnings}
+        </span>
+      ) : null}
+      {others > 0 && !cell.open_blockers && !cell.open_change_requests ? (
+        <span className="sr-only">{parts.slice(1).join(", ")}</span>
+      ) : null}
       {cell.open_blockers || cell.open_change_requests ? (
         <>
           {/* #310: aria-label on a role-less span is not read (axe

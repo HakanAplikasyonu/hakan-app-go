@@ -83,11 +83,15 @@ WHERE e.organization_id = @organization_id AND e.ended_at IS NULL
         WHERE a.organization_id = @organization_id AND a.user_id = @user_id));
 
 -- name: PeriodMatrixBlockers :many
-SELECT w.engagement_id, COALESCE(w.period, inv.period)::text AS period, count(*)::bigint AS n
+-- n: engelleyen açık uyarılar; open_warnings: seviyesi ne olursa olsun
+-- açık uyarıların tamamı (#529: mükellef ve dönem bazında açık uyarı sayısı).
+SELECT w.engagement_id, COALESCE(w.period, inv.period)::text AS period,
+       (count(*) FILTER (WHERE w.severity = 'blocker'))::bigint AS n,
+       count(*)::bigint AS open_warnings
 FROM data_warnings w
 LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.taxpayer_id = w.taxpayer_id AND inv.id = w.entity_id
 WHERE w.organization_id = @organization_id AND w.engagement_id = ANY(@engagement_ids::bigint[])
-  AND w.status = 'open' AND w.severity = 'blocker'
+  AND w.status = 'open'
   AND COALESCE(w.period, inv.period) = ANY(@periods::text[])
 GROUP BY w.engagement_id, COALESCE(w.period, inv.period);
 

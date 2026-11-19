@@ -272,6 +272,14 @@ function PeriodStrip({
                   {label}
                   {cell.open_blockers ? ` · ${cell.open_blockers}` : ""}
                 </span>
+                {/* Dönemde kalan açık uyarı (engelleyenler dâhil, #529). */}
+                {cell.open_warnings > 0 ? (
+                  <span className="text-text-3 text-center text-[11px] leading-tight tabular-nums">
+                    {t("office.engagement.strip_open_warnings", {
+                      count: cell.open_warnings,
+                    })}
+                  </span>
+                ) : null}
               </button>
             </li>
           );
