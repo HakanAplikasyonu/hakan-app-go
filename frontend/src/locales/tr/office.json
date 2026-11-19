@@ -2097,5 +2097,13 @@
   "review.value_required": "Bir değer yazın.",
   "review.document": "Belge {{number}}",
   "review.document_total": "Fatura toplamı {{amount}}",
-  "review.line_amount": "Satır tutarı {{amount}}"
+  "review.line_amount": "Satır tutarı {{amount}}",
+  "journals.export_selected": "Seçili {{count}} fişin çıktısını al",
+  "journals.selection_clear": "Seçimi temizle",
+  "journals.export_scope_selected": "Yalnız tabloda seçilen {{count}} onaylı fiş aktarılır.",
+  "journals.export_scope_period": "Dönemin tüm onaylı fişleri aktarılır. Yalnız bazılarını aktarmak için tablodan seçin.",
+  "journals.pick_col": "Seç",
+  "journals.pick_entry": "{{entry}} numaralı fişi çıktı için seç",
+  "journals.transfer_col": "Programa aktarım",
+  "journals.transfer_file_only": "Yalnız dosya alındı"
 }

@@ -317,6 +317,63 @@ func (q *Queries) InsertJournalDraftLine(ctx context.Context, arg InsertJournalD
 	return err
 }
 
+const journalDraftExports = `-- name: JournalDraftExports :many
+SELECT i.journal_draft_id, b.uuid AS batch_uuid, b.driver, b.created_at AS exported_at,
+       COALESCE(t.status, '')::text AS transfer_status, COALESCE(t.error_message, '')::text AS transfer_error
+FROM export_batch_items i
+JOIN export_batches b ON b.id = i.export_batch_id AND b.engagement_id = i.engagement_id
+LEFT JOIN LATERAL (
+    SELECT x.status, x.error_message FROM accounting_transfers x
+    WHERE x.export_batch_id = b.id AND x.engagement_id = b.engagement_id
+    ORDER BY x.created_at DESC, x.id DESC LIMIT 1
+) t ON TRUE
+WHERE i.organization_id = $1 AND i.engagement_id = $2
+  AND i.journal_draft_id = ANY($3::bigint[]) AND i.reversed_at IS NULL
+`
+
+type JournalDraftExportsParams struct {
+	OrganizationID int64   `json:"organization_id"`
+	EngagementID   int64   `json:"engagement_id"`
+	Ids            []int64 `json:"ids"`
+}
+
+type JournalDraftExportsRow struct {
+	JournalDraftID int64              `json:"journal_draft_id"`
+	BatchUuid      uuid.UUID          `json:"batch_uuid"`
+	Driver         string             `json:"driver"`
+	ExportedAt     pgtype.Timestamptz `json:"exported_at"`
+	TransferStatus string             `json:"transfer_status"`
+	TransferError  string             `json:"transfer_error"`
+}
+
+// Fişin geri alınmamış çıktısı ve o çıktının son aktarım durumu (#574).
+func (q *Queries) JournalDraftExports(ctx context.Context, arg JournalDraftExportsParams) ([]JournalDraftExportsRow, error) {
+	rows, err := q.db.Query(ctx, journalDraftExports, arg.OrganizationID, arg.EngagementID, arg.Ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []JournalDraftExportsRow{}
+	for rows.Next() {
+		var i JournalDraftExportsRow
+		if err := rows.Scan(
+			&i.JournalDraftID,
+			&i.BatchUuid,
+			&i.Driver,
+			&i.ExportedAt,
+			&i.TransferStatus,
+			&i.TransferError,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const journalDraftIssues = `-- name: JournalDraftIssues :many
 WITH d AS (
     SELECT jd.id, jd.period FROM journal_drafts jd

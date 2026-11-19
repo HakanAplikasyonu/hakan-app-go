@@ -206,3 +206,34 @@ func TestTransferHTTP(t *testing.T) {
 		t.Fatalf("unknown transfer %d", w.Code)
 	}
 }
+
+// #574: fiş listesi aktarılan fişin çıktısını ve aktarım durumunu gösterir.
+func TestDraftListShowsExportAndTransfer(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	b := e.exported(t, "luca")
+	find := func() *DraftExport {
+		t.Helper()
+		page, err := e.svc.ListDrafts(ctx, e.scope, DraftFilter{Period: oct.Format("2006-01"), Limit: 50})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range page.Items {
+			if d.Status == "exported" {
+				return d.Export
+			}
+		}
+		t.Fatal("no exported draft")
+		return nil
+	}
+	x := find()
+	if x == nil || x.BatchUUID != b.UUID || x.Driver != "luca" || x.TransferStatus != "" {
+		t.Fatalf("after export %+v", x)
+	}
+	if _, err := e.svc.RequestTransfer(ctx, e.scope, e.actor, b.UUID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if x := find(); x == nil || x.TransferStatus != TransferQueued {
+		t.Fatalf("after transfer %+v", x)
+	}
+}

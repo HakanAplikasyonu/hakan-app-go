@@ -2097,5 +2097,13 @@
   "review.value_required": "Enter a value.",
   "review.document": "Document {{number}}",
   "review.document_total": "Invoice total {{amount}}",
-  "review.line_amount": "Line amount {{amount}}"
+  "review.line_amount": "Line amount {{amount}}",
+  "journals.export_selected": "Export {{count}} selected entries",
+  "journals.selection_clear": "Clear selection",
+  "journals.export_scope_selected": "Only the {{count}} approved entries selected in the table are exported.",
+  "journals.export_scope_period": "All approved entries of the period are exported. Select entries in the table to export only some.",
+  "journals.pick_col": "Select",
+  "journals.pick_entry": "Select entry {{entry}} for export",
+  "journals.transfer_col": "Program transfer",
+  "journals.transfer_file_only": "File only"
 }

@@ -150,3 +150,17 @@ WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id 
   AND d.status = 'draft'
   AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
   AND l.journal_draft_id = d.id AND l.line_no = @line_no;
+
+-- name: JournalDraftExports :many
+-- Fişin geri alınmamış çıktısı ve o çıktının son aktarım durumu (#574).
+SELECT i.journal_draft_id, b.uuid AS batch_uuid, b.driver, b.created_at AS exported_at,
+       COALESCE(t.status, '')::text AS transfer_status, COALESCE(t.error_message, '')::text AS transfer_error
+FROM export_batch_items i
+JOIN export_batches b ON b.id = i.export_batch_id AND b.engagement_id = i.engagement_id
+LEFT JOIN LATERAL (
+    SELECT x.status, x.error_message FROM accounting_transfers x
+    WHERE x.export_batch_id = b.id AND x.engagement_id = b.engagement_id
+    ORDER BY x.created_at DESC, x.id DESC LIMIT 1
+) t ON TRUE
+WHERE i.organization_id = @organization_id AND i.engagement_id = @engagement_id
+  AND i.journal_draft_id = ANY(@ids::bigint[]) AND i.reversed_at IS NULL;

@@ -681,6 +681,8 @@ type Querier interface {
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
+	// Fişin geri alınmamış çıktısı ve o çıktının son aktarım durumu (#574).
+	JournalDraftExports(ctx context.Context, arg JournalDraftExportsParams) ([]JournalDraftExportsRow, error)
 	// Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
 	// da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
 	// kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.

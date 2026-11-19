@@ -29,6 +29,7 @@ import {
   type DataTableFeatures,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Hint } from "@/components/ui/hint";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
@@ -507,12 +508,47 @@ function ApproveClean({
   );
 }
 
+/**
+ * Where an exported entry went (#574): only the file, or the transfer to
+ * the program and its outcome. A failed transfer is retried in the
+ * transfers panel below.
+ */
+function DraftTransfer({ draft }: { draft: JournalDraft }) {
+  const { t } = useLocale();
+  const x = draft.export;
+  if (!x) return null;
+  if (!x.transfer_status)
+    return (
+      <span className="text-muted-foreground text-xs">
+        {t("office.journals.transfer_file_only")}
+      </span>
+    );
+  const v = TRANSFER_STATUS[x.transfer_status];
+  const pill = (
+    <StatusPill tone={v?.tone}>
+      {v ? t(v.labelKey) : x.transfer_status}
+    </StatusPill>
+  );
+  return x.transfer_status === "failed" && x.transfer_error ? (
+    <Hint label={x.transfer_error} wrap>
+      {pill}
+    </Hint>
+  ) : (
+    pill
+  );
+}
+
 function ExportPanel({
   engagement,
   period,
+  selected,
+  onClearSelection,
 }: {
   engagement: string;
   period: string;
+  /** Fişler tablosunda seçilen onaylı fişler (#574); boşsa dönemin tamamı. */
+  selected: string[];
+  onClearSelection: () => void;
 }) {
   const { t } = useLocale();
   const periodText = usePeriodText();
@@ -533,17 +569,20 @@ function ExportPanel({
       ? run.error.details.filter((d) => !DOUBLE_BOOKING_CODES.has(d.code ?? ""))
       : [];
 
+  // Seçim varsa yalnız seçilen fişler, yoksa dönemin onaylı fişleri.
+  const scopeInput = selected.length ? { drafts: selected } : { period };
   const exportNow = (confirm: string[]) =>
     run.mutate(
       {
         driver,
-        period,
+        ...scopeInput,
         confirm_documents: confirm.length ? confirm : undefined,
       },
       {
         onSuccess: () => {
           check.reset();
           setConfirmed(new Set());
+          onClearSelection();
         },
       },
     );
@@ -553,7 +592,7 @@ function ExportPanel({
     run.reset();
     setConfirmed(new Set());
     check.mutate(
-      { driver, period },
+      { driver, ...scopeInput },
       {
         onSuccess: (c) => {
           if (!c.excluded.length) exportNow([]);
@@ -594,7 +633,12 @@ function ExportPanel({
           ) : null}
           <Button
             size="sm"
-            disabled={!period || run.isPending || check.isPending || !chosen}
+            disabled={
+              (!period && !selected.length) ||
+              run.isPending ||
+              check.isPending ||
+              !chosen
+            }
             onClick={start}
           >
             {run.isPending || check.isPending ? (
@@ -602,19 +646,36 @@ function ExportPanel({
             ) : (
               <FileSpreadsheet className="size-4" />
             )}
-            {t("office.journals.export")}
+            {selected.length
+              ? t("office.journals.export_selected", {
+                  count: selected.length,
+                })
+              : t("office.journals.export")}
           </Button>
+          {selected.length ? (
+            <Button size="sm" variant="ghost" onClick={onClearSelection}>
+              {t("office.journals.selection_clear")}
+            </Button>
+          ) : null}
         </div>
         {chosen && !chosen.verified && chosen.name === "luca" ? (
           <p className="text-status-warning text-xs">
             {t("office.journals.luca_format_unverified")}
           </p>
         ) : null}
-        {!period ? (
+        {!period && !selected.length ? (
           <p className="text-muted-foreground text-xs">
             {t("office.journals.pick_period")}
           </p>
-        ) : null}
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            {selected.length
+              ? t("office.journals.export_scope_selected", {
+                  count: selected.length,
+                })
+              : t("office.journals.export_scope_period")}
+          </p>
+        )}
         {review ? (
           <div className="space-y-2">
             <DoubleBookingReview
@@ -803,6 +864,22 @@ function JournalsInner() {
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
   const { approve, reverse } = useJournalActions(slug, engagement);
+  // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
+  // seçim sıfırlanır.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [pickedFor, setPickedFor] = useState(`${engagement}|${period}`);
+  if (pickedFor !== `${engagement}|${period}`) {
+    setPickedFor(`${engagement}|${period}`);
+    setPicked(new Set());
+  }
+  const togglePick = useCallback((uuid: string, on: boolean) => {
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(uuid);
+      else next.delete(uuid);
+      return next;
+    });
+  }, []);
   const fmt = (d: string) =>
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
   const approveDraft = approve.mutate;
@@ -811,6 +888,23 @@ function JournalsInner() {
   const reversing = reverse.isPending;
   const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
     () => [
+      createColumn<JournalDraft>({
+        id: "pick",
+        labelKey: "office.journals.pick_col",
+        enableSorting: false,
+        meta: { cellClassName: "w-8" },
+        cell: ({ row }) =>
+          row.original.status === "approved" ? (
+            <Checkbox
+              checked={picked.has(row.original.uuid)}
+              onCheckedChange={(v) => togglePick(row.original.uuid, v === true)}
+              aria-label={t("office.journals.pick_entry", {
+                entry: row.original.entry_no,
+              })}
+              data-no-row-click
+            />
+          ) : null,
+      }),
       createColumn<JournalDraft>({
         id: "entry_no",
         labelKey: "office.journals.entry_no",
@@ -858,6 +952,13 @@ function JournalsInner() {
             {t(`office.journals.status_${row.original.status}`)}
           </span>
         ),
+      }),
+      createColumn<JournalDraft>({
+        id: "transfer",
+        labelKey: "office.journals.transfer_col",
+        accessorFn: (d) => d.export?.transfer_status ?? "",
+        enableSorting: false,
+        cell: ({ row }) => <DraftTransfer draft={row.original} />,
       }),
       createColumn<JournalDraft>({
         id: "check",
@@ -910,7 +1011,17 @@ function JournalsInner() {
           ) : null,
       }),
     ],
-    [approveDraft, approving, engagement, prompt, reverseDraft, reversing, t],
+    [
+      approveDraft,
+      approving,
+      engagement,
+      picked,
+      prompt,
+      reverseDraft,
+      reversing,
+      t,
+      togglePick,
+    ],
   );
   // Fişin ilişkili kayıtları: kaynak belge ve hareketler (#469).
   const relatedColumn = useRelatedColumn<JournalDraft>(
@@ -1026,7 +1137,12 @@ function JournalsInner() {
         )}
       </Panel>
 
-      <ExportPanel engagement={engagement} period={period} />
+      <ExportPanel
+        engagement={engagement}
+        period={period}
+        selected={[...picked]}
+        onClearSelection={() => setPicked(new Set())}
+      />
 
       {exports.data?.items.length ? (
         <Panel title={t("office.journals.history_title")}>
