@@ -334,12 +334,9 @@ export function LucaBankExportPanel({
                   </TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody className="divide-y">
+              <TableBody>
                 {columns.map((c, i) => (
-                  <TableRow
-                    key={c.header}
-                    className="border-b-0 hover:bg-transparent"
-                  >
+                  <TableRow key={c.header} className="hover:bg-transparent">
                     <TableCell className="px-0 py-1 pe-3 tabular-nums">
                       {i + 1}
                     </TableCell>

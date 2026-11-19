@@ -210,7 +210,7 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
               ))}
               <div className="max-h-80 overflow-auto rounded-lg border">
                 <Table containerClassName="overflow-visible">
-                  <TableHeader className="bg-surface-2 [&_tr]:border-b-0">
+                  <TableHeader className="bg-surface-2">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className={HEAD}>
                         {t("office.bank.upload.col_header")}
@@ -223,11 +223,11 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
                       </TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody className="[&_tr:last-child]:border-t">
+                  <TableBody>
                     {analysis.columns.map((c, i) => (
                       <TableRow
                         key={`${c.index}-${c.header}`}
-                        className="border-t border-b-0 hover:bg-transparent"
+                        className="hover:bg-transparent"
                       >
                         <TableCell className="px-2 py-1.5 font-medium">
                           {c.header}
