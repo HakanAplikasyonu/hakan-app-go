@@ -23659,13 +23659,14 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_change_requests]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests]
       properties:
         period: { $ref: "#/components/schemas/Period" }
         ready: { type: boolean }
         locked: { type: boolean }
         locked_at: { type: [string, "null"], format: date-time }
         open_blockers: { type: integer, format: int64 }
+        open_warnings: { type: integer, format: int64, description: "Every open data warning of the period, whatever its severity (blockers included)" }
         open_change_requests: { type: integer, format: int64 }
 
     PeriodMatrixRow:

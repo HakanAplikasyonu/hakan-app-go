@@ -339,14 +339,18 @@ func (p *Postgres) MatrixEngagements(ctx context.Context, f usecase.MatrixFilter
 // MatrixCounts implements usecase.Store.
 func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids []int64, periods []string) (usecase.MatrixCounts, error) {
 	out := usecase.MatrixCounts{
-		Blockers: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
+		Blockers: map[usecase.MatrixKey]int64{}, Warnings: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
 	}
 	bl, err := p.q.PeriodMatrixBlockers(ctx, db.PeriodMatrixBlockersParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {
 		return out, fmt.Errorf("matrix blockers: %w", err)
 	}
 	for _, r := range bl {
-		out.Blockers[usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}] = r.N
+		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
+		out.Warnings[k] = r.OpenWarnings
+		if r.N > 0 {
+			out.Blockers[k] = r.N
+		}
 	}
 	crs, err := p.q.PeriodMatrixChangeRequests(ctx, db.PeriodMatrixChangeRequestsParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {

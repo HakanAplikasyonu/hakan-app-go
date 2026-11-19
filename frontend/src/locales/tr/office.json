@@ -249,7 +249,7 @@
   "command.tip_invoices": "{{count}} fatura",
   "command.tip_pending": "{{count}} bekleyen öneri",
   "command.tip_blockers": "{{count}} engelleyici uyarı",
-  "command.tip_warnings": "{{count}} uyarı",
+  "command.tip_warnings": "{{count}} açık uyarı",
   "command.tip_regressed": "Aşamadan sonra engelleyici uyarı açıldı",
   "command.regressed": "{{count}} mükellefte dönem ilerledikten sonra engelleyici uyarı açıldı; kırmızı çerçeveli hücrelere yeniden bakın.",
   "command.matrix_title": "Mükellefler · {{shown}} / {{total}}",
@@ -1869,5 +1869,7 @@
   "warning_sheet.closed": "Bu uyarı kapandı.",
   "expense_view.title": "Masraf",
   "expense_view.load_failed": "Masraf yüklenemedi.",
-  "expense_view.decide_hint": "Karar verince \"onaylanmamış masraf\" uyarısı kendiliğinden kapanır."
+  "expense_view.decide_hint": "Karar verince \"onaylanmamış masraf\" uyarısı kendiliğinden kapanır.",
+  "col_open_warnings": "Açık uyarı",
+  "engagement.strip_open_warnings": "{{count}} açık uyarı"
 }

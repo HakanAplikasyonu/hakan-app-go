@@ -314,6 +314,12 @@ func TestMatrix(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.save(t, ubl) // held: one open request + one blocker in the period
+	// A non-blocking open warning on the other engagement: it counts as an
+	// open warning (#529) but does not hold the period back.
+	if _, err := f.d.Pool.Exec(ctx, `INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type, code, severity, producer, status)
+		VALUES ($1, $2, $3, $4, 'period', 'VAT_DEADLINE_NEAR', 'info', 'control:test', 'open')`, f.sub.OrganizationID, eng2, tp2, ubl.Period); err != nil {
+		t.Fatal(err)
+	}
 
 	m, err := f.svc.Matrix(ctx, usecase.MatrixFilter{OrganizationID: f.sub.OrganizationID, AllEngagements: true, Limit: 10}, ubl.Period, 2)
 	if err != nil {
@@ -332,10 +338,10 @@ func TestMatrix(t *testing.T) {
 			cells[eng2] = c
 		}
 	}
-	if c := cells[f.sub.EngagementID]; c.Ready || !c.Locked || c.OpenBlockers != 1 || c.OpenChangeRequests != 1 {
+	if c := cells[f.sub.EngagementID]; c.Ready || !c.Locked || c.OpenBlockers != 1 || c.OpenWarnings < 1 || c.OpenChangeRequests != 1 {
 		t.Fatalf("locked cell: %+v", c)
 	}
-	if c := cells[eng2]; !c.Ready || c.Locked {
+	if c := cells[eng2]; !c.Ready || c.Locked || c.OpenBlockers != 0 || c.OpenWarnings != 1 {
 		t.Fatalf("other cell: %+v", c)
 	}
 	// Without read_all a member sees only assigned engagements.
