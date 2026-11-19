@@ -87,6 +87,7 @@ import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { FilterSelect, Figure } from "./office-ui";
 import { ReviewGrid, ReviewHeading } from "./review-grid";
 import {
+  humanRationale,
   kindTitle,
   lineTypeLabel,
   matchSummary,
@@ -215,9 +216,8 @@ function EvidenceChain({
       ? t("office.review_api.invoice_line", { line: ctx.lineNo })
       : undefined,
   ].filter(Boolean);
-  // Kural anahtarı ("global:line_goods") gösterilmez (#378); yalnızca model adı.
-  const source =
-    s.provenance.origin === "model" ? s.provenance.model : undefined;
+  // Kural anahtarı ("global:line_goods") ve model adı ("demo-ocr")
+  // gösterilmez (#378, #576): müşavire teknik ad bir şey söylemez.
   const steps = [
     {
       icon: ScrollText,
@@ -240,12 +240,8 @@ function EvidenceChain({
       title: `${t("office.studio.ev_source")}: ${t(`office.review_api.origin_${s.provenance.origin}`)}`,
       body: (
         <>
-          {s.rationale || t("office.review_api.no_rationale")}
-          {source ? (
-            <Figure className="text-muted-foreground block text-[11px]">
-              {source}
-            </Figure>
-          ) : null}
+          {humanRationale(s.rationale, t) ||
+            t("office.review_api.no_rationale")}
         </>
       ),
     },

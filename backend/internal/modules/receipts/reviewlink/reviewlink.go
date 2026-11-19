@@ -45,7 +45,7 @@ func (r *Reviewer) SubmitField(ctx context.Context, f receipts.FieldReview) erro
 	}
 	raw, _ := json.Marshal(val)
 	targetID := f.TargetID
-	why := fmt.Sprintf("OCR alan güveni %.2f < %.2f", f.Value.Confidence, receipts.ReviewBelow)
+	why := fmt.Sprintf("Belge okuma bu alanı %%%.0f güvenle okudu (onay eşiği %%%.0f); belgeyle karşılaştırın.", f.Value.Confidence*100, receipts.ReviewBelow*100)
 	if !f.Value.Valid {
 		why = "OCR değeri okunamadı veya biçimi geçersiz: " + f.Value.Raw
 	}

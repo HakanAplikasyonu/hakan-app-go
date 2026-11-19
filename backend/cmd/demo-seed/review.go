@@ -74,7 +74,7 @@ func seedReview(ctx context.Context, pool *pgxpool.Pool, orgID, engID int64, tax
 		if _, err := rev.Submit(ctx, sub, review.Input{
 			Kind: reviewlink.Kind, TargetType: "expense", TargetID: &target, TargetField: f.field, Period: "2026-10",
 			Value: raw, Confidence: decimal.NewFromFloat(f.confidence),
-			Rationale:  fmt.Sprintf("OCR alan güveni %.2f (demo fişi)", f.confidence),
+			Rationale:  fmt.Sprintf("Belge okuma bu alanı %%%.0f güvenle okudu; belgeyle karşılaştırın.", f.confidence*100),
 			Provenance: review.Provenance{Origin: review.OriginModel, Model: DemoReceiptModel},
 		}); err != nil {
 			return fmt.Errorf("review %s: %w", f.field, err)

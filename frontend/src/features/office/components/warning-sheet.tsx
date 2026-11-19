@@ -170,9 +170,11 @@ export function WarningSheet({
             >
               <div className="flex flex-wrap items-center gap-2">
                 <SeverityBadge severity={current.severity} />
-                <Figure className="text-text-3 text-xs">
-                  {[current.code, current.period].filter(Boolean).join(" · ")}
-                </Figure>
+                {current.period ? (
+                  <Figure className="text-text-3 text-xs">
+                    {current.period}
+                  </Figure>
+                ) : null}
               </div>
               <p className="text-sm">{text(current)}</p>
               {gone ? (

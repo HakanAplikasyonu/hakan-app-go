@@ -97,7 +97,7 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				SELECT e.organization_id, e.id, x.taxpayer_id, 'receipt_field', 'expense', x.id, f.field, x.period,
 				       to_jsonb(CASE f.field WHEN 'total_amount' THEN x.amount::numeric(18,2)::text
 				                             WHEN 'tax_amount' THEN x.tax_amount::numeric(18,2)::text ELSE x.receipt_number END),
-				       f.conf, 'OCR alan güveni ' || f.conf::text, 'model', $3, 'pending', x.created_at, x.created_at
+				       f.conf, 'Belge okuma bu alanı %' || round(f.conf * 100)::text || ' güvenle okudu; belgeyle karşılaştırın.', 'model', $3, 'pending', x.created_at, x.created_at
 				FROM expenses x JOIN engagements e ON e.taxpayer_id = x.taxpayer_id AND e.id = ANY($1::bigint[])
 				CROSS JOIN LATERAL (VALUES ('total_amount', 0.52 + (x.id % 30) / 100.0), ('receipt_number', 0.41 + (x.id % 20) / 100.0)) f(field, conf)
 				WHERE x.source_system = $2 AND x.approval_status = 'pending' AND (x.id % 3 = 0 OR e.id = ANY($4::bigint[]))`,
@@ -107,7 +107,7 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				INSERT INTO suggestions (organization_id, engagement_id, taxpayer_id, kind, target_type, target_id, target_field, period,
 					proposed_value, confidence, rationale, origin, model, status, applied_value, decided_by, decided_at, created_at, updated_at)
 				SELECT e.organization_id, e.id, x.taxpayer_id, 'receipt_field', 'expense', x.id, 'total_amount', x.period,
-				       to_jsonb(x.amount::numeric(18,2)::text), 0.64, 'OCR alan güveni 0.64', 'model', $3,
+				       to_jsonb(x.amount::numeric(18,2)::text), 0.64, 'Belge okuma bu alanı %64 güvenle okudu; belgeyle karşılaştırın.', 'model', $3,
 				       CASE WHEN x.id % 5 = 0 THEN 'corrected' ELSE 'accepted' END, to_jsonb(x.amount::numeric(18,2)::text), $4,
 				       x.approved_at, x.created_at, x.approved_at
 				FROM expenses x JOIN engagements e ON e.taxpayer_id = x.taxpayer_id AND e.id = ANY($1::bigint[])

@@ -242,7 +242,7 @@
   "command.search": "Search title or tax ID",
   "command.status_empty": "No data",
   "command.status_collected": "Work pending",
-  "command.status_checked": "Ready",
+  "command.status_checked": "No blockers",
   "command.status_approved": "Approved (locked)",
   "command.status_exported": "Exported",
   "command.status_declared": "Declared",
@@ -2056,5 +2056,7 @@
   "balance_check.movements": "{{count}} movements",
   "balance_check.off": "The statement's closing balance does not match the movements: a missing day, a duplicate or a cancelled movement. Get the statement again and upload it; resolve the warning with a reason once the difference is gone.",
   "balance_check.no_balance": "The statement has no balance column, so it cannot be checked. Upload a statement with balances (MT940 or the bank's Excel).",
-  "balance_check.ok": "The balance matches the movements. You can resolve the warning with a reason."
+  "balance_check.ok": "The balance matches the movements. You can resolve the warning with a reason.",
+  "review_api.ocr_rationale": "Document reading is {{pct}}% sure of this field; compare it with the document and confirm.",
+  "command.status_open": "Month in progress"
 }
