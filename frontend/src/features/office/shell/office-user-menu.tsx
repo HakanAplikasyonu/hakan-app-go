@@ -10,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 
@@ -25,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { routes } from "@/config/routes";
+import { helpHref, helpTarget } from "@/features/help/lib/context";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { resetClickFix } from "@/lib/support/clickfix";
 import { useAuth } from "@/providers/auth-provider";
@@ -47,7 +49,11 @@ export function OfficeUserMenu() {
   const { user, isAuthenticated, logout } = useAuth();
   const tenant = useTenant();
   const { resolvedTheme, setTheme } = useTheme();
+  const pathname = usePathname();
   if (!isAuthenticated) return null;
+
+  // Yardım bu ofisteki rolün kılavuzunu, açık sayfanın bölümünde açar (#522).
+  const help = helpHref(helpTarget([tenant.role.key], pathname));
 
   const orgs = user?.organizations ?? [];
   const dark = resolvedTheme === "dark";
@@ -123,7 +129,7 @@ export function OfficeUserMenu() {
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href={routes.help.index()}>
+          <Link href={help}>
             <CircleHelp />
             {t("office.shell.help")}
           </Link>
