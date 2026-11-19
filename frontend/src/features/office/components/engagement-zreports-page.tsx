@@ -32,6 +32,12 @@ import {
   formatCellMoney,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
@@ -465,47 +471,46 @@ function ZReportsInner({ engagement }: { engagement: string }) {
           className="flex flex-wrap gap-2"
         >
           {filters.map((f) => (
-            <button
+            <FilterChip
               key={f.key}
-              type="button"
-              aria-pressed={status === f.key}
-              onClick={() =>
+              pressed={status === f.key}
+              onPressedChange={() =>
                 listState.setParams({ status: f.key === "all" ? null : f.key })
               }
-              className={cn(
-                "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-                status === f.key
-                  ? "border-brand bg-brand text-on-brand"
-                  : "border-line bg-surface text-text-2 hover:text-foreground",
-              )}
             >
               {f.label}
-            </button>
+            </FilterChip>
           ))}
         </div>
-        <label className="ms-auto flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">
+        <div className="ms-auto flex items-center gap-2 text-xs">
+          <Label
+            htmlFor="zreports-device"
+            className="text-muted-foreground text-xs font-normal"
+          >
             {t("office.zreports.col_device")}
-          </span>
-          <select
-            className="bg-background focus-visible:ring-ring h-9 rounded-md border px-2 font-mono text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+          </Label>
+          <NativeSelect
+            id="zreports-device"
+            className="pl-2 font-mono shadow-none"
             value={okc}
             onChange={(e) =>
               listState.setParams({ okc: e.target.value || null })
             }
           >
-            <option value="">{t("office.receipts.filter_all")}</option>
+            <NativeSelectOption value="">
+              {t("office.receipts.filter_all")}
+            </NativeSelectOption>
             {(data?.devices ?? []).map((d) => (
-              <option
+              <NativeSelectOption
                 key={d.okc_serial_number || "-"}
                 value={d.okc_serial_number || "-"}
               >
                 {d.okc_serial_number || t("office.zreports.no_device")} (
                 {d.reports})
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
+          </NativeSelect>
+        </div>
       </div>
 
       <EntityTable<RetailSale>
