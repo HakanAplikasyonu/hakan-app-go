@@ -22,6 +22,7 @@ EXPO_PUBLIC_API_URL=http://<bilgisayar-ip>:8080 npx expo start
 | `EXPO_PUBLIC_APP_ENV` | `development` / `preview` / `production` (eas.json profilleri ayarlar). |
 | `EXPO_PUBLIC_SENTRY_DSN` | Sentry DSN (https). Boşsa çökme raporu kapalı (#241). |
 | `EXPO_PUBLIC_CLICKFIX_WIDGET_ID` | Destek (#387): ofis → yazılım sağlayıcısı ClickFix widget kimliği (web'deki `NEXT_PUBLIC_CLICKFIX_WIDGET_ID` ile aynı). Boşsa ana sayfada Destek düğmesi yok. Backend'de `CLICKFIX_IDENTITY_SECRET` tanımlıysa kullanıcı doğrulanmış tanıtılır. |
+| `EXPO_PUBLIC_HELP_URL` | Web yardım merkezinin https adresi (`…/yardim`, #522). Ana sayfadaki **Yardım** düğmesi rolün kılavuzunu açar: sahip ve yönetici ofis yöneticisi, diğer roller ofis çalışanı kılavuzu. Boşsa düğme görünmez. |
 | `EXPO_PUBLIC_CLICKFIX_EMBED_URL` | ClickFix webview sayfası (https). Boşsa `https://getclickfix.com/widget-embed.html`. |
 | `EAS_OFFICE_PROJECT_ID` | `eas init` öncesinde push için EAS proje kimliği (mükellef uygulamasınınkinden ayrı). |
 

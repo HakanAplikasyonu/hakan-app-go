@@ -5,14 +5,16 @@ import { GorunumAyari, Kart, KesikKose, metin, Satir } from '@hakan/mobile-core/
 import { useTheme } from '@hakan/mobile-core/ui/theme';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Notice } from '@/components/ui';
 import { errorMessage } from '@/core/api/envelope';
 import { useAuth } from '@/core/auth/auth-provider';
+import { env } from '@/core/config/env';
 import { enablePush, getPushPermission, type PushPermission } from '@/core/push/push';
 import { initials } from '@/features/clients/format';
+import { helpGuideUrl } from '@/features/support/help';
 import { providerWidgetId } from '@/features/support/use-support';
 import { useDashboard, usePeriodCrown, type DashboardUpload } from '@/features/dashboard/api';
 import {
@@ -34,6 +36,7 @@ import { queueEta } from '@/features/review/format';
  */
 export default function HomeScreen() {
   const { me, office, offices, switchOffice, signOut, can } = useAuth();
+  const helpUrl = helpGuideUrl(env.helpUrl, office?.role);
   const { colors: c } = useTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -191,6 +194,8 @@ export default function HomeScreen() {
           <GorunumAyari />
         </Kart>
         {/* Destek (#387): yazılım sağlayıcısının ClickFix widget'ı tanımlıysa. */}
+        {/* Yardım (#522): rolün kılavuzu, web yardım merkezinde. */}
+        {helpUrl ? <Button testID="open-help" title="Yardım" variant="secondary" onPress={() => void Linking.openURL(helpUrl).catch(() => {})} /> : null}
         {providerWidgetId ? <Button title="Destek" variant="secondary" onPress={() => router.push('/destek')} /> : null}
         {offices.length > 1 ? <Button title="Ofis değiştir" variant="secondary" onPress={switchOffice} /> : null}
         <Button title="Çıkış yap" variant="ghost" onPress={signOut} />
