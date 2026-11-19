@@ -21,6 +21,7 @@ export { EngagementPayrollPage } from "./components/engagement-payroll-page";
 export { EngagementTaxReturnsPage } from "./components/engagement-tax-returns-page";
 export { EngagementConnectionsPage } from "./components/engagement-connections-page";
 export { EngagementReviewSettings } from "./components/engagement-review-settings";
+export { EngagementExcelImportsPage } from "./components/engagement-excel-imports-page";
 export { EngagementPrivacyPage } from "./components/engagement-privacy-page";
 export { ParasutCallbackPage } from "./components/parasut-callback-page";
 export { EngagementEasytradePage } from "./components/engagement-easytrade-page";

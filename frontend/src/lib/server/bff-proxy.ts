@@ -436,6 +436,10 @@ function isTenantPath(segments: string[]) {
 /** Mükellef (taxpayer uuid) of a /v1/taxpayer/* request (issue #4). */
 const TAXPAYER_HEADER = "X-Taxpayer";
 
+/** Client-chosen key of an idempotent write; the API caps it at 128 chars. */
+const IDEMPOTENCY_HEADER = "Idempotency-Key";
+const IDEMPOTENCY_KEY_MAX = 128;
+
 function isTaxpayerPath(segments: string[]) {
   return segments[0] === "taxpayer";
 }
@@ -502,6 +506,16 @@ export async function proxyToUpstream(
       const value = request.headers.get(name);
       if (value) headers.set(name, value);
     }
+  }
+  // Idempotent writes (Excel import commit, receipt upload) key on this
+  // header; without it the API refuses or cannot deduplicate a retry (#518).
+  const idempotencyKey = request.headers.get(IDEMPOTENCY_HEADER)?.trim();
+  if (
+    idempotencyKey &&
+    idempotencyKey.length <= IDEMPOTENCY_KEY_MAX &&
+    request.method !== "GET"
+  ) {
+    headers.set(IDEMPOTENCY_HEADER, idempotencyKey);
   }
   // Only tenant routes read the organization header; it is never forwarded
   // elsewhere.
