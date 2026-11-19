@@ -62,7 +62,7 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 | # | Nerede | Beklenen | Mevcut durum | Önem | İş |
 |---|---|---|---|---|---|
-| C1 ◐ | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte). **Web yapıldı (#518):** fiş listesinde "Düzeltme öner" penceresi (satıcı, tarih, toplam, KDV, fiş no, not). Kalan: mobil uygulama | P1 | S |
+| C1 ✅ | `/m/{taxpayer}/receipts` ve mobil | Fişe düzeltme talebi gönderme | `POST /v1/taxpayer/receipts/{uuid}/corrections` iki istemcide de yok (ofis tarafı B2 ile birlikte). **Web yapıldı (#518):** fiş listesinde "Düzeltme öner" penceresi (satıcı, tarih, toplam, KDV, fiş no, not). **Mobil zaten var** (denetim yanlış saymış: `mobile/src/features/receipts/api.ts` `sendCorrections`, fiş ayrıntısında alan alan "Düzelt", çevrimdışı kuyrukla gönderim) | P1 | S |
 | C2 | `mobile/` | Rapor, yükleme geçmişi, geçmiş paylaşımı (history-shares) | Web mükellef panelinde var (`/m/.../report`, `/uploads`), mobilde yok | P2 | M |
 | C3 | `mobile/`, `mobile-office/` | Çıkışta push cihaz kaydını silme | `DELETE /v1/push-devices/{token}` hiçbir istemcide yok; çıkıştan sonra bildirim gelmeye devam edebilir (doğrulanmalı) | P2 | S |
 
@@ -98,13 +98,13 @@ Var ve doğru yerde olanlar (eksik değil): Easytrade bağlantısı (mükellef s
 
 ## Önerilen uygulama sırası (#518)
 
-Durum: 1–7 yapıldı (D4 ertelendi: platform paneli P2; C1 mobil kaldı). Sıradaki: 8.
+Durum: 1–7 ve 9'un A5'i yapıldı (D4 ertelendi: platform paneli P2; C1 mobil zaten vardı; B2 demo verisi kaldı: talebin `new_payload` alanı tam fatura modeli ister, seed gerçek kilit yolundan üretmeli). Sıradaki: 8.
 
 1. ✅ **Mükellef detayına "Bağlantılar" sekmesi** iskeleti: bütün mükellef düzeyi bağlantıları (entegratör, banka, Easytrade, Paraşüt, KolayBi, WhatsApp, muhasebe aktarımı) tek yerde, durum rozeti ve son senkron saatiyle. Easytrade ve aktarım ayarı buraya bağlanır.
 2. ✅ **A2 banka web servis bağlantısı** (API hazır) + D4 çıkış IP'si bilgisi.
 3. **A1 e-Fatura entegratörü**: önce backend uçları (oluştur, kimlik bilgisini kasaya yaz, test et, senkron başlat, durum), sonra sekmeye ekran.
 4. **A3 Paraşüt, A4 KolayBi** (API hazır).
-5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte). (C1 mobil kaldı.)
+5. ✅ **B2 + C1 değişiklik/düzeltme talepleri** (iki uçlu akış birlikte).
 6. ✅ **E1 izin kataloğu** eşitlemesi ve düğme/sekme gizleme (E2).
 7. ✅ **B3 KVKK talepleri.**
 8. **B1 genel Excel içe aktarma sihirbazı.**
