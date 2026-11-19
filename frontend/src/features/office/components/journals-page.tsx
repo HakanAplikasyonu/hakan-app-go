@@ -3,6 +3,8 @@
 import {
   BookOpenCheck,
   Check,
+  CircleAlert,
+  CircleCheck,
   Download,
   FileSpreadsheet,
   Loader2,
@@ -11,7 +13,8 @@ import {
   Trash2,
   Undo2,
 } from "lucide-react";
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { EmptyState } from "@/components/common/empty-state";
@@ -26,11 +29,13 @@ import {
   type DataTableFeatures,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Hint } from "@/components/ui/hint";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DRAFTS_ANCHOR, EXPORT_ANCHOR } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -50,6 +55,7 @@ import {
   journalService,
   TRANSFER_DRIVERS,
   type JournalDraft,
+  type JournalDraftIssue,
   type JournalExportSummary,
   type JournalTransfer,
 } from "../services/journals.service";
@@ -338,6 +344,161 @@ function NewDraft({ engagement }: { engagement: string }) {
   );
 }
 
+function issueText(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  is: JournalDraftIssue,
+) {
+  return t(`office.journals.check.${is.code}`, {
+    line: is.line_no ?? "",
+    account: is.account ?? "",
+    amount: formatMoney(is.difference ?? "0"),
+  });
+}
+
+/**
+ * Taslak fişin kontrolü (#566): engeller ve hesap kodu engellerinde
+ * "Hesabı düzelt". Düzeltilince liste yenilenir, engel kalkar.
+ */
+function DraftCheck({
+  draft,
+  engagement,
+}: {
+  draft: JournalDraft;
+  engagement: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { prompt } = useDialogs();
+  const { setLineAccount } = useJournalActions(slug, engagement);
+  const issues = draft.issues ?? [];
+  if (draft.status !== "draft") return null;
+  if (!issues.length) {
+    return (
+      <span className="text-status-approved inline-flex items-center gap-1 text-xs">
+        <CircleCheck className="size-3.5" aria-hidden />
+        {t("office.journals.check.ok")}
+      </span>
+    );
+  }
+  const fix = async (is: JournalDraftIssue) => {
+    const account = await prompt({
+      title: t("office.journals.check.fix_title", { line: is.line_no ?? "" }),
+      description: t("office.journals.check.fix_description", {
+        account: is.account ?? "",
+      }),
+      placeholder: "770.01",
+      confirmLabel: t("office.journals.check.fix_confirm"),
+    });
+    const code = account?.trim();
+    if (!code || !is.line_no) return;
+    setLineAccount.mutate(
+      { draft: draft.uuid, line: is.line_no, account: code },
+      {
+        onSuccess: () =>
+          toast.success(
+            t("office.journals.check.fixed", {
+              line: is.line_no ?? "",
+              account: code,
+            }),
+          ),
+        onError: (err) =>
+          toast.error(errorText(t, err, t("office.api.load_error"))),
+      },
+    );
+  };
+  return (
+    <ul className="space-y-1 text-xs">
+      {issues.map((is, i) => (
+        <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-status-blocking inline-flex items-center gap-1">
+            <CircleAlert className="size-3.5 shrink-0" aria-hidden />
+            {issueText(t, is)}
+          </span>
+          {is.code === "unknown_account" || is.code === "parent_account" ? (
+            <Button
+              size="sm"
+              variant="link"
+              className="h-auto p-0 text-xs"
+              disabled={setLineAccount.isPending}
+              onClick={() => void fix(is)}
+            >
+              {t("office.journals.check.fix_account")}
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Engelsiz taslakları toplu onay (#566): yalnız kontrolden geçen fişler;
+ * engelliler taslakta kalır.
+ */
+function ApproveClean({
+  engagement,
+  drafts,
+}: {
+  engagement: string;
+  drafts: JournalDraft[];
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { confirm } = useDialogs();
+  const { approve } = useJournalActions(slug, engagement);
+  const [busy, setBusy] = useState(false);
+  const open = drafts.filter((d) => d.status === "draft");
+  const clean = open.filter((d) => !d.issues?.length);
+  if (!clean.length) return null;
+  const run = async () => {
+    const ok = await confirm({
+      title: t("office.journals.check.approve_clean_title", {
+        count: clean.length,
+      }),
+      description: t("office.journals.check.approve_clean_description", {
+        blocked: open.length - clean.length,
+      }),
+      confirmLabel: t("office.journals.approve"),
+    });
+    if (!ok) return;
+    setBusy(true);
+    let done = 0;
+    let failed = 0;
+    let reason = "";
+    for (const d of clean) {
+      try {
+        await approve.mutateAsync(d.uuid);
+        done += 1;
+      } catch (err) {
+        failed += 1;
+        reason = errorText(t, err, t("office.api.load_error"));
+      }
+    }
+    setBusy(false);
+    if (failed) {
+      toast.error(
+        t("office.journals.check.approve_partial", {
+          ok: done,
+          failed,
+          reason,
+        }),
+      );
+    } else {
+      toast.success(t("office.journals.check.approved", { count: done }));
+    }
+  };
+  return (
+    <Button size="sm" disabled={busy} onClick={() => void run()}>
+      {busy ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Check className="size-4" />
+      )}
+      {t("office.journals.check.approve_clean", { count: clean.length })}
+    </Button>
+  );
+}
+
 function ExportPanel({
   engagement,
   period,
@@ -395,6 +556,7 @@ function ExportPanel({
 
   return (
     <Panel
+      id={EXPORT_ANCHOR}
       title={t("office.journals.export_title")}
       description={t("office.journals.export_description", {
         period: periodText(period),
@@ -614,6 +776,17 @@ function JournalsInner() {
   const setPeriod = (value: string) =>
     setGlobalPeriod(isPeriod(value) ? value : ALL_PERIODS);
   const drafts = useJournalDrafts(slug, engagement, period);
+  // Sıradaki İşler'den gelen bağlantı bölüme götürür (#566): liste
+  // yüklendikten sonra kaydırılır, yoksa tarayıcı boş sayfada kalır.
+  const loaded = drafts.isSuccess;
+  useEffect(() => {
+    if (!loaded) return;
+    const id = window.location.hash.slice(1);
+    if (id !== DRAFTS_ANCHOR && id !== EXPORT_ANCHOR) return;
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ block: "start" });
+    el?.focus({ preventScroll: true });
+  }, [loaded]);
   const exports = useJournalExports(slug, engagement);
   const transfers = useJournalTransfers(slug, engagement);
   // Newest transfer per export (the list is newest first).
@@ -678,18 +851,37 @@ function JournalsInner() {
           </span>
         ),
       }),
+      createColumn<JournalDraft>({
+        id: "check",
+        labelKey: "office.journals.check.col",
+        accessorFn: (d) => d.issues?.length ?? 0,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <DraftCheck draft={row.original} engagement={engagement} />
+        ),
+      }),
       createActionsColumn<JournalDraft>({
         cell: (d) =>
           d.status === "draft" ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={approving}
-              onClick={() => approveDraft(d.uuid)}
+            // Engelli fiş onaylanmaz (#566); nedeni ipucunda.
+            <Hint
+              label={
+                d.issues?.length
+                  ? t("office.journals.check.approve_blocked")
+                  : undefined
+              }
+              wrap
             >
-              <Check className="size-4" />
-              {t("office.journals.approve")}
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={approving || !!d.issues?.length}
+                onClick={() => approveDraft(d.uuid)}
+              >
+                <Check className="size-4" />
+                {t("office.journals.approve")}
+              </Button>
+            </Hint>
           ) : d.status === "exported" ? (
             <Button
               size="sm"
@@ -710,7 +902,7 @@ function JournalsInner() {
           ) : null,
       }),
     ],
-    [approveDraft, approving, prompt, reverseDraft, reversing, t],
+    [approveDraft, approving, engagement, prompt, reverseDraft, reversing, t],
   );
   // Fişin ilişkili kayıtları: kaynak belge ve hareketler (#469).
   const relatedColumn = useRelatedColumn<JournalDraft>(
@@ -755,6 +947,8 @@ function JournalsInner() {
   }
 
   const rows = drafts.data?.items ?? [];
+  const openDrafts = rows.filter((d) => d.status === "draft");
+  const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
   const actionError = approve.error ?? reverse.error;
   return (
     <div className="space-y-4">
@@ -785,7 +979,23 @@ function JournalsInner() {
 
       <NewDraft engagement={engagement} />
 
-      <Panel title={t("office.journals.drafts_title")}>
+      <Panel
+        id={DRAFTS_ANCHOR}
+        title={t("office.journals.drafts_title")}
+        description={
+          openDrafts.length
+            ? blockedDrafts
+              ? t("office.journals.check.summary", {
+                  drafts: openDrafts.length,
+                  blocked: blockedDrafts,
+                })
+              : t("office.journals.check.summary_clean", {
+                  drafts: openDrafts.length,
+                })
+            : undefined
+        }
+        actions={<ApproveClean engagement={engagement} drafts={rows} />}
+      >
         {actionError ? (
           <p className="text-status-blocking px-4 pt-3 text-sm">
             {errorText(t, actionError, t("office.api.load_error"))}

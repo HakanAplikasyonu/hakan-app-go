@@ -681,6 +681,10 @@ type Querier interface {
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
+	// Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
+	// da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
+	// kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+	JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
 	// Karşılaştırılan sürüm: mükellefin son Luca hesap planı / mizan dökümü.
@@ -1322,6 +1326,8 @@ type Querier interface {
 	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
 	// Entegratör durumu (30 §8) faturaya işlenir.
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
+	// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
+	SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)

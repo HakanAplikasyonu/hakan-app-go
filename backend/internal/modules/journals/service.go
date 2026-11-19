@@ -123,6 +123,8 @@ type Draft struct {
 	Debit   decimal.Decimal `json:"debit"`
 	Credit  decimal.Decimal `json:"credit"`
 	Lines   int32           `json:"lines"`
+	// Issues: why a draft cannot be approved yet (#566); only on drafts.
+	Issues []DraftIssue `json:"issues,omitempty"`
 }
 
 // CreateDraft stores a new draft (status draft). The entry number is the next
@@ -211,6 +213,15 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	}
 	if tot.Lines == 0 || !repository.Dec(tot.Debit).Equal(repository.Dec(tot.Credit)) {
 		return fmt.Errorf("%w: debit %s, credit %s", ErrUnbalanced, repository.Dec(tot.Debit).StringFixed(2), repository.Dec(tot.Credit).StringFixed(2))
+	}
+	// Kontrol edilmemiş fiş onaylanmaz (#566): hesap planında olmayan ya da
+	// ana hesaba kayıt, kilitli dönem.
+	issues, err := s.draftIssues(ctx, scope, []int64{row.ID})
+	if err != nil {
+		return err
+	}
+	if len(issues[row.ID]) > 0 {
+		return &DraftBlockedError{Issues: issues[row.ID]}
 	}
 	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID)})
 	if err != nil {

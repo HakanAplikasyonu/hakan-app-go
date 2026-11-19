@@ -9313,7 +9313,7 @@ paths:
       tags: [Journals]
       operationId: approveJournalDraft
       summary: Approve a balanced draft
-      description: Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`.
+      description: Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft with other issues (account not in the plan, parent account, locked period; #566) with `422 JOURNAL_BLOCKED` listing them as error details.
       security:
         - bearerAuth: []
       responses:
@@ -9326,10 +9326,48 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422":
-          description: Not balanced (`JOURNAL_UNBALANCED`)
+          description: Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/lines/{lineNo}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: lineNo, in: path, required: true, schema: { type: integer, format: int32, minimum: 1 } }
+    patch:
+      tags: [Journals]
+      operationId: setJournalDraftLineAccount
+      summary: Fix a draft line's account code
+      description: |
+        Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
+        (#566): only drafts (not approved or exported entries) change. The
+        returned draft lists its remaining issues.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account]
+              properties:
+                account: { type: string, example: "770.01" }
+      responses:
+        "200":
+          description: Draft with the changed line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
@@ -22250,6 +22288,28 @@ components:
         debit: { type: string }
         credit: { type: string }
         lines: { type: integer, format: int32 }
+        issues:
+          type: array
+          description: |
+            Why a draft cannot be approved yet (#566); only on drafts with
+            issues. Approving such a draft returns 422 JOURNAL_BLOCKED.
+          items: { $ref: "#/components/schemas/JournalDraftIssue" }
+
+    JournalDraftIssue:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [unbalanced, unknown_account, parent_account, period_locked]
+          description: |
+            unbalanced: debit and credit differ (or no lines);
+            unknown_account: the line's code is not in the imported plan;
+            parent_account: the line posts to an account that has sub-accounts;
+            period_locked: the period is closed.
+        line_no: { type: integer, format: int32 }
+        account: { type: string }
+        difference: { type: string, description: "debit minus credit (unbalanced)" }
 
     JournalDraftPage:
       type: object

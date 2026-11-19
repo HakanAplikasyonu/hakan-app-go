@@ -317,6 +317,92 @@ func (q *Queries) InsertJournalDraftLine(ctx context.Context, arg InsertJournalD
 	return err
 }
 
+const journalDraftIssues = `-- name: JournalDraftIssues :many
+WITH d AS (
+    SELECT jd.id, jd.period FROM journal_drafts jd
+    WHERE jd.organization_id = $1 AND jd.engagement_id = $2
+      AND jd.id = ANY($3::bigint[])
+), has_plan AS (
+    SELECT EXISTS (
+        SELECT 1 FROM account_plan_accounts a
+        WHERE a.organization_id = $1 AND a.engagement_id = $2
+    ) AS yes
+)
+SELECT d.id AS draft_id, 'unbalanced'::text AS code, 0::int AS line_no, ''::text AS account_code,
+       (COALESCE(SUM(l.debit), 0) - COALESCE(SUM(l.credit), 0))::numeric AS difference
+FROM d
+LEFT JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2 AND l.journal_draft_id = d.id
+GROUP BY d.id
+HAVING COUNT(l.id) = 0 OR COALESCE(SUM(l.debit), 0) <> COALESCE(SUM(l.credit), 0)
+UNION ALL
+SELECT d.id, 'unknown_account', l.line_no, l.account_code, 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2 AND l.journal_draft_id = d.id
+WHERE (SELECT yes FROM has_plan)
+  AND NOT EXISTS (
+      SELECT 1 FROM account_plan_accounts a
+      WHERE a.organization_id = $1 AND a.engagement_id = $2 AND a.code = l.account_code
+  )
+UNION ALL
+SELECT d.id, 'parent_account', l.line_no, l.account_code, 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2 AND l.journal_draft_id = d.id
+JOIN account_plan_accounts a
+  ON a.organization_id = $1 AND a.engagement_id = $2 AND a.code = l.account_code AND NOT a.is_leaf
+UNION ALL
+SELECT d.id, 'period_locked', 0, '', 0::numeric
+FROM d
+JOIN period_locks pl
+  ON pl.organization_id = $1 AND pl.engagement_id = $2 AND pl.period = d.period
+ORDER BY 1, 3
+`
+
+type JournalDraftIssuesParams struct {
+	OrganizationID int64   `json:"organization_id"`
+	EngagementID   int64   `json:"engagement_id"`
+	DraftIds       []int64 `json:"draft_ids"`
+}
+
+type JournalDraftIssuesRow struct {
+	DraftID     int64          `json:"draft_id"`
+	Code        string         `json:"code"`
+	LineNo      int32          `json:"line_no"`
+	AccountCode string         `json:"account_code"`
+	Difference  pgtype.Numeric `json:"difference"`
+}
+
+// Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
+// da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
+// kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+func (q *Queries) JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error) {
+	rows, err := q.db.Query(ctx, journalDraftIssues, arg.OrganizationID, arg.EngagementID, arg.DraftIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []JournalDraftIssuesRow{}
+	for rows.Next() {
+		var i JournalDraftIssuesRow
+		if err := rows.Scan(
+			&i.DraftID,
+			&i.Code,
+			&i.LineNo,
+			&i.AccountCode,
+			&i.Difference,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const journalDraftTotals = `-- name: JournalDraftTotals :one
 SELECT COALESCE(SUM(debit), 0)::numeric AS debit, COALESCE(SUM(credit), 0)::numeric AS credit, COUNT(*)::int AS lines
 FROM journal_draft_lines
@@ -626,6 +712,38 @@ func (q *Queries) ReverseExportBatchItem(ctx context.Context, arg ReverseExportB
 		arg.ReversedBy,
 		arg.Reason,
 		arg.JournalDraftID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setJournalDraftLineAccount = `-- name: SetJournalDraftLineAccount :execrows
+UPDATE journal_draft_lines l SET account_code = $1
+FROM journal_drafts d
+WHERE d.organization_id = $2 AND d.engagement_id = $3 AND d.id = $4
+  AND d.status = 'draft'
+  AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
+  AND l.journal_draft_id = d.id AND l.line_no = $5
+`
+
+type SetJournalDraftLineAccountParams struct {
+	AccountCode    string `json:"account_code"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	DraftID        int64  `json:"draft_id"`
+	LineNo         int32  `json:"line_no"`
+}
+
+// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
+func (q *Queries) SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setJournalDraftLineAccount,
+		arg.AccountCode,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.DraftID,
+		arg.LineNo,
 	)
 	if err != nil {
 		return 0, err
