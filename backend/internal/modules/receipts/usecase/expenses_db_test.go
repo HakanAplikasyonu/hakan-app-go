@@ -5,9 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
+	warnrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
@@ -42,11 +45,24 @@ func TestExpensePostingAgainstPostgres(t *testing.T) {
 	must(err)
 
 	reader := &fakeReader{answer: fuel}
-	svc := New(pool, nopStore{}, reader, nil, nil, nil).WithJournals(journals.New(pool, nopStore{}))
+	q := db.New(pool)
+	svc := New(pool, nopStore{}, reader, nil, engine.New(warnrepo.NewWarnings(q), warnrepo.NewConfig(q)), nil).WithJournals(journals.New(pool, nopStore{}))
 	sc := engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
+	// UNAPPROVED_EXPENSE (#529): açık uyarı sayısı ve son durum.
+	unapproved := func() (open int, last string) {
+		t.Helper()
+		must(pool.QueryRow(ctx, `SELECT count(*) FILTER (WHERE status = 'open'),
+			COALESCE((array_agg(status ORDER BY updated_at DESC))[1], '')
+			FROM data_warnings WHERE engagement_id = $1 AND code = 'UNAPPROVED_EXPENSE' AND producer = $2`,
+			eng, ExpenseApprovalProducer).Scan(&open, &last))
+		return open, last
+	}
 
 	c, err := svc.Capture(ctx, sc, user, "fis.png", png("ex-a"), extract.KindFuel)
 	must(err)
+	if open, _ := unapproved(); open != 1 {
+		t.Fatalf("pending expense must raise UNAPPROVED_EXPENSE, open = %d", open)
+	}
 	page, err := svc.Expenses(ctx, sc, ExpenseFilter{Limit: 50})
 	must(err)
 	if page.Total != 1 || page.Pending != 1 || len(page.Items) != 1 || page.Amount.String() != "1200" {
@@ -80,6 +96,9 @@ func TestExpensePostingAgainstPostgres(t *testing.T) {
 	must(err)
 	if v.ApprovalStatus != "approved" || v.Journal == nil || v.Journal.Status != "draft" {
 		t.Fatalf("approved %+v", v)
+	}
+	if open, last := unapproved(); open != 0 || last != "auto_resolved" {
+		t.Fatalf("approval must resolve UNAPPROVED_EXPENSE: open %d, last %q", open, last)
 	}
 	rows, err := pool.Query(ctx, `SELECT l.account_code, l.debit::text, l.credit::text, l.source_kind, l.source_id
 		FROM journal_draft_lines l JOIN journal_drafts d ON d.id = l.journal_draft_id WHERE d.uuid = $1 ORDER BY l.line_no`, v.Journal.UUID)
@@ -116,8 +135,14 @@ func TestExpensePostingAgainstPostgres(t *testing.T) {
 		t.Fatalf("memory %+v", page.Items)
 	}
 	// Fiş yakalama ekranından onay da taslak üretir.
+	if open, _ := unapproved(); open != 1 {
+		t.Fatalf("second pending expense: open = %d", open)
+	}
 	_, err = svc.Decide(ctx, sc, c2.UUID, user, true)
 	must(err)
+	if open, _ := unapproved(); open != 0 {
+		t.Fatalf("capture approval must resolve UNAPPROVED_EXPENSE: open = %d", open)
+	}
 	var drafts int
 	must(pool.QueryRow(ctx, `SELECT count(*) FROM journal_drafts WHERE engagement_id = $1`, eng).Scan(&drafts))
 	if drafts != 2 {

@@ -12,13 +12,14 @@ import { useLocale } from "@/providers/locale-provider";
 import { warningRecordHref } from "../lib/related-href";
 import type { RelatedSourceKind } from "../services/related.service";
 import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
+import { ExpenseQuickView } from "./expense-quick-view";
 import { InvoiceQuickView } from "./invoice-quick-view";
 import { RelatedRecordsTable } from "./related-records";
 import { useEntityLabel } from "./warnings-page";
 
 /**
  * Bir kaydın yan paneldeki gövdesi (#528, #529): düzeltme alanı (banka
- * hareketinde fatura eşleştirme, faturada görüntü ve PDF), araya konan
+ * hareketinde fatura eşleştirme, faturada görüntü ve PDF, masrafta onay), araya konan
  * içerik (uyarılar), ilişkili kayıtlar ve kaydın kendi sayfasına bağlantı.
  * Kaydı olmayan uyarıda (`kind` null) ilişkili kayıtlar uyarının kendisinden.
  */
@@ -70,6 +71,13 @@ export function RecordDetail({
       ) : null}
       {kind === "invoice" && uuid ? (
         <InvoiceQuickView engagement={engagement} invoice={uuid} />
+      ) : null}
+      {kind === "expense" && uuid ? (
+        <ExpenseQuickView
+          engagement={engagement}
+          expense={uuid}
+          onChanged={onChanged}
+        />
       ) : null}
 
       {children}

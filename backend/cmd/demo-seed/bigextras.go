@@ -110,7 +110,7 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 			{"data_warnings (fiş)", `
 				INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity,
 					producer, status, created_at, updated_at)
-				SELECT e.organization_id, e.id, x.taxpayer_id, x.period, 'expense', x.id, 'UNAPPROVED_EXPENSE', 'info', 'receipts', 'open',
+				SELECT e.organization_id, e.id, x.taxpayer_id, x.period, 'expense', x.id, 'UNAPPROVED_EXPENSE', 'info', 'control:expense_approval', 'open',
 				       x.created_at, x.created_at
 				FROM expenses x JOIN engagements e ON e.taxpayer_id = x.taxpayer_id AND e.id = ANY($1::bigint[])
 				WHERE x.source_system = $2 AND x.approval_status = 'pending'`, []any{engs, bigSource}},

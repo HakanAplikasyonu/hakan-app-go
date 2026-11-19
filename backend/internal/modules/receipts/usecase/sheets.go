@@ -116,6 +116,7 @@ func (s *Service) ImportExpenses(ctx context.Context, sc engagementctx.Scope, us
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.q.WithTx(tx)
+	var inserted []db.Expense
 	for _, pr := range rows {
 		p, post, msg := expenseRow(sc, pr, cats, plan)
 		if msg != "" {
@@ -131,6 +132,7 @@ func (s *Service) ImportExpenses(ctx context.Context, sc engagementctx.Scope, us
 			return ImportResult{}, fmt.Errorf("receipts: import line %d: %w", pr.Line, err)
 		}
 		res.Inserted++
+		inserted = append(inserted, e)
 		if post != nil {
 			post.TargetID, post.DecidedBy = e.ID, optID(userID)
 			if _, err := q.UpsertReceiptPosting(ctx, *post); err != nil {
@@ -140,6 +142,9 @@ func (s *Service) ImportExpenses(ctx context.Context, sc engagementctx.Scope, us
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return ImportResult{}, err
+	}
+	for _, e := range inserted {
+		s.syncExpenseApproval(ctx, sc, e)
 	}
 	return res, nil
 }
