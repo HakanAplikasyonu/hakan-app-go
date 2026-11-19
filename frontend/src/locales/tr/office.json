@@ -1871,5 +1871,14 @@
   "expense_view.load_failed": "Masraf yüklenemedi.",
   "expense_view.decide_hint": "Karar verince \"onaylanmamış masraf\" uyarısı kendiliğinden kapanır.",
   "col_open_warnings": "Açık uyarı",
-  "engagement.strip_open_warnings": "{{count}} açık uyarı"
+  "engagement.strip_open_warnings": "{{count}} açık uyarı",
+  "zreport_view.title": "Z raporu",
+  "zreport_view.load_failed": "Z raporu yüklenemedi.",
+  "zreport_view.z_number": "Z numarası",
+  "zreport_view.date": "Tarih",
+  "zreport_view.save": "Düzelt ve yeniden denetle",
+  "zreport_view.saved": "Düzeltildi; süreklilik yeniden denetlendi",
+  "zreport_view.save_failed": "Z raporu kaydedilemedi",
+  "zreport_view.edit_hint": "Numara ya da tarih yanlış okunduysa burada düzelt; uyarı kendiliğinden kapanır. Arada gerçekten eksik rapor varsa mükelleften iste.",
+  "zreport_view.locked_hint": "Onaylanmış ya da reddedilmiş rapor burada değiştirilemez."
 }
