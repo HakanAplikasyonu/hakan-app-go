@@ -375,6 +375,7 @@ func (s *Service) DecideExpense(ctx context.Context, sc engagementctx.Scope, id 
 	if err := tx.Commit(ctx); err != nil {
 		return ExpenseView{}, err
 	}
+	s.syncExpenseApproval(ctx, sc, row)
 	return s.Expense(ctx, sc, id)
 }
 

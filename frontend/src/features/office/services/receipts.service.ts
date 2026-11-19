@@ -32,6 +32,8 @@ const base = (slug: string, engagement: string) =>
 export const receiptKeys = {
   expenses: (slug: string, engagement: string) =>
     [...base(slug, engagement), "expenses"] as const,
+  expense: (slug: string, engagement: string, expense: string) =>
+    [...base(slug, engagement), "expenses", expense] as const,
   categories: (slug: string, engagement: string) =>
     [...base(slug, engagement), "expense-categories"] as const,
   retail: (slug: string, engagement: string) =>
@@ -82,6 +84,13 @@ export const receiptsService = {
       "GET",
       `${eng(engagement)}/expenses`,
       { query: q },
+    );
+  },
+  expense(slug: string, engagement: string, expense: string) {
+    return tenantRequest<Expense>(
+      slug,
+      "GET",
+      `${eng(engagement)}/expenses/${encodeURIComponent(expense)}`,
     );
   },
   setPosting(

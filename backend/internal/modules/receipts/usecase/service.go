@@ -53,6 +53,10 @@ const (
 // PlateProducer is the data_warning producer of the plate check.
 const PlateProducer = "control:plate"
 
+// ExpenseApprovalProducer raises UNAPPROVED_EXPENSE on a pending expense
+// and resolves it once the expense is approved or rejected (#529).
+const ExpenseApprovalProducer = "control:expense_approval"
+
 // Errors.
 var (
 	ErrInvalid  = errors.New("receipts: invalid input")
@@ -314,6 +318,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	// After the commit: checks that only add information.
 	if draft.Type == "expense" {
 		v.PlateCheck = s.checkPlate(ctx, sc, draft.ID, res, date, hasDate)
+		s.syncExpenseApprovalByID(ctx, sc, draft.ID)
 	}
 	if draft.Type == "retail_sale" {
 		s.CheckZContinuity(ctx, sc, res.Get(extract.FieldOKCSerial))
@@ -405,12 +410,14 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.q.WithTx(tx)
+	var decided *db.Expense
 	switch {
 	case c.ExpenseID.Valid:
 		e, err := q.SetExpenseApproval(ctx, db.SetExpenseApprovalParams{ApprovalStatus: status, ApprovedBy: optID(userID), TaxpayerID: c.TaxpayerID, ID: c.ExpenseID.Int64})
 		if err != nil {
 			return View{}, fmt.Errorf("receipts: approve expense: %w", err)
 		}
+		decided = &e
 		// #384: the approved expense gets its account and journal draft.
 		if approve {
 			if err := s.postExpense(dbtx.WithTx(ctx, tx), q, sc, e, userID); err != nil {
@@ -437,6 +444,9 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return View{}, err
+	}
+	if decided != nil {
+		s.syncExpenseApproval(ctx, sc, *decided)
 	}
 	return s.view(c, nil), nil
 }
@@ -590,4 +600,37 @@ func optNum(d decimal.Decimal, ok bool) pgtype.Numeric {
 		return pgtype.Numeric{}
 	}
 	return toNumeric(d)
+}
+
+// syncExpenseApproval raises or resolves UNAPPROVED_EXPENSE for one
+// expense: open while it waits for the office's decision (#529). Only adds
+// information: failures are logged, never returned. An expense without a
+// period (no date yet) is checked once it has one.
+func (s *Service) syncExpenseApproval(ctx context.Context, sc engagementctx.Scope, e db.Expense) {
+	if s.warnings == nil || !e.Period.Valid {
+		return
+	}
+	var findings []engine.Finding
+	if e.ApprovalStatus == "pending" {
+		findings = []engine.Finding{{Code: "UNAPPROVED_EXPENSE", Params: map[string]any{}}}
+	}
+	id := e.ID
+	_ = database.BestEffort(ctx, "receipt_expense_approval_warning", func(ctx context.Context) error {
+		_, err := s.warnings.Apply(ctx, engine.Subject{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID},
+			ExpenseApprovalProducer, engine.Entity{Type: catalog.EntityExpense, ID: &id, Period: e.Period.String},
+			[]string{"UNAPPROVED_EXPENSE"}, findings)
+		return err
+	})
+}
+
+// syncExpenseApprovalByID loads the expense and syncs its warning.
+func (s *Service) syncExpenseApprovalByID(ctx context.Context, sc engagementctx.Scope, id int64) {
+	if s.warnings == nil {
+		return
+	}
+	e, err := s.q.GetExpense(ctx, db.GetExpenseParams{TaxpayerID: sc.TaxpayerID, ID: id})
+	if err != nil {
+		return
+	}
+	s.syncExpenseApproval(ctx, sc, e)
 }
