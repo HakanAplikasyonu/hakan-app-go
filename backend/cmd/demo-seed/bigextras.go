@@ -2,15 +2,21 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/demo"
+	invoicerepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
+	periodsrepo "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/periods/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/reports"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
@@ -220,6 +226,9 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 			}
 			cnt.add(s.name, int(tag.RowsAffected()))
 		}
+		if err := bigChangeRequests(ctx, tx, engs, cnt); err != nil {
+			return err
+		}
 		if err := bigReports(ctx, tx, w, o, ms, cnt); err != nil {
 			return err
 		}
@@ -328,4 +337,66 @@ func bigActivity(ctx context.Context, tx pgx.Tx, w *bigWorld, o *bigOffice, ms [
 	cnt.add("activity_events", len(rows))
 	return copyRows(ctx, tx, "activity_events", []string{"actor_user_id", "organization_id", "action", "resource", "payload",
 		"ip_address", "user_agent", "created_at"}, rows)
+}
+
+// bigChangeRequests opens change requests on locked periods (#518 B2): a
+// late sales invoice arrives for a closed month, so it waits for the
+// accountant instead of changing the filed period. The request goes through
+// the real period guard and carries the full invoice, so "Uygula" in the
+// demo writes a real invoice.
+func bigChangeRequests(ctx context.Context, tx pgx.Tx, engs []int64, cnt *bigCounts) error {
+	files, err := demo.UBL("atlas-01")
+	if err != nil || len(files) == 0 {
+		return fmt.Errorf("change requests: demo UBL: %w", err)
+	}
+	mapped, err := ublmap.MapXML(files[0].Data, ublmap.Options{OwnTaxID: "9000000017"})
+	if err != nil {
+		return fmt.Errorf("change requests: map UBL: %w", err)
+	}
+	// The latest locked month of every fourth engagement.
+	rows, err := tx.Query(ctx, `
+		SELECT DISTINCT ON (l.engagement_id) l.engagement_id, l.taxpayer_id, l.period::text
+		FROM period_locks l
+		WHERE l.engagement_id = ANY($1::bigint[]) AND l.engagement_id % 4 = 0
+		ORDER BY l.engagement_id, l.period DESC`, engs)
+	if err != nil {
+		return fmt.Errorf("change requests: locks: %w", err)
+	}
+	type target struct {
+		eng, taxpayer int64
+		period        string
+	}
+	targets, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (target, error) {
+		var t target
+		return t, r.Scan(&t.eng, &t.taxpayer, &t.period)
+	})
+	if err != nil {
+		return fmt.Errorf("change requests: locks: %w", err)
+	}
+	guard := periodsrepo.NewGuard()
+	n := 0
+	for _, t := range targets {
+		day, err := time.Parse("2006-01-02", t.period+"-27")
+		if err != nil {
+			return err
+		}
+		inv := mapped.Invoice
+		key := fmt.Sprintf("gec-%d-%s", t.eng, t.period)
+		sum := sha256.Sum256([]byte(key))
+		inv.SourceID = key
+		inv.UUID = uuid.NewSHA1(uuid.NameSpaceOID, []byte(key)).String()
+		inv.InvoiceNumber = fmt.Sprintf("GEC%s%09d", t.period[:4], t.eng)
+		inv.IssueDate, inv.Period = day, t.period
+		inv.PaymentDueDate = nil
+		inv.ContentHash = hex.EncodeToString(sum[:])
+		res, err := invoicerepo.SaveInvoiceGuarded(ctx, tx, t.taxpayer, inv, 0, guard)
+		if err != nil {
+			return fmt.Errorf("change requests: engagement %d: %w", t.eng, err)
+		}
+		if res.Outcome == invoicerepo.OutcomeHeld {
+			n++
+		}
+	}
+	cnt.add("change_requests", n)
+	return nil
 }
