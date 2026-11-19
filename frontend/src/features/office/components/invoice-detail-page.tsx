@@ -248,9 +248,6 @@ function InvoiceDetailInner({ id }: { id: string }) {
                         })}
                       </div>
                       <div className="flex gap-2">
-                        <Figure className="text-muted-foreground text-xs">
-                          {w.code}
-                        </Figure>
                         <WarningStatusLabel status={w.status} />
                       </div>
                     </div>

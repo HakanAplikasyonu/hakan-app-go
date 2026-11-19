@@ -205,3 +205,20 @@ export function matchSummary(s: SuggestionLike, t?: Translate) {
       : undefined;
   return [cp, amount, date].filter(Boolean).join(" · ") || undefined;
 }
+
+const OCR_RATIONALE_RE = /^OCR alan güveni\s+(\d+(?:\.\d+)?)/;
+
+/**
+ * Önerinin gerekçesi insan diliyle (#576): eski kayıtlardaki
+ * "OCR alan güveni 0.41000000" yüzdeye çevrilir; diğer gerekçeler aynen.
+ */
+export function humanRationale(
+  rationale: string | null | undefined,
+  t: Translate,
+): string {
+  if (!rationale) return "";
+  const m = OCR_RATIONALE_RE.exec(rationale);
+  if (!m) return rationale;
+  const pct = Math.round(Number(m[1]) * 100);
+  return t("office.review_api.ocr_rationale", { pct });
+}

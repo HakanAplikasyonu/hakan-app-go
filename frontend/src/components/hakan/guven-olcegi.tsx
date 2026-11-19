@@ -7,14 +7,14 @@ export type GuvenKaynagi = "kural" | "gecmis" | "model" | "girdi";
 export type GuvenKademesi = "dusuk" | "orta" | "yuksek";
 
 /**
- * Kademe: < .6 düşük, < .9 orta, aksi yüksek. Kural eşleşmesi her zaman
- * yüksek (docs/tasarim/bilesenler.md).
+ * Kademe: < .6 düşük, < .9 orta, aksi yüksek. Kademe her zaman gösterilen
+ * yüzdeden gelir: "%40 · Yüksek güven" gibi çelişki güveni bozar (#576).
+ * Kaynak (kural, geçmiş, model) yalnız ipucunda yazılır.
  */
 export function guvenKademesi(
   deger: number,
-  kaynak?: GuvenKaynagi,
+  _kaynak?: GuvenKaynagi,
 ): GuvenKademesi {
-  if (kaynak === "kural") return "yuksek";
   if (deger < 0.6) return "dusuk";
   if (deger < 0.9) return "orta";
   return "yuksek";

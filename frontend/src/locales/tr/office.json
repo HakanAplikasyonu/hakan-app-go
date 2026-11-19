@@ -242,7 +242,7 @@
   "command.search": "Unvan ya da VKN ara",
   "command.status_empty": "Veri yok",
   "command.status_collected": "Bekleyen iş var",
-  "command.status_checked": "Hazır",
+  "command.status_checked": "Engel yok",
   "command.status_approved": "Onaylandı (kilitli)",
   "command.status_exported": "Çıktı alındı",
   "command.status_declared": "Beyan",
@@ -2056,5 +2056,7 @@
   "balance_check.movements": "{{count}} hareket",
   "balance_check.off": "Ekstrenin kapanış bakiyesi hareketlerle tutmuyor: eksik gün, mükerrer ya da iptal edilmiş hareket olabilir. Ekstreyi bankadan yeniden alıp yükleyin; fark kapanınca uyarıyı gerekçeyle çözün.",
   "balance_check.no_balance": "Ekstrede bakiye sütunu yok; kontrol yapılamıyor. Bakiyeli ekstre (MT940 ya da bankanın Excel'i) yükleyin.",
-  "balance_check.ok": "Bakiye hareketlerle tutuyor. Uyarıyı gerekçeyle çözebilirsiniz."
+  "balance_check.ok": "Bakiye hareketlerle tutuyor. Uyarıyı gerekçeyle çözebilirsiniz.",
+  "review_api.ocr_rationale": "Belge okuma bu alanı %{{pct}} güvenle okudu; belgeyle karşılaştırıp onaylayın.",
+  "command.status_open": "Ay sürüyor"
 }

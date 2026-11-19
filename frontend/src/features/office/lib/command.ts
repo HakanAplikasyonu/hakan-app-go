@@ -3,6 +3,7 @@
  *
  * Kaynak dönem yönetimi (#32) `GET /v1/tenant/periods/matrix`. Hücre durumu:
  * - kilitli dönem → onaylandı
+ * - ayı bitmemiş dönem → ay sürüyor (henüz "hazır" denemez, #576)
  * - hazır (açık engelleyici uyarı ve açık değişiklik talebi yok) → kontrol edildi
  * - diğerleri → toplandı (engelleyici ya da talep sayısıyla)
  *
@@ -10,21 +11,32 @@
  * beyan kaydı dönem kaydına bağlanınca eklenir).
  */
 
+import { currentPeriod } from "../period/period";
 import type {
   PeriodMatrixCell,
   PeriodMatrixRow,
 } from "../services/periods.service";
 
-export const cellStatuses = ["collected", "checked", "approved"] as const;
+export const cellStatuses = [
+  "open",
+  "collected",
+  "checked",
+  "approved",
+] as const;
 export type CellStatus = (typeof cellStatuses)[number];
 
-export function statusOf(cell: PeriodMatrixCell): CellStatus {
+export function statusOf(
+  cell: PeriodMatrixCell,
+  current = currentPeriod(),
+): CellStatus {
   if (cell.locked) return "approved";
+  if (cell.period >= current) return "open";
   if (cell.ready) return "checked";
   return "collected";
 }
 
 const rank: Record<CellStatus, number> = {
+  open: 0,
   collected: 0,
   checked: 1,
   approved: 2,
@@ -78,6 +90,7 @@ export function statusCounts(
   period: string,
 ): Record<CellStatus, number> {
   const out: Record<CellStatus, number> = {
+    open: 0,
     collected: 0,
     checked: 0,
     approved: 0,

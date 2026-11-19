@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  humanRationale,
   kindTitle,
   matchSummary,
   suggestionTitle,
@@ -66,5 +67,22 @@ describe("reconciliation suggestions (#455)", () => {
     expect(matchSummary(s)).toBe(
       "Mizan 68.050,00 TL · Kaynaklar 0,00 TL · Fark 68.050,00 TL",
     );
+  });
+});
+
+describe("humanRationale (#576)", () => {
+  const t = (k: string, v?: Record<string, string | number>) =>
+    `${k}:${v?.pct ?? ""}`;
+  it("OCR güvenini yüzdeye çevirir", () => {
+    expect(humanRationale("OCR alan güveni 0.41000000000000000", t)).toBe(
+      "office.review_api.ocr_rationale:41",
+    );
+    expect(humanRationale("OCR alan güveni 0.64 < 0.80", t)).toBe(
+      "office.review_api.ocr_rationale:64",
+    );
+  });
+  it("diğer gerekçeler aynen", () => {
+    expect(humanRationale("Kural: 120 Alıcılar", t)).toBe("Kural: 120 Alıcılar");
+    expect(humanRationale(null, t)).toBe("");
   });
 });

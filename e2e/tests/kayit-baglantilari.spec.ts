@@ -119,7 +119,7 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await page.goBack();
     await page.waitForURL((u) => u.pathname.endsWith("/bank"));
     await expectShell(page, "Banka");
-    await focused(page).getByRole("link", { name: "Uyarı: BNK_UNINVOICED_COLLECTION" }).click();
+    await focused(page).getByRole("link", { name: "Uyarı: Faturası olmayan tahsilat" }).click();
 
     // Uyarılar sekmesi, uyarı seçili: andığı hareket ve ilgili kural.
     await page.waitForURL((u) => u.pathname.endsWith(`/engagements/${engagement}/warnings`) && u.searchParams.get("kayit")?.startsWith("warning:") === true);
@@ -127,7 +127,7 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await expect(focused(page).getByRole("link", { name: /^Banka hareketi: EFT GELEN/ })).toBeVisible();
     const axe = await new AxeBuilder({ page }).include('[data-testid="focused-record"]').withTags(["wcag2a", "wcag2aa"]).analyze();
     expect(axe.violations.filter((v) => v.impact === "critical" || v.impact === "serious")).toEqual([]);
-    await focused(page).getByRole("link", { name: "Kural: BNK_UNINVOICED_COLLECTION" }).click();
+    await focused(page).getByRole("link", { name: "Kural: Faturası olmayan tahsilat" }).click();
     await page.waitForURL((u) => u.pathname.endsWith("/warnings") && u.searchParams.get("code") === "BNK_UNINVOICED_COLLECTION");
     await expectShell(page, "Uyarılar");
 
@@ -168,10 +168,10 @@ test.describe("kayıtlar arası bağlantılar", () => {
     // Uyarılar sekmesi: uyarı kartından → andığı hareket ve kural.
     await tabs(page).getByRole("link", { name: "Uyarılar", exact: true }).click();
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/warnings`));
-    await page.getByRole("link", { name: "İlişkili kayıtlar: BNK_UNINVOICED_COLLECTION" }).first().click();
+    await page.getByRole("link", { name: "İlişkili kayıtlar: Faturası olmayan tahsilat" }).first().click();
     await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("warning:") === true);
     await expectShell(page, "Uyarılar");
-    await expect(focused(page).getByRole("link", { name: "Kural: BNK_UNINVOICED_COLLECTION" })).toBeVisible();
+    await expect(focused(page).getByRole("link", { name: "Kural: Faturası olmayan tahsilat" })).toBeVisible();
   });
 
   test("genel listelerden mükellef sekmesine; beyanname kontrol listesinden ilgili kayıtlara", async ({ page }) => {

@@ -172,7 +172,7 @@ export function InvoiceDrawer({
         title: t("office.drawer.fix_request_title", {
           number: d?.invoice_number ?? "",
         }),
-        note: worst ? `${worstText} (${worst.code})` : undefined,
+        note: worst ? worstText : undefined,
         due_days: 7,
       }),
     onSuccess: () => toast.success(t("office.drawer.fix_request_sent")),
@@ -260,8 +260,7 @@ export function InvoiceDrawer({
                     <span className="font-semibold">
                       {t(`office.severity_${worst.severity}`)}:
                     </span>{" "}
-                    <span className="text-foreground">{worstText}</span>{" "}
-                    <Figure className="text-xs">({worst.code})</Figure>
+                    <span className="text-foreground">{worstText}</span>
                   </p>
                 </div>
               ) : null}

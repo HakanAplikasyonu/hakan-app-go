@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type QueryClient,
   keepPreviousData,
   useMutation,
   useQuery,
@@ -14,6 +15,18 @@ import {
   type WarningGroupQuery,
   type WarningListQuery,
 } from "@/features/office/services/warnings.service";
+import { dashboardKeys } from "@/features/office/services/dashboard.service";
+
+/** Uyarı listesi, pano sayaçları ve dönem matrisi birlikte yenilenir. */
+function invalidateWarningCounts(queryClient: QueryClient, slug: string) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: warningKeys.all(slug) }),
+    queryClient.invalidateQueries({ queryKey: dashboardKeys.office(slug) }),
+    queryClient.invalidateQueries({
+      queryKey: ["tenant", slug.toLowerCase(), "periods"],
+    }),
+  ]);
+}
 
 /**
  * Warnings list: office-wide, or one engagement's when `engagement` is set
@@ -61,8 +74,8 @@ export function useDecideWarning(slug: string) {
         vars.action,
         vars.note,
       ),
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: warningKeys.all(slug) }),
+    // Kenar menü ve pano sayaçları da yenilenir: aynı sayı her yerde (#576).
+    onSettled: () => invalidateWarningCounts(queryClient, slug),
   });
 }
 
@@ -85,7 +98,7 @@ export function useAcknowledgeWarningGroup(slug: string, engagement?: string) {
   return useMutation({
     mutationFn: (vars: { code: string; period?: string; note: string }) =>
       warningService.acknowledgeBulk(slug, vars, engagement),
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: warningKeys.all(slug) }),
+    // Kenar menü ve pano sayaçları da yenilenir: aynı sayı her yerde (#576).
+    onSettled: () => invalidateWarningCounts(queryClient, slug),
   });
 }

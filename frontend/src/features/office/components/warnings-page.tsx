@@ -127,7 +127,7 @@ function useWarningColumns() {
             <>
               <div>{warningText(w)}</div>
               <Figure className="text-muted-foreground text-xs">
-                {[w.code, w.producer, w.period].filter(Boolean).join(" · ")}
+                {w.period}
               </Figure>
             </>
           );
@@ -236,6 +236,7 @@ function WarningsTable({
   const { t } = useLocale();
   const { slug } = useTenant();
   const rules = useWarningRules(slug);
+  const groupTitle = useGroupTitle();
   const baseColumns = useWarningColumns();
   // Uyarının ilişkili kayıtları: kaynak belge ve kural (#469).
   const relatedColumn = useRelatedColumn<ApiDataWarning>(
@@ -283,7 +284,9 @@ function WarningsTable({
           onChange={(v) => listState.setParams({ code: v === ALL ? null : v })}
           options={[
             { value: ALL, label: t("office.filter_all") },
-            ...codes.map((c) => ({ value: c, label: c })),
+            ...codes
+              .map((c) => ({ value: c, label: groupTitle(c) }))
+              .sort((a, b) => a.label.localeCompare(b.label, "tr")),
           ]}
         />
       ) : null}
@@ -419,7 +422,6 @@ function WarningGroupCard({
         <h2 id={titleId} className="min-w-48 flex-1 text-sm font-semibold">
           {groupTitle(group.code)}
         </h2>
-        <span className="text-text-3 font-mono text-xs">{group.code}</span>
         <span
           className="bg-surface-3 text-text-2 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums"
           aria-label={t("office.warnings_group_count", { count: group.count })}
@@ -554,7 +556,7 @@ function WarningGroupCard({
                       <Link
                         href={focusHref("warning", w.uuid)}
                         scroll={false}
-                        aria-label={`${t("office.related.title")}: ${w.code}`}
+                        aria-label={`${t("office.related.title")}: ${groupTitle(group.code)}`}
                       >
                         <Link2 className="size-4" aria-hidden />
                         {t("office.related.title")}

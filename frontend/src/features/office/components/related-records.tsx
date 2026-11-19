@@ -68,8 +68,16 @@ function RecordLabel({ item }: { item: RelatedRecord }) {
         {item.detail ? ` · ${item.detail}` : ""}
       </>
     );
+  // Uyarı ve kural: kodu değil adı (#576); çevirisi yoksa kod.
   if (item.kind === "warning" || item.kind === "rule")
-    return <Figure>{item.label}</Figure>;
+    return (
+      <>
+        {tr(
+          `office.warning_group.${item.label}`,
+          tr(`office.warning.${item.label}`, item.label),
+        )}
+      </>
+    );
   return <>{item.label || "—"}</>;
 }
 
@@ -167,6 +175,14 @@ export function RelatedRecordsTable({
       </TableHeader>
       <TableBody>
         {items.map((item, i) => {
+          // Uyarı ve kural adı; ham kod değil (#576).
+          const recordName = (r: RelatedRecord) =>
+            r.kind === "warning" || r.kind === "rule"
+              ? tr(
+                  `office.warning_group.${r.label}`,
+                  tr(`office.warning.${r.label}`, r.label),
+                )
+              : r.label;
           const href = relatedHref(slug, engagement, item);
           const kindLabel = t(`office.related.kind.${item.kind}`);
           return (
@@ -185,7 +201,7 @@ export function RelatedRecordsTable({
                   <Link
                     href={href}
                     className="text-brand-text hover:underline"
-                    aria-label={`${kindLabel}: ${item.label}`}
+                    aria-label={`${kindLabel}: ${recordName(item)}`}
                   >
                     <RecordLabel item={item} />
                   </Link>

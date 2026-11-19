@@ -43,6 +43,7 @@ import { Figure, FilterSelect, Panel } from "./office-ui";
 const PERIOD_COUNT = 6;
 
 const statusClass: Record<CellStatus, string> = {
+  open: "bg-muted text-muted-foreground",
   collected: "bg-status-review/20 text-foreground",
   checked: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
   approved: "bg-status-approved text-status-approved-foreground",
@@ -291,7 +292,7 @@ export function CommandCenterPage() {
         </InputGroup>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {cellStatuses.map((s) => (
           <Button
             key={s}
