@@ -414,10 +414,10 @@ export function tenantNav(slug: string): NavCatalog {
             permission: permissions.tenant.settings.read,
           },
           {
-            // Kullanım kılavuzları (#274); herkese açık sayfa.
+            // Kullanım kılavuzları (#274): rolün kılavuzuna gider (#522).
             id: "help",
             titleKey: "help.nav",
-            href: routes.help.index(),
+            href: routes.help.mine(),
             icon: LifeBuoy,
           },
         ],
