@@ -22,6 +22,13 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
@@ -74,9 +81,9 @@ function AccountInput({
 }) {
   const [account, setAccount] = useState(value);
   return (
-    <input
+    <Input
       aria-label={label}
-      className="bg-background focus-visible:ring-ring h-7 w-28 rounded-md border px-2 font-mono text-xs focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+      className="h-7 w-28 px-2 py-0 font-mono text-xs shadow-none"
       value={account}
       onChange={(e) => setAccount(e.target.value)}
       onBlur={() => {
@@ -108,21 +115,25 @@ function PostingCell({
   return (
     <div className="flex min-w-44 flex-col gap-1">
       {editable ? (
-        <select
+        <NativeSelect
+          size="sm"
           aria-label={t("office.expenses.col_category")}
-          className="bg-background focus-visible:ring-ring h-8 max-w-52 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+          wrapperClassName="max-w-52"
+          className="shadow-none"
           value={x.category_code ?? ""}
           onChange={(e) => onChange({ category_code: e.target.value })}
         >
-          {x.category_code ? null : <option value="">—</option>}
+          {x.category_code ? null : (
+            <NativeSelectOption value="">—</NativeSelectOption>
+          )}
           {categories
             .filter((c) => c.is_active)
             .map((c) => (
-              <option key={c.code} value={c.code}>
+              <NativeSelectOption key={c.code} value={c.code}>
                 {c.name}
-              </option>
+              </NativeSelectOption>
             ))}
-        </select>
+        </NativeSelect>
       ) : (
         <span className="text-sm">{x.category_name ?? "—"}</span>
       )}
@@ -480,44 +491,45 @@ function ExpensesInner({ engagement }: { engagement: string }) {
           className="flex flex-wrap gap-2"
         >
           {filters.map((f) => (
-            <button
+            <FilterChip
               key={f.key}
-              type="button"
-              aria-pressed={status === f.key}
-              onClick={() =>
+              pressed={status === f.key}
+              onPressedChange={() =>
                 listState.setParams({ status: f.key === "all" ? null : f.key })
               }
-              className={cn(
-                "focus-visible:ring-ring min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-                status === f.key
-                  ? "border-brand bg-brand text-on-brand"
-                  : "border-line bg-surface text-text-2 hover:text-foreground",
-              )}
             >
               {f.label}
-            </button>
+            </FilterChip>
           ))}
         </div>
-        <label className="ms-auto flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">
+        <div className="ms-auto flex items-center gap-2 text-xs">
+          <Label
+            htmlFor="expenses-category"
+            className="text-muted-foreground text-xs font-normal"
+          >
             {t("office.expenses.col_category")}
-          </span>
-          <select
-            className="bg-background focus-visible:ring-ring h-9 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+          </Label>
+          <NativeSelect
+            id="expenses-category"
+            className="pl-2 shadow-none"
             value={category}
             onChange={(e) =>
               listState.setParams({ category: e.target.value || null })
             }
           >
-            <option value="">{t("office.receipts.filter_all")}</option>
-            <option value="-">{t("office.expenses.no_category")}</option>
+            <NativeSelectOption value="">
+              {t("office.receipts.filter_all")}
+            </NativeSelectOption>
+            <NativeSelectOption value="-">
+              {t("office.expenses.no_category")}
+            </NativeSelectOption>
             {categories.map((c) => (
-              <option key={c.code} value={c.code}>
+              <NativeSelectOption key={c.code} value={c.code}>
                 {c.name}
-              </option>
+              </NativeSelectOption>
             ))}
-          </select>
-        </label>
+          </NativeSelect>
+        </div>
       </div>
 
       <EntityTable<Expense>

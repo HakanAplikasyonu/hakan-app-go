@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
@@ -81,7 +82,10 @@ export function DoubleBookingReview({
                     onCheckedChange={(v) => onToggle(key, v === true)}
                     className="mt-0.5"
                   />
-                  <label htmlFor={id} className="space-y-0.5 text-xs">
+                  <Label
+                    htmlFor={id}
+                    className="space-y-0.5 text-xs leading-normal font-normal"
+                  >
                     <span className="block">
                       {no ? <Figure>{no}</Figure> : null}{" "}
                       <span className="text-muted-foreground">
@@ -96,7 +100,7 @@ export function DoubleBookingReview({
                     <span className="block">
                       {t("office.journals.dup.confirm")}
                     </span>
-                  </label>
+                  </Label>
                 </div>
               );
             })}
@@ -124,10 +128,10 @@ function IntegratorBoxes({
       {LUCA_INTEGRATORS.map((name) => {
         const id = `${idPrefix}-${name}`;
         return (
-          <label
+          <Label
             key={name}
             htmlFor={id}
-            className="flex items-center gap-2 text-xs"
+            className="flex items-center gap-2 text-xs leading-normal font-normal"
           >
             <Checkbox
               id={id}
@@ -142,7 +146,7 @@ function IntegratorBoxes({
               }
             />
             {t(`office.journals.integrator_${name}`)}
-          </label>
+          </Label>
         );
       })}
     </div>
@@ -214,7 +218,10 @@ export function LucaPullSettingsPanel({ engagement }: { engagement: string }) {
           <p className="text-xs font-medium">
             {t("office.journals.pull.taxpayer")}
           </p>
-          <label htmlFor="pull-own" className="flex items-center gap-2 text-xs">
+          <Label
+            htmlFor="pull-own"
+            className="flex items-center gap-2 text-xs leading-normal font-normal"
+          >
             <Checkbox
               id="pull-own"
               checked={own !== null}
@@ -223,7 +230,7 @@ export function LucaPullSettingsPanel({ engagement }: { engagement: string }) {
               }
             />
             {t("office.journals.pull.own")}
-          </label>
+          </Label>
           <IntegratorBoxes
             idPrefix="pull-taxpayer"
             value={effective}

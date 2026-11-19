@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -206,7 +212,7 @@ export function ExpenseCategoriesDialog({
               save.mutate(form);
             }}
           >
-            <label className="flex flex-col gap-1 text-xs">
+            <Label className="flex flex-col gap-1 text-xs leading-normal font-normal">
               <span className="text-text-2">
                 {t("office.expenses.category_code")}
               </span>
@@ -218,8 +224,8 @@ export function ExpenseCategoriesDialog({
                   setForm({ ...form, code: e.target.value.toLowerCase() })
                 }
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
+            </Label>
+            <Label className="flex flex-col gap-1 text-xs leading-normal font-normal">
               <span className="text-text-2">
                 {t("office.expenses.category_name")}
               </span>
@@ -228,8 +234,8 @@ export function ExpenseCategoriesDialog({
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
+            </Label>
+            <Label className="flex flex-col gap-1 text-xs leading-normal font-normal">
               <span className="text-text-2">
                 {t("office.expenses.col_account")}
               </span>
@@ -241,8 +247,8 @@ export function ExpenseCategoriesDialog({
                   setForm({ ...form, account_code: e.target.value })
                 }
               />
-            </label>
-            <label className="flex flex-col gap-1 text-xs">
+            </Label>
+            <Label className="flex flex-col gap-1 text-xs leading-normal font-normal">
               <span className="text-text-2">
                 {t("office.expenses.category_keywords")}
               </span>
@@ -250,40 +256,42 @@ export function ExpenseCategoriesDialog({
                 value={form.keywords}
                 onChange={(e) => setForm({ ...form, keywords: e.target.value })}
               />
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4"
+            </Label>
+            <Label className="flex items-center gap-2 text-sm leading-normal font-normal">
+              <Checkbox
                 checked={form.deductible === "no"}
-                onChange={(e) =>
+                onCheckedChange={(v) =>
                   setForm({
                     ...form,
-                    deductible: e.target.checked ? "no" : "yes",
+                    deductible: v === true ? "no" : "yes",
                   })
                 }
               />
               {t("office.expenses.vat_not_deductible")}
-            </label>
-            <label className="flex items-center gap-2 text-xs">
-              <span className="text-text-2">
+            </Label>
+            <div className="flex items-center gap-2 text-xs">
+              <Label
+                htmlFor="expense-category-scope"
+                className="text-text-2 text-xs leading-normal font-normal"
+              >
                 {t("office.expenses.category_scope")}
-              </span>
-              <select
-                className="bg-background h-9 rounded-md border px-2 text-sm max-md:h-11"
+              </Label>
+              <NativeSelect
+                id="expense-category-scope"
+                className="pl-2 shadow-none"
                 value={form.scope}
                 onChange={(e) =>
                   setForm({ ...form, scope: e.target.value as Scope })
                 }
               >
-                <option value="taxpayer">
+                <NativeSelectOption value="taxpayer">
                   {t("office.expenses.scope_taxpayer")}
-                </option>
-                <option value="office">
+                </NativeSelectOption>
+                <NativeSelectOption value="office">
                   {t("office.expenses.scope_office")}
-                </option>
-              </select>
-            </label>
+                </NativeSelectOption>
+              </NativeSelect>
+            </div>
             <div className="flex justify-end gap-2 sm:col-span-2">
               <Button
                 type="button"
