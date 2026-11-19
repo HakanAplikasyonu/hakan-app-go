@@ -1,11 +1,15 @@
 package matching
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
 
+	"github.com/google/uuid"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
@@ -32,8 +36,77 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	org := middleware.RequireOrganization(orgResolver)
 	eng := middleware.RequireEngagement(engResolver)
 	write := middleware.RequireTenantPermission(rbac.PermTenantBankWrite)
+	read := middleware.RequireTenantPermission(rbac.PermTenantBankRead)
 	path := "POST /v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-matching"
 	mux.Handle(path, middleware.Chain(http.HandlerFunc(h.run), authn, org, write, eng))
+	// One movement (#528): its matches and candidates; match by hand, undo.
+	tx := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions/{transactionUuid}"
+	mux.Handle("GET "+tx+"/matching", middleware.Chain(http.HandlerFunc(h.transaction), authn, org, read, eng))
+	mux.Handle("PUT "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.match), authn, org, write, eng))
+	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
+}
+
+func subjectOf(r *http.Request) Subject {
+	scope := engagementctx.Must(r.Context())
+	return Subject{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID}
+}
+
+func (h *Handler) transaction(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	v, err := h.svc.Transaction(r.Context(), subjectOf(r), id)
+	h.reply(w, r, v, err)
+}
+
+type matchBody struct {
+	InvoiceUUIDs []uuid.UUID `json:"invoice_uuids"`
+}
+
+func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	var in matchBody
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs) == 0 || len(in.InvoiceUUIDs) > MaxCombination*2 {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "invoice_uuids must name 1-10 invoices")
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	v, err := h.svc.Match(r.Context(), subjectOf(r), id, in.InvoiceUUIDs, p.UserInternal)
+	h.reply(w, r, v, err)
+}
+
+func (h *Handler) unmatch(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	v, err := h.svc.Unmatch(r.Context(), subjectOf(r), id)
+	h.reply(w, r, v, err)
+}
+
+func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v TransactionView, err error) {
+	switch {
+	case err == nil:
+		response.JSON(w, r, http.StatusOK, v)
+	case errors.Is(err, ErrTransactionNotFound):
+		response.NotFound(w, r, "bank transaction not found")
+	case errors.Is(err, ErrNotMatchable):
+		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
+	case errors.Is(err, ErrInvalidInvoices):
+		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, r.Context().Err()):
+	default:
+		response.InternalErr(w, r, err, "bank matching failed")
+	}
 }
 
 // run: ?period=YYYY-MM. Matches the period's collections and payments to

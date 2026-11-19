@@ -26,6 +26,70 @@ func (q *Queries) DeleteBankTransactionMatches(ctx context.Context, arg DeleteBa
 	return err
 }
 
+const getBankTransactionByUUID = `-- name: GetBankTransactionByUUID :one
+SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
+`
+
+type GetBankTransactionByUUIDParams struct {
+	TaxpayerID int64     `json:"taxpayer_id"`
+	Uuid       uuid.UUID `json:"uuid"`
+}
+
+// Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
+func (q *Queries) GetBankTransactionByUUID(ctx context.Context, arg GetBankTransactionByUUIDParams) (BankTransaction, error) {
+	row := q.db.QueryRow(ctx, getBankTransactionByUUID, arg.TaxpayerID, arg.Uuid)
+	var i BankTransaction
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.CashBoxID,
+		&i.SourceSystem,
+		&i.SourceID,
+		&i.CaptureMethod,
+		&i.BookedAt,
+		&i.HasTime,
+		&i.BankSequence,
+		&i.TransactionDate,
+		&i.ValueDate,
+		&i.DebitCredit,
+		&i.Amount,
+		&i.Currency,
+		&i.BalanceAfter,
+		&i.BalanceBefore,
+		&i.Description,
+		&i.DescriptionExtra,
+		&i.DescriptionNormalized,
+		&i.BankReference,
+		&i.ReceiptNumber,
+		&i.BankTxnCode,
+		&i.Mt940Code,
+		&i.Channel,
+		&i.CounterpartyName,
+		&i.CounterpartyIban,
+		&i.CounterpartyTaxNumber,
+		&i.CounterpartyIdentityNumber,
+		&i.CounterpartyBankCode,
+		&i.EftQueryNumber,
+		&i.PaymentPurpose,
+		&i.IsCancelled,
+		&i.Kind,
+		&i.KindDetail,
+		&i.KindSource,
+		&i.KindConfidence,
+		&i.KindReason,
+		&i.ClassifiedAt,
+		&i.MatchStatus,
+		&i.PossibleDuplicateOf,
+		&i.Period,
+		&i.RawPayload,
+		&i.ContentHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertBankTransactionMatch = `-- name: InsertBankTransactionMatch :one
 INSERT INTO bank_transaction_matches (
     taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by
@@ -76,6 +140,64 @@ func (q *Queries) InsertBankTransactionMatch(ctx context.Context, arg InsertBank
 		&i.MatchedAt,
 	)
 	return i, err
+}
+
+const listBankTransactionMatchInvoices = `-- name: ListBankTransactionMatchInvoices :many
+SELECT m.amount, m.score, m.method, m.matched_at,
+       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
+FROM bank_transaction_matches m
+JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'invoice'
+ORDER BY i.issue_date, i.id
+`
+
+type ListBankTransactionMatchInvoicesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionMatchInvoicesRow struct {
+	Amount        pgtype.Numeric     `json:"amount"`
+	Score         int16              `json:"score"`
+	Method        string             `json:"method"`
+	MatchedAt     pgtype.Timestamptz `json:"matched_at"`
+	InvoiceUuid   uuid.UUID          `json:"invoice_uuid"`
+	InvoiceNumber string             `json:"invoice_number"`
+	IssueDate     pgtype.Date        `json:"issue_date"`
+	CustomerName  pgtype.Text        `json:"customer_name"`
+	Currency      string             `json:"currency"`
+	PayableAmount pgtype.Numeric     `json:"payable_amount"`
+}
+
+func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionMatchInvoices, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionMatchInvoicesRow{}
+	for rows.Next() {
+		var i ListBankTransactionMatchInvoicesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Score,
+			&i.Method,
+			&i.MatchedAt,
+			&i.InvoiceUuid,
+			&i.InvoiceNumber,
+			&i.IssueDate,
+			&i.CustomerName,
+			&i.Currency,
+			&i.PayableAmount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBankTransactionMatches = `-- name: ListBankTransactionMatches :many
@@ -365,6 +487,71 @@ func (q *Queries) ListInvoiceMatchCandidates(ctx context.Context, arg ListInvoic
 			&i.CustomerTaxNumber,
 			&i.CustomerIdentityNumber,
 			&i.BankAccounts,
+			&i.ComparableAmount,
+			&i.MatchedAmount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInvoicesForManualMatch = `-- name: ListInvoicesForManualMatch :many
+SELECT i.id, i.uuid, i.invoice_number,
+       (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = i.taxpayer_id AND m.target_type = 'invoice' AND m.target_id = i.id
+                   AND m.bank_transaction_id <> $2), 0)::numeric AS matched_amount
+FROM invoices i
+WHERE i.taxpayer_id = $3
+  AND i.uuid = ANY($4::uuid[])
+  AND i.direction = $5
+  AND i.status_normalized = 'active'
+  AND (i.currency = $1::text OR ($1::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
+ORDER BY i.issue_date, i.id
+`
+
+type ListInvoicesForManualMatchParams struct {
+	Currency          string      `json:"currency"`
+	BankTransactionID int64       `json:"bank_transaction_id"`
+	TaxpayerID        int64       `json:"taxpayer_id"`
+	Uuids             []uuid.UUID `json:"uuids"`
+	Direction         string      `json:"direction"`
+}
+
+type ListInvoicesForManualMatchRow struct {
+	ID               int64          `json:"id"`
+	Uuid             uuid.UUID      `json:"uuid"`
+	InvoiceNumber    string         `json:"invoice_number"`
+	ComparableAmount pgtype.Numeric `json:"comparable_amount"`
+	MatchedAmount    pgtype.Numeric `json:"matched_amount"`
+}
+
+// Elle eşleştirmede seçilen faturalar: aynı yön, aktif; açık tutar bu
+// hareketin eski eşleşmeleri hariç (yeniden eşleştirme).
+func (q *Queries) ListInvoicesForManualMatch(ctx context.Context, arg ListInvoicesForManualMatchParams) ([]ListInvoicesForManualMatchRow, error) {
+	rows, err := q.db.Query(ctx, listInvoicesForManualMatch,
+		arg.Currency,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.Uuids,
+		arg.Direction,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListInvoicesForManualMatchRow{}
+	for rows.Next() {
+		var i ListInvoicesForManualMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.InvoiceNumber,
 			&i.ComparableAmount,
 			&i.MatchedAmount,
 		); err != nil {

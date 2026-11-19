@@ -64,3 +64,31 @@ SELECT id, uuid, transaction_date, debit_credit, amount, currency, kind, kind_de
 FROM bank_transactions
 WHERE taxpayer_id = @taxpayer_id AND period = @period AND NOT is_cancelled AND possible_duplicate_of IS NULL
 ORDER BY transaction_date, id;
+
+-- Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
+-- name: GetBankTransactionByUUID :one
+SELECT * FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
+
+-- name: ListBankTransactionMatchInvoices :many
+SELECT m.amount, m.score, m.method, m.matched_at,
+       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
+FROM bank_transaction_matches m
+JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'invoice'
+ORDER BY i.issue_date, i.id;
+
+-- Elle eşleştirmede seçilen faturalar: aynı yön, aktif; açık tutar bu
+-- hareketin eski eşleşmeleri hariç (yeniden eşleştirme).
+-- name: ListInvoicesForManualMatch :many
+SELECT i.id, i.uuid, i.invoice_number,
+       (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = i.taxpayer_id AND m.target_type = 'invoice' AND m.target_id = i.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric AS matched_amount
+FROM invoices i
+WHERE i.taxpayer_id = @taxpayer_id
+  AND i.uuid = ANY(@uuids::uuid[])
+  AND i.direction = @direction
+  AND i.status_normalized = 'active'
+  AND (i.currency = @currency::text OR (@currency::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
+ORDER BY i.issue_date, i.id;

@@ -3,6 +3,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ArrowDownLeft, ArrowUpRight, Download, Link2Off } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
+import { useEngagementScope } from "../engagement-scope";
 import { downloadFile } from "../services/download";
 import { useOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
@@ -30,7 +32,7 @@ import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
 import { LucaBankExportPanel } from "./luca-bank-export-panel";
 import { Money } from "./office-ui";
-import { useRelatedColumn } from "./related-column";
+import { useFocusHref, useRelatedColumn } from "./related-column";
 
 type BankPage = components["schemas"]["BankTransactionPage"];
 type BankRow = components["schemas"]["BankTransaction"];
@@ -176,6 +178,10 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     listState.setParams({ match: m === "all" ? null : m });
   const { limit, offset } = listState.params;
   const baseColumns = useBankColumns();
+  // Satıra tıklayınca hareket seçili açılır: ayrıntı ve fatura eşleştirme (#528).
+  const scope = useEngagementScope();
+  const focusHref = useFocusHref();
+  const router = useRouter();
   // Satırın ilişkili kayıtları: mükellef detayında seçili açılır (#469).
   const relatedColumn = useRelatedColumn<BankRow>(
     "bank_transaction",
@@ -401,6 +407,14 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
         columns={columns}
         data={items}
         getRowId={(x) => x.uuid}
+        onRowClick={
+          scope
+            ? (x) =>
+                router.push(focusHref("bank_transaction", x.uuid), {
+                  scroll: false,
+                })
+            : undefined
+        }
         isLoading={list.isLoading}
         isError={list.isError}
         errorTitle={t("office.api.load_error")}
