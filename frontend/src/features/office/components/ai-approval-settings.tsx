@@ -97,14 +97,14 @@ function ThresholdCard() {
       description={t("office.settings.threshold_description")}
     >
       <div className="flex flex-col gap-5">
-        <label className="flex min-h-11 items-center gap-3 text-sm">
+        <Label className="flex min-h-11 items-center gap-3 text-sm font-normal">
           <Switch
             checked={auto}
             onCheckedChange={(v) => setAutoDraft(v)}
             disabled={!canWrite}
           />
           {t("office.settings.auto_accept")}
-        </label>
+        </Label>
         <div className="flex flex-wrap items-center gap-4">
           <GuvenOlcegi deger={value / 100} />
           <Figure className="font-display text-3xl font-bold">%{value}</Figure>

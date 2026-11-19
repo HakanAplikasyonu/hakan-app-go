@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
 import { routes } from "@/config/routes";
 import { isNavHrefActive } from "@/features/nav-engine/lib/active";
@@ -89,15 +90,15 @@ export function OfficeTabbar({ counts }: { counts: ShellCounts }) {
           );
         })}
         <li>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
             aria-expanded={openMobile}
             onClick={() => setOpenMobile(true)}
-            className="text-muted-foreground flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium"
+            className="text-muted-foreground h-auto min-h-14 w-full flex-col gap-0.5 rounded-none px-0 text-[11px] font-medium hover:bg-transparent has-[>svg]:px-0 [&_svg:not([class*='size-'])]:size-5"
           >
             <Menu className="size-5" strokeWidth={1.75} aria-hidden />
             {t("office.shell.tab_more")}
-          </button>
+          </Button>
         </li>
       </ul>
     </nav>

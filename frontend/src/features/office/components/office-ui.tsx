@@ -1,7 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
@@ -154,20 +159,27 @@ export function FilterSelect<T extends string>({
   onChange: (v: T) => void;
   options: { value: T; label: string }[];
 }) {
+  const id = useId();
   return (
-    <label className="flex max-w-full min-w-0 items-center gap-2 text-xs">
-      <span className="text-muted-foreground shrink-0">{label}</span>
-      <select
-        className="bg-background focus-visible:ring-ring h-8 max-w-full min-w-0 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11"
+    <div className="flex max-w-full min-w-0 items-center gap-2 text-xs">
+      <Label
+        htmlFor={id}
+        className="text-muted-foreground shrink-0 text-xs font-normal"
+      >
+        {label}
+      </Label>
+      <NativeSelect
+        id={id}
+        size="sm"
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value}>
+          <NativeSelectOption key={o.value} value={o.value}>
             {o.label}
-          </option>
+          </NativeSelectOption>
         ))}
-      </select>
-    </label>
+      </NativeSelect>
+    </div>
   );
 }

@@ -7,6 +7,15 @@ import { toast } from "sonner";
 
 import { StatusPill, formatCellDate } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Permission } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -160,40 +169,54 @@ function RequestCard({
         </span>
       </div>
       {d.fields.length > 0 ? (
-        <table className="w-full text-sm">
-          <caption className="sr-only">
+        <Table className="w-full text-sm">
+          <TableCaption className="sr-only">
             {t("office.change_requests.fields")}
-          </caption>
-          <thead className="text-text-3 text-left text-xs">
-            <tr>
-              <th scope="col" className="py-1 pr-3 font-medium">
+          </TableCaption>
+          <TableHeader className="text-xs">
+            <TableRow className="border-line hover:bg-transparent">
+              <TableHead
+                scope="col"
+                className="text-text-3 h-auto px-0 py-1 pr-3 font-medium"
+              >
                 {t("office.change_requests.col_field")}
-              </th>
-              <th scope="col" className="py-1 pr-3 font-medium">
+              </TableHead>
+              <TableHead
+                scope="col"
+                className="text-text-3 h-auto px-0 py-1 pr-3 font-medium"
+              >
                 {t("office.change_requests.col_old")}
-              </th>
-              <th scope="col" className="py-1 font-medium">
+              </TableHead>
+              <TableHead
+                scope="col"
+                className="text-text-3 h-auto px-0 py-1 font-medium"
+              >
                 {t("office.change_requests.col_new")}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {d.fields.map((f) => (
-              <tr key={f.field} className="border-line border-t">
-                <th
+              <TableRow
+                key={f.field}
+                className="border-line hover:bg-transparent"
+              >
+                <TableHead
                   scope="row"
-                  className="py-1.5 pr-3 font-mono text-xs font-normal"
+                  className="text-foreground h-auto px-0 py-1.5 pr-3 font-mono text-xs font-normal"
                 >
                   {f.field}
-                </th>
-                <td className="text-text-3 py-1.5 pr-3 break-all line-through">
+                </TableHead>
+                <TableCell className="text-text-3 px-0 py-1.5 pr-3 break-all whitespace-normal line-through">
                   {f.old}
-                </td>
-                <td className="py-1.5 font-medium break-all">{f.new}</td>
-              </tr>
+                </TableCell>
+                <TableCell className="px-0 py-1.5 font-medium break-all">
+                  {f.new}
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       ) : (
         <p className="text-text-3 text-sm">
           {req.kind === "create"

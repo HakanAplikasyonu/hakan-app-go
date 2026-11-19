@@ -178,11 +178,11 @@ function Inner({ engagement }: { engagement: string }) {
           >
             {items.map((x) => (
               <li key={x.uuid}>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
                   aria-current={x.uuid === openUuid ? "true" : undefined}
                   onClick={() => setOpen(x.uuid === openUuid ? null : x.uuid)}
-                  className="hover:bg-surface-2 focus-visible:ring-ring aria-[current=true]:bg-brand-tint flex min-h-11 w-full flex-wrap items-center gap-3 px-4 py-3 text-start focus-visible:ring-2 focus-visible:outline-none"
+                  className="hover:bg-surface-2 aria-[current=true]:bg-brand-tint h-auto min-h-11 w-full flex-wrap justify-start gap-3 rounded-none px-4 py-3 text-start font-normal whitespace-normal has-[>svg]:px-4"
                 >
                   <FileSpreadsheet
                     aria-hidden
@@ -204,7 +204,7 @@ function Inner({ engagement }: { engagement: string }) {
                   >
                     {datetime(x.created_at)}
                   </time>
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

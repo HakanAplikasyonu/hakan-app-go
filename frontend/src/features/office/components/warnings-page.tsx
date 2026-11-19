@@ -685,23 +685,23 @@ function WarningsInner() {
           className="bg-surface-3 flex gap-0.5 rounded-lg p-0.5"
         >
           {statusTabs.map((s) => (
-            <button
+            <Button
               key={s.key}
-              type="button"
+              variant="ghost"
               aria-pressed={status === s.key}
               onClick={() => setStatus(s.key)}
               className={cn(
-                "focus-visible:ring-ring min-h-11 rounded-md px-3 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-8",
+                "h-auto min-h-11 gap-0 rounded-md px-3 py-0 text-sm font-medium transition-colors md:min-h-8",
                 status === s.key
-                  ? "bg-surface text-foreground shadow-sm"
-                  : "text-text-2 hover:text-foreground",
+                  ? "bg-surface text-foreground hover:bg-surface hover:text-foreground shadow-sm"
+                  : "text-text-2 hover:text-foreground hover:bg-transparent",
               )}
             >
               {s.label}
               {s.count ? (
                 <span className="ms-1.5 tabular-nums">{s.count}</span>
               ) : null}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex-1" />
@@ -742,13 +742,13 @@ function WarningsInner() {
           const { icon: Icon, box, ring } = severityCard[s];
           const on = severity === s;
           return (
-            <button
+            <Button
               key={s}
-              type="button"
+              variant="ghost"
               aria-pressed={on}
               onClick={() => setSeverity(on ? null : s)}
               className={cn(
-                "bg-surface focus-visible:ring-ring flex items-center gap-3.5 rounded-xl border p-4 text-start transition-colors focus-visible:ring-2 focus-visible:outline-none",
+                "bg-surface hover:bg-surface h-auto justify-start gap-3.5 rounded-xl border p-4 text-start font-normal whitespace-normal transition-colors has-[>svg]:px-4",
                 on || (s === "blocker" && severityCount(s) > 0)
                   ? ring
                   : "border-line",
@@ -772,7 +772,7 @@ function WarningsInner() {
                   {t(`office.warnings_card_${s}`)}
                 </span>
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
