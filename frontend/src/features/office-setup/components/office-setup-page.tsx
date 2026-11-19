@@ -54,7 +54,7 @@ function Stepper({
     (k) => stepStatus(state, k) === "done",
   ).length;
   return (
-    <aside className="bg-card flex flex-col gap-4 rounded-[14px] border p-4 lg:sticky lg:top-20 lg:self-start lg:p-5">
+    <aside className="bg-card flex flex-col gap-4 rounded-lg border p-4 lg:sticky lg:top-20 lg:self-start lg:p-5">
       <div>
         <h1 className="font-display text-xl font-semibold tracking-tight">
           {t("setup.title")}
@@ -92,7 +92,7 @@ function Stepper({
                   aria-describedby={`setup-step-status-${key}`}
                   onClick={() => onSelect(i)}
                   className={cn(
-                    "h-auto min-h-11 w-full justify-start gap-3 rounded-[10px] px-2.5 py-2 text-start font-normal transition-colors",
+                    "h-auto min-h-11 w-full justify-start gap-3 rounded-md px-2.5 py-2 text-start font-normal transition-colors",
                     current
                       ? "bg-brand-tint text-brand-text hover:bg-brand-tint hover:text-brand-text"
                       : "hover:bg-surface-2",
@@ -189,7 +189,7 @@ function Wizard({ state }: { state: OfficeSetupState }) {
       >
         <section
           aria-labelledby="setup-step-title"
-          className="bg-card text-card-foreground rounded-[14px] border p-5 sm:p-8"
+          className="bg-card text-card-foreground rounded-lg border p-5 sm:p-8"
         >
           <p className="text-text-2 font-mono text-xs">
             {t("setup.step_counter", {

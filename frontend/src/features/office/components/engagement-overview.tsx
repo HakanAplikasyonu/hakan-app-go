@@ -217,7 +217,7 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
                 <li key={x.uuid} className="flex items-center gap-3 py-2.5">
                   <span
                     className={cn(
-                      "rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
+                      "rounded-md px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
                       x.overdue
                         ? "bg-danger-tint text-danger"
                         : "bg-warn-tint text-warn",

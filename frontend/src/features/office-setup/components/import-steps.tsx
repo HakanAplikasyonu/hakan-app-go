@@ -144,7 +144,7 @@ function useImportRowColumns() {
           const bad = isBad(row.original);
           return (
             <span
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${bad ? "bg-danger-tint text-danger" : "bg-ok-tint text-ok"}`}
+              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${bad ? "bg-danger-tint text-danger" : "bg-ok-tint text-ok"}`}
             >
               {bad ? t("setup.row_error") : t("setup.row_valid")}
             </span>
@@ -229,7 +229,7 @@ function ImportSummary({
   );
   return (
     <div className="mt-5 space-y-3">
-      <div className="bg-surface-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[10px] border px-4 py-3">
+      <div className="bg-surface-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border px-4 py-3">
         <span className="font-mono text-sm font-semibold">
           {batch.file_name}
         </span>

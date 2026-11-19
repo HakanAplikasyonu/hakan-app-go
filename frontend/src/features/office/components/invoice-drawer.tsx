@@ -213,7 +213,7 @@ export function InvoiceDrawer({
           <>
             <div className="border-line space-y-2 border-b p-5 pe-12">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="bg-brand-tint text-brand-text rounded-full px-2.5 py-0.5 text-xs font-semibold">
+                <span className="bg-brand-tint text-brand-text rounded-md px-2.5 py-0.5 text-xs font-semibold">
                   {invoiceKindText(d.type, d.profile, t)}
                 </span>
                 <InvoiceStateBadge status={d.status} />

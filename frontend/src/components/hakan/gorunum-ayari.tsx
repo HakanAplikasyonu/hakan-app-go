@@ -112,7 +112,7 @@ export function GorunumAyari({ className }: { className?: string }) {
                   setTheme(s.mode);
               }}
               className={cn(
-                "h-auto min-h-11 flex-col items-stretch justify-start gap-2 rounded-[12px] border-2 p-2 text-left text-[13px] font-semibold whitespace-normal transition-colors hover:bg-transparent",
+                "h-auto min-h-11 flex-col items-stretch justify-start gap-2 rounded-lg border-2 p-2 text-left text-[13px] font-semibold whitespace-normal transition-colors hover:bg-transparent",
                 secili
                   ? "border-brand"
                   : "border-line hover:border-line-strong",
@@ -144,7 +144,7 @@ export function GorunumAyari({ className }: { className?: string }) {
       <div
         role="radiogroup"
         aria-label={t("common.theme_mode")}
-        className="bg-surface-3 flex w-max gap-0.5 rounded-[10px] p-[3px]"
+        className="bg-surface-3 flex w-max gap-0.5 rounded-md p-[3px]"
       >
         {kipler.map((k) => (
           <Button

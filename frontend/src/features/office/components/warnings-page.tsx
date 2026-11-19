@@ -421,7 +421,7 @@ function WarningGroupCard({
         </h2>
         <span className="text-text-3 font-mono text-xs">{group.code}</span>
         <span
-          className="bg-surface-3 text-text-2 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums"
+          className="bg-surface-3 text-text-2 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums"
           aria-label={t("office.warnings_group_count", { count: group.count })}
         >
           {group.count}

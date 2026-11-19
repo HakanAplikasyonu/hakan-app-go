@@ -44,7 +44,7 @@ function SettingsNav({
           <li key={s.id} className="shrink-0">
             <a
               href={`#${s.id}`}
-              className="hover:bg-surface-2 text-text-2 hover:text-foreground flex min-h-11 items-center rounded-[10px] px-3 text-sm font-medium whitespace-nowrap"
+              className="hover:bg-surface-2 text-text-2 hover:text-foreground flex min-h-11 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap"
             >
               {s.label}
             </a>

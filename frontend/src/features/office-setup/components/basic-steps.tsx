@@ -225,7 +225,7 @@ export function AccountingStep(props: SetupStepProps) {
           <Label
             key={p.value}
             htmlFor={`setup-accounting-${p.value}`}
-            className="has-[button[data-state=checked]]:border-brand has-[button[data-state=checked]]:bg-brand-tint hover:border-line-strong flex min-h-16 cursor-pointer items-start gap-3 rounded-[14px] border p-4 font-normal"
+            className="has-[button[data-state=checked]]:border-brand has-[button[data-state=checked]]:bg-brand-tint hover:border-line-strong flex min-h-16 cursor-pointer items-start gap-3 rounded-lg border p-4 font-normal"
           >
             <RadioGroupItem
               value={p.value}
@@ -289,7 +289,7 @@ export function IntegrationsStep(props: SetupStepProps) {
         ].map((c) => (
           <li
             key={c.title}
-            className="bg-surface-2 flex flex-col gap-2 rounded-[14px] border p-4"
+            className="bg-surface-2 flex flex-col gap-2 rounded-lg border p-4"
           >
             <span className="text-sm font-semibold">{c.title}</span>
             <span className="text-text-2 flex-1 text-sm">{c.body}</span>

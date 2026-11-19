@@ -68,7 +68,7 @@ export function CommandBar() {
           <Button
             key={k}
             variant="ghost"
-            className="bg-surface-2 hover:bg-surface-3 h-auto rounded-full border px-2.5 py-1 text-xs font-normal"
+            className="bg-surface-2 hover:bg-surface-3 h-auto rounded-md border px-2.5 py-1 text-xs font-normal"
             onClick={() => submit(t(`office.copilot.command.${k}`))}
           >
             {t(`office.copilot.command.${k}`)}

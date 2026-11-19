@@ -50,7 +50,7 @@ function Card({
   return (
     <section
       aria-labelledby={`${id}-title`}
-      className="bg-card rounded-[14px] border p-5 sm:p-6"
+      className="bg-card rounded-lg border p-5 sm:p-6"
     >
       <h3 id={`${id}-title`} className="text-base font-semibold">
         {title}
@@ -126,7 +126,7 @@ function ThresholdCard() {
           </div>
         </div>
         <p
-          className="bg-surface-2 rounded-[10px] border p-3 text-sm"
+          className="bg-surface-2 rounded-md border p-3 text-sm"
           aria-live="polite"
         >
           {impact.isError ? (
@@ -286,7 +286,7 @@ function RuleCandidateCard() {
           )}
         </RadioGroup>
         <p
-          className="bg-surface-2 rounded-[10px] border p-3 text-sm"
+          className="bg-surface-2 rounded-md border p-3 text-sm"
           aria-live="polite"
         >
           {preview.isError

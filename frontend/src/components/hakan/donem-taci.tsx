@@ -109,7 +109,7 @@ export function DonemTaci({
   return (
     <section
       className={cn(
-        "bg-card chamfer border-line-strong flex flex-wrap items-end gap-8 rounded-[14px] border p-6 sm:p-7",
+        "bg-card chamfer border-line-strong flex flex-wrap items-end gap-8 rounded-lg border p-6 sm:p-7",
         className,
       )}
     >

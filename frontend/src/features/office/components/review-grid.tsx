@@ -203,7 +203,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
     <div className="flex min-h-0 flex-col gap-4">
       <header className="flex flex-wrap items-center gap-3">
         <ReviewHeading scoped={!!scope} />
-        <span className="bg-surface-2 rounded-full border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
+        <span className="bg-surface-2 rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
           {t("office.review_pending", { count: query.data?.total ?? 0 })}
         </span>
         {viewSwitch}

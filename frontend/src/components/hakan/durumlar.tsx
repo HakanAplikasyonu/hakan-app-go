@@ -51,7 +51,7 @@ function DurumIkonu({
     <span
       aria-hidden="true"
       className={cn(
-        "flex size-16 items-center justify-center rounded-[18px]",
+        "flex size-16 items-center justify-center rounded-xl",
         ton === "tehlike"
           ? "bg-danger-tint text-danger"
           : "bg-surface-3 text-text-2",
@@ -214,7 +214,7 @@ export function YuklemeDurumu({
       )}
     >
       <div className="flex items-center gap-3" aria-hidden="true">
-        <Skeleton className="size-8 rounded-[9px]" />
+        <Skeleton className="size-8 rounded-md" />
         <div className="flex grow flex-col gap-1.5">
           <Skeleton className="h-3 w-3/5" />
           <Skeleton className="h-3 w-2/5" />
