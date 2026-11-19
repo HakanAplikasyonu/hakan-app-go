@@ -185,6 +185,13 @@ func bigExtras(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, o *bigOffic
 				SELECT e.organization_id, e.id, e.taxpayer_id, e.id % 5 <> 0, 1 + e.id % 5, t.contact_email, $2, $3
 				FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id WHERE e.id = ANY($1::bigint[])
 				ON CONFLICT (organization_id, engagement_id) DO NOTHING`, []any{engs, prev, o.owner()}},
+			// Mükellefe özel inceleme eşiği (#518 A5): bazı mükelleflerde eşik
+			// yüksek, bazılarında otomatik onay kapalı.
+			{"review_settings (mükellef)", `
+				INSERT INTO review_settings (organization_id, engagement_id, kind, auto_accept, threshold, updated_by)
+				SELECT e.organization_id, e.id, '*', e.id % 14 <> 0, CASE WHEN e.id % 14 <> 0 THEN 0.98 END, $2
+				FROM engagements e WHERE e.id = ANY($1::bigint[]) AND e.id % 7 = 0
+				ON CONFLICT DO NOTHING`, []any{engs, o.owner()}},
 			// KVKK ilgili kişi talepleri (#518 B3): bekleyen dışa aktarım,
 			// reddedilmiş silme, süresi dolmuş dışa aktarım. Tamamlanmış silme
 			// yok: demo verisi anonimleştirilmiş görünmesin.
