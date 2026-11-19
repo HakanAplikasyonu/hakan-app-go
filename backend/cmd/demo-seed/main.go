@@ -255,6 +255,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedEinvoiceConnection(ctx, pool, eng.TaxpayerID); err != nil {
 				return fmt.Errorf("e-invoice connection → %s: %w", tp.Key, err)
 			}
+			// Paraşüt bağlı, son çekimin sayıları (#518 A3).
+			if err := seedParasutConnection(ctx, pool, eng.TaxpayerID); err != nil {
+				return fmt.Errorf("parasut connection → %s: %w", tp.Key, err)
+			}
 			// Taxpayer report: charts, comment, schedule, history (#386).
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)

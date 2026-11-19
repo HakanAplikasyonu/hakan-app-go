@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { lastDays } from "../components/engagement-connections-page";
-import { bankStep, splitIBANs } from "./use-bank-connections";
+import { bankStep, lastDays, splitIBANs } from "./use-bank-connections";
 
 describe("bankStep", () => {
   it("follows the setup states", () => {

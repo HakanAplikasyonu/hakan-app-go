@@ -20,6 +20,7 @@ export { EngagementBankPage } from "./components/engagement-bank-page";
 export { EngagementPayrollPage } from "./components/engagement-payroll-page";
 export { EngagementTaxReturnsPage } from "./components/engagement-tax-returns-page";
 export { EngagementConnectionsPage } from "./components/engagement-connections-page";
+export { ParasutCallbackPage } from "./components/parasut-callback-page";
 export { EngagementEasytradePage } from "./components/engagement-easytrade-page";
 export { WhatsAppPage } from "./components/whatsapp-page";
 export { EngagementExpensesPage } from "./components/engagement-expenses-page";

@@ -47,6 +47,15 @@ export function splitIBANs(text: string): string[] {
   return out;
 }
 
+/** Son n gün (bugün dahil), YYYY-MM-DD: "şimdi çek" aralığı. */
+export function lastDays(n: number, today = new Date()) {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const from = new Date(today);
+  from.setDate(from.getDate() - (n - 1));
+  return { from: iso(from), to: iso(today) };
+}
+
 /** Mükellefin banka web servisi bağlantıları (#518, A2). */
 export function useBankConnections(engagement: string) {
   const { slug } = useTenant();
