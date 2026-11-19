@@ -108,7 +108,7 @@ sayılmaz.
 ## Yevmiye
 
 Yevmiye fişi hazırlama, onay ve Luca / Zirve / Excel çıktısı
-[Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-ciktisi)nda
+[Ofis yöneticisi kılavuzu](ofis-yoneticisi.md#7-yevmiye-ve-luca--zirve-çıktısı)nda
 anlatılır. Bu ekranı göremiyorsanız rolünüzde yevmiye izni yoktur.
 
 ## Banka: Luca ekstresi (CSV)

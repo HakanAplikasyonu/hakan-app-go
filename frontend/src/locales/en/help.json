@@ -5,5 +5,20 @@
   "description": "Step-by-step guides for the office panel, the taxpayer portal and mobile app, and the desktop agent.",
   "turkish_only": "The guides are available in Turkish only.",
   "for_you": "For you",
-  "all_guides": "All guides"
+  "all_guides": "All guides",
+  "search_label": "Search the guides",
+  "search_placeholder": "Search the guides: e.g. UBL upload, trial balance, receipt",
+  "search_results": "{{count}} results",
+  "search_empty": "No results. Try another word or browse the guides below.",
+  "topics": "Popular topics",
+  "toc": "In this guide",
+  "pager": "Move between guides",
+  "prev": "Previous guide",
+  "next": "Next guide",
+  "feedback_question": "Was this page helpful?",
+  "feedback_yes": "Yes",
+  "feedback_no": "No",
+  "feedback_thanks": "Thank you.",
+  "feedback_chat_opened": "The support chat is open; tell us what is missing there.",
+  "feedback_contact": "Tell your office admin or the support team what is missing."
 }
