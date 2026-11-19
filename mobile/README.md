@@ -77,6 +77,7 @@ Diğer profiller: `development-simulator`, `preview`, `production`.
 - **Profil ve hesap:** gizlilik ve destek bağlantıları, çıkış ve hesap silme. Silme, `/v1/auth/account/deactivate/request` ile gelen e-posta koduyla onaylanır.
 - **Yapılandırma** (derleme anında, `EXPO_PUBLIC_*`):
   - `EXPO_PUBLIC_PRIVACY_URL`: https adresi.
+  - `EXPO_PUBLIC_HELP_URL`: web yardım merkezinin https adresi (`…/yardim`, #522). Profildeki **Yardım** düğmesi mükellef kılavuzunu açar; boşsa düğme görünmez.
   - `EXPO_PUBLIC_SUPPORT_URL`: https ya da `mailto:` adresi. ClickFix widget'ı tanımlıysa Destek düğmesi uygulama içi ekranı açar; bu bağlantı yedektir.
   - `EXPO_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID`: destek (#387). Ofis kendi widget kimliğini (Ayarlar → Destek) girmediyse kullanılan platform varsayılanı; ikisi de boşsa uygulama içi destek ekranı yoktur.
   - `EXPO_PUBLIC_CLICKFIX_EMBED_URL`: ClickFix webview sayfası (https); boşsa `https://getclickfix.com/widget-embed.html`.

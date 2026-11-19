@@ -4,6 +4,7 @@
  *
  *   EXPO_PUBLIC_API_URL=https://api.example.com   Go API origin, without /v1
  *   EXPO_PUBLIC_APP_ENV=development|preview|production
+ *   EXPO_PUBLIC_HELP_URL=https://…/yardim       web yardım merkezi (#522); boş: Yardım düğmesi gizlenir
  *   EXPO_PUBLIC_SENTRY_DSN=https://…@…/…         çökme raporu (#241); boş: Sentry kapalı
  *   EXPO_PUBLIC_CLICKFIX_WIDGET_ID=…              destek (#387): ofis → yazılım sağlayıcısı
  *                                                 ClickFix widget'ı; boş: destek ekranı yok
@@ -28,6 +29,7 @@ export const appEnv: AppEnv =
 export const env = {
   apiUrl: (process.env.EXPO_PUBLIC_API_URL?.trim() || 'http://localhost:8080').replace(/\/$/, ''),
   requestTimeoutMs: 20000,
+  helpUrl: safeLink(process.env.EXPO_PUBLIC_HELP_URL).replace(/\/$/, ''),
   sentryDsn: safeLink(process.env.EXPO_PUBLIC_SENTRY_DSN),
   clickfixWidgetId: process.env.EXPO_PUBLIC_CLICKFIX_WIDGET_ID?.trim() ?? '',
   clickfixEmbedUrl: safeLink(process.env.EXPO_PUBLIC_CLICKFIX_EMBED_URL),

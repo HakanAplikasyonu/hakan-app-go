@@ -5,6 +5,7 @@
  *   EXPO_PUBLIC_APP_ENV=development|preview|production
  *   EXPO_PUBLIC_PRIVACY_URL=https://…           gizlilik metni (profil ekranı); boş: gizlenir
  *   EXPO_PUBLIC_SUPPORT_URL=https://… | mailto:  destek (profil ekranı); boş: gizlenir
+ *   EXPO_PUBLIC_HELP_URL=https://…/yardim       web yardım merkezi (#522); boş: Yardım düğmesi gizlenir
  *   EXPO_PUBLIC_SENTRY_DSN=https://…@…/…         çökme raporu; boş: Sentry kapalı
  *   EXPO_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID=…     destek (#387): ofisin kendi widget'ı yoksa
  *                                                 kullanılan platform varsayılanı; ikisi de boşsa
@@ -32,6 +33,7 @@ export const env = {
   requestTimeoutMs: 20000,
   privacyUrl: safeLink(process.env.EXPO_PUBLIC_PRIVACY_URL),
   supportUrl: safeLink(process.env.EXPO_PUBLIC_SUPPORT_URL, true),
+  helpUrl: safeLink(process.env.EXPO_PUBLIC_HELP_URL).replace(/\/$/, ''),
   sentryDsn: safeLink(process.env.EXPO_PUBLIC_SENTRY_DSN),
   clickfixTaxpayerWidgetId: process.env.EXPO_PUBLIC_CLICKFIX_TAXPAYER_WIDGET_ID?.trim() ?? '',
   clickfixEmbedUrl: safeLink(process.env.EXPO_PUBLIC_CLICKFIX_EMBED_URL),
