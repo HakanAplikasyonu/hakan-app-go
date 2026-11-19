@@ -24,6 +24,7 @@ import {
   createMoneyColumn,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -65,9 +72,6 @@ import {
   Pill,
   resultTone,
 } from "./reconciliation-ui";
-
-const selectClass =
-  "bg-background focus-visible:ring-ring h-9 rounded-md border px-2 text-sm focus-visible:ring-2 focus-visible:outline-none max-md:h-11";
 
 function BabsCell({
   form,
@@ -380,15 +384,13 @@ export function CounterpartiesView({
       <p className="text-text-2 text-sm">
         {t("office.reconciliation.counterparty_hint")}
       </p>
-      <label className="flex w-fit items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="size-4"
+      <Label className="flex w-fit items-center gap-2 text-sm leading-normal font-normal">
+        <Checkbox
           checked={onlyIssues}
-          onChange={(e) => setOnlyIssues(e.target.checked)}
+          onCheckedChange={(v) => setOnlyIssues(v === true)}
         />
         {t("office.reconciliation.only_issues")}
-      </label>
+      </Label>
       <EntityTable<ReconciliationCounterparty>
         columns={columns}
         data={rows}
@@ -517,7 +519,7 @@ function LetterDialog({
             <Money value={balance} />
           </DialogDescription>
         </DialogHeader>
-        <label className="flex flex-col gap-1.5 text-sm">
+        <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
           <span className="font-medium">
             {t("office.reconciliation.letter_email")}
           </span>
@@ -527,8 +529,8 @@ function LetterDialog({
             autoComplete="email"
             onChange={(e) => setEmail(e.target.value)}
           />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
+        </Label>
+        <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
           <span className="font-medium">{t("office.reconciliation.note")}</span>
           <Textarea
             rows={3}
@@ -536,16 +538,14 @@ function LetterDialog({
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="size-4"
+        </Label>
+        <Label className="flex items-center gap-2 text-sm leading-normal font-normal">
+          <Checkbox
             checked={send}
-            onChange={(e) => setSend(e.target.checked)}
+            onCheckedChange={(v) => setSend(v === true)}
           />
           {t("office.reconciliation.letter_send_now")}
-        </label>
+        </Label>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t("office.reconciliation.cancel")}
@@ -711,19 +711,26 @@ export function BabsView({
       </p>
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-text-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Label
+              htmlFor="babs-import-form"
+              className="text-text-2 leading-normal font-normal"
+            >
               {t("office.reconciliation.col_form")}
-            </span>
-            <select
-              className={selectClass}
+            </Label>
+            <NativeSelect
+              id="babs-import-form"
               value={form}
               onChange={(e) => setForm(e.target.value as "ba" | "bs")}
             >
-              <option value="ba">{t("office.reconciliation.form_ba")}</option>
-              <option value="bs">{t("office.reconciliation.form_bs")}</option>
-            </select>
-          </label>
+              <NativeSelectOption value="ba">
+                {t("office.reconciliation.form_ba")}
+              </NativeSelectOption>
+              <NativeSelectOption value="bs">
+                {t("office.reconciliation.form_bs")}
+              </NativeSelectOption>
+            </NativeSelect>
+          </div>
           <Button
             size="sm"
             variant="outline"
@@ -1082,24 +1089,24 @@ function ResponseDialog({
           </DialogTitle>
           <DialogDescription>{letter?.counterparty_name}</DialogDescription>
         </DialogHeader>
-        <fieldset className="flex gap-4 text-sm">
-          <legend className="sr-only">
-            {t("office.reconciliation.col_response")}
-          </legend>
+        <RadioGroup
+          value={response}
+          onValueChange={(v) => setResponse(v as typeof response)}
+          aria-label={t("office.reconciliation.col_response")}
+          className="flex gap-4 text-sm"
+        >
           {(["agreed", "disputed"] as const).map((r) => (
-            <label key={r} className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="response"
-                checked={response === r}
-                onChange={() => setResponse(r)}
-              />
+            <Label
+              key={r}
+              className="flex items-center gap-2 leading-normal font-normal"
+            >
+              <RadioGroupItem value={r} />
               {t(`office.reconciliation.response_${r}`)}
-            </label>
+            </Label>
           ))}
-        </fieldset>
+        </RadioGroup>
         {response === "disputed" ? (
-          <label className="flex flex-col gap-1.5 text-sm">
+          <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
             <span className="font-medium">
               {t("office.reconciliation.their_balance")}
             </span>
@@ -1108,22 +1115,22 @@ function ResponseDialog({
               value={balance}
               onChange={(e) => setBalance(e.target.value)}
             />
-          </label>
+          </Label>
         ) : null}
-        <label className="flex flex-col gap-1.5 text-sm">
+        <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
           <span className="font-medium">
             {t("office.reconciliation.responder")}
           </span>
           <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1.5 text-sm">
+        </Label>
+        <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
           <span className="font-medium">{t("office.reconciliation.note")}</span>
           <Textarea
             rows={3}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-        </label>
+        </Label>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
             {t("office.reconciliation.cancel")}

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
@@ -111,7 +112,7 @@ export function NoteDialog({
             <DialogDescription>{description}</DialogDescription>
           ) : null}
         </DialogHeader>
-        <label className="flex flex-col gap-1.5 text-sm">
+        <Label className="flex flex-col gap-1.5 text-sm leading-normal font-normal">
           <span className="font-medium">{t("office.reconciliation.note")}</span>
           <Textarea
             value={note}
@@ -119,7 +120,7 @@ export function NoteDialog({
             rows={4}
             onChange={(e) => setNote(e.target.value)}
           />
-        </label>
+        </Label>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             {t("office.reconciliation.cancel")}

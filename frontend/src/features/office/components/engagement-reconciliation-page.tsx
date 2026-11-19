@@ -24,6 +24,7 @@ import {
   createMoneyColumn,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TabStrip, TabStripItem } from "@/components/ui/tab-strip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
@@ -161,31 +172,19 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
           </Button>
         ) : null}
       </div>
-      <div
-        role="tablist"
-        aria-label={t("office.reconciliation.view_label")}
-        className="border-line flex gap-1 overflow-x-auto border-b"
-      >
+      <TabStrip aria-label={t("office.reconciliation.view_label")}>
         {VIEWS.map((v) => (
-          <button
+          <TabStripItem
             key={v}
-            type="button"
-            role="tab"
-            aria-selected={view === v}
+            selected={view === v}
             onClick={() =>
               listState.setParams({ view: v === "accounts" ? null : v })
             }
-            className={cn(
-              "focus-visible:ring-ring -mb-px min-h-11 border-b-2 px-3 text-sm font-medium whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none md:min-h-9",
-              view === v
-                ? "border-brand text-foreground"
-                : "text-text-2 hover:text-foreground border-transparent",
-            )}
           >
             {t(`office.reconciliation.view_${v}`)}
-          </button>
+          </TabStripItem>
         ))}
-      </div>
+      </TabStrip>
 
       {view === "babs" ? (
         <BabsView engagement={engagement} period={period} canWrite={canWrite} />
@@ -536,15 +535,13 @@ function AccountsView({
         </div>
       ) : null}
 
-      <label className="flex w-fit items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          className="size-4"
+      <Label className="flex w-fit items-center gap-2 text-sm leading-normal font-normal">
+        <Checkbox
           checked={onlyOpen}
-          onChange={(e) => setOnlyOpen(e.target.checked)}
+          onCheckedChange={(v) => setOnlyOpen(v === true)}
         />
         {t("office.reconciliation.only_open")}
-      </label>
+      </Label>
 
       <EntityTable<ReconciliationItem>
         columns={columns}
@@ -638,27 +635,30 @@ function ItemDetailDialog({
                   {t("office.reconciliation.no_sources")}
                 </p>
               ) : (
-                <table className="w-full text-sm">
-                  <thead className="text-text-2 text-start text-xs">
-                    <tr>
-                      <th className="py-1 text-start font-medium">
+                <Table>
+                  <TableHeader className="[&_tr]:border-line text-xs">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-start">
                         {t("office.reconciliation.col_source")}
-                      </th>
-                      <th className="py-1 text-end font-medium">
+                      </TableHead>
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-end">
                         {t("office.reconciliation.col_debit")}
-                      </th>
-                      <th className="py-1 text-end font-medium">
+                      </TableHead>
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-end">
                         {t("office.reconciliation.col_credit")}
-                      </th>
-                      <th className="py-1 text-end font-medium">
+                      </TableHead>
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-end">
                         {t("office.reconciliation.col_draft")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {item.sources.map((s) => (
-                      <tr key={s.kind} className="border-line border-t">
-                        <td className="py-1.5">
+                      <TableRow
+                        key={s.kind}
+                        className="border-line hover:bg-transparent"
+                      >
+                        <TableCell className="px-0 py-1.5">
                           {t(`office.reconciliation.kind_${s.kind}`)}{" "}
                           <span className="text-text-3 text-xs">
                             (
@@ -667,20 +667,20 @@ function ItemDetailDialog({
                             })}
                             )
                           </span>
-                        </td>
-                        <td className="py-1.5 text-end">
+                        </TableCell>
+                        <TableCell className="px-0 py-1.5 text-end">
                           <Money value={s.debit} />
-                        </td>
-                        <td className="py-1.5 text-end">
+                        </TableCell>
+                        <TableCell className="px-0 py-1.5 text-end">
                           <Money value={s.credit} />
-                        </td>
-                        <td className="py-1.5 text-end">
+                        </TableCell>
+                        <TableCell className="px-0 py-1.5 text-end">
                           <Money value={s.draft_net} />
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               )}
             </section>
             <section className="space-y-2">
@@ -731,37 +731,40 @@ function ItemDetailDialog({
                 <h3 className="text-sm font-semibold">
                   {t("office.reconciliation.sub_accounts")}
                 </h3>
-                <table className="w-full text-sm">
-                  <thead className="text-text-2 text-xs">
-                    <tr>
-                      <th className="py-1 text-start font-medium">
+                <Table>
+                  <TableHeader className="[&_tr]:border-line text-xs">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-start">
                         {t("office.reconciliation.col_account")}
-                      </th>
-                      <th className="py-1 text-end font-medium">
+                      </TableHead>
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-end">
                         {t("office.reconciliation.col_ledger")}
-                      </th>
-                      <th className="py-1 text-end font-medium">
+                      </TableHead>
+                      <TableHead className="text-text-2 h-auto px-0 py-1 text-end">
                         {t("office.reconciliation.col_sources")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {item.sub_accounts.map((s) => (
-                      <tr key={s.code} className="border-line border-t">
-                        <td className="py-1.5">
+                      <TableRow
+                        key={s.code}
+                        className="border-line hover:bg-transparent"
+                      >
+                        <TableCell className="px-0 py-1.5">
                           <span className="font-mono">{s.code}</span>{" "}
                           <span className="text-text-2">{s.name}</span>
-                        </td>
-                        <td className="py-1.5 text-end">
+                        </TableCell>
+                        <TableCell className="px-0 py-1.5 text-end">
                           <Money value={s.ledger_net} />
-                        </td>
-                        <td className="py-1.5 text-end">
+                        </TableCell>
+                        <TableCell className="px-0 py-1.5 text-end">
                           <Money value={s.source_net} />
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </section>
             ) : null}
           </>
