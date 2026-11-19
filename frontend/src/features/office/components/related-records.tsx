@@ -2,9 +2,16 @@
 
 import { X } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -233,55 +240,70 @@ export function RelatedRecordsPanel({
 }
 
 /**
- * Mükellef detayında `?kayit=<tür>:<uuid>` ile seçili kaydın ilişkili
- * kayıtları; sekmenin üstünde, sekme çubuğunun altında (#469).
+ * Mükellef detayında `?kayit=<tür>:<uuid>` ile seçili kaydın ayrıntısı ve
+ * ilişkili kayıtları (#469). Sağdan açılan, kipsiz yan panel (#564): liste
+ * yerinde kalır, sayfa başa zıplamaz; başka satıra tıklayınca panel o
+ * kayda geçer. Dışarı tıklamak paneli kapatmaz (satır seçimiyle
+ * yarışmasın); "Seçimi kaldır", Esc ya da × kapatır.
  */
 export function FocusedRecord({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const params = useSearchParams();
   const pathname = usePathname();
+  const router = useRouter();
   const focus = parseFocus(params.get(FOCUS_PARAM));
-  if (!focus) return null;
   const rest = new URLSearchParams(params.toString());
   rest.delete(FOCUS_PARAM);
   const qs = rest.toString();
+  const closeHref = `${pathname}${qs ? `?${qs}` : ""}`;
   return (
-    <section
-      aria-labelledby="focused-record-title"
-      data-testid="focused-record"
+    <Sheet
+      open={focus !== null}
+      modal={false}
+      onOpenChange={(o) => {
+        if (!o) router.replace(closeHref, { scroll: false });
+      }}
     >
-      <Panel
-        title={
-          <span id="focused-record-title">
-            {t("office.related.focus_title", {
-              kind: t(`office.related.kind.${focus.kind}`),
-            })}
-          </span>
-        }
-        description={t("office.related.description")}
-        actions={
-          <Button asChild size="sm" variant="ghost">
-            <Link href={`${pathname}${qs ? `?${qs}` : ""}`} scroll={false}>
-              <X className="size-4" aria-hidden />
-              {t("office.related.focus_close")}
-            </Link>
-          </Button>
-        }
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto sm:max-w-2xl"
+        data-testid="focused-record"
+        onInteractOutside={(e) => e.preventDefault()}
       >
-        {focus.kind === "bank_transaction" && (
-          <div className="mb-6">
-            <BankTransactionMatchingPanel
+        {focus ? (
+          <div className="space-y-5">
+            <SheetHeader className="text-left">
+              <div className="flex flex-wrap items-center justify-between gap-2 pe-8">
+                <SheetTitle id="focused-record-title">
+                  {t("office.related.focus_title", {
+                    kind: t(`office.related.kind.${focus.kind}`),
+                  })}
+                </SheetTitle>
+                <Button asChild size="sm" variant="ghost">
+                  <Link href={closeHref} scroll={false}>
+                    <X className="size-4" aria-hidden />
+                    {t("office.related.focus_close")}
+                  </Link>
+                </Button>
+              </div>
+              <SheetDescription>
+                {t("office.related.description")}
+              </SheetDescription>
+            </SheetHeader>
+            {focus.kind === "bank_transaction" && (
+              <BankTransactionMatchingPanel
+                engagement={engagement}
+                transaction={focus.uuid}
+              />
+            )}
+            <RelatedRecordsTable
               engagement={engagement}
-              transaction={focus.uuid}
+              kind={focus.kind}
+              uuid={focus.uuid}
             />
           </div>
-        )}
-        <RelatedRecordsTable
-          engagement={engagement}
-          kind={focus.kind}
-          uuid={focus.uuid}
-        />
-      </Panel>
-    </section>
+        ) : null}
+      </SheetContent>
+    </Sheet>
   );
 }
