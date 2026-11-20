@@ -15,6 +15,9 @@ test.describe.configure({ mode: "serial" });
 
 const MUSAVIR = "musavir@demo.hakan.local";
 const description = `E2E onay akışı ${Date.now()}`;
+// Benzersiz tutar: aynı tutarlı başka bir fiş mükerrer kayıt incelemesini
+// açıp aktarımı bekletmesin.
+const amount = `${100 + (Date.now() % 800)},${String(Date.now() % 100).padStart(2, "0")}`;
 
 test("personel fişi hazırlar, onaylayamaz (#566)", async ({ page }) => {
   await uiLogin(page, DEMO.intern);
@@ -24,7 +27,7 @@ test("personel fişi hazırlar, onaylayamaz (#566)", async ({ page }) => {
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
   await rows.nth(0).locator("input").nth(0).fill("770.01");
-  await rows.nth(0).locator("input").nth(2).fill("150,00");
+  await rows.nth(0).locator("input").nth(2).fill(amount);
   await rows.nth(1).locator("input").nth(0).fill("100.01");
   await page.getByRole("button", { name: "Farkı kapat" }).click();
   await expect(page.getByText("Dengeli", { exact: true })).toBeVisible();
@@ -63,7 +66,8 @@ test("müşavir onaylar ve seçerek aktarır (#566, #574)", async ({ page }) => 
   await row.getByRole("checkbox").check();
   await expect(page.getByText("Yalnız tabloda seçilen 1 onaylı fiş aktarılır.")).toBeVisible();
   await page.locator('select:has(option[value="luca"])').selectOption("luca");
-  await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  // Seçim varken düğme "Seçili 1 fişin çıktısını al" yazar.
+  await page.getByRole("button", { name: /^(Seçili 1 fişin çıktısını al|Çıktı al)$/ }).last().click();
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   await expect(row).toContainText("Aktarıldı");
 });
