@@ -55,6 +55,22 @@ describe("bankMatchingService (#528)", () => {
       },
     );
   });
+  it("reads the movement's audit history (#565)", () => {
+    void bankMatchingService.history("demo", "e1", "t1");
+    expect(tenantRequest).toHaveBeenCalledWith(
+      "demo",
+      "GET",
+      `${base}/history`,
+    );
+    expect(bankMatchingKeys.history("Demo", "e1", "t1")).toEqual([
+      "tenant",
+      "demo",
+      "bank-matching",
+      "e1",
+      "t1",
+      "history",
+    ]);
+  });
   it("keys per office, engagement and movement", () => {
     expect(bankMatchingKeys.one("Demo", "e1", "t1")).toEqual([
       "tenant",

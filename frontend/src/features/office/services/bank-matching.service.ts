@@ -4,6 +4,8 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 export type BankTransactionMatching =
   components["schemas"]["BankTransactionMatching"];
 export type BankMatchCandidate = components["schemas"]["BankMatchCandidate"];
+export type BankTransactionHistoryEntry =
+  components["schemas"]["BankTransactionHistoryEntry"];
 
 const tx = (engagement: string, transaction: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-transactions/${encodeURIComponent(transaction)}`;
@@ -16,6 +18,15 @@ export const bankMatchingKeys = {
       "bank-matching",
       engagement,
       transaction,
+    ] as const,
+  history: (slug: string, engagement: string, transaction: string) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "bank-matching",
+      engagement,
+      transaction,
+      "history",
     ] as const,
   search: (slug: string, engagement: string, transaction: string, q: string) =>
     [
@@ -52,6 +63,14 @@ export const bankMatchingService = {
       "PUT",
       `${tx(engagement, transaction)}/matches`,
       { body: { invoice_uuids: invoiceUuids } },
+    );
+  },
+  /** Hareketi kim, ne zaman eşleştirdi / geri aldı / hesaba işledi (#565). */
+  history(slug: string, engagement: string, transaction: string) {
+    return tenantRequest<{ items: BankTransactionHistoryEntry[] }>(
+      slug,
+      "GET",
+      `${tx(engagement, transaction)}/history`,
     );
   },
   /** Elle eşleştirme için açık fatura araması (#565). */
