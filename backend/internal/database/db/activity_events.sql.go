@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/netip"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -139,6 +140,73 @@ func (q *Queries) ListActivityEvents(ctx context.Context, arg ListActivityEvents
 			&i.UserAgent,
 			&i.CreatedAt,
 			&i.OrganizationID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listResourceActivityForEngagement = `-- name: ListResourceActivityForEngagement :many
+SELECT e.uuid, e.action, e.payload, e.created_at,
+       u.uuid AS actor_uuid, u.name AS actor_name, u.surname AS actor_surname
+FROM activity_events e
+LEFT JOIN users u ON u.id = e.actor_user_id
+WHERE e.organization_id = $1
+  AND e.resource = $2
+  AND e.resource_uuid = $3
+  AND lower(e.payload->>'engagement_uuid') = lower($4::text)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT $5
+`
+
+type ListResourceActivityForEngagementParams struct {
+	OrganizationID pgtype.Int8 `json:"organization_id"`
+	Resource       string      `json:"resource"`
+	ResourceUuid   pgtype.UUID `json:"resource_uuid"`
+	EngagementUuid string      `json:"engagement_uuid"`
+	LimitCount     int32       `json:"limit_count"`
+}
+
+type ListResourceActivityForEngagementRow struct {
+	Uuid         uuid.UUID          `json:"uuid"`
+	Action       string             `json:"action"`
+	Payload      []byte             `json:"payload"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ActorUuid    pgtype.UUID        `json:"actor_uuid"`
+	ActorName    pgtype.Text        `json:"actor_name"`
+	ActorSurname pgtype.Text        `json:"actor_surname"`
+}
+
+// Audit history of one record in one engagement (#565): the organization's
+// events about the resource whose payload names the engagement.
+func (q *Queries) ListResourceActivityForEngagement(ctx context.Context, arg ListResourceActivityForEngagementParams) ([]ListResourceActivityForEngagementRow, error) {
+	rows, err := q.db.Query(ctx, listResourceActivityForEngagement,
+		arg.OrganizationID,
+		arg.Resource,
+		arg.ResourceUuid,
+		arg.EngagementUuid,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListResourceActivityForEngagementRow{}
+	for rows.Next() {
+		var i ListResourceActivityForEngagementRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Action,
+			&i.Payload,
+			&i.CreatedAt,
+			&i.ActorUuid,
+			&i.ActorName,
+			&i.ActorSurname,
 		); err != nil {
 			return nil, err
 		}

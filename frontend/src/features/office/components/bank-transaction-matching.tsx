@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, Link2, Link2Off, Search } from "lucide-react";
+import { BookOpenCheck, History, Link2, Link2Off, Search } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
@@ -86,6 +86,10 @@ export function BankTransactionMatchingPanel({
     });
     void qc.invalidateQueries({
       queryKey: ["tenant", slug.toLowerCase(), "bank-transactions"],
+    });
+    // Yeni işlem geçmişe düşer (#565).
+    void qc.invalidateQueries({
+      queryKey: bankMatchingKeys.history(slug, engagement, transaction),
     });
     toast.success(message);
     onChanged?.();
@@ -337,7 +341,80 @@ export function BankTransactionMatchingPanel({
         busy={busy}
         onBook={(code, name) => book.mutate({ code, name })}
       />
+
+      <HistorySection engagement={engagement} transaction={transaction} />
     </div>
+  );
+}
+
+/**
+ * Hareket geçmişi (#565): kim, ne zaman faturaya eşleştirdi, eşleşmeyi
+ * geri aldı ya da hesaba işledi. Yalnız bu dosyadaki işlemler listelenir.
+ */
+function HistorySection({
+  engagement,
+  transaction,
+}: {
+  engagement: string;
+  transaction: string;
+}) {
+  const { t, locale } = useLocale();
+  const { slug } = useTenant();
+  const h = useQuery({
+    queryKey: bankMatchingKeys.history(slug, engagement, transaction),
+    queryFn: () => bankMatchingService.history(slug, engagement, transaction),
+  });
+  const when = new Intl.DateTimeFormat(locale === "tr" ? "tr-TR" : "en-GB", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+  const items = h.data?.items ?? [];
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-history">
+      <h3 className="flex items-center gap-2 text-sm font-medium">
+        <History className="size-4" aria-hidden />
+        {t("office.bank.matching.history_title")}
+      </h3>
+      {h.isPending ? (
+        <Skeleton className="h-10 w-full" />
+      ) : h.isError ? (
+        <p className="text-muted-foreground text-sm">
+          {t("office.bank.matching.history_failed")}
+        </p>
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {t("office.bank.matching.history_empty")}
+        </p>
+      ) : (
+        <ol className="divide-y rounded-md border text-sm">
+          {items.map((e) => (
+            <li
+              key={e.uuid}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2"
+            >
+              <Figure className="text-muted-foreground shrink-0 text-xs">
+                <time dateTime={e.at}>{when.format(new Date(e.at))}</time>
+              </Figure>
+              <span className="font-medium">
+                {e.actor_name ??
+                  t("office.bank.matching.history_unknown_actor")}
+              </span>
+              <span>{t(`office.bank.matching.history_${e.action}`)}</span>
+              {e.action === "booked" && e.account_code ? (
+                <span className="text-muted-foreground">
+                  <Figure>{e.account_code}</Figure>
+                  {e.account_name ? ` ${e.account_name}` : ""}
+                </span>
+              ) : e.invoices.length > 0 ? (
+                <Figure className="text-muted-foreground">
+                  {e.invoices.join(", ")}
+                </Figure>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 

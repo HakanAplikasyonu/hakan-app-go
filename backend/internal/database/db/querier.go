@@ -987,6 +987,9 @@ type Querier interface {
 	// Kaynağın (kind, source_id) ilişkili kayıtları. Bütün sütunlar metin:
 	// tarih YYYY-MM-DD, tutar ondalık; olmayan değer boş metin.
 	ListRelatedRecords(ctx context.Context, arg ListRelatedRecordsParams) ([]ListRelatedRecordsRow, error)
+	// Audit history of one record in one engagement (#565): the organization's
+	// events about the resource whose payload names the engagement.
+	ListResourceActivityForEngagement(ctx context.Context, arg ListResourceActivityForEngagementParams) ([]ListResourceActivityForEngagementRow, error)
 	// Bağlantı kilidi alındıktan sonra çağrılır: 'running' kalan pencere yarıda
 	// kesilmiş bir çalışmadandır ve imlecinden sürer.
 	ListResumableSyncWindows(ctx context.Context, arg ListResumableSyncWindowsParams) ([]SyncWindow, error)

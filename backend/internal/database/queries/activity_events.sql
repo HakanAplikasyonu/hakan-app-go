@@ -26,3 +26,17 @@ WHERE (sqlc.narg(actor_user_id)::bigint IS NULL OR actor_user_id = sqlc.narg(act
     OR action ILIKE '%' || sqlc.narg(q) || '%'
     OR resource ILIKE '%' || sqlc.narg(q) || '%'
   );
+
+-- name: ListResourceActivityForEngagement :many
+-- Audit history of one record in one engagement (#565): the organization's
+-- events about the resource whose payload names the engagement.
+SELECT e.uuid, e.action, e.payload, e.created_at,
+       u.uuid AS actor_uuid, u.name AS actor_name, u.surname AS actor_surname
+FROM activity_events e
+LEFT JOIN users u ON u.id = e.actor_user_id
+WHERE e.organization_id = sqlc.arg(organization_id)
+  AND e.resource = sqlc.arg(resource)
+  AND e.resource_uuid = sqlc.arg(resource_uuid)
+  AND lower(e.payload->>'engagement_uuid') = lower(sqlc.arg(engagement_uuid)::text)
+ORDER BY e.created_at DESC, e.id DESC
+LIMIT sqlc.arg(limit_count);

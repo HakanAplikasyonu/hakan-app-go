@@ -53,7 +53,7 @@ func (h *Handler) audit(r *http.Request, action string, v TransactionView, extra
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
 	payload := map[string]any{
-		"engagement_uuid":  r.PathValue(engagementctx.PathParam),
+		"engagement_uuid":  subjectOf(r).EngagementUUID.String(),
 		"transaction_date": v.Date, "amount": v.Amount, "currency": v.Currency, "debit_credit": v.DebitCredit,
 	}
 	for k, val := range extra {
@@ -89,6 +89,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	tx := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions/{transactionUuid}"
 	mux.Handle("GET "+tx+"/matching", middleware.Chain(http.HandlerFunc(h.transaction), authn, org, read, eng))
 	mux.Handle("GET "+tx+"/invoice-search", middleware.Chain(http.HandlerFunc(h.search), authn, org, read, eng))
+	// Who matched, unmatched or booked the movement, when (#565).
+	mux.Handle("GET "+tx+"/history", middleware.Chain(http.HandlerFunc(h.history), authn, org, read, eng))
 	mux.Handle("PUT "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.match), authn, org, write, eng))
 	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
 	// Book the movement to an account from the same screen (#565).
@@ -97,7 +99,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 
 func subjectOf(r *http.Request) Subject {
 	scope := engagementctx.Must(r.Context())
-	return Subject{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID}
+	return Subject{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, EngagementUUID: scope.UUID}
 }
 
 func (h *Handler) transaction(w http.ResponseWriter, r *http.Request) {
@@ -118,6 +120,17 @@ func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	items, err := h.svc.Search(r.Context(), subjectOf(r), id, r.URL.Query().Get("q"))
+	h.reply(w, r, map[string]any{"items": items}, err)
+}
+
+// history: GET .../history (#565).
+func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	items, err := h.svc.History(r.Context(), subjectOf(r), id)
 	h.reply(w, r, map[string]any{"items": items}, err)
 }
 
