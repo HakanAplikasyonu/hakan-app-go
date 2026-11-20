@@ -135,6 +135,29 @@ func ScoreCandidate(m Movement, c Candidate, opt Options) Score {
 	return s
 }
 
+// Related: the candidate shares something with the movement beyond amount
+// and date (tax id, IBAN, invoice number in the description or the name).
+// Only such candidates are suggested (#710).
+func Related(s Score) bool {
+	for _, k := range []string{"tax_id", "iban", "invoice_number", "name"} {
+		if _, ok := s.Parts[k]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// Relevant: worth showing on the movement's screen — related, or of the
+// same amount. A candidate that only falls in the date window is noise.
+func Relevant(s Score) bool {
+	if Related(s) {
+		return true
+	}
+	_, exact := s.Parts["amount_exact"]
+	_, fee := s.Parts["amount_less_fee"]
+	return exact || fee
+}
+
 func absDays(a, b time.Time) int {
 	d := a.Sub(b).Hours() / 24
 	if d < 0 {
@@ -223,7 +246,9 @@ func Decide(m Movement, cands []Candidate, opt Options) Decision {
 		case best.Total >= AutoScore && best.Total-second >= AutoLead:
 			d.Outcome, d.Picks = OutcomeAuto, []Score{best}
 			return d
-		case best.Total >= SuggestScore:
+		case best.Total >= SuggestScore && Related(best):
+			// Amount and date alone are a coincidence (#710): another
+			// company's invoice of the same amount is not suggested.
 			d.Outcome, d.Picks = OutcomeSuggest, []Score{best}
 			return d
 		}
