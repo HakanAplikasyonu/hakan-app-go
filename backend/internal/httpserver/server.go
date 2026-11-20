@@ -73,6 +73,7 @@ import (
 	oauthproviderhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/handler"
 	oauthproviderusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/integrations/oauthprovider/usecase"
 	invoiceoffice "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/office"
+	invoiceposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/posting"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	journalsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
@@ -450,6 +451,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			warningsengine.New(warningsrepository.NewWarnings(deps.Queries), planCfg), planCfg)
 		journalSvc := journalsmodule.New(deps.DB, deps.Storage).WithPlanGate(planGate.ExportGate())
 		journalsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, journalsmodule.NewHandler(journalSvc, deps.Storage), rlsScope)
+		// Faturadan muhasebe fişi (#669): alış / satış faturası taslak fişe.
+		invoiceposting.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
+			invoiceposting.NewHandler(invoiceposting.NewService(deps.Queries, journalSvc)))
 	}
 	// KVKK veri sahibi talepleri (#193): dışa aktarma ve anonimleştirme, yönetici onaylı.
 	privacymodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,

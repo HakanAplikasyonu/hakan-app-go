@@ -1200,6 +1200,17 @@ type InvoiceItem struct {
 	TaxBreakdowns              []byte         `json:"tax_breakdowns"`
 }
 
+type InvoiceJournalLink struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	InvoiceID      int64              `json:"invoice_id"`
+	JournalDraftID int64              `json:"journal_draft_id"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type InvoiceSource struct {
 	ID            int64              `json:"id"`
 	TaxpayerID    int64              `json:"taxpayer_id"`

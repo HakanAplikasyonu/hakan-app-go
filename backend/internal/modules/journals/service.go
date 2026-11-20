@@ -39,6 +39,8 @@ var (
 	// ErrLineFromSource: the line's amount comes from its source (bank,
 	// invoice, payroll); it is corrected there, not on the draft.
 	ErrLineFromSource = errors.New("journals: the line's amount comes from its source document")
+	// ErrInvoicePosted: the engagement already booked this invoice (#669).
+	ErrInvoicePosted = errors.New("journals: the invoice already has an entry")
 )
 
 // DB is what the service needs from Postgres.
@@ -113,6 +115,10 @@ type DraftInput struct {
 	DocumentType string                     `json:"document_type,omitempty"`
 	Origin       map[string]any             `json:"origin,omitempty"`
 	Lines        []LineInput                `json:"lines"`
+	// InvoiceID links the draft to the invoice it books (#669), in the same
+	// transaction: an invoice already booked by this engagement gives
+	// ErrInvoicePosted and no draft. Not part of the API body.
+	InvoiceID int64 `json:"-"`
 }
 
 // Draft is the API view of a draft.
@@ -223,6 +229,18 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 			SourceKind: repository.Text(l.SourceKind), SourceID: repository.Text(l.SourceID), Confidence: repository.NumPtr(l.Confidence),
 		}); err != nil {
 			return Draft{}, fmt.Errorf("journals: line %d: %w", i+1, err)
+		}
+	}
+	if in.InvoiceID > 0 {
+		n, err := q.InsertInvoiceJournalLink(ctx, db.InsertInvoiceJournalLinkParams{
+			OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID,
+			InvoiceID: in.InvoiceID, JournalDraftID: row.ID, CreatedBy: actor(actorID),
+		})
+		if err != nil {
+			return Draft{}, fmt.Errorf("journals: invoice link: %w", err)
+		}
+		if n == 0 {
+			return Draft{}, ErrInvoicePosted
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {

@@ -28,6 +28,7 @@ import { directionOf } from "../lib/from-api";
 import { invoiceKindText } from "../lib/ubl-codes";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
+import { InvoicePostings } from "./invoice-postings";
 import { FilterSelect, Figure } from "./office-ui";
 import { useUrlOfficePeriod } from "../period";
 import { monthText } from "./vat-deduction-period";
@@ -236,7 +237,7 @@ function InvoicesInner() {
   const openInvoice = (uuid: string | null) =>
     listState.setParams({ invoice: uuid }, { resetPage: false });
 
-  const { period } = useUrlOfficePeriod();
+  const { period, focus } = useUrlOfficePeriod();
   const list = useEngagementInvoices(slug, engagement, {
     direction: direction === "all" ? undefined : direction,
     period,
@@ -328,6 +329,7 @@ function InvoicesInner() {
           ]}
         />
       </div>
+      <InvoicePostings slug={slug} engagement={engagement} period={focus} />
       <EntityTable<InvoiceRow>
         columns={columns}
         data={rows}
