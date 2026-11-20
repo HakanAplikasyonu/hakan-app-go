@@ -6970,6 +6970,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enter the missing counterparty VKN/TCKN of an invoice (INVALID_TAX_ID)
+         * @description Requires `tenant.invoices.write` and engagement access. Only for an
+         *     invoice that has neither a VKN nor a TCKN for the counterparty (the
+         *     source sent none or an invalid one). The number is checked (VKN 10
+         *     digits, TCKN 11 digits, both with their check digits; spaces are
+         *     ignored). The counterparty (cari) with that number is linked, or
+         *     created; the open INVALID_TAX_ID warning of the invoice is resolved;
+         *     who and when are recorded. The invoice then counts in Ba/Bs and in
+         *     bank matching by number.
+         *     The answer does not depend on whether the number is registered on
+         *     the platform (D1b): only this taxpayer's own counterparties are
+         *     looked up, and the response is the invoice.
+         *     400 `INVALID_TAX_ID`; 422 `TAX_ID_SET` (the invoice already has a
+         *     number), `PERIOD_LOCKED` (the invoice's period is locked). No 409:
+         *     a conflict answer would read as an existence answer.
+         */
+        put: operations["setEngagementInvoiceCounterpartyTaxId"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period": {
         parameters: {
             query?: never;
@@ -18206,6 +18248,13 @@ export interface components {
             warnings: components["schemas"]["OfficeInvoiceWarning"][];
             /** @description Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source. */
             exchange_rate_entry: null | {
+                /** @description Empty when the user was deleted */
+                set_by_name: string;
+                /** Format: date-time */
+                set_at: string;
+            };
+            /** @description Who entered the missing counterparty VKN/TCKN in the office, and when; null when it came with the source. */
+            counterparty_tax_id_entry: null | {
                 /** @description Empty when the user was deleted */
                 set_by_name: string;
                 /** Format: date-time */
@@ -32141,6 +32190,56 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementInvoiceCounterpartyTaxId: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 9000000017 */
+                    tax_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The invoice after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `TAX_ID_SET`, `PERIOD_LOCKED` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

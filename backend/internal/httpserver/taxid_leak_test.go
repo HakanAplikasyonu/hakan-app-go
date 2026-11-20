@@ -22,11 +22,15 @@ import (
 //	POST /v1/tenant/taxpayer-requests  internal/modules/taxpayers
 //	  TestAddTaxpayerAnswerDoesNotRevealExistence (#7)
 //	  TestTaxIDExistenceSideChannels (#171)
+//	PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id
+//	  internal/modules/invoices/office
+//	  TestCounterpartyTaxIDAnswerDoesNotRevealExistence
 //
 // Platform operations (/v1/platform/*) are the platform admin's catalog and
 // are outside D1b. Add to this list only together with such a test.
 var taxIDInputAllowed = map[string]bool{
 	"post /v1/tenant/taxpayer-requests": true,
+	"put /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id": true,
 }
 
 // forbiddenRoutes were removed because they revealed whether a tax id is

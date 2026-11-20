@@ -47,7 +47,7 @@ func (q *Queries) CountEngagementInvoices(ctx context.Context, arg CountEngageme
 }
 
 const getEngagementInvoice = `-- name: GetEngagementInvoice :one
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at, vat_deduction_period, vat_deduction_set_by, vat_deduction_set_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at, vat_deduction_period, vat_deduction_set_by, vat_deduction_set_at, counterparty_tax_id_set_by, counterparty_tax_id_set_at FROM invoices
 WHERE taxpayer_id = $1 AND uuid = $2
   AND engagement_document_visible($3::bigint, issue_date)
 `
@@ -124,6 +124,8 @@ func (q *Queries) GetEngagementInvoice(ctx context.Context, arg GetEngagementInv
 		&i.VatDeductionPeriod,
 		&i.VatDeductionSetBy,
 		&i.VatDeductionSetAt,
+		&i.CounterpartyTaxIDSetBy,
+		&i.CounterpartyTaxIDSetAt,
 	)
 	return i, err
 }
@@ -171,7 +173,7 @@ WITH page AS (
     ORDER BY i.issue_date DESC, i.id DESC
     LIMIT $7 OFFSET $6
 )
-SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at, invoices.exchange_rate_set_by, invoices.exchange_rate_set_at, invoices.vat_deduction_period, invoices.vat_deduction_set_by, invoices.vat_deduction_set_at,
+SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at, invoices.exchange_rate_set_by, invoices.exchange_rate_set_at, invoices.vat_deduction_period, invoices.vat_deduction_set_by, invoices.vat_deduction_set_at, invoices.counterparty_tax_id_set_by, invoices.counterparty_tax_id_set_at,
        (SELECT COUNT(*) FROM data_warnings w
          WHERE w.organization_id = $1 AND w.engagement_id = $2
            AND w.entity_type = 'invoice' AND w.entity_id = invoices.id AND w.status = 'open')::bigint AS open_warnings
@@ -281,6 +283,8 @@ func (q *Queries) ListEngagementInvoices(ctx context.Context, arg ListEngagement
 			&i.Invoice.VatDeductionPeriod,
 			&i.Invoice.VatDeductionSetBy,
 			&i.Invoice.VatDeductionSetAt,
+			&i.Invoice.CounterpartyTaxIDSetBy,
+			&i.Invoice.CounterpartyTaxIDSetAt,
 			&i.OpenWarnings,
 		); err != nil {
 			return nil, err
@@ -304,7 +308,7 @@ WITH page AS (
     ORDER BY i.issue_date DESC, i.id DESC
     LIMIT $8
 )
-SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at, invoices.exchange_rate_set_by, invoices.exchange_rate_set_at, invoices.vat_deduction_period, invoices.vat_deduction_set_by, invoices.vat_deduction_set_at,
+SELECT invoices.id, invoices.uuid, invoices.taxpayer_id, invoices.source_system, invoices.source_id, invoices.capture_method, invoices.ettn, invoices.invoice_number, invoices.direction, invoices.type, invoices.invoice_type_code_raw, invoices.profile, invoices.profile_raw, invoices.document_class, invoices.status, invoices.status_normalized, invoices.issue_date, invoices.issue_time, invoices.payment_due_date, invoices.period, invoices.customer_id, invoices.customer_tax_number, invoices.customer_identity_number, invoices.customer_name, invoices.currency, invoices.exchange_rate, invoices.line_extension_amount, invoices.allowance_total_amount, invoices.tax_exclusive_amount, invoices.tax_amount, invoices.tax_inclusive_amount, invoices.withholding_amount, invoices.excise_amount, invoices.communications_tax_amount, invoices.income_tax_withholding_amount, invoices.income_tax_withholding_rate, invoices.payable_amount, invoices.payable_amount_try, invoices.global_tax_exemption_code, invoices.original_invoice_number, invoices.original_invoice_issue_date, invoices.order_reference, invoices.is_internet_sale, invoices.sgk, invoices.despatch_id, invoices.notes, invoices.payment_status, invoices.remaining_amount, invoices.has_items, invoices.tax_summary_source, invoices.ubl_attachment_id, invoices.raw_payload, invoices.content_hash, invoices.source_updated_at, invoices.deleted_at_source, invoices.created_at, invoices.updated_at, invoices.exchange_rate_set_by, invoices.exchange_rate_set_at, invoices.vat_deduction_period, invoices.vat_deduction_set_by, invoices.vat_deduction_set_at, invoices.counterparty_tax_id_set_by, invoices.counterparty_tax_id_set_at,
        (SELECT COUNT(*) FROM data_warnings w
          WHERE w.organization_id = $1 AND w.engagement_id = $2
            AND w.entity_type = 'invoice' AND w.entity_id = invoices.id AND w.status = 'open')::bigint AS open_warnings
@@ -412,6 +416,8 @@ func (q *Queries) ListEngagementInvoicesAfter(ctx context.Context, arg ListEngag
 			&i.Invoice.VatDeductionPeriod,
 			&i.Invoice.VatDeductionSetBy,
 			&i.Invoice.VatDeductionSetAt,
+			&i.Invoice.CounterpartyTaxIDSetBy,
+			&i.Invoice.CounterpartyTaxIDSetAt,
 			&i.OpenWarnings,
 		); err != nil {
 			return nil, err

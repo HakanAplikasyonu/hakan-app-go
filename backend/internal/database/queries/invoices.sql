@@ -163,6 +163,24 @@ FROM invoices i
 LEFT JOIN users u ON u.id = i.exchange_rate_set_by
 WHERE i.taxpayer_id = @taxpayer_id AND i.id = @id AND i.exchange_rate_set_at IS NOT NULL;
 
+-- name: SetMissingInvoiceCounterpartyTaxID :execrows
+-- Karşı tarafın VKN/TCKN'si kaynakta yoksa ya da geçersizse ofis girer
+-- (#669, INVALID_TAX_ID): cari bağlanır. Numarası olan faturaya dokunulmaz.
+UPDATE invoices SET
+    customer_id = @customer_id,
+    customer_tax_number = sqlc.narg(tax_number),
+    customer_identity_number = sqlc.narg(identity_number),
+    counterparty_tax_id_set_by = sqlc.narg(set_by), counterparty_tax_id_set_at = NOW()
+WHERE taxpayer_id = @taxpayer_id AND id = @id
+  AND customer_tax_number IS NULL AND customer_identity_number IS NULL;
+
+-- name: InvoiceCounterpartyTaxIDEntry :one
+-- Elle girilen VKN/TCKN'nin kim tarafından ne zaman girildiği (#669).
+SELECT i.counterparty_tax_id_set_at, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.name, u.surname)), ''), u.email::text, '')::text AS set_by_name
+FROM invoices i
+LEFT JOIN users u ON u.id = i.counterparty_tax_id_set_by
+WHERE i.taxpayer_id = @taxpayer_id AND i.id = @id AND i.counterparty_tax_id_set_at IS NOT NULL;
+
 -- name: SetInvoiceVATDeductionPeriod :execrows
 -- KDV indirim dönemi (#640): alış faturasının KDV'si bu aya alınır; NULL
 -- belge ayına döndürür. Sınırları tablo kısıtı da denetler.

@@ -1161,6 +1161,8 @@ type Invoice struct {
 	VatDeductionPeriod         pgtype.Text        `json:"vat_deduction_period"`
 	VatDeductionSetBy          pgtype.Int8        `json:"vat_deduction_set_by"`
 	VatDeductionSetAt          pgtype.Timestamptz `json:"vat_deduction_set_at"`
+	CounterpartyTaxIDSetBy     pgtype.Int8        `json:"counterparty_tax_id_set_by"`
+	CounterpartyTaxIDSetAt     pgtype.Timestamptz `json:"counterparty_tax_id_set_at"`
 }
 
 type InvoiceItem struct {

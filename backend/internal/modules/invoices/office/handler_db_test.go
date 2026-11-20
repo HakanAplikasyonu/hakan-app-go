@@ -321,3 +321,53 @@ func TestOfficeSetsMissingExchangeRate(t *testing.T) {
 		t.Fatalf("rate entry %+v", en)
 	}
 }
+
+// TestCounterpartyTaxIDAnswerDoesNotRevealExistence (D1b, #171): entering a
+// counterparty VKN answers the same way whether or not that VKN is a
+// taxpayer on the platform. Only this taxpayer's own counterparties are
+// looked up; the answer is the invoice. The refusals are 422, not 409.
+func TestCounterpartyTaxIDAnswerDoesNotRevealExistence(t *testing.T) {
+	const registered, unknown = "4840847211", "6420011470"
+	answer := func(vkn string, register bool) (int, Detail) {
+		t.Helper()
+		e := setup(t)
+		ctx := context.Background()
+		if register {
+			e.d.Taxpayer(t, "legal", vkn)
+		}
+		if _, err := e.d.Pool.Exec(ctx, `UPDATE invoices SET customer_tax_number = NULL,
+			customer_identity_number = NULL, customer_id = NULL WHERE uuid = $1`, e.inv); err != nil {
+			t.Fatal(err)
+		}
+		uid := e.d.User(t)
+		put := func(body string) *httptest.ResponseRecorder {
+			r := httptest.NewRequest(http.MethodPut, "/x", strings.NewReader(body))
+			r.SetPathValue("invoiceUuid", e.inv)
+			r = r.WithContext(authctx.WithPrincipal(engagementctx.WithScope(r.Context(), e.scope), authctx.Principal{UserInternal: uid}))
+			w := httptest.NewRecorder()
+			e.h.setCounterpartyTaxID(w, r)
+			return w
+		}
+		w := put(`{"tax_id":"` + vkn + `"}`)
+		d := decode[Detail](t, w)
+		again := put(`{"tax_id":"` + vkn + `"}`)
+		if again.Code != http.StatusUnprocessableEntity || !strings.Contains(again.Body.String(), "TAX_ID_SET") {
+			t.Fatalf("second entry: %d %s", again.Code, again.Body)
+		}
+		return w.Code, d
+	}
+	codeA, a := answer(registered, true)
+	codeB, b := answer(unknown, false)
+	if codeA != http.StatusOK || codeB != http.StatusOK {
+		t.Fatalf("codes %d / %d", codeA, codeB)
+	}
+	if a.CounterpartyID != registered || b.CounterpartyID != unknown {
+		t.Fatalf("counterparty ids %q / %q", a.CounterpartyID, b.CounterpartyID)
+	}
+	if a.CounterpartyName != b.CounterpartyName {
+		t.Fatalf("counterparty name differs: %q / %q (reveals the platform taxpayer)", a.CounterpartyName, b.CounterpartyName)
+	}
+	if (a.CounterpartyTaxIDEntry == nil) != (b.CounterpartyTaxIDEntry == nil) || len(a.Warnings) != len(b.Warnings) {
+		t.Fatalf("answers differ: %+v / %+v", a, b)
+	}
+}
