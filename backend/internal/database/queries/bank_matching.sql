@@ -120,3 +120,75 @@ WHERE i.taxpayer_id = @taxpayer_id
        OR i.customer_identity_number = @term::text)
 ORDER BY i.issue_date DESC, i.id
 LIMIT 50;
+
+-- Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
+-- kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
+-- eşleşmeyi taxpayer_id ile süzer.
+
+-- name: ListBankTransactionMatchJournalLines :many
+SELECT m.amount, m.method, m.matched_at,
+       l.id AS line_id, l.line_no, l.account_code, l.description, l.document_no,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.entry_date, j.period, j.status AS journal_status
+FROM bank_transaction_matches m
+JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.id = m.target_id
+JOIN journal_drafts j
+  ON j.organization_id = @organization_id AND j.engagement_id = @engagement_id AND j.id = l.journal_draft_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id
+  AND m.target_type = 'journal_line' AND j.taxpayer_id = @taxpayer_id
+ORDER BY j.entry_date, j.entry_no, l.line_no;
+
+-- Aday fiş satırları: hareketin yönündeki taraf (gelen para → alacak,
+-- giden para → borç), banka hareketinden üretilmemiş satırlar. Arama terimi
+-- boşsa tarih penceresindeki ve tutarı tutan satırlar; doluysa hesap kodu
+-- (önek), satır / fiş açıklaması ya da belge no. cari_only: yalnız cari
+-- ana hesapları (@cari_codes). Açık tutar, bu hareketin eşleşmeleri hariç.
+-- name: SearchJournalLinesForBankMatch :many
+SELECT l.id, l.line_no, l.account_code, l.description, l.document_no,
+       (CASE WHEN @currency::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END)::numeric AS line_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = @taxpayer_id AND m.target_type = 'journal_line' AND m.target_id = l.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric AS matched_amount,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.entry_date, j.period, j.status AS journal_status,
+       j.description AS journal_description
+FROM journal_draft_lines l
+JOIN journal_drafts j
+  ON j.organization_id = l.organization_id AND j.engagement_id = l.engagement_id AND j.id = l.journal_draft_id
+WHERE l.organization_id = @organization_id AND l.engagement_id = @engagement_id
+  AND j.organization_id = @organization_id AND j.engagement_id = @engagement_id AND j.taxpayer_id = @taxpayer_id
+  AND l.source_kind IS DISTINCT FROM 'bank_transaction'
+  AND (CASE WHEN @side::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
+  AND (@currency::text = 'TRY' OR (l.currency = @currency::text AND l.foreign_amount IS NOT NULL))
+  AND (NOT @cari_only::boolean OR left(l.account_code, 3) = ANY(@cari_codes::text[]))
+  AND (
+        (@term::text = '' AND j.entry_date BETWEEN @date_from AND @date_to
+         AND abs((CASE WHEN @currency::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END) - @amount::numeric) <= @tolerance::numeric)
+     OR (@term::text <> '' AND (
+            l.account_code LIKE @term::text || '%'
+         OR l.description ILIKE '%' || @term::text || '%'
+         OR j.description ILIKE '%' || @term::text || '%'
+         OR COALESCE(l.document_no, '') ILIKE '%' || @term::text || '%'))
+  )
+ORDER BY j.entry_date DESC, j.entry_no DESC, l.line_no
+LIMIT 50;
+
+-- Elle eşleştirmede seçilen fiş satırları (anahtar "fiş uuid:satır no"). Süzgeçler
+-- aramayla aynı; açık tutar bu hareketin eski eşleşmeleri hariç
+-- (yeniden eşleştirme).
+-- name: ListJournalLinesForManualMatch :many
+SELECT l.id, l.line_no, l.account_code,
+       (CASE WHEN @currency::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END)::numeric AS line_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = @taxpayer_id AND m.target_type = 'journal_line' AND m.target_id = l.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric AS matched_amount,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.period
+FROM journal_draft_lines l
+JOIN journal_drafts j
+  ON j.organization_id = l.organization_id AND j.engagement_id = l.engagement_id AND j.id = l.journal_draft_id
+WHERE (j.uuid::text || ':' || l.line_no::text) = ANY(@keys::text[])
+  AND l.organization_id = @organization_id AND l.engagement_id = @engagement_id
+  AND j.organization_id = @organization_id AND j.engagement_id = @engagement_id AND j.taxpayer_id = @taxpayer_id
+  AND l.source_kind IS DISTINCT FROM 'bank_transaction'
+  AND (CASE WHEN @side::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
+  AND (@currency::text = 'TRY' OR (l.currency = @currency::text AND l.foreign_amount IS NOT NULL))
+ORDER BY j.entry_date, j.entry_no, l.line_no;

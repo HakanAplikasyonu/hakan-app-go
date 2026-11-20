@@ -1,7 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, History, Link2, Link2Off, Search } from "lucide-react";
+import {
+  BookOpenCheck,
+  History,
+  Link2,
+  Link2Off,
+  ListTree,
+  Search,
+} from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +21,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -22,10 +30,13 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { ACCOUNT_CODE_RE, useAccountPlanAccounts } from "../hooks/use-review";
+import { FOCUS_PARAM } from "../lib/related-href";
 import {
   bankMatchingKeys,
   bankMatchingService,
   type BankMatchCandidate,
+  type BankMatchJournalLineCandidate,
+  type BankMatchLineRef,
   type BankTransactionMatching,
 } from "../services/bank-matching.service";
 import { relatedKeys } from "../services/related.service";
@@ -62,6 +73,8 @@ export function BankTransactionMatchingPanel({
   const qc = useQueryClient();
   const key = bankMatchingKeys.one(slug, engagement, transaction);
   const [picked, setPicked] = useState<string[]>([]);
+  // Seçilen fiş satırları (#669 G), anahtar "fiş uuid:satır no".
+  const [pickedLines, setPickedLines] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
 
@@ -73,6 +86,17 @@ export function BankTransactionMatchingPanel({
   const settle = (v: BankTransactionMatching, message: string) => {
     qc.setQueryData(key, v);
     setPicked([]);
+    setPickedLines([]);
+    void qc.invalidateQueries({
+      queryKey: [
+        "tenant",
+        slug.toLowerCase(),
+        "bank-matching",
+        engagement,
+        transaction,
+        "line-search",
+      ],
+    });
     void qc.invalidateQueries({ queryKey: warningKeys.all(slug) });
     // Elle eşleştirme bekleyen öneriyi kuyruktan düşürür (#529).
     void qc.invalidateQueries({ queryKey: reviewKeys.all(slug) });
@@ -95,9 +119,23 @@ export function BankTransactionMatchingPanel({
     onChanged?.();
   };
   const match = useMutation({
-    mutationFn: (ids: string[]) =>
-      bankMatchingService.match(slug, engagement, transaction, ids),
-    onSuccess: (v) => settle(v, t("office.bank.matching.matched")),
+    mutationFn: (m: { invoices: string[]; lines: BankMatchLineRef[] }) =>
+      bankMatchingService.match(
+        slug,
+        engagement,
+        transaction,
+        m.invoices,
+        m.lines,
+      ),
+    onSuccess: (v) =>
+      settle(
+        v,
+        t(
+          v.matches.length > 0
+            ? "office.bank.matching.matched"
+            : "office.bank.matching.matched_lines",
+        ),
+      ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
   });
   const unmatch = useMutation({
@@ -151,6 +189,20 @@ export function BankTransactionMatchingPanel({
     routes.tenant.engagementInvoice(slug, engagement, id);
   const toggle = (id: string, on: boolean) =>
     setPicked((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const toggleLine = (id: string, on: boolean) =>
+    setPickedLines((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const journalHref = (id: string) =>
+    `${routes.tenant.engagementJournals(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`journal_draft:${id}`)}`;
+  const hasMatches = v.matches.length + v.journal_matches.length > 0;
+  const pickedCount = picked.length + pickedLines.length;
+  const submit = () =>
+    match.mutate({
+      invoices: picked,
+      lines: pickedLines.map((k) => {
+        const [uuid, no] = k.split(":");
+        return { journal_draft_uuid: uuid ?? "", line_no: Number(no) };
+      }),
+    });
 
   return (
     <div className="space-y-4" data-testid="bank-transaction-matching">
@@ -206,11 +258,13 @@ export function BankTransactionMatchingPanel({
         </div>
       </dl>
 
-      {v.matches.length > 0 && (
+      {hasMatches && (
         <section className="space-y-2">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium">
-              {t("office.bank.matching.matches_title")}
+              {v.matches.length > 0
+                ? t("office.bank.matching.matches_title")
+                : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -224,28 +278,61 @@ export function BankTransactionMatchingPanel({
               </Button>
             )}
           </div>
-          <ul className="divide-y rounded-md border text-sm">
-            {v.matches.map((m) => (
-              <li
-                key={m.invoice_uuid}
-                className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-              >
-                <Link
-                  className="font-medium underline-offset-4 hover:underline"
-                  href={invoiceHref(m.invoice_uuid)}
+          {v.matches.length > 0 ? (
+            <ul className="divide-y rounded-md border text-sm">
+              {v.matches.map((m) => (
+                <li
+                  key={m.invoice_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
                 >
-                  <Figure>{m.invoice_number}</Figure>
-                </Link>
-                <span className="text-muted-foreground">
-                  {trDate(m.issue_date)} · {m.counterparty_name ?? "—"}
-                </span>
-                <Money value={m.amount} currency={v.currency} />
-                <Badge variant="secondary">
-                  {t(`office.bank.matching.method_${m.method}`)}
-                </Badge>
-              </li>
-            ))}
-          </ul>
+                  <Link
+                    className="font-medium underline-offset-4 hover:underline"
+                    href={invoiceHref(m.invoice_uuid)}
+                  >
+                    <Figure>{m.invoice_number}</Figure>
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {trDate(m.issue_date)} · {m.counterparty_name ?? "—"}
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.journal_matches.length > 0 ? (
+            <>
+              {v.matches.length > 0 ? (
+                <h4 className="text-muted-foreground text-xs font-medium">
+                  {t("office.bank.matching.line_matches_title")}
+                </h4>
+              ) : null}
+              <ul
+                className="divide-y rounded-md border text-sm"
+                data-testid="bank-transaction-line-matches"
+              >
+                {v.journal_matches.map((m) => (
+                  <li
+                    key={`${m.journal_draft_uuid}:${m.line_no}`}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <Link
+                      className="font-medium underline-offset-4 hover:underline"
+                      href={journalHref(m.journal_draft_uuid)}
+                    >
+                      <Figure>{m.label}</Figure>
+                    </Link>
+                    <span className="text-muted-foreground min-w-0 truncate">
+                      {trDate(m.entry_date)} · {m.description || "—"}
+                    </span>
+                    <Money value={m.amount} currency={v.currency} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </section>
       )}
 
@@ -259,22 +346,6 @@ export function BankTransactionMatchingPanel({
             <h3 className="text-sm font-medium">
               {t("office.bank.matching.candidates_title")}
             </h3>
-            {canWrite && (
-              <Button
-                size="sm"
-                disabled={busy || picked.length === 0}
-                onClick={() => match.mutate(picked)}
-              >
-                <Link2 className="size-4" aria-hidden />
-                {v.matches.length > 0
-                  ? t("office.bank.matching.rematch", {
-                      count: String(picked.length),
-                    })
-                  : t("office.bank.matching.match", {
-                      count: String(picked.length),
-                    })}
-              </Button>
-            )}
           </div>
           {v.candidates.length === 0 ? (
             <p className="text-muted-foreground text-sm">
@@ -333,6 +404,41 @@ export function BankTransactionMatchingPanel({
           ) : null}
         </section>
       )}
+
+      {v.line_matchable && canWrite ? (
+        <LineSection
+          engagement={engagement}
+          transaction={transaction}
+          currency={v.currency}
+          picked={pickedLines}
+          onToggle={toggleLine}
+          journalHref={journalHref}
+        />
+      ) : null}
+
+      {canWrite && (v.matchable || v.line_matchable) ? (
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {hasMatches && pickedCount > 0 ? (
+            <span className="text-muted-foreground text-xs">
+              {t("office.bank.matching.rematch_hint")}
+            </span>
+          ) : null}
+          <Button
+            size="sm"
+            disabled={busy || pickedCount === 0}
+            onClick={submit}
+          >
+            <Link2 className="size-4" aria-hidden />
+            {hasMatches
+              ? t("office.bank.matching.rematch", {
+                  count: String(pickedCount),
+                })
+              : t("office.bank.matching.match", {
+                  count: String(pickedCount),
+                })}
+          </Button>
+        </div>
+      ) : null}
 
       <AccountSection
         engagement={engagement}
@@ -399,16 +505,31 @@ function HistorySection({
                 {e.actor_name ??
                   t("office.bank.matching.history_unknown_actor")}
               </span>
-              <span>{t(`office.bank.matching.history_${e.action}`)}</span>
+              <span>
+                {t(
+                  e.action === "matched" &&
+                    e.invoices.length === 0 &&
+                    e.journal_lines.length > 0
+                    ? "office.bank.matching.history_matched_lines"
+                    : `office.bank.matching.history_${e.action}`,
+                )}
+              </span>
               {e.action === "booked" && e.account_code ? (
                 <span className="text-muted-foreground">
                   <Figure>{e.account_code}</Figure>
                   {e.account_name ? ` ${e.account_name}` : ""}
                 </span>
-              ) : e.invoices.length > 0 ? (
+              ) : e.invoices.length + e.journal_lines.length > 0 ? (
                 <Figure className="text-muted-foreground">
-                  {e.invoices.join(", ")}
+                  {[...e.invoices, ...e.journal_lines].join(", ")}
                 </Figure>
+              ) : null}
+              {e.replaced.length > 0 ? (
+                <span className="text-muted-foreground text-xs">
+                  {t("office.bank.matching.history_replaced", {
+                    items: e.replaced.join(", "),
+                  })}
+                </span>
               ) : null}
             </li>
           ))}
@@ -566,6 +687,151 @@ function AccountRow({
         </Button>
       )}
     </li>
+  );
+}
+
+/**
+ * Fiş satırı / cari hareketi ile eşleştirme (#669 G). Faturası olmayan
+ * tahsilat ya da ödeme, daha önce girilmiş bir fişin satırına (cari 120 /
+ * 320 alt hesabı, avans, kira …) bağlanır. Terim yoksa tutarı tutan
+ * satırlar listelenir; "Yalnız cari hesaplar" cari ana hesaplara daraltır.
+ */
+function LineSection({
+  engagement,
+  transaction,
+  currency,
+  picked,
+  onToggle,
+  journalHref,
+}: {
+  engagement: string;
+  transaction: string;
+  currency: string;
+  picked: string[];
+  onToggle: (id: string, on: boolean) => void;
+  journalHref: (id: string) => string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [term, setTerm] = useState("");
+  const [cari, setCari] = useState(false);
+  const q = useDeferredValue(term.trim());
+  const ready = q.length === 0 || q.length >= 2;
+  const lines = useQuery({
+    queryKey: bankMatchingKeys.lineSearch(
+      slug,
+      engagement,
+      transaction,
+      q,
+      cari,
+    ),
+    queryFn: () =>
+      bankMatchingService.searchLines(slug, engagement, transaction, q, cari),
+    enabled: ready,
+  });
+  const items = lines.data?.items ?? [];
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-lines">
+      <h3 className="flex items-center gap-2 text-sm font-medium">
+        <ListTree className="size-4" aria-hidden />
+        {t("office.bank.matching.lines_title")}
+      </h3>
+      <div className="flex flex-wrap items-center gap-3">
+        <InputGroup className="max-w-md">
+          <InputGroupAddon>
+            <Search className="size-4" aria-hidden />
+          </InputGroupAddon>
+          <InputGroupInput
+            type="search"
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder={t("office.bank.matching.lines_search")}
+            aria-label={t("office.bank.matching.lines_search")}
+          />
+        </InputGroup>
+        <Label className="flex items-center gap-2 text-sm font-normal">
+          <Checkbox
+            checked={cari}
+            onCheckedChange={(on) => setCari(on === true)}
+          />
+          {t("office.bank.matching.lines_cari_only")}
+        </Label>
+      </div>
+      {!ready ? (
+        <p className="text-muted-foreground text-xs">
+          {t("office.bank.matching.lines_hint")}
+        </p>
+      ) : lines.isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : items.length === 0 ? (
+        <p className="text-muted-foreground text-sm">
+          {q.length === 0
+            ? t("office.bank.matching.lines_none")
+            : t("office.bank.matching.lines_empty")}
+        </p>
+      ) : (
+        <LineList
+          items={items}
+          currency={currency}
+          picked={picked}
+          onToggle={onToggle}
+          journalHref={journalHref}
+        />
+      )}
+    </section>
+  );
+}
+
+function LineList({
+  items,
+  currency,
+  picked,
+  onToggle,
+  journalHref,
+}: {
+  items: BankMatchJournalLineCandidate[];
+  currency: string;
+  picked: string[];
+  onToggle: (id: string, on: boolean) => void;
+  journalHref: (id: string) => string;
+}) {
+  const { t } = useLocale();
+  return (
+    <ul className="divide-y rounded-md border text-sm">
+      {items.map((l) => {
+        const id = `${l.journal_draft_uuid}:${l.line_no}`;
+        return (
+          <li key={id} className="flex flex-wrap items-center gap-3 px-3 py-2">
+            <Checkbox
+              checked={picked.includes(id)}
+              onCheckedChange={(on) => onToggle(id, on === true)}
+              aria-label={t("office.bank.matching.pick_line", {
+                line: l.label,
+              })}
+            />
+            <Link
+              className="font-medium underline-offset-4 hover:underline"
+              href={journalHref(l.journal_draft_uuid)}
+            >
+              <Figure>{l.label}</Figure>
+            </Link>
+            <span className="text-muted-foreground min-w-0 truncate">
+              {trDate(l.entry_date)} · {l.description || "—"}
+              {l.document_no ? ` · ${l.document_no}` : ""}
+            </span>
+            {l.cari ? (
+              <Badge variant="outline">
+                {t("office.bank.matching.lines_cari")}
+              </Badge>
+            ) : null}
+            <span className="ms-auto">
+              {t("office.bank.matching.open")}{" "}
+              <Money value={l.open_amount} currency={currency} />
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 

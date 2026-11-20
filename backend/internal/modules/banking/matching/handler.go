@@ -40,7 +40,10 @@ func (h *Handler) WithActivity(rec *activity.Recorder) *Handler {
 
 // Audit actions of the single-movement screen.
 const (
-	ActionMatched   = "bank.transaction.matched"
+	ActionMatched = "bank.transaction.matched"
+	// ActionRematched: the movement had matches and was matched again in
+	// one step (#669 G); the payload names what it replaced.
+	ActionRematched = "bank.transaction.rematched"
 	ActionUnmatched = "bank.transaction.unmatched"
 	ActionBooked    = "bank.transaction.booked"
 )
@@ -89,6 +92,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	tx := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-transactions/{transactionUuid}"
 	mux.Handle("GET "+tx+"/matching", middleware.Chain(http.HandlerFunc(h.transaction), authn, org, read, eng))
 	mux.Handle("GET "+tx+"/invoice-search", middleware.Chain(http.HandlerFunc(h.search), authn, org, read, eng))
+	// Existing journal lines / cari movements to tie the movement to (#669 G).
+	mux.Handle("GET "+tx+"/journal-line-search", middleware.Chain(http.HandlerFunc(h.searchLines), authn, org, read, eng))
 	// Who matched, unmatched or booked the movement, when (#565).
 	mux.Handle("GET "+tx+"/history", middleware.Chain(http.HandlerFunc(h.history), authn, org, read, eng))
 	mux.Handle("PUT "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.match), authn, org, write, eng))
@@ -134,9 +139,29 @@ func (h *Handler) history(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, map[string]any{"items": items}, err)
 }
 
+// searchLines: GET .../journal-line-search?q=&cari=1 (#669 G).
+func (h *Handler) searchLines(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	cari := r.URL.Query().Get("cari")
+	items, err := h.svc.SearchLines(r.Context(), subjectOf(r), id, r.URL.Query().Get("q"), cari == "1" || cari == "true")
+	h.reply(w, r, map[string]any{"items": items}, err)
+}
+
 type matchBody struct {
 	InvoiceUUIDs []uuid.UUID `json:"invoice_uuids"`
+	JournalLines []LineRef   `json:"journal_lines"`
 }
+
+// matchedPayload names what the movement is tied to (invoices, lines).
+func matchedPayload(v TransactionView) map[string]any {
+	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches)}
+}
+
+func hasMatches(v TransactionView) bool { return len(v.Matches)+len(v.JournalMatches) > 0 }
 
 func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("transactionUuid"))
@@ -147,14 +172,23 @@ func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	var in matchBody
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs) == 0 || len(in.InvoiceUUIDs) > MaxCombination*2 {
-		response.BadRequest(w, r, "VALIDATION_ERROR", "invoice_uuids must name 1-10 invoices")
+	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs)+len(in.JournalLines) == 0 ||
+		len(in.InvoiceUUIDs) > MaxCombination*2 || len(in.JournalLines) > MaxCombination*2 {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "name 1-10 invoices (invoice_uuids) and / or 1-10 journal lines (journal_lines)")
 		return
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
-	v, err := h.svc.Match(r.Context(), subjectOf(r), id, in.InvoiceUUIDs, p.UserInternal)
+	// What a re-match replaces is read first: afterwards it is gone.
+	before, _ := h.svc.Transaction(r.Context(), subjectOf(r), id)
+	v, err := h.svc.Match(r.Context(), subjectOf(r), id, in.InvoiceUUIDs, in.JournalLines, p.UserInternal)
 	if err == nil {
-		h.audit(r, ActionMatched, v, map[string]any{"invoices": invoiceNumbers(v.Matches)})
+		action, extra := ActionMatched, matchedPayload(v)
+		if hasMatches(before) {
+			action = ActionRematched
+			prev := matchedPayload(before)
+			extra["replaced_invoices"], extra["replaced_journal_lines"] = prev["invoices"], prev["journal_lines"]
+		}
+		h.audit(r, action, v, extra)
 	}
 	h.reply(w, r, v, err)
 }
@@ -168,8 +202,8 @@ func (h *Handler) unmatch(w http.ResponseWriter, r *http.Request) {
 	// What the undo removes is read first: afterwards it is gone.
 	before, _ := h.svc.Transaction(r.Context(), subjectOf(r), id)
 	v, err := h.svc.Unmatch(r.Context(), subjectOf(r), id)
-	if err == nil && len(before.Matches) > 0 {
-		h.audit(r, ActionUnmatched, v, map[string]any{"invoices": invoiceNumbers(before.Matches)})
+	if err == nil && hasMatches(before) {
+		h.audit(r, ActionUnmatched, v, matchedPayload(before))
 	}
 	h.reply(w, r, v, err)
 }
@@ -209,7 +243,7 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, ErrNotMatchable):
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
-	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
+	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 	case errors.Is(err, posting.ErrNotFound):
 		response.NotFound(w, r, "bank transaction not found")

@@ -200,6 +200,86 @@ func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg List
 	return items, nil
 }
 
+const listBankTransactionMatchJournalLines = `-- name: ListBankTransactionMatchJournalLines :many
+
+SELECT m.amount, m.method, m.matched_at,
+       l.id AS line_id, l.line_no, l.account_code, l.description, l.document_no,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.entry_date, j.period, j.status AS journal_status
+FROM bank_transaction_matches m
+JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2 AND l.id = m.target_id
+JOIN journal_drafts j
+  ON j.organization_id = $1 AND j.engagement_id = $2 AND j.id = l.journal_draft_id
+WHERE m.taxpayer_id = $3 AND m.bank_transaction_id = $4
+  AND m.target_type = 'journal_line' AND j.taxpayer_id = $3
+ORDER BY j.entry_date, j.entry_no, l.line_no
+`
+
+type ListBankTransactionMatchJournalLinesParams struct {
+	OrganizationID    int64 `json:"organization_id"`
+	EngagementID      int64 `json:"engagement_id"`
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionMatchJournalLinesRow struct {
+	Amount           pgtype.Numeric     `json:"amount"`
+	Method           string             `json:"method"`
+	MatchedAt        pgtype.Timestamptz `json:"matched_at"`
+	LineID           int64              `json:"line_id"`
+	LineNo           int32              `json:"line_no"`
+	AccountCode      string             `json:"account_code"`
+	Description      string             `json:"description"`
+	DocumentNo       pgtype.Text        `json:"document_no"`
+	JournalDraftUuid uuid.UUID          `json:"journal_draft_uuid"`
+	EntryNo          int32              `json:"entry_no"`
+	EntryDate        pgtype.Date        `json:"entry_date"`
+	Period           string             `json:"period"`
+	JournalStatus    string             `json:"journal_status"`
+}
+
+// Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
+// kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
+// eşleşmeyi taxpayer_id ile süzer.
+func (q *Queries) ListBankTransactionMatchJournalLines(ctx context.Context, arg ListBankTransactionMatchJournalLinesParams) ([]ListBankTransactionMatchJournalLinesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionMatchJournalLines,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionMatchJournalLinesRow{}
+	for rows.Next() {
+		var i ListBankTransactionMatchJournalLinesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Method,
+			&i.MatchedAt,
+			&i.LineID,
+			&i.LineNo,
+			&i.AccountCode,
+			&i.Description,
+			&i.DocumentNo,
+			&i.JournalDraftUuid,
+			&i.EntryNo,
+			&i.EntryDate,
+			&i.Period,
+			&i.JournalStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionMatches = `-- name: ListBankTransactionMatches :many
 SELECT id, uuid, taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by, matched_at FROM bank_transaction_matches
 WHERE taxpayer_id = $1 AND bank_transaction_id = $2
@@ -582,6 +662,86 @@ func (q *Queries) ListInvoicesForManualMatch(ctx context.Context, arg ListInvoic
 	return items, nil
 }
 
+const listJournalLinesForManualMatch = `-- name: ListJournalLinesForManualMatch :many
+SELECT l.id, l.line_no, l.account_code,
+       (CASE WHEN $1::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END)::numeric AS line_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = $2 AND m.target_type = 'journal_line' AND m.target_id = l.id
+                   AND m.bank_transaction_id <> $3), 0)::numeric AS matched_amount,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.period
+FROM journal_draft_lines l
+JOIN journal_drafts j
+  ON j.organization_id = l.organization_id AND j.engagement_id = l.engagement_id AND j.id = l.journal_draft_id
+WHERE (j.uuid::text || ':' || l.line_no::text) = ANY($4::text[])
+  AND l.organization_id = $5 AND l.engagement_id = $6
+  AND j.organization_id = $5 AND j.engagement_id = $6 AND j.taxpayer_id = $2
+  AND l.source_kind IS DISTINCT FROM 'bank_transaction'
+  AND (CASE WHEN $7::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
+  AND ($1::text = 'TRY' OR (l.currency = $1::text AND l.foreign_amount IS NOT NULL))
+ORDER BY j.entry_date, j.entry_no, l.line_no
+`
+
+type ListJournalLinesForManualMatchParams struct {
+	Currency          string   `json:"currency"`
+	TaxpayerID        int64    `json:"taxpayer_id"`
+	BankTransactionID int64    `json:"bank_transaction_id"`
+	Keys              []string `json:"keys"`
+	OrganizationID    int64    `json:"organization_id"`
+	EngagementID      int64    `json:"engagement_id"`
+	Side              string   `json:"side"`
+}
+
+type ListJournalLinesForManualMatchRow struct {
+	ID               int64          `json:"id"`
+	LineNo           int32          `json:"line_no"`
+	AccountCode      string         `json:"account_code"`
+	LineAmount       pgtype.Numeric `json:"line_amount"`
+	MatchedAmount    pgtype.Numeric `json:"matched_amount"`
+	JournalDraftUuid uuid.UUID      `json:"journal_draft_uuid"`
+	EntryNo          int32          `json:"entry_no"`
+	Period           string         `json:"period"`
+}
+
+// Elle eşleştirmede seçilen fiş satırları (anahtar "fiş uuid:satır no"). Süzgeçler
+// aramayla aynı; açık tutar bu hareketin eski eşleşmeleri hariç
+// (yeniden eşleştirme).
+func (q *Queries) ListJournalLinesForManualMatch(ctx context.Context, arg ListJournalLinesForManualMatchParams) ([]ListJournalLinesForManualMatchRow, error) {
+	rows, err := q.db.Query(ctx, listJournalLinesForManualMatch,
+		arg.Currency,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+		arg.Keys,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Side,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJournalLinesForManualMatchRow{}
+	for rows.Next() {
+		var i ListJournalLinesForManualMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LineNo,
+			&i.AccountCode,
+			&i.LineAmount,
+			&i.MatchedAmount,
+			&i.JournalDraftUuid,
+			&i.EntryNo,
+			&i.Period,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchInvoicesForBankMatch = `-- name: SearchInvoicesForBankMatch :many
 SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
        (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
@@ -642,6 +802,121 @@ func (q *Queries) SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvo
 			&i.CustomerName,
 			&i.ComparableAmount,
 			&i.MatchedAmount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchJournalLinesForBankMatch = `-- name: SearchJournalLinesForBankMatch :many
+SELECT l.id, l.line_no, l.account_code, l.description, l.document_no,
+       (CASE WHEN $1::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END)::numeric AS line_amount,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = $2 AND m.target_type = 'journal_line' AND m.target_id = l.id
+                   AND m.bank_transaction_id <> $3), 0)::numeric AS matched_amount,
+       j.uuid AS journal_draft_uuid, j.entry_no, j.entry_date, j.period, j.status AS journal_status,
+       j.description AS journal_description
+FROM journal_draft_lines l
+JOIN journal_drafts j
+  ON j.organization_id = l.organization_id AND j.engagement_id = l.engagement_id AND j.id = l.journal_draft_id
+WHERE l.organization_id = $4 AND l.engagement_id = $5
+  AND j.organization_id = $4 AND j.engagement_id = $5 AND j.taxpayer_id = $2
+  AND l.source_kind IS DISTINCT FROM 'bank_transaction'
+  AND (CASE WHEN $6::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
+  AND ($1::text = 'TRY' OR (l.currency = $1::text AND l.foreign_amount IS NOT NULL))
+  AND (NOT $7::boolean OR left(l.account_code, 3) = ANY($8::text[]))
+  AND (
+        ($9::text = '' AND j.entry_date BETWEEN $10 AND $11
+         AND abs((CASE WHEN $1::text = 'TRY' THEN l.debit + l.credit ELSE COALESCE(l.foreign_amount, 0) END) - $12::numeric) <= $13::numeric)
+     OR ($9::text <> '' AND (
+            l.account_code LIKE $9::text || '%'
+         OR l.description ILIKE '%' || $9::text || '%'
+         OR j.description ILIKE '%' || $9::text || '%'
+         OR COALESCE(l.document_no, '') ILIKE '%' || $9::text || '%'))
+  )
+ORDER BY j.entry_date DESC, j.entry_no DESC, l.line_no
+LIMIT 50
+`
+
+type SearchJournalLinesForBankMatchParams struct {
+	Currency          string         `json:"currency"`
+	TaxpayerID        int64          `json:"taxpayer_id"`
+	BankTransactionID int64          `json:"bank_transaction_id"`
+	OrganizationID    int64          `json:"organization_id"`
+	EngagementID      int64          `json:"engagement_id"`
+	Side              string         `json:"side"`
+	CariOnly          bool           `json:"cari_only"`
+	CariCodes         []string       `json:"cari_codes"`
+	Term              string         `json:"term"`
+	DateFrom          pgtype.Date    `json:"date_from"`
+	DateTo            pgtype.Date    `json:"date_to"`
+	Amount            pgtype.Numeric `json:"amount"`
+	Tolerance         pgtype.Numeric `json:"tolerance"`
+}
+
+type SearchJournalLinesForBankMatchRow struct {
+	ID                 int64          `json:"id"`
+	LineNo             int32          `json:"line_no"`
+	AccountCode        string         `json:"account_code"`
+	Description        string         `json:"description"`
+	DocumentNo         pgtype.Text    `json:"document_no"`
+	LineAmount         pgtype.Numeric `json:"line_amount"`
+	MatchedAmount      pgtype.Numeric `json:"matched_amount"`
+	JournalDraftUuid   uuid.UUID      `json:"journal_draft_uuid"`
+	EntryNo            int32          `json:"entry_no"`
+	EntryDate          pgtype.Date    `json:"entry_date"`
+	Period             string         `json:"period"`
+	JournalStatus      string         `json:"journal_status"`
+	JournalDescription string         `json:"journal_description"`
+}
+
+// Aday fiş satırları: hareketin yönündeki taraf (gelen para → alacak,
+// giden para → borç), banka hareketinden üretilmemiş satırlar. Arama terimi
+// boşsa tarih penceresindeki ve tutarı tutan satırlar; doluysa hesap kodu
+// (önek), satır / fiş açıklaması ya da belge no. cari_only: yalnız cari
+// ana hesapları (@cari_codes). Açık tutar, bu hareketin eşleşmeleri hariç.
+func (q *Queries) SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, searchJournalLinesForBankMatch,
+		arg.Currency,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Side,
+		arg.CariOnly,
+		arg.CariCodes,
+		arg.Term,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.Amount,
+		arg.Tolerance,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SearchJournalLinesForBankMatchRow{}
+	for rows.Next() {
+		var i SearchJournalLinesForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.LineNo,
+			&i.AccountCode,
+			&i.Description,
+			&i.DocumentNo,
+			&i.LineAmount,
+			&i.MatchedAmount,
+			&i.JournalDraftUuid,
+			&i.EntryNo,
+			&i.EntryDate,
+			&i.Period,
+			&i.JournalStatus,
+			&i.JournalDescription,
 		); err != nil {
 			return nil, err
 		}

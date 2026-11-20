@@ -762,6 +762,10 @@ type Querier interface {
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
 	ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error)
+	// Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
+	// kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
+	// eşleşmeyi taxpayer_id ile süzer.
+	ListBankTransactionMatchJournalLines(ctx context.Context, arg ListBankTransactionMatchJournalLinesParams) ([]ListBankTransactionMatchJournalLinesRow, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
@@ -900,6 +904,10 @@ type Querier interface {
 	// Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
 	ListJournalDrafts(ctx context.Context, arg ListJournalDraftsParams) ([]ListJournalDraftsRow, error)
 	ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDraftsByUUIDParams) ([]JournalDraft, error)
+	// Elle eşleştirmede seçilen fiş satırları (anahtar "fiş uuid:satır no"). Süzgeçler
+	// aramayla aynı; açık tutar bu hareketin eski eşleşmeleri hariç
+	// (yeniden eşleştirme).
+	ListJournalLinesForManualMatch(ctx context.Context, arg ListJournalLinesForManualMatchParams) ([]ListJournalLinesForManualMatchRow, error)
 	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -1355,6 +1363,12 @@ type Querier interface {
 	// dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
 	// faturalar.
 	SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error)
+	// Aday fiş satırları: hareketin yönündeki taraf (gelen para → alacak,
+	// giden para → borç), banka hareketinden üretilmemiş satırlar. Arama terimi
+	// boşsa tarih penceresindeki ve tutarı tutan satırlar; doluysa hesap kodu
+	// (önek), satır / fiş açıklaması ya da belge no. cari_only: yalnız cari
+	// ana hesapları (@cari_codes). Açık tutar, bu hareketin eşleşmeleri hariç.
+	SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error

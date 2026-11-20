@@ -235,7 +235,7 @@ func TestSampleMonth(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if view, err := svc.Match(ctx, sub, txUUID("c"), []uuid.UUID{invUUID(invKrt)}, user); err != nil || view.MatchStatus != "matched" {
+	if view, err := svc.Match(ctx, sub, txUUID("c"), []uuid.UUID{invUUID(invKrt)}, nil, user); err != nil || view.MatchStatus != "matched" {
 		t.Fatalf("match c: %+v %v", view, err)
 	}
 	var pendingStatus string
@@ -250,10 +250,10 @@ func TestSampleMonth(t *testing.T) {
 	if err != nil || !view.Matchable || len(view.Matches) != 0 || len(view.Candidates) == 0 || view.Candidates[0].InvoiceUUID != late {
 		t.Fatalf("view d: %+v %v", view, err)
 	}
-	if _, err := svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{invUUID(inv101)}, user); !errors.Is(err, ErrInvalidInvoices) {
+	if _, err := svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{invUUID(inv101)}, nil, user); !errors.Is(err, ErrInvalidInvoices) {
 		t.Fatalf("sales invoice on a payment: %v", err)
 	}
-	view, err = svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{late}, user)
+	view, err = svc.Match(ctx, sub, txUUID("d"), []uuid.UUID{late}, nil, user)
 	if err != nil || view.MatchStatus != "matched" || len(view.Matches) != 1 || view.Matches[0].Method != "manual" || view.Matches[0].Amount != "7000.00" {
 		t.Fatalf("match d: %+v %v", view, err)
 	}
@@ -319,7 +319,7 @@ func TestSampleMonth(t *testing.T) {
 	if view, err := svc.Transaction(ctx, sub, txUUID("f")); err != nil || view.Matchable || len(view.Candidates) != 0 {
 		t.Fatalf("view f: %+v %v", view, err)
 	}
-	if _, err := svc.Match(ctx, sub, txUUID("f"), []uuid.UUID{late}, user); !errors.Is(err, ErrNotMatchable) {
+	if _, err := svc.Match(ctx, sub, txUUID("f"), []uuid.UUID{late}, nil, user); !errors.Is(err, ErrNotMatchable) {
 		t.Fatalf("match f: %v", err)
 	}
 	if _, err := svc.Transaction(ctx, sub, uuid.New()); !errors.Is(err, ErrTransactionNotFound) {
