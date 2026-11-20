@@ -131,3 +131,41 @@ func TestSetLineAmountsFixesUnbalanced(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// #710 (ofis kararı): mükerrer fiş engellenir. Onay 409'a karşılık gelen
+// DraftDuplicateError döner; "yine de onayla" (Confirmed) geçirmez; ayrı
+// "yine de gönder" gerekçesiz reddedilir, gerekçeyle geçer ve gerekçe fişte
+// kalır. Eksik belge ise yalnız açık onay ister.
+func TestDuplicateDraftBlocked(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	src := uuid.NewString()
+	line := func() LineInput {
+		return LineInput{Account: "153", Debit: dec("120"), SourceKind: "invoice", SourceID: src}
+	}
+	a := e.draft(t, oct, line(), credit("320.01", "120"))
+	b := e.draft(t, oct, line(), credit("320.01", "120"))
+
+	var dup *DraftDuplicateError
+	for _, c := range []Confirmation{{}, {Confirmed: true, Note: "onaylıyorum"}} {
+		if err := e.svc.ApproveWith(ctx, e.scope, e.actor, a.UUID, c); !errors.As(err, &dup) || dup.Issues[0].Code != IssuePossibleDuplicate {
+			t.Fatalf("approve %+v err = %v", c, err)
+		}
+	}
+	if err := e.svc.ApproveWith(ctx, e.scope, e.actor, a.UUID, Confirmation{SendDuplicate: true, Reason: "  "}); !errors.Is(err, ErrReasonRequired) {
+		t.Fatalf("no reason err = %v", err)
+	}
+	reason := "İade sonrası yeniden kesilen fatura"
+	if err := e.svc.ApproveWith(ctx, e.scope, e.actor, a.UUID, Confirmation{SendDuplicate: true, Reason: " " + reason + " "}); err != nil {
+		t.Fatal(err)
+	}
+	det, err := e.svc.GetDraft(ctx, e.scope, a.UUID)
+	if err != nil || det.Status != "approved" || len(det.ApprovalWarnings) != 1 || det.ApprovalWarnings[0] != IssuePossibleDuplicate ||
+		det.ApprovalNote != reason {
+		t.Fatalf("approved duplicate: %+v %v", det.Draft, err)
+	}
+	// Öbür fiş de hâlâ mükerrer: kendi açık kararını ister.
+	if err := e.svc.Approve(ctx, e.scope, e.actor, b.UUID); !errors.As(err, &dup) {
+		t.Fatalf("second draft err = %v", err)
+	}
+}

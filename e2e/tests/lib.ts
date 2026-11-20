@@ -7,6 +7,7 @@ import {
   request as pwRequest,
   type APIRequestContext,
   type Browser,
+  type Locator,
   type Page,
 } from "@playwright/test";
 
@@ -403,6 +404,22 @@ export async function settledPopover(page: Page) {
     )
     .toBe(true);
   return pop;
+}
+
+/**
+ * Ekranda ham kod kalmasın (#710): snake_case alan / kaynak adı
+ * (`payable_amount`, `manual_upload`), çevrilmemiş i18n anahtarı
+ * (`office.x.y`) ve UBL / yön enum'u (`SATIS`, `incoming`). E-posta ve
+ * adresler önce çıkarılır. Bulunanlar hata iletisinde listelenir.
+ */
+export const RAW_TEXT =
+  /\b[a-z]+(?:_[a-z0-9]+)+\b|\b(?:office|common|sources|taxpayer|setup)\.[a-z_]+(?:\.[a-z_]+)*\b|\b(?:SATIS|ALIS|IADE|TEVKIFAT|ISTISNA|OZELMATRAH|IHRACKAYITLI|TEMELFATURA|TICARIFATURA|EARSIVFATURA|incoming|outgoing)\b/g;
+
+export async function expectNoRawText(target: Locator): Promise<void> {
+  const text = (await target.innerText())
+    .replace(/\S+@\S+/g, " ")
+    .replace(/https?:\/\/\S+/g, " ");
+  expect(text.match(RAW_TEXT) ?? [], text).toEqual([]);
 }
 
 /**

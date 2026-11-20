@@ -23,6 +23,7 @@ import { ChangeRequestsPanel } from "./change-requests-panel";
 import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
+import { LockedPeriodNote } from "./locked-period-note";
 import { useOfficePeriod } from "../period";
 import type { PeriodMatrixRow } from "../services/periods.service";
 
@@ -380,6 +381,9 @@ export function EngagementLayout({
         </div>
         <EngagementTabs engagement={engagement} />
         <PeriodStrip cells={cells} focus={period ?? focus} onPick={setPeriod} />
+        {period && cells.find((c) => c.period === period)?.locked ? (
+          <LockedPeriodNote engagement={engagement} period={period} />
+        ) : null}
         <ChangeRequestsPanel
           engagement={engagement}
           open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}

@@ -140,7 +140,15 @@ export function useJournalActions(slug: string, engagement: string) {
     }),
     approve: useMutation({
       mutationFn: (
-        v: string | { draft: string; confirm?: boolean; note?: string },
+        v:
+          | string
+          | {
+              draft: string;
+              confirm?: boolean;
+              note?: string;
+              sendDuplicate?: boolean;
+              reason?: string;
+            },
       ) =>
         typeof v === "string"
           ? journalService.approve(slug, engagement, v)

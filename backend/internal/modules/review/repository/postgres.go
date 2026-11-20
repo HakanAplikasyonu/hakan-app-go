@@ -195,6 +195,22 @@ func (p *Postgres) List(ctx context.Context, f usecase.Filter) ([]usecase.ListRo
 	return out, total, nil
 }
 
+// ByEngagement implements usecase.Store (#710).
+func (p *Postgres) ByEngagement(ctx context.Context, f usecase.Filter) ([]usecase.EngagementCount, error) {
+	rows, err := p.q.CountTenantSuggestionsByEngagement(ctx, db.CountTenantSuggestionsByEngagementParams{
+		OrganizationID: f.OrganizationID, AllEngagements: f.AllEngagements, UserID: f.UserID,
+		Status: optText(f.Status), Kind: optText(f.Kind), Period: optText(f.Period),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("count suggestions by engagement: %w", err)
+	}
+	out := make([]usecase.EngagementCount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.EngagementCount{EngagementUUID: r.EngagementUuid, Total: r.Total, Oldest: r.Oldest.Time})
+	}
+	return out, nil
+}
+
 // Settings implements usecase.Store.
 func (p *Postgres) Settings(ctx context.Context, organizationID, engagementID int64) ([]usecase.SettingRow, error) {
 	eng := pgtype.Int8{}
