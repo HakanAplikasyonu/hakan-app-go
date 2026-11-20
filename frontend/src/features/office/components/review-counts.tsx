@@ -10,7 +10,13 @@ type Scope = { engagement?: string; kind?: string; period?: string };
 
 /** Yalnızca toplam için tek satırlık sayım sorgusu. */
 function useStatusTotal(scope: Scope, status: ReviewSuggestionStatus) {
-  const q = useReviewSuggestions({ ...scope, status, limit: 1, offset: 0 });
+  // Sessiz: kuyruk yüklenemezse sayım "…" yazar; dört ayrı hata bildirimi
+  // açılmaz (kuyruğun kendi hata durumu yeterli).
+  const q = useReviewSuggestions(
+    { ...scope, status, limit: 1, offset: 0 },
+    true,
+    true,
+  );
   return q.data?.total;
 }
 
