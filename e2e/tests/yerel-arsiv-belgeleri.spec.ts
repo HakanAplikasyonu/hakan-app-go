@@ -116,8 +116,8 @@ test.describe("belge arşivi (#669 I)", () => {
     await expect(confirm).toContainText("Faaliyet belgesi");
     await confirm.getByRole("button", { name: "Sil", exact: true }).click();
     await expect(faaliyet).toHaveCount(0);
-    const after = await list();
-    expect(after.items.map((d) => d.title)).toEqual(["Vergi levhası"]);
+    // Satır silme isteği bitmeden kaybolabilir; veritabanı beklenerek denetlenir.
+    await expect.poll(async () => (await list()).items.map((d) => d.title)).toEqual(["Vergi levhası"]);
   });
 
   test("uç: aynı dosya ikinci kez reddedilir, PDF olmayan dosya 415", async () => {
