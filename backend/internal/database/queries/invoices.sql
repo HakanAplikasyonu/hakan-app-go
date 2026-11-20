@@ -151,6 +151,14 @@ WHERE taxpayer_id = @taxpayer_id AND id = @id;
 -- boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 UPDATE invoices SET
     exchange_rate = @rate::numeric,
-    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * @rate::numeric, 2))
+    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * @rate::numeric, 2)),
+    exchange_rate_set_by = sqlc.narg(set_by), exchange_rate_set_at = NOW()
 WHERE taxpayer_id = @taxpayer_id AND id = @id
   AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0);
+
+-- name: InvoiceExchangeRateEntry :one
+-- Elle girilen kurun kim tarafından ne zaman girildiği (#571).
+SELECT i.exchange_rate_set_at, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.name, u.surname)), ''), u.email::text, '')::text AS set_by_name
+FROM invoices i
+LEFT JOIN users u ON u.id = i.exchange_rate_set_by
+WHERE i.taxpayer_id = @taxpayer_id AND i.id = @id AND i.exchange_rate_set_at IS NOT NULL;

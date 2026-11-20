@@ -22,6 +22,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/view"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
@@ -118,7 +119,7 @@ func (h *Handler) setExchangeRate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	n, err := h.q.SetMissingInvoiceExchangeRate(r.Context(), db.SetMissingInvoiceExchangeRateParams{
-		Rate: repository.Num(rate), TaxpayerID: s.TaxpayerID, ID: inv.ID,
+		Rate: repository.Num(rate), TaxpayerID: s.TaxpayerID, ID: inv.ID, SetBy: actorOf(r),
 	})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not set the exchange rate")
@@ -223,6 +224,22 @@ type Detail struct {
 	view.Detail
 	HasUBL   bool      `json:"has_ubl"`
 	Warnings []Warning `json:"warnings"`
+	// ExchangeRateEntry: who entered the missing rate in the office, and
+	// when (#571); null when the rate came with the source.
+	ExchangeRateEntry *RateEntry `json:"exchange_rate_entry"`
+}
+
+// RateEntry is an office-entered exchange rate's author.
+type RateEntry struct {
+	SetByName string    `json:"set_by_name"`
+	SetAt     time.Time `json:"set_at"`
+}
+
+func actorOf(r *http.Request) pgtype.Int8 {
+	if p, ok := authctx.PrincipalFrom(r.Context()); ok && p.UserInternal > 0 {
+		return pgtype.Int8{Int64: p.UserInternal, Valid: true}
+	}
+	return pgtype.Int8{}
 }
 
 func (h *Handler) load(w http.ResponseWriter, r *http.Request) (db.Invoice, bool) {
@@ -263,6 +280,12 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := Detail{Detail: d, HasUBL: inv.UblAttachmentID.Valid && h.download != nil, Warnings: make([]Warning, 0, len(ws))}
+	if e, err := h.q.InvoiceExchangeRateEntry(r.Context(), db.InvoiceExchangeRateEntryParams{TaxpayerID: s.TaxpayerID, ID: inv.ID}); err == nil {
+		out.ExchangeRateEntry = &RateEntry{SetByName: e.SetByName, SetAt: e.ExchangeRateSetAt.Time}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		response.InternalErr(w, r, err, "could not load the exchange rate entry")
+		return
+	}
 	for _, x := range ws {
 		out.Warnings = append(out.Warnings, Warning{
 			UUID: x.Uuid, EntityType: x.EntityType, Code: x.Code, Severity: x.Severity, Status: x.Status,

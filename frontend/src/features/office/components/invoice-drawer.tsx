@@ -364,6 +364,28 @@ export function InvoiceDrawer({
                 />
               ) : null}
 
+              {d.exchange_rate_entry ? (
+                <p className="text-text-2 text-sm">
+                  {t("office.drawer.fx_entered", {
+                    currency: d.currency,
+                    rate: Number(d.exchange_rate ?? 0).toLocaleString(
+                      locale === "tr" ? "tr-TR" : "en-GB",
+                      { maximumFractionDigits: 6 },
+                    ),
+                    name:
+                      d.exchange_rate_entry.set_by_name ||
+                      t("office.drawer.fx_entered_unknown"),
+                    date: new Date(
+                      d.exchange_rate_entry.set_at,
+                    ).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  })}
+                </p>
+              ) : null}
+
               <section aria-labelledby="drawer-waterfall">
                 <h3
                   id="drawer-waterfall"

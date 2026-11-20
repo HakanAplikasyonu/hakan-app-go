@@ -1156,6 +1156,8 @@ type Invoice struct {
 	DeletedAtSource            pgtype.Timestamptz `json:"deleted_at_source"`
 	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	ExchangeRateSetBy          pgtype.Int8        `json:"exchange_rate_set_by"`
+	ExchangeRateSetAt          pgtype.Timestamptz `json:"exchange_rate_set_at"`
 }
 
 type InvoiceItem struct {

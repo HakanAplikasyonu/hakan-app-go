@@ -17566,6 +17566,13 @@ export interface components {
             /** @description A UBL-TR XML is stored (GET .../ubl) */
             has_ubl: boolean;
             warnings: components["schemas"]["OfficeInvoiceWarning"][];
+            /** @description Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source. */
+            exchange_rate_entry: null | {
+                /** @description Empty when the user was deleted */
+                set_by_name: string;
+                /** Format: date-time */
+                set_at: string;
+            };
         };
         EnvelopeOfficeInvoicePage: {
             /** @enum {boolean} */

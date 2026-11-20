@@ -678,6 +678,8 @@ type Querier interface {
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	// Elle girilen kurun kim tarafından ne zaman girildiği (#571).
+	InvoiceExchangeRateEntry(ctx context.Context, arg InvoiceExchangeRateEntryParams) (InvoiceExchangeRateEntryRow, error)
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)

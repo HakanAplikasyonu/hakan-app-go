@@ -729,6 +729,8 @@
   "drawer.fx_save": "Kuru kaydet",
   "drawer.fx_saved": "Kur kaydedildi; KDV ve TL tutarı güncellendi.",
   "drawer.fx_error": "Kur kaydedilemedi.",
+  "drawer.fx_entered": "{{currency}} kuru {{rate}} TL: ofiste {{name}} girdi ({{date}}).",
+  "drawer.fx_entered_unknown": "silinmiş bir kullanıcı",
   "drawer.loading": "Fatura yükleniyor",
   "drawer.preview": "Önizleme",
   "drawer.preview_of": "{{number}} faturasını çekmecede aç",

@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
@@ -242,14 +243,36 @@ func TestOfficeInvoiceCursorPagination(t *testing.T) {
 func TestOfficeSetsMissingExchangeRate(t *testing.T) {
 	e := setup(t)
 	ctx := context.Background()
+	uid := e.d.User(t)
+	if _, err := e.d.Pool.Exec(ctx, `UPDATE users SET name = 'Ayşe', surname = 'Kurcu' WHERE id = $1`, uid); err != nil {
+		t.Fatal(err)
+	}
+	req := func(method, body string) *http.Request {
+		r := httptest.NewRequest(method, "/x", strings.NewReader(body))
+		r.SetPathValue("invoiceUuid", e.inv)
+		ctx := authctx.WithPrincipal(engagementctx.WithScope(r.Context(), e.scope), authctx.Principal{UserInternal: uid})
+		return r.WithContext(ctx)
+	}
 	put := func(body string) *httptest.ResponseRecorder {
 		t.Helper()
-		r := httptest.NewRequest(http.MethodPut, "/x", strings.NewReader(body))
-		r.SetPathValue("invoiceUuid", e.inv)
-		r = r.WithContext(engagementctx.WithScope(r.Context(), e.scope))
 		w := httptest.NewRecorder()
-		e.h.setExchangeRate(w, r)
+		e.h.setExchangeRate(w, req(http.MethodPut, body))
 		return w
+	}
+	entry := func() *RateEntry {
+		t.Helper()
+		w := httptest.NewRecorder()
+		e.h.get(w, req(http.MethodGet, ""))
+		var env struct {
+			Data Detail `json:"data"`
+		}
+		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &env) != nil {
+			t.Fatalf("get: %d %s", w.Code, w.Body)
+		}
+		return env.Data.ExchangeRateEntry
+	}
+	if en := entry(); en != nil {
+		t.Fatalf("source invoice has a rate entry %+v", en)
 	}
 	if w := put(`{"rate":"38,5"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "NOT_FOREIGN_CURRENCY") {
 		t.Fatalf("TL invoice: %d %s", w.Code, w.Body)
@@ -292,5 +315,9 @@ func TestOfficeSetsMissingExchangeRate(t *testing.T) {
 	}
 	if w := put(`{"rate":"40"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "EXCHANGE_RATE_SET") {
 		t.Fatalf("second set: %d %s", w.Code, w.Body)
+	}
+	// Kuru kim, ne zaman girdi (#571).
+	if en := entry(); en == nil || en.SetByName != "Ayşe Kurcu" || en.SetAt.IsZero() {
+		t.Fatalf("rate entry %+v", en)
 	}
 }
