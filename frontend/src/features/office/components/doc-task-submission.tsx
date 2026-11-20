@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Paperclip } from "lucide-react";
+import { Check, Paperclip, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,14 @@ import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
+import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { downloadFile } from "../services/download";
+
+/** Yeniden istenen belgenin son günü: bugünden bu kadar gün sonra. */
+const REREQUEST_DUE_DAYS = 3;
 
 type TaskUpload = { uuid: string; file_name: string | null; kind: string };
 type TaskDetail = { uuid: string; status: string; uploads?: TaskUpload[] };
@@ -34,6 +38,7 @@ export function DocTaskSubmission({
   const { slug } = useTenant();
   const { can } = usePermission();
   const qc = useQueryClient();
+  const { prompt } = useDialogs();
   const base = `/v1/tenant/engagements/${encodeURIComponent(engagement)}/document-tasks/${encodeURIComponent(task)}`;
   const q = useQuery({
     queryKey: [
@@ -58,6 +63,26 @@ export function DocTaskSubmission({
     onError: (e) =>
       toast.error(
         isApiError(e) ? e.message : t("office.engagement.task_complete_failed"),
+      ),
+  });
+  // Gelen belge yanlış ya da eksikse (#571): neyin eksik olduğu yazılır,
+  // istek yeniden açılır ve mükellefe yeniden bildirilir.
+  const rerequest = useMutation({
+    mutationFn: (note: string) =>
+      tenantRequest<TaskDetail>(slug, "POST", `${base}/rerequest`, {
+        body: { note, due_days: REREQUEST_DUE_DAYS },
+      }),
+    onSuccess: () => {
+      toast.success(t("office.engagement.task_rerequested"));
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase(), "doc-tasks", engagement],
+      });
+    },
+    onError: (e) =>
+      toast.error(
+        isApiError(e)
+          ? e.message
+          : t("office.engagement.task_rerequest_failed"),
       ),
   });
   const open = useMutation({
@@ -95,15 +120,34 @@ export function DocTaskSubmission({
         </Button>
       ))}
       {can(permissions.tenant.docTasks.write) ? (
-        <Button
-          size="sm"
-          className="h-7 px-2 text-xs"
-          disabled={complete.isPending}
-          onClick={() => complete.mutate()}
-        >
-          <Check className="size-3.5" aria-hidden />
-          {t("office.engagement.task_complete")}
-        </Button>
+        <>
+          <Button
+            size="sm"
+            className="h-7 px-2 text-xs"
+            disabled={complete.isPending || rerequest.isPending}
+            onClick={() => complete.mutate()}
+          >
+            <Check className="size-3.5" aria-hidden />
+            {t("office.engagement.task_complete")}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            disabled={complete.isPending || rerequest.isPending}
+            onClick={async () => {
+              const note = await prompt({
+                title: t("office.engagement.task_rerequest"),
+                description: t("office.engagement.task_rerequest_prompt"),
+                confirmLabel: t("office.engagement.task_rerequest"),
+              });
+              if (note?.trim()) rerequest.mutate(note.trim());
+            }}
+          >
+            <RotateCcw className="size-3.5" aria-hidden />
+            {t("office.engagement.task_rerequest")}
+          </Button>
+        </>
       ) : null}
     </div>
   );
