@@ -10,6 +10,7 @@ import {
   type LegalKind,
   type LegalLanguage,
 } from "@/features/legal/services/legal.service";
+import { queryOrNull } from "@/lib/query/or-null";
 import { useAppMutation } from "@/lib/query/mutation";
 import { useLocale } from "@/providers/locale-provider";
 import { appToast } from "@/providers/toast-provider";
@@ -61,7 +62,9 @@ export function useOfficeDpa(slug: string, enabled = true) {
   const { locale } = useLocale();
   return useQuery({
     queryKey: legalKeys.officeDpa(slug, locale),
-    queryFn: () => officeDpaService.get(slug, locale),
+    // Sözleşme henüz yayımlanmadıysa uç 404 döner: hata değil, boş durum
+    // (#639). `null` önbelleğe alınır, kart "yayımlanmadı" der.
+    queryFn: () => queryOrNull(() => officeDpaService.get(slug, locale)),
     enabled,
     retry: false,
     meta: { silent: true },

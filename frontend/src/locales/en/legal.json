@@ -30,6 +30,7 @@
   "dpa_title": "Data Processing Agreement",
   "dpa_description": "Your office is the data controller for your taxpayers' data; the platform processes it on your office's behalf and instructions (KVKK art. 12/2). This relationship is governed by the Data Processing Agreement.",
   "dpa_status_none": "Not accepted yet",
+  "dpa_not_published": "The agreement has not been published yet. You can accept it here once it is.",
   "dpa_status_accepted": "Version {{version}} accepted",
   "dpa_status_new_version": "New version available (version {{version}})",
   "dpa_accepted_by": "Version {{version}} accepted by {{user}} on {{date}}.",
