@@ -75,6 +75,11 @@ export class Api {
     return this.ctx.post(path, { headers: this.headers(), multipart: { file } });
   }
 
+  /** Çok parçalı yükleme, alan adı `field` (ör. fiş fotoğrafı: "image"). */
+  async uploadField(path: string, field: string, file: { name: string; mimeType: string; buffer: Buffer }) {
+    return this.ctx.post(path, { headers: this.headers(), multipart: { [field]: file } });
+  }
+
   /** `data` of a 2xx JSON envelope; fails the test otherwise. */
   async json<T = any>(res: Awaited<ReturnType<APIRequestContext["get"]>>): Promise<T> {
     const text = await res.text();
