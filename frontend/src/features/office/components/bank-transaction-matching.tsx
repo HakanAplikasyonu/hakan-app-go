@@ -290,6 +290,11 @@ export function BankTransactionMatchingPanel({
               </Button>
             )}
           </div>
+          {canWrite ? (
+            <p className="text-text-2 text-xs">
+              {t("office.bank.matching.unmatch_hint")}
+            </p>
+          ) : null}
           {v.matches.length > 0 ? (
             <ul className="divide-y rounded-md border text-sm">
               {v.matches.map((m) => (
@@ -310,6 +315,7 @@ export function BankTransactionMatchingPanel({
                   <Badge variant="secondary">
                     {t(`office.bank.matching.method_${m.method}`)}
                   </Badge>
+                  <MatchReason parts={m.parts} />
                 </li>
               ))}
             </ul>
@@ -924,17 +930,51 @@ function CandidateList({
             <Money value={c.open_amount} currency={currency} />
           </span>
           {c.score > 0 ? (
-            <Badge
-              variant={c.score >= 80 ? "default" : "outline"}
-              title={Object.entries(c.parts)
-                .map(([k, n]) => `${k}: ${n}`)
-                .join(", ")}
-            >
+            <Badge variant={c.score >= 80 ? "default" : "outline"}>
               {t("office.bank.matching.score", { score: String(c.score) })}
             </Badge>
           ) : null}
+          <MatchReason parts={c.parts} />
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Score parts in the order they weigh (21 §6.2). */
+const REASONS = [
+  "tax_id",
+  "iban",
+  "invoice_number",
+  "amount_exact",
+  "amount_less_fee",
+  "name",
+  "date",
+] as const;
+const RELATED = ["tax_id", "iban", "invoice_number", "name"];
+
+/**
+ * "Neden önerildi" (#710): eşleştiricinin puan parçaları Türkçe cümle
+ * olarak görünür. Yalnız tutarı tutan aday ayrıca uyarılır. Elle
+ * eşleşmede parça yoktur, satır çizilmez.
+ */
+function MatchReason({ parts }: { parts: Record<string, number> }) {
+  const { t } = useLocale();
+  const keys = REASONS.filter((k) => k in parts);
+  if (keys.length === 0) return null;
+  const related = keys.some((k) => RELATED.includes(k));
+  return (
+    <p className="text-text-2 w-full text-xs" data-testid="bank-match-reason">
+      {t("office.bank.matching.why", {
+        reasons: keys
+          .map((k) => t(`office.bank.matching.reason_${k}`))
+          .join(", "),
+      })}
+      {related ? null : (
+        <span className="text-warn ms-1">
+          {t("office.bank.matching.why_amount_only")}
+        </span>
+      )}
+    </p>
   );
 }

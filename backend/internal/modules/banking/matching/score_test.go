@@ -157,3 +157,21 @@ func TestControls(t *testing.T) {
 		t.Error("no rows, no findings")
 	}
 }
+
+// #710: a same-amount invoice of another company is not suggested; on the
+// movement's screen only related or same-amount candidates are shown.
+func TestUnrelatedNotSuggested(t *testing.T) {
+	m := Movement{Date: on(10), Direction: banking.DirIn, Amount: d("12000"), TaxID: "9100000021"}
+	other := Candidate{ID: 1, IssueDate: on(10), Open: d("12000"), TaxID: "9999999999"} // 40 + 10 = 50
+	dd := Decide(m, []Candidate{other}, opt)
+	if dd.Outcome != OutcomeNone {
+		t.Fatalf("amount + date only → none, got %s", dd.Outcome)
+	}
+	if !Relevant(dd.Ranked[0]) || Related(dd.Ranked[0]) {
+		t.Fatalf("same amount: relevant but not related, parts %v", dd.Ranked[0].Parts)
+	}
+	dateOnly := ScoreCandidate(m, Candidate{IssueDate: on(10), Open: d("99")}, opt)
+	if Relevant(dateOnly) {
+		t.Fatalf("date window only is not shown, parts %v", dateOnly.Parts)
+	}
+}
