@@ -149,6 +149,9 @@ type bankTxn struct {
 	match      string // matched / unmatched / suggested
 	balance    kurus
 	period     string
+	// fx: kur farkı of a foreign-currency collection (#568), collected TL
+	// minus the invoice's TL amount; booked to 646 (gain) or 656 (loss).
+	fx kurus
 }
 
 type jLine struct {
@@ -815,6 +818,19 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 		if d.dir == "outgoing" {
 			kind := []string{"EFT", "FAST", "HAVALE"}[r.IntN(3)]
 			who := strings.ToUpper(slugASCII(cp.Name))
+			if d.currency != "TRY" {
+				// Döviz tahsilatı: tahsil günündeki kurla TL'ye çevrilir; fatura
+				// kuruyla arasındaki fark kur farkıdır (646 / 656).
+				rate := usdTRY(d.paidOn)
+				if d.currency == "EUR" {
+					rate = math.Round(rate*1.08*10000) / 10000
+				}
+				got := kurus(math.Round(float64(d.payable()) * rate))
+				add(bankTxn{date: d.paidOn, dir: "A", amount: got, cpName: cp.Name, cpIBAN: cp.IBAN, cpTaxID: cp.TaxID,
+					desc: fmt.Sprintf("DOVIZ TAHSILAT %d.%02d %s GONDEREN: %s FT %s KUR %.4f", d.payable()/100, d.payable()%100, d.currency, who, d.number, rate),
+					kind: "YABANCI_PARA_HAVALE", kindDetail: "customer_collection", account: "120.01", invoice: i, fx: got - amt})
+				continue
+			}
 			switch u := rx.IntN(20); {
 			case u == 0 && amt >= 500000:
 				// Kısmi ödeme: müşteri faturayı iki parçada öder.
@@ -1166,7 +1182,13 @@ func (m *clientModel) buildVouchers(w *bigWorld, tax taxDue) {
 				continue
 			}
 			if t.dir == "A" {
-				bl = append(bl, jLine{account: "102.01", desc: t.desc, debit: t.amount}, jLine{account: t.account, desc: t.desc, credit: t.amount})
+				bl = append(bl, jLine{account: "102.01", desc: t.desc, debit: t.amount}, jLine{account: t.account, desc: t.desc, credit: t.amount - t.fx})
+				switch {
+				case t.fx > 0:
+					bl = append(bl, jLine{account: "646.01", desc: "Kur farkı " + t.desc, credit: t.fx})
+				case t.fx < 0:
+					bl = append(bl, jLine{account: "656.01", desc: "Kur farkı " + t.desc, debit: -t.fx})
+				}
 			} else {
 				bl = append(bl, jLine{account: t.account, desc: t.desc, debit: t.amount}, jLine{account: "102.01", desc: t.desc, credit: t.amount})
 			}
@@ -1230,7 +1252,7 @@ var accountNames = map[string]string{
 	"360.01": "ÖDENECEK KDV", "360.02": "ÖDENECEK GELİR VE DAMGA VERGİSİ", "361": "ÖDENECEK SOSYAL GÜVENLİK KESİNTİLERİ",
 	"361.01": "ÖDENECEK SGK PRİMLERİ", "391": "HESAPLANAN KDV", "391.01": "HESAPLANAN KDV", "500": "SERMAYE", "500.01": "SERMAYE",
 	"600": "YURTİÇİ SATIŞLAR", "600.01": "YURTİÇİ SATIŞLAR", "601": "YURTDIŞI SATIŞLAR", "601.01": "YURTDIŞI SATIŞLAR",
-	"610": "SATIŞTAN İADELER", "610.01": "SATIŞTAN İADELER", "642": "FAİZ GELİRLERİ", "642.01": "MEVDUAT FAİZ GELİRLERİ", "646": "KAMBİYO KARLARI", "646.01": "KAMBİYO KARLARI",
+	"610": "SATIŞTAN İADELER", "610.01": "SATIŞTAN İADELER", "642": "FAİZ GELİRLERİ", "642.01": "MEVDUAT FAİZ GELİRLERİ", "646": "KAMBİYO KARLARI", "646.01": "KAMBİYO KARLARI", "656": "KAMBİYO ZARARLARI", "656.01": "KAMBİYO ZARARLARI",
 	"679": "DİĞER OLAĞANDIŞI GELİR VE KARLAR", "679.01": "DİĞER OLAĞANDIŞI GELİRLER",
 	"689": "DİĞER OLAĞANDIŞI GİDER VE ZARARLAR", "689.01": "DİĞER OLAĞANDIŞI GİDERLER",
 	"740": "HİZMET ÜRETİM MALİYETİ", "740.01": "HİZMET ÜRETİM MALİYETİ", "770": "GENEL YÖNETİM GİDERLERİ",

@@ -210,6 +210,8 @@ func checkBigRealLife(t *testing.T, d *testdb.DB) {
 		min  int
 	}{
 		{"partial payments", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND description LIKE '%KISMI ODEME'`, 1},
+		{"foreign currency collections", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND kind = 'YABANCI_PARA_HAVALE'`, 1},
+		{"kur farkı lines", `SELECT count(*) FROM journal_draft_lines WHERE engagement_id IN (` + big + `) AND account_code IN ('646.01', '656.01') AND description LIKE 'Kur farkı DOVIZ%'`, 1},
 		{"own account transfers", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND kind_detail = 'own_account_transfer'`, 2},
 		{"duplicate invoices", `SELECT count(*) FROM data_warnings WHERE engagement_id IN (` + big + `) AND code = 'POSSIBLE_DUPLICATE'`, 1},
 		{"drafts on a parent account", `SELECT count(*) FROM journal_draft_lines WHERE engagement_id IN (` + big + `) AND account_code ~ '^7[0-9]{2}$'`, 1},
