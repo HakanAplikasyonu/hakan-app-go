@@ -119,6 +119,14 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, f usecase.Filter)
 		f.Status = st
 	}
 	f.Kind = q.Get("kind")
+	if v := q.Get("invoice"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			response.BadRequest(w, r, response.CodeValidationError, "invoice must be a uuid")
+			return
+		}
+		f.Invoice = id.String()
+	}
 	if v := q.Get("rule_candidate"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {

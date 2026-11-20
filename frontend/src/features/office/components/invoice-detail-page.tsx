@@ -2,7 +2,7 @@
 
 import { ArrowLeft, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo } from "react";
 
 import { EmptyState } from "@/components/common/empty-state";
@@ -32,6 +32,7 @@ import type { InvoiceLine } from "../types";
 import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
+import { InvoiceAccountCodes } from "./invoice-account-codes";
 import { InvoicePreview } from "./invoice-preview";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { RelatedRecordsPanel } from "./related-records";
@@ -77,7 +78,6 @@ function InvoiceDetailInner({ id }: { id: string }) {
   const taxpayer = options.find((o) => o.engagement === engagement);
   const warningText = useWarningText();
   const { can } = usePermission();
-  const router = useRouter();
   const suggest = useSuggestInvoiceAccounts();
   const suggestError = useDecisionErrorText();
   // Geri dönüş listenin süzgeç ve sayfa durumunu korur (URL parametreleri).
@@ -146,23 +146,14 @@ function InvoiceDetailInner({ id }: { id: string }) {
                           toast.info(t("office.suggest_accounts_none"));
                           return;
                         }
+                        // Öneriler bu sayfada, Hesap kodları bölümünde
+                        // (#669 F): kullanıcı kuyruğa gönderilmez.
                         toast.success(
                           t("office.suggest_accounts_done", { count: n }),
-                          {
-                            action: {
-                              label: t("office.nav_review"),
-                              onClick: () =>
-                                router.push(
-                                  scope
-                                    ? routes.tenant.engagementReview(
-                                        slug,
-                                        scope,
-                                      )
-                                    : routes.tenant.review(slug),
-                                ),
-                            },
-                          },
                         );
+                        document
+                          .getElementById("hesap-kodlari")
+                          ?.scrollIntoView({ block: "start" });
                       },
                       onError: (err) => toast.error(suggestError(err)),
                     },
@@ -276,6 +267,8 @@ function InvoiceDetailInner({ id }: { id: string }) {
               emptyDescription=""
             />
           </Panel>
+
+          <InvoiceAccountCodes engagement={engagement} invoice={id} />
 
           <Panel
             title={t("office.waterfall.title")}

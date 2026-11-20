@@ -6349,6 +6349,7 @@ paths:
         - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
         - { name: kind, in: query, required: false, schema: { type: string } }
         - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
+        - { name: invoice, in: query, required: false, description: "Only suggestions read from this invoice (#669 F)", schema: { type: string, format: uuid } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
       responses:
@@ -6504,6 +6505,7 @@ paths:
         - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
         - { name: kind, in: query, required: false, schema: { type: string } }
         - { name: rule_candidate, in: query, required: false, schema: { type: boolean } }
+        - { name: invoice, in: query, required: false, description: "Only suggestions read from this invoice (#669 F)", schema: { type: string, format: uuid } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
       responses:

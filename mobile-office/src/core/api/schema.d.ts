@@ -28161,6 +28161,8 @@ export interface operations {
                 status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
                 kind?: string;
                 rule_candidate?: boolean;
+                /** @description Only suggestions read from this invoice (#669 F) */
+                invoice?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -28371,6 +28373,8 @@ export interface operations {
                 status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
                 kind?: string;
                 rule_candidate?: boolean;
+                /** @description Only suggestions read from this invoice (#669 F) */
+                invoice?: string;
                 limit?: number;
                 offset?: number;
             };
