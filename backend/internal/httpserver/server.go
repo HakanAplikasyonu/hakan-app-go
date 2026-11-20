@@ -635,13 +635,14 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 	// Banka hareketi → mizan hesabı (#383): takma ad hafızası, hesap önerisi,
 	// inceleme ve onaylananlardan yevmiye taslağı (Luca / Zirve çıktısına girer).
+	bankFlow := bankposting.NewWorkflow(deps.DB, reviewSvc, journalsmodule.New(deps.DB, deps.Storage))
 	bankposting.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		bankposting.NewHandler(bankposting.NewService(deps.DB),
-			bankposting.NewWorkflow(deps.DB, reviewSvc, journalsmodule.New(deps.DB, deps.Storage))))
-	// Banka–fatura eşleme ve BNK kontrolleri (#21).
+		bankposting.NewHandler(bankposting.NewService(deps.DB), bankFlow))
+	// Banka–fatura eşleme ve BNK kontrolleri (#21); tek hareket ekranı
+	// hareketi hesaba da işler (#565).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")})))
+			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	if deps.Storage != nil {

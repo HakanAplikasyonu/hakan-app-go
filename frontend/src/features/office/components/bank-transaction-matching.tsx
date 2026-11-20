@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, Link2Off, Search } from "lucide-react";
+import { BookOpenCheck, Link2, Link2Off, Search } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useState } from "react";
 import { toast } from "sonner";
@@ -17,9 +17,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { ACCOUNT_CODE_RE, useAccountPlanAccounts } from "../hooks/use-review";
 import {
   bankMatchingKeys,
   bankMatchingService,
@@ -100,7 +102,31 @@ export function BankTransactionMatchingPanel({
     onSuccess: (v) => settle(v, t("office.bank.matching.unmatched")),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
   });
-  const busy = match.isPending || unmatch.isPending;
+  // Hesaba işle (#565): fatura yoksa cari, avans, gider ya da vergi hesabı.
+  const book = useMutation({
+    mutationFn: (a: { code: string; name: string }) =>
+      bankMatchingService.setAccount(
+        slug,
+        engagement,
+        transaction,
+        a.code,
+        a.name,
+      ),
+    onSuccess: (v) => {
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase(), "bank-postings"],
+      });
+      settle(
+        v,
+        t("office.bank.matching.account_saved", {
+          code: v.posting?.account_code ?? "",
+        }),
+      );
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.bank.matching.account_failed"))),
+  });
+  const busy = match.isPending || unmatch.isPending || book.isPending;
   // Elle arama (#565): aday penceresinin dışındaki faturalar.
   const search = useQuery({
     queryKey: bankMatchingKeys.search(slug, engagement, transaction, deferred),
@@ -146,7 +172,15 @@ export function BankTransactionMatchingPanel({
           <dt className="text-muted-foreground">
             {t("office.bank.matching.counterparty")}
           </dt>
-          <dd>{v.counterparty_name ?? "—"}</dd>
+          <dd>
+            {v.counterparty_name ?? "—"}
+            {v.counterparty_from_description ? (
+              <span className="text-muted-foreground text-xs">
+                {" "}
+                {t("office.bank.matching.counterparty_guessed")}
+              </span>
+            ) : null}
+          </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">
@@ -295,7 +329,166 @@ export function BankTransactionMatchingPanel({
           ) : null}
         </section>
       )}
+
+      <AccountSection
+        engagement={engagement}
+        posting={v.posting}
+        canWrite={canWrite}
+        busy={busy}
+        onBook={(code, name) => book.mutate({ code, name })}
+      />
     </div>
+  );
+}
+
+/**
+ * Hareketin mizan hesabı (#565). Fatura yoksa ya da hareket fatura
+ * kapatmıyorsa (maaş, vergi, kira, virman, banka masrafı) müşavir hareketi
+ * buradan plandaki bir hesaba işler; fişe girmiş hareket değiştirilmez.
+ */
+function AccountSection({
+  engagement,
+  posting,
+  canWrite,
+  busy,
+  onBook,
+}: {
+  engagement: string;
+  posting: BankTransactionMatching["posting"];
+  canWrite: boolean;
+  busy: boolean;
+  onBook: (code: string, name: string) => void;
+}) {
+  const { t } = useLocale();
+  const [term, setTerm] = useState("");
+  const q = useDeferredValue(term.trim());
+  const plan = useAccountPlanAccounts(engagement, q, canWrite && q.length >= 2);
+  const items = q.length >= 2 ? (plan.data?.items ?? []) : [];
+  const drafted = posting?.status === "drafted";
+  // Planda olmayan ama biçimi doğru kod da yazılabilir (alt hesap açılacaksa).
+  const custom = ACCOUNT_CODE_RE.test(q) && !items.some((a) => a.code === q);
+  const book = (code: string, name: string) => {
+    onBook(code, name);
+    setTerm("");
+  };
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-account">
+      <h3 className="text-sm font-medium">
+        {t("office.bank.matching.account_title")}
+      </h3>
+      {posting ? (
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          <Figure className="font-semibold">{posting.account_code}</Figure>
+          <span>{posting.account_name}</span>
+          <Badge
+            variant={posting.status === "suggested" ? "outline" : "default"}
+          >
+            {t(`office.bank.matching.account_status_${posting.status}`)}
+          </Badge>
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          {t("office.bank.matching.account_none")}
+        </p>
+      )}
+      {drafted ? (
+        <p className="text-muted-foreground text-xs">
+          {t("office.bank.matching.account_drafted_hint")}
+        </p>
+      ) : canWrite ? (
+        <div className="space-y-2">
+          <InputGroup className="max-w-md">
+            <InputGroupAddon>
+              <Search className="size-4" aria-hidden />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="search"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder={t("office.bank.matching.account_search")}
+              aria-label={t("office.bank.matching.account_search")}
+            />
+          </InputGroup>
+          {q.length < 2 ? (
+            <p className="text-muted-foreground text-xs">
+              {t("office.bank.matching.account_hint")}
+            </p>
+          ) : plan.isLoading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : items.length === 0 && !custom ? (
+            <p className="text-muted-foreground text-sm">
+              {t("office.bank.matching.account_empty")}
+            </p>
+          ) : (
+            <ul className="divide-y rounded-md border text-sm">
+              {custom ? (
+                <AccountRow
+                  code={q}
+                  name={t("office.bank.matching.account_custom")}
+                  disabled={busy}
+                  onBook={() => book(q, "")}
+                />
+              ) : null}
+              {items.map((a) => (
+                <AccountRow
+                  key={a.code}
+                  code={a.code}
+                  name={a.name}
+                  parent={!a.is_leaf}
+                  disabled={busy}
+                  onBook={() => book(a.code, a.name)}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function AccountRow({
+  code,
+  name,
+  parent,
+  disabled,
+  onBook,
+}: {
+  code: string;
+  name: string;
+  /** Ana hesap: altında alt hesap var, fişe alt hesap yazılır. */
+  parent?: boolean;
+  disabled: boolean;
+  onBook: () => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <li className="flex flex-wrap items-center gap-3 px-3 py-2">
+      <Figure
+        className={cn("w-28 shrink-0 font-semibold", parent && "opacity-60")}
+      >
+        {code}
+      </Figure>
+      <span className={cn("min-w-0 flex-1 truncate", parent && "opacity-60")}>
+        {name}
+      </span>
+      {parent ? (
+        <span className="text-muted-foreground text-xs">
+          {t("office.bank.matching.account_parent")}
+        </span>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={disabled}
+          onClick={onBook}
+          aria-label={t("office.bank.matching.account_book_aria", { code })}
+        >
+          <BookOpenCheck className="size-4" aria-hidden />
+          {t("office.bank.matching.account_book")}
+        </Button>
+      )}
+    </li>
   );
 }
 

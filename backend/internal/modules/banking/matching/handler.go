@@ -9,6 +9,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
+	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -45,6 +47,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+tx+"/invoice-search", middleware.Chain(http.HandlerFunc(h.search), authn, org, read, eng))
 	mux.Handle("PUT "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.match), authn, org, write, eng))
 	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
+	// Book the movement to an account from the same screen (#565).
+	mux.Handle("PUT "+tx+"/account", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
 }
 
 func subjectOf(r *http.Request) Subject {
@@ -105,6 +109,30 @@ func (h *Handler) unmatch(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
+type accountBody struct {
+	AccountCode string `json:"account_code"`
+	AccountName string `json:"account_name"`
+}
+
+// setAccount: PUT .../account (#565).
+func (h *Handler) setAccount(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	var in accountBody
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil || in.AccountCode == "" {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "account_code is required")
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	v, err := h.svc.SetAccount(r.Context(), subjectOf(r), id, p.UserInternal, in.AccountCode, in.AccountName)
+	h.reply(w, r, v, err)
+}
+
 func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error) {
 	switch {
 	case err == nil:
@@ -113,8 +141,14 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, ErrNotMatchable):
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
-	case errors.Is(err, ErrInvalidInvoices):
+	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, posting.ErrNotFound):
+		response.NotFound(w, r, "bank transaction not found")
+	case errors.Is(err, posting.ErrDrafted):
+		response.Conflict(w, r, "BANK_POSTING_DRAFTED", "the movement is already in a journal draft; reverse the draft first")
+	case errors.Is(err, reviewusecase.ErrState), errors.Is(err, reviewusecase.ErrNotFound):
+		response.Conflict(w, r, "SUGGESTION_STATE", "the suggestion was decided meanwhile; reload")
 	case errors.Is(err, r.Context().Err()):
 	default:
 		response.InternalErr(w, r, err, "bank matching failed")
