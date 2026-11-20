@@ -27,7 +27,7 @@ export const ACTION_PERMISSIONS: Record<CopilotAction, string[]> = {
   bank_suggest: [Permission.TenantBankWrite],
   bank_approve: [Permission.TenantBankWrite],
   bank_drafts: [Permission.TenantBankWrite, permissions.tenant.journals.write],
-  journals_approve: [permissions.tenant.journals.write],
+  journals_approve: [permissions.tenant.journals.approve],
   export_transfer: [permissions.tenant.journals.export],
   report_send: [permissions.tenant.engagements.write],
   open_documents: [],

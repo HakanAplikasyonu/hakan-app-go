@@ -7000,7 +7000,7 @@ export interface paths {
         put?: never;
         /**
          * Approve a balanced draft
-         * @description Requires `tenant.journals.write`. An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
+         * @description Requires `tenant.journals.approve` (the müşavir's final check,
          */
         post: operations["approveJournalDraft"];
         delete?: never;

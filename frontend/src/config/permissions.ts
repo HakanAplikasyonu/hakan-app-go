@@ -68,6 +68,7 @@ export const Permission = {
   TenantJournalsRead: "tenant.journals.read",
   TenantJournalsWrite: "tenant.journals.write",
   TenantJournalsExport: "tenant.journals.export",
+  TenantJournalsApprove: "tenant.journals.approve",
   /** Personel, bordro ve SGK (issue #382). */
   TenantPayrollRead: "tenant.payroll.read",
   TenantPayrollWrite: "tenant.payroll.write",
@@ -237,6 +238,7 @@ export const permissions = {
       read: Permission.TenantJournalsRead,
       write: Permission.TenantJournalsWrite,
       export: Permission.TenantJournalsExport,
+      approve: Permission.TenantJournalsApprove,
     },
     review: {
       read: Permission.TenantReviewRead,
