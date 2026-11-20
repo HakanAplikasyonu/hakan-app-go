@@ -44,8 +44,21 @@ INSERT INTO bank_transaction_matches (
 ON CONFLICT (taxpayer_id, bank_transaction_id, target_type, target_id) DO NOTHING
 RETURNING *;
 
+-- Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
+-- geri alınır (#565): prim yeniden açık borç olur.
 -- name: DeleteBankTransactionMatches :exec
-DELETE FROM bank_transaction_matches WHERE taxpayer_id = @taxpayer_id AND bank_transaction_id = @bank_transaction_id;
+WITH released AS (
+    UPDATE sgk_premiums s
+    SET paid_amount = GREATEST(s.paid_amount - m.total, 0),
+        paid_at = CASE WHEN s.paid_amount - m.total <= 0 THEN NULL ELSE s.paid_at END,
+        bank_transaction_id = CASE WHEN s.bank_transaction_id = @bank_transaction_id THEN NULL ELSE s.bank_transaction_id END
+    FROM (SELECT x.target_id, sum(x.amount) AS total FROM bank_transaction_matches x
+          WHERE x.taxpayer_id = @taxpayer_id AND x.bank_transaction_id = @bank_transaction_id AND x.target_type = 'sgk_premium'
+          GROUP BY x.target_id) m
+    WHERE s.taxpayer_id = @taxpayer_id AND s.id = m.target_id
+    RETURNING s.id
+)
+DELETE FROM bank_transaction_matches d WHERE d.taxpayer_id = @taxpayer_id AND d.bank_transaction_id = @bank_transaction_id;
 
 -- name: ListBankTransactionMatches :many
 SELECT * FROM bank_transaction_matches
@@ -244,3 +257,30 @@ WHERE f.taxpayer_id = @taxpayer_id AND f.direction = @direction::text
   AND COALESCE(f.due_date, f.transaction_date) BETWEEN @date_from::date AND @date_to::date
 ORDER BY abs(f.amount_try - @amount::numeric), f.transaction_date DESC
 LIMIT 20;
+
+-- name: ListBankTransactionSgkMatches :many
+SELECT m.amount, m.method, s.uuid AS sgk_premium_uuid, s.period, s.payable_amount
+FROM bank_transaction_matches m
+JOIN sgk_premiums s ON s.taxpayer_id = m.taxpayer_id AND s.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'sgk_premium'
+ORDER BY s.period;
+
+-- Elle bağlanabilecek SGK primleri (#565): dönem aralığında; ödenen tutar
+-- bu hareketin payı hariç (yeniden bağlama).
+-- name: ListSgkPremiumsForBankMatch :many
+SELECT s.id, s.uuid, s.period, s.payable_amount, s.due_date,
+       (s.paid_amount - COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = s.taxpayer_id AND m.target_type = 'sgk_premium' AND m.target_id = s.id
+                   AND m.bank_transaction_id = @bank_transaction_id), 0))::numeric(18,2) AS paid
+FROM sgk_premiums s
+WHERE s.taxpayer_id = @taxpayer_id AND s.payable_amount > 0
+  AND s.period >= @period_from::text AND s.period <= @period_to::text
+ORDER BY s.period DESC;
+
+-- Elle bağlanan ödeme primi öder (#565).
+-- name: AddSgkPremiumPaid :exec
+UPDATE sgk_premiums
+SET paid_amount = paid_amount + @amount::numeric,
+    paid_at = @paid_at::date,
+    bank_transaction_id = @bank_transaction_id::bigint
+WHERE taxpayer_id = @taxpayer_id AND id = @id;
