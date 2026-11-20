@@ -92,6 +92,18 @@ func TestRelatedChain(t *testing.T) {
 		VALUES ($1, $2, $3, 'account_code', 'invoice_item', $4, 'account_code', '"600.01"', 0.8, 'test', 'rule', 'R1', 'pending')`,
 		org, eng, tp, itemID)
 	must(err)
+	// Reddedilen öneri artık bağ değil (#669): listede olmamalı.
+	_, err = d.Pool.Exec(ctx, `INSERT INTO suggestions (organization_id, engagement_id, taxpayer_id, kind, target_type, target_id,
+			target_field, proposed_value, confidence, rationale, origin, rule_ref, status)
+		VALUES ($1, $2, $3, 'account_code', 'invoice_item', $4, 'vat_account_code', '"191.99"', 0.4, 'test', 'rule', 'R2', 'rejected')`,
+		org, eng, tp, itemID)
+	must(err)
+	// Onaylanmamış karşı hesap önerisi tahmindir: "possible".
+	_, err = d.Pool.Exec(ctx, `INSERT INTO bank_transaction_postings (organization_id, engagement_id, taxpayer_id, bank_transaction_id,
+			account_code, account_name, status, confidence, source)
+		VALUES ($1, $2, $3, $4, '780.01', 'BANKA MASRAFLARI', 'suggested', 0.6, 'kind_default')`,
+		org, eng, tp, btID)
+	must(err)
 
 	has := func(res Result, kind, relation, id string) bool {
 		for _, it := range res.Items {
@@ -109,13 +121,16 @@ func TestRelatedChain(t *testing.T) {
 		{"bank_transaction", "payment", btUUID.String()},
 		{"journal_draft", "journal", draftUUID.String()},
 		{"warning", "warning", warnUUID.String()},
-		{"suggestion", "review", ""},
+		{"suggestion", "possible", ""},
 	} {
 		if !has(res, want[0], want[1], want[2]) {
 			t.Errorf("invoice: missing %v in %+v", want, res.Items)
 		}
 	}
 	for _, it := range res.Items {
+		if it.Kind == "suggestion" && it.Status == "rejected" {
+			t.Errorf("rejected suggestion listed: %+v", it)
+		}
 		if it.Kind == "bank_transaction" && (it.Amount == nil || *it.Amount != "12000.00") {
 			t.Errorf("payment amount: %+v", it)
 		}
@@ -124,7 +139,7 @@ func TestRelatedChain(t *testing.T) {
 	// Banka hareketi → fatura; fiş → fatura; uyarı → fatura ve kural.
 	res, err = svc.List(ctx, sub, "bank_transaction", btUUID, all)
 	must(err)
-	if !has(res, "invoice", "payment", invUUID.String()) {
+	if !has(res, "invoice", "payment", invUUID.String()) || !has(res, "account", "possible", "") || has(res, "account", "counterparty_account", "") {
 		t.Errorf("bank: %+v", res.Items)
 	}
 	res, err = svc.List(ctx, sub, "journal_draft", draftUUID, all)

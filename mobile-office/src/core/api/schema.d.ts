@@ -20080,10 +20080,10 @@ export interface components {
              */
             uuid: string | null;
             /**
-             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and review suggestions about it.
+             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart. Rejected, reverted and superseded suggestions are not listed.
              * @enum {string}
              */
-            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account";
+            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account" | "possible";
             /** Format: date */
             date: string | null;
             /** @description Decimal; matched amount for payments, debit total for journals */
