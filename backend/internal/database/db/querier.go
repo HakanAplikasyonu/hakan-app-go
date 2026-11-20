@@ -906,10 +906,23 @@ type Querier interface {
 	ListOAuthAccountsByUserID(ctx context.Context, userID int64) ([]ListOAuthAccountsByUserIDRow, error)
 	ListOAuthAccountsForUserIDs(ctx context.Context, userIds []int64) ([]ListOAuthAccountsForUserIDsRow, error)
 	ListOAuthProviderSettings(ctx context.Context) ([]OauthProviderSetting, error)
+	// tenant-lint: org-wide ofis son aktarımlar; read_all yoksa engagement_assignments ile süzülür
+	// Ofis genelinde her çıktının son aktarımı (yeniden deneme eskisini gizler)
+	// ve aktarılan dönemin en son mizan karşılaştırması (#574). check_issues:
+	// tutmayan hesap + mizanda olmayan + kaynağı olmayan. Dönem seçmeden alınan
+	// çıktının dönemi fişlerinden okunur (en eski).
+	ListOfficeAccountingTransfers(ctx context.Context, arg ListOfficeAccountingTransfersParams) ([]ListOfficeAccountingTransfersRow, error)
 	// Müşavir mobil mükellef listesi ve ayrıntısı (issue #238). İstekler RLS
 	// kapsamında (issue #166) çalışır; süzgeçler burada da açıkça yazılır.
 	// tenant-lint: org-wide ofis mükellef listesi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeClients(ctx context.Context, arg ListOfficeClientsParams) ([]ListOfficeClientsRow, error)
+	// tenant-lint: org-wide ofis bekleyen aktarımlar; read_all yoksa engagement_assignments ile süzülür
+	// Ofis genelinde programa henüz aktarılmamış onaylı fişler (#574), mükellef
+	// ve dönem bazında: approved = onaylı, çıktısı alınmamış; in_transfer =
+	// çıktısının son aktarımı sürüyor (kuyrukta, ajanda, klasörde); failed =
+	// son aktarımı hata verdi. Yalnız indirilen ya da aktarımı iptal edilen
+	// çıktılar sayılmaz (programa elle alınmış olabilir). Eski dönem önce.
+	ListOfficePendingTransfers(ctx context.Context, arg ListOfficePendingTransfersParams) ([]ListOfficePendingTransfersRow, error)
 	// tenant-lint: org-wide ofis gönderim geçmişi; read_all yoksa engagement_assignments ile süzülür
 	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)

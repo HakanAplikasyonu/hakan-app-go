@@ -511,3 +511,226 @@ func (q *Queries) ListAccountingTransfers(ctx context.Context, arg ListAccountin
 	}
 	return items, nil
 }
+
+const listOfficeAccountingTransfers = `-- name: ListOfficeAccountingTransfers :many
+SELECT x.uuid, x.status, x.driver, x.error_message, x.completed_at, x.created_at,
+       b.uuid AS batch_uuid, b.period AS batch_period,
+       e.uuid AS engagement_uuid, t.title AS taxpayer_title,
+       (r.id IS NOT NULL)::bool AS checked,
+       r.created_at AS check_at,
+       (COALESCE((r.summary->>'differences')::int, 0)
+        + COALESCE((r.summary->>'missing_in_ledger')::int, 0)
+        + COALESCE((r.summary->>'missing_in_sources')::int, 0))::bigint AS check_issues,
+       count(*) OVER ()::bigint AS total
+FROM (
+    SELECT DISTINCT ON (a.export_batch_id) a.id, a.uuid, a.organization_id, a.engagement_id, a.export_batch_id, a.driver, a.method, a.status, a.agent_id, a.delivered_files, a.folder_label, a.error_code, a.error_message, a.requested_by, a.completed_by, a.claimed_at, a.delivered_at, a.completed_at, a.created_at, a.updated_at
+    FROM accounting_transfers a
+    WHERE a.organization_id = $1
+      AND ($2::bool OR a.engagement_id IN (
+            SELECT g.engagement_id FROM engagement_assignments g
+            WHERE g.organization_id = $1 AND g.user_id = $3))
+    ORDER BY a.export_batch_id, a.created_at DESC, a.id DESC
+) x
+JOIN (
+    SELECT eb.id, eb.engagement_id, eb.uuid,
+           COALESCE(eb.period, min(d.period))::text AS period
+    FROM export_batches eb
+    JOIN export_batch_items i ON i.engagement_id = eb.engagement_id AND i.export_batch_id = eb.id
+    JOIN journal_drafts d ON d.engagement_id = i.engagement_id AND d.id = i.journal_draft_id
+    WHERE eb.organization_id = $1
+    GROUP BY eb.id
+) b ON b.id = x.export_batch_id AND b.engagement_id = x.engagement_id
+JOIN engagements e ON e.organization_id = x.organization_id AND e.id = x.engagement_id
+JOIN taxpayers t ON t.id = e.taxpayer_id
+LEFT JOIN LATERAL (
+    SELECT rr.id, rr.created_at, rr.summary
+    FROM reconciliation_runs rr
+    WHERE rr.organization_id = x.organization_id AND rr.engagement_id = x.engagement_id
+      AND rr.period = b.period
+    ORDER BY rr.id DESC
+    LIMIT 1
+) r ON TRUE
+WHERE ($4::text IS NULL OR x.status = $4)
+ORDER BY x.created_at DESC, x.id DESC
+LIMIT $6 OFFSET $5
+`
+
+type ListOfficeAccountingTransfersParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	AllEngagements bool        `json:"all_engagements"`
+	UserID         int64       `json:"user_id"`
+	Status         pgtype.Text `json:"status"`
+	Off            int32       `json:"off"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListOfficeAccountingTransfersRow struct {
+	Uuid           uuid.UUID          `json:"uuid"`
+	Status         string             `json:"status"`
+	Driver         string             `json:"driver"`
+	ErrorMessage   pgtype.Text        `json:"error_message"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	BatchUuid      uuid.UUID          `json:"batch_uuid"`
+	BatchPeriod    string             `json:"batch_period"`
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	TaxpayerTitle  string             `json:"taxpayer_title"`
+	Checked        bool               `json:"checked"`
+	CheckAt        pgtype.Timestamptz `json:"check_at"`
+	CheckIssues    int64              `json:"check_issues"`
+	Total          int64              `json:"total"`
+}
+
+// tenant-lint: org-wide ofis son aktarımlar; read_all yoksa engagement_assignments ile süzülür
+// Ofis genelinde her çıktının son aktarımı (yeniden deneme eskisini gizler)
+// ve aktarılan dönemin en son mizan karşılaştırması (#574). check_issues:
+// tutmayan hesap + mizanda olmayan + kaynağı olmayan. Dönem seçmeden alınan
+// çıktının dönemi fişlerinden okunur (en eski).
+func (q *Queries) ListOfficeAccountingTransfers(ctx context.Context, arg ListOfficeAccountingTransfersParams) ([]ListOfficeAccountingTransfersRow, error) {
+	rows, err := q.db.Query(ctx, listOfficeAccountingTransfers,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Status,
+		arg.Off,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOfficeAccountingTransfersRow{}
+	for rows.Next() {
+		var i ListOfficeAccountingTransfersRow
+		if err := rows.Scan(
+			&i.Uuid,
+			&i.Status,
+			&i.Driver,
+			&i.ErrorMessage,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.BatchUuid,
+			&i.BatchPeriod,
+			&i.EngagementUuid,
+			&i.TaxpayerTitle,
+			&i.Checked,
+			&i.CheckAt,
+			&i.CheckIssues,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOfficePendingTransfers = `-- name: ListOfficePendingTransfers :many
+WITH visible AS (
+    SELECT e.id, e.uuid, t.title
+    FROM engagements e
+    JOIN taxpayers t ON t.id = e.taxpayer_id
+    WHERE e.organization_id = $3
+      AND ($4::bool OR e.id IN (
+            SELECT a.engagement_id FROM engagement_assignments a
+            WHERE a.organization_id = $3 AND a.user_id = $5))
+), approved AS (
+    SELECT d.engagement_id, d.period, count(*)::bigint AS n
+    FROM journal_drafts d
+    WHERE d.organization_id = $3 AND d.status = 'approved'
+      AND d.engagement_id IN (SELECT id FROM visible)
+    GROUP BY d.engagement_id, d.period
+), latest AS (
+    SELECT DISTINCT ON (x.export_batch_id) x.engagement_id, x.export_batch_id, x.status
+    FROM accounting_transfers x
+    WHERE x.organization_id = $3 AND x.engagement_id IN (SELECT id FROM visible)
+    ORDER BY x.export_batch_id, x.created_at DESC, x.id DESC
+), sent AS (
+    SELECT d.engagement_id, d.period,
+           count(*) FILTER (WHERE l.status IN ('queued', 'claimed', 'delivered'))::bigint AS in_transfer,
+           count(*) FILTER (WHERE l.status = 'failed')::bigint AS failed
+    FROM latest l
+    JOIN export_batch_items i ON i.engagement_id = l.engagement_id AND i.export_batch_id = l.export_batch_id
+    JOIN journal_drafts d ON d.engagement_id = i.engagement_id AND d.id = i.journal_draft_id
+    WHERE l.status IN ('queued', 'claimed', 'delivered', 'failed')
+      AND i.organization_id = $3 AND i.reversed_at IS NULL
+      AND d.organization_id = $3
+    GROUP BY d.engagement_id, d.period
+), keys AS (
+    SELECT engagement_id, period FROM approved
+    UNION
+    SELECT engagement_id, period FROM sent
+)
+SELECT v.uuid AS engagement_uuid, v.title AS taxpayer_title, k.period::text AS period,
+       COALESCE(a.n, 0)::bigint AS approved,
+       COALESCE(s.in_transfer, 0)::bigint AS in_transfer,
+       COALESCE(s.failed, 0)::bigint AS failed,
+       count(*) OVER ()::bigint AS total
+FROM keys k
+JOIN visible v ON v.id = k.engagement_id
+LEFT JOIN approved a ON a.engagement_id = k.engagement_id AND a.period = k.period
+LEFT JOIN sent s ON s.engagement_id = k.engagement_id AND s.period = k.period
+ORDER BY k.period, v.title, v.id
+LIMIT $2 OFFSET $1
+`
+
+type ListOfficePendingTransfersParams struct {
+	Off            int32 `json:"off"`
+	Lim            int32 `json:"lim"`
+	OrganizationID int64 `json:"organization_id"`
+	AllEngagements bool  `json:"all_engagements"`
+	UserID         int64 `json:"user_id"`
+}
+
+type ListOfficePendingTransfersRow struct {
+	EngagementUuid uuid.UUID `json:"engagement_uuid"`
+	TaxpayerTitle  string    `json:"taxpayer_title"`
+	Period         string    `json:"period"`
+	Approved       int64     `json:"approved"`
+	InTransfer     int64     `json:"in_transfer"`
+	Failed         int64     `json:"failed"`
+	Total          int64     `json:"total"`
+}
+
+// tenant-lint: org-wide ofis bekleyen aktarımlar; read_all yoksa engagement_assignments ile süzülür
+// Ofis genelinde programa henüz aktarılmamış onaylı fişler (#574), mükellef
+// ve dönem bazında: approved = onaylı, çıktısı alınmamış; in_transfer =
+// çıktısının son aktarımı sürüyor (kuyrukta, ajanda, klasörde); failed =
+// son aktarımı hata verdi. Yalnız indirilen ya da aktarımı iptal edilen
+// çıktılar sayılmaz (programa elle alınmış olabilir). Eski dönem önce.
+func (q *Queries) ListOfficePendingTransfers(ctx context.Context, arg ListOfficePendingTransfersParams) ([]ListOfficePendingTransfersRow, error) {
+	rows, err := q.db.Query(ctx, listOfficePendingTransfers,
+		arg.Off,
+		arg.Lim,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOfficePendingTransfersRow{}
+	for rows.Next() {
+		var i ListOfficePendingTransfersRow
+		if err := rows.Scan(
+			&i.EngagementUuid,
+			&i.TaxpayerTitle,
+			&i.Period,
+			&i.Approved,
+			&i.InTransfer,
+			&i.Failed,
+			&i.Total,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

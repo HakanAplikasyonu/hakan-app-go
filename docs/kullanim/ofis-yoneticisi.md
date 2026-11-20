@@ -209,6 +209,21 @@ aktarmayı programda siz yaparsınız. Bu yolun nedeni:
 Aktarıldı olarak işaretlenen bir çıktı bir daha gönderilemez. Luca aynı
 dosya iki kez yüklenince fişleri iki kez keser; bu kural bunu önler.
 
+### Ofis genelinde aktarımlar
+
+Kenar çubuğundaki **Programa aktarımlar** sayfası bütün mükellefleri tek
+yerde gösterir:
+
+- **Aktarılmayı bekleyenler:** onaylanmış ama programa ulaşmamış fişi olan
+  mükellef ve dönemler; kaç fişin çıktı beklediği, aktarımda olduğu ya da
+  aktarımının hata verdiği. Yalnız indirilen çıktılar sayılmaz.
+- **Son aktarımlar:** her çıktının son aktarımı ve programa aktarılan
+  dönemin mizan durumu: **Uyumlu**, **N hesapta fark**, **Karşılaştırılmadı**
+  ya da **Aktarımdan önce karşılaştırılmış**.
+
+Satıra tıklayınca mükellefin Fişler ekranı o dönemle açılır. Atanmadığınız
+mükellefler listede yer almaz (bütün mükellefleri görme izni yoksa).
+
 ## 8. Dönem durumu
 
 **Komuta merkezi** mükellef × dönem matrisidir: iş nerede, kimde, ne bekliyor?

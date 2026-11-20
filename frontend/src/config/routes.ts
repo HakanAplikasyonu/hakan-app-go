@@ -3,6 +3,8 @@ export const DOC_TASKS_ANCHOR = "belge-istekleri";
 /** Fişler ekranında taslak fiş kontrolü ve aktarım bölümleri (#566). */
 export const DRAFTS_ANCHOR = "taslak-fisler";
 export const EXPORT_ANCHOR = "aktarim";
+/** Fişler ekranında programa aktarım geçmişi (#574). */
+export const TRANSFERS_ANCHOR = "programa-aktarim";
 
 export const routes = {
   public: {
@@ -145,6 +147,8 @@ export const routes = {
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */
     journals: (slug: string) => `/t/${encodeURIComponent(slug)}/journals`,
+    /** Ofis geneli bekleyen ve son programa aktarımlar (#574). */
+    transfers: (slug: string) => `/t/${encodeURIComponent(slug)}/transfers`,
     /** One engagement; opens on its documents. */
     engagement: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}`,

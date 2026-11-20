@@ -32,7 +32,11 @@ import { Hint } from "@/components/ui/hint";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DRAFTS_ANCHOR, EXPORT_ANCHOR } from "@/config/routes";
+import {
+  DRAFTS_ANCHOR,
+  EXPORT_ANCHOR,
+  TRANSFERS_ANCHOR,
+} from "@/config/routes";
 import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
@@ -619,13 +623,14 @@ function JournalsInner() {
   const setPeriod = (value: string) =>
     setGlobalPeriod(isPeriod(value) ? value : ALL_PERIODS);
   const drafts = useJournalDrafts(slug, engagement, period);
-  // Sıradaki İşler'den gelen bağlantı bölüme götürür (#566): liste
+  // Sıradaki İşler'den ve ofis Aktarımlar ekranından (#574) gelen bağlantı
+  // bölüme götürür (#566): liste
   // yüklendikten sonra kaydırılır, yoksa tarayıcı boş sayfada kalır.
   const loaded = drafts.isSuccess;
   useEffect(() => {
     if (!loaded) return;
     const id = window.location.hash.slice(1);
-    if (id !== DRAFTS_ANCHOR && id !== EXPORT_ANCHOR) return;
+    if (![DRAFTS_ANCHOR, EXPORT_ANCHOR, TRANSFERS_ANCHOR].includes(id)) return;
     const el = document.getElementById(id);
     el?.scrollIntoView({ block: "start" });
     el?.focus({ preventScroll: true });

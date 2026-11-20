@@ -17,6 +17,14 @@ export type JournalTransferPage = components["schemas"]["JournalTransferPage"];
 export type JournalTransferStatus =
   components["schemas"]["JournalTransferStatus"];
 export type JournalExportCheck = components["schemas"]["JournalExportCheck"];
+export type OfficeJournalTransfer =
+  components["schemas"]["OfficeJournalTransfer"];
+export type OfficeJournalTransferPage =
+  components["schemas"]["OfficeJournalTransferPage"];
+export type PendingJournalTransfer =
+  components["schemas"]["PendingJournalTransfer"];
+export type PendingJournalTransferPage =
+  components["schemas"]["PendingJournalTransferPage"];
 export type JournalExportDocument =
   components["schemas"]["JournalExportDocument"];
 export type JournalExportSettings =
@@ -62,6 +70,11 @@ export const journalKeys = {
     [...base(slug, engagement), "journals", "settings"] as const,
   officeSettings: (slug: string) =>
     ["tenant", slug.toLowerCase(), "journal-export-settings"] as const,
+  /** Ofis geneli aktarım görünümü (#574). */
+  officeTransfers: (slug: string) =>
+    ["tenant", slug.toLowerCase(), "journal-transfers"] as const,
+  officePending: (slug: string) =>
+    ["tenant", slug.toLowerCase(), "journal-transfers", "pending"] as const,
 };
 
 /**
@@ -197,6 +210,24 @@ export const journalService = {
       "PUT",
       "/v1/tenant/journal-export-settings",
       { body: input, silent: true },
+    );
+  },
+  /** Ofis genelinde her çıktının son aktarımı ve mizan durumu (#574). */
+  officeTransfers(slug: string) {
+    return tenantRequest<OfficeJournalTransferPage>(
+      slug,
+      "GET",
+      "/v1/tenant/journal-transfers",
+      { query: { limit: 200 } },
+    );
+  },
+  /** Ofis genelinde programa aktarılmamış onaylı fişler (#574). */
+  officePending(slug: string) {
+    return tenantRequest<PendingJournalTransferPage>(
+      slug,
+      "GET",
+      "/v1/tenant/journal-transfers/pending",
+      { query: { limit: 200 } },
     );
   },
   transfers(slug: string, engagement: string) {

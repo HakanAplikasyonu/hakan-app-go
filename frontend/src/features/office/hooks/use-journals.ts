@@ -55,6 +55,27 @@ export function useJournalTransfers(slug: string, engagement: string) {
   });
 }
 
+/** Ofis geneli bekleyen aktarımlar ve son aktarımlar (#574). */
+export function useOfficePendingTransfers(slug: string) {
+  return useQuery({
+    queryKey: journalKeys.officePending(slug),
+    queryFn: () => journalService.officePending(slug),
+  });
+}
+
+export function useOfficeTransfers(slug: string) {
+  return useQuery({
+    queryKey: journalKeys.officeTransfers(slug),
+    queryFn: () => journalService.officeTransfers(slug),
+    refetchInterval: (q) =>
+      q.state.data?.items.some(
+        (t) => t.status === "queued" || t.status === "claimed",
+      )
+        ? 30_000
+        : false,
+  });
+}
+
 /** Document → file trail of the export history (#466). */
 export function useJournalDocuments(
   slug: string,
