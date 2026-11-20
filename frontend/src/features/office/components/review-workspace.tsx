@@ -98,6 +98,9 @@ import {
 } from "../lib/suggestion-label";
 
 const ACCOUNT_KIND = "account_code";
+// Banka hareketinin karşı hesabı (#383): değeri de hesap kodu, aynı
+// seçiciyle düzeltilir (#569).
+const BANK_ACCOUNT_KIND = "bank_account";
 // Fişten okunan alan (#569): değer elle düzeltilir (tarih, tutar, fiş no).
 const RECEIPT_KIND = "receipt_field";
 const DATE_FIELDS = new Set(["date"]);
@@ -660,14 +663,16 @@ function ReviewWorkspaceInner() {
     pinnedAt >= 0 ? pinnedAt : Math.min(cursor, Math.max(queue.length - 1, 0));
   const current = queue[index];
   const currentValue = current ? accountValue(current.proposed_value) : {};
-  const canCorrect = !!current && current.kind === ACCOUNT_KIND;
+  const isLineAccount = !!current && current.kind === ACCOUNT_KIND;
+  const canCorrect =
+    isLineAccount || (!!current && current.kind === BANK_ACCOUNT_KIND);
   const canCorrectValue = !!current && current.kind === RECEIPT_KIND;
   const canFix = canCorrect || canCorrectValue;
   const cpKey = current ? counterpartyKeyOf(current) : undefined;
   const canRule =
     canCorrect && !!cpKey && can(permissions.tenant.accountRules.write);
   const bulkPicked = queue.filter((s) => confidenceOf(s) * 100 >= bulkAt);
-  const history = useCounterpartyHistory(canCorrect ? current : undefined);
+  const history = useCounterpartyHistory(isLineAccount ? current : undefined);
   const memory = useAccountMemoryActions(slug, current?.engagement_uuid ?? "");
   const promote = memory.promote.mutateAsync;
 
@@ -1257,7 +1262,7 @@ function ReviewWorkspaceInner() {
             </section>
           </div>
 
-          {canCorrect ? (
+          {isLineAccount ? (
             <section className="bg-card rounded-lg border p-4">
               <h3 className="mb-2 text-sm font-semibold">
                 {t("office.studio.ev_history")}
@@ -1296,7 +1301,11 @@ function ReviewWorkspaceInner() {
             </Button>
             <Hint
               label={
-                canFix ? undefined : t("office.review.correct_unavailable")
+                canFix
+                  ? undefined
+                  : current.kind === "bank_match"
+                    ? t("office.review.correct_unavailable_bank_match")
+                    : t("office.review.correct_unavailable")
               }
               wrap={!canFix || bulkBusy}
             >

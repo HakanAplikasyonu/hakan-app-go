@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -12,7 +13,7 @@ import {
 } from "@/components/tables";
 import { useLocale } from "@/providers/locale-provider";
 
-import { useEngagementScope } from "../engagement-scope";
+import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
 import {
   ACCOUNT_CODE_RE,
@@ -61,6 +62,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
     "",
   );
   const { mutateAsync } = useReviewDecision();
+  const invoiceHref = useInvoiceHref({ carry: false });
   const errorText = useDecisionErrorText();
 
   // En düşük güven önce; kuyrukla aynı sıra.
@@ -117,6 +119,22 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
               .join(" · ") || "—"
           );
         },
+        // Satırdan belge detayına (#569).
+        render: (v, s) => {
+          const id = suggestionContext(s).invoiceUuid;
+          const text = typeof v === "string" ? v : "—";
+          return id ? (
+            <Link
+              href={invoiceHref(id, s.engagement_uuid)}
+              className="underline-offset-4 hover:underline"
+              title={t("office.review_grid.open_document")}
+            >
+              {text}
+            </Link>
+          ) : (
+            text
+          );
+        },
         width: 200,
       },
       {
@@ -153,6 +171,13 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         value: (s) => `%${Math.round(confidenceOf(s) * 100)}`,
         align: "end",
         width: 72,
+      },
+      {
+        // Öneren (#569): kural, model, belge ya da girdi.
+        id: "source",
+        header: t("office.review_grid.col_source"),
+        value: (s) => t(`office.review_api.origin_${s.provenance.origin}`),
+        width: 90,
       },
       {
         id: "code",
@@ -194,7 +219,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         placeholder: t("office.review_grid.decision_auto"),
       },
     ],
-    [t, directory.entries, planAccounts, planNames],
+    [t, directory.entries, planAccounts, planNames, invoiceHref],
   );
 
   const onSaveRow = useCallback(
