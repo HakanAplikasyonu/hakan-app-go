@@ -205,12 +205,19 @@ test.describe("@docs masaüstü görüntüleri", () => {
   // http kökünden diskteki dosyalarla sun.
   const UI_DIR = path.resolve(__dirname, "../../desktop/ui");
   const ui = "http://desktop.hakan.test/index.html";
-  const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
+  const types: Record<string, string> = {
+    ".html": "text/html",
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".svg": "image/svg+xml",
+    ".woff2": "font/woff2",
+  };
   test.beforeEach(async ({ page }) => {
     await page.route("http://desktop.hakan.test/**", (route) => {
-      const name = path.basename(new URL(route.request().url()).pathname) || "index.html";
-      const file = path.join(UI_DIR, name);
-      if (!file.startsWith(UI_DIR)) return route.abort();
+      // Alt klasörler (fonts/) korunur; kök dışına çıkan yol reddedilir.
+      const rel = decodeURIComponent(new URL(route.request().url()).pathname).replace(/^\/+/, "") || "index.html";
+      const file = path.resolve(UI_DIR, rel);
+      if (!file.startsWith(UI_DIR + path.sep)) return route.abort();
       return route.fulfill({ body: readFileSync(file), contentType: types[path.extname(file)] ?? "application/octet-stream" });
     });
   });
