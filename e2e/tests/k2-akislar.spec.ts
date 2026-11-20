@@ -163,6 +163,12 @@ test.describe("EPIC #560 akışları (koordinatör 2)", () => {
 
     // Veritabanı: hareket 780.01'e işlendi.
     await expect.poll(async () => (await matching(fee)).posting).toMatchObject({ status: "approved", account_code: "780.01" });
+
+    // Ekran: karar "Son kararlar" listesinde yeni kodla "düzeltildi" görünür.
+    const recent = page.getByRole("region", { name: "Son kararlar" });
+    const decided = recent.getByRole("listitem").filter({ hasText: "780.01" });
+    await expect(decided).toHaveCount(1);
+    await expect(decided).toContainText("düzeltildi");
   });
 
   test("#570 Dönem uyarısı İncele panelinden çözülür: hareket eşleşir, uyarı kapanır", async ({ page }) => {
