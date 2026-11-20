@@ -111,6 +111,59 @@ func (s *Service) draftIssues(ctx context.Context, scope engagementctx.Scope, id
 	return out, nil
 }
 
+// ValidLineAmounts: a draft line has exactly one positive side, at most two
+// decimals (kuruş), like a new draft's lines.
+func ValidLineAmounts(debit, credit decimal.Decimal) error {
+	if debit.IsNegative() || credit.IsNegative() || debit.IsZero() == credit.IsZero() {
+		return fmt.Errorf("%w: a line has exactly one of debit / credit, above zero", ErrInvalid)
+	}
+	if !debit.Equal(debit.Round(2)) || !credit.Equal(credit.Round(2)) {
+		return fmt.Errorf("%w: amounts have at most two decimals", ErrInvalid)
+	}
+	return nil
+}
+
+// SetLineAmounts changes one line's debit / credit of a draft (#566): the
+// control screen's fix for a debit-credit difference. Only drafts, and only
+// lines without a source (entered by hand or from Excel): a bank, invoice
+// or payroll line's amount is its source's (ErrLineFromSource).
+func (s *Service) SetLineAmounts(ctx context.Context, scope engagementctx.Scope, id uuid.UUID, lineNo int32, debit, credit decimal.Decimal) error {
+	if err := ValidLineAmounts(debit, credit); err != nil {
+		return err
+	}
+	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if row.Status != "draft" {
+		return fmt.Errorf("%w: status is %s", ErrInvalid, row.Status)
+	}
+	n, err := s.q.SetJournalDraftLineAmounts(ctx, db.SetJournalDraftLineAmountsParams{
+		Debit: repository.Num(debit), Credit: repository.Num(credit),
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, DraftID: row.ID, LineNo: lineNo,
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		// The line is missing, or it has a source.
+		lines, err := s.q.ListJournalDraftLines(ctx, db.ListJournalDraftLinesParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, JournalDraftID: row.ID})
+		if err != nil {
+			return err
+		}
+		for _, l := range lines {
+			if l.LineNo == lineNo {
+				return ErrLineFromSource
+			}
+		}
+		return ErrNotFound
+	}
+	return nil
+}
+
 var accountCodeRe = regexp.MustCompile(`^[0-9]{3}(\.[0-9A-Za-z]+)*$`)
 
 // SetLineAccount changes one line's account code of a draft (#566): the

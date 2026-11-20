@@ -36,7 +36,7 @@ export function vatDeductionRange(docPeriod: string) {
   };
 }
 
-function monthText(period: string, locale: string) {
+export function monthText(period: string, locale: string) {
   const d = new Date(`${period}-01T00:00:00`);
   if (Number.isNaN(d.getTime())) return period;
   return d.toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB", {

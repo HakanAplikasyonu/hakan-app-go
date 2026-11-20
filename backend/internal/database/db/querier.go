@@ -62,6 +62,8 @@ type Querier interface {
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
+	CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error)
 	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
 	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
 	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
@@ -853,6 +855,8 @@ type Querier interface {
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 	// görür (engagement_document_visible, issue #8).
+	// Dönem süzgecinde KDV'si o aya alınan alış faturası da gelir (#640): ofis
+	// geç gelen faturayı beyan ettiği ayda görür.
 	// Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
 	// satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 	ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error)
@@ -1416,6 +1420,10 @@ type Querier interface {
 	SetInvoiceVATDeductionPeriod(ctx context.Context, arg SetInvoiceVATDeductionPeriodParams) (int64, error)
 	// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
 	SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error)
+	// Kontrol ekranında borç-alacak farkı düzeltilir (#566): yalnız taslakta ve
+	// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
+	// satırının tutarı kaynağından gelir.
+	SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
@@ -1506,6 +1514,8 @@ type Querier interface {
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
 	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
+	// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
+	TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	// Mükellefin entegratör bağlantıları (entegrator_<ad>): kaynağı entegratör

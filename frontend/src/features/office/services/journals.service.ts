@@ -147,6 +147,25 @@ export const journalService = {
       { body: { account } },
     );
   },
+  /**
+   * Kaynaksız satırın tutarı düzeltilir (#566): borç-alacak tutmayan taslak
+   * kontrol ekranında dengelenir. Tek taraf dolu olmalı.
+   */
+  setLineAmounts(
+    slug: string,
+    engagement: string,
+    draft: string,
+    line: number,
+    debit: string,
+    credit: string,
+  ) {
+    return tenantRequest<JournalDraftDetail>(
+      slug,
+      "PATCH",
+      `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/lines/${line}`,
+      { body: { debit, credit } },
+    );
+  },
   /** Onaylı, henüz aktarılmamış fişin onayını gerekçeyle geri alır (#566). */
   unapprove(slug: string, engagement: string, draft: string, reason: string) {
     return tenantRequest<JournalDraftDetail>(

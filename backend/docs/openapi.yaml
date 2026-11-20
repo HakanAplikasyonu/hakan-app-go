@@ -9681,11 +9681,16 @@ paths:
     patch:
       tags: [Journals]
       operationId: setJournalDraftLineAccount
-      summary: Fix a draft line's account code
+      summary: Fix a draft line's account code or amount
       description: |
         Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
-        (#566): only drafts (not approved or exported entries) change. The
-        returned draft lists its remaining issues.
+        and "Tutarı düzelt" (#566): only drafts (not approved or exported
+        entries) change. `account` and / or `debit` + `credit` (exactly one
+        side above zero, at most two decimals); at least one is required.
+        An amount changes only on a line without a source (entered by hand
+        or from Excel): a bank, invoice or payroll line's amount is its
+        source's (`409 LINE_FROM_SOURCE`). The returned draft lists its
+        remaining issues.
       security:
         - bearerAuth: []
       requestBody:
@@ -9694,9 +9699,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [account]
               properties:
                 account: { type: string, example: "770.01" }
+                debit: { type: string, example: "100.00" }
+                credit: { type: string, example: "0" }
       responses:
         "200":
           description: Draft with the changed line
@@ -9705,6 +9711,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
         "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: "`LINE_FROM_SOURCE`: the line's amount comes from its source document"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
@@ -16765,6 +16777,38 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: checkEngagementTaxReturn
+      summary: Mark the prepared return as checked (final check)
+      description: |
+        Requires `tenant.tax_returns.approve` (#669, office decision: everyone
+        prepares returns; only the responsible person, owner or admin, marks
+        "kontrol edildi" and "verildi"). Who and when are kept
+        (`record.checked_by_name`, `record.checked_at`). Only a prepared
+        return (`409 TAX_RETURN_NOT_PREPARED`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Checked return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16806,10 +16850,11 @@ paths:
       operationId: fileEngagementTaxReturn
       summary: Record that the prepared return was filed
       description: |
-        Requires `tenant.tax_returns.write`. `filed_on` is not before the
-        period's last day nor in the future; `accrual_number` is the
-        tahakkuk fiş no. Only a prepared return (`409
-        TAX_RETURN_NOT_PREPARED`).
+        Requires `tenant.tax_returns.approve` (#669: only the responsible
+        person marks "verildi"; filing also marks the return checked when it
+        was not). `filed_on` is not before the period's last day nor in the
+        future; `accrual_number` is the tahakkuk fiş no. Only a prepared
+        return (`409 TAX_RETURN_NOT_PREPARED`).
       security:
         - bearerAuth: []
       requestBody:
@@ -25743,7 +25788,7 @@ components:
 
     TaxReturnRecord:
       type: object
-      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, accrual_document, updated_at]
+      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, checked_at, accrual_document, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -25754,6 +25799,10 @@ components:
         filed_on: { type: [string, "null"], format: date }
         accrual_number: { type: [string, "null"] }
         filed_at: { type: [string, "null"], format: date-time }
+        checked_at: { type: [string, "null"], format: date-time, description: "Final check by the responsible person (#669)" }
+        prepared_by_name: { type: string, description: Who prepared the return }
+        checked_by_name: { type: string, description: Who marked it checked }
+        filed_by_name: { type: string, description: Who marked it filed }
         accrual_document:
           description: The GİB tahakkuk PDF attached after filing (#575); null when none.
           oneOf:

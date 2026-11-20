@@ -196,7 +196,8 @@ RETURNING *;
 
 -- name: ReopenTaxReturn :one
 UPDATE tax_returns
-SET status = 'draft', snapshot = NULL, payable_amount = NULL, carry_out = NULL, prepared_by = NULL, prepared_at = NULL
+SET status = 'draft', snapshot = NULL, payable_amount = NULL, carry_out = NULL, prepared_by = NULL, prepared_at = NULL,
+    checked_by = NULL, checked_at = NULL
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
   AND status = 'prepared'
 RETURNING *;
@@ -204,10 +205,27 @@ RETURNING *;
 -- name: FileTaxReturn :one
 UPDATE tax_returns
 SET status = 'filed', filed_on = @filed_on, accrual_number = sqlc.narg(accrual_number),
-    note = COALESCE(sqlc.narg(note), note), filed_by = sqlc.narg(filed_by), filed_at = NOW()
+    note = COALESCE(sqlc.narg(note), note), filed_by = sqlc.narg(filed_by), filed_at = NOW(),
+    -- Veren sorumlu kontrol etmiş sayılır (ayrıca işaretlenmediyse).
+    checked_by = COALESCE(checked_by, sqlc.narg(filed_by)), checked_at = COALESCE(checked_at, NOW())
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
   AND status = 'prepared'
 RETURNING *;
+
+-- name: CheckTaxReturn :one
+-- Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
+UPDATE tax_returns
+SET checked_by = sqlc.narg(checked_by), checked_at = NOW()
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
+  AND status = 'prepared'
+RETURNING *;
+
+-- name: TaxReturnUserName :one
+-- Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
+SELECT TRIM(u.name || ' ' || u.surname)::text AS full_name
+FROM users u
+JOIN organization_members om ON om.user_id = u.id AND om.organization_id = @organization_id
+WHERE u.id = @user_id;
 
 -- name: SetTaxReturnAccrualDocument :one
 -- Tahakkuk PDF'i (#575) yalnızca verilmiş beyana eklenir; yenisi eskisinin

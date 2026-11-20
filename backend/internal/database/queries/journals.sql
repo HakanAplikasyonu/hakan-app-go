@@ -198,6 +198,18 @@ WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id 
   AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
   AND l.journal_draft_id = d.id AND l.line_no = @line_no;
 
+-- name: SetJournalDraftLineAmounts :execrows
+-- Kontrol ekranında borç-alacak farkı düzeltilir (#566): yalnız taslakta ve
+-- kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
+-- satırının tutarı kaynağından gelir.
+UPDATE journal_draft_lines l SET debit = @debit, credit = @credit
+FROM journal_drafts d
+WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id AND d.id = @draft_id
+  AND d.status = 'draft'
+  AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
+  AND l.journal_draft_id = d.id AND l.line_no = @line_no
+  AND l.source_kind IS NULL;
+
 -- name: JournalDraftExports :many
 -- Fişin geri alınmamış çıktısı ve o çıktının son aktarım durumu (#574).
 SELECT i.journal_draft_id, b.uuid AS batch_uuid, b.driver, b.created_at AS exported_at,

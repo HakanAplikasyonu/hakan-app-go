@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/accountingexport"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
@@ -217,7 +218,8 @@ func (h *Handler) unapprove(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, d)
 }
 
-// setLineAccount: kontrol ekranında satırın hesap kodu düzeltilir (#566).
+// setLineAccount: kontrol ekranında satırın hesap kodu ve / veya tutarı
+// düzeltilir (#566). Gövde: {"account"?, "debit"?, "credit"?}; en az biri.
 func (h *Handler) setLineAccount(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathUUID(w, r, "draftUuid")
 	if !ok {
@@ -229,16 +231,38 @@ func (h *Handler) setLineAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Account string `json:"account"`
+		Account string           `json:"account"`
+		Debit   *decimal.Decimal `json:"debit"`
+		Credit  *decimal.Decimal `json:"credit"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
-		response.BadRequest(w, r, "INVALID_BODY", "body must be {\"account\": \"770.01\"}")
+		response.BadRequest(w, r, "INVALID_BODY", "body must be {\"account\": \"770.01\"} and / or {\"debit\": \"100.00\", \"credit\": \"0\"}")
+		return
+	}
+	amounts := in.Debit != nil || in.Credit != nil
+	if strings.TrimSpace(in.Account) == "" && !amounts {
+		response.BadRequest(w, r, "INVALID_BODY", "account or debit / credit is required")
 		return
 	}
 	s := engagementctx.Must(r.Context())
-	if err := h.svc.SetLineAccount(r.Context(), s, id, int32(line), in.Account); err != nil {
-		h.fail(w, r, err)
-		return
+	if amounts {
+		var debit, credit decimal.Decimal
+		if in.Debit != nil {
+			debit = *in.Debit
+		}
+		if in.Credit != nil {
+			credit = *in.Credit
+		}
+		if err := h.svc.SetLineAmounts(r.Context(), s, id, int32(line), debit, credit); err != nil {
+			h.fail(w, r, err)
+			return
+		}
+	}
+	if strings.TrimSpace(in.Account) != "" {
+		if err := h.svc.SetLineAccount(r.Context(), s, id, int32(line), in.Account); err != nil {
+			h.fail(w, r, err)
+			return
+		}
 	}
 	d, err := h.svc.GetDraft(r.Context(), s, id)
 	if err != nil {
@@ -482,6 +506,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "JOURNAL_UNBALANCED", err.Error())
 	case errors.Is(err, ErrReasonRequired):
 		response.BadRequest(w, r, "REASON_REQUIRED", "a reason is required")
+	case errors.Is(err, ErrLineFromSource):
+		response.Conflict(w, r, "LINE_FROM_SOURCE", err.Error())
 	case errors.Is(err, ErrInvalid):
 		response.BadRequest(w, r, "INVALID_DRAFT", err.Error())
 	case errors.Is(err, ErrNotApproved):

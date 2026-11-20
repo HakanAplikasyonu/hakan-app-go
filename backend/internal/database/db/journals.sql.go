@@ -934,6 +934,43 @@ func (q *Queries) SetJournalDraftLineAccount(ctx context.Context, arg SetJournal
 	return result.RowsAffected(), nil
 }
 
+const setJournalDraftLineAmounts = `-- name: SetJournalDraftLineAmounts :execrows
+UPDATE journal_draft_lines l SET debit = $1, credit = $2
+FROM journal_drafts d
+WHERE d.organization_id = $3 AND d.engagement_id = $4 AND d.id = $5
+  AND d.status = 'draft'
+  AND l.organization_id = d.organization_id AND l.engagement_id = d.engagement_id
+  AND l.journal_draft_id = d.id AND l.line_no = $6
+  AND l.source_kind IS NULL
+`
+
+type SetJournalDraftLineAmountsParams struct {
+	Debit          pgtype.Numeric `json:"debit"`
+	Credit         pgtype.Numeric `json:"credit"`
+	OrganizationID int64          `json:"organization_id"`
+	EngagementID   int64          `json:"engagement_id"`
+	DraftID        int64          `json:"draft_id"`
+	LineNo         int32          `json:"line_no"`
+}
+
+// Kontrol ekranında borç-alacak farkı düzeltilir (#566): yalnız taslakta ve
+// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
+// satırının tutarı kaynağından gelir.
+func (q *Queries) SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setJournalDraftLineAmounts,
+		arg.Debit,
+		arg.Credit,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.DraftID,
+		arg.LineNo,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const upsertExportSettings = `-- name: UpsertExportSettings :one
 INSERT INTO export_settings (organization_id, engagement_id, invoices_reach_luca_directly, block_on_unknown_account, luca_pull_integrators, updated_by)
 VALUES ($1, $2, $3, $4, $5::text[], $6)

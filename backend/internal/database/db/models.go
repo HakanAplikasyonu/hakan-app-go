@@ -2223,6 +2223,8 @@ type TaxReturn struct {
 	AccrualSha256     pgtype.Text        `json:"accrual_sha256"`
 	AccrualUploadedBy pgtype.Int8        `json:"accrual_uploaded_by"`
 	AccrualUploadedAt pgtype.Timestamptz `json:"accrual_uploaded_at"`
+	CheckedBy         pgtype.Int8        `json:"checked_by"`
+	CheckedAt         pgtype.Timestamptz `json:"checked_at"`
 }
 
 type Taxpayer struct {

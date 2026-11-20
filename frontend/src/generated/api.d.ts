@@ -7253,10 +7253,15 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Fix a draft line's account code
+         * Fix a draft line's account code or amount
          * @description Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
-         *     (#566): only drafts (not approved or exported entries) change. The
-         *     returned draft lists its remaining issues.
+         *     and "Tutarı düzelt" (#566): only drafts (not approved or exported
+         *     entries) change. `account` and / or `debit` + `credit` (exactly one
+         *     side above zero, at most two decimals); at least one is required.
+         *     An amount changes only on a line without a source (entered by hand
+         *     or from Excel): a bank, invoice or payroll line's amount is its
+         *     source's (`409 LINE_FROM_SOURCE`). The returned draft lists its
+         *     remaining issues.
          */
         patch: operations["setJournalDraftLineAccount"];
         trace?: never;
@@ -12850,6 +12855,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the prepared return as checked (final check)
+         * @description Requires `tenant.tax_returns.approve` (#669, office decision: everyone
+         *     prepares returns; only the responsible person, owner or admin, marks
+         *     "kontrol edildi" and "verildi"). Who and when are kept
+         *     (`record.checked_by_name`, `record.checked_at`). Only a prepared
+         *     return (`409 TAX_RETURN_NOT_PREPARED`).
+         */
+        post: operations["checkEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen": {
         parameters: {
             query?: never;
@@ -12905,10 +12945,11 @@ export interface paths {
         put?: never;
         /**
          * Record that the prepared return was filed
-         * @description Requires `tenant.tax_returns.write`. `filed_on` is not before the
-         *     period's last day nor in the future; `accrual_number` is the
-         *     tahakkuk fiş no. Only a prepared return (`409
-         *     TAX_RETURN_NOT_PREPARED`).
+         * @description Requires `tenant.tax_returns.approve` (#669: only the responsible
+         *     person marks "verildi"; filing also marks the return checked when it
+         *     was not). `filed_on` is not before the period's last day nor in the
+         *     future; `accrual_number` is the tahakkuk fiş no. Only a prepared
+         *     return (`409 TAX_RETURN_NOT_PREPARED`).
          */
         post: operations["fileEngagementTaxReturn"];
         delete?: never;
@@ -20460,6 +20501,17 @@ export interface components {
             accrual_number: string | null;
             /** Format: date-time */
             filed_at: string | null;
+            /**
+             * Format: date-time
+             * @description Final check by the responsible person (#669)
+             */
+            checked_at: string | null;
+            /** @description Who prepared the return */
+            prepared_by_name?: string;
+            /** @description Who marked it checked */
+            checked_by_name?: string;
+            /** @description Who marked it filed */
+            filed_by_name?: string;
             /** @description The GİB tahakkuk PDF attached after filing (#575); null when none. */
             accrual_document: null | {
                 file_name: string;
@@ -32532,7 +32584,11 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @example 770.01 */
-                    account: string;
+                    account?: string;
+                    /** @example 100.00 */
+                    debit?: string;
+                    /** @example 0 */
+                    credit?: string;
                 };
             };
         };
@@ -32550,6 +32606,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            /** @description `LINE_FROM_SOURCE`: the line's amount comes from its source document */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
@@ -41406,6 +41471,43 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    checkEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checked return */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
