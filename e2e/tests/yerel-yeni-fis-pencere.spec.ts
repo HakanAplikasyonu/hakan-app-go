@@ -14,6 +14,8 @@ const amount = `${100 + (Date.now() % 800)},${String(Date.now() % 97).padStart(2
 test("yeni fiş açılır pencerede; kayıttan sonra kaydırma konumu korunur (#710)", async ({
   page,
 }) => {
+  // Kısa görünüm: liste görünümü aşar, sayfa kesin kayar.
+  await page.setViewportSize({ width: 1280, height: 520 });
   await uiLogin(page, DEMO.owner);
   await page.goto(officePath("/journals"));
   await pickTaxpayer(page, DEMO.selin.title);
@@ -25,14 +27,21 @@ test("yeni fiş açılır pencerede; kayıttan sonra kaydırma konumu korunur (#
   ).toBeVisible();
   await expect(formRows).toHaveCount(0);
 
-  // Biraz aşağı kaydır; konum kayıttan sonra aynı kalmalı.
-  await page.mouse.wheel(0, 300);
+  // Biraz aşağı kaydır; konum kayıttan sonra aynı kalmalı. Tekerlek fare
+  // altındaki öğeyi (kenar menü) kaydırabilir; pencere doğrudan kaydırılır.
   await expect
-    .poll(() => page.evaluate(() => window.scrollY))
+    .poll(() =>
+      page.evaluate(() => {
+        window.scrollTo(0, 200);
+        return window.scrollY;
+      }),
+    )
     .toBeGreaterThan(0);
-  const before = await page.evaluate(() => window.scrollY);
 
   await openNewEntry(page);
+  // Düğmeye tıklarken sayfa düğmeyi göstermek için kayabilir: konum pencere
+  // açıkken ölçülür (kayıt öncesi konum).
+  const before = await page.evaluate(() => window.scrollY);
   await expect(formRows).toHaveCount(2);
   await page
     .getByPlaceholder(/açıklama/i)
