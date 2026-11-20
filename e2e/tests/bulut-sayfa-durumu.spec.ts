@@ -1,6 +1,6 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { addConsentedTaxpayer, Api, DEMO, officePath, pickTaxpayer, uiLogin, uniqueVkn } from "./lib";
+import { addConsentedTaxpayer, Api, DEMO, officePath, pickTaxpayer, settledPopover, uiLogin, uniqueVkn } from "./lib";
 
 /**
  * Sayfa durumu adreste (#669 D, #564 madde 15): İnceleme kuyruğu ve Fişler
@@ -114,6 +114,8 @@ test.describe("Sayfa durumu adreste (#669 D)", () => {
     await expect(picker).toBeVisible();
     if (!/Ekim 2026/i.test(await picker.innerText())) {
       await picker.click();
+      // Pencere açılırken kayar (zoom / slide); ay düğmesi ancak durunca tıklanır.
+      const pop = await settledPopover(page);
       const prev = page.getByRole("button", { name: "Önceki yıl" });
       const next = page.getByRole("button", { name: "Sonraki yıl" });
       const year = prev.locator("xpath=following-sibling::span[1]");
@@ -123,7 +125,8 @@ test.describe("Sayfa durumu adreste (#669 D)", () => {
         await (shown > PERIOD_YEAR ? prev : next).click();
       }
       await expect(year).toHaveText(String(PERIOD_YEAR));
-      await page.getByRole("button", { name: PERIOD_MONTH, exact: true }).click();
+      await settledPopover(page);
+      await pop.getByRole("button", { name: PERIOD_MONTH, exact: true }).click();
     }
     await expect(picker).toContainText(/Ekim 2026/i);
     await page.waitForURL(
