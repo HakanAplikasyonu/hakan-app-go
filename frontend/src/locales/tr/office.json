@@ -2128,5 +2128,10 @@
   "tax_returns.office.due_passed": "{{count}} gün geçti",
   "tax_returns.office.due_rolled": "(hafta sonu nedeniyle Pazartesi'ye kaydı)",
   "tax_returns.office.late": "Gecikti",
-  "tax_returns.office.statement_missing": "Banka ekstresi eksik: {{name}}"
+  "tax_returns.office.statement_missing": "Banka ekstresi eksik: {{name}}",
+  "tax_returns.office.statement_request": "Mükelleften iste",
+  "tax_returns.office.statement_request_sent": "İstendi",
+  "tax_returns.office.statement_requested": "Ekstre mükelleften istendi; görev listesine düştü.",
+  "tax_returns.office.statement_request_title": "{{period}} {{account}} banka ekstresi",
+  "tax_returns.office.statement_request_note": "Ayın tüm hareketlerini içeren ekstre (PDF, Excel ya da MT940) gerekiyor. İnternet bankacılığından indirip yükleyebilirsiniz."
 }

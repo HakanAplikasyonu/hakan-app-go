@@ -2128,5 +2128,10 @@
   "tax_returns.office.due_passed": "{{count}} days overdue",
   "tax_returns.office.due_rolled": "(moved to Monday because of the weekend)",
   "tax_returns.office.late": "Overdue",
-  "tax_returns.office.statement_missing": "Bank statement missing: {{name}}"
+  "tax_returns.office.statement_missing": "Bank statement missing: {{name}}",
+  "tax_returns.office.statement_request": "Request from taxpayer",
+  "tax_returns.office.statement_request_sent": "Requested",
+  "tax_returns.office.statement_requested": "Statement requested; added to the taxpayer's tasks.",
+  "tax_returns.office.statement_request_title": "{{period}} {{account}} bank statement",
+  "tax_returns.office.statement_request_note": "We need the statement with all of the month's movements (PDF, Excel or MT940). You can download it from internet banking and upload it."
 }

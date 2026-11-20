@@ -1,20 +1,26 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
 import { FileCheck2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 
 import { EntityTable } from "@/components/entity";
 import { PageHeader } from "@/components/layout/page-header";
 import { createColumn, StatusPill } from "@/components/tables";
 import type { StatusTone } from "@/components/tables";
+import { Button } from "@/components/ui/button";
+import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import { usePeriodMatrixAt } from "../hooks/use-office-data";
+import { createDocumentRequest } from "../services/engagement-documents.service";
 import { useOfficePeriod, usePeriodText } from "../period";
 import type {
   PeriodMatrix,
@@ -113,6 +119,57 @@ function ReturnCell({
         <Money value={r.payable_amount} className="text-xs" />
       ) : null}
     </span>
+  );
+}
+
+/**
+ * Eksik ekstreyi mükelleften ister (#568): mükellefin görev listesine
+ * "Ekim 2026 Ziraat TL vadesiz banka ekstresi" düşer, hatırlatma gider.
+ */
+function StatementRequest({
+  engagement,
+  period,
+  account,
+}: {
+  engagement: string;
+  period: string;
+  account: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const { can } = usePermission();
+  const periodText = usePeriodText();
+  const request = useMutation({
+    mutationFn: () =>
+      createDocumentRequest(slug, engagement, {
+        title: t("office.tax_returns.office.statement_request_title", {
+          period: periodText(period),
+          account,
+        }),
+        note: t("office.tax_returns.office.statement_request_note"),
+        due_days: 3,
+      }),
+    onSuccess: () =>
+      toast.success(t("office.tax_returns.office.statement_requested")),
+    onError: () => toast.error(t("office.api.load_error")),
+  });
+  if (!can(permissions.tenant.docTasks.write)) return null;
+  return (
+    <Button
+      size="sm"
+      variant="link"
+      className="h-auto p-0 text-xs"
+      data-no-row-click
+      disabled={request.isPending || request.isSuccess}
+      onClick={(e) => {
+        e.stopPropagation();
+        request.mutate();
+      }}
+    >
+      {request.isSuccess
+        ? t("office.tax_returns.office.statement_request_sent")
+        : t("office.tax_returns.office.statement_request")}
+    </Button>
   );
 }
 
@@ -285,8 +342,16 @@ export function OfficeTaxReturnsPage() {
           return (
             <span className="flex flex-col text-xs">
               {c.missing_bank_statements.map((name) => (
-                <span key={name} className="text-status-warning">
+                <span
+                  key={name}
+                  className="text-status-warning flex flex-wrap items-center gap-x-2"
+                >
                   {t("office.tax_returns.office.statement_missing", { name })}
+                  <StatementRequest
+                    engagement={row.original.engagement_uuid}
+                    period={c.period}
+                    account={name}
+                  />
                 </span>
               ))}
               {c.open_document_tasks ? (
