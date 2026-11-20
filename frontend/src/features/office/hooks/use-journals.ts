@@ -139,8 +139,20 @@ export function useJournalActions(slug: string, engagement: string) {
       onSuccess: refresh,
     }),
     approve: useMutation({
-      mutationFn: (draft: string) =>
-        journalService.approve(slug, engagement, draft),
+      mutationFn: (
+        v:
+          | string
+          | {
+              draft: string;
+              confirm?: boolean;
+              note?: string;
+              sendDuplicate?: boolean;
+              reason?: string;
+            },
+      ) =>
+        typeof v === "string"
+          ? journalService.approve(slug, engagement, v)
+          : journalService.approve(slug, engagement, v.draft, v),
       onSuccess: refresh,
     }),
     setLineAccount: useMutation({
@@ -154,6 +166,23 @@ export function useJournalActions(slug: string, engagement: string) {
         ),
       onSuccess: refresh,
     }),
+    setLineAmounts: useMutation({
+      mutationFn: async (v: {
+        draft: string;
+        lines: { line: number; debit: string; credit: string }[];
+      }) => {
+        for (const l of v.lines)
+          await journalService.setLineAmounts(
+            slug,
+            engagement,
+            v.draft,
+            l.line,
+            l.debit,
+            l.credit,
+          );
+      },
+      onSettled: refresh,
+    }),
     unapprove: useMutation({
       mutationFn: (v: { draft: string; reason: string }) =>
         journalService.unapprove(slug, engagement, v.draft, v.reason),
@@ -162,6 +191,11 @@ export function useJournalActions(slug: string, engagement: string) {
     reverse: useMutation({
       mutationFn: (v: { draft: string; reason: string }) =>
         journalService.reverse(slug, engagement, v.draft, v.reason),
+      onSuccess: refresh,
+    }),
+    cancelExport: useMutation({
+      mutationFn: (v: { draft: string; reason: string }) =>
+        journalService.cancelExport(slug, engagement, v.draft, v.reason),
       onSuccess: refresh,
     }),
     export: useMutation({

@@ -113,7 +113,10 @@ export const tenantService = {
   getSettings(slug: string) {
     return tenantRequest<TenantSettings>(slug, "GET", "/v1/tenant/settings");
   },
-  patchSettings(slug: string, body: { name?: string }) {
+  patchSettings(
+    slug: string,
+    body: { name?: string; settings?: Record<string, unknown> },
+  ) {
     return tenantRequest<TenantSettings>(slug, "PATCH", "/v1/tenant/settings", {
       body,
     });

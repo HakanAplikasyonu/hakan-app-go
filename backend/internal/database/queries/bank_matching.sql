@@ -78,7 +78,7 @@ ORDER BY t.transaction_date, t.id;
 SELECT * FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
 
 -- name: ListBankTransactionMatchInvoices :many
-SELECT m.amount, m.score, m.method, m.matched_at,
+SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
        i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
@@ -104,7 +104,8 @@ ORDER BY i.issue_date, i.id;
 -- name: SearchInvoicesForBankMatch :many
 -- Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 -- dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
--- faturalar.
+-- faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
+-- fatura tutarı aralığı (hareketin para biriminde); boş olan uygulanmaz.
 SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
        (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
        COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
@@ -114,10 +115,17 @@ WHERE i.taxpayer_id = @taxpayer_id
   AND i.direction = @direction
   AND i.status_normalized = 'active'
   AND (i.currency = @currency::text OR (@currency::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
-  AND (i.invoice_number ILIKE '%' || @term::text || '%'
-       OR i.customer_name ILIKE '%' || @term::text || '%'
-       OR i.customer_tax_number = @term::text
-       OR i.customer_identity_number = @term::text)
+  AND (sqlc.narg(term)::text IS NULL
+       OR i.invoice_number ILIKE '%' || sqlc.narg(term)::text || '%'
+       OR i.customer_name ILIKE '%' || sqlc.narg(term)::text || '%'
+       OR i.customer_tax_number = sqlc.narg(term)::text
+       OR i.customer_identity_number = sqlc.narg(term)::text)
+  AND (sqlc.narg(date_from)::date IS NULL OR i.issue_date >= sqlc.narg(date_from)::date)
+  AND (sqlc.narg(date_to)::date IS NULL OR i.issue_date <= sqlc.narg(date_to)::date)
+  AND (sqlc.narg(amount_min)::numeric IS NULL
+       OR (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END) >= sqlc.narg(amount_min)::numeric)
+  AND (sqlc.narg(amount_max)::numeric IS NULL
+       OR (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END) <= sqlc.narg(amount_max)::numeric)
 ORDER BY i.issue_date DESC, i.id
 LIMIT 50;
 
@@ -192,3 +200,23 @@ WHERE (j.uuid::text || ':' || l.line_no::text) = ANY(@keys::text[])
   AND (CASE WHEN @side::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
   AND (@currency::text = 'TRY' OR (l.currency = @currency::text AND l.foreign_amount IS NOT NULL))
 ORDER BY j.entry_date, j.entry_no, l.line_no;
+
+-- Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+-- name: ListBankTransactionPayrollMatches :many
+SELECT m.amount, m.method, r.uuid AS payroll_run_uuid, r.period, r.net_total
+FROM bank_transaction_matches m
+JOIN payroll_runs r ON r.taxpayer_id = m.taxpayer_id AND r.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'payroll_run'
+ORDER BY r.period;
+
+-- Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+-- eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+-- name: ListPayrollRunsForBankMatch :many
+SELECT r.id, r.uuid, r.period, r.net_total,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = r.taxpayer_id AND m.target_type = 'payroll_run' AND m.target_id = r.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric(18,2) AS paid,
+       (SELECT count(*) FROM payroll_lines l WHERE l.taxpayer_id = r.taxpayer_id AND l.payroll_run_id = r.id)::int AS employee_count
+FROM payroll_runs r
+WHERE r.taxpayer_id = @taxpayer_id AND r.period >= @period_from::text AND r.period <= @period_to::text
+ORDER BY r.period DESC;

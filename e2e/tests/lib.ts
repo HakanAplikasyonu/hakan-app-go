@@ -7,6 +7,7 @@ import {
   request as pwRequest,
   type APIRequestContext,
   type Browser,
+  type Locator,
   type Page,
 } from "@playwright/test";
 
@@ -82,6 +83,15 @@ export class Api {
 
   async put(path: string, data: unknown = {}, headers?: Record<string, string>) {
     return this.ctx.put(path, { headers: this.headers(headers), data });
+  }
+
+  async patch(path: string, data: unknown = {}, headers?: Record<string, string>) {
+    return this.ctx.patch(path, { headers: this.headers(headers), data });
+  }
+
+  /** Çok parçalı PUT, alan adı `file` (ör. beyanın tahakkuk PDF'i). */
+  async uploadPut(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
+    return this.ctx.put(path, { headers: this.headers(), multipart: { file } });
   }
 
   async upload(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
@@ -370,4 +380,44 @@ export async function addConsentedTaxpayerWithUser(
   const engagement = await engagementOf(api, taxpayer.title);
   const row = await api.json<{ uuid: string }>(await api.get(`/v1/tenant/engagements/${engagement}/taxpayer`));
   return { engagement, taxpayerUuid: row.uuid, email, password };
+}
+
+/**
+ * Açık açılır pencerenin (Radix Popover) giriş animasyonu bitene ve yeri
+ * iki karede sabit kalana kadar bekler; içindeki düğmeye tıklarken
+ * "element is not stable" düşmelerini önler. Pencereyi döndürür.
+ */
+export async function settledPopover(page: Page) {
+  const pop = page.locator('[data-slot="popover-content"][data-state="open"]').last();
+  await expect(pop).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        pop.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => undefined)));
+          const frame = () => new Promise((r) => requestAnimationFrame(() => r(el.getBoundingClientRect())));
+          const a = (await frame()) as DOMRect;
+          const b = (await frame()) as DOMRect;
+          return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  return pop;
+}
+
+/**
+ * Ekranda ham kod kalmasın (#710): snake_case alan / kaynak adı
+ * (`payable_amount`, `manual_upload`), çevrilmemiş i18n anahtarı
+ * (`office.x.y`) ve UBL / yön enum'u (`SATIS`, `incoming`). E-posta ve
+ * adresler önce çıkarılır. Bulunanlar hata iletisinde listelenir.
+ */
+export const RAW_TEXT =
+  /\b[a-z]+(?:_[a-z0-9]+)+\b|\b(?:office|common|sources|taxpayer|setup)\.[a-z_]+(?:\.[a-z_]+)*\b|\b(?:SATIS|ALIS|IADE|TEVKIFAT|ISTISNA|OZELMATRAH|IHRACKAYITLI|TEMELFATURA|TICARIFATURA|EARSIVFATURA|incoming|outgoing)\b/g;
+
+export async function expectNoRawText(target: Locator): Promise<void> {
+  const text = (await target.innerText())
+    .replace(/\S+@\S+/g, " ")
+    .replace(/https?:\/\/\S+/g, " ");
+  expect(text.match(RAW_TEXT) ?? [], text).toEqual([]);
 }

@@ -23,8 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import { useRelatedRecords } from "../hooks/use-related";
 import { focusNeighbor } from "../lib/focus-step";
@@ -39,6 +41,7 @@ import type {
   RelatedSourceKind,
 } from "../services/related.service";
 import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
+import { ManualLinkForm, ManualUnlinkButton } from "./journal-manual-link";
 import { Figure, Money, Panel, SeverityBadge } from "./office-ui";
 
 /** Çeviri yoksa ham değer (bilinmeyen durum ya da öneri türü). */
@@ -137,6 +140,41 @@ export function RelatedRecordsTable({
   kind: RelatedSourceKind;
   uuid: string;
   onOpen?: OpenRelated;
+}) {
+  const { can } = usePermission();
+  // Fişe elle kayıt bağlama (#710): fişin ilişkili kayıtlarında.
+  const linkable =
+    kind === "journal_draft" && can(permissions.tenant.journals.write);
+  const table = (
+    <RelatedTable
+      engagement={engagement}
+      kind={kind}
+      uuid={uuid}
+      onOpen={onOpen}
+      linkable={linkable}
+    />
+  );
+  if (!linkable) return table;
+  return (
+    <>
+      {table}
+      <ManualLinkForm engagement={engagement} draft={uuid} />
+    </>
+  );
+}
+
+function RelatedTable({
+  engagement,
+  kind,
+  uuid,
+  onOpen,
+  linkable,
+}: {
+  engagement: string;
+  kind: RelatedSourceKind;
+  uuid: string;
+  onOpen?: OpenRelated;
+  linkable: boolean;
 }) {
   const { t } = useLocale();
   const tr = useTr();
@@ -312,6 +350,21 @@ export function RelatedRecordsTable({
                 </TableCell>
                 <TableCell className="px-4 py-2 align-top whitespace-nowrap">
                   {tr(`office.related.status.${item.status}`, item.status)}
+                  {linkable &&
+                  item.relation === "manual" &&
+                  item.uuid &&
+                  (item.kind === "invoice" ||
+                    item.kind === "bank_transaction") ? (
+                    <div>
+                      <ManualUnlinkButton
+                        engagement={engagement}
+                        draft={uuid}
+                        kind={item.kind}
+                        uuid={item.uuid}
+                        label={recordName(item)}
+                      />
+                    </div>
+                  ) : null}
                 </TableCell>
               </TableRow>
             </Fragment>

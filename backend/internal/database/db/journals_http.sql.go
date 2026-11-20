@@ -120,7 +120,7 @@ func (q *Queries) ListExportBatches(ctx context.Context, arg ListExportBatchesPa
 
 const listJournalDrafts = `-- name: ListJournalDrafts :many
 
-SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason,
+SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason, d.approval_warnings, d.approval_note,
        COALESCE(t.debit, 0)::numeric AS total_debit,
        COALESCE(t.credit, 0)::numeric AS total_credit,
        COALESCE(t.lines, 0)::int AS line_count
@@ -168,6 +168,8 @@ type ListJournalDraftsRow struct {
 	ApprovalRevertedBy   pgtype.Int8        `json:"approval_reverted_by"`
 	ApprovalRevertedAt   pgtype.Timestamptz `json:"approval_reverted_at"`
 	ApprovalRevertReason pgtype.Text        `json:"approval_revert_reason"`
+	ApprovalWarnings     []string           `json:"approval_warnings"`
+	ApprovalNote         pgtype.Text        `json:"approval_note"`
 	TotalDebit           pgtype.Numeric     `json:"total_debit"`
 	TotalCredit          pgtype.Numeric     `json:"total_credit"`
 	LineCount            int32              `json:"line_count"`
@@ -212,6 +214,8 @@ func (q *Queries) ListJournalDrafts(ctx context.Context, arg ListJournalDraftsPa
 			&i.ApprovalRevertedBy,
 			&i.ApprovalRevertedAt,
 			&i.ApprovalRevertReason,
+			&i.ApprovalWarnings,
+			&i.ApprovalNote,
 			&i.TotalDebit,
 			&i.TotalCredit,
 			&i.LineCount,

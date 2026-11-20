@@ -139,10 +139,10 @@ Yönetici olarak takip etmeniz gerekenler:
 
 ## 7. Yevmiye ve Luca / Zirve çıktısı
 
-**Yevmiye ve çıktı** sayfasında yevmiye fişi hazırlanır, onaylanır ve
+**Fişler ve aktarım** sayfasında yevmiye fişi hazırlanır, onaylanır ve
 muhasebe programının dosyası indirilir.
 
-![Yevmiye ve çıktı](../../frontend/public/yardim/img/ofis-yevmiye.jpg)
+![Fişler ve aktarım](../../frontend/public/yardim/img/ofis-yevmiye.jpg)
 
 1. Üstten mükellefi ve dönemi seçin.
 2. **Yeni fiş:** açıklamayı yazın, satırları ekleyin. Her satırda hesap kodu

@@ -189,7 +189,10 @@ type Filter struct {
 	Kind           string
 	RuleCandidate  *bool
 	Period         string // YYYY-MM, the suggestion's period (#333); "" = any
-	Limit, Offset  int32
+	// Invoice: suggestions read from one invoice (provenance input
+	// invoice_uuid, #669 F); "" = any.
+	Invoice       string
+	Limit, Offset int32
 }
 
 // ListRow is a listed suggestion with its engagement's public id.
@@ -209,6 +212,15 @@ type Store interface {
 	// ImpactCounts aggregates the office's suggestions decided in the last
 	// f.Months months against f.Threshold.
 	ImpactCounts(ctx context.Context, f ImpactFilter) (ImpactCounts, error)
+	// ByEngagement counts the filtered suggestions per engagement (#710).
+	ByEngagement(ctx context.Context, f Filter) ([]EngagementCount, error)
+}
+
+// EngagementCount is one taxpayer's share of the queue (#710).
+type EngagementCount struct {
+	EngagementUUID uuid.UUID
+	Total          int64
+	Oldest         time.Time
 }
 
 // ImpactFilter scopes a threshold-impact aggregate.

@@ -74,6 +74,15 @@
   --status-warning-foreground: var(--surface);
   --status-blocking: var(--danger);
   --status-blocking-foreground: var(--surface);
+
+  /* Akış adımları (EasyTrade dili): sakin ana renk tamamlanan, halka
+     sıradaki, gri bekleyen, küçük kırmızı nokta hata. İşaretler hep metinle
+     birlikte kullanılır; renk tek başına anlam taşımaz. */
+  --step-done: var(--brand-text);
+  --step-current: var(--brand-text);
+  --step-pending: var(--line-strong);
+  --step-error: var(--danger);
+  --step-line: var(--line);
 }
 
 @theme inline {
@@ -148,6 +157,11 @@
   --color-status-warning-foreground: var(--status-warning-foreground);
   --color-status-blocking: var(--status-blocking);
   --color-status-blocking-foreground: var(--status-blocking-foreground);
+  --color-step-done: var(--step-done);
+  --color-step-current: var(--step-current);
+  --color-step-pending: var(--step-pending);
+  --color-step-error: var(--step-error);
+  --color-step-line: var(--step-line);
 
   --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono:

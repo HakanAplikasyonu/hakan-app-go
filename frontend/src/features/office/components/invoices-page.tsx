@@ -28,8 +28,10 @@ import { directionOf } from "../lib/from-api";
 import { invoiceKindText } from "../lib/ubl-codes";
 import { EngagementPicker, useSelectedEngagement } from "./engagement-picker";
 import { InvoiceDrawer } from "./invoice-drawer";
+import { InvoicePostings } from "./invoice-postings";
 import { FilterSelect, Figure } from "./office-ui";
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
+import { monthText } from "./vat-deduction-period";
 
 type Dir = "all" | "outgoing" | "incoming";
 const PAGE = 50;
@@ -58,8 +60,8 @@ export function InvoiceStateBadge({ status }: { status: string }) {
 
 type InvoiceRow = OfficeInvoice;
 
-function useInvoiceColumns(engagement: string) {
-  const { t } = useLocale();
+function useInvoiceColumns(engagement: string, period: string | null) {
+  const { t, locale } = useLocale();
   const invoiceHref = useInvoiceHref();
   return useMemo<ColumnDef<InvoiceRow, unknown>[]>(
     () => [
@@ -109,6 +111,13 @@ function useInvoiceColumns(engagement: string) {
                   <Figure>{inv.open_warnings}</Figure>
                 </span>
               ) : null}
+              <VatMovedNote
+                invoice={inv}
+                period={period}
+                text={(key, month) =>
+                  t(key, { month: monthText(month, locale) })
+                }
+              />
             </div>
           );
         },
@@ -177,7 +186,37 @@ function useInvoiceColumns(engagement: string) {
         cell: ({ row }) => <InvoiceStateBadge status={row.original.status} />,
       }),
     ],
-    [engagement, invoiceHref, t],
+    [engagement, invoiceHref, locale, period, t],
+  );
+}
+
+/**
+ * Geç gelen alış faturası (#640): KDV'si alındığı ayın listesinde "Eylül
+ * 2026'dan gelen", belge ayında "Kasım 2026'ya alındı" notu.
+ */
+function VatMovedNote({
+  invoice,
+  period,
+  text,
+}: {
+  invoice: InvoiceRow;
+  period: string | null;
+  text: (key: string, month: string) => string;
+}) {
+  const moved = invoice.vat_deduction_period;
+  if (!moved) return null;
+  const docMonth = invoice.issue_date.slice(0, 7);
+  const label =
+    period === moved
+      ? text("office.invoices.vat_moved_from", docMonth)
+      : text("office.invoices.vat_moved_to", moved);
+  return (
+    <span
+      className="bg-surface-3 text-text-2 rounded-md px-1.5 py-0.5 text-xs whitespace-nowrap"
+      data-testid="vat-moved-note"
+    >
+      {label}
+    </span>
   );
 }
 
@@ -198,14 +237,14 @@ function InvoicesInner() {
   const openInvoice = (uuid: string | null) =>
     listState.setParams({ invoice: uuid }, { resetPage: false });
 
-  const { period } = useOfficePeriod();
+  const { period, focus } = useUrlOfficePeriod();
   const list = useEngagementInvoices(slug, engagement, {
     direction: direction === "all" ? undefined : direction,
     period,
     limit: listState.params.limit,
     offset: listState.params.offset,
   });
-  const baseColumns = useInvoiceColumns(engagement);
+  const baseColumns = useInvoiceColumns(engagement, period ?? null);
   const columns = useMemo<ColumnDef<InvoiceRow, unknown>[]>(
     () => [
       ...baseColumns,
@@ -290,6 +329,7 @@ function InvoicesInner() {
           ]}
         />
       </div>
+      <InvoicePostings slug={slug} engagement={engagement} period={focus} />
       <EntityTable<InvoiceRow>
         columns={columns}
         data={rows}
@@ -299,7 +339,7 @@ function InvoicesInner() {
         errorTitle={t("office.api.load_error")}
         onRetry={() => void list.refetch()}
         emptyTitle={t("office.invoices_empty")}
-        emptyDescription=""
+        emptyDescription={t("office.invoices_empty_hint")}
         state={listState.tableState}
         rowCount={total}
         pageSizeOptions={[25, 50, 100]}

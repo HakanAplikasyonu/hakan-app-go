@@ -51,7 +51,12 @@ func (e env) invoiceDraft(t *testing.T, kind string, id int64) Draft {
 		LineInput{Account: "153", Debit: dec("100"), SourceKind: kind, SourceID: src},
 		LineInput{Account: "191", Debit: dec("20"), SourceKind: kind, SourceID: src},
 		LineInput{Account: "320.01", Credit: dec("120"), SourceKind: kind, SourceID: src})
-	e.approve(t, d)
+	// Aynı belgeden ikinci fiş bu testlerde bilerek kurulur; mükerrer
+	// engelini (#710) açıkça "yine de gönder" ile geçer.
+	if err := e.svc.ApproveWith(context.Background(), e.scope, e.actor, d.UUID,
+		Confirmation{SendDuplicate: true, Reason: "test: aynı belgeden ikinci fiş"}); err != nil {
+		t.Fatal(err)
+	}
 	return d
 }
 

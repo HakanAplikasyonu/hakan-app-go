@@ -114,6 +114,11 @@ export RATE_LIMIT_REGISTER_LIMIT="${E2E_REGISTER_LIMIT:-1000}"
 # Mükellef onayı (taxpayer-consents/approve) da IP başına 15 dk'da 20 ile
 # sınırlı; addConsentedTaxpayer kullanan senaryolar çoğaldıkça 429 alınıyordu.
 export RATE_LIMIT_TAXPAYER_ACCEPT_LIMIT="${E2E_TAXPAYER_ACCEPT_LIMIT:-1000}"
+# Onay / davet bağlantısının önizlemesi de IP başına 15 dk'da 60; senaryo
+# sayısı arttıkça koşunun sonunda 429 alınıyordu (kayıt formu açılmıyor).
+export RATE_LIMIT_TAXPAYER_PREVIEW_LIMIT="${E2E_TAXPAYER_PREVIEW_LIMIT:-1000}"
+# Ofis ekip daveti önizlemesi de aynı (IP başına 15 dk'da 60).
+export RATE_LIMIT_TEAM_INVITE_PREVIEW_LIMIT="${E2E_TEAM_INVITE_PREVIEW_LIMIT:-1000}"
 # setsid: süreç grubu lideri olur, e2e-down grubu birlikte kapatır.
 setsid nohup "$DIR/server" > "$DIR/server.log" 2>&1 < /dev/null &
 echo $! > "$DIR/server.pid"

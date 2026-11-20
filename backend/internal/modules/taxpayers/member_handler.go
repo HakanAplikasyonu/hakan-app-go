@@ -20,9 +20,14 @@ import (
 // Rate limits for the invitation endpoints (per 15 minutes).
 const (
 	limitWindow        = 15 * time.Minute
-	limitPreviewPerIP  = 60
 	limitInvitesPerOrg = 50
 )
+
+// limitPreviewPerIP caps invitation and consent link previews per IP.
+// RATE_LIMIT_TAXPAYER_PREVIEW_LIMIT overrides it: every consented taxpayer
+// an e2e scenario creates opens the consent link from one IP
+// (scripts/e2e-up.sh).
+var limitPreviewPerIP = envLimit("RATE_LIMIT_TAXPAYER_PREVIEW_LIMIT", 60)
 
 // limitAcceptPerIP caps invitation accepts and consent decisions per IP.
 // RATE_LIMIT_TAXPAYER_ACCEPT_LIMIT overrides it: the e2e suite approves many

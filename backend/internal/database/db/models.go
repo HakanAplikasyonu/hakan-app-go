@@ -422,6 +422,8 @@ type BankTransaction struct {
 	ContentHash                pgtype.Text        `json:"content_hash"`
 	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	ExcludedBy                 pgtype.Int8        `json:"excluded_by"`
+	ExcludedAt                 pgtype.Timestamptz `json:"excluded_at"`
 }
 
 type BankTransactionDocument struct {
@@ -1161,6 +1163,8 @@ type Invoice struct {
 	VatDeductionPeriod         pgtype.Text        `json:"vat_deduction_period"`
 	VatDeductionSetBy          pgtype.Int8        `json:"vat_deduction_set_by"`
 	VatDeductionSetAt          pgtype.Timestamptz `json:"vat_deduction_set_at"`
+	CounterpartyTaxIDSetBy     pgtype.Int8        `json:"counterparty_tax_id_set_by"`
+	CounterpartyTaxIDSetAt     pgtype.Timestamptz `json:"counterparty_tax_id_set_at"`
 }
 
 type InvoiceItem struct {
@@ -1198,6 +1202,17 @@ type InvoiceItem struct {
 	ExpenseCategoryID          pgtype.Int8    `json:"expense_category_id"`
 	LineType                   string         `json:"line_type"`
 	TaxBreakdowns              []byte         `json:"tax_breakdowns"`
+}
+
+type InvoiceJournalLink struct {
+	ID             int64              `json:"id"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	TaxpayerID     int64              `json:"taxpayer_id"`
+	InvoiceID      int64              `json:"invoice_id"`
+	JournalDraftID int64              `json:"journal_draft_id"`
+	CreatedBy      pgtype.Int8        `json:"created_by"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type InvoiceSource struct {
@@ -1250,6 +1265,8 @@ type JournalDraft struct {
 	ApprovalRevertedBy   pgtype.Int8        `json:"approval_reverted_by"`
 	ApprovalRevertedAt   pgtype.Timestamptz `json:"approval_reverted_at"`
 	ApprovalRevertReason pgtype.Text        `json:"approval_revert_reason"`
+	ApprovalWarnings     []string           `json:"approval_warnings"`
+	ApprovalNote         pgtype.Text        `json:"approval_note"`
 }
 
 type JournalDraftLine struct {
@@ -2221,6 +2238,15 @@ type TaxReturn struct {
 	AccrualSha256     pgtype.Text        `json:"accrual_sha256"`
 	AccrualUploadedBy pgtype.Int8        `json:"accrual_uploaded_by"`
 	AccrualUploadedAt pgtype.Timestamptz `json:"accrual_uploaded_at"`
+	CheckedBy         pgtype.Int8        `json:"checked_by"`
+	CheckedAt         pgtype.Timestamptz `json:"checked_at"`
+}
+
+type TaxReturnSetting struct {
+	OrganizationID     int64              `json:"organization_id"`
+	FinalCheckRequired bool               `json:"final_check_required"`
+	UpdatedBy          pgtype.Int8        `json:"updated_by"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Taxpayer struct {

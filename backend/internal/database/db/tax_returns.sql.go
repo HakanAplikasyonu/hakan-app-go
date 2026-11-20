@@ -11,13 +11,76 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkTaxReturn = `-- name: CheckTaxReturn :one
+UPDATE tax_returns
+SET checked_by = $1, checked_at = NOW()
+WHERE organization_id = $2 AND engagement_id = $3 AND kind = $4 AND period = $5
+  AND status = 'prepared'
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
+`
+
+type CheckTaxReturnParams struct {
+	CheckedBy      pgtype.Int8 `json:"checked_by"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	Kind           string      `json:"kind"`
+	Period         string      `json:"period"`
+}
+
+// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
+func (q *Queries) CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error) {
+	row := q.db.QueryRow(ctx, checkTaxReturn,
+		arg.CheckedBy,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Kind,
+		arg.Period,
+	)
+	var i TaxReturn
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.OrganizationID,
+		&i.EngagementID,
+		&i.Kind,
+		&i.Period,
+		&i.Status,
+		&i.Adjustments,
+		&i.Acknowledged,
+		&i.Snapshot,
+		&i.PayableAmount,
+		&i.CarryOut,
+		&i.FiledOn,
+		&i.AccrualNumber,
+		&i.Note,
+		&i.PreparedBy,
+		&i.PreparedAt,
+		&i.FiledBy,
+		&i.FiledAt,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AccrualStorageKey,
+		&i.AccrualFileName,
+		&i.AccrualSizeBytes,
+		&i.AccrualSha256,
+		&i.AccrualUploadedBy,
+		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
 const fileTaxReturn = `-- name: FileTaxReturn :one
 UPDATE tax_returns
 SET status = 'filed', filed_on = $1, accrual_number = $2,
-    note = COALESCE($3, note), filed_by = $4, filed_at = NOW()
+    note = COALESCE($3, note), filed_by = $4, filed_at = NOW(),
+    -- Veren sorumlu kontrol etmiş sayılır (ayrıca işaretlenmediyse).
+    checked_by = COALESCE(checked_by, $4), checked_at = COALESCE(checked_at, NOW())
 WHERE organization_id = $5 AND engagement_id = $6 AND kind = $7 AND period = $8
   AND status = 'prepared'
-RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
 `
 
 type FileTaxReturnParams struct {
@@ -72,12 +135,14 @@ func (q *Queries) FileTaxReturn(ctx context.Context, arg FileTaxReturnParams) (T
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
 	)
 	return i, err
 }
 
 const getTaxReturn = `-- name: GetTaxReturn :one
-SELECT id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at FROM tax_returns
+SELECT id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at FROM tax_returns
 WHERE organization_id = $1 AND engagement_id = $2 AND kind = $3 AND period = $4
 `
 
@@ -125,12 +190,31 @@ func (q *Queries) GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (Tax
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
+const getTaxReturnSettings = `-- name: GetTaxReturnSettings :one
+SELECT organization_id, final_check_required, updated_by, updated_at FROM tax_return_settings WHERE organization_id = $1
+`
+
+// Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
+func (q *Queries) GetTaxReturnSettings(ctx context.Context, organizationID int64) (TaxReturnSetting, error) {
+	row := q.db.QueryRow(ctx, getTaxReturnSettings, organizationID)
+	var i TaxReturnSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.FinalCheckRequired,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listTaxReturns = `-- name: ListTaxReturns :many
-SELECT id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at FROM tax_returns
+SELECT id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at FROM tax_returns
 WHERE organization_id = $1 AND engagement_id = $2
   AND ($3::text IS NULL OR period LIKE $3::text || '-%')
 ORDER BY period DESC, kind
@@ -180,6 +264,8 @@ func (q *Queries) ListTaxReturns(ctx context.Context, arg ListTaxReturnsParams) 
 			&i.AccrualSha256,
 			&i.AccrualUploadedBy,
 			&i.AccrualUploadedAt,
+			&i.CheckedBy,
+			&i.CheckedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -201,7 +287,7 @@ SET status = 'prepared', adjustments = EXCLUDED.adjustments, acknowledged = EXCL
     snapshot = EXCLUDED.snapshot, payable_amount = EXCLUDED.payable_amount, carry_out = EXCLUDED.carry_out,
     prepared_by = EXCLUDED.prepared_by, prepared_at = NOW()
 WHERE tax_returns.status = 'draft'
-RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
 `
 
 type PrepareTaxReturnParams struct {
@@ -260,16 +346,19 @@ func (q *Queries) PrepareTaxReturn(ctx context.Context, arg PrepareTaxReturnPara
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
 	)
 	return i, err
 }
 
 const reopenTaxReturn = `-- name: ReopenTaxReturn :one
 UPDATE tax_returns
-SET status = 'draft', snapshot = NULL, payable_amount = NULL, carry_out = NULL, prepared_by = NULL, prepared_at = NULL
+SET status = 'draft', snapshot = NULL, payable_amount = NULL, carry_out = NULL, prepared_by = NULL, prepared_at = NULL,
+    checked_by = NULL, checked_at = NULL
 WHERE organization_id = $1 AND engagement_id = $2 AND kind = $3 AND period = $4
   AND status = 'prepared'
-RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
 `
 
 type ReopenTaxReturnParams struct {
@@ -316,6 +405,8 @@ func (q *Queries) ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
 	)
 	return i, err
 }
@@ -326,7 +417,7 @@ SET accrual_storage_key = $1::text, accrual_file_name = $2::text,
     accrual_size_bytes = $3::bigint, accrual_sha256 = $4::text, accrual_uploaded_by = $5, accrual_uploaded_at = NOW()
 WHERE organization_id = $6 AND engagement_id = $7 AND kind = $8 AND period = $9
   AND status = 'filed'
-RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
 `
 
 type SetTaxReturnAccrualDocumentParams struct {
@@ -385,6 +476,8 @@ func (q *Queries) SetTaxReturnAccrualDocument(ctx context.Context, arg SetTaxRet
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
 	)
 	return i, err
 }
@@ -969,13 +1062,108 @@ func (q *Queries) TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnReta
 	return items, nil
 }
 
+const taxReturnSectionStats = `-- name: TaxReturnSectionStats :one
+SELECT
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text)::bigint AS retail_total,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text
+        AND r.approval_status = 'approved')::bigint AS retail_processed,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text
+        AND r.approval_status = 'rejected')::bigint AS retail_ignored,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL)::bigint AS invoice_total,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'active' AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL))::bigint AS invoice_processed,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'cancelled')::bigint AS invoice_ignored,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled)::bigint AS bank_total,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled AND b.match_status = 'matched')::bigint AS bank_processed,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled AND b.match_status = 'ignored')::bigint AS bank_ignored,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0)::bigint AS expense_total,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'approved')::bigint AS expense_processed,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'rejected')::bigint AS expense_ignored
+`
+
+type TaxReturnSectionStatsParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Period     string `json:"period"`
+}
+
+type TaxReturnSectionStatsRow struct {
+	RetailTotal      int64 `json:"retail_total"`
+	RetailProcessed  int64 `json:"retail_processed"`
+	RetailIgnored    int64 `json:"retail_ignored"`
+	InvoiceTotal     int64 `json:"invoice_total"`
+	InvoiceProcessed int64 `json:"invoice_processed"`
+	InvoiceIgnored   int64 `json:"invoice_ignored"`
+	BankTotal        int64 `json:"bank_total"`
+	BankProcessed    int64 `json:"bank_processed"`
+	BankIgnored      int64 `json:"bank_ignored"`
+	ExpenseTotal     int64 `json:"expense_total"`
+	ExpenseProcessed int64 `json:"expense_processed"`
+	ExpenseIgnored   int64 `json:"expense_ignored"`
+}
+
+// Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+// (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+// her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+// fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+// eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+// sayılan banka hareketi.
+func (q *Queries) TaxReturnSectionStats(ctx context.Context, arg TaxReturnSectionStatsParams) (TaxReturnSectionStatsRow, error) {
+	row := q.db.QueryRow(ctx, taxReturnSectionStats, arg.TaxpayerID, arg.Period)
+	var i TaxReturnSectionStatsRow
+	err := row.Scan(
+		&i.RetailTotal,
+		&i.RetailProcessed,
+		&i.RetailIgnored,
+		&i.InvoiceTotal,
+		&i.InvoiceProcessed,
+		&i.InvoiceIgnored,
+		&i.BankTotal,
+		&i.BankProcessed,
+		&i.BankIgnored,
+		&i.ExpenseTotal,
+		&i.ExpenseProcessed,
+		&i.ExpenseIgnored,
+	)
+	return i, err
+}
+
+const taxReturnUserName = `-- name: TaxReturnUserName :one
+SELECT TRIM(u.name || ' ' || u.surname)::text AS full_name
+FROM users u
+JOIN organization_members om ON om.user_id = u.id AND om.organization_id = $1
+WHERE u.id = $2
+`
+
+type TaxReturnUserNameParams struct {
+	OrganizationID int64 `json:"organization_id"`
+	UserID         int64 `json:"user_id"`
+}
+
+// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
+func (q *Queries) TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error) {
+	row := q.db.QueryRow(ctx, taxReturnUserName, arg.OrganizationID, arg.UserID)
+	var full_name string
+	err := row.Scan(&full_name)
+	return full_name, err
+}
+
 const upsertTaxReturnDraft = `-- name: UpsertTaxReturnDraft :one
 INSERT INTO tax_returns (organization_id, engagement_id, kind, period, adjustments, acknowledged, note, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (organization_id, engagement_id, kind, period) DO UPDATE
 SET adjustments = EXCLUDED.adjustments, acknowledged = EXCLUDED.acknowledged, note = EXCLUDED.note
 WHERE tax_returns.status = 'draft'
-RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at
+RETURNING id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at
 `
 
 type UpsertTaxReturnDraftParams struct {
@@ -1031,6 +1219,34 @@ func (q *Queries) UpsertTaxReturnDraft(ctx context.Context, arg UpsertTaxReturnD
 		&i.AccrualSha256,
 		&i.AccrualUploadedBy,
 		&i.AccrualUploadedAt,
+		&i.CheckedBy,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
+const upsertTaxReturnSettings = `-- name: UpsertTaxReturnSettings :one
+INSERT INTO tax_return_settings (organization_id, final_check_required, updated_by, updated_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, final_check_required, updated_by, updated_at
+`
+
+type UpsertTaxReturnSettingsParams struct {
+	OrganizationID     int64       `json:"organization_id"`
+	FinalCheckRequired bool        `json:"final_check_required"`
+	UpdatedBy          pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error) {
+	row := q.db.QueryRow(ctx, upsertTaxReturnSettings, arg.OrganizationID, arg.FinalCheckRequired, arg.UpdatedBy)
+	var i TaxReturnSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.FinalCheckRequired,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

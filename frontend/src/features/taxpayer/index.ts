@@ -8,3 +8,4 @@ export { TaxpayerReceiptsPage } from "./components/taxpayer-receipts-page";
 export { TaxpayerUploadsPage } from "./components/taxpayer-uploads-page";
 export { TaxpayerRequestsPage } from "./components/taxpayer-requests-page";
 export { TaxpayerPayrollPage } from "./components/taxpayer-payroll-page";
+export { TaxpayerArchivePage } from "./components/taxpayer-archive-page";

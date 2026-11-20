@@ -5,8 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
@@ -100,6 +103,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
 	// Book the movement to an account from the same screen (#565).
 	mux.Handle("PUT "+tx+"/account", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
+	// Take a (duplicate) movement out of the account or put it back (#710).
+	mux.Handle("PUT "+tx+"/exclusion", middleware.Chain(http.HandlerFunc(h.exclusion), authn, org, write, eng))
 }
 
 func subjectOf(r *http.Request) Subject {
@@ -117,14 +122,42 @@ func (h *Handler) transaction(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
-// search: GET .../invoice-search?q= (#565).
+// search: GET .../invoice-search?q=&from=&to=&min=&max= (#565).
 func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("transactionUuid"))
 	if err != nil {
 		response.NotFound(w, r, "bank transaction not found")
 		return
 	}
-	items, err := h.svc.Search(r.Context(), subjectOf(r), id, r.URL.Query().Get("q"))
+	qs := r.URL.Query()
+	f := SearchFilter{Term: qs.Get("q")}
+	for _, d := range []struct {
+		key string
+		dst **time.Time
+	}{{"from", &f.From}, {"to", &f.To}} {
+		if v := strings.TrimSpace(qs.Get(d.key)); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				response.BadRequest(w, r, "VALIDATION_ERROR", d.key+" must be YYYY-MM-DD")
+				return
+			}
+			*d.dst = &t
+		}
+	}
+	for _, a := range []struct {
+		key string
+		dst **decimal.Decimal
+	}{{"min", &f.Min}, {"max", &f.Max}} {
+		if v := strings.TrimSpace(qs.Get(a.key)); v != "" {
+			n, err := decimal.NewFromString(v)
+			if err != nil || n.IsNegative() {
+				response.BadRequest(w, r, "VALIDATION_ERROR", a.key+" must be a non-negative amount")
+				return
+			}
+			*a.dst = &n
+		}
+	}
+	items, err := h.svc.SearchFiltered(r.Context(), subjectOf(r), id, f)
 	h.reply(w, r, map[string]any{"items": items}, err)
 }
 
@@ -154,14 +187,26 @@ func (h *Handler) searchLines(w http.ResponseWriter, r *http.Request) {
 type matchBody struct {
 	InvoiceUUIDs []uuid.UUID `json:"invoice_uuids"`
 	JournalLines []LineRef   `json:"journal_lines"`
+	// PayrollRunUUIDs: payroll runs the payment pays (net salaries, #710).
+	PayrollRunUUIDs []uuid.UUID `json:"payroll_run_uuids"`
 }
 
 // matchedPayload names what the movement is tied to (invoices, lines).
 func matchedPayload(v TransactionView) map[string]any {
-	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches)}
+	return map[string]any{"invoices": invoiceNumbers(v.Matches), "journal_lines": lineLabels(v.JournalMatches), "payroll_periods": payrollPeriods(v.PayrollMatches)}
 }
 
-func hasMatches(v TransactionView) bool { return len(v.Matches)+len(v.JournalMatches) > 0 }
+func hasMatches(v TransactionView) bool {
+	return len(v.Matches)+len(v.JournalMatches)+len(v.PayrollMatches) > 0
+}
+
+func payrollPeriods(ms []MatchedPayroll) []string {
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, m.Period)
+	}
+	return out
+}
 
 func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("transactionUuid"))
@@ -172,15 +217,15 @@ func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	var in matchBody
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
 	dec.DisallowUnknownFields()
-	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs)+len(in.JournalLines) == 0 ||
-		len(in.InvoiceUUIDs) > MaxCombination*2 || len(in.JournalLines) > MaxCombination*2 {
-		response.BadRequest(w, r, "VALIDATION_ERROR", "name 1-10 invoices (invoice_uuids) and / or 1-10 journal lines (journal_lines)")
+	if err := dec.Decode(&in); err != nil || len(in.InvoiceUUIDs)+len(in.JournalLines)+len(in.PayrollRunUUIDs) == 0 ||
+		len(in.InvoiceUUIDs) > MaxCombination*2 || len(in.JournalLines) > MaxCombination*2 || len(in.PayrollRunUUIDs) > 3 {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "name 1-10 invoices (invoice_uuids), 1-3 payroll runs (payroll_run_uuids) and / or 1-10 journal lines (journal_lines)")
 		return
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
 	// What a re-match replaces is read first: afterwards it is gone.
 	before, _ := h.svc.Transaction(r.Context(), subjectOf(r), id)
-	v, err := h.svc.Match(r.Context(), subjectOf(r), id, in.InvoiceUUIDs, in.JournalLines, p.UserInternal)
+	v, err := h.svc.MatchAll(r.Context(), subjectOf(r), id, MatchInput{Invoices: in.InvoiceUUIDs, PayrollRuns: in.PayrollRunUUIDs, Lines: in.JournalLines}, p.UserInternal)
 	if err == nil {
 		action, extra := ActionMatched, matchedPayload(v)
 		if hasMatches(before) {
@@ -243,8 +288,10 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, ErrNotMatchable):
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
-	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
+	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, ErrCancelledByBank):
+		response.Conflict(w, r, "BANK_TRANSACTION_CANCELLED", "the bank cancelled this movement; it cannot be put back")
 	case errors.Is(err, posting.ErrNotFound):
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, posting.ErrDrafted):

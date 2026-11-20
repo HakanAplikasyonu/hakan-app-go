@@ -71,7 +71,7 @@ var trCatalog = map[string]string{
 	"export.format.csv":                   "CSV",
 	"export.format.json":                  "JSON",
 	// Mizan dışa aktarımı (#669 E).
-	"trial_balance.title": "Mizan", "trial_balance.code": "Hesap kodu", "trial_balance.name": "Hesap adı",
+	"trial_balance.title": "Mizan", "trial_balance.live_title": "Canlı mizan", "trial_balance.code": "Hesap kodu", "trial_balance.name": "Hesap adı",
 	"trial_balance.debit": "Borç", "trial_balance.credit": "Alacak",
 	"trial_balance.debit_balance": "Borç bakiyesi", "trial_balance.credit_balance": "Alacak bakiyesi",
 	"trial_balance.previous_balance": "Önceki bakiye", "trial_balance.change": "Değişim",
@@ -110,7 +110,7 @@ var enCatalog = map[string]string{
 	"export.format.csv":                   "CSV",
 	"export.format.json":                  "JSON",
 	// Trial balance export (#669 E).
-	"trial_balance.title": "Trial balance", "trial_balance.code": "Account code", "trial_balance.name": "Account name",
+	"trial_balance.title": "Trial balance", "trial_balance.live_title": "Live trial balance", "trial_balance.code": "Account code", "trial_balance.name": "Account name",
 	"trial_balance.debit": "Debit", "trial_balance.credit": "Credit",
 	"trial_balance.debit_balance": "Debit balance", "trial_balance.credit_balance": "Credit balance",
 	"trial_balance.previous_balance": "Previous balance", "trial_balance.change": "Change",

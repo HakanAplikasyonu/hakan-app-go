@@ -62,12 +62,14 @@ warning_office_alerts engagement
 taxpayer_import_batches
 account_rule_settings
 office_support_settings
+tax_return_settings
 report_deliveries engagement
 whatsapp_chat_links engagement
 whatsapp_captures engagement
 report_schedules engagement
 expense_categories
 receipt_postings engagement
+invoice_journal_links engagement
 copilot_plans
 reconciliation_runs engagement
 reconciliation_items engagement

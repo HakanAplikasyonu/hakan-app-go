@@ -24,6 +24,7 @@ WHERE s.organization_id = $1
   AND ($6::text IS NULL OR s.kind = $6::text)
   AND ($7::bool IS NULL OR s.rule_candidate = $7::bool)
   AND ($8::text IS NULL OR s.period = $8::text)
+  AND ($9::text IS NULL OR s.inputs->>'invoice_uuid' = $9::text)
 `
 
 type CountTenantSuggestionsParams struct {
@@ -35,6 +36,7 @@ type CountTenantSuggestionsParams struct {
 	Kind           pgtype.Text `json:"kind"`
 	RuleCandidate  pgtype.Bool `json:"rule_candidate"`
 	Period         pgtype.Text `json:"period"`
+	InvoiceUuid    pgtype.Text `json:"invoice_uuid"`
 }
 
 // tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
@@ -48,10 +50,71 @@ func (q *Queries) CountTenantSuggestions(ctx context.Context, arg CountTenantSug
 		arg.Kind,
 		arg.RuleCandidate,
 		arg.Period,
+		arg.InvoiceUuid,
 	)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const countTenantSuggestionsByEngagement = `-- name: CountTenantSuggestionsByEngagement :many
+SELECT e.uuid AS engagement_uuid, count(*)::bigint AS total, min(s.created_at)::timestamptz AS oldest
+FROM suggestions s
+JOIN engagements e ON e.id = s.engagement_id AND e.organization_id = s.organization_id
+WHERE s.organization_id = $1
+  AND ($2::bool OR s.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = $1 AND a.user_id = $3))
+  AND ($4::text IS NULL OR s.status = $4::text)
+  AND ($5::text IS NULL OR s.kind = $5::text)
+  AND ($6::text IS NULL OR s.period = $6::text)
+GROUP BY e.uuid
+ORDER BY count(*) DESC, min(s.created_at), e.uuid
+LIMIT 500
+`
+
+type CountTenantSuggestionsByEngagementParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	AllEngagements bool        `json:"all_engagements"`
+	UserID         int64       `json:"user_id"`
+	Status         pgtype.Text `json:"status"`
+	Kind           pgtype.Text `json:"kind"`
+	Period         pgtype.Text `json:"period"`
+}
+
+type CountTenantSuggestionsByEngagementRow struct {
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	Total          int64              `json:"total"`
+	Oldest         pgtype.Timestamptz `json:"oldest"`
+}
+
+// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+// kullanıcının görebildiği mükellefler; çok olan önce.
+func (q *Queries) CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error) {
+	rows, err := q.db.Query(ctx, countTenantSuggestionsByEngagement,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Status,
+		arg.Kind,
+		arg.Period,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountTenantSuggestionsByEngagementRow{}
+	for rows.Next() {
+		var i CountTenantSuggestionsByEngagementRow
+		if err := rows.Scan(&i.EngagementUuid, &i.Total, &i.Oldest); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const counterpartyCodeHistory = `-- name: CounterpartyCodeHistory :many
@@ -482,8 +545,9 @@ WHERE s.organization_id = $1
   AND ($6::text IS NULL OR s.kind = $6::text)
   AND ($7::bool IS NULL OR s.rule_candidate = $7::bool)
   AND ($8::text IS NULL OR s.period = $8::text)
+  AND ($9::text IS NULL OR s.inputs->>'invoice_uuid' = $9::text)
 ORDER BY CASE WHEN s.status = 'pending' THEN s.confidence END ASC NULLS LAST, s.updated_at DESC, s.id DESC
-LIMIT $10 OFFSET $9
+LIMIT $11 OFFSET $10
 `
 
 type ListTenantSuggestionsParams struct {
@@ -495,6 +559,7 @@ type ListTenantSuggestionsParams struct {
 	Kind           pgtype.Text `json:"kind"`
 	RuleCandidate  pgtype.Bool `json:"rule_candidate"`
 	Period         pgtype.Text `json:"period"`
+	InvoiceUuid    pgtype.Text `json:"invoice_uuid"`
 	Off            int32       `json:"off"`
 	Lim            int32       `json:"lim"`
 }
@@ -542,6 +607,7 @@ func (q *Queries) ListTenantSuggestions(ctx context.Context, arg ListTenantSugge
 		arg.Kind,
 		arg.RuleCandidate,
 		arg.Period,
+		arg.InvoiceUuid,
 		arg.Off,
 		arg.Lim,
 	)

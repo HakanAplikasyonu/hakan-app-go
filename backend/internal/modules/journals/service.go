@@ -36,6 +36,11 @@ var (
 	ErrBlocked         = errors.New("journals: export blocked by validation issues")
 	ErrNothingToExport = errors.New("journals: no approved entries to export")
 	ErrReasonRequired  = errors.New("journals: a reason is required to reverse an export")
+	// ErrLineFromSource: the line's amount comes from its source (bank,
+	// invoice, payroll); it is corrected there, not on the draft.
+	ErrLineFromSource = errors.New("journals: the line's amount comes from its source document")
+	// ErrInvoicePosted: the engagement already booked this invoice (#669).
+	ErrInvoicePosted = errors.New("journals: the invoice already has an entry")
 )
 
 // DB is what the service needs from Postgres.
@@ -110,6 +115,10 @@ type DraftInput struct {
 	DocumentType string                     `json:"document_type,omitempty"`
 	Origin       map[string]any             `json:"origin,omitempty"`
 	Lines        []LineInput                `json:"lines"`
+	// InvoiceID links the draft to the invoice it books (#669), in the same
+	// transaction: an invoice already booked by this engagement gives
+	// ErrInvoicePosted and no draft. Not part of the API body.
+	InvoiceID int64 `json:"-"`
 }
 
 // Draft is the API view of a draft.
@@ -222,6 +231,18 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 			return Draft{}, fmt.Errorf("journals: line %d: %w", i+1, err)
 		}
 	}
+	if in.InvoiceID > 0 {
+		n, err := q.InsertInvoiceJournalLink(ctx, db.InsertInvoiceJournalLinkParams{
+			OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID,
+			InvoiceID: in.InvoiceID, JournalDraftID: row.ID, CreatedBy: actor(actorID),
+		})
+		if err != nil {
+			return Draft{}, fmt.Errorf("journals: invoice link: %w", err)
+		}
+		if n == 0 {
+			return Draft{}, ErrInvoicePosted
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return Draft{}, err
 	}
@@ -232,6 +253,13 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 // Approve moves a balanced draft to approved. An unbalanced draft is refused
 // (docs/02 §2: blocker before any driver sees it).
 func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID) error {
+	return s.ApproveWith(ctx, scope, actorID, id, Confirmation{Confirmed: true})
+}
+
+// ApproveWith approves a draft. A possible duplicate is refused unless
+// c.SendDuplicate with a reason (#710); a missing document needs
+// c.Confirmed. The accepted warnings and the note / reason stay on the entry.
+func (s *Service) ApproveWith(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID, c Confirmation) error {
 	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
@@ -255,7 +283,36 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	if b := blocking(issues[row.ID]); len(b) > 0 {
 		return &DraftBlockedError{Issues: b}
 	}
-	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID)})
+	warn := confirmable(issues[row.ID])
+	// Mükerrer fiş engellenir (#710); yalnız ayrı "yine de gönder" ve
+	// gerekçeyle geçer. Eksik belge açık onayla geçer (#705).
+	dup, other := splitDuplicates(warn)
+	reason := strings.TrimSpace(c.Reason)
+	if len(dup) > 0 {
+		if !c.SendDuplicate {
+			return &DraftDuplicateError{Issues: dup}
+		}
+		if reason == "" {
+			return ErrReasonRequired
+		}
+	}
+	if len(other) > 0 && !c.Confirmed {
+		return &DraftNeedsConfirmationError{Issues: other}
+	}
+	codes := []string{}
+	for _, w := range warn {
+		codes = append(codes, w.Code)
+	}
+	note := pgtype.Text{}
+	text := strings.TrimSpace(c.Note)
+	if len(dup) > 0 {
+		text = reason
+	}
+	if text != "" && len(warn) > 0 {
+		note = pgtype.Text{String: text, Valid: true}
+	}
+	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID),
+		ApprovalWarnings: codes, ApprovalNote: note})
 	if err != nil {
 		return err
 	}

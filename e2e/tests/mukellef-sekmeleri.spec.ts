@@ -130,7 +130,7 @@ test.describe("mükellef sekmeleri", () => {
     await tabs(page).getByRole("link", { name: "Fişler" }).click();
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/journals`));
     await expectShell(page, taxpayer.title);
-    await expect(page.getByRole("heading", { level: 2, name: "Yevmiye ve çıktı" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Fişler ve aktarım" })).toBeVisible();
     expect(new URL(page.url()).searchParams.get("taxpayer")).toBeNull();
 
     // Geri tuşu sekmeler arasında da çalışır.

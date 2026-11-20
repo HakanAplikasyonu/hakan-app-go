@@ -66,6 +66,8 @@ test.describe("@a11y ofis paneli", () => {
       `/engagements/${atlas}/reconciliation?view=babs`,
       `/engagements/${atlas}/reconciliation?view=letters`,
       `/engagements/${atlas}/trial-balance`,
+      `/engagements/${atlas}/trial-balance?kaynak=canli`,
+      `/engagements/${atlas}/archive`,
       // Beyannameler: KDV1 (taslak, kontrol listesi), MUHSGK ve Ba/Bs (#390).
       `/engagements/${atlas}/tax-returns`,
       `/engagements/${atlas}/tax-returns?kind=muhsgk`,
@@ -169,7 +171,7 @@ test.describe("@a11y mükellef paneli", () => {
     await uiLogin(page, DEMO.taxpayerUser);
     await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
     const base = new URL(page.url()).pathname;
-    for (const s of ["", "/invoices", "/receipts", "/uploads", "/payroll", "/report", "/requests"]) {
+    for (const s of ["", "/invoices", "/receipts", "/uploads", "/payroll", "/archive", "/report", "/requests"]) {
       await test.step(s || "/", async () => {
         await page.goto(base + s);
         await scan(page, base + s);

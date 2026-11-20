@@ -85,7 +85,14 @@ test.describe("mükellef mizanı (#669 E)", () => {
     const sep = list.items.find((x) => x.period === "2026-09");
     expect(sep).toBeTruthy();
     await page.getByLabel("Dönem (yüklenen mizan)").selectOption(sep!.uuid);
-    await expect(table.getByRole("row", { name: /^100 KASA/ })).toContainText("600,00");
+    // Ekim satırı da önceki dönem sütununda 600,00 gösterir; seçimin gerçekten
+    // uygulandığı URL'den ve Ekim tutarının kaybolmasından anlaşılır. Yoksa
+    // Excel, seçim uygulanmadan (en yeni mizanla) iner.
+    await expect(page).toHaveURL(new RegExp(`mizan=${sep!.uuid}`));
+    await expect(page.getByText("Karşılaştırılan: Eylül 2026")).toBeHidden();
+    const kasaMain = table.getByRole("row", { name: /^100 KASA/ });
+    await expect(kasaMain).toContainText("600,00");
+    await expect(kasaMain).not.toContainText("1.500,00");
 
     // Excel ve PDF.
     const [xlsx] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Excel" }).click()]);

@@ -67,6 +67,7 @@ WHERE s.organization_id = @organization_id
   AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text)
   AND (sqlc.narg(rule_candidate)::bool IS NULL OR s.rule_candidate = sqlc.narg(rule_candidate)::bool)
   AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(invoice_uuid)::text IS NULL OR s.inputs->>'invoice_uuid' = sqlc.narg(invoice_uuid)::text)
 ORDER BY CASE WHEN s.status = 'pending' THEN s.confidence END ASC NULLS LAST, s.updated_at DESC, s.id DESC
 LIMIT @lim OFFSET @off;
 
@@ -82,7 +83,25 @@ WHERE s.organization_id = @organization_id
   AND (sqlc.narg(status)::text IS NULL OR s.status = sqlc.narg(status)::text)
   AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text)
   AND (sqlc.narg(rule_candidate)::bool IS NULL OR s.rule_candidate = sqlc.narg(rule_candidate)::bool)
-  AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text);
+  AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(invoice_uuid)::text IS NULL OR s.inputs->>'invoice_uuid' = sqlc.narg(invoice_uuid)::text);
+
+-- name: CountTenantSuggestionsByEngagement :many
+-- Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+-- kullanıcının görebildiği mükellefler; çok olan önce.
+SELECT e.uuid AS engagement_uuid, count(*)::bigint AS total, min(s.created_at)::timestamptz AS oldest
+FROM suggestions s
+JOIN engagements e ON e.id = s.engagement_id AND e.organization_id = s.organization_id
+WHERE s.organization_id = @organization_id
+  AND (@all_engagements::bool OR s.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
+  AND (sqlc.narg(status)::text IS NULL OR s.status = sqlc.narg(status)::text)
+  AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text)
+  AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text)
+GROUP BY e.uuid
+ORDER BY count(*) DESC, min(s.created_at), e.uuid
+LIMIT 500;
 
 -- name: ListReviewSettings :many
 -- Ofis satırları ve, engagement verilirse, onun satırları.

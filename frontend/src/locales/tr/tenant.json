@@ -129,5 +129,14 @@
   "support_widget_help": "ClickFix panelinde Web widget → Kurulum sekmesindeki data-widget değeri.",
   "support_widget_placeholder": "Örn. 3f2a9c1e-…",
   "support_widget_invalid": "Yalnız harf, rakam, - ve _ kullanılabilir (en fazla 128 karakter).",
-  "support_saved": "Destek ayarı kaydedildi."
+  "support_saved": "Destek ayarı kaydedildi.",
+  "statement_ai_title": "Banka ekstresi",
+  "statement_ai_label": "Tanınmayan ekstrede kolonları yapay zekâ önersin",
+  "statement_ai_description": "Kapalıyken dosya yapay zekâya gönderilmez; kolonlar şablonlardan ve başlık adlarından önerilir, gerisini önizlemede siz seçersiniz.",
+  "settings_section_tax_returns": "Beyan",
+  "settings_section_tax_returns_description": "Beyanın son kontrolünü kimin yapacağı.",
+  "final_check_title": "Sorumlu müşavirin son kontrolü",
+  "final_check_label": "\"Kontrol edildi\" ve \"Verildi\" işaretini yalnız sorumlu koysun",
+  "final_check_on": "Açık: beyanı herkes hazırlar; kontrol edildi ve verildi işaretini yalnız ofis sahibi ya da yönetici koyar.",
+  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir."
 }

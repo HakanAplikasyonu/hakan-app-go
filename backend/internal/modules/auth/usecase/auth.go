@@ -371,7 +371,10 @@ func (u *AuthUseCase) insertPasswordlessUser(ctx context.Context, email, name, s
 	if _, err := rand.Read(random); err != nil {
 		return model.User{}, err
 	}
-	hash, err := password.Hash(base64.RawURLEncoding.EncodeToString(random))
+	// The user never types this password (MarkPasswordUnset below); the
+	// "Aa1" suffix keeps it inside the policy, which random base64 alone
+	// misses now and then (no digit / upper case: a flaky sign-up).
+	hash, err := password.Hash(base64.RawURLEncoding.EncodeToString(random) + "Aa1")
 	if err != nil {
 		return model.User{}, err
 	}

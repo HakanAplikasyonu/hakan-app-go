@@ -27,13 +27,31 @@ import {
   DataTable,
   StatusPill,
   type DataTableFeatures,
+  type StatusTone,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DRAFTS_ANCHOR,
   EXPORT_ANCHOR,
@@ -49,11 +67,19 @@ import { useLocale } from "@/providers/locale-provider";
 import {
   useExportDrivers,
   useJournalActions,
+  useJournalDraft,
   useJournalDrafts,
   useJournalExports,
   useJournalTransfers,
 } from "../hooks/use-journals";
-import { formatMoney } from "../lib/decimal";
+import {
+  absDiff,
+  formatMoney,
+  fromMinor,
+  parseAmountInput,
+  sum,
+  toMinor,
+} from "../lib/decimal";
 import { exportIssueText } from "../lib/export-issue";
 import { periodService } from "../services/periods.service";
 import { journalErrorText } from "../lib/journal-error";
@@ -90,10 +116,12 @@ import {
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
-const statusClass: Record<JournalDraft["status"], string> = {
-  draft: "bg-secondary text-secondary-foreground",
-  approved: "bg-status-approved/12 text-status-approved",
-  exported: "bg-brand/12 text-brand",
+// Fiş durumu ortak sade rozetle (#708 dili, #710): taslak gri, onaylı
+// yeşil, aktarılmış ana renk nokta; anlamı metin taşır.
+const statusTone: Record<JournalDraft["status"], StatusTone> = {
+  draft: "neutral",
+  approved: "ok",
+  exported: "info",
 };
 
 type Translate = (key: string) => string;
@@ -123,6 +151,17 @@ function driverLabel(t: Translate, name: string) {
 
 /** Onayı durduran engel var mı (#566); hesap kodu sorunları uyarıdır. */
 const isBlocked = (d: JournalDraft) => !!d.issues?.some((i) => i.blocking);
+/** Onayı engellemeyen ama açıkça sorulan uyarılar (#669, ofis kararı). */
+const CONFIRM_CODES = ["missing_document", "possible_duplicate"];
+const warningsOf = (d: JournalDraft) =>
+  (d.issues ?? []).filter((i) => CONFIRM_CODES.includes(i.code));
+/**
+ * Mükerrer olabilir (#710, ofis kararı): onay engellenir; yalnız fişin
+ * kendi satırındaki ayrı "Yine de gönder" ve zorunlu gerekçeyle geçer.
+ * Toplu onay bu fişleri atlar.
+ */
+const isDuplicate = (d: JournalDraft) =>
+  !!d.issues?.some((i) => i.code === "possible_duplicate");
 
 function issueText(
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -150,6 +189,7 @@ function DraftCheck({
   const { slug } = useTenant();
   const { prompt } = useDialogs();
   const { setLineAccount } = useJournalActions(slug, engagement);
+  const [amountsOpen, setAmountsOpen] = useState(false);
   const { permissions: perms } = useTenant();
   const canUnlock = perms.includes(permissions.tenant.periods.lock);
   const qc = useQueryClient();
@@ -226,51 +266,260 @@ function DraftCheck({
     );
   };
   return (
-    <ul className="space-y-1 text-xs">
-      {issues.map((is, i) => (
-        <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1",
-              is.blocking ? "text-status-blocking" : "text-status-warning",
-            )}
-          >
-            <CircleAlert className="size-3.5 shrink-0" aria-hidden />
-            {issueText(t, is)}
-          </span>
-          {/* Kapalı dönem (#669 A): yetkili kullanıcı dönemi buradan,
+    <>
+      <ul className="space-y-1 text-xs">
+        {issues.map((is, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1",
+                is.blocking ? "text-status-blocking" : "text-status-warning",
+              )}
+            >
+              <CircleAlert className="size-3.5 shrink-0" aria-hidden />
+              {issueText(t, is)}
+            </span>
+            {/* Kapalı dönem (#669 A): yetkili kullanıcı dönemi buradan,
               gerekçesiyle açar; yetkisi olmayan kime başvuracağını görür. */}
-          {is.code === "period_locked" ? (
-            canUnlock ? (
+            {is.code === "period_locked" ? (
+              canUnlock ? (
+                <Button
+                  size="sm"
+                  variant="link"
+                  className="h-auto p-0 text-xs"
+                  disabled={unlock.isPending}
+                  onClick={() => void openPeriod()}
+                >
+                  {t("office.journals.check.unlock_period")}
+                </Button>
+              ) : (
+                <span className="text-muted-foreground">
+                  {t("office.journals.check.unlock_no_permission")}
+                </span>
+              )
+            ) : null}
+            {is.code === "unbalanced" ? (
               <Button
                 size="sm"
                 variant="link"
                 className="h-auto p-0 text-xs"
-                disabled={unlock.isPending}
-                onClick={() => void openPeriod()}
+                onClick={() => setAmountsOpen(true)}
               >
-                {t("office.journals.check.unlock_period")}
+                {t("office.journals.check.fix_amounts")}
               </Button>
-            ) : (
-              <span className="text-muted-foreground">
-                {t("office.journals.check.unlock_no_permission")}
-              </span>
-            )
-          ) : null}
-          {is.code === "unknown_account" || is.code === "parent_account" ? (
-            <Button
-              size="sm"
-              variant="link"
-              className="h-auto p-0 text-xs"
-              disabled={setLineAccount.isPending}
-              onClick={() => void fix(is)}
-            >
-              {t("office.journals.check.fix_account")}
-            </Button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+            ) : null}
+            {is.code === "unknown_account" || is.code === "parent_account" ? (
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0 text-xs"
+                disabled={setLineAccount.isPending}
+                onClick={() => void fix(is)}
+              >
+                {t("office.journals.check.fix_account")}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {amountsOpen ? (
+        <DraftAmountsDialog
+          draft={draft}
+          engagement={engagement}
+          onClose={() => setAmountsOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+type AmountEdit = { debit: string; credit: string };
+
+/**
+ * Borç-alacak tutmayan taslağın tutar düzeltmesi (#566): kaynaksız (elle
+ * girilmiş) satırların borç/alacağı yazılır, fark canlı görünür. Belgeden
+ * gelen satırın tutarı belgesinden düzeltilir; burada yalnız okunur.
+ */
+function DraftAmountsDialog({
+  draft,
+  engagement,
+  onClose,
+}: {
+  draft: JournalDraft;
+  engagement: string;
+  onClose: () => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const detail = useJournalDraft(slug, engagement, draft.uuid);
+  const { setLineAmounts } = useJournalActions(slug, engagement);
+  const [edits, setEdits] = useState<Record<number, AmountEdit>>({});
+  const lines = detail.data?.items ?? [];
+  const value = (no: number, side: keyof AmountEdit, current: string) =>
+    edits[no]?.[side] ?? (Number(current) ? current.replace(".", ",") : "");
+  const parsed = lines.map((l) => {
+    const debit = parseAmountInput(value(l.line_no, "debit", l.debit));
+    const credit = parseAmountInput(value(l.line_no, "credit", l.credit));
+    return { line: l, debit, credit };
+  });
+  const invalid = parsed.some(
+    (p) =>
+      p.debit === null ||
+      p.credit === null ||
+      // Tek taraf dolu olmalı: ya borç ya alacak.
+      Number(p.debit || 0) > 0 === Number(p.credit || 0) > 0,
+  );
+  const debitTotal = sum(parsed.map((p) => p.debit || "0"));
+  const creditTotal = sum(parsed.map((p) => p.credit || "0"));
+  const diff = invalid ? null : fromMinor(absDiff(debitTotal, creditTotal));
+  const changed = parsed.filter(
+    (p) =>
+      !p.line.source_kind &&
+      (toMinor(p.debit) !== toMinor(p.line.debit) ||
+        toMinor(p.credit) !== toMinor(p.line.credit)),
+  );
+  const set = (no: number, side: keyof AmountEdit, v: string, l: AmountEdit) =>
+    setEdits((prev) => ({ ...prev, [no]: { ...l, ...prev[no], [side]: v } }));
+  const save = () => {
+    setLineAmounts.mutate(
+      {
+        draft: draft.uuid,
+        lines: changed.map((p) => ({
+          line: p.line.line_no,
+          debit: p.debit || "0",
+          credit: p.credit || "0",
+        })),
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            t("office.journals.check.amounts_fixed", { count: changed.length }),
+          );
+          onClose();
+        },
+        onError: (err) =>
+          toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+      },
+    );
+  };
+  return (
+    <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {t("office.journals.check.amounts_title", {
+              entry: draft.entry_no,
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t("office.journals.check.amounts_description")}
+          </DialogDescription>
+        </DialogHeader>
+        {detail.isPending ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <Table data-testid="draft-amounts">
+            <TableHeader>
+              <TableRow className="text-muted-foreground text-left text-xs">
+                <TableHead className="py-1 pr-2 font-medium">
+                  {t("office.journals.check.amounts_line")}
+                </TableHead>
+                <TableHead className="py-1 pr-2 font-medium">
+                  {t("office.journals.check.amounts_account")}
+                </TableHead>
+                <TableHead className="py-1 pr-2 text-right font-medium">
+                  {t("office.journals.check.amounts_debit")}
+                </TableHead>
+                <TableHead className="py-1 text-right font-medium">
+                  {t("office.journals.check.amounts_credit")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l) => {
+                const base = {
+                  debit: value(l.line_no, "debit", l.debit),
+                  credit: value(l.line_no, "credit", l.credit),
+                };
+                return (
+                  <TableRow key={l.line_no} className="border-t align-top">
+                    <TableCell className="py-1.5 pr-2 tabular-nums">
+                      {l.line_no}
+                    </TableCell>
+                    <TableCell className="py-1.5 pr-2">
+                      <span className="font-mono">{l.account}</span>
+                      {l.source_kind ? (
+                        <span className="text-muted-foreground block text-xs">
+                          {t("office.journals.check.amounts_from_source")}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    {(["debit", "credit"] as const).map((side) => (
+                      <TableCell
+                        key={side}
+                        className={cn(
+                          "py-1.5 text-right tabular-nums",
+                          side === "debit" && "pr-2",
+                        )}
+                      >
+                        {l.source_kind ? (
+                          formatMoney(l[side])
+                        ) : (
+                          <Input
+                            inputMode="decimal"
+                            className="h-8 w-32 text-right tabular-nums"
+                            aria-label={t(
+                              `office.journals.check.amounts_${side}_label`,
+                              { line: l.line_no },
+                            )}
+                            value={base[side]}
+                            onChange={(e) =>
+                              set(l.line_no, side, e.target.value, base)
+                            }
+                          />
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+        {lines.length ? (
+          <p
+            className={cn(
+              "text-sm",
+              diff === "0.00" ? "text-status-approved" : "text-status-blocking",
+            )}
+            data-testid="draft-amounts-diff"
+            aria-live="polite"
+          >
+            {diff === null
+              ? t("office.journals.check.amounts_invalid")
+              : diff === "0.00"
+                ? t("office.journals.check.amounts_balanced")
+                : t("office.journals.check.amounts_diff", {
+                    amount: formatMoney(diff),
+                  })}
+          </p>
+        ) : null}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            {t("office.journals.check.amounts_cancel")}
+          </Button>
+          <Button
+            disabled={invalid || !changed.length || setLineAmounts.isPending}
+            onClick={save}
+          >
+            {setLineAmounts.isPending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            {t("office.journals.check.amounts_save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -287,32 +536,64 @@ function ApproveClean({
 }) {
   const { t } = useLocale();
   const { slug, permissions: perms } = useTenant();
-  const { confirm } = useDialogs();
+  const { confirm, prompt } = useDialogs();
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
-  const clean = open.filter((d) => !isBlocked(d));
+  const clean = open.filter((d) => !isBlocked(d) && !isDuplicate(d));
+  const duplicates = open.filter((d) => !isBlocked(d) && isDuplicate(d));
   // Son onay sorumlu müşavirde (#566).
   if (!clean.length || !perms.includes(permissions.tenant.journals.approve))
     return null;
+  const warned = clean.filter((d) => warningsOf(d).length > 0).length;
   const run = async () => {
-    const ok = await confirm({
-      title: t("office.journals.check.approve_clean_title", {
-        count: clean.length,
+    const description = [
+      t("office.journals.check.approve_clean_description", {
+        blocked: open.length - clean.length - duplicates.length,
       }),
-      description: t("office.journals.check.approve_clean_description", {
-        blocked: open.length - clean.length,
-      }),
-      confirmLabel: t("office.journals.approve"),
-    });
-    if (!ok) return;
+      duplicates.length
+        ? t("office.journals.check.approve_clean_duplicates", {
+            count: duplicates.length,
+          })
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    // Uyarılı fiş varsa kaç tanesi olduğu açıkça söylenir; gerekçe isteğe bağlı.
+    let note = "";
+    if (warned > 0) {
+      const answer = await prompt({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description: `${description} ${t("office.journals.check.approve_clean_warned", { count: warned })}`,
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (answer === null) return;
+      note = answer.trim();
+    } else {
+      const ok = await confirm({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description,
+        confirmLabel: t("office.journals.approve"),
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     let done = 0;
     let failed = 0;
     let reason = "";
     for (const d of clean) {
       try {
-        await approve.mutateAsync(d.uuid);
+        await approve.mutateAsync(
+          warningsOf(d).length
+            ? { draft: d.uuid, confirm: true, note }
+            : d.uuid,
+        );
         done += 1;
       } catch (err) {
         failed += 1;
@@ -461,11 +742,11 @@ function ExportPanel({
             }))}
           />
           {chosen && !chosen.verified ? (
-            <span className="bg-status-warning/12 text-status-warning rounded-md px-2 py-0.5 text-xs">
+            <StatusPill tone="warn">
               {t("office.journals.template_unverified", {
                 version: chosen.template_version,
               })}
-            </span>
+            </StatusPill>
           ) : null}
           <Button
             size="sm"
@@ -705,7 +986,10 @@ function JournalsInner() {
   for (const tr of transfers.data?.items ?? [])
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
-  const { approve, unapprove, reverse } = useJournalActions(slug, engagement);
+  const { approve, unapprove, cancelExport } = useJournalActions(
+    slug,
+    engagement,
+  );
   // Hazırlayan stajyer onaylayamaz; fiş müşavirin onayını bekler (#566).
   const canApprove = perms.includes(permissions.tenant.journals.approve);
   // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
@@ -730,8 +1014,51 @@ function JournalsInner() {
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
   const approveDraft = approve.mutate;
   const approving = approve.isPending;
-  const reverseDraft = reverse.mutate;
-  const reversing = reverse.isPending;
+  // Uyarılı fiş (eksik belge / mükerrer olabilir, #669): engellenmez, ama
+  // onaydan önce açıkça sorulur; gerekçe isteğe bağlı, fişte kalır.
+  const approveOne = useCallback(
+    async (d: JournalDraft) => {
+      const warnings = warningsOf(d);
+      if (!warnings.length) {
+        approveDraft(d.uuid);
+        return;
+      }
+      if (isDuplicate(d)) {
+        // Engel: ayrı ve açık "yine de gönder", gerekçe zorunlu (#710).
+        const reason = await prompt({
+          title: t("office.journals.check.duplicate_title"),
+          description: [
+            ...warnings.map((w) => issueText(t, w)),
+            t("office.journals.check.duplicate_description"),
+          ].join(" "),
+          placeholder: t("office.journals.check.duplicate_reason"),
+          confirmLabel: t("office.journals.check.duplicate_send"),
+        });
+        if (reason === null || !reason.trim()) return;
+        approveDraft({
+          draft: d.uuid,
+          confirm: true,
+          sendDuplicate: true,
+          reason: reason.trim(),
+        });
+        return;
+      }
+      const note = await prompt({
+        title: t("office.journals.check.confirm_title"),
+        description: warnings.map((w) => issueText(t, w)).join(" "),
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (note === null) return;
+      approveDraft({ draft: d.uuid, confirm: true, note: note.trim() });
+    },
+    [approveDraft, prompt, t],
+  );
+  // Aktarılmış fiş (#710, ofis kararı): düzeltme fişi yok; fiş tamamen
+  // iptal edilir, taslağa döner; programdaki fiş kullanıcı tarafından silinir.
+  const cancelDraftExport = cancelExport.mutate;
+  const cancelling = cancelExport.isPending;
   const unapproveDraft = unapprove.mutate;
   const unapproving = unapprove.isPending;
   const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
@@ -823,14 +1150,9 @@ function JournalsInner() {
         labelKey: "office.col_status",
         accessorKey: "status",
         cell: ({ row }) => (
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 text-xs font-medium",
-              statusClass[row.original.status],
-            )}
-          >
+          <StatusPill tone={statusTone[row.original.status]}>
             {t(`office.journals.status_${row.original.status}`)}
-          </span>
+          </StatusPill>
         ),
       }),
       createColumn<JournalDraft>({
@@ -895,41 +1217,58 @@ function JournalsInner() {
                 size="sm"
                 variant="outline"
                 disabled={approving || isBlocked(d)}
-                onClick={() => approveDraft(d.uuid)}
+                onClick={() => void approveOne(d)}
               >
                 <Check className="size-4" />
                 {t("office.journals.approve")}
               </Button>
             </Hint>
-          ) : d.status === "exported" ? (
+          ) : d.status === "exported" && canApprove ? (
             <Button
               size="sm"
               variant="ghost"
-              disabled={reversing}
+              disabled={cancelling}
               onClick={async () => {
+                const vars = {
+                  no: d.entry_no,
+                  date: new Date(d.entry_date).toLocaleDateString("tr-TR"),
+                };
                 const reason = await prompt({
-                  title: t("office.journals.reverse"),
-                  description: t("office.journals.reverse_prompt"),
-                  confirmLabel: t("office.journals.reverse"),
+                  title: t("office.journals.cancel_export_title", vars),
+                  description: t(
+                    "office.journals.cancel_export_description",
+                    vars,
+                  ),
+                  placeholder: t("office.journals.cancel_export_reason"),
+                  confirmLabel: t("office.journals.cancel_export"),
                 });
-                if (reason?.trim()) reverseDraft({ draft: d.uuid, reason });
+                if (!reason?.trim()) return;
+                cancelDraftExport(
+                  { draft: d.uuid, reason: reason.trim() },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t("office.journals.cancel_export_done", vars),
+                      ),
+                  },
+                );
               }}
             >
               <Undo2 className="size-4" />
-              {t("office.journals.reverse")}
+              {t("office.journals.cancel_export")}
             </Button>
           ) : null,
       }),
     ],
     [
-      approveDraft,
+      approveOne,
       approving,
       canApprove,
       engagement,
       picked,
       prompt,
-      reverseDraft,
-      reversing,
+      cancelDraftExport,
+      cancelling,
       t,
       togglePick,
       unapproveDraft,
@@ -982,7 +1321,7 @@ function JournalsInner() {
   const openDrafts = rows.filter((d) => d.status === "draft");
   const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
   const stoppedDrafts = openDrafts.filter(isBlocked).length;
-  const actionError = approve.error ?? unapprove.error ?? reverse.error;
+  const actionError = approve.error ?? unapprove.error ?? cancelExport.error;
   return (
     <div className="space-y-4">
       {header}
@@ -1039,7 +1378,11 @@ function JournalsInner() {
         {drafts.isLoading ? (
           <Skeleton className="m-4 h-32" />
         ) : rows.length === 0 ? (
-          <EmptyState className="m-4" title={t("office.journals.empty")} />
+          <EmptyState
+            className="m-4"
+            title={t("office.journals.empty")}
+            description={t("office.journals.empty_hint")}
+          />
         ) : (
           <DataTable<JournalDraft>
             columns={draftColumns}

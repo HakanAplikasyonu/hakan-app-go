@@ -167,14 +167,14 @@ func (p *Postgres) List(ctx context.Context, f usecase.Filter) ([]usecase.ListRo
 	}
 	rows, err := p.q.ListTenantSuggestions(ctx, db.ListTenantSuggestionsParams{
 		OrganizationID: f.OrganizationID, EngagementID: eng, AllEngagements: f.AllEngagements, UserID: f.UserID,
-		Status: optText(f.Status), Kind: optText(f.Kind), RuleCandidate: rc, Period: optText(f.Period), Lim: f.Limit, Off: f.Offset,
+		Status: optText(f.Status), Kind: optText(f.Kind), RuleCandidate: rc, Period: optText(f.Period), InvoiceUuid: optText(f.Invoice), Lim: f.Limit, Off: f.Offset,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("list suggestions: %w", err)
 	}
 	total, err := p.q.CountTenantSuggestions(ctx, db.CountTenantSuggestionsParams{
 		OrganizationID: f.OrganizationID, EngagementID: eng, AllEngagements: f.AllEngagements, UserID: f.UserID,
-		Status: optText(f.Status), Kind: optText(f.Kind), RuleCandidate: rc, Period: optText(f.Period),
+		Status: optText(f.Status), Kind: optText(f.Kind), RuleCandidate: rc, Period: optText(f.Period), InvoiceUuid: optText(f.Invoice),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("count suggestions: %w", err)
@@ -193,6 +193,22 @@ func (p *Postgres) List(ctx context.Context, f usecase.Filter) ([]usecase.ListRo
 		}), EngagementUUID: r.EngagementUuid})
 	}
 	return out, total, nil
+}
+
+// ByEngagement implements usecase.Store (#710).
+func (p *Postgres) ByEngagement(ctx context.Context, f usecase.Filter) ([]usecase.EngagementCount, error) {
+	rows, err := p.q.CountTenantSuggestionsByEngagement(ctx, db.CountTenantSuggestionsByEngagementParams{
+		OrganizationID: f.OrganizationID, AllEngagements: f.AllEngagements, UserID: f.UserID,
+		Status: optText(f.Status), Kind: optText(f.Kind), Period: optText(f.Period),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("count suggestions by engagement: %w", err)
+	}
+	out := make([]usecase.EngagementCount, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.EngagementCount{EngagementUUID: r.EngagementUuid, Total: r.Total, Oldest: r.Oldest.Time})
+	}
+	return out, nil
 }
 
 // Settings implements usecase.Store.

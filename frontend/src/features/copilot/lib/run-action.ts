@@ -64,7 +64,18 @@ export async function runStep(
       }
       case "journals_approve": {
         const page = await journalService.drafts(slug, eng, step.period);
-        const open = page.items.filter((d) => d.status === "draft");
+        // Engelli ve uyarılı (eksik belge / mükerrer olabilir, #669) fişler
+        // asistanla onaylanmaz; fişler ekranında açıkça onaylanır.
+        const open = page.items.filter(
+          (d) =>
+            d.status === "draft" &&
+            !(d.issues ?? []).some(
+              (i) =>
+                i.blocking ||
+                i.code === "missing_document" ||
+                i.code === "possible_duplicate",
+            ),
+        );
         if (open.length === 0) return { status: "nothing" };
         for (const d of open) {
           await journalService.approve(slug, eng, d.uuid);

@@ -23,7 +23,63 @@ const (
 	IssueUnknownAccount = "unknown_account"
 	IssueParentAccount  = "parent_account"
 	IssuePeriodLocked   = "period_locked"
+	// Uyarılar (#669, ofis kararı): onay engellenmez ama açıkça sorulur.
+	IssueMissingDocument   = "missing_document"
+	IssuePossibleDuplicate = "possible_duplicate"
 )
+
+// confirmable keeps the warnings the approver must accept explicitly.
+func confirmable(issues []DraftIssue) []DraftIssue {
+	var out []DraftIssue
+	for _, is := range issues {
+		if is.Code == IssueMissingDocument || is.Code == IssuePossibleDuplicate {
+			out = append(out, is)
+		}
+	}
+	return out
+}
+
+// DraftNeedsConfirmationError: the draft has warnings (missing document,
+// possible duplicate); the approval needs the explicit confirmation.
+type DraftNeedsConfirmationError struct{ Issues []DraftIssue }
+
+func (e *DraftNeedsConfirmationError) Error() string {
+	return fmt.Sprintf("journals: draft has %d warning(s) to confirm", len(e.Issues))
+}
+
+// DraftDuplicateError: the draft's source document is in another entry too
+// (#710, ofis kararı: mükerrer fiş engellenir). It passes only with the
+// separate, explicit "yine de gönder" and a reason.
+type DraftDuplicateError struct{ Issues []DraftIssue }
+
+func (e *DraftDuplicateError) Error() string {
+	return "journals: draft is a possible duplicate"
+}
+
+// Confirmation is the approver's answer to the draft's warnings.
+type Confirmation struct {
+	// Confirmed: "eksik belge var; yine de onaylıyorum".
+	Confirmed bool
+	// Note: optional reason, kept on the entry.
+	Note string
+	// SendDuplicate: "mükerrer olabilir; yine de gönder" (#710). Needs
+	// Reason; the reason is kept on the entry.
+	SendDuplicate bool
+	Reason        string
+}
+
+// splitDuplicates separates the possible-duplicate warnings (a block that
+// only "yine de gönder" passes) from the ones a confirmation passes.
+func splitDuplicates(warn []DraftIssue) (dup, other []DraftIssue) {
+	for _, is := range warn {
+		if is.Code == IssuePossibleDuplicate {
+			dup = append(dup, is)
+		} else {
+			other = append(other, is)
+		}
+	}
+	return dup, other
+}
 
 // DraftIssue is a problem the control screen shows on a draft. Blocking
 // ones (unbalanced, locked period) stop the approval; account code problems
@@ -79,6 +135,59 @@ func (s *Service) draftIssues(ctx context.Context, scope engagementctx.Scope, id
 		out[r.DraftID] = append(out[r.DraftID], is)
 	}
 	return out, nil
+}
+
+// ValidLineAmounts: a draft line has exactly one positive side, at most two
+// decimals (kuruş), like a new draft's lines.
+func ValidLineAmounts(debit, credit decimal.Decimal) error {
+	if debit.IsNegative() || credit.IsNegative() || debit.IsZero() == credit.IsZero() {
+		return fmt.Errorf("%w: a line has exactly one of debit / credit, above zero", ErrInvalid)
+	}
+	if !debit.Equal(debit.Round(2)) || !credit.Equal(credit.Round(2)) {
+		return fmt.Errorf("%w: amounts have at most two decimals", ErrInvalid)
+	}
+	return nil
+}
+
+// SetLineAmounts changes one line's debit / credit of a draft (#566): the
+// control screen's fix for a debit-credit difference. Only drafts, and only
+// lines without a source (entered by hand or from Excel): a bank, invoice
+// or payroll line's amount is its source's (ErrLineFromSource).
+func (s *Service) SetLineAmounts(ctx context.Context, scope engagementctx.Scope, id uuid.UUID, lineNo int32, debit, credit decimal.Decimal) error {
+	if err := ValidLineAmounts(debit, credit); err != nil {
+		return err
+	}
+	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if row.Status != "draft" {
+		return fmt.Errorf("%w: status is %s", ErrInvalid, row.Status)
+	}
+	n, err := s.q.SetJournalDraftLineAmounts(ctx, db.SetJournalDraftLineAmountsParams{
+		Debit: repository.Num(debit), Credit: repository.Num(credit),
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, DraftID: row.ID, LineNo: lineNo,
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		// The line is missing, or it has a source.
+		lines, err := s.q.ListJournalDraftLines(ctx, db.ListJournalDraftLinesParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, JournalDraftID: row.ID})
+		if err != nil {
+			return err
+		}
+		for _, l := range lines {
+			if l.LineNo == lineNo {
+				return ErrLineFromSource
+			}
+		}
+		return ErrNotFound
+	}
+	return nil
 }
 
 var accountCodeRe = regexp.MustCompile(`^[0-9]{3}(\.[0-9A-Za-z]+)*$`)

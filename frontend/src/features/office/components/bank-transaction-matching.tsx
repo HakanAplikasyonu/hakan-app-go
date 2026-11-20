@@ -21,6 +21,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
@@ -31,6 +32,7 @@ import { usePermission } from "@/providers/permission-provider";
 
 import { ACCOUNT_CODE_RE, useAccountPlanAccounts } from "../hooks/use-review";
 import { FOCUS_PARAM } from "../lib/related-href";
+import { periodLabel } from "../period/period";
 import {
   bankMatchingKeys,
   bankMatchingService,
@@ -66,7 +68,7 @@ export function BankTransactionMatchingPanel({
   /** Eşleşme değişince (beyan ekranı özetini yeniler). */
   onChanged?: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can("tenant.bank.write");
@@ -75,8 +77,21 @@ export function BankTransactionMatchingPanel({
   const [picked, setPicked] = useState<string[]>([]);
   // Seçilen fiş satırları (#669 G), anahtar "fiş uuid:satır no".
   const [pickedLines, setPickedLines] = useState<string[]>([]);
+  // Seçilen bordrolar (#710): net maaş ödemesi.
+  const [pickedPayroll, setPickedPayroll] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
+  // Elle arama süzgeçleri (#565): düzenleme tarihi ve tutar aralığı.
+  const [range, setRange] = useState({ from: "", to: "", min: "", max: "" });
+  const deferredRange = useDeferredValue(range);
+  const filter = {
+    q: deferred.length >= 2 ? deferred : "",
+    from: deferredRange.from,
+    to: deferredRange.to,
+    min: deferredRange.min.trim().replace(",", "."),
+    max: deferredRange.max.trim().replace(",", "."),
+  };
+  const searching = Object.values(filter).some((v) => v !== "");
 
   const q = useQuery({
     queryKey: key,
@@ -87,6 +102,7 @@ export function BankTransactionMatchingPanel({
     qc.setQueryData(key, v);
     setPicked([]);
     setPickedLines([]);
+    setPickedPayroll([]);
     void qc.invalidateQueries({
       queryKey: [
         "tenant",
@@ -119,13 +135,18 @@ export function BankTransactionMatchingPanel({
     onChanged?.();
   };
   const match = useMutation({
-    mutationFn: (m: { invoices: string[]; lines: BankMatchLineRef[] }) =>
+    mutationFn: (m: {
+      invoices: string[];
+      lines: BankMatchLineRef[];
+      payroll: string[];
+    }) =>
       bankMatchingService.match(
         slug,
         engagement,
         transaction,
         m.invoices,
         m.lines,
+        m.payroll,
       ),
     onSuccess: (v) =>
       settle(
@@ -133,7 +154,9 @@ export function BankTransactionMatchingPanel({
         t(
           v.matches.length > 0
             ? "office.bank.matching.matched"
-            : "office.bank.matching.matched_lines",
+            : v.payroll_matches.length > 0
+              ? "office.bank.matching.matched_payroll"
+              : "office.bank.matching.matched_lines",
         ),
       ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
@@ -171,10 +194,10 @@ export function BankTransactionMatchingPanel({
   const busy = match.isPending || unmatch.isPending || book.isPending;
   // Elle arama (#565): aday penceresinin dışındaki faturalar.
   const search = useQuery({
-    queryKey: bankMatchingKeys.search(slug, engagement, transaction, deferred),
+    queryKey: bankMatchingKeys.search(slug, engagement, transaction, filter),
     queryFn: () =>
-      bankMatchingService.search(slug, engagement, transaction, deferred),
-    enabled: deferred.length >= 2 && !!q.data?.matchable,
+      bankMatchingService.search(slug, engagement, transaction, filter),
+    enabled: searching && !!q.data?.matchable,
   });
 
   if (q.isPending) return <Skeleton className="h-32 w-full" />;
@@ -193,10 +216,16 @@ export function BankTransactionMatchingPanel({
     setPickedLines((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
   const journalHref = (id: string) =>
     `${routes.tenant.engagementJournals(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`journal_draft:${id}`)}`;
-  const hasMatches = v.matches.length + v.journal_matches.length > 0;
-  const pickedCount = picked.length + pickedLines.length;
+  const payrollHref = (id: string) =>
+    `${routes.tenant.engagementPayroll(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`payroll_run:${id}`)}`;
+  const togglePayroll = (id: string, on: boolean) =>
+    setPickedPayroll((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const hasMatches =
+    v.matches.length + v.journal_matches.length + v.payroll_matches.length > 0;
+  const pickedCount = picked.length + pickedLines.length + pickedPayroll.length;
   const submit = () =>
     match.mutate({
+      payroll: pickedPayroll,
       invoices: picked,
       lines: pickedLines.map((k) => {
         const [uuid, no] = k.split(":");
@@ -264,7 +293,9 @@ export function BankTransactionMatchingPanel({
             <h3 className="text-sm font-medium">
               {v.matches.length > 0
                 ? t("office.bank.matching.matches_title")
-                : t("office.bank.matching.line_matches_title")}
+                : v.payroll_matches.length > 0
+                  ? t("office.bank.matching.payroll_matches_title")
+                  : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -278,6 +309,11 @@ export function BankTransactionMatchingPanel({
               </Button>
             )}
           </div>
+          {canWrite ? (
+            <p className="text-text-2 text-xs">
+              {t("office.bank.matching.unmatch_hint")}
+            </p>
+          ) : null}
           {v.matches.length > 0 ? (
             <ul className="divide-y rounded-md border text-sm">
               {v.matches.map((m) => (
@@ -293,6 +329,37 @@ export function BankTransactionMatchingPanel({
                   </Link>
                   <span className="text-muted-foreground">
                     {trDate(m.issue_date)} · {m.counterparty_name ?? "—"}
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                  <MatchReason parts={m.parts} />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.payroll_matches.length > 0 ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-payroll-matches"
+            >
+              {v.payroll_matches.map((m) => (
+                <li
+                  key={m.payroll_run_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <Link
+                    className="font-medium underline-offset-4 hover:underline"
+                    href={payrollHref(m.payroll_run_uuid)}
+                  >
+                    {t("office.bank.matching.payroll_label", {
+                      period: periodLabel(m.period, locale),
+                    })}
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {t("office.bank.matching.payroll_net")}{" "}
+                    <Money value={m.net_total} currency={v.currency} />
                   </span>
                   <Money value={m.amount} currency={v.currency} />
                   <Badge variant="secondary">
@@ -374,7 +441,39 @@ export function BankTransactionMatchingPanel({
                   aria-label={t("office.bank.matching.search_placeholder")}
                 />
               </InputGroup>
-              {deferred.length >= 2 ? (
+              <div
+                className="grid max-w-md grid-cols-2 gap-2"
+                data-testid="bank-invoice-search-range"
+              >
+                {(
+                  [
+                    ["from", "date"],
+                    ["to", "date"],
+                    ["min", "text"],
+                    ["max", "text"],
+                  ] as const
+                ).map(([key, type]) => (
+                  <div key={key} className="space-y-1">
+                    <Label
+                      htmlFor={`bank-search-${transaction}-${key}`}
+                      className="text-text-2 text-xs"
+                    >
+                      {t(`office.bank.matching.search_${key}`)}
+                    </Label>
+                    <Input
+                      id={`bank-search-${transaction}-${key}`}
+                      type={type}
+                      inputMode={type === "text" ? "decimal" : undefined}
+                      value={range[key]}
+                      onChange={(e) =>
+                        setRange((r) => ({ ...r, [key]: e.target.value }))
+                      }
+                      className="h-8"
+                    />
+                  </div>
+                ))}
+              </div>
+              {searching ? (
                 search.isLoading ? (
                   <Skeleton className="h-16 w-full" />
                 ) : (search.data?.items ?? []).length === 0 ? (
@@ -404,6 +503,52 @@ export function BankTransactionMatchingPanel({
           ) : null}
         </section>
       )}
+
+      {v.payroll_matchable && canWrite && v.payroll_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-payroll-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.payroll_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.payroll_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.payroll_candidates.map((c) => (
+              <li
+                key={c.payroll_run_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <Checkbox
+                  checked={pickedPayroll.includes(c.payroll_run_uuid)}
+                  onCheckedChange={(on) =>
+                    togglePayroll(c.payroll_run_uuid, on === true)
+                  }
+                  aria-label={t("office.bank.matching.pick_payroll", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                />
+                <Link
+                  className="font-medium underline-offset-4 hover:underline"
+                  href={payrollHref(c.payroll_run_uuid)}
+                >
+                  {t("office.bank.matching.payroll_label", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                </Link>
+                <span className="text-muted-foreground">
+                  {t("office.bank.matching.payroll_employees", {
+                    count: c.employee_count,
+                  })}
+                </span>
+                <span className="ms-auto">
+                  {t("office.bank.matching.open")}{" "}
+                  <Money value={c.open_amount} currency={v.currency} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {v.line_matchable && canWrite ? (
         <LineSection
@@ -880,17 +1025,51 @@ function CandidateList({
             <Money value={c.open_amount} currency={currency} />
           </span>
           {c.score > 0 ? (
-            <Badge
-              variant={c.score >= 80 ? "default" : "outline"}
-              title={Object.entries(c.parts)
-                .map(([k, n]) => `${k}: ${n}`)
-                .join(", ")}
-            >
+            <Badge variant={c.score >= 80 ? "default" : "outline"}>
               {t("office.bank.matching.score", { score: String(c.score) })}
             </Badge>
           ) : null}
+          <MatchReason parts={c.parts} />
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Score parts in the order they weigh (21 §6.2). */
+const REASONS = [
+  "tax_id",
+  "iban",
+  "invoice_number",
+  "amount_exact",
+  "amount_less_fee",
+  "name",
+  "date",
+] as const;
+const RELATED = ["tax_id", "iban", "invoice_number", "name"];
+
+/**
+ * "Neden önerildi" (#710): eşleştiricinin puan parçaları Türkçe cümle
+ * olarak görünür. Yalnız tutarı tutan aday ayrıca uyarılır. Elle
+ * eşleşmede parça yoktur, satır çizilmez.
+ */
+function MatchReason({ parts }: { parts: Record<string, number> }) {
+  const { t } = useLocale();
+  const keys = REASONS.filter((k) => k in parts);
+  if (keys.length === 0) return null;
+  const related = keys.some((k) => RELATED.includes(k));
+  return (
+    <p className="text-text-2 w-full text-xs" data-testid="bank-match-reason">
+      {t("office.bank.matching.why", {
+        reasons: keys
+          .map((k) => t(`office.bank.matching.reason_${k}`))
+          .join(", "),
+      })}
+      {related ? null : (
+        <span className="text-warn ms-1">
+          {t("office.bank.matching.why_amount_only")}
+        </span>
+      )}
+    </p>
   );
 }

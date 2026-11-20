@@ -27,7 +27,7 @@ func (q *Queries) DeleteBankTransactionMatches(ctx context.Context, arg DeleteBa
 }
 
 const getBankTransactionByUUID = `-- name: GetBankTransactionByUUID :one
-SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
+SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at, excluded_by, excluded_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
 `
 
 type GetBankTransactionByUUIDParams struct {
@@ -86,6 +86,8 @@ func (q *Queries) GetBankTransactionByUUID(ctx context.Context, arg GetBankTrans
 		&i.ContentHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExcludedBy,
+		&i.ExcludedAt,
 	)
 	return i, err
 }
@@ -143,7 +145,7 @@ func (q *Queries) InsertBankTransactionMatch(ctx context.Context, arg InsertBank
 }
 
 const listBankTransactionMatchInvoices = `-- name: ListBankTransactionMatchInvoices :many
-SELECT m.amount, m.score, m.method, m.matched_at,
+SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
        i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
@@ -161,6 +163,7 @@ type ListBankTransactionMatchInvoicesRow struct {
 	Score         int16              `json:"score"`
 	Method        string             `json:"method"`
 	MatchedAt     pgtype.Timestamptz `json:"matched_at"`
+	Evidence      []byte             `json:"evidence"`
 	InvoiceUuid   uuid.UUID          `json:"invoice_uuid"`
 	InvoiceNumber string             `json:"invoice_number"`
 	IssueDate     pgtype.Date        `json:"issue_date"`
@@ -183,6 +186,7 @@ func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg List
 			&i.Score,
 			&i.Method,
 			&i.MatchedAt,
+			&i.Evidence,
 			&i.InvoiceUuid,
 			&i.InvoiceNumber,
 			&i.IssueDate,
@@ -324,6 +328,54 @@ func (q *Queries) ListBankTransactionMatches(ctx context.Context, arg ListBankTr
 	return items, nil
 }
 
+const listBankTransactionPayrollMatches = `-- name: ListBankTransactionPayrollMatches :many
+SELECT m.amount, m.method, r.uuid AS payroll_run_uuid, r.period, r.net_total
+FROM bank_transaction_matches m
+JOIN payroll_runs r ON r.taxpayer_id = m.taxpayer_id AND r.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'payroll_run'
+ORDER BY r.period
+`
+
+type ListBankTransactionPayrollMatchesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionPayrollMatchesRow struct {
+	Amount         pgtype.Numeric `json:"amount"`
+	Method         string         `json:"method"`
+	PayrollRunUuid uuid.UUID      `json:"payroll_run_uuid"`
+	Period         string         `json:"period"`
+	NetTotal       pgtype.Numeric `json:"net_total"`
+}
+
+// Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+func (q *Queries) ListBankTransactionPayrollMatches(ctx context.Context, arg ListBankTransactionPayrollMatchesParams) ([]ListBankTransactionPayrollMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionPayrollMatches, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionPayrollMatchesRow{}
+	for rows.Next() {
+		var i ListBankTransactionPayrollMatchesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Method,
+			&i.PayrollRunUuid,
+			&i.Period,
+			&i.NetTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionsForControls = `-- name: ListBankTransactionsForControls :many
 SELECT t.id, t.uuid, t.transaction_date, t.debit_credit, t.amount, t.currency, t.kind, t.kind_detail, t.match_status,
        t.counterparty_name, t.counterparty_iban, t.counterparty_tax_number, t.counterparty_identity_number,
@@ -412,7 +464,7 @@ func (q *Queries) ListBankTransactionsForControls(ctx context.Context, arg ListB
 
 const listBankTransactionsForMatching = `-- name: ListBankTransactionsForMatching :many
 
-SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions
+SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at, excluded_by, excluded_at FROM bank_transactions
 WHERE taxpayer_id = $1 AND period = $2 AND NOT is_cancelled
   AND kind_detail IN ('customer_collection', 'supplier_payment', 'rent_payment', 'utility_payment')
   AND match_status IN ('unmatched', 'suggested')
@@ -481,6 +533,8 @@ func (q *Queries) ListBankTransactionsForMatching(ctx context.Context, arg ListB
 			&i.ContentHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExcludedBy,
+			&i.ExcludedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -742,6 +796,67 @@ func (q *Queries) ListJournalLinesForManualMatch(ctx context.Context, arg ListJo
 	return items, nil
 }
 
+const listPayrollRunsForBankMatch = `-- name: ListPayrollRunsForBankMatch :many
+SELECT r.id, r.uuid, r.period, r.net_total,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = r.taxpayer_id AND m.target_type = 'payroll_run' AND m.target_id = r.id
+                   AND m.bank_transaction_id <> $1), 0)::numeric(18,2) AS paid,
+       (SELECT count(*) FROM payroll_lines l WHERE l.taxpayer_id = r.taxpayer_id AND l.payroll_run_id = r.id)::int AS employee_count
+FROM payroll_runs r
+WHERE r.taxpayer_id = $2 AND r.period >= $3::text AND r.period <= $4::text
+ORDER BY r.period DESC
+`
+
+type ListPayrollRunsForBankMatchParams struct {
+	BankTransactionID int64  `json:"bank_transaction_id"`
+	TaxpayerID        int64  `json:"taxpayer_id"`
+	PeriodFrom        string `json:"period_from"`
+	PeriodTo          string `json:"period_to"`
+}
+
+type ListPayrollRunsForBankMatchRow struct {
+	ID            int64          `json:"id"`
+	Uuid          uuid.UUID      `json:"uuid"`
+	Period        string         `json:"period"`
+	NetTotal      pgtype.Numeric `json:"net_total"`
+	Paid          pgtype.Numeric `json:"paid"`
+	EmployeeCount int32          `json:"employee_count"`
+}
+
+// Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+// eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+func (q *Queries) ListPayrollRunsForBankMatch(ctx context.Context, arg ListPayrollRunsForBankMatchParams) ([]ListPayrollRunsForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, listPayrollRunsForBankMatch,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.PeriodFrom,
+		arg.PeriodTo,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPayrollRunsForBankMatchRow{}
+	for rows.Next() {
+		var i ListPayrollRunsForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.Period,
+			&i.NetTotal,
+			&i.Paid,
+			&i.EmployeeCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchInvoicesForBankMatch = `-- name: SearchInvoicesForBankMatch :many
 SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
        (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
@@ -752,19 +867,30 @@ WHERE i.taxpayer_id = $2
   AND i.direction = $3
   AND i.status_normalized = 'active'
   AND (i.currency = $1::text OR ($1::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
-  AND (i.invoice_number ILIKE '%' || $4::text || '%'
+  AND ($4::text IS NULL
+       OR i.invoice_number ILIKE '%' || $4::text || '%'
        OR i.customer_name ILIKE '%' || $4::text || '%'
        OR i.customer_tax_number = $4::text
        OR i.customer_identity_number = $4::text)
+  AND ($5::date IS NULL OR i.issue_date >= $5::date)
+  AND ($6::date IS NULL OR i.issue_date <= $6::date)
+  AND ($7::numeric IS NULL
+       OR (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END) >= $7::numeric)
+  AND ($8::numeric IS NULL
+       OR (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END) <= $8::numeric)
 ORDER BY i.issue_date DESC, i.id
 LIMIT 50
 `
 
 type SearchInvoicesForBankMatchParams struct {
-	Currency   string `json:"currency"`
-	TaxpayerID int64  `json:"taxpayer_id"`
-	Direction  string `json:"direction"`
-	Term       string `json:"term"`
+	Currency   string         `json:"currency"`
+	TaxpayerID int64          `json:"taxpayer_id"`
+	Direction  string         `json:"direction"`
+	Term       pgtype.Text    `json:"term"`
+	DateFrom   pgtype.Date    `json:"date_from"`
+	DateTo     pgtype.Date    `json:"date_to"`
+	AmountMin  pgtype.Numeric `json:"amount_min"`
+	AmountMax  pgtype.Numeric `json:"amount_max"`
 }
 
 type SearchInvoicesForBankMatchRow struct {
@@ -779,13 +905,18 @@ type SearchInvoicesForBankMatchRow struct {
 
 // Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 // dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
-// faturalar.
+// faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
+// fatura tutarı aralığı (hareketin para biriminde); boş olan uygulanmaz.
 func (q *Queries) SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error) {
 	rows, err := q.db.Query(ctx, searchInvoicesForBankMatch,
 		arg.Currency,
 		arg.TaxpayerID,
 		arg.Direction,
 		arg.Term,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.AmountMin,
+		arg.AmountMax,
 	)
 	if err != nil {
 		return nil, err

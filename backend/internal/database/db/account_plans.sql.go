@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const accountPlanNames = `-- name: AccountPlanNames :many
+SELECT code::text AS code, name FROM account_plan_accounts
+WHERE organization_id = $1 AND engagement_id = $2 AND target = $3
+  AND code = ANY($4::text[])
+`
+
+type AccountPlanNamesParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementID   int64    `json:"engagement_id"`
+	Target         string   `json:"target"`
+	Codes          []string `json:"codes"`
+}
+
+type AccountPlanNamesRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// Etkin plandaki hesap adları (canlı mizanın adları, #669 E).
+func (q *Queries) AccountPlanNames(ctx context.Context, arg AccountPlanNamesParams) ([]AccountPlanNamesRow, error) {
+	rows, err := q.db.Query(ctx, accountPlanNames,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Target,
+		arg.Codes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AccountPlanNamesRow{}
+	for rows.Next() {
+		var i AccountPlanNamesRow
+		if err := rows.Scan(&i.Code, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countAccountPlanAccounts = `-- name: CountAccountPlanAccounts :one
 SELECT COUNT(*) FROM account_plan_accounts
 WHERE organization_id = $1 AND engagement_id = $2 AND target = $3
@@ -567,6 +611,62 @@ func (q *Queries) ListTrialBalanceLines(ctx context.Context, arg ListTrialBalanc
 			&i.Credit,
 			&i.Balance,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const liveTrialBalanceTotals = `-- name: LiveTrialBalanceTotals :many
+SELECT l.account_code::text AS account_code,
+       SUM(l.debit)::numeric AS debit,
+       SUM(l.credit)::numeric AS credit
+FROM journal_draft_lines l
+JOIN journal_drafts d ON d.id = l.journal_draft_id AND d.engagement_id = l.engagement_id
+WHERE d.organization_id = $1 AND d.engagement_id = $2
+  AND d.period >= $3::text AND d.period <= $4::text
+  AND (d.status IN ('approved', 'exported') OR $5::bool)
+GROUP BY l.account_code
+ORDER BY l.account_code
+`
+
+type LiveTrialBalanceTotalsParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	FromPeriod     string `json:"from_period"`
+	ToPeriod       string `json:"to_period"`
+	IncludeDrafts  bool   `json:"include_drafts"`
+}
+
+type LiveTrialBalanceTotalsRow struct {
+	AccountCode string         `json:"account_code"`
+	Debit       pgtype.Numeric `json:"debit"`
+	Credit      pgtype.Numeric `json:"credit"`
+}
+
+// Canlı mizan (#669 E): ofisin kendi fişlerinden hesap bazında borç /
+// alacak toplamı, [from_period, to_period] aralığında. Varsayılan onaylı ve
+// aktarılmış fişler; include_drafts taslakları da katar.
+func (q *Queries) LiveTrialBalanceTotals(ctx context.Context, arg LiveTrialBalanceTotalsParams) ([]LiveTrialBalanceTotalsRow, error) {
+	rows, err := q.db.Query(ctx, liveTrialBalanceTotals,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.FromPeriod,
+		arg.ToPeriod,
+		arg.IncludeDrafts,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LiveTrialBalanceTotalsRow{}
+	for rows.Next() {
+		var i LiveTrialBalanceTotalsRow
+		if err := rows.Scan(&i.AccountCode, &i.Debit, &i.Credit); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

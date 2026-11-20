@@ -16,6 +16,18 @@ export type BankTransactionHistoryEntry =
 const tx = (engagement: string, transaction: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-transactions/${encodeURIComponent(transaction)}`;
 
+/**
+ * Elle fatura araması süzgeci (#565): terim (fatura no, unvan, VKN), düzenleme
+ * tarihi aralığı ve tutar aralığı; boş olan gönderilmez.
+ */
+export type BankInvoiceSearch = {
+  q?: string;
+  from?: string;
+  to?: string;
+  min?: string;
+  max?: string;
+};
+
 export const bankMatchingKeys = {
   one: (slug: string, engagement: string, transaction: string) =>
     [
@@ -34,7 +46,12 @@ export const bankMatchingKeys = {
       transaction,
       "history",
     ] as const,
-  search: (slug: string, engagement: string, transaction: string, q: string) =>
+  search: (
+    slug: string,
+    engagement: string,
+    transaction: string,
+    filter: BankInvoiceSearch,
+  ) =>
     [
       "tenant",
       slug.toLowerCase(),
@@ -42,7 +59,7 @@ export const bankMatchingKeys = {
       engagement,
       transaction,
       "search",
-      q,
+      filter,
     ] as const,
   lineSearch: (
     slug: string,
@@ -86,16 +103,21 @@ export const bankMatchingService = {
     transaction: string,
     invoiceUuids: string[],
     journalLines: BankMatchLineRef[] = [],
+    payrollRunUuids: string[] = [],
   ) {
     return tenantRequest<BankTransactionMatching>(
       slug,
       "PUT",
       `${tx(engagement, transaction)}/matches`,
       {
-        body:
-          journalLines.length > 0
-            ? { invoice_uuids: invoiceUuids, journal_lines: journalLines }
-            : { invoice_uuids: invoiceUuids },
+        body: {
+          invoice_uuids: invoiceUuids,
+          ...(journalLines.length > 0 ? { journal_lines: journalLines } : {}),
+          // Bordroya bağlama (#710): net maaş ödemesi.
+          ...(payrollRunUuids.length > 0
+            ? { payroll_run_uuids: payrollRunUuids }
+            : {}),
+        },
       },
     );
   },
@@ -126,12 +148,19 @@ export const bankMatchingService = {
     );
   },
   /** Elle eşleştirme için açık fatura araması (#565). */
-  search(slug: string, engagement: string, transaction: string, q: string) {
+  search(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    filter: BankInvoiceSearch,
+  ) {
+    const query: Record<string, string> = {};
+    for (const [k, v] of Object.entries(filter)) if (v) query[k] = v;
     return tenantRequest<{ items: BankMatchCandidate[] }>(
       slug,
       "GET",
       `${tx(engagement, transaction)}/invoice-search`,
-      { query: { q } },
+      { query },
     );
   },
   /**

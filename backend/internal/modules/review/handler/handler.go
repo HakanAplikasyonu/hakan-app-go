@@ -95,6 +95,45 @@ func (h *Handler) ListOffice(w http.ResponseWriter, r *http.Request) {
 	h.list(w, r, usecase.Filter{OrganizationID: s.ID, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), UserID: userID(r)})
 }
 
+// ByTaxpayer: GET /v1/tenant/review/taxpayers?kind=&period=&status= (#710).
+// The queue per taxpayer: how many suggestions each visible taxpayer has
+// under the same filter as the queue, largest first; the office picks one
+// and works through it. Titles come from the engagement directory.
+func (h *Handler) ByTaxpayer(w http.ResponseWriter, r *http.Request) {
+	s := orgctx.Must(r.Context())
+	f := usecase.Filter{OrganizationID: s.ID, AllEngagements: s.Has(rbac.PermTenantEngagementsReadAll), UserID: userID(r)}
+	var ok bool
+	if f.Period, ok = periodq.Parse(w, r); !ok {
+		return
+	}
+	q := r.URL.Query()
+	switch st := q.Get("status"); st {
+	case "":
+		f.Status = string(usecase.StatusPending)
+	case "all":
+	default:
+		f.Status = st
+	}
+	f.Kind = q.Get("kind")
+	rows, err := h.svc.ByEngagement(r.Context(), f)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	type item struct {
+		EngagementUUID uuid.UUID `json:"engagement_uuid"`
+		Total          int64     `json:"total"`
+		Oldest         time.Time `json:"oldest_created_at"`
+	}
+	items := make([]item, 0, len(rows))
+	var sum int64
+	for _, row := range rows {
+		items = append(items, item{EngagementUUID: row.EngagementUUID, Total: row.Total, Oldest: row.Oldest})
+		sum += row.Total
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items, "total": sum})
+}
+
 // ListEngagement: GET /v1/tenant/engagements/{engagementUuid}/suggestions.
 func (h *Handler) ListEngagement(w http.ResponseWriter, r *http.Request) {
 	s := orgctx.Must(r.Context())
@@ -119,6 +158,14 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, f usecase.Filter)
 		f.Status = st
 	}
 	f.Kind = q.Get("kind")
+	if v := q.Get("invoice"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			response.BadRequest(w, r, response.CodeValidationError, "invoice must be a uuid")
+			return
+		}
+		f.Invoice = id.String()
+	}
 	if v := q.Get("rule_candidate"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {

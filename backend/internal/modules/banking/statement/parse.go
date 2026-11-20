@@ -48,33 +48,16 @@ func Parse(name string, data []byte) ([]Statement, string, error) {
 func ParseWith(name string, data []byte, tpls []Template) ([]Statement, string, error) {
 	format := Detect(name, data)
 	switch format {
-	case "pdf":
-		st, err := ParsePDFWith(data, tpls)
-		if err != nil {
-			return nil, format, err
-		}
-		return []Statement{st}, format, nil
-	case "excel":
-		rows, err := ReadXLSX(data)
-		if err != nil {
-			return nil, format, err
-		}
-		st, err := ParseTabularWith(rows, "excel", tpls)
-		if err != nil {
-			return nil, format, err
-		}
-		return []Statement{st}, format, nil
 	case "mt940":
 		text, _ := Decode(data)
 		sts, err := ParseMT940(text)
 		return sts, format, err
-	case "csv":
-		text, _ := Decode(data)
-		rows, err := ReadCSV(text)
+	case "pdf", "excel", "csv":
+		rows, err := readTable(format, data, tpls)
 		if err != nil {
-			return nil, format, fmt.Errorf("csv: %w", err)
+			return nil, format, err
 		}
-		st, err := ParseTabularWith(rows, "csv", tpls)
+		st, err := statementFromRows(rows, format, tpls)
 		if err != nil {
 			return nil, format, err
 		}

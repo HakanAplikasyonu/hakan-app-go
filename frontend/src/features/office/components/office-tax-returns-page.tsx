@@ -182,7 +182,7 @@ function ReturnCell({
         {t(`office.tax_returns.status_${r.status}`)}
       </StatusPill>
       {late && r.status !== "filed" ? (
-        <span className="text-status-blocking text-xs">
+        <span className="text-text-2 text-xs font-medium">
           {t("office.tax_returns.office.late")}
         </span>
       ) : null}
@@ -415,8 +415,12 @@ export function OfficeTaxReturnsPage() {
               {c.missing_bank_statements.map((name) => (
                 <span
                   key={name}
-                  className="text-status-warning flex flex-wrap items-center gap-x-2"
+                  className="text-text-2 flex flex-wrap items-center gap-x-2"
                 >
+                  <span
+                    className="bg-warn size-1.5 shrink-0 rounded-full"
+                    aria-hidden
+                  />
                   {t("office.tax_returns.office.statement_missing", { name })}
                   <StatementRequest
                     engagement={row.original.engagement_uuid}
@@ -426,7 +430,11 @@ export function OfficeTaxReturnsPage() {
                 </span>
               ))}
               {c.open_document_tasks ? (
-                <span className="text-status-warning">
+                <span className="text-text-2 flex items-center gap-x-2">
+                  <span
+                    className="bg-warn size-1.5 shrink-0 rounded-full"
+                    aria-hidden
+                  />
                   {t("office.tax_returns.office.documents_open", {
                     count: c.open_document_tasks,
                   })}

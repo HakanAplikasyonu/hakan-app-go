@@ -12,6 +12,9 @@ export type UBLUploadJob = components["schemas"]["UBLUploadJob"];
 export type UBLUploadItem = components["schemas"]["UBLUploadItem"];
 export type EngagementPage = components["schemas"]["EngagementPage"];
 export type EngagementTaxpayer = components["schemas"]["Taxpayer"];
+export type InvoicePostingResult =
+  components["schemas"]["InvoicePostingResult"];
+export type InvoicePostingBatch = components["schemas"]["InvoicePostingBatch"];
 
 export type InvoiceFilter = {
   direction?: "outgoing" | "incoming";
@@ -134,6 +137,20 @@ export const officeInvoiceService = {
       { body: { rate }, silent: true },
     );
   },
+  /** Eksik/geçersiz karşı taraf VKN/TCKN'sini girer; cari bağlanır, uyarı çözülür. */
+  setCounterpartyTaxID(
+    slug: string,
+    engagement: string,
+    invoice: string,
+    taxID: string,
+  ) {
+    return tenantRequest<OfficeInvoiceDetail>(
+      slug,
+      "PUT",
+      `${eng(engagement)}/invoices/${encodeURIComponent(invoice)}/counterparty-tax-id`,
+      { body: { tax_id: taxID }, silent: true },
+    );
+  },
   /**
    * KDV indirim dönemi (#640): alış faturasının KDV'si sonraki bir aya alınır;
    * `null` belge ayına döndürür. Faturanın yeni hâli döner.
@@ -153,6 +170,18 @@ export const officeInvoiceService = {
       : tenantRequest<OfficeInvoiceDetail>(slug, "DELETE", path, {
           silent: true,
         });
+  },
+  /**
+   * Faturadan fiş (#669): dönemin fişi olmayan alış / satış faturaları
+   * taslak fişe; satış belge ayında, alış KDV indirim ayında.
+   */
+  postPeriod(slug: string, engagement: string, period: string) {
+    return tenantRequest<InvoicePostingBatch>(
+      slug,
+      "POST",
+      `${eng(engagement)}/invoice-postings`,
+      { body: { period }, silent: true },
+    );
   },
   /** The stored UBL-TR XML as text (not JSON, so not through tenantRequest). */
   async ubl(slug: string, engagement: string, invoice: string) {

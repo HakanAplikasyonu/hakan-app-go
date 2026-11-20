@@ -110,6 +110,11 @@ type Store interface {
 	// TrialBalanceLines returns the accounts of one trial balance import with
 	// their amounts, down to maxLevel (0: all).
 	TrialBalanceLines(ctx context.Context, s Subject, importID int64, maxLevel int) ([]Account, error)
+	// LiveTotals sums the engagement's own journal lines per account code
+	// over [from, to] (#669 E); drafts only when includeDrafts.
+	LiveTotals(ctx context.Context, s Subject, from, to string, includeDrafts bool) ([]LiveTotal, error)
+	// AccountNames maps codes to their names in the active plan of target.
+	AccountNames(ctx context.Context, s Subject, target string, codes []string) (map[string]string, error)
 }
 
 // MissingAccount is an applied account code to open in the target program.
