@@ -422,6 +422,8 @@ type BankTransaction struct {
 	ContentHash                pgtype.Text        `json:"content_hash"`
 	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	ExcludedBy                 pgtype.Int8        `json:"excluded_by"`
+	ExcludedAt                 pgtype.Timestamptz `json:"excluded_at"`
 }
 
 type BankTransactionDocument struct {

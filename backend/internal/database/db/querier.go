@@ -37,6 +37,10 @@ type Querier interface {
 	// hedefi; plan yoksa 'luca'.
 	ActiveAccountPlanTarget(ctx context.Context, arg ActiveAccountPlanTargetParams) (string, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
+	// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi, fişin
+	// origin.manual_links dizisinde {kind, id}. Satırlara, tutarlara ve aktarıma
+	// dokunmaz; yalnız ilişkili kayıtlarda görünür. Aynı bağ ikinci kez eklenmez.
+	AddJournalDraftManualLink(ctx context.Context, arg AddJournalDraftManualLinkParams) (int64, error)
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
@@ -176,6 +180,9 @@ type Querier interface {
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
 	CountTenantSuggestions(ctx context.Context, arg CountTenantSuggestionsParams) (int64, error)
+	// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+	// kullanıcının görebildiği mükellefler; çok olan önce.
+	CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error)
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
@@ -767,6 +774,10 @@ type Querier interface {
 	ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBabsDeclarations(ctx context.Context, arg ListBabsDeclarationsParams) ([]BabsDeclaration, error)
+	// Bakiye uyuşmazlığında bakılacak hareketler (#710): içe aktarmanın olası
+	// mükerrer dediği ya da aynı hesapta aynı gün, yön ve tutarda ikizi olan
+	// hareketler; ofisin hesaptan çıkardıkları da (geri alınabilsin diye).
+	ListBankBalanceSuspects(ctx context.Context, arg ListBankBalanceSuspectsParams) ([]ListBankBalanceSuspectsRow, error)
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -1304,6 +1315,8 @@ type Querier interface {
 	// Üretilen kod cari hafızasına da yazılır; incelemede verilmiş bir karar
 	// varsa ona dokunulmaz.
 	RememberGeneratedCounterpartyAccount(ctx context.Context, arg RememberGeneratedCounterpartyAccountParams) error
+	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
+	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
@@ -1415,6 +1428,9 @@ type Querier interface {
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
+	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
+	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
+	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
