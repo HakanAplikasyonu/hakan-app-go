@@ -101,7 +101,7 @@ Bağlantının kendi durumu §4'teki olaylarla `source_connection` üzerinde yü
 
 | Kod | Seviye | Varlık | Ne zaman | Kaynak |
 |---|---|---|---|---|
-| `INT_CONNECTION_FAILED` | `blocker` | source_connection | `status` `auth_failed` / `rate_limited` ya da `last_error` dolu (son deneme hata verdi) | §4 |
+| `INT_CONNECTION_FAILED` | `warning` | source_connection | `status` `auth_failed` / `rate_limited` ya da `last_error` dolu (son deneme hata verdi) | §4 |
 | `INT_SYNC_STALE` | `warning` | source_connection | Kurulmuş bağlantı `stale_days` (varsayılan 3) gündür başarılı çekim yapmadı; hiç yapmadıysa kurulumdan `never_synced_days` (varsayılan 1) gün sonra | §4 |
 
 ## 4. Bağlantı olayları

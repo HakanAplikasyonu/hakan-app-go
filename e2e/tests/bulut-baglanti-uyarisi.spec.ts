@@ -6,12 +6,13 @@ import { addConsentedTaxpayer, Api, DEMO, officePath, uiLogin, uniqueVkn } from 
  * Bağlantı hataları Komuta Merkezi'nde (#669 K).
  *
  * - Hata veren bir entegrasyon bağlantısı (`source_connections`)
- *   `INT_CONNECTION_FAILED` engelleyici uyarısını açar: varlık
+ *   `INT_CONNECTION_FAILED` uyarısını açar (önem: uyarı; dönem onayını
+ *   engellemez): varlık
  *   `source_connection`, dönem içinde bulunulan ay (Europe/Istanbul).
  *   Kontroller yeniden çalışınca ikinci uyarı açılmaz.
  * - Uyarı mükellefin Uyarılar sekmesinde görünür; "Bağlantıya git"
  *   Bağlantılar ekranını açar.
- * - Komuta Merkezi'nde mükellefin bu ayki hücresi engelleyici uyarıya
+ * - Komuta Merkezi'nde mükellefin bu ayki hücresi uyarı listesine
  *   götürür; oradan da "Bağlantıya git" Bağlantılar ekranını açar.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef. Bağlantıyı hata durumuna
@@ -93,12 +94,12 @@ test.describe("Bağlantı hataları Komuta Merkezi'nde (#669 K)", () => {
     await api?.dispose();
   });
 
-  test("hata veren bağlantı engelleyici uyarı açar; yeniden çalışınca tek uyarı", async () => {
+  test("hata veren bağlantı uyarı açar; yeniden çalışınca tek uyarı", async () => {
     await api.json(await api.post(`${base()}/controls/run`, { period }));
     const list = await openWarnings();
     expect(list.total).toBe(1);
     const w = list.items[0];
-    expect(w.severity).toBe("blocker");
+    expect(w.severity).toBe("warning");
     expect(w.entity_type).toBe("source_connection");
     expect(w.period).toBe(period);
     expect(w.params.source).toBe("Vakıfbank");
@@ -125,10 +126,10 @@ test.describe("Bağlantı hataları Komuta Merkezi'nde (#669 K)", () => {
     await page.getByPlaceholder("Unvan ya da VKN ara").fill(taxpayer.title);
     const cell = page.getByRole("link", { name: new RegExp(`^${escape(taxpayer.title)} · ${escape(monthLabel(period))}:`) });
     await expect(cell).toHaveCount(1);
-    await expect(cell).toHaveAttribute("data-target", "blockers");
+    await expect(cell).toHaveAttribute("data-target", "warnings");
     await cell.click();
     await page.waitForURL(
-      (u) => u.pathname.endsWith(`/engagements/${engagement}/warnings`) && u.searchParams.get("severity") === "blocker",
+      (u) => u.pathname.endsWith(`/engagements/${engagement}/warnings`),
     );
     await expect(page.getByText(TEXT).first()).toBeVisible({ timeout: 30_000 });
     await page.getByRole("link", { name: "Bağlantıya git" }).first().click();

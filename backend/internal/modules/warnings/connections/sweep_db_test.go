@@ -14,15 +14,16 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
-// The sweep opens INT_CONNECTION_FAILED for every office that follows the
-// taxpayer, closes last month's warning and that of a recovered connection
-// (seed 000129 supplies the codes' configuration).
+// The sweep opens INT_CONNECTION_FAILED for failing connections across
+// offices, closes last month's warning and that of a recovered connection
+// (seed 000129 supplies the codes' configuration). A taxpayer has one active
+// engagement, so the two offices follow two taxpayers.
 func TestSweepDB(t *testing.T) {
 	d := testdb.Open(t)
 	ctx := context.Background()
 	orgA, orgB := d.Organization(t), d.Organization(t)
-	tp := d.Taxpayer(t, "legal", "9000006691")
-	engA, engB := d.Engagement(t, orgA, tp), d.Engagement(t, orgB, tp)
+	tp, tpB := d.Taxpayer(t, "legal", "9000006691"), d.Taxpayer(t, "legal", "9000006692")
+	engA, engB := d.Engagement(t, orgA, tp), d.Engagement(t, orgB, tpB)
 
 	// Fixtures and reads go through the row level security bypass, as in
 	// the worker.
@@ -32,19 +33,24 @@ func TestSweepDB(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var conn int64
-	sys(func(ctx context.Context, tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `
-		INSERT INTO source_connections (taxpayer_id, source_system, setup_state, status, last_error, last_success_at)
-		VALUES ($1, 'bank_vakifbank', 'active', 'auth_failed', '{"reason":"bad_credentials"}', NOW() - interval '2 days')
-		RETURNING id`, tp).Scan(&conn)
-	})
+	failing := func(taxpayer int64) int64 {
+		t.Helper()
+		var id int64
+		sys(func(ctx context.Context, tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `
+			INSERT INTO source_connections (taxpayer_id, source_system, setup_state, status, last_error, last_success_at)
+			VALUES ($1, 'bank_vakifbank', 'active', 'auth_failed', '{"reason":"bad_credentials"}', NOW() - interval '2 days')
+			RETURNING id`, taxpayer).Scan(&id)
+		})
+		return id
+	}
+	conn, connB := failing(tp), failing(tpB)
 	// An open warning of an earlier month on the same connection.
 	sys(func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 		INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id,
 			code, severity, params, producer)
-		VALUES ($1, $2, $3, '2000-01', 'source_connection', $4, 'INT_CONNECTION_FAILED', 'blocker', '{}', $5)`,
+		VALUES ($1, $2, $3, '2000-01', 'source_connection', $4, 'INT_CONNECTION_FAILED', 'warning', '{}', $5)`,
 			orgA, engA, tp, conn, Producer)
 		return err
 	})
@@ -66,7 +72,7 @@ func TestSweepDB(t *testing.T) {
 		sys(func(ctx context.Context, tx pgx.Tx) error {
 			rows, err := tx.Query(ctx, `
 				SELECT engagement_id, code || '@' || COALESCE(period, '') FROM data_warnings
-				WHERE taxpayer_id = $1 AND producer = $2 AND status = 'open' ORDER BY id`, tp, Producer)
+				WHERE taxpayer_id = ANY($1::bigint[]) AND producer = $2 AND status = 'open' ORDER BY id`, []int64{tp, tpB}, Producer)
 			if err != nil {
 				return err
 			}
@@ -84,7 +90,8 @@ func TestSweepDB(t *testing.T) {
 		return out
 	}
 
-	if n := sweep(); n != 2 {
+	// Other tests' connections may share the database: at least these two.
+	if n := sweep(); n < 2 {
 		t.Fatalf("created = %d, want one per office", n)
 	}
 	want := "INT_CONNECTION_FAILED@" + Period(time.Now())
@@ -99,7 +106,7 @@ func TestSweepDB(t *testing.T) {
 	sys(func(ctx context.Context, tx pgx.Tx) error {
 		_, err := tx.Exec(ctx, `
 			UPDATE source_connections SET status = 'active', last_error = NULL, last_success_at = NOW()
-			WHERE taxpayer_id = $1 AND id = $2`, tp, conn)
+			WHERE (taxpayer_id, id) IN (($1, $2), ($3, $4))`, tp, conn, tpB, connB)
 		return err
 	})
 	sweep()
