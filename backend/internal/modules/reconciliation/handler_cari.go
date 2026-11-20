@@ -1,6 +1,7 @@
 package reconciliation
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,11 @@ import (
 
 func (h *Handler) listCounterparties(w http.ResponseWriter, r *http.Request) {
 	out, err := h.svc.Counterparties(r.Context(), engagementctx.Must(r.Context()), r.PathValue("runRef"), strings.TrimSpace(r.URL.Query().Get("period")))
+	if errors.Is(err, ErrNoRun) {
+		// Henüz karşılaştırma yok: boş durum, hata değil (#639).
+		response.JSON(w, r, http.StatusOK, map[string]any{"run": nil, "items": []CounterpartyView{}})
+		return
+	}
 	if err != nil {
 		h.fail(w, r, err)
 		return
