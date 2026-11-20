@@ -264,7 +264,11 @@ func (h *Handler) customerCandidates(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "q is at most 100 characters")
 		return
 	}
-	items, err := h.svc.CustomerCandidates(r.Context(), engagementctx.Must(r.Context()), q)
+	limit := int32(200)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		limit, _ = paging(l, "")
+	}
+	items, err := h.svc.CustomerCandidates(r.Context(), engagementctx.Must(r.Context()), q, limit)
 	if err != nil {
 		h.fail(w, r, err)
 		return

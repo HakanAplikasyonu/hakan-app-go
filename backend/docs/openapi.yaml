@@ -10172,11 +10172,12 @@ paths:
       - $ref: "#/components/parameters/XOrganization"
       - $ref: "#/components/parameters/EngagementUuid"
       - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 }, description: Searched in the name only }
+      - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
     get:
       tags: [Journals]
       operationId: listJournalLinkCustomerCandidates
       summary: Cari cards that can be linked to a journal draft (#710)
-      description: Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most 200.
+      description: Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most `limit` (default 200).
       security:
         - bearerAuth: []
       responses:

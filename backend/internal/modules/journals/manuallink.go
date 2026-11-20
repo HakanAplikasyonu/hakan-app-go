@@ -70,9 +70,13 @@ type LinkCustomerCandidate struct {
 }
 
 // CustomerCandidates lists the taxpayer's cari cards by name (q searches
-// the name only, never the VKN / TCKN), at most 200.
-func (s *Service) CustomerCandidates(ctx context.Context, scope engagementctx.Scope, q string) ([]LinkCustomerCandidate, error) {
-	rows, err := s.q.ListEngagementCustomers(ctx, db.ListEngagementCustomersParams{TaxpayerID: scope.TaxpayerID, Q: q, Lim: 200})
+// the name only, never the VKN / TCKN), at most limit (1..200; anything
+// else means 200).
+func (s *Service) CustomerCandidates(ctx context.Context, scope engagementctx.Scope, q string, limit int32) ([]LinkCustomerCandidate, error) {
+	if limit < 1 || limit > 200 {
+		limit = 200
+	}
+	rows, err := s.q.ListEngagementCustomers(ctx, db.ListEngagementCustomersParams{TaxpayerID: scope.TaxpayerID, Q: q, Lim: limit})
 	if err != nil {
 		return nil, err
 	}

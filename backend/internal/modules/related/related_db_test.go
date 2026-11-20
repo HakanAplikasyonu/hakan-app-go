@@ -239,7 +239,7 @@ func TestRelatedChain(t *testing.T) {
 	if has(res, "customer", "manual", "") {
 		t.Errorf("customer after unlink: %+v", res.Items)
 	}
-	cands, err := jsvc.CustomerCandidates(ctx, scope, "bağ")
+	cands, err := jsvc.CustomerCandidates(ctx, scope, "bağ", 0)
 	must(err)
 	if len(cands) != 1 || cands[0].UUID != custUUID || cands[0].Type != "supplier" {
 		t.Errorf("customer candidates: %+v", cands)

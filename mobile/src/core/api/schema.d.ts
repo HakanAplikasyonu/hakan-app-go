@@ -7610,6 +7610,7 @@ export interface paths {
             query?: {
                 /** @description Searched in the name only */
                 q?: string;
+                limit?: number;
             };
             header: {
                 /**
@@ -7625,7 +7626,7 @@ export interface paths {
         };
         /**
          * Cari cards that can be linked to a journal draft (#710)
-         * @description Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most 200.
+         * @description Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most `limit` (default 200).
          */
         get: operations["listJournalLinkCustomerCandidates"];
         put?: never;
@@ -33694,6 +33695,7 @@ export interface operations {
             query?: {
                 /** @description Searched in the name only */
                 q?: string;
+                limit?: number;
             };
             header: {
                 /**
