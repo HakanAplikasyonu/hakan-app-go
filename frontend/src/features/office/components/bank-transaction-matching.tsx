@@ -83,6 +83,8 @@ export function BankTransactionMatchingPanel({
   const [pickedLines, setPickedLines] = useState<string[]>([]);
   // Seçilen bordrolar (#710): net maaş ödemesi.
   const [pickedPayroll, setPickedPayroll] = useState<string[]>([]);
+  // Seçilen SGK primleri (#565): aylık prim ödemesi.
+  const [pickedSgk, setPickedSgk] = useState<string[]>([]);
   // Seçilen çek / senetler (#565): entegrasyondan gelen finansal işlem.
   const [pickedFinancial, setPickedFinancial] = useState<string[]>([]);
   const [term, setTerm] = useState("");
@@ -109,6 +111,7 @@ export function BankTransactionMatchingPanel({
     setPicked([]);
     setPickedLines([]);
     setPickedPayroll([]);
+    setPickedSgk([]);
     setPickedFinancial([]);
     void qc.invalidateQueries({
       queryKey: [
@@ -146,6 +149,7 @@ export function BankTransactionMatchingPanel({
       invoices: string[];
       lines: BankMatchLineRef[];
       payroll: string[];
+      sgk: string[];
       financial: string[];
     }) =>
       bankMatchingService.match(
@@ -155,6 +159,7 @@ export function BankTransactionMatchingPanel({
         m.invoices,
         m.lines,
         m.payroll,
+        m.sgk,
         m.financial,
       ),
     onSuccess: (v) =>
@@ -165,9 +170,11 @@ export function BankTransactionMatchingPanel({
             ? "office.bank.matching.matched"
             : v.payroll_matches.length > 0
               ? "office.bank.matching.matched_payroll"
-              : v.financial_matches.length > 0
-                ? "office.bank.matching.matched_financial"
-                : "office.bank.matching.matched_lines",
+              : v.sgk_matches.length > 0
+                ? "office.bank.matching.matched_sgk"
+                : v.financial_matches.length > 0
+                  ? "office.bank.matching.matched_financial"
+                  : "office.bank.matching.matched_lines",
         ),
       ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
@@ -231,6 +238,9 @@ export function BankTransactionMatchingPanel({
     `${routes.tenant.engagementPayroll(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`payroll_run:${id}`)}`;
   const togglePayroll = (id: string, on: boolean) =>
     setPickedPayroll((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const toggleSgk = (id: string, on: boolean) =>
+    setPickedSgk((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const sgkHref = routes.tenant.engagementPayroll(slug, engagement);
   const toggleFinancial = (id: string, on: boolean) =>
     setPickedFinancial((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
   const financialLabel = (f: {
@@ -245,16 +255,19 @@ export function BankTransactionMatchingPanel({
     v.matches.length +
       v.journal_matches.length +
       v.payroll_matches.length +
+      v.sgk_matches.length +
       v.financial_matches.length >
     0;
   const pickedCount =
     picked.length +
     pickedLines.length +
     pickedPayroll.length +
+    pickedSgk.length +
     pickedFinancial.length;
   const submit = () =>
     match.mutate({
       payroll: pickedPayroll,
+      sgk: pickedSgk,
       financial: pickedFinancial,
       invoices: picked,
       lines: pickedLines.map((k) => {
@@ -325,9 +338,11 @@ export function BankTransactionMatchingPanel({
                 ? t("office.bank.matching.matches_title")
                 : v.payroll_matches.length > 0
                   ? t("office.bank.matching.payroll_matches_title")
-                  : v.financial_matches.length > 0
-                    ? t("office.bank.matching.financial_matches_title")
-                    : t("office.bank.matching.line_matches_title")}
+                  : v.sgk_matches.length > 0
+                    ? t("office.bank.matching.sgk_matches_title")
+                    : v.financial_matches.length > 0
+                      ? t("office.bank.matching.financial_matches_title")
+                      : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -392,6 +407,36 @@ export function BankTransactionMatchingPanel({
                   <span className="text-muted-foreground">
                     {t("office.bank.matching.payroll_net")}{" "}
                     <Money value={m.net_total} currency={v.currency} />
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.sgk_matches.length > 0 ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-sgk-matches"
+            >
+              {v.sgk_matches.map((m) => (
+                <li
+                  key={m.sgk_premium_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <Link
+                    className="font-medium underline-offset-4 hover:underline"
+                    href={sgkHref}
+                  >
+                    {t("office.bank.matching.sgk_label", {
+                      period: periodLabel(m.period, locale),
+                    })}
+                  </Link>
+                  <span className="text-muted-foreground">
+                    {t("office.bank.matching.sgk_payable")}{" "}
+                    <Money value={m.payable_amount} currency={v.currency} />
                   </span>
                   <Money value={m.amount} currency={v.currency} />
                   <Badge variant="secondary">
@@ -593,6 +638,52 @@ export function BankTransactionMatchingPanel({
                 <span className="text-muted-foreground">
                   {t("office.bank.matching.payroll_employees", {
                     count: c.employee_count,
+                  })}
+                </span>
+                <span className="ms-auto">
+                  {t("office.bank.matching.open")}{" "}
+                  <Money value={c.open_amount} currency={v.currency} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {v.payroll_matchable && canWrite && v.sgk_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-sgk-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.sgk_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.sgk_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.sgk_candidates.map((c) => (
+              <li
+                key={c.sgk_premium_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <Checkbox
+                  checked={pickedSgk.includes(c.sgk_premium_uuid)}
+                  onCheckedChange={(on) =>
+                    toggleSgk(c.sgk_premium_uuid, on === true)
+                  }
+                  aria-label={t("office.bank.matching.pick_sgk", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                />
+                <Link
+                  className="font-medium underline-offset-4 hover:underline"
+                  href={sgkHref}
+                >
+                  {t("office.bank.matching.sgk_label", {
+                    period: periodLabel(c.period, locale),
+                  })}
+                </Link>
+                <span className="text-muted-foreground">
+                  {t("office.bank.matching.sgk_due", {
+                    date: trDate(c.due_date),
                   })}
                 </span>
                 <span className="ms-auto">

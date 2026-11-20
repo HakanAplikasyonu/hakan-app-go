@@ -17677,6 +17677,26 @@ export interface components {
                 open_amount: string;
                 employee_count: number;
             }[];
+            /** @description SGK premiums the movement pays (#565) */
+            sgk_matches: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description SGK premiums of the movement's month and the three before still unpaid (#565); only for an outgoing payment */
+            sgk_candidates: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                open_amount: string;
+                /** Format: date */
+                due_date: string;
+            }[];
             /** @description Source financial transactions (cheque, promissory note) the movement settles (#565) */
             financial_matches: {
                 /** Format: uuid */
@@ -36850,6 +36870,8 @@ export interface operations {
                     invoice_uuids?: string[];
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
+                    /** @description SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back */
+                    sgk_premium_uuids?: unknown[];
                     /** @description Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
                     financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
