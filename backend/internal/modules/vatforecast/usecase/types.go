@@ -186,9 +186,11 @@ type Calendar struct {
 	DueDay  int    `json:"due_day"`
 	// DaysLeft: due date − today (Europe/Istanbul); negative once passed.
 	DaysLeft int `json:"days_left"`
-	// RolledForward: the due day fell on a weekend and moved to Monday.
+	// RolledForward: the due day fell on a weekend or public holiday and
+	// moved to the next working day.
 	RolledForward bool `json:"rolled_forward"`
-	// HolidaysChecked is false: public holidays are not applied yet.
+	// HolidaysChecked: the due date's year is in the holiday calendar
+	// (workday.Covered); false means only weekends and fixed holidays.
 	HolidaysChecked bool `json:"holidays_checked"`
 }
 

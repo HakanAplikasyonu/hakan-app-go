@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/workday"
 	"regexp"
 	"sort"
 	"strconv"
@@ -44,9 +45,8 @@ func PreviousPeriod(p string) string {
 }
 
 // DueDate is the KDV1 deadline of period: dueDay of the following month
-// (clamped to the month's last day), moved to Monday when it falls on a
-// Saturday or Sunday (VUK 18: a deadline on a non-working day moves to the
-// next working day). Public holidays are NOT applied.
+// (clamped to the month's last day), moved to the next working day when it
+// falls on a weekend or a public holiday (VUK 18; see workday).
 func DueDate(period string, dueDay int) (due time.Time, rolled bool, err error) {
 	start, err := ParsePeriod(period)
 	if err != nil {
@@ -61,13 +61,9 @@ func DueDate(period string, dueDay int) (due time.Time, rolled bool, err error) 
 		dueDay = last
 	}
 	due = time.Date(next.Year(), next.Month(), dueDay, 0, 0, 0, 0, Istanbul)
-	switch due.Weekday() {
-	case time.Saturday:
-		return due.AddDate(0, 0, 2), true, nil
-	case time.Sunday:
-		return due.AddDate(0, 0, 1), true, nil
-	}
-	return due, false, nil
+	// VUK 18: hafta sonu ya da resmi tatil ilk iş gününe kayar (#575).
+	due, moved := workday.Next(due)
+	return due, moved, nil
 }
 
 // daysBetween counts calendar days from a's date to b's date (Istanbul).
@@ -211,7 +207,7 @@ func Compute(in Input) (Forecast, error) {
 	}
 	f.Calendar = Calendar{
 		DueDate: due.Format("2006-01-02"), DueDay: in.Settings.DueDay, RolledForward: rolled,
-		DaysLeft: daysBetween(in.Now, due),
+		DaysLeft: daysBetween(in.Now, due), HolidaysChecked: workday.Covered(due.Year()),
 	}
 
 	f.Checks.DaysBefore = in.Settings.DaysBefore

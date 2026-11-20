@@ -211,6 +211,8 @@ func TestDueDate(t *testing.T) {
 		{KindMUHSGK, "2026-10", "2026-11-26"}, // perşembe
 		{KindBABS, "2026-10", "2026-11-30"},   // ayın son günü, pazartesi
 		{KindBABS, "2027-01", "2027-03-01"},   // 28 Şubat 2027 pazar → 1 Mart
+		{KindKDV1, "2026-04", "2026-06-01"},   // 28 Mayıs 2026 Kurban Bayramı → ilk iş günü
+		{KindMUHSGK, "2026-04", "2026-05-26"}, // arife yarım gün: kaymaz
 	}
 	for _, c := range cases {
 		got, _, err := DueDate(c.kind, c.period)
