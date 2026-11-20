@@ -13,6 +13,7 @@ import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 import { useDecideWarning } from "../hooks/use-warnings";
+import { createDocumentRequest } from "../services/engagement-documents.service";
 import type {
   ApiDataWarning,
   WarningDecisionAction,
@@ -23,6 +24,17 @@ export const WARNINGS_WRITE_PERMISSION = Permission.TenantWarningsWrite;
 
 /** A reason shorter than this is not a reason (#529). */
 const INVOICE_ENTITIES = new Set(["invoice", "invoice_item"]);
+
+/**
+ * Belgesi eksik uyarılar (#570): panelden mükelleften belge istenir; istek
+ * açılınca uyarı "Gördüm" olarak, isteğin gerekçesiyle kapanır.
+ */
+export const DOC_REQUEST_CODES = new Set([
+  "BNK_UNDOCUMENTED_PAYMENT",
+  "BNK_UNINVOICED_COLLECTION",
+  "UBL_MISSING",
+  "MISSING_AT_SOURCE",
+]);
 
 export const MIN_NOTE = 3;
 export const MAX_NOTE = 500;
@@ -159,8 +171,14 @@ export function WarningDecisionInfo({ warning }: { warning: ApiDataWarning }) {
 export function ApiWarningActions({
   warning,
   onDecided,
+  requestText,
 }: {
   warning: ApiDataWarning;
+  /**
+   * Uyarının okunur metni (yan panel): verilirse belgesi eksik uyarıda
+   * "Mükelleften belge iste" çıkar (#570).
+   */
+  requestText?: string;
   /** Karar kaydedilince (yan panel sıradaki uyarıya geçer). */
   onDecided?: (w: ApiDataWarning) => void;
 }) {
@@ -169,6 +187,8 @@ export function ApiWarningActions({
   const { can } = usePermission();
   const decide = useDecideWarning(slug);
   const [action, setAction] = useState<WarningDecisionAction | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState("");
   // Fatura kaynağından gelir, ofiste değiştirilmez (#546): karar gerekçeyle
   // verilir; sık gerekçeler hazır gelir.
   const presets = INVOICE_ENTITIES.has(warning.entity_type)
@@ -195,6 +215,31 @@ export function ApiWarningActions({
         },
       },
     );
+  const canRequest =
+    requestText !== undefined &&
+    DOC_REQUEST_CODES.has(warning.code) &&
+    can(Permission.TenantDocTasksWrite);
+  // Belge isteği açılır, uyarı isteğin notuyla "Gördüm" olarak kapanır.
+  const requestDocument = async () => {
+    setRequesting(true);
+    setRequestError("");
+    try {
+      await createDocumentRequest(slug, warning.engagement_uuid, {
+        title: t("office.warning_request.title", {
+          period: warning.period ?? "",
+        }).trim(),
+        note: requestText || undefined,
+        due_days: 7,
+      });
+      run("acknowledge", t("office.warning_request.note"));
+    } catch (e) {
+      setRequestError(
+        (e instanceof Error && e.message) || t("office.warning_request.error"),
+      );
+    } finally {
+      setRequesting(false);
+    }
+  };
   return (
     <div className="flex flex-col items-end gap-1">
       {action ? (
@@ -207,7 +252,17 @@ export function ApiWarningActions({
           onCancel={() => setAction(null)}
         />
       ) : (
-        <div className="flex gap-1">
+        <div className="flex flex-wrap justify-end gap-1">
+          {canRequest ? (
+            <Button
+              size="sm"
+              className="min-h-11 md:min-h-8"
+              disabled={requesting || decide.isPending}
+              onClick={() => void requestDocument()}
+            >
+              {t("office.warning_request.action")}
+            </Button>
+          ) : null}
           <Hint label={t("office.warning_decision.acknowledge_hint")}>
             <Button
               variant="outline"
@@ -230,6 +285,11 @@ export function ApiWarningActions({
           </Hint>
         </div>
       )}
+      {requestError ? (
+        <p role="alert" className="text-destructive max-w-56 text-xs">
+          {requestError}
+        </p>
+      ) : null}
       {decide.error ? (
         <p role="alert" className="text-destructive max-w-56 text-xs">
           {decide.error.message || t("office.warnings_api.action_error")}
