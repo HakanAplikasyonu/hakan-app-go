@@ -11140,7 +11140,10 @@ export interface paths {
          *     day) wins over `due_days` (default office policy, at most 90);
          *     `period` defaults to the due date's month. The response's
          *     `bank_transaction` is a stand-in (amount 0, the title as description)
-         *     so clients built for bank tasks keep working.
+         *     so clients built for bank tasks keep working. When an open or
+         *     submitted request with the same title (case-insensitive) already
+         *     exists, nothing new is opened, nobody is notified again and that task
+         *     is returned with 200 (#568).
          */
         post: operations["createTenantDocumentRequest"];
         delete?: never;
@@ -38027,6 +38030,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description The same request is already open; that task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeDocumentTask"];
+                };
+            };
             /** @description Created task */
             201: {
                 headers: {

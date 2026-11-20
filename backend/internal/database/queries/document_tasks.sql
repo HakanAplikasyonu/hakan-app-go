@@ -272,6 +272,15 @@ VALUES (@organization_id, @engagement_id, @taxpayer_id, NULL, 'DOC_REQUEST', 'do
         @title, @note, @due_at, @next_reminder_at, sqlc.narg(created_by))
 RETURNING id, uuid;
 
+-- name: OpenDocumentRequestByTitle :one
+-- Aynı mükellefe aynı başlıkla açık bir talep varsa ikincisi açılmaz (#568).
+SELECT uuid FROM document_tasks
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND kind = 'document_request' AND status IN ('open', 'submitted')
+  AND lower(title) = lower(@title::text)
+ORDER BY id DESC
+LIMIT 1;
+
 -- name: CompleteDocumentTask :execrows
 -- Ofis yüklenen belgeyi kabul etti: görev tamamlanır (matched).
 UPDATE document_tasks

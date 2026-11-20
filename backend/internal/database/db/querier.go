@@ -1148,6 +1148,8 @@ type Querier interface {
 	OfficeDashboardCounts(ctx context.Context, arg OfficeDashboardCountsParams) (OfficeDashboardCountsRow, error)
 	// tenant-lint: org-wide ofis panosu son yüklemeler; read_all yoksa engagement_assignments ile süzülür
 	OfficeDashboardRecentUploads(ctx context.Context, arg OfficeDashboardRecentUploadsParams) ([]OfficeDashboardRecentUploadsRow, error)
+	// Aynı mükellefe aynı başlıkla açık bir talep varsa ikincisi açılmaz (#568).
+	OpenDocumentRequestByTitle(ctx context.Context, arg OpenDocumentRequestByTitleParams) (uuid.UUID, error)
 	OpenWarningCodesForEntity(ctx context.Context, arg OpenWarningCodesForEntityParams) ([]string, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.

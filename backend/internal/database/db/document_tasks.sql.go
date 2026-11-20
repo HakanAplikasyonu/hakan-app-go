@@ -1281,6 +1281,29 @@ func (q *Queries) MarkDocumentTasksReminded(ctx context.Context, arg MarkDocumen
 	return result.RowsAffected(), nil
 }
 
+const openDocumentRequestByTitle = `-- name: OpenDocumentRequestByTitle :one
+SELECT uuid FROM document_tasks
+WHERE organization_id = $1 AND engagement_id = $2
+  AND kind = 'document_request' AND status IN ('open', 'submitted')
+  AND lower(title) = lower($3::text)
+ORDER BY id DESC
+LIMIT 1
+`
+
+type OpenDocumentRequestByTitleParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Title          string `json:"title"`
+}
+
+// Aynı mükellefe aynı başlıkla açık bir talep varsa ikincisi açılmaz (#568).
+func (q *Queries) OpenDocumentRequestByTitle(ctx context.Context, arg OpenDocumentRequestByTitleParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, openDocumentRequestByTitle, arg.OrganizationID, arg.EngagementID, arg.Title)
+	var uuid uuid.UUID
+	err := row.Scan(&uuid)
+	return uuid, err
+}
+
 const rerequestDocumentTask = `-- name: RerequestDocumentTask :execrows
 UPDATE document_tasks
 SET status = 'open', note = $1, due_at = $2, next_reminder_at = $3,

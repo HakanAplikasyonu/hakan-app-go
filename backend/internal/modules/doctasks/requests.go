@@ -36,6 +36,10 @@ type RequestInput struct {
 	Period string `json:"period"`
 }
 
+// ErrRequestExists: an open request with the same title already exists;
+// the existing task is returned with it.
+var ErrRequestExists = errors.New("doctasks: request already open")
+
 // RerequestInput asks again after an upload that was not enough.
 type RerequestInput struct {
 	Note    string `json:"note"`
@@ -109,6 +113,18 @@ func (s *Service) CreateRequest(ctx context.Context, scope engagementctx.Scope, 
 	}
 	if !ValidPeriod(period) {
 		return Task{}, ErrBadPeriod
+	}
+	// Aynı talep açıkken yenisi açılmaz; mükellefe ikinci bildirim gitmez.
+	if open, err := s.q.OpenDocumentRequestByTitle(ctx, db.OpenDocumentRequestByTitleParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Title: title,
+	}); err == nil {
+		t, err := s.Get(ctx, scope, open)
+		if err != nil {
+			return Task{}, err
+		}
+		return t, ErrRequestExists
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return Task{}, fmt.Errorf("doctasks: open request: %w", err)
 	}
 	row, err := s.q.CreateDocumentRequest(ctx, db.CreateDocumentRequestParams{
 		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID,
