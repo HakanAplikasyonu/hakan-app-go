@@ -16,6 +16,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { warningRecordKind } from "../lib/related-href";
 import { sheetPosition } from "../lib/warning-sheet-position";
+import { warningTransactions } from "../lib/warning-transactions";
 import type { ApiDataWarning } from "../services/warnings.service";
 import { Figure, SeverityBadge } from "./office-ui";
 import {
@@ -24,6 +25,7 @@ import {
 } from "./bank-balance-check";
 import { RecordDetail } from "./record-detail";
 import { ApiWarningActions } from "./warning-actions";
+import { WarningTransactions } from "./warning-transactions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
 
 /** Açık uyarının adres parametresi: dönünce kalınan yer korunur (#529). */
@@ -206,6 +208,14 @@ export function WarningSheet({
               <BankBalanceCheckPanel
                 engagement={current.engagement_uuid}
                 period={current.period}
+              />
+            ) : null}
+            {/* Dönem uyarısı (#570): işaret ettiği hareketler burada çözülür. */}
+            {!gone && kind !== "bank_transaction" && current.engagement_uuid ? (
+              <WarningTransactions
+                key={current.uuid}
+                engagement={current.engagement_uuid}
+                items={warningTransactions(current.params)}
               />
             ) : null}
             <RecordDetail
