@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/provider"
 	aiusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/ai/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
@@ -72,7 +73,44 @@ func (im *Importer) Analyze(ctx context.Context, org, userID int64, name string,
 	if err != nil {
 		return Analysis{}, err
 	}
-	return AnalyzeFile(ctx, name, data, tpls, im.ai, ColumnRequest{OrganizationID: org, UserID: userID})
+	ai, err := im.columnAI(ctx, org)
+	if err != nil {
+		return Analysis{}, err
+	}
+	return AnalyzeFile(ctx, name, data, tpls, ai, ColumnRequest{OrganizationID: org, UserID: userID})
+}
+
+// SettingStatementAI is the office setting (organizations.settings) that
+// turns the AI column suggestion of statement uploads off. Missing or true:
+// on (when an AI provider is configured). Off: the rule-based flow
+// (templates, header synonyms, heuristics) runs alone.
+const SettingStatementAI = "bank_statement_ai"
+
+// StatementAIEnabled reads SettingStatementAI from an organization's
+// settings object.
+func StatementAIEnabled(settings []byte) bool {
+	var s map[string]any
+	if len(settings) == 0 || json.Unmarshal(settings, &s) != nil {
+		return true
+	}
+	on, ok := s[SettingStatementAI].(bool)
+	return !ok || on
+}
+
+// columnAI is the AI column mapper for the office, nil when the office
+// turned it off.
+func (im *Importer) columnAI(ctx context.Context, org int64) (ColumnSuggester, error) {
+	if im.ai == nil || org <= 0 {
+		return im.ai, nil
+	}
+	o, err := database.QueriesFor(im.pool).GetOrganizationByID(ctx, org)
+	if err != nil {
+		return nil, err
+	}
+	if !StatementAIEnabled(o.Settings) {
+		return nil, nil
+	}
+	return im.ai, nil
 }
 
 // AnalyzeFile is Analyze without the database.

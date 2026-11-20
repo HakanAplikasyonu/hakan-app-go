@@ -154,7 +154,7 @@ export function usePatchTenantSettings(slug: string) {
   const queryClient = useQueryClient();
   const refreshScope = useRefreshScope(slug);
   return useAppMutation({
-    mutationFn: (body: { name?: string }) =>
+    mutationFn: (body: { name?: string; settings?: Record<string, unknown> }) =>
       tenantService.patchSettings(slug, body),
     onSuccess: async (settings) => {
       queryClient.setQueryData(tenantAdminKeys.settings(slug), settings);

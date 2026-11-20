@@ -129,5 +129,8 @@
   "support_widget_help": "ClickFix panelinde Web widget → Kurulum sekmesindeki data-widget değeri.",
   "support_widget_placeholder": "Örn. 3f2a9c1e-…",
   "support_widget_invalid": "Yalnız harf, rakam, - ve _ kullanılabilir (en fazla 128 karakter).",
-  "support_saved": "Destek ayarı kaydedildi."
+  "support_saved": "Destek ayarı kaydedildi.",
+  "statement_ai_title": "Banka ekstresi",
+  "statement_ai_label": "Tanınmayan ekstrede kolonları yapay zekâ önersin",
+  "statement_ai_description": "Kapalıyken dosya yapay zekâya gönderilmez; kolonlar şablonlardan ve başlık adlarından önerilir, gerisini önizlemede siz seçersiniz."
 }
