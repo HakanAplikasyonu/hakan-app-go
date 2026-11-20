@@ -287,7 +287,7 @@ export const demoWarnings: DataWarning[] = [
     expected: "4600.40",
     actual: "4600.00",
   }),
-  warning("inv-5", "POSSIBLE_DUPLICATE", { other: "OPT2026000004410" }),
+  warning("inv-5", "POSSIBLE_DUPLICATE", { count: "1" }),
   warning("inv-6", "INVALID_TAX_ID", { value: "940000005" }),
   warning("inv-9", "PARTY_MISMATCH", {
     expected: "10000000146",

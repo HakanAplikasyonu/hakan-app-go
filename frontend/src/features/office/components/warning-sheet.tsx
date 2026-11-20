@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -12,6 +13,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { routes } from "@/config/routes";
+import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 
 import { warningRecordKind } from "../lib/related-href";
@@ -86,6 +89,7 @@ export function WarningSheet({
   const { t } = useLocale();
   const text = useApiWarningText();
   const entity = useEntityLabel();
+  const { slug } = useTenant();
   const { openUuid, last, open, close } = sheet;
   // Sayfada birden çok liste (grup kartları) olabilir: panel yalnızca açık
   // uyarı bu listedeyse ya da buradan açıldıysa görünür.
@@ -110,6 +114,14 @@ export function WarningSheet({
     }
   };
 
+  // Olası mükerrer (#570): aynı görünen öteki fatura(lar) panelden açılır.
+  const duplicates =
+    current?.code === "POSSIBLE_DUPLICATE" &&
+    Array.isArray(current.params?.candidates)
+      ? current.params.candidates.filter(
+          (x): x is string => typeof x === "string",
+        )
+      : [];
   const kind = current?.entity_uuid
     ? warningRecordKind(current.entity_type)
     : null;
@@ -179,6 +191,26 @@ export function WarningSheet({
                 ) : null}
               </div>
               <p className="text-sm">{text(current)}</p>
+              {duplicates.length > 0 && current.engagement_uuid ? (
+                <p className="text-sm" data-testid="duplicate-candidates">
+                  {t("office.warning_sheet.duplicate_candidates")}{" "}
+                  {duplicates.map((id, i) => (
+                    <Link
+                      key={id}
+                      href={routes.tenant.engagementInvoice(
+                        slug,
+                        current.engagement_uuid,
+                        id,
+                      )}
+                      className="text-brand-text me-2 underline-offset-4 hover:underline"
+                    >
+                      {t("office.warning_sheet.duplicate_open", {
+                        index: String(i + 1),
+                      })}
+                    </Link>
+                  ))}
+                </p>
+              ) : null}
               {!gone && kind === "invoice" ? (
                 <p
                   className="text-text-3 text-xs"

@@ -86,7 +86,17 @@ export function useApiWarningText() {
       Object.entries(w.params ?? {}).map(([k, v]) => [k, paramText(v)]),
     );
     const msg = t(key, params);
-    return msg === key ? w.code : msg;
+    if (msg === key) return w.code;
+    // Doldurulmamış yer tutucu kullanıcıya gösterilmez (#576): kural kısa
+    // adıyla, o da yoksa yer tutucusuz yazılır.
+    if (/\{\{\w+\}\}/.test(msg)) {
+      const groupKey = `office.warning_group.${w.code}`;
+      const group = t(groupKey);
+      return group !== groupKey
+        ? group
+        : msg.replace(/\s*\{\{\w+\}\}/g, "").trim();
+    }
+    return msg;
   };
 }
 
