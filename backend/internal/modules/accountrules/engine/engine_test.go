@@ -189,3 +189,34 @@ func TestHumanizeRationale(t *testing.T) {
 		t.Fatal("non-rule text changed")
 	}
 }
+
+// #569: kalem adı açık bir gider söylüyorsa son çare ticari mal (153) değil.
+func TestDefaultsExpenseKeywords(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]string{
+		"Kira bedeli":               "770",
+		"Ofis kirası":               "770",
+		"İş makinesi kirası":        "770",
+		"Elektrik bedeli":           "770",
+		"Doğalgaz bedeli":           "770",
+		"İnternet hizmeti":          "770",
+		"Aylık danışmanlık hizmeti": "770",
+		"Kargo hizmeti":             "760",
+		"Reklam hizmeti":            "760",
+		"Pazaryeri komisyonu":       "760",
+		// Mal kalır.
+		"Kiraz":              "153",
+		"Elektrik malzemesi": "153",
+		"Ambalaj malzemesi":  "153",
+		"Sebze meyve":        "153",
+	} {
+		a, _ := Pick(Defaults, RoleLine, Context{Direction: "incoming", ItemName: name, LineType: "goods"})
+		if a.AccountCode != want {
+			t.Errorf("%s = %s, want %s", name, a.AccountCode, want)
+		}
+	}
+	// Satış tarafı etkilenmez.
+	if a, _ := Pick(Defaults, RoleLine, Context{Direction: "outgoing", ItemName: "Kargo hizmeti"}); a.AccountCode != "600" {
+		t.Errorf("outgoing kargo = %s", a.AccountCode)
+	}
+}
