@@ -7055,6 +7055,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/journal-draft": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The journal draft that books the invoice (#669)
+         * @description Requires `tenant.invoices.read` and engagement access. `draft` is
+         *     null while the invoice has no entry.
+         */
+        get: operations["getEngagementInvoiceJournalDraft"];
+        put?: never;
+        /**
+         * Book a purchase / sales invoice as a journal draft (#669)
+         * @description Requires `tenant.journals.write` and engagement access. Purchase:
+         *     line accounts (153 / 150 / 7xx) debit net, 191 debit KDV, 320 cari
+         *     credit total. Sales: 120 cari debit total, line accounts (600 / 601 /
+         *     602) credit net, 391 credit KDV. Line accounts are the approved
+         *     account codes; KDV goes to the plan's 191 / 391 sub-account for the
+         *     rate. The entry is dated the document date; a purchase whose KDV
+         *     was moved (#640) is dated the first day of the deduction month.
+         *     Document number and date stay on the lines.
+         *
+         *     One draft per invoice: a second call returns the existing draft
+         *     (`outcome: existing`, 200). Invoices the first version cannot book
+         *     correctly are refused with a reason (`outcome: refused`, 200):
+         *     `NOT_ACTIVE`, `FOREIGN_CURRENCY`, `RETURN_INVOICE`, `WITHHOLDING`,
+         *     `EXEMPTION`, `SPECIAL_TAX`, `UNSUPPORTED_TYPE`, `NO_ITEMS`,
+         *     `TOTALS_MISMATCH`, `ITEM_ACCOUNT_MISSING`.
+         */
+        post: operations["postEngagementInvoiceJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invoice-postings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Book the period's invoices as journal drafts (#669)
+         * @description Requires `tenant.journals.write` and engagement access. Books every
+         *     active invoice of the entry period that has no draft yet: sales of
+         *     the document month, purchases of their KDV deduction month (#640).
+         *     Each invoice is booked as in `POST …/invoices/{invoiceUuid}/journal-draft`;
+         *     refused invoices are listed with their reason.
+         */
+        post: operations["postEngagementInvoicePostings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/export-drivers": {
         parameters: {
             query?: never;
@@ -18280,6 +18360,60 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["OfficeInvoiceDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoiceJournalDraftRef: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: int32 */
+            entry_no: number;
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "approved" | "exported";
+        };
+        InvoiceJournalLink: {
+            draft: components["schemas"]["InvoiceJournalDraftRef"] | null;
+        };
+        EnvelopeInvoiceJournalLink: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoiceJournalLink"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoicePostingResult: {
+            /** Format: uuid */
+            invoice_uuid: string;
+            invoice_number: string;
+            /** @enum {string} */
+            outcome: "created" | "existing" | "refused";
+            draft?: components["schemas"]["InvoiceJournalDraftRef"];
+            /**
+             * @description Why it was refused.
+             * @enum {string}
+             */
+            reason?: "NOT_ACTIVE" | "FOREIGN_CURRENCY" | "RETURN_INVOICE" | "WITHHOLDING" | "EXEMPTION" | "SPECIAL_TAX" | "UNSUPPORTED_TYPE" | "NO_ITEMS" | "TOTALS_MISMATCH" | "ITEM_ACCOUNT_MISSING";
+            /** @description ITEM_ACCOUNT_MISSING: the line without an account code. */
+            line_no?: number;
+            detail?: string;
+        };
+        EnvelopeInvoicePostingResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoicePostingResult"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoicePostingBatch: {
+            /** @example 2026-10 */
+            period: string;
+            created: number;
+            refused: number;
+            items: components["schemas"]["InvoicePostingResult"][];
+        };
+        EnvelopeInvoicePostingBatch: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoicePostingBatch"];
             meta: components["schemas"]["ResponseMeta"];
         };
         JournalDraftLineInput: {
@@ -32335,6 +32469,120 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementInvoiceJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice's draft, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoiceJournalLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postEngagementInvoiceJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The existing draft, or the reason it was refused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingResult"];
+                };
+            };
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postEngagementInvoicePostings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description What happened to each invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingBatch"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

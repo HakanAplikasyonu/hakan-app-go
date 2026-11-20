@@ -68,6 +68,7 @@ whatsapp_captures engagement
 report_schedules engagement
 expense_categories
 receipt_postings engagement
+invoice_journal_links engagement
 copilot_plans
 reconciliation_runs engagement
 reconciliation_items engagement

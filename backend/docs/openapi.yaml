@@ -9471,6 +9471,109 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/journal-draft:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Invoices]
+      operationId: getEngagementInvoiceJournalDraft
+      summary: The journal draft that books the invoice (#669)
+      description: |
+        Requires `tenant.invoices.read` and engagement access. `draft` is
+        null while the invoice has no entry.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The invoice's draft, or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoiceJournalLink"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Invoices]
+      operationId: postEngagementInvoiceJournalDraft
+      summary: Book a purchase / sales invoice as a journal draft (#669)
+      description: |
+        Requires `tenant.journals.write` and engagement access. Purchase:
+        line accounts (153 / 150 / 7xx) debit net, 191 debit KDV, 320 cari
+        credit total. Sales: 120 cari debit total, line accounts (600 / 601 /
+        602) credit net, 391 credit KDV. Line accounts are the approved
+        account codes; KDV goes to the plan's 191 / 391 sub-account for the
+        rate. The entry is dated the document date; a purchase whose KDV
+        was moved (#640) is dated the first day of the deduction month.
+        Document number and date stay on the lines.
+
+        One draft per invoice: a second call returns the existing draft
+        (`outcome: existing`, 200). Invoices the first version cannot book
+        correctly are refused with a reason (`outcome: refused`, 200):
+        `NOT_ACTIVE`, `FOREIGN_CURRENCY`, `RETURN_INVOICE`, `WITHHOLDING`,
+        `EXEMPTION`, `SPECIAL_TAX`, `UNSUPPORTED_TYPE`, `NO_ITEMS`,
+        `TOTALS_MISMATCH`, `ITEM_ACCOUNT_MISSING`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The existing draft, or the reason it was refused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingResult"
+        "201":
+          description: The new draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingResult"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoice-postings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Invoices]
+      operationId: postEngagementInvoicePostings
+      summary: Book the period's invoices as journal drafts (#669)
+      description: |
+        Requires `tenant.journals.write` and engagement access. Books every
+        active invoice of the entry period that has no draft yet: sales of
+        the document month, purchases of their KDV deduction month (#640).
+        Each invoice is booked as in `POST …/invoices/{invoiceUuid}/journal-draft`;
+        refused invoices are listed with their reason.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period]
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+      responses:
+        "200":
+          description: What happened to each invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingBatch"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/export-drivers:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23316,6 +23419,74 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/OfficeInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoiceJournalDraftRef:
+      type: object
+      required: [uuid, entry_no, period, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        entry_no: { type: integer, format: int32 }
+        period: { type: string, example: "2026-10" }
+        status: { type: string, enum: [draft, approved, exported] }
+
+    InvoiceJournalLink:
+      type: object
+      required: [draft]
+      properties:
+        draft:
+          oneOf:
+            - $ref: "#/components/schemas/InvoiceJournalDraftRef"
+            - type: "null"
+
+    EnvelopeInvoiceJournalLink:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoiceJournalLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoicePostingResult:
+      type: object
+      required: [invoice_uuid, invoice_number, outcome]
+      properties:
+        invoice_uuid: { type: string, format: uuid }
+        invoice_number: { type: string }
+        outcome: { type: string, enum: [created, existing, refused] }
+        draft: { $ref: "#/components/schemas/InvoiceJournalDraftRef" }
+        reason:
+          type: string
+          description: Why it was refused.
+          enum: [NOT_ACTIVE, FOREIGN_CURRENCY, RETURN_INVOICE, WITHHOLDING, EXEMPTION, SPECIAL_TAX, UNSUPPORTED_TYPE, NO_ITEMS, TOTALS_MISMATCH, ITEM_ACCOUNT_MISSING]
+        line_no: { type: integer, description: "ITEM_ACCOUNT_MISSING: the line without an account code." }
+        detail: { type: string }
+
+    EnvelopeInvoicePostingResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoicePostingResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoicePostingBatch:
+      type: object
+      required: [period, created, refused, items]
+      properties:
+        period: { type: string, example: "2026-10" }
+        created: { type: integer }
+        refused: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoicePostingResult" }
+
+    EnvelopeInvoicePostingBatch:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoicePostingBatch" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     JournalDraftLineInput:

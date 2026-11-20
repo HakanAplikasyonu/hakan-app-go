@@ -446,7 +446,11 @@ type Querier interface {
 	GetInvoiceAttachment(ctx context.Context, arg GetInvoiceAttachmentParams) (Attachment, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
+	// Faturanın karşı tarafına onaylanmış cari hesap (account_assignments,
+	// target customer); yoksa boş.
+	GetInvoiceCustomerAccount(ctx context.Context, arg GetInvoiceCustomerAccountParams) (string, error)
 	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
+	GetInvoiceJournalLink(ctx context.Context, arg GetInvoiceJournalLinkParams) (GetInvoiceJournalLinkRow, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
 	GetJournalDraftByID(ctx context.Context, arg GetJournalDraftByIDParams) (JournalDraft, error)
@@ -643,6 +647,9 @@ type Querier interface {
 	InsertImportedRetailSale(ctx context.Context, arg InsertImportedRetailSaleParams) (RetailSale, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
+	// Faturadan muhasebe fişi (#669, Oğuz kararı 20.11).
+	// Bir iş bir faturadan tek fiş üretir; ikinci istek 0 satır döner.
+	InsertInvoiceJournalLink(ctx context.Context, arg InsertInvoiceJournalLinkParams) (int64, error)
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
@@ -903,6 +910,8 @@ type Querier interface {
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
+	// Satırlar ve onaylı hesap kodları (account_assignments).
+	ListInvoiceItemsForPosting(ctx context.Context, arg ListInvoiceItemsForPostingParams) ([]ListInvoiceItemsForPostingRow, error)
 	// Adaylar: aynı mükellef, aynı yön, aktif, tamamen kapanmamış faturalar;
 	// tarih penceresi içinde ve tutar / karşı taraf / fatura no'dan en az biri
 	// tutuyor. Tutar, hareketin para biriminde: aynı para birimi ise ödenecek,
@@ -1119,6 +1128,9 @@ type Querier interface {
 	// Kritik uyarı bildirimi (issue #241). Zamanlanmış iş bütün ofisleri tarar.
 	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin bildirilmemiş açık engelleyicilerini tarar
 	ListUnalertedBlockerWarnings(ctx context.Context, arg ListUnalertedBlockerWarningsParams) ([]ListUnalertedBlockerWarningsRow, error)
+	// Fişi olmayan, bu fiş dönemine düşen faturalar: satış belge ayında, alış
+	// KDV indirim ayında (#640). Görünürlük ofisin dönemine göre (#8).
+	ListUnpostedInvoices(ctx context.Context, arg ListUnpostedInvoicesParams) ([]ListUnpostedInvoicesRow, error)
 	ListUserLegalAcceptances(ctx context.Context, userID int64) ([]ListUserLegalAcceptancesRow, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
