@@ -7,6 +7,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -48,11 +49,21 @@ type OrganizationService interface {
 // Rate limits (per window) for the invitation endpoints.
 const (
 	limitWindow          = 15 * time.Minute
-	limitPreviewPerIP    = 60
 	limitAcceptPerIP     = 20
 	limitInvitesPerOrg   = 50 // emails one organization may trigger per window
 	maxSettingsJSONBytes = 16 << 10
 )
+
+// limitPreviewPerIP caps team invitation previews per IP.
+// RATE_LIMIT_TEAM_INVITE_PREVIEW_LIMIT overrides it: the e2e suite opens many
+// invitation links from one IP in one run (scripts/e2e-up.sh), like the
+// taxpayer consent preview.
+var limitPreviewPerIP = func() int {
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv("RATE_LIMIT_TEAM_INVITE_PREVIEW_LIMIT"))); err == nil && v > 0 {
+		return v
+	}
+	return 60
+}()
 
 // Handler serves the organization-scoped tenant routes.
 type Handler struct {
