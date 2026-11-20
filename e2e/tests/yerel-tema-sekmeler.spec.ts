@@ -25,6 +25,10 @@ test("banka ve mizan sekmeleri ortak başlık ve tek birincil eylemle açılır 
   await page.setViewportSize({ width: 1440, height: 900 });
   await uiLogin(page, DEMO.owner);
 
+  // Gizli dosya girişi (input type=file) de "button" rolündedir ve aynı
+  // adı taşır: görünür düğme data-slot ile seçilir.
+  const button = (scope: ReturnType<typeof page.locator>, name: string) =>
+    scope.locator('[data-slot="button"]', { hasText: name });
   const primaries = (scope: ReturnType<typeof page.locator>) =>
     scope.locator('[data-slot="button"][data-variant="default"]:visible');
 
@@ -33,14 +37,14 @@ test("banka ve mizan sekmeleri ortak başlık ve tek birincil eylemle açılır 
   const bankHeading = page.getByRole("heading", { level: 2, name: "Banka hareketleri" });
   await expect(bankHeading).toBeVisible();
   const bankHeader = bankHeading.locator("xpath=ancestor::div[contains(@class,'justify-between')][1]");
-  await expect(bankHeader.getByRole("button", { name: "Ekstre yükle" })).toHaveAttribute("data-variant", "default");
-  await expect(bankHeader.getByRole("button", { name: "Excel'e aktar" })).toHaveAttribute("data-variant", "outline");
+  await expect(button(bankHeader, "Ekstre yükle")).toHaveAttribute("data-variant", "default");
+  await expect(button(bankHeader, "Excel'e aktar")).toHaveAttribute("data-variant", "outline");
   await expect(primaries(bankHeader)).toHaveCount(1);
 
   // Mizan boş: başlık görünür, boş durum ve birincil yükleme.
   await page.goto(officePath(`/engagements/${engagement}/trial-balance`));
   await expect(page.getByRole("heading", { level: 2, name: "Mizan" })).toBeVisible();
-  const upload = page.getByRole("button", { name: "Mizan yükle" });
+  const upload = button(page.getByRole("main"), "Mizan yükle");
   await expect(upload).toBeVisible();
   await expect(upload).toHaveAttribute("data-variant", "default");
 });
