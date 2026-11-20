@@ -215,6 +215,52 @@ function Detail({
 }
 
 /**
+ * Hata veren ya da aktarılamayan çıktıların listesi (#710): program, dönem,
+ * neden ve satırın kendi "Yeniden dene" düğmesi.
+ */
+function ProblemList({
+  items,
+  reason,
+  busy,
+  onRetry,
+}: {
+  items: JournalTransfer[];
+  reason: (tr: JournalTransfer) => string;
+  busy: boolean;
+  onRetry: (tr: JournalTransfer) => void;
+}) {
+  const { t } = useLocale();
+  return (
+    <ul className="space-y-1 text-xs">
+      {items.map((tr) => {
+        const name = `${program(t, tr.driver)}${tr.period ? ` · ${tr.period}` : ""}`;
+        return (
+          <li
+            key={tr.uuid}
+            className="flex flex-wrap items-center justify-between gap-2"
+          >
+            <span className="min-w-0">
+              <span className="font-medium">{name}</span>: {reason(tr)}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={busy}
+              aria-label={t("office.journals.transfer_retry_named", { name })}
+              onClick={() => onRetry(tr)}
+            >
+              <RotateCcw className="size-3.5" aria-hidden />
+              {t("office.journals.transfer_retry")}
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
  * Transfers to Luca / Zirve through the desktop agent (#391): the history
  * and the error screen of the journals page. A delivered transfer is closed
  * by the user after importing in the program.
@@ -280,6 +326,12 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
   }, [items]);
   const openFailures = useMemo(
     () => [...latest.values()].filter((tr) => tr.status === "failed"),
+    [latest],
+  );
+  // Vazgeçilip yeniden denenmeyen çıktılar programa gitmedi (#710): hata
+  // verenlerden ayrı listede, yeniden deneme yolu açık.
+  const notTransferred = useMemo(
+    () => [...latest.values()].filter((tr) => tr.status === "cancelled"),
     [latest],
   );
 
@@ -437,27 +489,50 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
       description={t("office.journals.transfers_description")}
     >
       <div className="space-y-3 p-4">
-        {openFailures.length ? (
-          <div
-            role="alert"
-            className="border-status-blocking/40 rounded-md border p-3 text-sm"
+        {openFailures.length || notTransferred.length ? (
+          <section
+            aria-label={t("office.journals.transfer_problems_title")}
+            data-testid="transfer-problems"
+            className="border-status-blocking/40 space-y-3 rounded-md border p-3 text-sm"
           >
-            <p className="text-status-blocking mb-1 flex items-center gap-2 font-medium">
-              <AlertTriangle className="size-4" />
-              {t("office.journals.transfer_failures", {
-                count: openFailures.length,
-              })}
+            {openFailures.length ? (
+              <div role="alert">
+                <p className="text-status-blocking mb-1 flex items-center gap-2 font-medium">
+                  <AlertTriangle className="size-4" />
+                  {t("office.journals.transfer_failures", {
+                    count: openFailures.length,
+                  })}
+                </p>
+                <ProblemList
+                  items={openFailures}
+                  reason={(tr) => transferError(t, tr)}
+                  busy={busy}
+                  onRetry={(tr) => retryTransfer.mutate(tr.uuid)}
+                />
+              </div>
+            ) : null}
+            {notTransferred.length ? (
+              <div data-testid="transfer-not-transferred">
+                <p className="text-status-warning mb-1 flex items-center gap-2 font-medium">
+                  <X className="size-4" />
+                  {t("office.journals.transfer_not_transferred", {
+                    count: notTransferred.length,
+                  })}
+                </p>
+                <ProblemList
+                  items={notTransferred}
+                  reason={() =>
+                    t("office.journals.transfer_not_transferred_reason")
+                  }
+                  busy={busy}
+                  onRetry={(tr) => retryTransfer.mutate(tr.uuid)}
+                />
+              </div>
+            ) : null}
+            <p className="text-muted-foreground text-xs">
+              {t("office.journals.transfer_problems_hint")}
             </p>
-            <ul className="space-y-0.5 text-xs">
-              {openFailures.map((tr) => (
-                <li key={tr.uuid}>
-                  <span className="font-medium">{program(t, tr.driver)}</span>
-                  {tr.period ? ` · ${tr.period}` : ""}:{" "}
-                  <span>{transferError(t, tr)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          </section>
         ) : null}
         {actionError ? (
           <p className="text-status-blocking text-sm">
