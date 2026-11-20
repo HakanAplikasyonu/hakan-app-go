@@ -4535,6 +4535,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/suggestions/history": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Counterparty's past line account codes
+         * @description Requires `tenant.review.read`, `tenant.engagements.read` and engagement access. Line account codes (`invoice_item` / `account_code`) of the engagement's accepted, corrected and auto-accepted suggestions for one counterparty (provenance input `counterparty_key`), most used first, over all decisions (#669 L).
+         */
+        get: operations["getCounterpartyCodeHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/suggestions": {
         parameters: {
             query?: never;
@@ -19879,6 +19907,21 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
+        CounterpartyCodeUse: {
+            account_code: string;
+            /** Format: int64 */
+            uses: number;
+            /** Format: date-time */
+            last_used_at: string;
+        };
+        EnvelopeCounterpartyCodeHistory: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["CounterpartyCodeUse"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeAccountSuggestionList: {
             /** @enum {boolean} */
             success: true;
@@ -28070,6 +28113,43 @@ export interface operations {
                 };
                 content?: never;
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCounterpartyCodeHistory: {
+        parameters: {
+            query: {
+                /** @description The suggestion's `provenance.inputs.counterparty_key` */
+                counterparty: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Codes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCounterpartyCodeHistory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];

@@ -130,3 +130,22 @@ WHERE s.organization_id = @organization_id
   AND s.decided_at IS NOT NULL
   AND s.decided_at >= NOW() - make_interval(months => @months::int)
   AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text);
+
+-- name: CounterpartyCodeHistory :many
+-- Karşı tarafın geçmiş satır hesabı kodları (#669 L): mükellefin kabul
+-- edilen, düzeltilen ve otomatik uygulanan önerileri; en çok kullanılan önce.
+SELECT (COALESCE(s.applied_value, s.proposed_value)->>'account_code')::text AS account_code,
+       count(*)::bigint AS uses,
+       max(s.updated_at)::timestamptz AS last_used_at
+FROM suggestions s
+WHERE s.organization_id = @organization_id
+  AND s.engagement_id = @engagement_id
+  AND s.kind = 'account_code'
+  AND s.target_type = 'invoice_item'
+  AND s.target_field = 'account_code'
+  AND s.status IN ('accepted', 'corrected', 'auto_accepted')
+  AND s.inputs->>'counterparty_key' = @counterparty_key::text
+  AND COALESCE(s.applied_value, s.proposed_value)->>'account_code' IS NOT NULL
+GROUP BY 1
+ORDER BY uses DESC, last_used_at DESC
+LIMIT @lim;

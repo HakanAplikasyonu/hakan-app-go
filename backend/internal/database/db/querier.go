@@ -177,6 +177,9 @@ type Querier interface {
 	// Kural hafızası (docs/01 §3 "carries context forward"): aynı karşı tarafın
 	// önceki faturalarında onaylanmış satır hesap kodları, en sık kullanılan önce.
 	CounterpartyAccountHistory(ctx context.Context, arg CounterpartyAccountHistoryParams) ([]CounterpartyAccountHistoryRow, error)
+	// Karşı tarafın geçmiş satır hesabı kodları (#669 L): mükellefin kabul
+	// edilen, düzeltilen ve otomatik uygulanan önerileri; en çok kullanılan önce.
+	CounterpartyCodeHistory(ctx context.Context, arg CounterpartyCodeHistoryParams) ([]CounterpartyCodeHistoryRow, error)
 	CreateBulkJob(ctx context.Context, arg CreateBulkJobParams) (BulkJob, error)
 	// ---------------------------------------------------------------------------
 	// Müşavirin elle açtığı belge talebi (issue #240).

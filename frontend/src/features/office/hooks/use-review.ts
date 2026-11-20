@@ -35,6 +35,21 @@ export function useReviewSuggestions(filter: ReviewListFilter, enabled = true) {
   });
 }
 
+/** Karşı tarafın geçmiş satır kodları (#669 L): sunucu bütün kararlardan sayar. */
+export function useCounterpartyCodeHistory(
+  engagement: string | undefined,
+  counterparty: string | undefined,
+) {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: reviewKeys.history(slug, engagement ?? "", counterparty ?? ""),
+    queryFn: () =>
+      reviewService.history(slug, engagement ?? "", counterparty ?? ""),
+    enabled: !!engagement && !!counterparty,
+    staleTime: 60_000,
+  });
+}
+
 /**
  * Effective auto-accept threshold for a suggestion kind: pending suggestions
  * are the ones whose confidence stayed below it.

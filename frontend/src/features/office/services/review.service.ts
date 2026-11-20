@@ -12,6 +12,7 @@ export type ReviewSuggestionPage =
   components["schemas"]["EnvelopeSuggestionPage"]["data"];
 export type ReviewSettings = components["schemas"]["ReviewSettings"];
 export type AccountPlanAccount = components["schemas"]["AccountPlanAccount"];
+export type CounterpartyCodeUse = components["schemas"]["CounterpartyCodeUse"];
 export type AccountSuggestionList =
   components["schemas"]["EnvelopeAccountSuggestionList"]["data"];
 export type AccountPlanAccountPage =
@@ -48,6 +49,13 @@ export const reviewKeys = {
       uuid.toLowerCase(),
     ] as const,
   settings: (slug: string) => [...reviewKeys.all(slug), "settings"] as const,
+  history: (slug: string, engagement: string, counterparty: string) =>
+    [
+      ...reviewKeys.all(slug),
+      "history",
+      engagement.toLowerCase(),
+      counterparty,
+    ] as const,
   engagementSettings: (slug: string, engagement: string) =>
     [...reviewKeys.all(slug), "settings", engagement] as const,
   accounts: (slug: string, engagement: string, q: string) =>
@@ -85,6 +93,15 @@ export const reviewService = {
         offset: filter.offset,
       },
     });
+  },
+  /** Karşı tarafın geçmiş satır kodları, bütün kararlardan (#669 L). */
+  history(slug: string, engagement: string, counterparty: string) {
+    return tenantRequest<{ items: CounterpartyCodeUse[] }>(
+      slug,
+      "GET",
+      `/v1/tenant/engagements/${enc(engagement)}/suggestions/history`,
+      { query: { counterparty, limit: 4 } },
+    );
   },
   get(slug: string, engagement: string, uuid: string) {
     return tenantRequest<ReviewSuggestionDetail>(

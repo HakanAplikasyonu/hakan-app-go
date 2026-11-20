@@ -364,3 +364,18 @@ func nilIfEmpty(b []byte) json.RawMessage {
 	}
 	return json.RawMessage(b)
 }
+
+// CounterpartyHistory implements usecase.HistoryStore (#669 L).
+func (p *Postgres) CounterpartyHistory(ctx context.Context, organizationID, engagementID int64, counterpartyKey string, limit int32) ([]usecase.CodeUse, error) {
+	rows, err := p.q.CounterpartyCodeHistory(ctx, db.CounterpartyCodeHistoryParams{
+		OrganizationID: organizationID, EngagementID: engagementID, CounterpartyKey: counterpartyKey, Lim: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("counterparty history: %w", err)
+	}
+	out := make([]usecase.CodeUse, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.CodeUse{AccountCode: r.AccountCode, Uses: r.Uses, LastUsedAt: r.LastUsedAt.Time})
+	}
+	return out, nil
+}
