@@ -98,6 +98,7 @@ LIMIT @lim OFFSET @off;
 
 -- name: ListApprovedBankPostingsWithoutDraft :many
 SELECT p.bank_transaction_id, p.account_code, p.account_name, p.confidence,
+       p.commission_amount, p.commission_account_code,
        t.uuid, t.cash_box_id, t.transaction_date, t.debit_credit, t.amount, t.currency, t.description,
        t.counterparty_name, cb.name AS cash_box_name,
        COALESCE(l.account_code, '102')::text AS bank_account_code
@@ -149,3 +150,10 @@ FROM bank_transaction_postings p
 JOIN bank_transactions t ON t.taxpayer_id = p.taxpayer_id AND t.id = p.bank_transaction_id
 WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id
   AND t.taxpayer_id = @taxpayer_id AND t.uuid = ANY(@uuids::uuid[]) AND p.status = 'approved';
+
+-- POS komisyonu (#565): yalnız fişe girmemiş harekette; boş değer siler.
+-- name: SetBankPostingCommission :execrows
+UPDATE bank_transaction_postings
+SET commission_amount = sqlc.narg(commission_amount), commission_account_code = sqlc.narg(commission_account_code)
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND taxpayer_id = @taxpayer_id
+  AND bank_transaction_id = @bank_transaction_id AND journal_draft_uuid IS NULL;
