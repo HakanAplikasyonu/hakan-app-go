@@ -93,7 +93,7 @@ export function useParasut(engagement: string) {
   const connections = useQuery({
     queryKey: key,
     queryFn: () =>
-      tenantRequest<{ items: ParasutConnection[] }>(
+      tenantRequest<{ items: ParasutConnection[]; configured: boolean }>(
         slug,
         "GET",
         parasutBase(engagement),
@@ -143,7 +143,7 @@ export function useKolayBi(engagement: string) {
   const connections = useQuery({
     queryKey: key,
     queryFn: () =>
-      tenantRequest<{ items: KolayBiConnection[] }>(
+      tenantRequest<{ items: KolayBiConnection[]; configured: boolean }>(
         slug,
         "GET",
         kolaybiBase(engagement),

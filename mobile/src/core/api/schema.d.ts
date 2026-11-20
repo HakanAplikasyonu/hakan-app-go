@@ -13286,6 +13286,8 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["KolayBiConnection"][];
+                /** @description false when the server lacks this integration's settings or the secret vault: connecting, authorizing and syncing would answer 503, so the panel shows an empty state instead (#639) */
+                configured: boolean;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -13548,6 +13550,8 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["ParasutConnection"][];
+                /** @description false when the server lacks this integration's settings or the secret vault: connecting, authorizing and syncing would answer 503, so the panel shows an empty state instead (#639) */
+                configured: boolean;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
