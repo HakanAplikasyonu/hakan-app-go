@@ -154,12 +154,15 @@ FROM (
                           WHERE b.taxpayer_id = $2 AND b.id = $3) IN w.params::text) > 0))
 
     UNION ALL
-    -- Kayıt → inceleme kaydı (öneri).
-    SELECT 'suggestion', s.uuid::text, 'review',
+    -- Kayıt → inceleme kaydı (öneri). Karara bağlanmış öneri gerçek bağdır;
+    -- bekleyen öneri tahmindir ("possible", #669); reddedilen, geri alınan
+    -- ve yerine yenisi gelen öneriler artık bağ değildir, listelenmez.
+    SELECT 'suggestion', s.uuid::text, CASE WHEN s.status = 'pending' THEN 'possible' ELSE 'review' END,
            to_char(s.created_at, 'YYYY-MM-DD'), '', '', s.status, s.kind, s.target_field
     FROM suggestions s
     WHERE s.organization_id = $5 AND s.engagement_id = $4
       AND $1::text IN ('invoice', 'bank_transaction', 'expense', 'retail_sale')
+      AND s.status NOT IN ('rejected', 'reverted', 'superseded')
       AND ((s.target_type = $1::text AND s.target_id = $3)
         OR ($1::text = 'invoice' AND s.target_type = 'invoice_item' AND s.target_id IN (
             SELECT ii.id FROM invoice_items ii WHERE ii.taxpayer_id = $2 AND ii.invoice_id = $3)))
@@ -265,8 +268,10 @@ FROM (
         WHERE $1::text = 'financial_transaction' AND f.taxpayer_id = $2 AND f.id = $3)
 
     UNION ALL
-    -- Banka hareketi → cari / karşı hesap (muhasebeleştirme kaydı).
-    SELECT 'account', '', 'counterparty_account', '', '', '', bp.status, bp.account_code, bp.account_name
+    -- Banka hareketi → cari / karşı hesap (muhasebeleştirme kaydı). Onaylanmamış
+    -- öneri (takma ad, işlem türü varsayılanı …) tahmindir: "possible" (#669).
+    SELECT 'account', '', CASE WHEN bp.status = 'approved' THEN 'counterparty_account' ELSE 'possible' END,
+           '', '', '', bp.status, bp.account_code, bp.account_name
     FROM bank_transaction_postings bp
     WHERE $1::text = 'bank_transaction' AND bp.organization_id = $5 AND bp.engagement_id = $4
       AND bp.bank_transaction_id = $3

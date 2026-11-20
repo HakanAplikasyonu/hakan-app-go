@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import { Fragment, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -150,8 +150,12 @@ export function RelatedRecordsTable({
         {t("office.related.load_error")}
       </p>
     );
-  const items = query.data?.items ?? [];
-  if (items.length === 0)
+  const all = query.data?.items ?? [];
+  // Gerçek bağlar önce; tahminler (bekleyen öneri, onaylanmamış karşı
+  // hesap) ayrı "Olası" başlığı altında, açıkça etiketli (#669).
+  const items = all.filter((x) => x.relation !== "possible");
+  const possible = all.filter((x) => x.relation === "possible");
+  if (all.length === 0)
     return (
       <p className="text-text-2 p-4 text-sm" data-testid="related-empty">
         {t("office.related.empty")}
@@ -194,7 +198,18 @@ export function RelatedRecordsTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {items.map((item, i) => {
+        {items.length === 0 ? (
+          <TableRow className="border-line hover:bg-transparent">
+            <TableCell
+              colSpan={5}
+              className="text-text-2 px-4 py-2 text-sm"
+              data-testid="related-empty"
+            >
+              {t("office.related.empty")}
+            </TableCell>
+          </TableRow>
+        ) : null}
+        {[...items, ...possible].map((item, i) => {
           // Uyarı ve kural adı; ham kod değil (#576).
           const recordName = (r: RelatedRecord) =>
             r.kind === "warning" || r.kind === "rule"
@@ -205,79 +220,101 @@ export function RelatedRecordsTable({
               : r.label;
           const href = relatedHref(slug, engagement, item);
           const kindLabel = t(`office.related.kind.${item.kind}`);
+          const firstPossible = i === items.length && possible.length > 0;
           return (
-            <TableRow
-              className="border-line hover:bg-transparent"
-              key={`${item.kind}-${item.uuid ?? item.label}-${i}`}
-            >
-              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
-                <div className="font-medium">{kindLabel}</div>
-                <div className="text-text-3 text-xs">
-                  {t(`office.related.relation.${item.relation}`)}
-                </div>
-              </TableCell>
-              <TableCell className="px-4 py-2 align-top">
-                {onOpen && panelTarget(item) ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="text-brand-text h-auto p-0 text-left font-normal whitespace-normal"
+            <Fragment key={`${item.kind}-${item.uuid ?? item.label}-${i}`}>
+              {firstPossible ? (
+                <TableRow
+                  className="border-line bg-surface-2 hover:bg-surface-2"
+                  data-testid="related-possible-heading"
+                >
+                  <TableCell colSpan={5} className="px-4 py-2">
+                    <div className="text-sm font-semibold">
+                      {t("office.related.possible_title")}
+                    </div>
+                    <div className="text-text-2 text-xs">
+                      {t("office.related.possible_hint")}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              <TableRow
+                className="border-line hover:bg-transparent"
+                data-testid={
+                  item.relation === "possible"
+                    ? "related-possible"
+                    : "related-definite"
+                }
+              >
+                <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                  <div className="font-medium">{kindLabel}</div>
+                  <div className="text-text-3 text-xs">
+                    {t(`office.related.relation.${item.relation}`)}
+                  </div>
+                </TableCell>
+                <TableCell className="px-4 py-2 align-top">
+                  {onOpen && panelTarget(item) ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="text-brand-text h-auto p-0 text-left font-normal whitespace-normal"
+                        aria-label={`${kindLabel}: ${recordName(item)}`}
+                        data-testid="related-open-in-panel"
+                        onClick={() => {
+                          const target = panelTarget(item);
+                          if (target)
+                            onOpen({ ...target, label: recordName(item) });
+                        }}
+                      >
+                        <RecordLabel item={item} />
+                      </Button>
+                      {href ? (
+                        <Link
+                          href={href}
+                          className="text-text-3 hover:text-brand-text"
+                          aria-label={t("office.related.open_page", {
+                            record: `${kindLabel}: ${recordName(item)}`,
+                          })}
+                          title={t("office.related.open_page", {
+                            record: kindLabel,
+                          })}
+                        >
+                          <ExternalLink className="size-3.5" aria-hidden />
+                        </Link>
+                      ) : null}
+                    </span>
+                  ) : href ? (
+                    <Link
+                      href={href}
+                      className="text-brand-text hover:underline"
                       aria-label={`${kindLabel}: ${recordName(item)}`}
-                      data-testid="related-open-in-panel"
-                      onClick={() => {
-                        const target = panelTarget(item);
-                        if (target)
-                          onOpen({ ...target, label: recordName(item) });
-                      }}
                     >
                       <RecordLabel item={item} />
-                    </Button>
-                    {href ? (
-                      <Link
-                        href={href}
-                        className="text-text-3 hover:text-brand-text"
-                        aria-label={t("office.related.open_page", {
-                          record: `${kindLabel}: ${recordName(item)}`,
-                        })}
-                        title={t("office.related.open_page", {
-                          record: kindLabel,
-                        })}
-                      >
-                        <ExternalLink className="size-3.5" aria-hidden />
-                      </Link>
-                    ) : null}
-                  </span>
-                ) : href ? (
-                  <Link
-                    href={href}
-                    className="text-brand-text hover:underline"
-                    aria-label={`${kindLabel}: ${recordName(item)}`}
-                  >
+                    </Link>
+                  ) : (
                     <RecordLabel item={item} />
-                  </Link>
-                ) : (
-                  <RecordLabel item={item} />
-                )}
-                <Detail item={item} />
-              </TableCell>
-              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
-                <Figure>{trDate(item.date)}</Figure>
-              </TableCell>
-              <TableCell className="px-4 py-2 text-right align-top whitespace-nowrap">
-                {item.amount ? (
-                  <Money
-                    value={item.amount}
-                    currency={item.currency ?? "TRY"}
-                  />
-                ) : (
-                  "—"
-                )}
-              </TableCell>
-              <TableCell className="px-4 py-2 align-top whitespace-nowrap">
-                {tr(`office.related.status.${item.status}`, item.status)}
-              </TableCell>
-            </TableRow>
+                  )}
+                  <Detail item={item} />
+                </TableCell>
+                <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                  <Figure>{trDate(item.date)}</Figure>
+                </TableCell>
+                <TableCell className="px-4 py-2 text-right align-top whitespace-nowrap">
+                  {item.amount ? (
+                    <Money
+                      value={item.amount}
+                      currency={item.currency ?? "TRY"}
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell className="px-4 py-2 align-top whitespace-nowrap">
+                  {tr(`office.related.status.${item.status}`, item.status)}
+                </TableCell>
+              </TableRow>
+            </Fragment>
           );
         })}
       </TableBody>
