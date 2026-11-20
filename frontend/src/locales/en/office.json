@@ -2529,5 +2529,11 @@
   "bank.upload.suggested": "Account suggestions ready: {{count}} movements; {{high}} with high confidence.",
   "bank.upload.approve_high": "Approve high-confidence ({{count}})",
   "bank.upload.make_drafts": "Create draft vouchers",
-  "bank.upload.already_loaded": "This statement was already uploaded: {{count}} movements are on record and were not added again."
+  "bank.upload.already_loaded": "This statement was already uploaded: {{count}} movements are on record and were not added again.",
+  "tax_returns.mark_checked": "Mark as checked",
+  "tax_returns.checked": "The return was marked as checked.",
+  "tax_returns.approve_only_responsible": "Only the responsible person (office owner or admin) marks a return checked and filed; you can prepare it.",
+  "tax_returns.trail_prepared": "Prepared by {{who}} ({{date}})",
+  "tax_returns.trail_checked": "Checked by {{who}} ({{date}})",
+  "tax_returns.trail_filed": "Filed by {{who}} ({{date}})"
 }

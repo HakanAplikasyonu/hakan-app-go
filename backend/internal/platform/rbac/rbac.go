@@ -124,6 +124,10 @@ const (
 	// Beyanname önizlemesi ve beyan kayıtları (issue #390).
 	PermTenantTaxReturnsRead  = "tenant.tax_returns.read"
 	PermTenantTaxReturnsWrite = "tenant.tax_returns.write"
+	// PermTenantTaxReturnsApprove: the final check (#669): "kontrol edildi"
+	// and "verildi" are marked only by the responsible person (owner, admin);
+	// everyone with write prepares returns.
+	PermTenantTaxReturnsApprove = "tenant.tax_returns.approve"
 	// Belge arşivi ve İSG evrakları (issue #393).
 	PermTenantDocumentsRead  = "tenant.documents.read"
 	PermTenantDocumentsWrite = "tenant.documents.write"
