@@ -879,7 +879,8 @@ function JournalsInner() {
         </div>
       </div>
 
-      <NewDraft engagement={engagement} />
+      {/* Mükellef değişince yarım fiş öbür mükellefe taşınmaz (#573). */}
+      <NewDraft key={engagement} engagement={engagement} />
 
       <Panel
         id={DRAFTS_ANCHOR}

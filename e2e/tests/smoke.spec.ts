@@ -243,6 +243,16 @@ test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydo
   await rows.nth(0).locator("input").nth(2).fill("150,00");
   await rows.nth(1).locator("input").nth(0).fill("100.01");
   await office.getByRole("button", { name: "Farkı kapat" }).click();
+  await expect(rows.nth(1).locator("input").nth(3)).toHaveValue("150,00");
+  await expect(office.getByText("Dengeli", { exact: true })).toBeVisible();
+  // Kaydetmeyi durduran satır sorunu varsa hata iletisinde görünsün.
+  const problem = office.getByText(/satırdaki tutar okunamadı|satırda hesap kodu ve yalnızca|En az bir satıra hesap/);
+  if (await problem.count()) {
+    const values = await rows.evaluateAll((trs) =>
+      trs.map((tr) => [...tr.querySelectorAll("input")].map((i) => (i as HTMLInputElement).value).join(" | ")),
+    );
+    throw new Error(`${await problem.first().innerText()} — satırlar: ${values.join(" / ")}`);
+  }
   await office.getByRole("button", { name: "Taslağı kaydet" }).click();
   await expect(office.locator("tr", { hasText: "E2E Selin fişi" }).first()).toBeVisible();
 
