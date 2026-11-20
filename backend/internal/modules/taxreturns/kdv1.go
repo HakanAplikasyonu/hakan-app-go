@@ -60,6 +60,9 @@ type InvoiceLine struct {
 // InvoiceStats counts the period's invoices for the checklist.
 type InvoiceStats struct {
 	Included, Draft, Cancelled, MissingExchangeRate, HeaderEstimate int64
+	// MovedIn / MovedOut: purchase invoices whose KDV deduction was moved
+	// into / out of this period (KDV indirim dönemi, #640).
+	MovedIn, MovedOut int64
 }
 
 // RetailLine is the rate breakdown of approved Z reports (TL).
@@ -491,6 +494,14 @@ func kdv1Checklist(in KDV1Input, k KDV1, exportVAT decimal.Decimal) []CheckItem 
 	if s.HeaderEstimate > 0 {
 		c = append(c, item("HEADER_ESTIMATE", SeverityWarning,
 			fmt.Sprintf("%d faturanın KDV kırılımı başlık tutarından tahmin edildi; kalemleri kontrol edin.", s.HeaderEstimate), s.HeaderEstimate))
+	}
+	if s.MovedIn > 0 {
+		c = append(c, item("VAT_DEDUCTION_MOVED_IN", SeverityInfo,
+			fmt.Sprintf("%d alış faturasının KDV'si önceki bir aydan bu döneme alındı (KDV indirim dönemi).", s.MovedIn), s.MovedIn))
+	}
+	if s.MovedOut > 0 {
+		c = append(c, item("VAT_DEDUCTION_MOVED_OUT", SeverityInfo,
+			fmt.Sprintf("Bu ayın %d alış faturasının KDV'si sonraki bir aya alındı; bu beyanda indirilmedi.", s.MovedOut), s.MovedOut))
 	}
 	if in.ExpenseStats.Pending > 0 {
 		c = append(c, item("PENDING_EXPENSES", SeverityWarning,

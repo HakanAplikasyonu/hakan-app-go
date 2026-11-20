@@ -401,6 +401,7 @@ func (s *Service) invoiceStats(ctx context.Context, tp int64, period string) (In
 	return InvoiceStats{
 		Included: st.Included, Draft: st.Draft, Cancelled: st.Cancelled,
 		MissingExchangeRate: st.MissingExchangeRate, HeaderEstimate: st.HeaderEstimate,
+		MovedIn: st.MovedIn, MovedOut: st.MovedOut,
 	}, nil
 }
 

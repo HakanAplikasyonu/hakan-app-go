@@ -1455,7 +1455,9 @@ type Querier interface {
 	// KDV1 satırları KDV dönemine göre (#640): alış faturasının KDV indirim
 	// dönemi varsa o ay, yoksa belge ayı. Ba/Bs ve MUHSGK belge ayında kalır.
 	TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoiceLinesParams) ([]TaxReturnInvoiceLinesRow, error)
-	// Kontrol listesi: beyana giren / girmeyen fatura sayıları.
+	// Kontrol listesi: beyana giren / girmeyen fatura sayıları. Sayımlar KDV
+	// dönemine göre (#640); moved_in başka aydan bu döneme KDV'si alınan,
+	// moved_out bu ayın belgesi olup KDV'si sonraki aya alınan alış faturaları.
 	TaxReturnInvoiceStats(ctx context.Context, arg TaxReturnInvoiceStatsParams) (TaxReturnInvoiceStatsRow, error)
 	// Ba/Bs: karşı taraf kimliği olmayan (yabancı ya da eksik) faturalar.
 	TaxReturnMissingCounterparty(ctx context.Context, arg TaxReturnMissingCounterpartyParams) ([]TaxReturnMissingCounterpartyRow, error)

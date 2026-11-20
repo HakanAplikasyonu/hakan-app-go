@@ -27,18 +27,23 @@ GROUP BY i.direction, i.type, s.tax_rate, COALESCE(s.withholding_code, ''),
 ORDER BY i.direction, i.type, s.tax_rate, 4, 5;
 
 -- name: TaxReturnInvoiceStats :one
--- Kontrol listesi: beyana giren / girmeyen fatura sayıları.
-SELECT COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+-- Kontrol listesi: beyana giren / girmeyen fatura sayıları. Sayımlar KDV
+-- dönemine göre (#640); moved_in başka aydan bu döneme KDV'si alınan,
+-- moved_out bu ayın belgesi olup KDV'si sonraki aya alınan alış faturaları.
+SELECT COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL))::bigint AS included,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'draft')::bigint AS draft,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'cancelled')::bigint AS cancelled,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.status_normalized = 'draft')::bigint AS draft,
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.status_normalized = 'cancelled')::bigint AS cancelled,
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND i.currency <> 'TRY' AND i.exchange_rate IS NULL)::bigint AS missing_exchange_rate,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
-                          AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+                          AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate,
+       COUNT(*) FILTER (WHERE i.vat_deduction_period = @period::text AND i.status_normalized = 'active'
+                          AND i.deleted_at_source IS NULL)::bigint AS moved_in,
+       COUNT(*) FILTER (WHERE i.period = @period::text AND i.vat_deduction_period IS NOT NULL
+                          AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL)::bigint AS moved_out
 FROM invoices i
-WHERE i.taxpayer_id = @taxpayer_id AND (i.period = @period OR i.vat_deduction_period = @period)
-  AND COALESCE(i.vat_deduction_period, i.period) = @period;
+WHERE i.taxpayer_id = @taxpayer_id AND (i.period = @period::text OR i.vat_deduction_period = @period::text);
 
 -- name: TaxReturnRetailVATLines :many
 -- Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).

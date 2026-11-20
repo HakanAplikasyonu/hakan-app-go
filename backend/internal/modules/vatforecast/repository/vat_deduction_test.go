@@ -110,6 +110,21 @@ func TestVATDeductionPeriodMovesInputVAT(t *testing.T) {
 		if got := incomingVAT(next); !got.Equal(retNov.Add(movedVAT)) {
 			t.Errorf("KDV1 november incoming %s, want %s", got, retNov.Add(movedVAT))
 		}
+		// Kontrol listesi: Ekim'de "sonraki aya alındı", Kasım'da "önceki aydan alındı".
+		octStats, err := q.TaxReturnInvoiceStats(ctx, db.TaxReturnInvoiceStatsParams{TaxpayerID: s.sub.TaxpayerID, Period: demoPeriod})
+		if err != nil {
+			t.Fatal(err)
+		}
+		novStats, err := q.TaxReturnInvoiceStats(ctx, db.TaxReturnInvoiceStatsParams{TaxpayerID: s.sub.TaxpayerID, Period: next})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if octStats.MovedOut != 1 || octStats.MovedIn != 0 || novStats.MovedIn != 1 || novStats.MovedOut != 0 {
+			t.Errorf("moved counts oct %+v nov %+v", octStats, novStats)
+		}
+		if octStats.Included != oct.Totals.InvoiceCount || novStats.Included != nov.Totals.InvoiceCount {
+			t.Errorf("included oct %d/%d nov %d/%d", octStats.Included, oct.Totals.InvoiceCount, novStats.Included, nov.Totals.InvoiceCount)
+		}
 		if got := babsCount(demoPeriod); got != babsOct {
 			t.Errorf("Ba/Bs october documents %d, want %d", got, babsOct)
 		}
