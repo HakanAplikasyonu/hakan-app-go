@@ -52,7 +52,7 @@ export function useSelectedEngagement(
     // Mükellef değişince liste sayfası başa döner (#381).
     next.delete("page");
     next.delete("offset");
-    router.replace(`${pathname}?${next.toString()}`);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
   };
 
   useEffect(() => {
