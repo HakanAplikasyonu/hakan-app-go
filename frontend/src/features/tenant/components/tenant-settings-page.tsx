@@ -20,6 +20,7 @@ import {
   useTenantSettings,
 } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
@@ -220,6 +221,7 @@ export function TenantSettingsPage() {
               description={t("tenant.settings_section_ai_description")}
             >
               <AiApprovalSettings />
+              <StatementAiSetting slug={tenant.slug} canWrite={canWrite} />
             </Section>
           ) : null}
           {showAgents ? (

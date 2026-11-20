@@ -129,5 +129,8 @@
   "support_widget_help": "The data-widget value on the Web widget → Install tab of the ClickFix panel.",
   "support_widget_placeholder": "e.g. 3f2a9c1e-…",
   "support_widget_invalid": "Only letters, digits, - and _ are allowed (up to 128 characters).",
-  "support_saved": "Support setting saved."
+  "support_saved": "Support setting saved.",
+  "statement_ai_title": "Bank statements",
+  "statement_ai_label": "Let AI suggest columns for unrecognised statements",
+  "statement_ai_description": "When off, the file is not sent to AI; columns are suggested from templates and header names, and you pick the rest in the preview."
 }
