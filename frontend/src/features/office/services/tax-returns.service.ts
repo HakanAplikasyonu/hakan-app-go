@@ -6,6 +6,7 @@ import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 export type TaxReturnKind = "kdv1" | "muhsgk" | "babs";
 export type TaxReturnPreview = components["schemas"]["TaxReturnPreview"];
 export type TaxReturnSummary = components["schemas"]["TaxReturnSummary"];
+export type TaxReturnSection = components["schemas"]["TaxReturnSection"];
 export type TaxReturnCheckItem = components["schemas"]["TaxReturnCheckItem"];
 export type TaxReturnKDV1 = components["schemas"]["TaxReturnKDV1"];
 export type TaxReturnMUHSGK = components["schemas"]["TaxReturnMUHSGK"];

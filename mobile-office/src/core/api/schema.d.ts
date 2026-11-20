@@ -20899,12 +20899,28 @@ export interface components {
             };
             record: components["schemas"]["TaxReturnRecord"] | null;
             open_warnings: string[];
+            /** @description The period's sources, processed / total (#710); always live, also for a prepared or filed return */
+            sections: components["schemas"]["TaxReturnSection"][];
             /** Format: date-time */
             computed_at: string;
             checklist: components["schemas"]["TaxReturnCheckItem"][];
             kdv1?: components["schemas"]["TaxReturnKDV1"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
+        };
+        /**
+         * @description One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
+         *     value, matched bank transaction); ignored was set aside (rejected, cancelled, ignored); the rest still waits.
+         */
+        TaxReturnSection: {
+            /** @enum {string} */
+            key: "retail" | "invoices" | "bank" | "expenses";
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            processed: number;
+            /** Format: int64 */
+            ignored: number;
         };
         TaxReturnSummary: {
             /** Format: uuid */

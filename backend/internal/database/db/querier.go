@@ -1534,6 +1534,13 @@ type Querier interface {
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
 	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
+	// Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+	// (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+	// her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+	// fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+	// eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+	// sayılan banka hareketi.
+	TaxReturnSectionStats(ctx context.Context, arg TaxReturnSectionStatsParams) (TaxReturnSectionStatsRow, error)
 	// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
 	TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
