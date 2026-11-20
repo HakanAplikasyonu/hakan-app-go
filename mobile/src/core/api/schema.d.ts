@@ -12323,6 +12323,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/tax-return-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's tax return final check setting (#710)
+         * @description Requires `tenant.tax_returns.read`. `final_check_required` (default
+         *     true): "kontrol edildi" and "verildi" are marked only by the
+         *     responsible (`tenant.tax_returns.approve`). When the office turns it
+         *     off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+         *     too; who and when are recorded either way.
+         */
+        get: operations["getTaxReturnSettings"];
+        /**
+         * Set the office's tax return final check setting (#710)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putTaxReturnSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rule-settings": {
         parameters: {
             query?: never;
@@ -13001,7 +13035,9 @@ export interface paths {
          * Mark the prepared return as checked (final check)
          * @description Requires `tenant.tax_returns.approve` (#669, office decision: everyone
          *     prepares returns; only the responsible person, owner or admin, marks
-         *     "kontrol edildi" and "verildi"). Who and when are kept
+         *     "kontrol edildi" and "verildi"). When the office turned the final
+         *     check off (`/v1/tenant/tax-return-settings`, #710),
+         *     `tenant.tax_returns.write` is enough. Who and when are kept
          *     (`record.checked_by_name`, `record.checked_at`). Only a prepared
          *     return (`409 TAX_RETURN_NOT_PREPARED`).
          */
@@ -13067,7 +13103,8 @@ export interface paths {
         put?: never;
         /**
          * Record that the prepared return was filed
-         * @description Requires `tenant.tax_returns.approve` (#669: only the responsible
+         * @description Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+         *     office turned the final check off, #710) (#669: only the responsible
          *     person marks "verildi"; filing also marks the return checked when it
          *     was not). `filed_on` is not before the period's last day nor in the
          *     future; `accrual_number` is the tahakkuk fiş no. Only a prepared
@@ -20273,6 +20310,18 @@ export interface components {
             updated_at?: string;
             /** @description True while the office has not set one */
             default: boolean;
+        };
+        TaxReturnSettings: {
+            /** @description Only the responsible marks "kontrol edildi" / "verildi" (default true) */
+            final_check_required: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeTaxReturnSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxReturnSettings"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeAccountRuleSettings: {
             /** @enum {boolean} */
@@ -40843,6 +40892,71 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeClickFixIdentity"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    final_check_required: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

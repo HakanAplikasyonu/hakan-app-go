@@ -2240,6 +2240,13 @@ type TaxReturn struct {
 	CheckedAt         pgtype.Timestamptz `json:"checked_at"`
 }
 
+type TaxReturnSetting struct {
+	OrganizationID     int64              `json:"organization_id"`
+	FinalCheckRequired bool               `json:"final_check_required"`
+	UpdatedBy          pgtype.Int8        `json:"updated_by"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+}
+
 type Taxpayer struct {
 	ID           int64              `json:"id"`
 	Uuid         uuid.UUID          `json:"uuid"`

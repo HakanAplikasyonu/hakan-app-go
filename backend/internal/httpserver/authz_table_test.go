@@ -63,6 +63,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules/preview": azTenantReadAction,
 	"GET /v1/tenant/account-rule-settings":                               azTenantRead,
+	"GET /v1/tenant/tax-return-settings":                                 azTenantRead,
+	"PUT /v1/tenant/tax-return-settings":                                 azTenantWrite,
 	"GET /v1/tenant/support-settings":                                    azTenantRead,
 	"PUT /v1/tenant/support-settings":                                    azTenantWrite,
 	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
