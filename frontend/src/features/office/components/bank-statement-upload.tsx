@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import {
   bankPostingService,
@@ -31,17 +32,42 @@ const UPLOAD_ERRORS = [
   "INVALID_OVERRIDES",
 ] as const;
 
+/** Bu güven ve üstündeki hesap önerileri tek tıkla toplu onaylanabilir. */
+export const HIGH_CONFIDENCE = 0.7;
+
+/** Raporun yeni hareket eklenen dönemleri (YYYY-MM; en çok 12). */
+export function periodsOf(rep: BankStatementReport): string[] {
+  const out = new Set<string>();
+  for (const a of rep.accounts) {
+    if (a.inserted === 0 || !a.from || !a.to) continue;
+    let [y, m] = a.from.slice(0, 7).split("-").map(Number);
+    const end = a.to.slice(0, 7);
+    for (let i = 0; i < 12; i++) {
+      const p = `${y}-${String(m).padStart(2, "0")}`;
+      out.add(p);
+      if (p >= end) break;
+      m++;
+      if (m > 12) [y, m] = [y + 1, 1];
+    }
+  }
+  return [...out].sort();
+}
+
 /**
  * Ekstre yükleme (#383, #669 ekstre). MT940 doğrudan okunur. Excel, CSV ve
  * metin PDF önce deneme okumasından geçer, sonra Excel benzeri önizlemede
  * gösterilir: kolonların anlamı, dışarıda bırakılacak satırlar, okunamayan
  * hücreler. Biçim tanınmadıysa kolonlar başlık adlarından (ve AI'dan)
  * önerilir. Onaylanan eşleme ofis şablonu olarak kaydedilir; aynı düzendeki
- * bir sonraki ekstrede kendiliğinden gelir.
+ * bir sonraki ekstrede kendiliğinden gelir. Yükleme bitince hesap önerisi
+ * kendiliğinden çalışır; yüksek güvenli öneriler bildirimden tek tıkla
+ * onaylanır, ardından taslak fiş oluşturulur.
  */
 export function BankStatementUpload({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
+  const { can } = usePermission();
+  const canWrite = can("tenant.bank.write");
   const qc = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -66,16 +92,106 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
       });
   };
 
+  const makeDrafts = async (periods: string[]) => {
+    try {
+      let drafts = 0;
+      let count = 0;
+      for (const p of periods) {
+        const r = await bankPostingService.drafts(slug, engagement, p);
+        drafts += r.drafts.length;
+        count += r.transactions;
+      }
+      toast.success(t("office.bank.posting.drafts_done", { drafts, count }));
+      refresh();
+    } catch (e) {
+      toast.error(uploadError(e));
+    }
+  };
+
+  const approveHigh = async (ids: string[], periods: string[]) => {
+    try {
+      const r = await bankPostingService.approve(slug, engagement, ids);
+      toast.success(
+        t("office.bank.posting.approve_done", {
+          approved: r.approved,
+          skipped: r.skipped,
+        }),
+        {
+          duration: 30_000,
+          action: {
+            label: t("office.bank.upload.make_drafts"),
+            onClick: () => void makeDrafts(periods),
+          },
+        },
+      );
+      refresh();
+    } catch (e) {
+      toast.error(uploadError(e));
+    }
+  };
+
+  // Yüklemeden sonra hesap önerisi kendiliğinden çalışır (eşleşen cari ve
+  // işlem türüne göre); yüksek güvenliler bildirimden toplu onaylanır.
+  const suggestAfter = async (rep: BankStatementReport) => {
+    const periods = periodsOf(rep);
+    if (!canWrite || periods.length === 0) return;
+    try {
+      let count = 0;
+      const high: string[] = [];
+      for (const p of periods) {
+        const r = await bankPostingService.suggest(slug, engagement, p);
+        count += r.suggested + r.auto_approved;
+        const page = await bankPostingService.list(slug, engagement, {
+          period: p,
+          status: "suggested",
+          limit: 200,
+          offset: 0,
+        });
+        for (const x of page.items)
+          if (
+            x.suggestion_status === "pending" &&
+            Number(x.confidence ?? 0) >= HIGH_CONFIDENCE
+          )
+            high.push(x.uuid);
+      }
+      refresh();
+      if (count === 0) return;
+      toast.info(
+        t("office.bank.upload.suggested", { count, high: high.length }),
+        high.length > 0
+          ? {
+              duration: 30_000,
+              action: {
+                label: t("office.bank.upload.approve_high", {
+                  count: high.length,
+                }),
+                onClick: () => void approveHigh(high, periods),
+              },
+            }
+          : undefined,
+      );
+    } catch {
+      // Öneri çalışmazsa yükleme yine tamamdır; Hesap eşleştirme
+      // sekmesinden elle çalıştırılabilir.
+    }
+  };
+
   const done = (rep: BankStatementReport) => {
     const inserted = rep.accounts.reduce((n, a) => n + a.inserted, 0);
-    toast.success(
-      t("office.bank.upload.done", {
-        count: inserted,
-        bank: rep.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
-      }),
-    );
+    const already = rep.accounts.reduce((n, a) => n + a.merged + a.skipped, 0);
+    if (inserted === 0 && already > 0)
+      // Aynı ekstre ikinci kez: hiçbir şey eklenmez, açıkça söylenir.
+      toast.warning(t("office.bank.upload.already_loaded", { count: already }));
+    else
+      toast.success(
+        t("office.bank.upload.done", {
+          count: inserted,
+          bank: rep.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
+        }),
+      );
     setAnalysis(null);
     refresh();
+    void suggestAfter(rep);
   };
 
   const importFile = async (f: File, o?: BankStatementOverrides) => {

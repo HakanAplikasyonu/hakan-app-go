@@ -1081,7 +1081,7 @@
   "bank.posting.learn_hint": "Seçim karşı tarafın takma adı olarak hatırlanır; aynı ödeyen sonraki ekstrelerde bu hesaba önerilir.",
   "bank.posting.drafts": "Fiş taslağı oluştur ({{count}})",
   "bank.posting.drafts_same_account": "{{count}} hareketin karşı hesabı banka hesabının kendisiydi; fişe alınmadı, incelemeye döndü. Karşı hesabı (ör. öbür bankanın 102 alt hesabı) seçin.",
-  "bank.posting.drafts_done":"{{drafts}} fiş taslağı oluşturuldu ({{count}} hareket). Taslaklar yevmiye ekranından onaylanıp Luca / Zirve'ye aktarılır.",
+  "bank.posting.drafts_done": "{{drafts}} fiş taslağı oluşturuldu ({{count}} hareket). Taslaklar yevmiye ekranından onaylanıp Luca / Zirve'ye aktarılır.",
   "bank.posting.failed": "İşlem yapılamadı.",
   "bank.posting.empty_title": "Eşleştirilecek hareket yok",
   "bank.posting.empty": "Bu dönem ve süzgeç için banka hareketi yok. Ekstre yükleyin ya da süzgeci değiştirin.",
@@ -2436,5 +2436,9 @@
   "trial_balance.live_empty_title": "Bu dönemde fiş yok",
   "trial_balance.live_empty_body": "Onaylı fiş olunca canlı mizan burada görünür.",
   "trial_balance.col_luca": "Luca bakiyesi",
-  "trial_balance.col_difference": "Fark"
+  "trial_balance.col_difference": "Fark",
+  "bank.upload.suggested": "Hesap önerisi hazır: {{count}} hareket; {{high}} tanesi yüksek güvenli.",
+  "bank.upload.approve_high": "Yüksek güvenlileri onayla ({{count}})",
+  "bank.upload.make_drafts": "Taslak fiş oluştur",
+  "bank.upload.already_loaded": "Bu ekstre daha önce yüklenmiş: {{count}} hareket zaten kayıtlı, yeniden eklenmedi."
 }

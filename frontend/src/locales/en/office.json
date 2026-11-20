@@ -1081,7 +1081,7 @@
   "bank.posting.learn_hint": "The choice is remembered as the counterparty's alias; the same payer is suggested this account in later statements.",
   "bank.posting.drafts": "Create journal drafts ({{count}})",
   "bank.posting.drafts_same_account": "{{count}} movements were booked to the bank account itself; they were not drafted and went back to review. Pick the counter account (e.g. the other bank's 102 sub-account).",
-  "bank.posting.drafts_done":"{{drafts}} journal drafts created ({{count}} movements). Approve them on the journals screen to export to Luca / Zirve.",
+  "bank.posting.drafts_done": "{{drafts}} journal drafts created ({{count}} movements). Approve them on the journals screen to export to Luca / Zirve.",
   "bank.posting.failed": "The action failed.",
   "bank.posting.empty_title": "No movements to match",
   "bank.posting.empty": "No bank movements for this period and filter. Upload a statement or change the filter.",
@@ -2436,5 +2436,9 @@
   "trial_balance.live_empty_title": "No entries in this period",
   "trial_balance.live_empty_body": "The live trial balance appears once entries are approved.",
   "trial_balance.col_luca": "Luca balance",
-  "trial_balance.col_difference": "Difference"
+  "trial_balance.col_difference": "Difference",
+  "bank.upload.suggested": "Account suggestions ready: {{count}} movements; {{high}} with high confidence.",
+  "bank.upload.approve_high": "Approve high-confidence ({{count}})",
+  "bank.upload.make_drafts": "Create draft vouchers",
+  "bank.upload.already_loaded": "This statement was already uploaded: {{count}} movements are on record and were not added again."
 }

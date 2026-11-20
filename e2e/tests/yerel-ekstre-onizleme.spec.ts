@@ -97,6 +97,20 @@ test("ekstre önizleme: kolonları eşle, satırı dışarıda bırak, hücreyi 
   await expect(table.getByRole("row").filter({ hasText: `HESAP ISLETIM UCRETI E2E ${tag}` })).toContainText("12,50");
   await expect(table.getByRole("row").filter({ hasText: `E2E ${tag}` })).toHaveCount(3);
 
+  // Hesap önerisi kendiliğinden çalışır: işletim ücreti (banka masrafı → 780)
+  // yüksek güvenli; bildirimden toplu onay, ardından taslak fiş.
+  await expect(page.getByText(/^Hesap önerisi hazır: \d+ hareket; [1-9]\d* tanesi yüksek güvenli\./)).toBeVisible();
+  await page.getByRole("button", { name: /^Yüksek güvenlileri onayla \(\d+\)$/ }).click();
+  await expect(page.getByText(/^[1-9]\d* hareket onaylandı/)).toBeVisible();
+  await page.getByRole("button", { name: "Taslak fiş oluştur" }).click();
+  await expect(page.getByText(/^[1-9]\d* fiş taslağı oluşturuldu/)).toBeVisible();
+  const check = await Api.login(DEMO.owner);
+  const drafted = await check.json<{ items: { description: string; account_code?: string }[] }>(
+    await check.get(`/v1/tenant/engagements/${selin}/bank-postings?period=2026-10&status=drafted&limit=200&offset=0`),
+  );
+  await check.dispose();
+  expect(drafted.items.find((x) => x.description.includes(`HESAP ISLETIM UCRETI E2E ${tag}`))?.account_code).toBe("780");
+
   // Aynı dosya yeniden: eşleme kendiliğinden gelir, hareketler zaten yüklü.
   await upload(page, iban);
   await expect(preview.getByRole("heading", { name: "Ekstre önizleme" })).toBeVisible();
