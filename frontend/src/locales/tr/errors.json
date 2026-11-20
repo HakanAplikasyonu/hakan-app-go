@@ -22,7 +22,7 @@
   "codes.INVALID_RESET_CODE": "Şifre sıfırlama kodu geçersiz veya süresi dolmuş.",
   "codes.INVALID_VERIFICATION_CODE": "Doğrulama kodu geçersiz veya süresi dolmuş.",
   "codes.PASSWORD_RESET_FAILED": "Şifre sıfırlanamadı.",
-  "codes.NO_TENANT_MEMBERSHIP": "Bu işletmeye üyeliğiniz yok.",
+  "codes.NO_TENANT_MEMBERSHIP": "Bu ofise üyeliğiniz yok.",
   "codes.LAST_ORGANIZATION_OWNER": "Organizasyonun en az bir sahibi kalmalı.",
   "codes.ORGANIZATION_SUSPENDED": "Bu organizasyon askıya alınmış.",
   "codes.ORGANIZATION_ACCESS_EXPIRED": "Bu organizasyonun erişim süresi sona erdi.",
