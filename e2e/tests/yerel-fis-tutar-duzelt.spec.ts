@@ -51,7 +51,7 @@ test("Dengesiz taslak: Tutarları düzelt → kontrol tamam → onayla (#566)", 
   expect(both.status()).toBe(400);
 
   await uiLogin(page, DEMO.owner);
-  await page.goto(officePath(`/journals?taxpayer=${engagement}`));
+  await page.goto(officePath(`/journals?taxpayer=${engagement}&period=${period}`));
   const row = page.locator("tr", { hasText: description }).first();
   await expect(row).toBeVisible();
   await expect(row).toContainText("Borç ve alacak tutmuyor");
