@@ -12,10 +12,12 @@ export function useEngagementDocuments(
   engagement: string,
   page: { limit: number; offset: number },
   enabled = true,
+  period?: string,
 ) {
   return useQuery({
-    queryKey: engagementDocumentKeys.documents(slug, engagement, page),
-    queryFn: () => engagementDocumentService.documents(slug, engagement, page),
+    queryKey: engagementDocumentKeys.documents(slug, engagement, page, period),
+    queryFn: () =>
+      engagementDocumentService.documents(slug, engagement, page, period),
     placeholderData: keepPreviousData,
     enabled,
   });

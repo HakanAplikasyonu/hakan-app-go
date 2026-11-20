@@ -43,5 +43,7 @@ SELECT i.uuid, i.invoice_number, i.issue_date, i.direction, i.payable_amount, i.
 FROM invoices i
 WHERE i.taxpayer_id = sqlc.arg(taxpayer_id)
   AND engagement_document_visible(sqlc.arg(engagement_id)::bigint, i.issue_date)
+  -- Üst çubuktaki ofis dönemi (#576); boşsa bütün dönemler.
+  AND (sqlc.narg(period)::text IS NULL OR i.period = sqlc.narg(period)::text)
 ORDER BY i.issue_date DESC, i.id DESC
 LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);

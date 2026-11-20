@@ -28,6 +28,7 @@ import {
   useEngagementHistoryShares,
 } from "@/features/office/hooks/use-engagement-documents";
 import type { EngagementDocument } from "@/features/office/services/engagement-documents.service";
+import { useOfficePeriod } from "@/features/office/period/use-office-period";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 import { EngagementNextWork } from "@/features/copilot";
@@ -122,11 +123,14 @@ function DocumentsSection({
   // olabilir" demek; çekirdek sayfalaması toplamsız (hasNextPage) çalışır.
   const listState = useUrlListState({ initialPageSize: PAGE_SIZE });
   const { limit, offset } = listState.params;
+  // Üst çubuktaki dönem listeyi süzer (#576); "Tüm dönemler"de hepsi.
+  const { period } = useOfficePeriod();
   const query = useEngagementDocuments(
     slug,
     engagement,
     { limit, offset },
     enabled,
+    period,
   );
   const columns = useDocumentColumns();
   const items = query.data?.items ?? [];
