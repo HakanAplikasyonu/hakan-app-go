@@ -78,6 +78,7 @@ var authzTable = map[string]authzClass{
 	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link":                   azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/whatsapp/captures":                   azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/file": azTenantRead,
+	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task": azTenantWrite,
 	"GET /healthz":                                                                   azPublic,
 	"GET /readyz":                                                                    azPublic,
 	"GET /v1/app/config":                                                             azPublic,

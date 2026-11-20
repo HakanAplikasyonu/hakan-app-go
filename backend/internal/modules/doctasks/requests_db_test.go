@@ -123,3 +123,53 @@ func TestDocumentRequestFlow(t *testing.T) {
 		t.Fatalf("other office complete: %v", err)
 	}
 }
+
+// TestOpenRequests is the #571 rule behind "a document that arrives outside
+// the request is tied to it only when it is the single open one": the list
+// holds the engagement's open document requests only. A request that got its
+// document, a cancelled one and a bank document task are not candidates.
+func TestOpenRequests(t *testing.T) {
+	w := setupWorld(t)
+	ctx := context.Background()
+	creator := w.d.User(t)
+	w.d.Member(t, w.scope.OrganizationID, creator, "owner")
+
+	titles := func() []string {
+		t.Helper()
+		open, err := w.svc.OpenRequests(ctx, w.scope)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := make([]string, 0, len(open))
+		for _, x := range open {
+			if x.Kind != KindDocumentRequest || x.Status != StatusOpen {
+				t.Fatalf("not an open request: %+v", x)
+			}
+			out = append(out, x.Title)
+		}
+		return out
+	}
+	if got := titles(); len(got) != 0 {
+		t.Fatalf("no request yet: %v", got)
+	}
+	first, err := w.svc.CreateRequest(ctx, w.scope, creator, RequestInput{Title: "Kira kontratı", DueDays: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(); len(got) != 1 || got[0] != "Kira kontratı" {
+		t.Fatalf("one open request: %v", got)
+	}
+	if _, err := w.svc.CreateRequest(ctx, w.scope, creator, RequestInput{Title: "Vergi levhası", DueDays: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(); len(got) != 2 {
+		t.Fatalf("two open requests: %v", got)
+	}
+	// A cancelled request is no candidate any more.
+	if _, err := w.svc.Cancel(ctx, w.scope, first.UUID, creator, "gerek kalmadı"); err != nil {
+		t.Fatal(err)
+	}
+	if got := titles(); len(got) != 1 || got[0] != "Vergi levhası" {
+		t.Fatalf("after cancel: %v", got)
+	}
+}

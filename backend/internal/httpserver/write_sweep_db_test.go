@@ -153,6 +153,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/whatsapp/chat-links/{linkUuid}":                                    {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/chat-link":                      {body: `{"chat_key":"905551112233@c.us","label":"Atlas Muhasebe"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/whatsapp/captures":                      {file: "file", fileName: "belge.pdf", fileBody: "%PDF-1.4\n% whatsapp sweep\n", fields: map[string]string{"target": "document", "chat_key": "905551112233@c.us"}},
+	"PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task":    {body: `{"task_uuid":"00000000-0000-0000-0000-000000000001"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/approve":         {},
 	"POST /v1/tenant/engagements/{engagementUuid}/receipts/{receiptUuid}/reject":          {},
 	"PUT /v1/tenant/expense-categories":                                                   {body: `{"code":"tarama","name":"Tarama","account_code":"770"}`},

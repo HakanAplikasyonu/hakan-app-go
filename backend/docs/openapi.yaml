@@ -16829,6 +16829,47 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: captureUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [WhatsApp]
+      operationId: linkWhatsAppCaptureTask
+      summary: Tie a document saved without a task to an open document request
+      description: |
+        Requires `tenant.receipts.write`, `tenant.doc_tasks.write` and
+        engagement access (#571). The stored file becomes an upload of the
+        task (the task is `submitted`) and the capture names the task. 409
+        `CAPTURE_NOT_LINKABLE` when the capture already answers a task or is
+        not a document kept here; 409 `TASK_CLOSED` when the task is no
+        longer open; 404 for an unknown capture or task.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_uuid]
+              properties:
+                task_uuid: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The capture, now naming the task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeWhatsAppCapture"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -25588,6 +25629,8 @@ components:
         has_file: { type: boolean, description: "A document stored here (download with …/whatsapp/captures/{captureUuid}/file)." }
         created_at: { type: string, format: date-time }
         replayed: { type: boolean }
+        auto_linked: { type: boolean, description: "Only on the answer of the save: the document was saved without a task and tied to the engagement's only open document request (#571)." }
+        open_requests: { type: integer, description: "Only on the answer of the save: open document requests of the engagement when a document was saved without a task; with 2 or more nothing is tied (#571)." }
 
     EnvelopeWhatsAppCapture:
       type: object

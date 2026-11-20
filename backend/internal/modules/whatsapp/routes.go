@@ -59,4 +59,6 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("PUT "+ebase+"/chat-link", write, h.SetLink, eng...)
 	r.Tenant("POST "+ebase+"/captures", write, h.Capture, eng...)
 	r.Tenant("GET "+ebase+"/captures/{captureUuid}/file", read, h.CaptureFile, eng...)
+	// Görevsiz kaydedilen belge sonradan bir belge isteğine bağlanır (#571).
+	r.Tenant("PUT "+ebase+"/captures/{captureUuid}/task", write, h.LinkTask, eng...)
 }
