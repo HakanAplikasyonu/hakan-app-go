@@ -41,3 +41,6 @@ yarn-error.log*
 
 # Yerel Redis dökümü
 dump.rdb
+
+# go build ./cmd/<ad> backend klasöründe çalıştırılınca oluşan ikili dosyalar
+/backend/demo-seed
