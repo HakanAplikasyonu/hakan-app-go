@@ -65,6 +65,54 @@ func (q *Queries) ApproveBankPosting(ctx context.Context, arg ApproveBankPosting
 	return i, err
 }
 
+const bankTransactionBookedAccounts = `-- name: BankTransactionBookedAccounts :many
+SELECT t.uuid AS bank_transaction_uuid, p.account_code, p.account_name
+FROM bank_transaction_postings p
+JOIN bank_transactions t ON t.taxpayer_id = p.taxpayer_id AND t.id = p.bank_transaction_id
+WHERE p.organization_id = $1 AND p.engagement_id = $2
+  AND t.taxpayer_id = $3 AND t.uuid = ANY($4::uuid[]) AND p.status = 'approved'
+`
+
+type BankTransactionBookedAccountsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	TaxpayerID     int64       `json:"taxpayer_id"`
+	Uuids          []uuid.UUID `json:"uuids"`
+}
+
+type BankTransactionBookedAccountsRow struct {
+	BankTransactionUuid uuid.UUID `json:"bank_transaction_uuid"`
+	AccountCode         string    `json:"account_code"`
+	AccountName         string    `json:"account_name"`
+}
+
+// Banka listesindeki "hesaba işlendi" göstergesi (#565): onaylanmış karşı
+// hesabı olan hareketler.
+func (q *Queries) BankTransactionBookedAccounts(ctx context.Context, arg BankTransactionBookedAccountsParams) ([]BankTransactionBookedAccountsRow, error) {
+	rows, err := q.db.Query(ctx, bankTransactionBookedAccounts,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.Uuids,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []BankTransactionBookedAccountsRow{}
+	for rows.Next() {
+		var i BankTransactionBookedAccountsRow
+		if err := rows.Scan(&i.BankTransactionUuid, &i.AccountCode, &i.AccountName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countBankPostings = `-- name: CountBankPostings :one
 SELECT count(*) FILTER (WHERE p.id IS NULL)::bigint AS unassigned,
        count(*) FILTER (WHERE p.status = 'suggested')::bigint AS suggested,

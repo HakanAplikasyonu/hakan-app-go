@@ -142,6 +142,31 @@ function useBankColumns() {
           );
         },
       }),
+      // Karşı hesabı onaylanmış hareket (#565): faturayla eşleşmese de
+      // hangi hesaba işlendiği listede görünür.
+      createColumn<BankRow>({
+        id: "booked_account",
+        labelKey: "office.bank.col_booked",
+        accessorFn: (x) => x.booked_account_code ?? "",
+        meta: { cellClassName: "whitespace-nowrap" },
+        cell: ({ row }) => {
+          const x = row.original;
+          if (!x.booked_account_code)
+            return <span className="text-text-3">—</span>;
+          return (
+            <span>
+              <span className="font-mono text-sm font-semibold">
+                {x.booked_account_code}
+              </span>
+              {x.booked_account_name ? (
+                <span className="text-text-2 ms-1.5 text-xs">
+                  {x.booked_account_name}
+                </span>
+              ) : null}
+            </span>
+          );
+        },
+      }),
       createStatusColumn<BankRow>({
         id: "match_status",
         labelKey: "office.bank.col_match",

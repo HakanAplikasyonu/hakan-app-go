@@ -51,6 +51,9 @@ type Querier interface {
 	// bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
 	// Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
 	BankBalanceCheck(ctx context.Context, arg BankBalanceCheckParams) ([]BankBalanceCheckRow, error)
+	// Banka listesindeki "hesaba işlendi" göstergesi (#565): onaylanmış karşı
+	// hesabı olan hareketler.
+	BankTransactionBookedAccounts(ctx context.Context, arg BankTransactionBookedAccountsParams) ([]BankTransactionBookedAccountsRow, error)
 	// Banka ekranındaki "dışa aktarıldı" işareti: hareket başına çıktı sayısı
 	// ve son çıktı zamanı.
 	BankTransactionExportMarks(ctx context.Context, arg BankTransactionExportMarksParams) ([]BankTransactionExportMarksRow, error)

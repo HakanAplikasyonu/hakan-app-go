@@ -47,6 +47,10 @@ type TransactionView struct {
 	// (#465); more than one means it was exported again.
 	LucaExports      int32      `json:"luca_exports"`
 	LucaLastExportAt *time.Time `json:"luca_last_exported_at,omitempty"`
+	// BookedAccountCode: the trial-balance account the movement is booked
+	// to (an approved posting, #565); empty when it has none yet.
+	BookedAccountCode string `json:"booked_account_code,omitempty"`
+	BookedAccountName string `json:"booked_account_name,omitempty"`
 }
 
 // TransactionSummary counts the filtered set (match status not applied).
@@ -172,6 +176,17 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 	for _, m := range marks {
 		marked[m.BankTransactionUuid] = m
 	}
+	booked, err := h.q.BankTransactionBookedAccounts(r.Context(), db.BankTransactionBookedAccountsParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, Uuids: ids,
+	})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load booked accounts")
+		return
+	}
+	accounts := make(map[uuid.UUID]db.BankTransactionBookedAccountsRow, len(booked))
+	for _, b := range booked {
+		accounts[b.BankTransactionUuid] = b
+	}
 	for i, t := range rows {
 		items[i] = TransactionView{
 			UUID: t.Uuid, Date: t.TransactionDate.Time.Format(time.DateOnly), Direction: direction(t.DebitCredit),
@@ -179,6 +194,9 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 			CounterpartyName: textPtr(t.CounterpartyName), Kind: t.Kind, KindDetail: t.KindDetail,
 			MatchStatus: t.MatchStatus, Period: t.Period, PossibleDuplicate: t.PossibleDuplicate,
 			CashBoxUUID: t.CashBoxUuid, CashBoxName: t.CashBoxName,
+		}
+		if b, ok := accounts[t.Uuid]; ok {
+			items[i].BookedAccountCode, items[i].BookedAccountName = b.AccountCode, b.AccountName
 		}
 		if m, ok := marked[t.Uuid]; ok {
 			items[i].LucaExports = m.Exports

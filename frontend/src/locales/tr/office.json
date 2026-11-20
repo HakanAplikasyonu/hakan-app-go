@@ -918,6 +918,7 @@
   "bank.col_account": "Hesap",
   "bank.col_amount": "Tutar",
   "bank.col_match": "Eşleşme",
+  "bank.col_booked": "İşlendiği hesap",
   "bank.direction_in": "Giriş",
   "bank.direction_out": "Çıkış",
   "bank.possible_duplicate": "muhtemel mükerrer",
