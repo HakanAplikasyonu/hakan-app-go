@@ -9520,6 +9520,52 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: unapproveJournalDraft
+      summary: Take back the approval of an entry that is not exported yet
+      description: |
+        Requires `tenant.journals.approve` (#566). An approved entry that has
+        not been exported becomes a draft again: its lines can be corrected
+        and it must be approved again. Who, when and why stay on the entry
+        (`approval_reverted`). 409 `ALREADY_EXPORTED` for an exported entry
+        (reverse the export first), 409 `NOT_APPROVED` for a draft, 422
+        `JOURNAL_BLOCKED` (`period_locked`) for an entry of a locked period.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Draft (a draft again)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`JOURNAL_BLOCKED`: the entry's period is locked"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-exports:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22606,6 +22652,13 @@ components:
           items: { $ref: "#/components/schemas/JournalDraftIssue" }
         export:
           $ref: "#/components/schemas/JournalDraftExport"
+        approval_reverted:
+          type: object
+          description: The last time the entry's approval was taken back and why (#566); absent when it never was.
+          required: [at, reason]
+          properties:
+            at: { type: string, format: date-time }
+            reason: { type: string }
 
     JournalDraftExport:
       type: object

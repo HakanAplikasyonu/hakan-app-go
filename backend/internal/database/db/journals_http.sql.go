@@ -120,7 +120,7 @@ func (q *Queries) ListExportBatches(ctx context.Context, arg ListExportBatchesPa
 
 const listJournalDrafts = `-- name: ListJournalDrafts :many
 
-SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at,
+SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason,
        COALESCE(t.debit, 0)::numeric AS total_debit,
        COALESCE(t.credit, 0)::numeric AS total_credit,
        COALESCE(t.lines, 0)::int AS line_count
@@ -147,27 +147,30 @@ type ListJournalDraftsParams struct {
 }
 
 type ListJournalDraftsRow struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	TaxpayerID     int64              `json:"taxpayer_id"`
-	Period         string             `json:"period"`
-	EntryNo        int32              `json:"entry_no"`
-	EntryType      string             `json:"entry_type"`
-	EntryDate      pgtype.Date        `json:"entry_date"`
-	Description    string             `json:"description"`
-	DocumentType   pgtype.Text        `json:"document_type"`
-	Status         string             `json:"status"`
-	Origin         []byte             `json:"origin"`
-	ApprovedBy     pgtype.Int8        `json:"approved_by"`
-	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
-	CreatedBy      pgtype.Int8        `json:"created_by"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	TotalDebit     pgtype.Numeric     `json:"total_debit"`
-	TotalCredit    pgtype.Numeric     `json:"total_credit"`
-	LineCount      int32              `json:"line_count"`
+	ID                   int64              `json:"id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	OrganizationID       int64              `json:"organization_id"`
+	EngagementID         int64              `json:"engagement_id"`
+	TaxpayerID           int64              `json:"taxpayer_id"`
+	Period               string             `json:"period"`
+	EntryNo              int32              `json:"entry_no"`
+	EntryType            string             `json:"entry_type"`
+	EntryDate            pgtype.Date        `json:"entry_date"`
+	Description          string             `json:"description"`
+	DocumentType         pgtype.Text        `json:"document_type"`
+	Status               string             `json:"status"`
+	Origin               []byte             `json:"origin"`
+	ApprovedBy           pgtype.Int8        `json:"approved_by"`
+	ApprovedAt           pgtype.Timestamptz `json:"approved_at"`
+	CreatedBy            pgtype.Int8        `json:"created_by"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	ApprovalRevertedBy   pgtype.Int8        `json:"approval_reverted_by"`
+	ApprovalRevertedAt   pgtype.Timestamptz `json:"approval_reverted_at"`
+	ApprovalRevertReason pgtype.Text        `json:"approval_revert_reason"`
+	TotalDebit           pgtype.Numeric     `json:"total_debit"`
+	TotalCredit          pgtype.Numeric     `json:"total_credit"`
+	LineCount            int32              `json:"line_count"`
 }
 
 // Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
@@ -206,6 +209,9 @@ func (q *Queries) ListJournalDrafts(ctx context.Context, arg ListJournalDraftsPa
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ApprovalRevertedBy,
+			&i.ApprovalRevertedAt,
+			&i.ApprovalRevertReason,
 			&i.TotalDebit,
 			&i.TotalCredit,
 			&i.LineCount,

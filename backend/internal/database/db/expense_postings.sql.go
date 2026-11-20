@@ -112,7 +112,7 @@ func (q *Queries) GetExpenseCategory(ctx context.Context, arg GetExpenseCategory
 }
 
 const getJournalDraftByID = `-- name: GetJournalDraftByID :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at FROM journal_drafts
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason FROM journal_drafts
 WHERE organization_id = $1 AND engagement_id = $2 AND id = $3
 `
 
@@ -144,6 +144,9 @@ func (q *Queries) GetJournalDraftByID(ctx context.Context, arg GetJournalDraftBy
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApprovalRevertedBy,
+		&i.ApprovalRevertedAt,
+		&i.ApprovalRevertReason,
 	)
 	return i, err
 }

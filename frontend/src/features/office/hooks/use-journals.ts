@@ -141,6 +141,11 @@ export function useJournalActions(slug: string, engagement: string) {
         ),
       onSuccess: refresh,
     }),
+    unapprove: useMutation({
+      mutationFn: (v: { draft: string; reason: string }) =>
+        journalService.unapprove(slug, engagement, v.draft, v.reason),
+      onSuccess: refresh,
+    }),
     reverse: useMutation({
       mutationFn: (v: { draft: string; reason: string }) =>
         journalService.reverse(slug, engagement, v.draft, v.reason),

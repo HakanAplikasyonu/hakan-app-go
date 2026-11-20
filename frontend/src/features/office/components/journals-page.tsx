@@ -150,9 +150,22 @@ function DraftCheck({
   if (draft.status !== "draft") return null;
   if (!issues.length) {
     return (
-      <span className="text-status-approved inline-flex items-center gap-1 text-xs">
-        <CircleCheck className="size-3.5" aria-hidden />
-        {t("office.journals.check.ok")}
+      <span className="flex flex-col gap-0.5">
+        <span className="text-status-approved inline-flex items-center gap-1 text-xs">
+          <CircleCheck className="size-3.5" aria-hidden />
+          {t("office.journals.check.ok")}
+        </span>
+        {/* Onayı geri alınmış fiş (#566): neden taslağa döndüğü görünür. */}
+        {draft.approval_reverted ? (
+          <span
+            className="text-muted-foreground text-xs"
+            data-testid="approval-reverted"
+          >
+            {t("office.journals.approval_reverted", {
+              reason: draft.approval_reverted.reason,
+            })}
+          </span>
+        ) : null}
       </span>
     );
   }
@@ -642,7 +655,7 @@ function JournalsInner() {
   for (const tr of transfers.data?.items ?? [])
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
-  const { approve, reverse } = useJournalActions(slug, engagement);
+  const { approve, unapprove, reverse } = useJournalActions(slug, engagement);
   // Hazırlayan stajyer onaylayamaz; fiş müşavirin onayını bekler (#566).
   const canApprove = perms.includes(permissions.tenant.journals.approve);
   // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
@@ -667,6 +680,8 @@ function JournalsInner() {
   const approving = approve.isPending;
   const reverseDraft = reverse.mutate;
   const reversing = reverse.isPending;
+  const unapproveDraft = unapprove.mutate;
+  const unapproving = unapprove.isPending;
   const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
     () => [
       createColumn<JournalDraft>({
@@ -767,6 +782,32 @@ function JournalsInner() {
             <span className="text-muted-foreground text-xs">
               {t("office.journals.awaiting_approval")}
             </span>
+          ) : d.status === "approved" && canApprove ? (
+            // Onaylı ama henüz aktarılmamış fiş (#566): onay gerekçeyle geri
+            // alınır, fiş taslağa döner ve düzeltilip yeniden onaylanır.
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={unapproving}
+              onClick={async () => {
+                const reason = await prompt({
+                  title: t("office.journals.unapprove"),
+                  description: t("office.journals.unapprove_prompt"),
+                  confirmLabel: t("office.journals.unapprove"),
+                });
+                if (reason?.trim())
+                  unapproveDraft(
+                    { draft: d.uuid, reason },
+                    {
+                      onSuccess: () =>
+                        toast.success(t("office.journals.unapproved")),
+                    },
+                  );
+              }}
+            >
+              <Undo2 className="size-4" />
+              {t("office.journals.unapprove")}
+            </Button>
           ) : d.status === "draft" ? (
             // Engelli fiş onaylanmaz (#566); nedeni ipucunda.
             <Hint
@@ -818,6 +859,8 @@ function JournalsInner() {
       reversing,
       t,
       togglePick,
+      unapproveDraft,
+      unapproving,
     ],
   );
   // Fişin ilişkili kayıtları: kaynak belge ve hareketler (#469).
@@ -866,7 +909,7 @@ function JournalsInner() {
   const openDrafts = rows.filter((d) => d.status === "draft");
   const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
   const stoppedDrafts = openDrafts.filter(isBlocked).length;
-  const actionError = approve.error ?? reverse.error;
+  const actionError = approve.error ?? unapprove.error ?? reverse.error;
   return (
     <div className="space-y-4">
       {header}

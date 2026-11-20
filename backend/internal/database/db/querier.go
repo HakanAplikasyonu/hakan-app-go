@@ -1307,6 +1307,9 @@ type Querier interface {
 	RetireOlderLegalDocuments(ctx context.Context, arg RetireOlderLegalDocumentsParams) error
 	// Geri alma: kim, ne zaman, neden. Fiş tekrar onaylı olur ve yeniden çıktıya alınabilir.
 	ReverseExportBatchItem(ctx context.Context, arg ReverseExportBatchItemParams) (int64, error)
+	// Onayı geri al (#566): yalnız onaylı (aktarılmamış) fiş taslağa döner;
+	// kim, ne zaman, neden fişte kalır.
+	RevertJournalDraftApproval(ctx context.Context, arg RevertJournalDraftApprovalParams) (int64, error)
 	// tenant-lint: org-wide eşik etkisi özeti (#333); yalnızca sayım, read_all yoksa engagement_assignments ile süzülür
 	// Son @months ayda karara bağlanmış (bekleyen ve yerine yenisi gelen hariç) öneriler.
 	ReviewThresholdImpact(ctx context.Context, arg ReviewThresholdImpactParams) (ReviewThresholdImpactRow, error)

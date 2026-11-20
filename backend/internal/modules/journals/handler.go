@@ -74,6 +74,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base+"/journal-drafts/{draftUuid}", engaged(read, h.getDraft))
 	// Onay sorumlu müşavirde (#566): hazırlayan stajyer onaylayamaz.
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/approve", engaged(approve, h.approve))
+	// Onayı gerekçeyle geri al (#566): onaylayan yetki geri de alır.
+	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/unapprove", engaged(approve, h.unapprove))
 	mux.Handle("PATCH "+base+"/journal-drafts/{draftUuid}/lines/{lineNo}", engaged(write, h.setLineAccount))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
@@ -162,6 +164,33 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
 	if err := h.svc.Approve(r.Context(), s, p.UserInternal, id); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	d, err := h.svc.GetDraft(r.Context(), s, id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, d)
+}
+
+// unapprove: POST .../journal-drafts/{draftUuid}/unapprove {"reason": "..."}.
+func (h *Handler) unapprove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "draftUuid")
+	if !ok {
+		return
+	}
+	var in struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "body must be {\"reason\": \"...\"}")
+		return
+	}
+	s := engagementctx.Must(r.Context())
+	p, _ := authctx.PrincipalFrom(r.Context())
+	if err := h.svc.Unapprove(r.Context(), s, p.UserInternal, id, in.Reason); err != nil {
 		h.fail(w, r, err)
 		return
 	}
@@ -429,7 +458,7 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, ErrUnbalanced):
 		response.Error(w, r, http.StatusUnprocessableEntity, "JOURNAL_UNBALANCED", err.Error())
 	case errors.Is(err, ErrReasonRequired):
-		response.BadRequest(w, r, "REASON_REQUIRED", "a reason is required to reverse an export")
+		response.BadRequest(w, r, "REASON_REQUIRED", "a reason is required")
 	case errors.Is(err, ErrInvalid):
 		response.BadRequest(w, r, "INVALID_DRAFT", err.Error())
 	case errors.Is(err, ErrNotApproved):

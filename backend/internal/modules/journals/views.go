@@ -79,6 +79,7 @@ func (s *Service) ListDrafts(ctx context.Context, scope engagementctx.Scope, f D
 			UUID: r.Uuid, Period: r.Period, EntryNo: r.EntryNo, Type: r.EntryType, Date: r.EntryDate.Time, Description: r.Description, Status: r.Status,
 			Debit: repository.Dec(r.TotalDebit), Credit: repository.Dec(r.TotalCredit), Lines: r.LineCount,
 			Issues: issues[r.ID], Export: exports[r.ID],
+			ApprovalReverted: approvalRevert(r.ApprovalRevertedAt, r.ApprovalRevertReason),
 		})
 	}
 	return out, nil
@@ -148,6 +149,7 @@ func (s *Service) GetDraft(ctx context.Context, scope engagementctx.Scope, id uu
 		DocumentType: row.DocumentType.String, Origin: map[string]any{},
 		CreatedAt: row.CreatedAt.Time, Items: make([]DraftLine, 0, len(lines)),
 	}
+	out.ApprovalReverted = approvalRevert(row.ApprovalRevertedAt, row.ApprovalRevertReason)
 	_ = json.Unmarshal(row.Origin, &out.Origin)
 	if row.ApprovedAt.Valid {
 		t := row.ApprovedAt.Time

@@ -130,6 +130,22 @@ type Draft struct {
 	// Export: the live export of an exported draft and its latest
 	// transfer to the program (#574).
 	Export *DraftExport `json:"export,omitempty"`
+	// ApprovalReverted: the last time the entry's approval was taken back
+	// and why (#566); absent when it never was.
+	ApprovalReverted *ApprovalRevert `json:"approval_reverted,omitempty"`
+}
+
+// ApprovalRevert is when and why an approval was taken back.
+type ApprovalRevert struct {
+	At     time.Time `json:"at"`
+	Reason string    `json:"reason"`
+}
+
+func approvalRevert(at pgtype.Timestamptz, reason pgtype.Text) *ApprovalRevert {
+	if !at.Valid {
+		return nil
+	}
+	return &ApprovalRevert{At: at.Time, Reason: reason.String}
 }
 
 // DraftExport is where an exported draft went.
@@ -245,6 +261,53 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	}
 	if n == 0 {
 		return fmt.Errorf("%w: status is %s", ErrInvalid, row.Status)
+	}
+	return nil
+}
+
+// Unapprove takes back the approval of an entry that has not been exported
+// yet (#566): the accountant approved the wrong entry, or it must be
+// corrected before it goes to the program. The entry is a draft again (its
+// lines can be edited, it must be approved again); who, when and why stay on
+// the entry. An exported entry is reversed first (Reverse); an entry of a
+// locked period is not touched.
+func (s *Service) Unapprove(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return ErrReasonRequired
+	}
+	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	switch row.Status {
+	case "exported":
+		return fmt.Errorf("%w: entry %s/%d", ErrAlreadyExported, row.Period, row.EntryNo)
+	case "draft":
+		return fmt.Errorf("%w: entry %s/%d", ErrNotApproved, row.Period, row.EntryNo)
+	}
+	issues, err := s.draftIssues(ctx, scope, []int64{row.ID})
+	if err != nil {
+		return err
+	}
+	for _, is := range issues[row.ID] {
+		if is.Code == IssuePeriodLocked {
+			return &DraftBlockedError{Issues: []DraftIssue{is}}
+		}
+	}
+	n, err := s.q.RevertJournalDraftApproval(ctx, db.RevertJournalDraftApprovalParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID,
+		RevertedBy: actor(actorID), Reason: repository.Text(reason),
+	})
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		// Decided meanwhile (exported or already reverted by someone else).
+		return fmt.Errorf("%w: entry %s/%d", ErrNotApproved, row.Period, row.EntryNo)
 	}
 	return nil
 }
