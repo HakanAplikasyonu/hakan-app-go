@@ -92,13 +92,22 @@ export function OfficeMenu({
                     );
                     const count = counts.items[item.id];
                     const title = t(item.titleKey);
+                    // Uyarılar sayacı açık ENGELLEYİCİ sayısıdır (#576):
+                    // sayfadaki "Açık" toplamıyla karışmasın diye birimiyle.
+                    const countText = !count
+                      ? ""
+                      : item.id === "warnings"
+                        ? t("office.shell.count_blockers", {
+                            count: fmt(count),
+                          })
+                        : fmt(count);
                     const Icon = item.icon;
                     return (
                       <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
                           asChild
                           isActive={active}
-                          tooltip={count ? `${title} · ${fmt(count)}` : title}
+                          tooltip={count ? `${title} · ${countText}` : title}
                           className={cn(
                             "h-9 gap-2.5 rounded-md max-md:h-11 pointer-coarse:h-11",
                             "data-[active=true]:bg-brand-tint data-[active=true]:text-brand-text",
@@ -117,7 +126,7 @@ export function OfficeMenu({
                             {count && !rail ? (
                               <span className="text-muted-foreground font-mono text-[11px] font-semibold tabular-nums">
                                 <span className="sr-only">, </span>
-                                {fmt(count)}
+                                {countText}
                               </span>
                             ) : null}
                           </Link>

@@ -644,6 +644,7 @@
   "review.undo_hint": "undo the last decision",
   "shell.agents_offline": "{{count}} offline",
   "shell.agents_online": "{{count}} agents online",
+  "shell.count_blockers": "{{count}} blocking",
   "shell.group_office": "Office",
   "shell.group_records": "Records",
   "shell.group_today": "Today",
