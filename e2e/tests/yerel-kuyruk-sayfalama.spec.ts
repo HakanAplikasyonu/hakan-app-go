@@ -63,7 +63,11 @@ test("kuyruk 100'den fazla öneriyi sayfalar; başlık, döküm ve API aynı say
 
   // Sayfalama: ilk 100, sonra kalanlar; geri dönülür.
   const pager = page.getByTestId("review-pager");
-  const items = page.getByRole("listitem").filter({ hasText: "EFT UCRETI" });
+  // Yalnız kuyruk listesi: seçili kartın kanıt zinciri de <li> içerir.
+  const items = page
+    .getByRole("list", { name: "Bekleyen öneriler" })
+    .getByRole("listitem")
+    .filter({ hasText: "EFT UCRETI" });
   await expect(pager).toContainText(`1–100 / ${pending}`);
   await expect(items).toHaveCount(100);
   await expect(pager.getByRole("button", { name: "Önceki 100" })).toBeDisabled();
