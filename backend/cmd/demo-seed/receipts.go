@@ -1,14 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/extract"
 	receipts "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/usecase"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
@@ -84,6 +90,14 @@ func seedReceiptRows(ctx context.Context, pool *pgxpool.Pool, scope engagementct
 				return fmt.Errorf("approve expense: %w", err)
 			}
 		}
+		// Okunamayan iki fiş fotoğrafı (#568): bulanık çekilmiş, yapay zekâ
+		// okuyamadı; ofis Masraflar ekranında görür, mükelleften yenisini ister.
+		blurry := receipts.New(pool, seedStore, unreadableReader{}, nil, warn, nil)
+		for i, name := range []string{"fis-bulanik-1.png", "fis-bulanik-2.png"} {
+			if _, err := blurry.Capture(ctx, scope, actor, name, blurryPhoto(uint8(i)), ""); err != nil {
+				return fmt.Errorf("unreadable receipt: %w", err)
+			}
+		}
 		zs, err := svc.RetailSales(ctx, scope, receipts.RetailFilter{Period: "2026-10", Status: "pending", Limit: 100})
 		if err != nil {
 			return err
@@ -98,4 +112,31 @@ func seedReceiptRows(ctx context.Context, pool *pgxpool.Pool, scope engagementct
 		}
 		return nil
 	})
+}
+
+// unreadableReader is the AI reader that cannot read a blurry photo.
+type unreadableReader struct{}
+
+func (unreadableReader) Read(context.Context, extract.Request) (extract.Result, error) {
+	return extract.Result{}, errors.New("fotoğraf okunamadı: görüntü bulanık, tutar ve tarih seçilemiyor")
+}
+
+// blurryPhoto is a small out-of-focus "receipt": a pale strip with soft grey
+// bands where the lines would be. seed makes each photo distinct.
+func blurryPhoto(seed uint8) []byte {
+	const w, h = 120, 220
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		band := uint8(18 * (1 + (y/14)%2))
+		for x := 0; x < w; x++ {
+			v := 236 - band + uint8((x*7+y*3+int(seed)*11)%9)
+			if x < 12 || x > w-12 {
+				v = 170 + seed
+			}
+			img.Set(x, y, color.RGBA{v, v, v - 6, 255})
+		}
+	}
+	var buf bytes.Buffer
+	_ = png.Encode(&buf, img)
+	return buf.Bytes()
 }

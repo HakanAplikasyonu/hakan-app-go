@@ -7154,7 +7154,7 @@ paths:
       operationId: rejectReceiptCapture
       summary: Reject a receipt draft
       description: |
-        Requires `tenant.receipts.approve` (accountant). Only drafts; only approved expenses count for the declaration.
+        Requires `tenant.receipts.approve` (accountant). Drafts (only approved expenses count for the declaration) and unreadable captures (`failed`, #568: closed after the taxpayer is asked for a new photo).
       security:
         - bearerAuth: []
       responses:

@@ -15,6 +15,7 @@ export type RetailSale = components["schemas"]["RetailSale"];
 export type RetailSalePage =
   components["schemas"]["EnvelopeRetailSalePage"]["data"];
 export type RetailSaleInput = components["schemas"]["RetailSaleInput"];
+export type ReceiptCapture = components["schemas"]["ReceiptCapture"];
 export type ReceiptImportResult =
   components["schemas"]["EnvelopeReceiptImportResult"]["data"];
 
@@ -36,6 +37,8 @@ export const receiptKeys = {
     [...base(slug, engagement), "expenses", expense] as const,
   categories: (slug: string, engagement: string) =>
     [...base(slug, engagement), "expense-categories"] as const,
+  captures: (slug: string, engagement: string, status: string) =>
+    [...base(slug, engagement), "receipts", status] as const,
   retail: (slug: string, engagement: string) =>
     [...base(slug, engagement), "retail-sales"] as const,
   retailSale: (slug: string, engagement: string, sale: string) =>
@@ -123,6 +126,34 @@ export const receiptsService = {
       `${eng(engagement)}/expenses/${encodeURIComponent(expense)}/${approve ? "approve" : "reject"}`,
       { silent: true },
     );
+  },
+  /** Fiş yüklemeleri (#568: okunamayanlar `status=failed`). */
+  captures(slug: string, engagement: string, status: string) {
+    return tenantRequest<{ items: ReceiptCapture[]; total: number }>(
+      slug,
+      "GET",
+      `${eng(engagement)}/receipts`,
+      { query: { status, limit: 20 }, silent: true },
+    );
+  },
+  /** Okunamayan fotoğrafı kapatır (taslağı yoktur, #568). */
+  closeCapture(slug: string, engagement: string, capture: string) {
+    return tenantRequest<ReceiptCapture>(
+      slug,
+      "POST",
+      `${eng(engagement)}/receipts/${encodeURIComponent(capture)}/reject`,
+      { silent: true },
+    );
+  },
+  /** Fiş fotoğrafı (yalnızca görsel); bulunamazsa null. */
+  async captureImage(slug: string, engagement: string, capture: string) {
+    const root = apiConfig.baseUrl.replace(/\/$/, "");
+    const response = await fetch(
+      `${root}${eng(engagement)}/receipts/${encodeURIComponent(capture)}/image`,
+      { credentials: "include", headers: { [ORGANIZATION_HEADER]: slug } },
+    );
+    if (!response.ok) return null;
+    return URL.createObjectURL(await response.blob());
   },
   categories(slug: string, engagement: string) {
     return tenantRequest<{ items: ExpenseCategory[] }>(
