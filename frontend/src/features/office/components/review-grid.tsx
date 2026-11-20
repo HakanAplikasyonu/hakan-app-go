@@ -266,7 +266,9 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
       <header className="flex flex-wrap items-center gap-3">
         <ReviewHeading scoped={!!scope} />
         <span className="bg-surface-2 rounded-md border px-2.5 py-0.5 font-mono text-xs font-semibold tabular-nums">
-          {t("office.review_pending", { count: query.data?.total ?? 0 })}
+          {/* Tablo yalnız hesap kodu önerilerini gösterir (#576): menüdeki
+              kuyruk toplamıyla çelişmesin diye türüyle yazılır. */}
+          {t("office.review_grid.pending", { count: query.data?.total ?? 0 })}
         </span>
         {viewSwitch}
       </header>

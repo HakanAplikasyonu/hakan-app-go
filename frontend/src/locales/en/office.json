@@ -963,6 +963,7 @@
   "review_grid.col_item": "Line",
   "review_grid.col_proposed": "Suggested",
   "review_grid.col_confidence": "Confidence",
+  "review_grid.pending": "{{count}} account code suggestions pending",
   "review_grid.col_source": "Source",
   "review_grid.open_document": "Open the document",
   "review_grid.col_code": "Account code",
