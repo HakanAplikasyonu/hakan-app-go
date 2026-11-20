@@ -35,6 +35,7 @@ import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoicePreview } from "./invoice-preview";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { RelatedRecordsPanel } from "./related-records";
+import { VatDeductionPeriod } from "./vat-deduction-period";
 import { InvoiceStateBadge } from "./invoices-page";
 import {
   Figure,
@@ -256,6 +257,8 @@ function InvoiceDetailInner({ id }: { id: string }) {
               </ul>
             ) : null}
           </Panel>
+
+          <VatDeductionPeriod engagement={engagement} invoice={d} />
 
           <RelatedRecordsPanel
             engagement={engagement}

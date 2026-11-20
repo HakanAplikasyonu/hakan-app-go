@@ -45,6 +45,7 @@ import { InvoiceStateBadge } from "./invoices-page";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { Figure, useWarningText } from "./office-ui";
 import { RelatedRecordsTable } from "./related-records";
+import { VatDeductionPeriod } from "./vat-deduction-period";
 
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
 const INVOICES_WRITE = "tenant.invoices.write";
@@ -386,6 +387,8 @@ export function InvoiceDrawer({
                   })}
                 </p>
               ) : null}
+
+              <VatDeductionPeriod engagement={engagement} invoice={d} />
 
               <section aria-labelledby="drawer-waterfall">
                 <h3

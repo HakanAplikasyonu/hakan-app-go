@@ -134,6 +134,26 @@ export const officeInvoiceService = {
       { body: { rate }, silent: true },
     );
   },
+  /**
+   * KDV indirim dönemi (#640): alış faturasının KDV'si sonraki bir aya alınır;
+   * `null` belge ayına döndürür. Faturanın yeni hâli döner.
+   */
+  setVatDeductionPeriod(
+    slug: string,
+    engagement: string,
+    invoice: string,
+    period: string | null,
+  ) {
+    const path = `${eng(engagement)}/invoices/${encodeURIComponent(invoice)}/vat-deduction-period`;
+    return period
+      ? tenantRequest<OfficeInvoiceDetail>(slug, "PUT", path, {
+          body: { period },
+          silent: true,
+        })
+      : tenantRequest<OfficeInvoiceDetail>(slug, "DELETE", path, {
+          silent: true,
+        });
+  },
   /** The stored UBL-TR XML as text (not JSON, so not through tenantRequest). */
   async ubl(slug: string, engagement: string, invoice: string) {
     const base = apiConfig.baseUrl.replace(/\/$/, "");
