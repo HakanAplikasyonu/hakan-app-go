@@ -2034,6 +2034,8 @@
   "warning_sheet.position": "{{index}} / {{total}}",
   "warning_sheet.hint": "Fix the record here, then close it with a reason. Use ← → to move between warnings.",
   "warning_sheet.closed": "This warning is closed.",
+  "warning_sheet.auto_next": "Moving to the next warning…",
+  "warning_sheet.stay": "Stay here",
   "warning_sheet.duplicate_candidates": "Looks the same as:",
   "warning_sheet.duplicate_open": "Open invoice {{index}}",
   "warning_decision.presets_label": "Ready-made reasons",
