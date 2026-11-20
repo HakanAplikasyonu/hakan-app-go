@@ -22366,7 +22366,7 @@ components:
           type: array
           items:
             type: object
-            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, amount, method, score]
+            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, amount, method, score, parts]
             properties:
               invoice_uuid: { type: string, format: uuid }
               invoice_number: { type: string }
@@ -22375,6 +22375,7 @@ components:
               amount: { type: string }
               method: { type: string, enum: [auto, suggested_accepted, manual] }
               score: { type: integer }
+              parts: { type: object, additionalProperties: { type: integer }, description: "Why the matcher proposed it (21 §6.2 parts); empty for a manual match" }
         candidates:
           type: array
           items: { $ref: "#/components/schemas/BankMatchCandidate" }
