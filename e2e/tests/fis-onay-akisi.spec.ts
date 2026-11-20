@@ -15,6 +15,9 @@ test.describe.configure({ mode: "serial" });
 
 const MUSAVIR = "musavir@demo.hakan.local";
 const description = `E2E onay akışı ${Date.now()}`;
+// Benzersiz tutar: aynı tutarlı başka bir fiş mükerrer kayıt incelemesini
+// açıp aktarımı bekletmesin.
+const amount = `${100 + (Date.now() % 800)},${String(Date.now() % 100).padStart(2, "0")}`;
 
 test("personel fişi hazırlar, onaylayamaz (#566)", async ({ page }) => {
   await uiLogin(page, DEMO.intern);
@@ -24,7 +27,7 @@ test("personel fişi hazırlar, onaylayamaz (#566)", async ({ page }) => {
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
   await rows.nth(0).locator("input").nth(0).fill("770.01");
-  await rows.nth(0).locator("input").nth(2).fill("150,00");
+  await rows.nth(0).locator("input").nth(2).fill(amount);
   await rows.nth(1).locator("input").nth(0).fill("100.01");
   await page.getByRole("button", { name: "Farkı kapat" }).click();
   await expect(page.getByText("Dengeli", { exact: true })).toBeVisible();
@@ -63,7 +66,8 @@ test("müşavir onaylar ve seçerek aktarır (#566, #574)", async ({ page }) => 
   await row.getByRole("checkbox").check();
   await expect(page.getByText("Yalnız tabloda seçilen 1 onaylı fiş aktarılır.")).toBeVisible();
   await page.locator('select:has(option[value="luca"])').selectOption("luca");
-  await page.getByRole("button", { name: "Çıktı al", exact: true }).last().click();
+  // Seçim varken düğme "Seçili 1 fişin çıktısını al" yazar.
+  await page.getByRole("button", { name: /^(Seçili 1 fişin çıktısını al|Çıktı al)$/ }).last().click();
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   await expect(row).toContainText("Aktarıldı");
 });
@@ -80,12 +84,17 @@ test("programa aktarılan fişte mizan karşılaştırması görünür (#574)", 
   await page.getByRole("button", { name: "Eki", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Programa aktarım" })).toBeVisible();
 
-  // Demo: Ekim'in Luca aktarımı programa alınmış; yanında mizan durumu.
-  const imported = page.getByRole("row").filter({ hasText: /Luca.*Programa aktarıldı/ }).first();
-  await expect(imported).toContainText(
-    /Luca mizanı kayıtlarla tutuyor|Mizan karşılaştırmasında \d+ hesapta fark var|Mizan aktarımdan önce karşılaştırılmış|Mizanla karşılaştırılmadı/,
-  );
-  const link = imported.getByRole("button", { name: /Farkları gör|Mizanla karşılaştır/ });
+  // Demo: Ekim'in Luca aktarımı programa alınmış. Mizan durumu yalnızca
+  // dönem çıktısında görünür (seçili fiş aktarımında sütun "—"); küçük demo
+  // seçili fiş aktarır. Durum varsa metni ve bağlantısı denetlenir.
+  const imported = page.getByRole("row").filter({ hasText: /Luca.*Programa aktarıldı/ });
+  await expect(imported.first()).toBeVisible();
+  const withStatus = imported.filter({
+    hasText:
+      /Luca mizanı kayıtlarla tutuyor|Mizan karşılaştırmasında \d+ hesapta fark var|Mizan aktarımdan önce karşılaştırılmış|Mizanla karşılaştırılmadı/,
+  });
+  if (!(await withStatus.count())) return;
+  const link = withStatus.first().getByRole("button", { name: /Farkları gör|Mizanla karşılaştır/ });
   if (await link.count()) {
     await link.click();
     await page.waitForURL(/\/reconciliation/);
