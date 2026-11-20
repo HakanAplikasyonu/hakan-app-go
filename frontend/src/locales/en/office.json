@@ -2133,5 +2133,11 @@
   "tax_returns.office.statement_request_sent": "Requested",
   "tax_returns.office.statement_requested": "Statement requested; added to the taxpayer's tasks.",
   "tax_returns.office.statement_request_title": "{{period}} {{account}} bank statement",
-  "tax_returns.office.statement_request_note": "We need the statement with all of the month's movements (PDF, Excel or MT940). You can download it from internet banking and upload it."
+  "tax_returns.office.statement_request_note": "We need the statement with all of the month's movements (PDF, Excel or MT940). You can download it from internet banking and upload it.",
+  "journals.transfer_check_ok": "Luca trial balance matches the records",
+  "journals.transfer_check_differences": "Trial balance comparison: {{count}} accounts differ",
+  "journals.transfer_check_stale": "Trial balance was compared before this transfer",
+  "journals.transfer_check_none": "Not compared with the trial balance",
+  "journals.transfer_check_open": "See differences",
+  "journals.transfer_check_run": "Compare with trial balance"
 }

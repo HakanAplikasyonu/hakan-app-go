@@ -2133,5 +2133,11 @@
   "tax_returns.office.statement_request_sent": "İstendi",
   "tax_returns.office.statement_requested": "Ekstre mükelleften istendi; görev listesine düştü.",
   "tax_returns.office.statement_request_title": "{{period}} {{account}} banka ekstresi",
-  "tax_returns.office.statement_request_note": "Ayın tüm hareketlerini içeren ekstre (PDF, Excel ya da MT940) gerekiyor. İnternet bankacılığından indirip yükleyebilirsiniz."
+  "tax_returns.office.statement_request_note": "Ayın tüm hareketlerini içeren ekstre (PDF, Excel ya da MT940) gerekiyor. İnternet bankacılığından indirip yükleyebilirsiniz.",
+  "journals.transfer_check_ok": "Luca mizanı kayıtlarla tutuyor",
+  "journals.transfer_check_differences": "Mizan karşılaştırmasında {{count}} hesapta fark var",
+  "journals.transfer_check_stale": "Mizan aktarımdan önce karşılaştırılmış",
+  "journals.transfer_check_none": "Mizanla karşılaştırılmadı",
+  "journals.transfer_check_open": "Farkları gör",
+  "journals.transfer_check_run": "Mizanla karşılaştır"
 }
