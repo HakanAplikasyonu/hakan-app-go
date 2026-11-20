@@ -78,7 +78,7 @@ ORDER BY t.transaction_date, t.id;
 SELECT * FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;
 
 -- name: ListBankTransactionMatchInvoices :many
-SELECT m.amount, m.score, m.method, m.matched_at,
+SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
        i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id

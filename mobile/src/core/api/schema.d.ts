@@ -17422,6 +17422,10 @@ export interface components {
                 /** @enum {string} */
                 method: "auto" | "suggested_accepted" | "manual";
                 score: number;
+                /** @description Why the matcher proposed it (21 §6.2 parts); empty for a manual match */
+                parts: {
+                    [key: string]: number;
+                };
             }[];
             candidates: components["schemas"]["BankMatchCandidate"][];
         };

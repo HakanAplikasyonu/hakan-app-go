@@ -90,6 +90,9 @@ type MatchedInvoice struct {
 	Amount        string    `json:"amount"`
 	Method        string    `json:"method"`
 	Score         int       `json:"score"`
+	// Parts: why the matcher proposed it (21 §6.2 score parts); empty for
+	// a match made by hand (#710).
+	Parts map[string]int `json:"parts"`
 }
 
 // CandidateView is an open invoice with its 21 §6.2 score.
@@ -232,6 +235,7 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 		v.Matches = append(v.Matches, MatchedInvoice{
 			InvoiceUUID: r.InvoiceUuid, InvoiceNumber: r.InvoiceNumber, IssueDate: r.IssueDate.Time.Format("2006-01-02"),
 			Counterparty: textPtr(r.CustomerName), Amount: dec(r.Amount).StringFixed(2), Method: r.Method, Score: int(r.Score),
+			Parts: evidenceParts(r.Evidence, r.Method),
 		})
 	}
 	if !v.Matchable {
@@ -244,7 +248,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	ranked := make([]Score, 0, len(cands))
 	for _, c := range cands {
 		if c.Open.IsPositive() && !matched[byID[c.ID].Uuid] {
-			ranked = append(ranked, ScoreCandidate(m, c, s.opt))
+			if sc := ScoreCandidate(m, c, s.opt); Relevant(sc) {
+				ranked = append(ranked, sc)
+			}
 		}
 	}
 	sort.SliceStable(ranked, func(i, j int) bool {
@@ -501,6 +507,22 @@ func (s *Service) refreshed(ctx context.Context, q *db.Queries, sub Subject, id 
 		return TransactionView{}, err
 	}
 	return s.Transaction(ctx, sub, id)
+}
+
+// evidenceParts reads the score parts kept with an automatic or suggested
+// match; a manual match has no reason to show.
+func evidenceParts(raw []byte, method string) map[string]int {
+	out := map[string]int{}
+	if method == "manual" {
+		return out
+	}
+	var e struct {
+		Parts map[string]int `json:"parts"`
+	}
+	if json.Unmarshal(raw, &e) == nil && e.Parts != nil {
+		out = e.Parts
+	}
+	return out
 }
 
 func uniqueUUIDs(ids []uuid.UUID) map[uuid.UUID]bool {
