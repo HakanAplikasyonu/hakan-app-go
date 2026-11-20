@@ -577,6 +577,9 @@ function ReviewWorkspaceInner() {
   const { slug } = useTenant();
   const invoiceHref = useInvoiceHref({ carry: false });
   const { can } = usePermission();
+  // Karar yetkisi (#569): stajyer kuyruğu görür ama onaylayamaz, düzeltemez,
+  // reddedemez; düğmeler yerine nedeni gösterilir.
+  const canDecide = can(permissions.tenant.review.decide);
   const params = useSearchParams();
   const reduce = useReducedMotion();
   const isMobile = useIsMobile();
@@ -684,10 +687,13 @@ function ReviewWorkspaceInner() {
   const canCorrect =
     isLineAccount || (!!current && current.kind === BANK_ACCOUNT_KIND);
   const canCorrectValue = !!current && current.kind === RECEIPT_KIND;
-  const canFix = canCorrect || canCorrectValue;
+  const canFix = (canCorrect || canCorrectValue) && canDecide;
   const cpKey = current ? counterpartyKeyOf(current) : undefined;
   const canRule =
-    canCorrect && !!cpKey && can(permissions.tenant.accountRules.write);
+    canCorrect &&
+    canDecide &&
+    !!cpKey &&
+    can(permissions.tenant.accountRules.write);
   const bulkPicked = queue.filter((s) => confidenceOf(s) * 100 >= bulkAt);
   const history = useCounterpartyHistory(isLineAccount ? current : undefined);
   const memory = useAccountMemoryActions(slug, current?.engagement_uuid ?? "");
@@ -920,7 +926,9 @@ function ReviewWorkspaceInner() {
         setDirection("skip");
         setPinned(undefined);
         setCursor((c) => Math.max(c - 1, 0));
-      } else if (k === "a" || e.key === "Enter") void decide("accepted");
+      } else if (e.key === "?") setHelp((h) => !h);
+      else if (!canDecide) return;
+      else if (k === "a" || e.key === "Enter") void decide("accepted");
       else if (k === "r" || e.key === "Backspace") void decide("rejected");
       else if (k === "e") {
         if (canCorrect) setPicking(true);
@@ -928,13 +936,13 @@ function ReviewWorkspaceInner() {
       } else if (k === "k") {
         if (canRule) void decideWithRule();
       } else if (k === "z" || k === "u") undo();
-      else if (e.key === "?") setHelp((h) => !h);
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
+    canDecide,
     decide,
     decideWithRule,
     undo,
@@ -984,7 +992,8 @@ function ReviewWorkspaceInner() {
     <Button
       variant="ghost"
       onClick={() =>
-        canCorrect ? setPicking(true) : canCorrectValue && setEditing(true)
+        canDecide &&
+        (canCorrect ? setPicking(true) : canCorrectValue && setEditing(true))
       }
       className={cn(
         "group h-auto w-full flex-wrap items-baseline justify-start gap-x-3 gap-y-0 rounded-md border border-dashed p-3 text-start font-normal whitespace-normal transition-colors hover:bg-transparent",
@@ -1321,7 +1330,21 @@ function ReviewWorkspaceInner() {
             </section>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-2">
+          {canDecide ? null : (
+            <p
+              role="note"
+              className="bg-surface-2 text-text-2 rounded-md border px-4 py-3 text-sm"
+              data-testid="review-no-decide"
+            >
+              {t("office.review.no_decide_permission")}
+            </p>
+          )}
+          <div
+            className={cn(
+              "flex flex-wrap items-center gap-2",
+              !canDecide && "hidden",
+            )}
+          >
             <Button
               onClick={() => void decide("accepted")}
               className="bg-brand text-on-brand hover:bg-brand/90 h-11 px-5"
@@ -1574,7 +1597,7 @@ function ReviewWorkspaceInner() {
         </div>
       ) : null}
 
-      {queue.length && showList ? (
+      {queue.length && showList && canDecide ? (
         <div className="bg-card flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
           <GuvenOlcegi deger={bulkAt / 100} />
           <p className="min-w-0 flex-1 text-sm">
