@@ -211,6 +211,14 @@ func TestReconciliationRunAgainstPostgres(t *testing.T) {
 		t.Fatalf("september %+v", sepRun.Run)
 	}
 
+	// Dönem başına son koşu tek sorguda (#639): karşılaştırılmamış ay nil.
+	byPeriod, err := svc.LatestByPeriod(ctx, sc, "2026-08", "2026-10")
+	must(err)
+	if len(byPeriod) != 3 || byPeriod["2026-08"] != nil || byPeriod["2026-09"] == nil || byPeriod["2026-09"].UUID != sepRun.Run.UUID ||
+		byPeriod["2026-10"] == nil || byPeriod["2026-10"].UUID != det2.Run.UUID {
+		t.Fatalf("latest by period %+v", byPeriod)
+	}
+
 	// Koşusu olmayan dönem: boş durum ErrNoRun (handler 200 + run null döner, #639).
 	if _, err := svc.Detail(ctx, sc, "latest", "2025-01"); !errors.Is(err, ErrNoRun) || !errors.Is(err, ErrNotFound) {
 		t.Fatalf("no run: %v", err)
@@ -218,6 +226,9 @@ func TestReconciliationRunAgainstPostgres(t *testing.T) {
 
 	// Başka engagement görmez.
 	osc := engagementctx.Scope{ID: otherEng, OrganizationID: org, TaxpayerID: otherTp}
+	if other, err := svc.LatestByPeriod(ctx, osc, "2026-08", "2026-10"); err != nil || other["2026-10"] != nil {
+		t.Fatalf("other engagement latest by period: %v %+v", err, other)
+	}
 	if _, err := svc.Detail(ctx, osc, run.UUID.String(), ""); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("other engagement: %v", err)
 	}

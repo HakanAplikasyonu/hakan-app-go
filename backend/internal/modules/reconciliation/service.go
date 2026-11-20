@@ -692,6 +692,53 @@ func (s *Service) Runs(ctx context.Context, sc engagementctx.Scope, period strin
 	return out, nil
 }
 
+// MaxLatestPeriods bounds LatestByPeriod's window (months).
+const MaxLatestPeriods = 60
+
+// LatestByPeriod returns the newest run of every month in [from, to]; a month
+// never compared maps to nil (#639). One query instead of one per period.
+func (s *Service) LatestByPeriod(ctx context.Context, sc engagementctx.Scope, from, to string) (map[string]*Run, error) {
+	if !ValidPeriod(from) || !ValidPeriod(to) || from > to {
+		return nil, fmt.Errorf("%w: from and to must be YYYY-MM, from <= to", ErrInvalid)
+	}
+	periods := monthsBetween(from, to)
+	if len(periods) > MaxLatestPeriods {
+		return nil, fmt.Errorf("%w: at most %d months", ErrInvalid, MaxLatestPeriods)
+	}
+	rows, err := s.q.LatestReconciliationRunsByPeriod(ctx, db.LatestReconciliationRunsByPeriodParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, FromPeriod: from, ToPeriod: to,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]*Run, len(periods))
+	for _, p := range periods {
+		out[p] = nil
+	}
+	for _, r := range rows {
+		run := runView(r.ID, r.Uuid, r.Period, r.WindowFrom, r.WindowTo, r.Tolerance, r.Summary, r.CreatedAt, r.TrialBalanceUuid, r.TrialBalanceFileName)
+		out[r.Period] = &run
+	}
+	return out, nil
+}
+
+// monthsBetween lists YYYY-MM months from..to inclusive (both valid, from <= to).
+func monthsBetween(from, to string) []string {
+	y, _ := strconv.Atoi(from[:4])
+	m, _ := strconv.Atoi(from[5:])
+	var out []string
+	for {
+		p := fmt.Sprintf("%04d-%02d", y, m)
+		if p > to || len(out) > MaxLatestPeriods {
+			return out
+		}
+		out = append(out, p)
+		if m++; m > 12 {
+			m, y = 1, y+1
+		}
+	}
+}
+
 // Detail returns a run ("latest" or a uuid; latest may be narrowed to a
 // period) with its items.
 func (s *Service) Detail(ctx context.Context, sc engagementctx.Scope, which, period string) (RunDetail, error) {
