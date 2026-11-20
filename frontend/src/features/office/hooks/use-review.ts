@@ -25,13 +25,22 @@ import { valueText } from "../lib/suggestion-label";
 /** Auto-accept threshold the server falls back to (`review.DefaultPolicy`). */
 const DEFAULT_THRESHOLD = 0.95;
 
-export function useReviewSuggestions(filter: ReviewListFilter, enabled = true) {
+/**
+ * `silent`: hata bildirimi açılmaz; bileşen hatayı kendisi gösterir (ör.
+ * sayım satırı "…" yazar, aynı hata için ayrıca bildirim yığılmaz).
+ */
+export function useReviewSuggestions(
+  filter: ReviewListFilter,
+  enabled = true,
+  silent = false,
+) {
   const { slug } = useTenant();
   return useQuery({
     queryKey: reviewKeys.list(slug, filter),
     queryFn: () => reviewService.list(slug, filter),
     placeholderData: keepPreviousData,
     enabled,
+    meta: silent ? { silent: true } : undefined,
   });
 }
 

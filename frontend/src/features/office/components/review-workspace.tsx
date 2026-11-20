@@ -90,6 +90,7 @@ import {
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { FilterSelect, Figure } from "./office-ui";
+import { ReviewCounts } from "./review-counts";
 import { ReviewGrid, ReviewHeading } from "./review-grid";
 import { ReviewReceiptImage } from "./review-receipt-image";
 import {
@@ -592,14 +593,34 @@ function ReviewWorkspaceInner() {
   const engagement = scope ?? urlEngagement;
   const [kind, setKind] = useUrlParam("kind", "all");
   const [tier, setTier] = useUrlParam<Tier>("tier", "all", TIERS);
-  const query = useReviewSuggestions({
-    status: "pending",
+  // Sayfalama (#669 B): kuyruk 100'er yüklenir; sunucu en düşük güveni önce
+  // verir, sayfalar o sırayı sürdürür. Süzgeç değişince başa dönülür.
+  const [page, setPage] = useState(0);
+  const filterKey = `${engagement}|${kind}|${period ?? ""}`;
+  const [pageFor, setPageFor] = useState(filterKey);
+  if (pageFor !== filterKey) {
+    setPageFor(filterKey);
+    setPage(0);
+  }
+  const scopeFilter = {
     engagement: engagement === "all" ? undefined : engagement,
     kind: kind === "all" ? undefined : kind,
     period,
+  };
+  const query = useReviewSuggestions({
+    status: "pending",
+    ...scopeFilter,
     limit: REVIEW_PAGE_MAX,
-    offset: 0,
+    offset: page * REVIEW_PAGE_MAX,
   });
+  // Son sayfa kararlarla boşalınca bir önceki sayfaya dönülür.
+  if (
+    page > 0 &&
+    query.data &&
+    !query.isPlaceholderData &&
+    query.data.items.length === 0
+  )
+    setPage(page - 1);
   const decision = useReviewDecision();
   const errorText = useDecisionErrorText();
 
@@ -945,6 +966,10 @@ function ReviewWorkspaceInner() {
   const left =
     pending.length +
     Math.max((query.data?.total ?? 0) - (query.data?.items.length ?? 0), 0);
+
+  const total = query.data?.total ?? 0;
+  const pageFrom = total === 0 ? 0 : page * REVIEW_PAGE_MAX + 1;
+  const pageTo = page * REVIEW_PAGE_MAX + (query.data?.items.length ?? 0);
 
   const ctx = current ? suggestionContext(current) : undefined;
   const taxpayer = current?.engagement_uuid
@@ -1366,6 +1391,11 @@ function ReviewWorkspaceInner() {
 
   return (
     <div className="flex min-h-0 flex-col gap-4">
+      <ReviewCounts
+        scope={scopeFilter}
+        pending={left}
+        filtered={engagement !== "all" || kind !== "all" || !!period}
+      />
       <header className="flex flex-wrap items-center gap-3">
         <ReviewHeading scoped={!!scope} />
         <span
@@ -1375,6 +1405,46 @@ function ReviewWorkspaceInner() {
           {t("office.review_pending", { count: left })}
         </span>
         <ReviewViewSwitch view="queue" />
+        {total > REVIEW_PAGE_MAX ? (
+          <div
+            className="flex items-center gap-1 text-xs tabular-nums"
+            data-testid="review-pager"
+          >
+            <span className="text-muted-foreground">
+              {t("office.review.page_range", {
+                from: String(pageFrom),
+                to: String(pageTo),
+                total: String(total),
+              })}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="pointer-coarse:h-11"
+              disabled={page === 0 || query.isFetching}
+              onClick={() => {
+                setPage(page - 1);
+                setCursor(0);
+                setPinned(undefined);
+              }}
+            >
+              {t("office.review.page_prev")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="pointer-coarse:h-11"
+              disabled={pageTo >= total || query.isFetching}
+              onClick={() => {
+                setPage(page + 1);
+                setCursor(0);
+                setPinned(undefined);
+              }}
+            >
+              {t("office.review.page_next")}
+            </Button>
+          </div>
+        ) : null}
         <div
           role="group"
           aria-label={t("office.review.tier_label")}
