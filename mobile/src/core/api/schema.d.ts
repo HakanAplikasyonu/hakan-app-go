@@ -10213,6 +10213,13 @@ export interface paths {
          *     balance, lookalike) and are classified. A balance that does not add
          *     up raises `BNK_GAP`; a text PDF whose balance does not add up is
          *     refused. `?preview=true` reports the same counts without writing.
+         *     For .xlsx, CSV and text PDF, `overrides` (JSON) carries the
+         *     accountant's decisions from the table preview (`analyze`): the column
+         *     mapping (`columns`, header → field, as a template's columns), rows left
+         *     out (`skip_rows`, 1-based file rows below the header) and corrected
+         *     cells (`edits`: row, file column, value). The file is read with exactly
+         *     this mapping; an invalid mapping or an edit outside the movement rows
+         *     is `INVALID_OVERRIDES` (400). MT940 ignores it.
          */
         post: operations["importTenantBankStatement"];
         delete?: never;
@@ -16973,6 +16980,23 @@ export interface components {
             lines: number;
             row_errors: number;
             warnings: string[];
+            /**
+             * @description The table below the header (at most 2000 non-empty rows) as the
+             *     import reads it with the proposed columns, for the Excel-like
+             *     preview. kind is movement, error (not readable: fix a cell or
+             *     leave the row out), skip (totals line and after) or empty when the
+             *     proposal has no date and amount columns yet.
+             */
+            rows: components["schemas"]["BankStatementPreviewRow"][];
+        };
+        BankStatementPreviewRow: {
+            /** @description 1-based row of the file table */
+            row: number;
+            /** @description One per analysis column, in that order */
+            cells: string[];
+            /** @enum {string} */
+            kind: "movement" | "error" | "skip" | "";
+            reason?: string;
         };
         EnvelopeBankStatementTemplate: {
             /** @enum {boolean} */
@@ -37389,6 +37413,8 @@ export interface operations {
                     file: string;
                     /** Format: uuid */
                     cash_box_uuid?: string;
+                    /** @description JSON {"columns":[{"header","field"}],"skip_rows":[int],"edits":[{"row","column","value"}]} */
+                    overrides?: string;
                 };
             };
         };
