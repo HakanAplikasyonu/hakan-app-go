@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -129,6 +130,9 @@ func seedBig(ctx context.Context, pool *pgxpool.Pool, pass string, sc bigScale, 
 		if err := bigExtras(ctx, pool, w, o, ms, cnt); err != nil {
 			return fmt.Errorf("%s extras: %w", o.def.Slug, err)
 		}
+		if err := bigRealLife(ctx, pool, w, o, ms, cnt); err != nil {
+			return fmt.Errorf("%s real life: %w", o.def.Slug, err)
+		}
 		fmt.Printf("big demo %-14s %d taxpayers (%s)\n", o.def.Slug, len(ms), time.Since(t0).Round(time.Millisecond))
 	}
 	if _, err := pool.Exec(ctx, `ANALYZE`); err != nil {
@@ -164,8 +168,9 @@ func bigOffices(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, pass strin
 	}
 	for i := 0; i < n; i++ {
 		def := demo.BigOffices[i]
+		members := def.Staff(i)
 		byEmail := map[string]authmodel.User{}
-		for _, m := range append(append([]demo.Member{}, def.Members...), def.TaxpayerUser) {
+		for _, m := range append(append([]demo.Member{}, members...), def.TaxpayerUser) {
 			u, err := ensureUser(ctx, pool, users, m, hash)
 			if err != nil {
 				return fmt.Errorf("user %s: %w", m.Email, err)
@@ -174,8 +179,15 @@ func bigOffices(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, pass strin
 		}
 		o := &bigOffice{def: def, idx: i}
 		if i == 0 {
-			if err := pool.QueryRow(ctx, `SELECT id FROM organizations WHERE slug = $1`, def.Slug).Scan(&o.orgID); err != nil {
+			// Düzenli demo ofisi var; yalnız üretilen çalışanlar eklenir.
+			var orgUUID uuid.UUID
+			if err := pool.QueryRow(ctx, `SELECT id, uuid FROM organizations WHERE slug = $1`, def.Slug).Scan(&o.orgID, &orgUUID); err != nil {
 				return fmt.Errorf("office %s: %w", def.Slug, err)
+			}
+			for _, m := range members[len(def.Members):] {
+				if _, err := orgSvc.AddMember(ctx, orgUUID, byEmail[m.Email].UUID, m.RoleKey); err != nil {
+					return fmt.Errorf("member %s: %w", m.Email, err)
+				}
 			}
 		} else {
 			org, err := orgSvc.CreateOrganization(ctx, orgmodel.CreateOrganizationInput{
@@ -187,14 +199,14 @@ func bigOffices(ctx context.Context, pool *pgxpool.Pool, w *bigWorld, pass strin
 			if org.Slug != def.Slug {
 				return fmt.Errorf("office slug %q was taken; got %q", def.Slug, org.Slug)
 			}
-			for _, m := range def.Members[1:] {
+			for _, m := range members[1:] {
 				if _, err := orgSvc.AddMember(ctx, org.UUID, byEmail[m.Email].UUID, m.RoleKey); err != nil {
 					return fmt.Errorf("member %s: %w", m.Email, err)
 				}
 			}
 			o.orgID = org.ID
 		}
-		for _, m := range def.Members {
+		for _, m := range members {
 			o.staff = append(o.staff, byEmail[m.Email].ID)
 		}
 		o.staff = append(o.staff, byEmail[def.TaxpayerUser.Email].ID)
@@ -271,7 +283,8 @@ func printBigSummary(sc bigScale) {
 			break
 		}
 		fmt.Printf("  /t/%-14s %s\n", o.Slug, o.Name)
-		for _, m := range o.Members {
+		staff := o.Staff(i)
+		for _, m := range staff {
 			fmt.Printf("      %-30s %-7s %s %s · %s\n", m.Email, m.RoleKey, m.Name, m.Surname, m.Title)
 		}
 		first := demo.GenerateTaxpayers(i, 1)

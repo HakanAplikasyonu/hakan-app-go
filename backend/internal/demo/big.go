@@ -72,6 +72,49 @@ var BigOffices = []BigOffice{
 	},
 }
 
+// BigStaffPerOffice: office members (owner included) of every big-demo
+// office. A real office of 30 taxpayers runs with about ten people; the
+// listed members come first, the rest are generated.
+const BigStaffPerOffice = 10
+
+// bigStaffRoles: titles of the generated members, in order.
+var bigStaffRoles = []struct{ role, title, local string }{
+	{"admin", "Müşavir (SMMM)", "musavir"},
+	{"member", "Muhasebe personeli", "personel"},
+	{"member", "Muhasebe personeli", "personel"},
+	{"member", "Bordro sorumlusu", "bordro"},
+	{"member", "Muhasebe personeli", "personel"},
+	{"member", "Stajyer", "stajyer"},
+	{"member", "Stajyer", "stajyer"},
+}
+
+// Staff returns every member of office o of the big demo: the listed ones
+// first (owner first), then generated colleagues up to BigStaffPerOffice.
+// Generated e-mails share the owner's domain (personel2@…, stajyer3@…).
+func (b BigOffice) Staff(o int) []Member {
+	out := append([]Member{}, b.Members...)
+	domain := b.Members[0].Email[strings.IndexByte(b.Members[0].Email, '@')+1:]
+	used := map[string]bool{}
+	for _, m := range out {
+		used[m.Email] = true
+	}
+	r := Rand(o, 900, 0x57aff)
+	for i := 0; len(out) < BigStaffPerOffice; i++ {
+		def := bigStaffRoles[i%len(bigStaffRoles)]
+		email := ""
+		for n := 2; ; n++ {
+			email = fmt.Sprintf("%s%d@%s", def.local, n, domain)
+			if !used[email] {
+				break
+			}
+		}
+		used[email] = true
+		out = append(out, Member{Email: email, Name: FirstNames[r.IntN(len(FirstNames))],
+			Surname: LastNames[r.IntN(len(LastNames))], RoleKey: def.role, Title: def.title})
+	}
+	return out
+}
+
 // BigOfficeSlugs returns the slugs of every big-demo office (reset scope).
 func BigOfficeSlugs() []string {
 	out := make([]string, len(BigOffices))

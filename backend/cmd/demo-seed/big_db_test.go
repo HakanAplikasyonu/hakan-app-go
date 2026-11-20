@@ -60,6 +60,7 @@ func TestBigDemoSeedsAndResets(t *testing.T) {
 
 	checkBigLedger(t, d)
 	checkBigReturns(t, d)
+	checkBigRealLife(t, d)
 	// #518 B2: kilitli döneme geç gelen fatura talep olarak bekler; talep
 	// tam fatura içeriğini taşır (uygulanınca gerçek fatura yazılır).
 	if n := count(t, d, `SELECT count(*) FROM change_requests c JOIN period_locks l
@@ -186,5 +187,50 @@ func checkBigReturns(t *testing.T, d *testdb.DB) {
 		if n := count(t, d, sql, slugs); n != 0 {
 			t.Errorf("%s: %d", name, n)
 		}
+	}
+}
+
+// checkBigRealLife (#568): ofis kadrosu, rutin dışı banka işlemleri ve
+// gerçek bir nedene bağlı hatalar.
+func checkBigRealLife(t *testing.T, d *testdb.DB) {
+	t.Helper()
+	slugs := demo.BigOfficeSlugs()[:testScale.Offices]
+	for _, slug := range slugs {
+		if n := count(t, d, `SELECT count(*) FROM organization_members m JOIN organizations o ON o.id = m.organization_id
+			WHERE o.slug = $1`, slug); n != demo.BigStaffPerOffice {
+			t.Errorf("%s members = %d, want %d", slug, n, demo.BigStaffPerOffice)
+		}
+	}
+	big := `SELECT e.id FROM engagements e JOIN taxpayers t ON t.id = e.taxpayer_id
+		JOIN organizations o ON o.id = e.organization_id
+		WHERE o.slug = ANY($1::text[]) AND t.tax_id NOT IN ('9000000017', '10000000146')`
+	for _, c := range []struct {
+		name string
+		sql  string
+		min  int
+	}{
+		{"partial payments", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND description LIKE '%KISMI ODEME'`, 1},
+		{"own account transfers", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND kind_detail = 'own_account_transfer'`, 2},
+		{"duplicate invoices", `SELECT count(*) FROM data_warnings WHERE engagement_id IN (` + big + `) AND code = 'POSSIBLE_DUPLICATE'`, 1},
+		{"drafts on a parent account", `SELECT count(*) FROM journal_draft_lines WHERE engagement_id IN (` + big + `) AND account_code ~ '^7[0-9]{2}$'`, 1},
+		{"trainee drafts", `SELECT count(*) FROM journal_drafts j JOIN organization_members m ON m.user_id = j.created_by
+			AND m.organization_id = j.organization_id JOIN users u ON u.id = m.user_id
+			WHERE j.engagement_id IN (` + big + `) AND j.status = 'draft' AND u.email LIKE 'stajyer%'`, 1},
+	} {
+		var args []any
+		if strings.Contains(c.sql, "$1") {
+			args = append(args, slugs)
+		}
+		if n := count(t, d, c.sql, args...); n < c.min {
+			t.Errorf("%s = %d, want ≥ %d", c.name, n, c.min)
+		}
+	}
+	// Mükerrer uyarısı boşuna değil: aday aynı karşı taraf, tarih ve tutarda.
+	if n := count(t, d, `SELECT count(*) FROM data_warnings w JOIN invoices c ON c.id = w.entity_id
+		WHERE w.code = 'POSSIBLE_DUPLICATE' AND w.engagement_id IN (`+big+`)
+		  AND NOT EXISTS (SELECT 1 FROM invoices o WHERE o.uuid::text = w.params->'candidates'->>0 AND o.id <> c.id
+		      AND o.taxpayer_id = c.taxpayer_id AND o.issue_date = c.issue_date AND o.payable_amount = c.payable_amount
+		      AND o.customer_tax_number IS NOT DISTINCT FROM c.customer_tax_number AND o.invoice_number <> c.invoice_number)`, slugs); n != 0 {
+		t.Errorf("duplicate warnings without a real duplicate: %d", n)
 	}
 }
