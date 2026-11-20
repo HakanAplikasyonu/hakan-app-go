@@ -57,6 +57,66 @@ func (q *Queries) CountTenantSuggestions(ctx context.Context, arg CountTenantSug
 	return column_1, err
 }
 
+const countTenantSuggestionsByEngagement = `-- name: CountTenantSuggestionsByEngagement :many
+SELECT e.uuid AS engagement_uuid, count(*)::bigint AS total, min(s.created_at)::timestamptz AS oldest
+FROM suggestions s
+JOIN engagements e ON e.id = s.engagement_id AND e.organization_id = s.organization_id
+WHERE s.organization_id = $1
+  AND ($2::bool OR s.engagement_id IN (
+        SELECT a.engagement_id FROM engagement_assignments a
+        WHERE a.organization_id = $1 AND a.user_id = $3))
+  AND ($4::text IS NULL OR s.status = $4::text)
+  AND ($5::text IS NULL OR s.kind = $5::text)
+  AND ($6::text IS NULL OR s.period = $6::text)
+GROUP BY e.uuid
+ORDER BY count(*) DESC, min(s.created_at), e.uuid
+LIMIT 500
+`
+
+type CountTenantSuggestionsByEngagementParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	AllEngagements bool        `json:"all_engagements"`
+	UserID         int64       `json:"user_id"`
+	Status         pgtype.Text `json:"status"`
+	Kind           pgtype.Text `json:"kind"`
+	Period         pgtype.Text `json:"period"`
+}
+
+type CountTenantSuggestionsByEngagementRow struct {
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	Total          int64              `json:"total"`
+	Oldest         pgtype.Timestamptz `json:"oldest"`
+}
+
+// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+// kullanıcının görebildiği mükellefler; çok olan önce.
+func (q *Queries) CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error) {
+	rows, err := q.db.Query(ctx, countTenantSuggestionsByEngagement,
+		arg.OrganizationID,
+		arg.AllEngagements,
+		arg.UserID,
+		arg.Status,
+		arg.Kind,
+		arg.Period,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountTenantSuggestionsByEngagementRow{}
+	for rows.Next() {
+		var i CountTenantSuggestionsByEngagementRow
+		if err := rows.Scan(&i.EngagementUuid, &i.Total, &i.Oldest); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const counterpartyCodeHistory = `-- name: CounterpartyCodeHistory :many
 SELECT (COALESCE(s.applied_value, s.proposed_value)->>'account_code')::text AS account_code,
        count(*)::bigint AS uses,

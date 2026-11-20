@@ -80,6 +80,7 @@ import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 import { useEngagementScope } from "../engagement-scope";
 import { checklistHref } from "../lib/related-href";
+import { useTaxReturnSettings } from "../hooks/use-tax-return-settings";
 
 /** Form alanı etiketi: soluk, normal kalınlıkta (önceki görünümle aynı). */
 const FIELD_LABEL = "text-text-2 leading-normal font-normal";
@@ -153,8 +154,12 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(Permission.TenantTaxReturnsWrite);
-  // Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu (sahip, yönetici).
-  const canApprove = can(Permission.TenantTaxReturnsApprove);
+  // Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu (sahip,
+  // yönetici); ofis ayarı kapalıysa hazırlayan da işaretler (#710).
+  const settings = useTaxReturnSettings(slug, canWrite);
+  const canApprove =
+    can(Permission.TenantTaxReturnsApprove) ||
+    (canWrite && settings.data?.final_check_required === false);
   const qc = useQueryClient();
   // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
   const { focus: period, setPeriod } = useOfficePeriod();

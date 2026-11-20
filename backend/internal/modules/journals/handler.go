@@ -162,10 +162,13 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// Gövde isteğe bağlı: {"confirm_warnings": true, "note": "..."} (#669).
+	// Gövde isteğe bağlı: {"confirm_warnings": true, "note": "..."} (#669);
+	// mükerrer fiş için {"send_duplicate": true, "reason": "..."} (#710).
 	var in struct {
 		ConfirmWarnings bool   `json:"confirm_warnings"`
 		Note            string `json:"note"`
+		SendDuplicate   bool   `json:"send_duplicate"`
+		Reason          string `json:"reason"`
 	}
 	if r.ContentLength != 0 {
 		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil && !errors.Is(err, io.EOF) {
@@ -173,13 +176,15 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if len(in.Note) > 1000 {
-		response.BadRequest(w, r, "INVALID_BODY", "note must be at most 1000 characters")
+	if len(in.Note) > 1000 || len(in.Reason) > 1000 {
+		response.BadRequest(w, r, "INVALID_BODY", "note and reason must be at most 1000 characters")
 		return
 	}
 	s := engagementctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
-	if err := h.svc.ApproveWith(r.Context(), s, p.UserInternal, id, Confirmation{Confirmed: in.ConfirmWarnings, Note: in.Note}); err != nil {
+	if err := h.svc.ApproveWith(r.Context(), s, p.UserInternal, id, Confirmation{
+		Confirmed: in.ConfirmWarnings, Note: in.Note, SendDuplicate: in.SendDuplicate, Reason: in.Reason,
+	}); err != nil {
 		h.fail(w, r, err)
 		return
 	}
@@ -474,7 +479,15 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var blocked *BlockedError
 	var draftBlocked *DraftBlockedError
 	var needsConfirm *DraftNeedsConfirmationError
+	var duplicate *DraftDuplicateError
 	switch {
+	case errors.As(err, &duplicate):
+		details := make([]response.Detail, 0, len(duplicate.Issues))
+		for _, is := range duplicate.Issues {
+			details = append(details, response.Detail{Code: is.Code})
+		}
+		response.ErrorWithDetails(w, r, http.StatusConflict, "JOURNAL_DUPLICATE",
+			"the draft's source document is in another entry; send it anyway with send_duplicate and a reason", details)
 	case errors.As(err, &needsConfirm):
 		details := make([]response.Detail, 0, len(needsConfirm.Issues))
 		for _, is := range needsConfirm.Issues {

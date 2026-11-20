@@ -134,7 +134,8 @@ func TestLockedPeriodChangeOpensRequest(t *testing.T) {
 		t.Fatalf("hashes: old=%v new=%v", cr.OldHash, cr.NewHash)
 	}
 	var diff Diff
-	if err := json.Unmarshal(cr.Diff, &diff); err != nil || diff.Kind != KindUpdate || diff.Fields["source"].New != "manual_upload/ubl_upload" {
+	if err := json.Unmarshal(cr.Diff, &diff); err != nil || diff.Kind != KindUpdate || diff.Fields["source"].New != "manual_upload/ubl_upload" ||
+		diff.Summary.InvoiceNumber == "" || diff.Summary.PayableAmount == "" {
 		t.Fatalf("diff: %s %v", cr.Diff, err)
 	}
 	var payload model.Invoice

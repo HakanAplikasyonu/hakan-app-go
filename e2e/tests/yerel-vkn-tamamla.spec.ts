@@ -19,7 +19,10 @@ import {
  * kimin ne zaman girdiğini tutar. Geçersiz numara 400, ikinci giriş 422.
  *
  * Veri: her koşuda yeni bir mükellef; ona demo atlas-01'den türetilen bir
- * satış faturası yüklenir, alıcının TCKN'si geçersiz yapılır.
+ * satış faturası yüklenir, alıcının TCKN'si 9 haneye indirilir. Okuyucu
+ * VKN/TCKN'yi uzunlukla ayırır (10 VKN, 11 TCKN): 11 haneli bir numara
+ * geçerli sayılır, uyarı çıkmaz; geçersiz uzunluktaki numara saklanmaz ve
+ * INVALID_TAX_ID açılır.
  */
 test("geçersiz VKN'li faturada numara panelden girilir, uyarı çözülür", async ({
   page,
@@ -40,9 +43,9 @@ test("geçersiz VKN'li faturada numara panelden girilir, uyarı çözülür", as
   );
   const xml = ubl.buffer
     .toString("utf8")
-    .replace(/schemeID="TCKN">\d+</, 'schemeID="TCKN">12345678900<')
+    .replace(/schemeID="TCKN">\d+</, 'schemeID="TCKN">123456789<')
     .replace(/(<ID\b[^>]*>)ATL\d+(<\/ID>)/, `$1${number}$2`);
-  expect(xml).toContain("12345678900");
+  expect(xml).toContain('schemeID="TCKN">123456789<');
   await api.json(
     await api.upload(`/v1/tenant/engagements/${eng}/ubl-uploads`, {
       ...ubl,

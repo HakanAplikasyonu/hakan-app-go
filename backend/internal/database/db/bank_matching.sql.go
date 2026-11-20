@@ -143,7 +143,7 @@ func (q *Queries) InsertBankTransactionMatch(ctx context.Context, arg InsertBank
 }
 
 const listBankTransactionMatchInvoices = `-- name: ListBankTransactionMatchInvoices :many
-SELECT m.amount, m.score, m.method, m.matched_at,
+SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
        i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
@@ -161,6 +161,7 @@ type ListBankTransactionMatchInvoicesRow struct {
 	Score         int16              `json:"score"`
 	Method        string             `json:"method"`
 	MatchedAt     pgtype.Timestamptz `json:"matched_at"`
+	Evidence      []byte             `json:"evidence"`
 	InvoiceUuid   uuid.UUID          `json:"invoice_uuid"`
 	InvoiceNumber string             `json:"invoice_number"`
 	IssueDate     pgtype.Date        `json:"issue_date"`
@@ -183,6 +184,7 @@ func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg List
 			&i.Score,
 			&i.Method,
 			&i.MatchedAt,
+			&i.Evidence,
 			&i.InvoiceUuid,
 			&i.InvoiceNumber,
 			&i.IssueDate,

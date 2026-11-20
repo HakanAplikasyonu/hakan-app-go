@@ -124,6 +124,22 @@ func (m *MemoryStore) List(_ context.Context, f Filter) ([]ListRow, int64, error
 	return out, int64(len(out)), nil
 }
 
+// ByEngagement implements Store: memory rows carry no engagement uuid, so
+// the count is per engagement id under uuid.Nil (tests use one engagement).
+func (m *MemoryStore) ByEngagement(ctx context.Context, f Filter) ([]EngagementCount, error) {
+	rows, total, err := m.List(ctx, f)
+	if err != nil || total == 0 {
+		return []EngagementCount{}, err
+	}
+	oldest := rows[0].CreatedAt
+	for _, r := range rows {
+		if r.CreatedAt.Before(oldest) {
+			oldest = r.CreatedAt
+		}
+	}
+	return []EngagementCount{{Total: total, Oldest: oldest}}, nil
+}
+
 // Settings implements Store.
 func (m *MemoryStore) Settings(_ context.Context, _, engagementID int64) ([]SettingRow, error) {
 	m.mu.Lock()
