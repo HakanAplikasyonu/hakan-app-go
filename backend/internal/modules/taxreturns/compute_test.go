@@ -256,3 +256,20 @@ func TestParseKDV1Adjustments(t *testing.T) {
 		t.Errorf("parse = %+v, %v", a, err)
 	}
 }
+
+// KDV indirim dönemi (#640): başka aydan alınan ve sonraki aya aktarılan
+// alış faturaları kontrol listesinde bilgi olarak görünür, onay istemez.
+func TestComputeKDV1VATDeductionMoved(t *testing.T) {
+	_, items := ComputeKDV1(KDV1Input{
+		InvoiceStats: InvoiceStats{Included: 1, MovedIn: 2, MovedOut: 1},
+		Carry:        Carry{Source: CarryManual},
+	})
+	c := codes(items)
+	in, out := c["VAT_DEDUCTION_MOVED_IN"], c["VAT_DEDUCTION_MOVED_OUT"]
+	if in.Severity != SeverityInfo || in.Count != 2 || out.Severity != SeverityInfo || out.Count != 1 {
+		t.Errorf("checklist = %+v", items)
+	}
+	if open := applyAcks(items, nil); len(open) != 0 {
+		t.Errorf("info items must not block: %v", open)
+	}
+}

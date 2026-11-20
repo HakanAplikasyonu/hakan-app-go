@@ -631,7 +631,8 @@ SELECT i.direction, i.type, s.tax_rate,
 FROM invoices i
 JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
 WHERE i.taxpayer_id = $1
-  AND i.period = $2
+  AND (i.period = $2 OR i.vat_deduction_period = $2)
+  AND COALESCE(i.vat_deduction_period, i.period) = $2
   AND i.status_normalized = 'active'
   AND i.deleted_at_source IS NULL
   AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL)
@@ -662,6 +663,8 @@ type TaxReturnInvoiceLinesRow struct {
 // uyarıyla aynı (vat_forecast.sql): yalnızca aktif ve kaynakta silinmemiş
 // faturalar; döviz tutarı invoices.exchange_rate ile TL'ye çevrilir ve özet
 // satırı bazında kuruşa yuvarlanır; kuru olmayan döviz faturası dışarıda.
+// KDV1 satırları KDV dönemine göre (#640): alış faturasının KDV indirim
+// dönemi varsa o ay, yoksa belge ayı. Ba/Bs ve MUHSGK belge ayında kalır.
 func (q *Queries) TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoiceLinesParams) ([]TaxReturnInvoiceLinesRow, error) {
 	rows, err := q.db.Query(ctx, taxReturnInvoiceLines, arg.TaxpayerID, arg.Period)
 	if err != nil {
@@ -693,21 +696,25 @@ func (q *Queries) TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoic
 }
 
 const taxReturnInvoiceStats = `-- name: TaxReturnInvoiceStats :one
-SELECT COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+SELECT COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = $1::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL))::bigint AS included,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'draft')::bigint AS draft,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'cancelled')::bigint AS cancelled,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = $1::text AND i.status_normalized = 'draft')::bigint AS draft,
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = $1::text AND i.status_normalized = 'cancelled')::bigint AS cancelled,
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = $1::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND i.currency <> 'TRY' AND i.exchange_rate IS NULL)::bigint AS missing_exchange_rate,
-       COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
-                          AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate
+       COUNT(*) FILTER (WHERE COALESCE(i.vat_deduction_period, i.period) = $1::text AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL
+                          AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate,
+       COUNT(*) FILTER (WHERE i.vat_deduction_period = $1::text AND i.status_normalized = 'active'
+                          AND i.deleted_at_source IS NULL)::bigint AS moved_in,
+       COUNT(*) FILTER (WHERE i.period = $1::text AND i.vat_deduction_period IS NOT NULL
+                          AND i.status_normalized = 'active' AND i.deleted_at_source IS NULL)::bigint AS moved_out
 FROM invoices i
-WHERE i.taxpayer_id = $1 AND i.period = $2
+WHERE i.taxpayer_id = $2 AND (i.period = $1::text OR i.vat_deduction_period = $1::text)
 `
 
 type TaxReturnInvoiceStatsParams struct {
-	TaxpayerID int64  `json:"taxpayer_id"`
 	Period     string `json:"period"`
+	TaxpayerID int64  `json:"taxpayer_id"`
 }
 
 type TaxReturnInvoiceStatsRow struct {
@@ -716,11 +723,15 @@ type TaxReturnInvoiceStatsRow struct {
 	Cancelled           int64 `json:"cancelled"`
 	MissingExchangeRate int64 `json:"missing_exchange_rate"`
 	HeaderEstimate      int64 `json:"header_estimate"`
+	MovedIn             int64 `json:"moved_in"`
+	MovedOut            int64 `json:"moved_out"`
 }
 
-// Kontrol listesi: beyana giren / girmeyen fatura sayıları.
+// Kontrol listesi: beyana giren / girmeyen fatura sayıları. Sayımlar KDV
+// dönemine göre (#640); moved_in başka aydan bu döneme KDV'si alınan,
+// moved_out bu ayın belgesi olup KDV'si sonraki aya alınan alış faturaları.
 func (q *Queries) TaxReturnInvoiceStats(ctx context.Context, arg TaxReturnInvoiceStatsParams) (TaxReturnInvoiceStatsRow, error) {
-	row := q.db.QueryRow(ctx, taxReturnInvoiceStats, arg.TaxpayerID, arg.Period)
+	row := q.db.QueryRow(ctx, taxReturnInvoiceStats, arg.Period, arg.TaxpayerID)
 	var i TaxReturnInvoiceStatsRow
 	err := row.Scan(
 		&i.Included,
@@ -728,6 +739,8 @@ func (q *Queries) TaxReturnInvoiceStats(ctx context.Context, arg TaxReturnInvoic
 		&i.Cancelled,
 		&i.MissingExchangeRate,
 		&i.HeaderEstimate,
+		&i.MovedIn,
+		&i.MovedOut,
 	)
 	return i, err
 }

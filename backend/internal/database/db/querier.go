@@ -1452,8 +1452,12 @@ type Querier interface {
 	// uyarıyla aynı (vat_forecast.sql): yalnızca aktif ve kaynakta silinmemiş
 	// faturalar; döviz tutarı invoices.exchange_rate ile TL'ye çevrilir ve özet
 	// satırı bazında kuruşa yuvarlanır; kuru olmayan döviz faturası dışarıda.
+	// KDV1 satırları KDV dönemine göre (#640): alış faturasının KDV indirim
+	// dönemi varsa o ay, yoksa belge ayı. Ba/Bs ve MUHSGK belge ayında kalır.
 	TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoiceLinesParams) ([]TaxReturnInvoiceLinesRow, error)
-	// Kontrol listesi: beyana giren / girmeyen fatura sayıları.
+	// Kontrol listesi: beyana giren / girmeyen fatura sayıları. Sayımlar KDV
+	// dönemine göre (#640); moved_in başka aydan bu döneme KDV'si alınan,
+	// moved_out bu ayın belgesi olup KDV'si sonraki aya alınan alış faturaları.
 	TaxReturnInvoiceStats(ctx context.Context, arg TaxReturnInvoiceStatsParams) (TaxReturnInvoiceStatsRow, error)
 	// Ba/Bs: karşı taraf kimliği olmayan (yabancı ya da eksik) faturalar.
 	TaxReturnMissingCounterparty(ctx context.Context, arg TaxReturnMissingCounterpartyParams) ([]TaxReturnMissingCounterpartyRow, error)
@@ -1590,7 +1594,9 @@ type Querier interface {
 	//   * yalnızca status_normalized = 'active' ve kaynakta silinmemiş faturalar;
 	//   * tutarlar TL'ye çevrilir: TRY ise 1, değilse invoices.exchange_rate; kuru
 	//     olmayan döviz faturası dışarıda kalır (VATForecastExcluded sayar);
-	//   * çevrim özet satırı bazında kuruşa yuvarlanır (ROUND(x * kur, 2)).
+	//   * çevrim özet satırı bazında kuruşa yuvarlanır (ROUND(x * kur, 2));
+	//   * dönem KDV dönemidir (#640): alış faturasının KDV indirim dönemi
+	//     (vat_deduction_period) varsa o ay, yoksa belge ayı.
 	// VATForecastLines ile VATForecastHistory aynı formülü kullanır; devir zinciri
 	// ekrandaki dönem toplamıyla tutarlı kalır.
 	// invoice_count satır grubundaki fatura sayısıdır; çok oranlı bir fatura
