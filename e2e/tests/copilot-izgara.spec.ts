@@ -101,9 +101,9 @@ test.describe("düzenlenebilir ızgara", () => {
     const grid = page.getByRole("grid", { name: "Hesap kodu önerileri" });
     const cell = (row: number, col: number) =>
       grid.locator(`[role=row][aria-rowindex="${row}"] [role=gridcell][aria-colindex="${col}"]`);
-    // Kolonlar: 1 satır başlığı, 9 "Hesap kodu", 10 "Karar" (Belge ve
-    // Tutar sütunları, #569).
-    const code = cell(2, 9);
+    // Kolonlar: 1 satır başlığı, 10 "Hesap kodu", 11 "Karar" (Belge, Tutar
+    // ve Öneren sütunları, #569).
+    const code = cell(2, 10);
     await expect(code).toBeVisible();
     const original = (await code.innerText()).trim();
 
@@ -111,7 +111,7 @@ test.describe("düzenlenebilir ızgara", () => {
     await code.click();
     await expect(code).toBeFocused();
     await page.keyboard.press("ArrowRight");
-    await expect(cell(2, 10)).toBeFocused();
+    await expect(cell(2, 11)).toBeFocused();
     await page.keyboard.press("ArrowLeft");
     await expect(code).toBeFocused();
 
