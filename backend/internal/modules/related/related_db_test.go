@@ -214,6 +214,37 @@ func TestRelatedChain(t *testing.T) {
 	if has(res, "invoice", "manual", "") || !has(res, "bank_transaction", "manual", btUUID.String()) {
 		t.Errorf("after unlink: %+v", res.Items)
 	}
+	// Cari kartı da elle bağlanır; fişte türüyle görünür, bağ kaldırılır.
+	var custUUID uuid.UUID
+	must(d.Pool.QueryRow(ctx, `INSERT INTO customers (taxpayer_id, source_system, source_id, capture_method, type, name, tax_number)
+		VALUES ($1, 'excel_import', '9300000011', 'excel_import', 'supplier', 'Cari Bağ Ltd', '9300000011') RETURNING uuid`, tp).Scan(&custUUID))
+	if on, err := jsvc.SetManualLink(ctx, scope, handUUID, journals.LinkCustomer, custUUID, true); err != nil || !on {
+		t.Fatalf("link customer: %v %v", on, err)
+	}
+	res, err = svc.List(ctx, sub, "journal_draft", handUUID, all)
+	must(err)
+	if !has(res, "customer", "manual", custUUID.String()) {
+		t.Errorf("hand draft → customer: %+v", res.Items)
+	}
+	for _, it := range res.Items {
+		if it.Kind == "customer" && (it.Status != "supplier" || it.Label != "Cari Bağ Ltd") {
+			t.Errorf("customer item: %+v", it)
+		}
+	}
+	if on, err := jsvc.SetManualLink(ctx, scope, handUUID, journals.LinkCustomer, custUUID, false); err != nil || on {
+		t.Fatalf("unlink customer: %v %v", on, err)
+	}
+	res, err = svc.List(ctx, sub, "journal_draft", handUUID, all)
+	must(err)
+	if has(res, "customer", "manual", "") {
+		t.Errorf("customer after unlink: %+v", res.Items)
+	}
+	cands, err := jsvc.CustomerCandidates(ctx, scope, "bağ")
+	must(err)
+	if len(cands) != 1 || cands[0].UUID != custUUID || cands[0].Type != "supplier" {
+		t.Errorf("customer candidates: %+v", cands)
+	}
+
 	var lines int
 	must(d.Pool.QueryRow(ctx, `SELECT count(*) FROM journal_draft_lines WHERE journal_draft_id = $1 AND source_kind IS NULL`, handID).Scan(&lines))
 	if lines != 2 {
