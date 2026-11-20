@@ -81,6 +81,7 @@
   "codes.PAYROLL_SHEET_NOT_FOUND": "Dosyada bordroya benzeyen bir sayfa bulunamadı. Bordro dökümünü Excel ya da CSV olarak yükleyin.",
   "codes.PAYROLL_UNAVAILABLE": "Bordro işlemleri şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
   "codes.BANK_POSTING_DRAFTED": "Bu hareket bir yevmiye taslağında. Değiştirmek için önce taslağı geri alın.",
+  "codes.BANK_POSTING_MISSING": "Bu hareketin karşı hesabı henüz seçilmedi. Önce hareketi hesaba işleyin, sonra komisyonu girin.",
   "codes.BANK_REFUSED": "Banka isteği reddetti. Bağlantı bilgilerini kontrol edin.",
   "codes.BANK_NOT_SUPPORTED": "Bu banka için doğrudan bağlantı henüz yok. Ekstre yükleyerek devam edin.",
   "codes.INVALID_IBAN": "IBAN geçersiz. TR ile başlayan 26 karakterlik IBAN'ı girin.",
