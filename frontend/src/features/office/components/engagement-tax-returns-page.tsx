@@ -35,6 +35,7 @@ import {
   createDateColumn,
   createMoneyColumn,
   createStatusColumn,
+  StatusPill,
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -545,18 +546,9 @@ function StatusBar({
         </span>
         <span className="font-display text-lg font-bold">{periodLabel}</span>
       </div>
-      <span
-        className={cn(
-          "rounded-md px-2.5 py-1 text-xs font-semibold",
-          tone === "ok"
-            ? "bg-ok-tint text-ok"
-            : tone === "info"
-              ? "bg-brand-tint text-brand-text"
-              : "bg-surface-3 text-text-2",
-        )}
-      >
+      <StatusPill tone={tone}>
         {t(`office.tax_returns.status_${p.status}`)}
-      </span>
+      </StatusPill>
       <span className="text-text-2 flex items-center gap-1.5 text-sm">
         <CalendarClock className="size-4" aria-hidden />
         {t("office.tax_returns.due", { date: dueLabel })}
@@ -841,9 +833,8 @@ function Checklist({
                 key={c.code}
                 className={cn(
                   "flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2",
-                  warn && !c.acknowledged
-                    ? "border-warn/40 bg-warn-tint"
-                    : "border-line",
+                  // Onaylanmamış uyarı bağırmaz (#708 dili): ince sarı çerçeve.
+                  warn && !c.acknowledged ? "border-warn/60" : "border-line",
                 )}
               >
                 <Icon
