@@ -50,7 +50,9 @@ export function EngagementNextWork({
   const { can } = usePermission();
   const router = useRouter();
   const copilot = useOptionalCopilot();
-  const { focus } = useOfficePeriod();
+  const { focus, setPeriod } = useOfficePeriod();
+  // Sayılan dönem açılan ekranda da seçili olsun (#566).
+  const pinPeriod = () => setPeriod(focus);
   const query = useEngagementWorkflow(slug, engagement, focus);
 
   if (query.isLoading) {
@@ -82,6 +84,7 @@ export function EngagementNextWork({
       return;
     }
     // Mükellef sayfalarındaki kart: hedef mükellef sekmesinde açılır (#468).
+    pinPeriod();
     router.push(actionHref(slug, step.action, engagement, true));
   };
 
@@ -147,6 +150,7 @@ export function EngagementNextWork({
           steps={row.steps}
           next={row.next_step}
           hrefFor={(k) => stepHref(slug, k, engagement, true)}
+          onNavigate={pinPeriod}
         />
         <p className="text-text-3 text-xs tabular-nums">
           {t("office.copilot.progress", {
@@ -180,6 +184,7 @@ export function EngagementNextWork({
           next={row.next_step}
           compact
           hrefFor={(k) => stepHref(slug, k, engagement, true)}
+          onNavigate={pinPeriod}
         />
       </div>
       {next}
