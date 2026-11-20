@@ -8512,6 +8512,8 @@ export interface paths {
         /**
          * Counterparty (cari) reconciliation of a run
          * @description Requires `tenant.reconciliation.read` (#389). Per counterparty (VKN/TCKN): the trial balance balance of its 120 / 320 account from the counterparty account memory, the portal balance (invoices up to the period end, sales +, purchases −, minus bank payments matched to them, TL) and the period's Form BA (purchases) / BS (sales) totals (KDV hariç, invoice count) against the declared form lines. A counterparty reaching 5.000 TL must be on the form. Each row has the contact email of its customer card and its newest letter.
+         *     When `latest` finds no run yet (the period was never compared) the answer is `200` with `run: null` and no items: an empty state,
+         *     not an error (#639). 404 is kept for an unknown run uuid or engagement.
          */
         get: operations["listReconciliationCounterparties"];
         put?: never;
@@ -20555,8 +20557,9 @@ export interface components {
         };
         /** @enum {string} */
         BabsResult: "not_required" | "ok" | "missing_in_form" | "extra_in_form" | "amount_mismatch" | "count_mismatch" | "no_declaration";
+        /** @description Counterparty rows of a run; `run` is null (and `items` empty) when `latest` finds no run yet (#639). */
         ReconciliationCounterpartyPage: {
-            run: components["schemas"]["ReconciliationRun"];
+            run: components["schemas"]["ReconciliationRun"] | null;
             items: components["schemas"]["ReconciliationCounterparty"][];
         };
         BabsDeclaration: {

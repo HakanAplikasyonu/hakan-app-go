@@ -355,7 +355,7 @@ export function CounterpartiesView({
     [t, canWrite, decideItem],
   );
 
-  const sum = list.data?.run.summary;
+  const sum = list.data?.run?.summary;
   if (list.isLoading) return <Skeleton className="h-64 w-full" />;
   return (
     <div className="space-y-4">
