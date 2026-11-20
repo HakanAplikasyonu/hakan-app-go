@@ -779,6 +779,8 @@
   "drawer.fx_error": "Kur kaydedilemedi.",
   "drawer.fx_entered": "{{currency}} kuru {{rate}} TL: ofiste {{name}} girdi ({{date}}).",
   "drawer.fx_entered_unknown": "silinmiş bir kullanıcı",
+  "invoices.vat_moved_from": "{{month}} faturası; KDV'si bu ayda",
+  "invoices.vat_moved_to": "KDV'si {{month}} beyanına alındı",
   "vat_deduction.title": "KDV indirim dönemi",
   "vat_deduction.default": "KDV'si belge ayı {{doc}} beyanında indirilir.",
   "vat_deduction.moved": "KDV'si {{month}} beyanına alındı; fatura belge ayı {{doc}} içinde kalır.",

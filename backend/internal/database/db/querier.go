@@ -849,6 +849,8 @@ type Querier interface {
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 	// görür (engagement_document_visible, issue #8).
+	// Dönem süzgecinde KDV'si o aya alınan alış faturası da gelir (#640): ofis
+	// geç gelen faturayı beyan ettiği ayda görür.
 	// Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
 	// satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 	ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error)

@@ -779,6 +779,8 @@
   "drawer.fx_error": "Could not save the rate.",
   "drawer.fx_entered": "{{currency}} rate {{rate}} TL: entered in the office by {{name}} ({{date}}).",
   "drawer.fx_entered_unknown": "a deleted user",
+  "invoices.vat_moved_from": "{{month}} invoice; VAT deducted this month",
+  "invoices.vat_moved_to": "VAT moved to {{month}}",
   "vat_deduction.title": "KDV deduction period",
   "vat_deduction.default": "Its KDV is deducted in the document month's return ({{doc}}).",
   "vat_deduction.moved": "Its KDV moved to the {{month}} return; the invoice stays in its document month {{doc}}.",

@@ -16,7 +16,7 @@ const countEngagementInvoices = `-- name: CountEngagementInvoices :one
 WITH d AS MATERIALIZED (
     SELECT issue_date, COUNT(*) AS n FROM invoices
     WHERE taxpayer_id = $2
-      AND ($3::text IS NULL OR period = $3)
+      AND ($3::text IS NULL OR period = $3 OR vat_deduction_period = $3)
       AND ($4::text IS NULL OR direction = $4)
     GROUP BY issue_date
 )
@@ -166,7 +166,7 @@ WITH page AS (
     SELECT i.id FROM invoices i
     WHERE i.taxpayer_id = $3
       AND engagement_document_visible($2::bigint, i.issue_date)
-      AND ($4::text IS NULL OR i.period = $4)
+      AND ($4::text IS NULL OR i.period = $4 OR i.vat_deduction_period = $4)
       AND ($5::text IS NULL OR i.direction = $5)
     ORDER BY i.issue_date DESC, i.id DESC
     LIMIT $7 OFFSET $6
@@ -197,6 +197,8 @@ type ListEngagementInvoicesRow struct {
 // Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 // faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 // görür (engagement_document_visible, issue #8).
+// Dönem süzgecinde KDV'si o aya alınan alış faturası da gelir (#640): ofis
+// geç gelen faturayı beyan ettiği ayda görür.
 // Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
 // satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 func (q *Queries) ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error) {
@@ -297,7 +299,7 @@ WITH page AS (
     WHERE i.taxpayer_id = $3
       AND (i.issue_date, i.id) < ($4::date, $5::bigint)
       AND engagement_document_visible($2::bigint, i.issue_date)
-      AND ($6::text IS NULL OR i.period = $6)
+      AND ($6::text IS NULL OR i.period = $6 OR i.vat_deduction_period = $6)
       AND ($7::text IS NULL OR i.direction = $7)
     ORDER BY i.issue_date DESC, i.id DESC
     LIMIT $8
