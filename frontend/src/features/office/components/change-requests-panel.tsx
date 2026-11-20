@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronUp, FileClock } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -57,13 +57,12 @@ export function ChangeRequestsPanel({
   const canRead = can(Permission.TenantPeriodsRead);
   const canDecide = can(Permission.TenantChangeRequestsDecide);
   // Komuta Merkezi / Mükellefler'den "?talepler=ac" ile gelinince liste açık
-  // gelir (#710). Panel sayım gelmeden çizilmediği için sunucu çiziminde
-  // fark oluşmaz.
-  const [expanded, setExpanded] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("talepler") === "ac",
-  );
+  // gelir (#710). Adres Next'in arama parametrelerinden okunur: istemci
+  // tarafı geçişte sayfa adres güncellenmeden çizilebilir, window.location
+  // o an eski adresi gösterir. Kullanıcı düğmeye basınca onun seçimi geçer.
+  const wantOpen = useSearchParams()?.get("talepler") === "ac";
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const expanded = toggled ?? wantOpen;
   const cr = useChangeRequests(engagement, canRead && open > 0 && expanded);
 
   if (!canRead || open === 0) return null;
@@ -91,7 +90,7 @@ export function ChangeRequestsPanel({
           variant="outline"
           aria-expanded={expanded}
           aria-controls="change-requests-list"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => setToggled(!expanded)}
         >
           {expanded ? (
             <ChevronUp aria-hidden className="size-4" />

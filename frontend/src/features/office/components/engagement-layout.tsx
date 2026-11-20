@@ -384,10 +384,13 @@ export function EngagementLayout({
         {period && cells.find((c) => c.period === period)?.locked ? (
           <LockedPeriodNote engagement={engagement} period={period} />
         ) : null}
-        <ChangeRequestsPanel
-          engagement={engagement}
-          open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}
-        />
+        {/* Panel ?talepler=ac'yi arama parametrelerinden okur (#710). */}
+        <Suspense fallback={null}>
+          <ChangeRequestsPanel
+            engagement={engagement}
+            open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}
+          />
+        </Suspense>
         {/* Seçili kayıt (?kayit=tür:uuid) ve ilişkili kayıtları (#469). */}
         <Suspense fallback={null}>
           <FocusedRecord engagement={engagement} />
