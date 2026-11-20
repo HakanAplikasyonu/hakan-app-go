@@ -130,9 +130,8 @@ export function DataTableToolbar<TData>({
   return (
     <div className="flex flex-col gap-3">
       {forceMobileCards ? (
-        <p className="text-muted-foreground text-xs">
-          {t("table.mobile_cards")}
-        </p>
+        // Ekran okuyucuya söylenir; görünür metin olarak kalabalık ediyordu.
+        <p className="sr-only">{t("table.mobile_cards")}</p>
       ) : null}
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-1 sm:flex-row sm:flex-wrap sm:items-center">
