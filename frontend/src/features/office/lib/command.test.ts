@@ -15,6 +15,12 @@ describe("cellTarget (#567)", () => {
   it("opens the change requests for an open change request (#710)", () => {
     expect(cellTarget(cell(0, 3, 1))).toBe("change_requests");
   });
+  it("opens the change requests first in a locked period (#710)", () => {
+    expect(cellTarget({ ...cell(2, 7, 1), locked: true })).toBe(
+      "change_requests",
+    );
+    expect(cellTarget({ ...cell(2, 7, 0), locked: true })).toBe("blockers");
+  });
   it("opens the warning list when only non-blocking warnings are open", () => {
     expect(cellTarget(cell(0, 3, 0))).toBe("warnings");
   });

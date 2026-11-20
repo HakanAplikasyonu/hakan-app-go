@@ -39,7 +39,8 @@ export function statusOf(
 
 /**
  * Hücreye tıklayınca açılacak ekran (#567, #710): problemden çözüm ekranına.
- * Engelleyici uyarı varsa o uyarılar; açık değişiklik talebi mükellef
+ * Kapalı dönemde açık talep varsa önce talep listesi; engelleyici uyarı
+ * varsa o uyarılar; açık değişiklik talebi mükellef
  * ekranında talep listesi açık gelir; yalnız engellemeyen uyarı varsa uyarı
  * listesi; iş yoksa mükellef özeti.
  */
@@ -53,8 +54,12 @@ export function cellTarget(
   cell: Pick<
     PeriodMatrixCell,
     "open_blockers" | "open_warnings" | "open_change_requests"
-  >,
+  > &
+    Partial<Pick<PeriodMatrixCell, "locked">>,
 ): CellTarget {
+  // Kapalı dönemde ilk iş açık talebin kararıdır: talep uygulanmadan
+  // dönemdeki engel giderilemez (#710).
+  if (cell.locked && cell.open_change_requests > 0) return "change_requests";
   if (cell.open_blockers > 0) return "blockers";
   if (cell.open_change_requests > 0) return "change_requests";
   if (cell.open_warnings > 0) return "warnings";

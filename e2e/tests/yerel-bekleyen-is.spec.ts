@@ -61,11 +61,13 @@ test("bekleyen iş: Mükellefler ve Komuta Merkezi rozeti talep listesini açık
   await page.goto(officePath("/taxpayers"));
   await page.getByPlaceholder("Unvan ya da VKN ara").fill(taxpayer.vkn);
   // Kilitli dönem "Onaylandı (kilitli)" yazar; açık talep varken rozet
-  // talep listesine götürür.
-  const badge = page.locator('a[data-target="change_requests"]', {
-    hasText: "Onaylandı (kilitli)",
-  });
+  // (dönemde engel olsa da) talep listesine götürür.
+  const badge = page
+    .getByRole("row", { name: new RegExp(taxpayer.title) })
+    .locator("a[data-target]");
   await expect(badge).toHaveCount(1);
+  await expect(badge).toContainText("Onaylandı (kilitli)");
+  await expect(badge).toHaveAttribute("data-target", "change_requests");
   await badge.click();
   await expect(page).toHaveURL(
     new RegExp(`/engagements/${engagement}\\?talepler=ac`),
