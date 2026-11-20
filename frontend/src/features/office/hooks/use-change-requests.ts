@@ -30,10 +30,24 @@ export function readDiff(diff: Record<string, unknown> | undefined) {
     fields.push({ field, old: show(pair.old), new: show(pair.new) });
   }
   fields.sort((a, b) => a.field.localeCompare(b.field));
+  // Gelen faturanın özeti (#710); eski taleplerde yoksa alanlardan.
+  const sum = (diff?.summary ?? {}) as Record<string, unknown>;
+  const pick = (k: string, field: string) => {
+    if (typeof sum[k] === "string" && sum[k]) return sum[k] as string;
+    const pair = (raw[field] ?? {}) as Record<string, unknown>;
+    return typeof pair.new === "string" ? pair.new : "";
+  };
   return {
     source: typeof src.system === "string" ? src.system : "",
     method: typeof src.capture_method === "string" ? src.capture_method : "",
     fields,
+    summary: {
+      number: pick("invoice_number", "invoice_number"),
+      direction: pick("direction", "direction"),
+      counterparty: pick("counterparty", "customer_name"),
+      payable: pick("payable_amount", "payable_amount"),
+      currency: pick("currency", "currency") || "TRY",
+    },
   };
 }
 
