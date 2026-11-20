@@ -16962,6 +16962,12 @@ export interface components {
             luca_exports?: number;
             /** Format: date-time */
             luca_last_exported_at?: string;
+            /**
+             * @description Trial-balance account the movement is booked to (approved posting, #565); absent when none
+             * @example 340.01
+             */
+            booked_account_code?: string;
+            booked_account_name?: string;
         };
         BankTransactionPage: {
             items: components["schemas"]["BankTransaction"][];

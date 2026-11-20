@@ -211,6 +211,14 @@ test.describe("EPIC #560 akışları (koordinatör 2)", () => {
     expect(booked.posting).toMatchObject({ status: "approved", account_code: "340.01" });
     expect(booked.match_status).toBe("unmatched");
     expect(await openUninvoiced()).toBe(0);
+    // Banka listesi de hangi hesaba işlendiğini gösterir.
+    const listed = await api.json<{ items: { uuid: string; booked_account_code?: string }[] }>(
+      await api.get(`${base()}/bank-transactions?period=${PERIOD}&limit=10`),
+    );
+    expect(listed.items.find((x) => x.uuid === collection)?.booked_account_code).toBe("340.01");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("row").filter({ hasText: "EFT GELEN ATL2026000000102" })).toContainText("340.01");
+    await page.goto(officePath(`/engagements/${engagement}/bank?kayit=bank_transaction:${collection}`));
 
     // Fatura sonradan bulunur: aynı panelden yeniden eşleştirilir.
     await panel.getByRole("checkbox", { name: "ATL2026000000102 faturasını seç" }).check();

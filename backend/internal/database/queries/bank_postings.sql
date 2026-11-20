@@ -140,3 +140,12 @@ SELECT p.*, s.uuid AS suggestion_uuid, s.status AS suggestion_status
 FROM bank_transaction_postings p
 LEFT JOIN suggestions s ON s.organization_id = p.organization_id AND s.engagement_id = p.engagement_id AND s.id = p.suggestion_id
 WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id AND p.bank_transaction_id = @bank_transaction_id;
+
+-- name: BankTransactionBookedAccounts :many
+-- Banka listesindeki "hesaba işlendi" göstergesi (#565): onaylanmış karşı
+-- hesabı olan hareketler.
+SELECT t.uuid AS bank_transaction_uuid, p.account_code, p.account_name
+FROM bank_transaction_postings p
+JOIN bank_transactions t ON t.taxpayer_id = p.taxpayer_id AND t.id = p.bank_transaction_id
+WHERE p.organization_id = @organization_id AND p.engagement_id = @engagement_id
+  AND t.taxpayer_id = @taxpayer_id AND t.uuid = ANY(@uuids::uuid[]) AND p.status = 'approved';

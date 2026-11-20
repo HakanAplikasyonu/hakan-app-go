@@ -919,6 +919,7 @@
   "bank.col_account": "Account",
   "bank.col_amount": "Amount",
   "bank.col_match": "Match",
+  "bank.col_booked": "Booked to",
   "bank.direction_in": "In",
   "bank.direction_out": "Out",
   "bank.possible_duplicate": "possible duplicate",

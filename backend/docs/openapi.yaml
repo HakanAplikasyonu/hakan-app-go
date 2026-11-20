@@ -21777,6 +21777,8 @@ components:
         cash_box_name: { type: string }
         luca_exports: { type: integer, format: int32, description: "Luca bank statement files that held the movement (#465); 2 or more = exported again" }
         luca_last_exported_at: { type: string, format: date-time }
+        booked_account_code: { type: string, description: "Trial-balance account the movement is booked to (approved posting, #565); absent when none", example: "340.01" }
+        booked_account_name: { type: string }
     BankTransactionPage:
       type: object
       required: [items, limit, offset, summary]
