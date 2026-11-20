@@ -35,6 +35,7 @@ import {
   createDateColumn,
   createMoneyColumn,
   createStatusColumn,
+  StatusPill,
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
 import {
   TAX_RETURN_KINDS,
   type TaxReturnAdjustments,
@@ -75,6 +76,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnSections } from "./tax-return-sections";
 import { TaxReturnWarnings } from "./tax-return-warnings";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
@@ -162,7 +164,8 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
     (canWrite && settings.data?.final_check_required === false);
   const qc = useQueryClient();
   // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
-  const { focus: period, setPeriod } = useOfficePeriod();
+  // Dönem adreste de durur (#710): bağlantıyla gelen `?period=` geçerli.
+  const { focus: period, setPeriod } = useUrlOfficePeriod();
   const dates = useDates();
   const listState = useUrlListState({ initialPageSize: 50 });
   const rawKind = listState.getParam("kind") as TaxReturnKind | null;
@@ -360,6 +363,12 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             />
           ) : null}
           <TaxReturnSummary p={p} />
+          <TaxReturnSections
+            slug={slug}
+            engagement={engagement}
+            period={period}
+            sections={p.sections}
+          />
           {p.status === "draft" ? (
             <TaxReturnWarnings
               engagement={engagement}
@@ -545,18 +554,9 @@ function StatusBar({
         </span>
         <span className="font-display text-lg font-bold">{periodLabel}</span>
       </div>
-      <span
-        className={cn(
-          "rounded-md px-2.5 py-1 text-xs font-semibold",
-          tone === "ok"
-            ? "bg-ok-tint text-ok"
-            : tone === "info"
-              ? "bg-brand-tint text-brand-text"
-              : "bg-surface-3 text-text-2",
-        )}
-      >
+      <StatusPill tone={tone}>
         {t(`office.tax_returns.status_${p.status}`)}
-      </span>
+      </StatusPill>
       <span className="text-text-2 flex items-center gap-1.5 text-sm">
         <CalendarClock className="size-4" aria-hidden />
         {t("office.tax_returns.due", { date: dueLabel })}
@@ -841,9 +841,8 @@ function Checklist({
                 key={c.code}
                 className={cn(
                   "flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2",
-                  warn && !c.acknowledged
-                    ? "border-warn/40 bg-warn-tint"
-                    : "border-line",
+                  // Onaylanmamış uyarı bağırmaz (#708 dili): ince sarı çerçeve.
+                  warn && !c.acknowledged ? "border-warn/60" : "border-line",
                 )}
               >
                 <Icon

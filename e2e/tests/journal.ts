@@ -2,12 +2,15 @@ import { readFileSync, statSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { openNewEntry } from "./lib";
+
 /**
  * Yevmiye ekranında 3 satırlı dengeli bir fiş kaydeder ve onaylar.
  * `receivable`: alıcı hesabı. Demo ofisinin hesap planında 120.01 grup
  * hesabıdır (#456), çıktı yalnızca muavine izin verir: 120.01.001.
  */
 export async function newApprovedEntry(page: Page, description: string, receivable = "120.01") {
+  await openNewEntry(page);
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
   // Tutarlar Türkçe yazılır; KDV satırının tutarını "Farkı kapat" yazar (#573).

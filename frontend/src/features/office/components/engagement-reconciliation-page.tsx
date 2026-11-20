@@ -22,6 +22,7 @@ import {
   createActionsColumn,
   createColumn,
   createMoneyColumn,
+  StatusPill,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -421,9 +422,9 @@ function AccountsView({
             <p className="text-sm">{x.note}</p>
           ) : x.suggestion ? (
             <p className="text-text-2 text-sm">
-              <span className="bg-brand-tint text-brand-text me-1 rounded px-1.5 py-0.5 text-[11px]">
+              <StatusPill tone="info" className="me-1">
                 {t("office.reconciliation.suggested")}
-              </span>
+              </StatusPill>
               {x.suggestion}
             </p>
           ) : (
@@ -567,9 +568,10 @@ function AccountsView({
         <div
           className={cn(
             "flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm",
+            // Fark varsa ince sarı çerçeve ve küçük işaret (#708 dili).
             sum.bank.matched
               ? "border-line bg-surface"
-              : "border-warn bg-warn-tint",
+              : "border-warn/60 bg-surface",
           )}
         >
           <Landmark className="size-4" aria-hidden />

@@ -196,6 +196,20 @@ export const journalService = {
       { body: { reason } },
     );
   },
+  /** Aktarılmış fişin tamamen iptali (#710): aktarımdan çıkar, taslağa döner. */
+  cancelExport(
+    slug: string,
+    engagement: string,
+    draft: string,
+    reason: string,
+  ) {
+    return tenantRequest<JournalDraftDetail>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/cancel-export`,
+      { body: { reason } },
+    );
+  },
   exports(slug: string, engagement: string) {
     return tenantRequest<{ items: JournalExportSummary[] }>(
       slug,

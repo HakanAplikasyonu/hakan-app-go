@@ -801,6 +801,8 @@ type Querier interface {
 	// eşleşmeyi taxpayer_id ile süzer.
 	ListBankTransactionMatchJournalLines(ctx context.Context, arg ListBankTransactionMatchJournalLinesParams) ([]ListBankTransactionMatchJournalLinesRow, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
+	// Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+	ListBankTransactionPayrollMatches(ctx context.Context, arg ListBankTransactionPayrollMatchesParams) ([]ListBankTransactionPayrollMatchesRow, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
 	// booked_by_hand (#565): müşavir hareketi bu angajmanda kendi kararıyla bir
@@ -1006,6 +1008,9 @@ type Querier interface {
 	// Dönem bordroları, yeniden eskiye: net maaş ödemesine eşlenen banka
 	// tutarı, SGK tahakkuk/ödeme durumu ve fiş taslağı.
 	ListPayrollRuns(ctx context.Context, arg ListPayrollRunsParams) ([]ListPayrollRunsRow, error)
+	// Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+	// eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+	ListPayrollRunsForBankMatch(ctx context.Context, arg ListPayrollRunsForBankMatchParams) ([]ListPayrollRunsForBankMatchRow, error)
 	// Mükellef panelinde sahibin göreceği bekleyen talepler (mükellefin kendi
 	// VKN'si için). Ofislerin kendi kayıtlarıdır ama yalnızca talebin hedefi
 	// olan mükellefe gösterilir.
@@ -1552,6 +1557,13 @@ type Querier interface {
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
 	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
+	// Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+	// (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+	// her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+	// fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+	// eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+	// sayılan banka hareketi.
+	TaxReturnSectionStats(ctx context.Context, arg TaxReturnSectionStatsParams) (TaxReturnSectionStatsRow, error)
 	// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
 	TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.

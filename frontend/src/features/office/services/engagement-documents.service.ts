@@ -66,6 +66,8 @@ export type DocumentRequestInput = {
   title: string;
   note?: string;
   due_days?: number;
+  /** İsteğin ait olduğu dönem; yoksa son günün ayı (sunucu). */
+  period?: string;
 };
 
 export function createDocumentRequest(
