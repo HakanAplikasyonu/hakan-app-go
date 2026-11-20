@@ -7,6 +7,8 @@ import { Suspense, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/empty-state";
+import { ErrorState } from "@/components/common/error-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -206,9 +208,9 @@ function UploadedTrialBalance({ engagement }: { engagement: string }) {
           e.target.value = "";
         }}
       />
+      {/* Sayfanın tek birincil eylemi (#710); dışa aktarmalar ikincil. */}
       <Button
         size="sm"
-        variant="outline"
         disabled={upload.isPending}
         onClick={() => fileRef.current?.click()}
       >
@@ -218,16 +220,37 @@ function UploadedTrialBalance({ engagement }: { engagement: string }) {
     </>
   ) : null;
 
+  // Liste yokken de sayfa başlığı görünür (#710): kullanıcı nerede olduğunu
+  // ve ne yapacağını okur; hata durumunda yeniden dene.
+  const header = (
+    <PageHeader
+      headingLevel={2}
+      title={t("office.trial_balance.title")}
+      description={t("office.trial_balance.description")}
+    />
+  );
   if (list.isLoading) return <Skeleton className="h-64 w-full" />;
   if (list.isError)
-    return <p className="text-danger text-sm">{t("office.api.load_error")}</p>;
+    return (
+      <div className="space-y-4">
+        {header}
+        <ErrorState
+          title={t("office.api.load_error")}
+          onRetry={() => void list.refetch()}
+          retryLabel={t("common.retry")}
+        />
+      </div>
+    );
   if (items.length === 0)
     return (
-      <EmptyState
-        title={t("office.trial_balance.empty_title")}
-        description={t("office.trial_balance.empty_body")}
-        action={uploadButton}
-      />
+      <div className="space-y-4">
+        {header}
+        <EmptyState
+          title={t("office.trial_balance.empty_title")}
+          description={t("office.trial_balance.empty_body")}
+          action={uploadButton}
+        />
+      </div>
     );
 
   const rep = report.data;
