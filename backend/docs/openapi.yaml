@@ -9917,6 +9917,53 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: cancelJournalDraftExport
+      summary: Cancel an entry already transferred to the program completely (#710)
+      description: |
+        Office decision (#710 A.4): before the e-defter there is no correction
+        entry. In one transaction the entry leaves its export (who, when and
+        why on the export item) and goes back to draft with the same reason,
+        so it can be corrected, approved and exported again. The user deletes
+        the entry in the program. Requires `tenant.journals.export` and
+        `tenant.journals.approve`. A locked period gives `JOURNAL_BLOCKED`
+        (`period_locked`); an entry not in a live export `NOT_EXPORTED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Draft (back to draft)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`JOURNAL_BLOCKED` (period_locked)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

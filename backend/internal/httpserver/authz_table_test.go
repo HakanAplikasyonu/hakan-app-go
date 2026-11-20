@@ -609,4 +609,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                 azTenantWrite,
 	"POST /v1/public/reconciliation-letters/preview":                                                            azPublic,
 	"POST /v1/public/reconciliation-letters/respond":                                                            azPublic,
+
+	// Aktarılmış fişin tamamen iptali (#710).
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": azTenantWrite,
 }

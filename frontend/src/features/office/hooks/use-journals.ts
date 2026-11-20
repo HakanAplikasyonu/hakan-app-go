@@ -193,6 +193,11 @@ export function useJournalActions(slug: string, engagement: string) {
         journalService.reverse(slug, engagement, v.draft, v.reason),
       onSuccess: refresh,
     }),
+    cancelExport: useMutation({
+      mutationFn: (v: { draft: string; reason: string }) =>
+        journalService.cancelExport(slug, engagement, v.draft, v.reason),
+      onSuccess: refresh,
+    }),
     export: useMutation({
       mutationFn: (input: JournalExportInput) =>
         journalService.export(slug, engagement, input),
