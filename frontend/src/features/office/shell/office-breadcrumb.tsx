@@ -2,8 +2,8 @@
 
 import { Check, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import {
   Breadcrumb,
@@ -35,6 +35,13 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementTabs } from "../components/engagement-layout";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
+import { FOCUS_PARAM } from "../lib/related-href";
+import {
+  isPeriod,
+  PERIOD_PARAM,
+  useOfficePeriod,
+  usePeriodText,
+} from "../period";
 import {
   engagementInPath,
   matchByPath,
@@ -96,24 +103,128 @@ export function OfficeBreadcrumb({
   );
 }
 
+/**
+ * Mükellef ayrıntısında hiyerarşi (#710): ofis → mükellef → dönem → sayfa
+ * → kayıt. Dönem çalışılan aydır (sayfadaki ve üst çubuktaki seçiciyle
+ * aynı); kayıt ayrıntısında (ör. fatura) sayfa adı listeye geri götürür.
+ */
 function EngagementCrumbs({ engagement }: { engagement: string }) {
   const pathname = usePathname();
+  const periodText = usePeriodText();
+  const { focus } = useOfficePeriod();
   const tabs = useEngagementTabs(engagement);
   const tab = matchByPath(pathname, tabs);
+  const tabPath = tab?.href.split("?")[0]!.replace(/\/+$/, "");
+  const subPath = !!tab && pathname.replace(/\/+$/, "") !== tabPath;
   return (
     <>
       <BreadcrumbItem>
         <TaxpayerSwitcher engagement={engagement} />
       </BreadcrumbItem>
+      <BreadcrumbSeparator className="hidden md:list-item" />
+      <BreadcrumbItem
+        className="text-text-2 hidden shrink-0 md:inline-flex"
+        data-testid="crumb-period"
+      >
+        {periodText(focus)}
+      </BreadcrumbItem>
       {tab ? (
         <>
           <BreadcrumbSeparator className="hidden sm:list-item" />
           <BreadcrumbItem className="hidden sm:inline-flex">
-            <BreadcrumbPage>{tab.label}</BreadcrumbPage>
+            <Suspense
+              fallback={
+                <TabCrumb tab={tab} detail={subPath} back={tabPath ?? ""} />
+              }
+            >
+              <FocusAwareTabCrumb
+                tab={tab}
+                subPath={subPath}
+                tabPath={tabPath ?? ""}
+              />
+            </Suspense>
           </BreadcrumbItem>
+          {subPath ? <RecordCrumb /> : null}
         </>
       ) : null}
     </>
+  );
+}
+
+/**
+ * `?kayit=` ile odaklı kayıt da bir kayıt ayrıntısıdır (#710): sayfa adı
+ * listeye geri götürür ve adresteki dönem dönüşte korunur.
+ */
+function FocusAwareTabCrumb({
+  tab,
+  subPath,
+  tabPath,
+}: {
+  tab: { href: string; label: string };
+  subPath: boolean;
+  tabPath: string;
+}) {
+  const params = useSearchParams();
+  const focused = !subPath && params.has(FOCUS_PARAM);
+  const period = params.get(PERIOD_PARAM);
+  const back =
+    period && isPeriod(period)
+      ? `${tabPath}?${PERIOD_PARAM}=${encodeURIComponent(period)}`
+      : tab.href;
+  return (
+    <>
+      <TabCrumb tab={tab} detail={subPath || focused} back={back} />
+      {focused ? <FocusRecordCrumb /> : null}
+    </>
+  );
+}
+
+function TabCrumb({
+  tab,
+  detail,
+  back,
+}: {
+  tab: { href: string; label: string };
+  detail: boolean;
+  back: string;
+}) {
+  const { t } = useLocale();
+  return detail ? (
+    <BreadcrumbLink asChild>
+      <Link
+        href={back || tab.href}
+        aria-label={t("office.shell.breadcrumb_back", { page: tab.label })}
+      >
+        {tab.label}
+      </Link>
+    </BreadcrumbLink>
+  ) : (
+    <BreadcrumbPage>{tab.label}</BreadcrumbPage>
+  );
+}
+
+function RecordCrumb() {
+  const { t } = useLocale();
+  return (
+    <>
+      <BreadcrumbSeparator className="hidden sm:list-item" />
+      <BreadcrumbItem className="hidden sm:inline-flex">
+        <BreadcrumbPage>{t("office.shell.crumb_record")}</BreadcrumbPage>
+      </BreadcrumbItem>
+    </>
+  );
+}
+
+/** Odaklı kayıt kırıntısı sekme öğesinin içinde durur (aynı liste). */
+function FocusRecordCrumb() {
+  const { t } = useLocale();
+  return (
+    <span className="ms-2 inline-flex items-center gap-2">
+      <span aria-hidden className="text-muted-foreground">
+        ›
+      </span>
+      <BreadcrumbPage>{t("office.shell.crumb_record")}</BreadcrumbPage>
+    </span>
   );
 }
 

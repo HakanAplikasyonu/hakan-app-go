@@ -19,6 +19,7 @@ import {
   Upload,
   Users,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { FOCUS_PARAM } from "../lib/related-href";
 import { useOfficePeriod, usePeriodText } from "../period";
 import {
   payrollKeys,
@@ -56,6 +58,7 @@ import {
 } from "../services/payroll.service";
 import { Money } from "./office-ui";
 import { PayrollEmployeeDialog } from "./payroll-employee-dialog";
+import { PayrollLineSheet } from "./payroll-line-sheet";
 import { useRelatedColumn } from "./related-column";
 
 /** Form alanı etiketi: normal kalınlıkta (önceki görünümle aynı). */
@@ -172,10 +175,18 @@ function RunsView({ engagement }: { engagement: string }) {
   });
   const items = runs.data?.items ?? [];
   const [picked, setPicked] = useState<string | null>(null);
+  // Bankadan ya da ilişkili kayıttan gelen bağlantı (`?kayit=payroll_run:…`)
+  // o dönemin bordrosunu ve personel dökümünü açar (#710).
+  const focused = useSearchParams().get(FOCUS_PARAM) ?? "";
+  const focusRun = focused.startsWith("payroll_run:")
+    ? focused.slice("payroll_run:".length)
+    : null;
   const selected =
     items.find((r) => r.uuid === picked) ??
+    items.find((r) => r.uuid === focusRun) ??
     items.find((r) => r.period === focus) ??
     items[0];
+  const [line, setLine] = useState<PayrollLine | null>(null);
   const detail = useQuery({
     queryKey: [...keyBase, "run", selected?.uuid],
     queryFn: () => payrollService.run(slug, engagement, selected!.uuid),
@@ -373,6 +384,15 @@ function RunsView({ engagement }: { engagement: string }) {
           <LinesTable
             lines={detail.data?.lines ?? []}
             loading={detail.isLoading}
+            onPick={setLine}
+          />
+          {/* Personel satırının detayı (#710): brütten nete, işveren
+              maliyeti, bağlı banka ödemesi. */}
+          <PayrollLineSheet
+            engagement={engagement}
+            run={selected}
+            line={line}
+            onClose={() => setLine(null)}
           />
         </section>
       ) : null}
@@ -453,9 +473,11 @@ function Stat({
 function LinesTable({
   lines,
   loading,
+  onPick,
 }: {
   lines: PayrollLine[];
   loading: boolean;
+  onPick: (line: PayrollLine) => void;
 }) {
   const { t } = useLocale();
   const columns = useMemo<ColumnDef<PayrollLine, unknown>[]>(
@@ -522,6 +544,7 @@ function LinesTable({
       getRowId={(l) => String(l.row)}
       isLoading={loading}
       emptyTitle={t("office.payroll.lines_empty")}
+      onRowClick={onPick}
       features={{ ...tableFeatures, persistKey: "office.payroll.lines" }}
     />
   );

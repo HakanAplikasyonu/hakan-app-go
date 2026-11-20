@@ -8,6 +8,8 @@ const (
 	Expenses         = "expenses"
 	RetailSales      = "retail_sales"
 	BankTransactions = "bank_transactions"
+	// Customers: cari kartları (müşteri / tedarikçi listesi, #669).
+	Customers = "customers"
 )
 
 // Field kinds: how a cell is checked and normalised before it reaches the
@@ -122,6 +124,21 @@ var bankCatalog = catalog(BankTransactions, "Banka hareketleri", "",
 	kf{"counterparty_tax_id", "karşı taraf VKN / TCKN", KindText},
 )
 
+// Cari kartı alanları (#669): VKN / TCKN başına bir kart; tür boşsa
+// "her ikisi" sayılır.
+var customerCatalog = catalog(Customers, "Cari kartları", "",
+	[][]string{{"name"}, {"tax_id"}},
+	kf{"name", "unvan ya da ad soyad", KindText},
+	kf{"tax_id", "VKN (10 hane) ya da TCKN (11 hane)", KindText},
+	kf{"type", "tür: müşteri (alıcı, 120), tedarikçi (satıcı, 320) ya da her ikisi", KindText},
+	kf{"tax_office", "vergi dairesi", KindText},
+	kf{"address", "adres", KindText},
+	kf{"district", "ilçe", KindText},
+	kf{"city", "il", KindText},
+	kf{"email", "e-posta", KindText},
+	kf{"phone", "telefon", KindText},
+)
+
 var payrollCatalog = func() Catalog {
 	kinds := map[string]string{
 		"employee_name": KindText, "first_name": KindText, "last_name": KindText, "national_id": KindText,
@@ -162,6 +179,7 @@ var catalogs = map[string]Catalog{
 	Expenses:         expenseCatalog,
 	RetailSales:      retailCatalog,
 	BankTransactions: bankCatalog,
+	Customers:        customerCatalog,
 }
 
 // CatalogFor returns the catalog of a supported data type.

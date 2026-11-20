@@ -88,7 +88,7 @@ test("geçersiz VKN'li faturada numara panelden girilir, uyarı çözülür", as
 
   // Sunucu: denetim haneli olmayan numara reddedilir.
   const bad = await api.put(`${url}/counterparty-tax-id`, {
-    tax_id: "1234567890",
+    tax_id: "1234567891", // son hane denetimi tutmaz (1234567890 geçerli VKN)
   });
   expect(bad.status()).toBe(400);
   expect(await bad.text()).toContain("INVALID_TAX_ID");

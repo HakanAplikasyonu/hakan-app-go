@@ -200,3 +200,23 @@ WHERE (j.uuid::text || ':' || l.line_no::text) = ANY(@keys::text[])
   AND (CASE WHEN @side::text = 'credit' THEN l.credit > 0 ELSE l.debit > 0 END)
   AND (@currency::text = 'TRY' OR (l.currency = @currency::text AND l.foreign_amount IS NOT NULL))
 ORDER BY j.entry_date, j.entry_no, l.line_no;
+
+-- Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+-- name: ListBankTransactionPayrollMatches :many
+SELECT m.amount, m.method, r.uuid AS payroll_run_uuid, r.period, r.net_total
+FROM bank_transaction_matches m
+JOIN payroll_runs r ON r.taxpayer_id = m.taxpayer_id AND r.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'payroll_run'
+ORDER BY r.period;
+
+-- Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+-- eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+-- name: ListPayrollRunsForBankMatch :many
+SELECT r.id, r.uuid, r.period, r.net_total,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = r.taxpayer_id AND m.target_type = 'payroll_run' AND m.target_id = r.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric(18,2) AS paid,
+       (SELECT count(*) FROM payroll_lines l WHERE l.taxpayer_id = r.taxpayer_id AND l.payroll_run_id = r.id)::int AS employee_count
+FROM payroll_runs r
+WHERE r.taxpayer_id = @taxpayer_id AND r.period >= @period_from::text AND r.period <= @period_to::text
+ORDER BY r.period DESC;

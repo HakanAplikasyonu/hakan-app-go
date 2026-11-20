@@ -4937,7 +4937,7 @@ export interface paths {
         /**
          * Upload an Excel / CSV export
          * @description Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
-         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
+         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports), `bank_transactions` (#395) and `customers` (cari cards, #669) are accepted; for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
          */
         post: operations["uploadExcelImport"];
         delete?: never;
@@ -7438,6 +7438,41 @@ export interface paths {
          *     the export; the draft is approved again and can be exported again.
          */
         post: operations["reverseJournalDraftExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an entry already transferred to the program completely (#710)
+         * @description Office decision (#710 A.4): before the e-defter there is no correction
+         *     entry. In one transaction the entry leaves its export (who, when and
+         *     why on the export item) and goes back to draft with the same reason,
+         *     so it can be corrected, approved and exported again. The user deletes
+         *     the entry in the program. Requires `tenant.journals.export` and
+         *     `tenant.journals.approve`. A locked period gives `JOURNAL_BLOCKED`
+         *     (`period_locked`); an entry not in a live export `NOT_EXPORTED`.
+         */
+        post: operations["cancelJournalDraftExport"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14804,7 +14839,7 @@ export interface components {
         };
         ExcelImportMappingInput: {
             /** @enum {string} */
-            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             source_system?: string;
             columns?: {
                 column: string;
@@ -14831,7 +14866,7 @@ export interface components {
         };
         ExcelImportDataType: {
             /** @enum {string} */
-            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             /** @example Banka hareketleri */
             label: string;
             fields: {
@@ -17537,6 +17572,27 @@ export interface components {
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /** @description An outgoing payment can be tied to a payroll run (#710) */
+            payroll_matchable: boolean;
+            /** @description Payroll runs the movement pays (net salaries, */
+            payroll_matches: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Payroll runs of the movement's month and the two before with net still unpaid (#710) */
+            payroll_candidates: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                open_amount: string;
+                employee_count: number;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -21093,12 +21149,28 @@ export interface components {
             };
             record: components["schemas"]["TaxReturnRecord"] | null;
             open_warnings: string[];
+            /** @description The period's sources, processed / total (#710); always live, also for a prepared or filed return */
+            sections: components["schemas"]["TaxReturnSection"][];
             /** Format: date-time */
             computed_at: string;
             checklist: components["schemas"]["TaxReturnCheckItem"][];
             kdv1?: components["schemas"]["TaxReturnKDV1"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
+        };
+        /**
+         * @description One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
+         *     value, matched bank transaction); ignored was set aside (rejected, cancelled, ignored); the rest still waits.
+         */
+        TaxReturnSection: {
+            /** @enum {string} */
+            key: "retail" | "invoices" | "bank" | "expenses";
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            processed: number;
+            /** Format: int64 */
+            ignored: number;
         };
         JournalDraftManualLink: {
             /** @enum {string} */
@@ -29473,7 +29545,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
                     /** @example bizimhesap */
                     source_system?: string;
                     /** @example 2026-10 */
@@ -33275,6 +33347,56 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    cancelJournalDraftExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Draft (back to draft) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `JOURNAL_BLOCKED` (period_locked) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
     linkJournalDraftInvoice: {
         parameters: {
             query?: never;
@@ -36600,6 +36722,8 @@ export interface operations {
             content: {
                 "application/json": {
                     invoice_uuids?: string[];
+                    /** @description Payroll runs an outgoing payment pays (net salaries, */
+                    payroll_run_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */

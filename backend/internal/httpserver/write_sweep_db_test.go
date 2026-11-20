@@ -310,6 +310,9 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen":          {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document": {file: "file", fileName: "tahakkuk.pdf", fileBody: "%PDF-1.4\n% tahakkuk taramasi\n", late: true},
 
+	// Aktarılmış fişin tamamen iptali (#710).
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},
+
 	// Fişe elle bağlanan kayıt (#710).
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":                 {},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              {late: true},

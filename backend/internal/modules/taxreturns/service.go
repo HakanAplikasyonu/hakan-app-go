@@ -84,7 +84,42 @@ type Preview struct {
 	Calendar     Calendar `json:"calendar"`
 	Record       *Record  `json:"record"`
 	OpenWarnings []string `json:"open_warnings"`
+	// Sections: the period's source records, processed / total (#710).
+	// Always live, also for a prepared or filed return.
+	Sections []Section `json:"sections"`
 	body
+}
+
+// Section keys of Preview.Sections, in screen order.
+const (
+	SectionRetail   = "retail"
+	SectionInvoices = "invoices"
+	SectionBank     = "bank"
+	SectionExpenses = "expenses"
+)
+
+// Section is one source of the period: how many records there are, how
+// many were processed (they count for the return) and how many were set
+// aside on purpose (rejected, cancelled, ignored). The rest still waits.
+type Section struct {
+	Key       string `json:"key"`
+	Total     int64  `json:"total"`
+	Processed int64  `json:"processed"`
+	Ignored   int64  `json:"ignored"`
+}
+
+// sections loads the period's section summary.
+func (s *Service) sections(ctx context.Context, sc engagementctx.Scope, period string) ([]Section, error) {
+	st, err := s.q.TaxReturnSectionStats(ctx, db.TaxReturnSectionStatsParams{TaxpayerID: sc.TaxpayerID, Period: period})
+	if err != nil {
+		return nil, fmt.Errorf("tax return sections: %w", err)
+	}
+	return []Section{
+		{Key: SectionRetail, Total: st.RetailTotal, Processed: st.RetailProcessed, Ignored: st.RetailIgnored},
+		{Key: SectionInvoices, Total: st.InvoiceTotal, Processed: st.InvoiceProcessed, Ignored: st.InvoiceIgnored},
+		{Key: SectionBank, Total: st.BankTotal, Processed: st.BankProcessed, Ignored: st.BankIgnored},
+		{Key: SectionExpenses, Total: st.ExpenseTotal, Processed: st.ExpenseProcessed, Ignored: st.ExpenseIgnored},
+	}, nil
 }
 
 // Summary is one row of the return list.
@@ -234,6 +269,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 		Calendar: s.calendar(kind, period), Record: recordView(rec), OpenWarnings: []string{},
 	}
 	if err := s.withNames(ctx, sc, p.Record, rec); err != nil {
+		return Preview{}, err
+	}
+	if p.Sections, err = s.sections(ctx, sc, period); err != nil {
 		return Preview{}, err
 	}
 	if rec != nil {
