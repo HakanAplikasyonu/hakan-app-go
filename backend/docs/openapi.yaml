@@ -9961,6 +9961,112 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Journals]
+      operationId: linkJournalDraftInvoice
+      summary: Link an invoice to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Journals]
+      operationId: unlinkJournalDraftInvoice
+      summary: Unlink an invoice to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Journals]
+      operationId: linkJournalDraftBankTransaction
+      summary: Link a bank transaction to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Journals]
+      operationId: unlinkJournalDraftBankTransaction
+      summary: Unlink a bank transaction to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26081,8 +26187,8 @@ components:
         uuid: { type: [string, "null"], format: uuid, description: "null for rule and account" }
         relation:
           type: string
-          enum: [payment, journal, source, warning, review, rule, counterparty_account, possible]
-          description: "payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart. Rejected, reverted and superseded suggestions are not listed."
+          enum: [payment, journal, source, warning, review, rule, counterparty_account, possible, manual]
+          description: "payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart; manual: linked to a journal draft by hand (#710). Rejected, reverted and superseded suggestions are not listed."
         date: { type: [string, "null"], format: date }
         amount: { type: [string, "null"], description: "Decimal; matched amount for payments, debit total for journals" }
         currency: { type: [string, "null"] }
@@ -26473,6 +26579,22 @@ components:
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
+
+    JournalDraftManualLink:
+      type: object
+      required: [kind, uuid, linked]
+      properties:
+        kind: { type: string, enum: [invoice, bank_transaction] }
+        uuid: { type: string, format: uuid }
+        linked: { type: boolean }
+
+    EnvelopeJournalDraftManualLink:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalDraftManualLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TaxReturnSummary:
       type: object
