@@ -30,6 +30,7 @@ import { RecordDetail } from "./record-detail";
 import type { OpenRelated } from "./related-records";
 import { ApiWarningActions } from "./warning-actions";
 import { WarningCodeFix } from "./warning-code-fix";
+import { WarningVatDeduction } from "./vat-deduction-period";
 import { WarningTransactions } from "./warning-transactions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
 
@@ -305,6 +306,17 @@ export function WarningSheet({
                 key={current.uuid}
                 warning={current}
                 onDone={afterDecided}
+              />
+            ) : null}
+            {/* Alış faturası uyarısı (#640): KDV indirim dönemi buradan da değişir. */}
+            {(current.entity_type === "invoice" ||
+              current.entity_type === "invoice_item") &&
+            current.entity_uuid &&
+            current.engagement_uuid ? (
+              <WarningVatDeduction
+                key={`vat-${current.uuid}`}
+                engagement={current.engagement_uuid}
+                invoice={current.entity_uuid}
               />
             ) : null}
             {current.code === BALANCE_WARNING_CODE &&
