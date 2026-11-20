@@ -94,11 +94,13 @@ test("Sıradaki İşler → kontrol → dönemi aç → onayla → aktarım → 
   await expect(page.getByText("1 fiş aktarıldı.")).toBeVisible();
   await expect(approved).toContainText("Aktarıldı");
 
-  // Veritabanı: fiş aktarıldı ve bir çıktıya bağlı.
-  const detail = await api.json<{ status: string; export?: { exported_at: string } }>(
-    await api.get(`${base}/journal-drafts/${draft.uuid}`),
-  );
-  expect(detail.status).toBe("exported");
-  expect(detail.export?.exported_at).toBeTruthy();
+  // Veritabanı: fiş aktarıldı ve bir çıktıya bağlı (çıktı bilgisi listede gelir).
+  const listed = (
+    await api.json<{ items: { uuid: string; status: string; export?: { exported_at: string } }[] }>(
+      await api.get(`${base}/journal-drafts?period=${period}&limit=50`),
+    )
+  ).items.find((d) => d.uuid === draft.uuid);
+  expect(listed?.status).toBe("exported");
+  expect(listed?.export?.exported_at).toBeTruthy();
   await api.dispose();
 });
