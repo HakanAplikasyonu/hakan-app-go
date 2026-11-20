@@ -35,6 +35,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementTabs } from "../components/engagement-layout";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
+import { useOfficePeriod, usePeriodText } from "../period";
 import {
   engagementInPath,
   matchByPath,
@@ -96,21 +97,54 @@ export function OfficeBreadcrumb({
   );
 }
 
+/**
+ * Mükellef ayrıntısında hiyerarşi (#710): ofis → mükellef → dönem → sayfa
+ * → kayıt. Dönem çalışılan aydır (sayfadaki ve üst çubuktaki seçiciyle
+ * aynı); kayıt ayrıntısında (ör. fatura) sayfa adı listeye geri götürür.
+ */
 function EngagementCrumbs({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
   const pathname = usePathname();
+  const periodText = usePeriodText();
+  const { focus } = useOfficePeriod();
   const tabs = useEngagementTabs(engagement);
   const tab = matchByPath(pathname, tabs);
+  const tabPath = tab?.href.split("?")[0]!.replace(/\/+$/, "");
+  const detail = !!tab && pathname.replace(/\/+$/, "") !== tabPath;
   return (
     <>
       <BreadcrumbItem>
         <TaxpayerSwitcher engagement={engagement} />
       </BreadcrumbItem>
+      <BreadcrumbSeparator className="hidden md:list-item" />
+      <BreadcrumbItem
+        className="text-text-2 hidden shrink-0 md:inline-flex"
+        data-testid="crumb-period"
+      >
+        {periodText(focus)}
+      </BreadcrumbItem>
       {tab ? (
         <>
           <BreadcrumbSeparator className="hidden sm:list-item" />
           <BreadcrumbItem className="hidden sm:inline-flex">
-            <BreadcrumbPage>{tab.label}</BreadcrumbPage>
+            {detail ? (
+              <BreadcrumbLink asChild>
+                <Link href={tab.href}>{tab.label}</Link>
+              </BreadcrumbLink>
+            ) : (
+              <BreadcrumbPage>{tab.label}</BreadcrumbPage>
+            )}
           </BreadcrumbItem>
+          {detail ? (
+            <>
+              <BreadcrumbSeparator className="hidden sm:list-item" />
+              <BreadcrumbItem className="hidden sm:inline-flex">
+                <BreadcrumbPage>
+                  {t("office.shell.crumb_record")}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          ) : null}
         </>
       ) : null}
     </>
