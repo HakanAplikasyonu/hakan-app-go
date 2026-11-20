@@ -27,6 +27,7 @@ import {
   DataTable,
   StatusPill,
   type DataTableFeatures,
+  type StatusTone,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -115,10 +116,12 @@ import {
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
-const statusClass: Record<JournalDraft["status"], string> = {
-  draft: "bg-secondary text-secondary-foreground",
-  approved: "bg-status-approved/12 text-status-approved",
-  exported: "bg-brand/12 text-brand",
+// Fiş durumu ortak sade rozetle (#708 dili, #710): taslak gri, onaylı
+// yeşil, aktarılmış ana renk nokta; anlamı metin taşır.
+const statusTone: Record<JournalDraft["status"], StatusTone> = {
+  draft: "neutral",
+  approved: "ok",
+  exported: "info",
 };
 
 type Translate = (key: string) => string;
@@ -739,11 +742,11 @@ function ExportPanel({
             }))}
           />
           {chosen && !chosen.verified ? (
-            <span className="bg-status-warning/12 text-status-warning rounded-md px-2 py-0.5 text-xs">
+            <StatusPill tone="warn">
               {t("office.journals.template_unverified", {
                 version: chosen.template_version,
               })}
-            </span>
+            </StatusPill>
           ) : null}
           <Button
             size="sm"
@@ -1147,14 +1150,9 @@ function JournalsInner() {
         labelKey: "office.col_status",
         accessorKey: "status",
         cell: ({ row }) => (
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 text-xs font-medium",
-              statusClass[row.original.status],
-            )}
-          >
+          <StatusPill tone={statusTone[row.original.status]}>
             {t(`office.journals.status_${row.original.status}`)}
-          </span>
+          </StatusPill>
         ),
       }),
       createColumn<JournalDraft>({
