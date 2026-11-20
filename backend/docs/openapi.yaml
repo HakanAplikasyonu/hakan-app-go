@@ -14622,6 +14622,73 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: getEngagementLiveTrialBalance
+      summary: Live trial balance from the office's own journal entries (#669)
+      description: |
+        Requires `tenant.account_plan.read`. Sums the engagement's journal entries (onaylı ve aktarılmış; `include_drafts=true` adds drafts) from January of the period's year to the period, per account code. Parent accounts carry their children's sums; names come from the active Luca plan (empty when the code is not in it). `balance` is signed (positive: borç bakiyesi).
+
+        `compare=luca` compares each line with the latest uploaded Luca trial balance of the same period: `change` = canlı bakiye − Luca bakiyesi; `compared_to` is null when that period has no upload. `period` defaults to the current month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', examples: ["2026-10"] } }
+        - { name: include_drafts, in: query, schema: { type: boolean, default: false } }
+        - { name: compare, in: query, schema: { type: string, enum: [none, luca], default: none } }
+        - { name: level, in: query, description: "Deepest level returned (1: main accounts); 0 or omitted: all", schema: { type: integer, minimum: 0, maximum: 10 } }
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/LiveTrialBalanceReport" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: exportEngagementLiveTrialBalance
+      summary: Download the live trial balance as Excel or PDF (#669)
+      description: Requires `tenant.account_plan.read`. The same report as GET .../live-trial-balance, as a file (`canli_mizan_<period>`).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [xlsx, pdf], default: xlsx } }
+        - { name: period, in: query, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', examples: ["2026-10"] } }
+        - { name: include_drafts, in: query, schema: { type: boolean, default: false } }
+        - { name: compare, in: query, schema: { type: string, enum: [none, luca], default: none } }
+        - { name: level, in: query, schema: { type: integer, minimum: 0, maximum: 10 } }
+        - { name: locale, in: query, schema: { type: string, enum: [tr, en], default: tr } }
+      responses:
+        "200":
+          description: The file (Content-Disposition attachment)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/accounts:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -24535,6 +24602,27 @@ components:
         lines:
           type: array
           items: { $ref: "#/components/schemas/TrialBalanceLine" }
+
+    LiveTrialBalanceReport:
+      type: object
+      required: [period, from_period, include_drafts, compared_to, lines, totals]
+      properties:
+        period: { type: string, examples: ["2026-10"] }
+        from_period: { type: string, description: "January of the period's year", examples: ["2026-01"] }
+        include_drafts: { type: boolean }
+        compared_to:
+          oneOf:
+            - $ref: "#/components/schemas/TrialBalance"
+            - type: "null"
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/TrialBalanceLine" }
+        totals:
+          type: object
+          required: [debit, credit]
+          properties:
+            debit: { type: string, description: "Decimal string, sum over leaf accounts" }
+            credit: { type: string }
 
     AccountPlanAccount:
       type: object

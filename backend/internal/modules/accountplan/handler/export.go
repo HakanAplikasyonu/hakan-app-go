@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -93,24 +92,9 @@ func (h *Handler) TrialBalanceExport(w http.ResponseWriter, r *http.Request) {
 		period = *rep.TrialBalance.Period
 	}
 	title := strings.TrimSpace(i18n.Translate(i18n.Normalize(locale), "trial_balance.title") + " " + period)
-	var body []byte
-	if format == ioengine.ExportPDF {
-		body, err = ioengine.EncodePDF(ds, locale, nil, title)
-	} else {
-		body, err = ioengine.EncodeXLSX(ds, locale, nil)
-	}
-	if err != nil {
-		response.InternalErr(w, r, err, "could not build the trial balance file")
-		return
-	}
 	name := "mizan"
 	if period != "" {
 		name += "_" + period
 	}
-	w.Header().Set("Content-Type", ioengine.ContentTypeForExport(format))
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.%s"`, name, ioengine.FileExtForExport(format)))
-	w.Header().Set("Content-Length", strconv.Itoa(len(body)))
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(body)
+	writeExport(w, r, ds, format, locale, title, name)
 }

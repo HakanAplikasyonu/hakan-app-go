@@ -11011,6 +11011,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Live trial balance from the office's own journal entries (#669)
+         * @description Requires `tenant.account_plan.read`. Sums the engagement's journal entries (onaylı ve aktarılmış; `include_drafts=true` adds drafts) from January of the period's year to the period, per account code. Parent accounts carry their children's sums; names come from the active Luca plan (empty when the code is not in it). `balance` is signed (positive: borç bakiyesi).
+         *
+         *     `compare=luca` compares each line with the latest uploaded Luca trial balance of the same period: `change` = canlı bakiye − Luca bakiyesi; `compared_to` is null when that period has no upload. `period` defaults to the current month.
+         */
+        get: operations["getEngagementLiveTrialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the live trial balance as Excel or PDF (#669)
+         * @description Requires `tenant.account_plan.read`. The same report as GET .../live-trial-balance, as a file (`canli_mizan_<period>`).
+         */
+        get: operations["exportEngagementLiveTrialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/account-plan/accounts": {
         parameters: {
             query?: never;
@@ -19409,6 +19467,23 @@ export interface components {
             trial_balance: components["schemas"]["TrialBalance"];
             compared_to: components["schemas"]["TrialBalance"] | null;
             lines: components["schemas"]["TrialBalanceLine"][];
+        };
+        LiveTrialBalanceReport: {
+            /** @example 2026-10 */
+            period: string;
+            /**
+             * @description January of the period's year
+             * @example 2026-01
+             */
+            from_period: string;
+            include_drafts: boolean;
+            compared_to: components["schemas"]["TrialBalance"] | null;
+            lines: components["schemas"]["TrialBalanceLine"][];
+            totals: {
+                /** @description Decimal string, sum over leaf accounts */
+                debit: string;
+                credit: string;
+            };
         };
         AccountPlanAccount: {
             /** @example 120.01.001 */
@@ -38543,6 +38618,89 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementLiveTrialBalance: {
+        parameters: {
+            query?: {
+                period?: string;
+                include_drafts?: boolean;
+                compare?: "none" | "luca";
+                /** @description Deepest level returned (1: main accounts); 0 or omitted: all */
+                level?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["LiveTrialBalanceReport"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementLiveTrialBalance: {
+        parameters: {
+            query?: {
+                format?: "xlsx" | "pdf";
+                period?: string;
+                include_drafts?: boolean;
+                compare?: "none" | "luca";
+                level?: number;
+                locale?: "tr" | "en";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (Content-Disposition attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

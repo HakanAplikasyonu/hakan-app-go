@@ -19,6 +19,8 @@ type Querier interface {
 	AcceptOrganizationInvitation(ctx context.Context, id int64) (OrganizationInvitation, error)
 	// tenant-lint: cross-org kabul, token özetiyle bulunan satırın id'siyle tek kullanımlık
 	AcceptTaxpayerInvitation(ctx context.Context, id int64) (int64, error)
+	// Etkin plandaki hesap adları (canlı mizanın adları, #669 E).
+	AccountPlanNames(ctx context.Context, arg AccountPlanNamesParams) ([]AccountPlanNamesRow, error)
 	// Kural adayı: müşavirin aynı karşı taraf için aynı hesap koduna verdiği
 	// düzeltme / kabul kararları (kural dışı önerilerde). min_count kez
 	// tekrarlanınca "kural yapılsın mı?" sorulur.
@@ -1124,6 +1126,10 @@ type Querier interface {
 	ListWhatsAppCaptures(ctx context.Context, arg ListWhatsAppCapturesParams) ([]ListWhatsAppCapturesRow, error)
 	// tenant-lint: org-wide ofisin eşleme listesi; görünmeyen engagement'ların satırı RLS ile düşer
 	ListWhatsAppChatLinks(ctx context.Context, arg ListWhatsAppChatLinksParams) ([]ListWhatsAppChatLinksRow, error)
+	// Canlı mizan (#669 E): ofisin kendi fişlerinden hesap bazında borç /
+	// alacak toplamı, [from_period, to_period] aralığında. Varsayılan onaylı ve
+	// aktarılmış fişler; include_drafts taslakları da katar.
+	LiveTrialBalanceTotals(ctx context.Context, arg LiveTrialBalanceTotalsParams) ([]LiveTrialBalanceTotalsRow, error)
 	// Karar: talebi satır kilidiyle okur (eşzamanlı iki karar tek sonuç verir).
 	LockChangeRequest(ctx context.Context, arg LockChangeRequestParams) (ChangeRequest, error)
 	// tenant-lint: cross-org onay işlemi, token ile bulunan satır kilitlenir
