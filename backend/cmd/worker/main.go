@@ -38,6 +38,9 @@ import (
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/sources/easytrade"
+	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
+	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
+	warningsrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/observability"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/bulkengine"
@@ -250,6 +253,10 @@ func main() {
 		}).SendBlockerAlerts)).
 		WithAgentsOfflineSweep(systemCount(pool, "agents: offline sweep across offices",
 			agentsusecase.New(database.NewQueries(pool), notifSvc, cfg.Auth.FrontendURL, log).SweepOfflineCount)).
+		// Bağlantı sağlığı uyarıları (#669 K): bütün ofisler (gerekçeli satır
+		// güvenliği atlaması).
+		WithConnectionWarnings(systemCount(pool, "warnings: connection health across offices",
+			connectionWarnings(database.NewQueries(pool)).Sweep)).
 		WithEntegratorSync(func(ctx context.Context, p queue.EntegratorSyncPayload) error {
 			return entegratorSvc.RunTask(ctx, p.TaxpayerID, p.ConnectionUUID, p.Kind)
 		}).
@@ -307,6 +314,10 @@ func main() {
 		}
 		if err := queue.RegisterAgentsOfflineSweepSchedule(scheduler); err != nil {
 			log.Error("agents_offline_sweep_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterConnectionWarningsSchedule(scheduler); err != nil {
+			log.Error("connection_warnings_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEasytradeSweepSchedule(scheduler); err != nil {
@@ -403,6 +414,11 @@ func mailSweeps(fns ...func(context.Context) (int, error)) func(context.Context)
 		}
 		return total, nil
 	}
+}
+
+// connectionWarnings builds the connection health checker over q.
+func connectionWarnings(q *db.Queries) *warningsconnections.Checker {
+	return warningsconnections.New(q, warningsengine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q)))
 }
 
 func systemCount(pool *pgxpool.Pool, reason string, fn func(context.Context) (int, error)) func(context.Context) (int, error) {

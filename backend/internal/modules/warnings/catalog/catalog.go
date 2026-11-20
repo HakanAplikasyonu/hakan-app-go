@@ -1,5 +1,5 @@
 // Package catalog lists the warning codes of
-// docs/kaynak/musavir-entegrasyon-paketi/05-uyari-kodlari.md (§3.1–§3.4)
+// docs/kaynak/musavir-entegrasyon-paketi/05-uyari-kodlari.md (§3.1–§3.5)
 // plus UBL_SCHEMATRON_FAIL (docs/01 §1.1) and ACCOUNT_NOT_IN_TARGET_PLAN
 // (docs/02) and the VAT early-warning codes (docs/00 K9). Producers write
 // codes, never texts; the panel renders the text.
@@ -53,6 +53,7 @@ const (
 	EntityRetailSale           = "retail_sale"
 	EntityBankTransaction      = "bank_transaction"
 	EntityEntegratorDocument   = "entegrator_document"
+	EntitySourceConnection     = "source_connection"
 	EntityPeriod               = "period"
 	AnyEntity                  = "*"
 )
@@ -61,7 +62,7 @@ const (
 var EntityTypes = []string{
 	EntityInvoice, EntityInvoiceItem, EntityCustomer, EntityExpense,
 	EntityFinancialTransaction, EntityRetailSale, EntityBankTransaction,
-	EntityEntegratorDocument, EntityPeriod,
+	EntityEntegratorDocument, EntitySourceConnection, EntityPeriod,
 }
 
 // Code is one catalog entry.
@@ -127,6 +128,9 @@ var Codes = []Code{
 	{"BNK_GAP", "3.4", bank},
 	{"BNK_NON_BUSINESS", "3.4", bank},
 	{"BNK_UNCLASSIFIED", "3.4", bank},
+	// §3.5 Bağlantı sağlığı (#669 K). Seed: *_connection_warnings.up.sql.
+	{"INT_CONNECTION_FAILED", "3.5", []string{EntitySourceConnection}},
+	{"INT_SYNC_STALE", "3.5", []string{EntitySourceConnection}},
 	// Added by HAKAN docs.
 	{"UBL_SCHEMATRON_FAIL", "01", []string{EntityInvoice}},
 	{"ACCOUNT_NOT_IN_TARGET_PLAN", "02", []string{AnyEntity}},

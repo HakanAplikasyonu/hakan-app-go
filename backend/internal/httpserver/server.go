@@ -128,6 +128,7 @@ import (
 	vatforecasthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/handler"
 	vatforecastrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/repository"
 	vatforecastusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/vatforecast/usecase"
+	warningsconnections "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/connections"
 	warningscontrols "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/controls"
 	warningsengine "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 	warningshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/handler"
@@ -697,7 +698,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			WithTarget(excelmapping.BankTransactions, bankImporter.ExcelTarget())),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
-			WithControls(warningscontrols.New(deps.Queries, warningEngine)).
+			// Bağlantı sağlığı uyarıları (#669 K) kontrollerle birlikte tazelenir.
+			WithControls(warningscontrols.New(deps.Queries, warningEngine).
+				WithConnections(warningsconnections.New(deps.Queries, warningEngine))).
 			WithActivity(activityRec),
 		review:       reviewhandler.New(reviewSvc, activityRec),
 		receipts:     receiptshandler.New(receiptsSvc),

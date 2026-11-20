@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState } from "react";
 
 import { Hint } from "@/components/ui/hint";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Permission } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { datetime } from "@/lib/utils/format";
 import { useLocale } from "@/providers/locale-provider";
@@ -35,6 +37,32 @@ export const DOC_REQUEST_CODES = new Set([
   "UBL_MISSING",
   "MISSING_AT_SOURCE",
 ]);
+
+/**
+ * Bağlantı sağlığı uyarıları (#669 K, INT_CONNECTION_FAILED /
+ * INT_SYNC_STALE) bağlantıya işaret eder: çözümü mükellefin Bağlantılar
+ * ekranındadır.
+ */
+export const CONNECTION_ENTITY = "source_connection";
+
+/** Bağlantı uyarısında "Bağlantıya git": mükellefin Bağlantılar ekranı. */
+function ConnectionLink({ warning }: { warning: ApiDataWarning }) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  return (
+    <Button asChild size="sm" className="min-h-11 md:min-h-8">
+      <Link
+        href={routes.tenant.engagementConnections(
+          slug,
+          warning.engagement_uuid,
+        )}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {t("office.warning_connection.action")}
+      </Link>
+    </Button>
+  );
+}
 
 export const MIN_NOTE = 3;
 export const MAX_NOTE = 500;
@@ -197,9 +225,14 @@ export function ApiWarningActions({
         : ["checked", "correction_requested", "rounding"]
       ).map((k) => t(`office.warning_decision.preset_${k}`))
     : undefined;
+  const connection =
+    warning.entity_type === CONNECTION_ENTITY ? (
+      <ConnectionLink warning={warning} />
+    ) : null;
   if (warning.status !== "open")
     return <WarningDecisionInfo warning={warning} />;
-  if (!can(WARNINGS_WRITE_PERMISSION)) return null;
+  // Bağlantıya gitmek karar yetkisi istemez.
+  if (!can(WARNINGS_WRITE_PERMISSION)) return connection;
   const run = (a: WarningDecisionAction, note: string) =>
     decide.mutate(
       {
@@ -253,6 +286,7 @@ export function ApiWarningActions({
         />
       ) : (
         <div className="flex flex-wrap justify-end gap-1">
+          {connection}
           {canRequest ? (
             <Button
               size="sm"

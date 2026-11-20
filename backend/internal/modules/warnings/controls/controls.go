@@ -30,14 +30,25 @@ type Queries interface {
 	ItemNamesHistory(ctx context.Context, arg db.ItemNamesHistoryParams) ([]db.ItemNamesHistoryRow, error)
 }
 
+// ConnectionChecker refreshes the engagement's connection health warnings
+// (#669 K, warnings/connections).
+type ConnectionChecker interface {
+	Check(ctx context.Context, s engine.Subject) (engine.Report, error)
+}
+
 // Runner runs the controls.
 type Runner struct {
-	q      Queries
-	engine *engine.Engine
+	q           Queries
+	engine      *engine.Engine
+	connections ConnectionChecker
 }
 
 // New builds a runner.
 func New(q Queries, e *engine.Engine) *Runner { return &Runner{q: q, engine: e} }
+
+// WithConnections also refreshes the connection warnings on every run, so
+// "kontrolleri çalıştır" does not wait for the periodic sweep.
+func (r *Runner) WithConnections(c ConnectionChecker) *Runner { r.connections = c; return r }
 
 // Result summarizes one run.
 type Result struct {
@@ -104,6 +115,13 @@ func (r *Runner) Run(ctx context.Context, s engine.Subject, period string) (Resu
 		})
 		if err != nil {
 			return res, err
+		}
+		add(&res.Report, rep)
+	}
+	if r.connections != nil {
+		rep, err := r.connections.Check(ctx, s)
+		if err != nil {
+			return res, fmt.Errorf("controls: connections: %w", err)
 		}
 		add(&res.Report, rep)
 	}

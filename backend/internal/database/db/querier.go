@@ -47,6 +47,9 @@ type Querier interface {
 	AssignUserRoleBySlug(ctx context.Context, arg AssignUserRoleBySlugParams) error
 	// Koşul ortadan kalktı: üreticinin bu varlıktaki, artık bulunmayan kodlu açık uyarıları.
 	AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDataWarningsParams) (int64, error)
+	// Bağlantı uyarısı içinde bulunulan aya yazılır. Önceki aylarda açık kalanlar
+	// ve artık bulunmayan bağlantılarınkiler kendiliğinden kapanır.
+	AutoResolveOtherConnectionWarnings(ctx context.Context, arg AutoResolveOtherConnectionWarningsParams) (int64, error)
 	// Dönemin ekstre bakiye kontrolü (#570): her hesapta ilk hareketin önceki
 	// bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
 	// Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
@@ -799,6 +802,10 @@ type Querier interface {
 	ListBulkJobsForActor(ctx context.Context, arg ListBulkJobsForActorParams) ([]BulkJob, error)
 	ListCashBoxes(ctx context.Context, taxpayerID int64) ([]CashBox, error)
 	ListChangeRequests(ctx context.Context, arg ListChangeRequestsParams) ([]ListChangeRequestsRow, error)
+	// Bağlantı sağlığı uyarıları (#669 K): INT_CONNECTION_FAILED, INT_SYNC_STALE.
+	// Üretici control:source_connection; uyarı varlığı source_connection.
+	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin bağlantısı olan (ya da açık bağlantı uyarısı kalan) mükelleflerini tarar
+	ListConnectionWarningSubjects(ctx context.Context) ([]ListConnectionWarningSubjectsRow, error)
 	ListControlInvoiceItems(ctx context.Context, arg ListControlInvoiceItemsParams) ([]ListControlInvoiceItemsRow, error)
 	// Müşavir kontrolleri (issue #31): kuralları besleyen okuma sorguları.
 	ListControlInvoices(ctx context.Context, arg ListControlInvoicesParams) ([]ListControlInvoicesRow, error)

@@ -8,8 +8,8 @@ Dokümanlarda geçen bütün uyarılar burada tek listede. Kod yazılırken uyar
 |---|---|---|
 | id | UUID | |
 | company_id | UUID | |
-| period | CHAR(7) | Uyarının ait olduğu dönem (`2026-10`); bağlantı olaylarında `NULL` |
-| entity_type | TEXT | `invoice`, `invoice_item`, `expense`, `financial_transaction`, `retail_sale`, `bank_transaction`, `entegrator_document`, `period` (dönem geneli kontroller) |
+| period | CHAR(7) | Uyarının ait olduğu dönem (`2026-10`); bağlantı uyarılarında (§3.5) uyarının görüldüğü ay |
+| entity_type | TEXT | `invoice`, `invoice_item`, `expense`, `financial_transaction`, `retail_sale`, `bank_transaction`, `entegrator_document`, `source_connection` (bağlantı sağlığı, §3.5), `period` (dönem geneli kontroller) |
 | entity_id | UUID | Dönem geneli kontrolde `NULL` |
 | code | TEXT | §3 listesindeki kod |
 | severity | TEXT | `info`, `warning`, `blocker` (§2) |
@@ -95,9 +95,18 @@ Kuralların neden istendiği ve müşavirin sözü `06`'da. Eşikler ve kelime l
 
 `21` §6.3'teki kontrol kodları: `BNK_UNINVOICED_COLLECTION`, `BNK_UNDOCUMENTED_PAYMENT`, `BNK_FEES_NOT_BOOKED`, `BNK_INTEREST`, `BNK_TAX_PAID`, `BNK_RENT_WITHHOLDING`, `BNK_SALARY_VS_PAYROLL`, `BNK_PAYMENT_METHOD_MISMATCH`, `BNK_CASH_LIMIT`, `BNK_POS_VS_SALES`, `BNK_BALANCE_MISMATCH`, `BNK_GAP`, `BNK_NON_BUSINESS`, `BNK_UNCLASSIFIED`. Anlamları ve hesaplama kuralları orada. Önerilen seviye: `BNK_GAP` ve `BNK_BALANCE_MISMATCH` `blocker`, diğerleri `warning`.
 
-## 4. Bağlantı olayları (`data_warning`'e yazılmaz)
+### 3.5 Bağlantı sağlığı (#669 K)
 
-Bağlantıya ait sorunlar `source_connection.status` ve `source_connection.last_error` (`01` §4.2) üzerinden yürür, müşavire / mükellefe bildirim gider.
+Bağlantının kendi durumu §4'teki olaylarla `source_connection` üzerinde yürür. Müşavirin işi kaçırmaması için bağlantı hata verirken ya da uzun süre veri çekmezken bu iki kod mükellefin uyarılarına ve Komuta Merkezi'ne düşer. Üretici `control:source_connection`, varlık `source_connection`, dönem uyarının görüldüğü ay (Europe/Istanbul). Ay dönünce önceki ayın açık uyarısı kendiliğinden kapanır, yerine yeni ayınki açılır. Bağlantı düzelince (başarılı çekim, `status=active`, `last_error` boş) ya da bağlantı kapatılınca (`status=disabled`) uyarı `auto_resolved` olur. Taslak ya da bankaya / mükellefe bekleyen kurulumlar (`setup_state` `draft`, `authorization_requested`, `form_ready`, `submitted_to_bank`) eski sayılmaz. Kontrol zamanlanmış işte (15 dk) ve `POST …/controls/run` ile çalışır.
+
+| Kod | Seviye | Varlık | Ne zaman | Kaynak |
+|---|---|---|---|---|
+| `INT_CONNECTION_FAILED` | `blocker` | source_connection | `status` `auth_failed` / `rate_limited` ya da `last_error` dolu (son deneme hata verdi) | §4 |
+| `INT_SYNC_STALE` | `warning` | source_connection | Kurulmuş bağlantı `stale_days` (varsayılan 3) gündür başarılı çekim yapmadı; hiç yapmadıysa kurulumdan `never_synced_days` (varsayılan 1) gün sonra | §4 |
+
+## 4. Bağlantı olayları
+
+Bağlantıya ait sorunlar `source_connection.status` ve `source_connection.last_error` (`01` §4.2) üzerinden yürür, müşavire / mükellefe bildirim gider. Bu olayların kodları `data_warning`'e yazılmaz. Bağlantının hata vermesi ya da eskimesi §3.5'teki iki kodla `data_warning`'e düşer.
 
 | Kod | Bağlantıya etkisi | Kaynak |
 |---|---|---|
