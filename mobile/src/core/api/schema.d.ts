@@ -7444,6 +7444,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link an invoice to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftInvoice"];
+        post?: never;
+        /**
+         * Unlink an invoice to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftInvoice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link a bank transaction to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftBankTransaction"];
+        post?: never;
+        /**
+         * Unlink a bank transaction to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftBankTransaction"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove": {
         parameters: {
             query?: never;
@@ -9424,6 +9508,41 @@ export interface paths {
          *     draft, `BANK_TRANSACTION_NOT_MATCHABLE` when it is cancelled.
          */
         put: operations["setTenantBankTransactionAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a duplicate movement out of the account or put it back
+         * @description Requires `tenant.bank.write` (#710). When the statement balance does
+         *     not agree, the office takes a duplicate movement out of the account
+         *     (it no longer counts in totals, matching or warnings; its matches
+         *     are dropped) or puts one it took out back. Who and when are kept;
+         *     the period's bank warnings are refreshed at once. 409
+         *     `BANK_POSTING_DRAFTED` when the movement is already in a journal
+         *     draft, `BANK_TRANSACTION_CANCELLED` when the bank cancelled it.
+         */
+        put: operations["setTenantBankTransactionExclusion"];
         post?: never;
         delete?: never;
         options?: never;
@@ -20640,10 +20759,10 @@ export interface components {
              */
             uuid: string | null;
             /**
-             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart. Rejected, reverted and superseded suggestions are not listed.
+             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart; manual: linked to a journal draft by hand (#710). Rejected, reverted and superseded suggestions are not listed.
              * @enum {string}
              */
-            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account" | "possible";
+            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account" | "possible" | "manual";
             /** Format: date */
             date: string | null;
             /** @description Decimal; matched amount for payments, debit total for journals */
@@ -20996,6 +21115,19 @@ export interface components {
             processed: number;
             /** Format: int64 */
             ignored: number;
+        };
+        JournalDraftManualLink: {
+            /** @enum {string} */
+            kind: "invoice" | "bank_transaction";
+            /** Format: uuid */
+            uuid: string;
+            linked: boolean;
+        };
+        EnvelopeJournalDraftManualLink: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalDraftManualLink"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         TaxReturnSummary: {
             /** Format: uuid */
@@ -33159,6 +33291,142 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    linkJournalDraftInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    linkJournalDraftBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     unapproveJournalDraft: {
         parameters: {
             query?: never;
@@ -36470,6 +36738,56 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    setTenantBankTransactionExclusion: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    excluded: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement's state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: uuid */
+                            uuid: string;
+                            excluded: boolean;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listEasytradeConnections: {
         parameters: {
             query?: never;
@@ -38954,6 +39272,22 @@ export interface operations {
                         data: {
                             period: string;
                             items: components["schemas"]["BankBalanceCheck"][];
+                            /** @description Movements to look at (#710): flagged as possible duplicates by the import, with a twin (same account, day, direction, amount), or taken out by the office */
+                            suspects: {
+                                /** Format: uuid */
+                                uuid: string;
+                                /** Format: uuid */
+                                cash_box_uuid: string;
+                                /** Format: date */
+                                transaction_date: string;
+                                /** @enum {string} */
+                                debit_credit: "A" | "B";
+                                amount: string;
+                                currency: string;
+                                description: string;
+                                possible_duplicate: boolean;
+                                excluded: boolean;
+                            }[];
                         };
                         meta: components["schemas"]["ResponseMeta"];
                     };
