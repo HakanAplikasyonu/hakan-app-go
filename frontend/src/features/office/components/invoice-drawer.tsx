@@ -37,6 +37,7 @@ import { createDocumentRequest } from "../services/engagement-documents.service"
 import type { InvoiceLine } from "../types";
 import { AmountWaterfall } from "./amount-waterfall";
 import { InvoiceStateBadge } from "./invoices-page";
+import { InvoicePdfButton } from "./invoice-quick-view";
 import { Figure, useWarningText } from "./office-ui";
 
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
@@ -300,6 +301,12 @@ export function InvoiceDrawer({
                   {t("office.drawer.open_invoice")}
                 </Link>
               </Button>
+              {/* Belgenin görüntüsü (#571): kayıttan üretilen PDF. */}
+              <InvoicePdfButton
+                engagement={engagement}
+                invoice={d.uuid}
+                number={d.invoice_number}
+              />
               {can(DOC_TASKS_WRITE) ? (
                 <Button
                   type="button"
