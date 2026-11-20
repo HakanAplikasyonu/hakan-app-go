@@ -74,6 +74,11 @@ func TestLowConfidenceFieldsReachQueueAndCorrectionsApply(t *testing.T) {
 	if total != 2 || rows[0].Input.Kind != Kind || rows[0].Input.Provenance.Model == "" {
 		t.Fatalf("queue = %d %+v", total, rows)
 	}
+	// The queue shows the photo next to the value (#569): each suggestion
+	// names the capture it was read from.
+	if got := rows[0].Input.Provenance.Inputs["receipt_uuid"]; got != v.UUID.String() {
+		t.Fatalf("receipt_uuid = %v, want %s", got, v.UUID)
+	}
 	var taxSug, numSug review.ListRow
 	for _, r := range rows {
 		switch r.Input.TargetField {

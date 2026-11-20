@@ -81,7 +81,7 @@ func (s *Service) Correct(ctx context.Context, sc engagementctx.Scope, captureUU
 		if err := s.reviewer.SubmitField(ctx, FieldReview{
 			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID,
 			TargetType: target, TargetID: id, Period: period, Field: it.field, Value: it.value,
-			AttachmentID: c.AttachmentID, ProposedBy: userID, Note: it.note,
+			AttachmentID: c.AttachmentID, ReceiptUUID: c.Uuid, ProposedBy: userID, Note: it.note,
 		}); err != nil {
 			return out, fmt.Errorf("receipts: submit correction %s: %w", it.field, err)
 		}
