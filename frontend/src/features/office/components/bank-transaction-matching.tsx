@@ -17,6 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -24,6 +29,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
@@ -33,6 +47,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { ACCOUNT_CODE_RE, useAccountPlanAccounts } from "../hooks/use-review";
 import { FOCUS_PARAM } from "../lib/related-href";
 import { periodLabel } from "../period/period";
+import { payrollKeys, payrollService } from "../services/payroll.service";
 import {
   bankMatchingKeys,
   bankMatchingService,
@@ -365,6 +380,13 @@ export function BankTransactionMatchingPanel({
                   <Badge variant="secondary">
                     {t(`office.bank.matching.method_${m.method}`)}
                   </Badge>
+                  <PayrollBreakdown
+                    engagement={engagement}
+                    run={m.payroll_run_uuid}
+                    paid={m.amount}
+                    currency={v.currency}
+                    href={payrollHref(m.payroll_run_uuid)}
+                  />
                 </li>
               ))}
             </ul>
@@ -1071,5 +1093,119 @@ function MatchReason({ parts }: { parts: Record<string, number> }) {
         </span>
       )}
     </p>
+  );
+}
+
+/**
+ * Bağlanan bordronun personel dökümü (#710): açılınca kişi başı net,
+ * bordro net toplamı, bu ödemenin bağlanan tutarı ve fark. Kişi adı bordro
+ * sayfasında o dönemi (personel satırlarıyla) açar.
+ */
+function PayrollBreakdown({
+  engagement,
+  run,
+  paid,
+  currency,
+  href,
+}: {
+  engagement: string;
+  run: string;
+  paid: string;
+  currency: string;
+  href: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [open, setOpen] = useState(false);
+  const q = useQuery({
+    queryKey: [...payrollKeys.all(slug, engagement), "run", run],
+    queryFn: () => payrollService.run(slug, engagement, run),
+    enabled: open,
+  });
+  const lines = q.data?.lines ?? [];
+  const net = q.data?.totals.net_total ?? "0";
+  const diff = (Number(paid) - Number(net)).toFixed(2);
+  return (
+    <Collapsible
+      className="w-full"
+      data-testid="bank-payroll-breakdown"
+      open={open}
+      onOpenChange={setOpen}
+    >
+      <CollapsibleTrigger className="text-brand-text cursor-pointer text-xs font-medium underline-offset-4 hover:underline">
+        {t("office.bank.matching.payroll_breakdown")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {q.isLoading ? (
+          <Skeleton className="mt-2 h-16 w-full" />
+        ) : q.isError ? (
+          <p className="text-danger mt-2 text-xs" role="alert">
+            {t("office.bank.matching.payroll_breakdown_error")}
+          </p>
+        ) : q.data ? (
+          <Table className="mt-2 text-xs">
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  {t("office.bank.matching.payroll_col_employee")}
+                </TableHead>
+                <TableHead className="text-end">
+                  {t("office.bank.matching.payroll_col_net")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l, i) => (
+                <TableRow key={`${l.employee_name}-${i}`}>
+                  <TableCell>
+                    <Link
+                      className="underline-offset-4 hover:underline"
+                      href={href}
+                    >
+                      {l.employee_name}
+                    </Link>
+                  </TableCell>
+                  <TableCell className="text-end">
+                    <Money value={l.net} currency={currency} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow>
+                <TableCell>
+                  {t("office.bank.matching.payroll_total_net", {
+                    count: lines.length,
+                  })}
+                </TableCell>
+                <TableCell className="text-end">
+                  <Money value={net} currency={currency} />
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>{t("office.bank.matching.payroll_paid")}</TableCell>
+                <TableCell className="text-end">
+                  <Money value={paid} currency={currency} />
+                </TableCell>
+              </TableRow>
+              <TableRow data-testid="bank-payroll-diff">
+                <TableCell>
+                  {Number(diff) === 0
+                    ? t("office.bank.matching.payroll_diff_none")
+                    : t("office.bank.matching.payroll_diff")}
+                </TableCell>
+                <TableCell className="text-end">
+                  {Number(diff) === 0 ? (
+                    "—"
+                  ) : (
+                    <Money value={diff} currency={currency} />
+                  )}
+                </TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
