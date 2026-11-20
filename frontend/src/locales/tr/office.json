@@ -2611,6 +2611,7 @@
   "transfers.check_differences": "{{count}} hesapta fark",
   "transfers.check_stale": "Aktarımdan önce karşılaştırılmış",
   "transfers.check_none": "Karşılaştırılmadı",
+  "transfers.open_reconciliation": "Mutabakatta aç",
   "tax_returns.export_pdf": "PDF özet",
   "tax_returns.export_pdf_failed": "PDF dosyası indirilemedi.",
   "tax_returns.office.col_tax_id": "VKN / TCKN",

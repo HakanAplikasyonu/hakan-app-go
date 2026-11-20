@@ -2611,6 +2611,7 @@
   "transfers.check_differences": "{{count}} accounts differ",
   "transfers.check_stale": "Compared before the transfer",
   "transfers.check_none": "Not compared",
+  "transfers.open_reconciliation": "Open reconciliation",
   "tax_returns.export_pdf": "PDF summary",
   "tax_returns.export_pdf_failed": "Could not download the PDF.",
   "tax_returns.office.col_tax_id": "Tax ID",
