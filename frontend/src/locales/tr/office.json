@@ -586,6 +586,8 @@
   "memory.missing_title": "Luca'da açılacak hesaplar",
   "memory.missing_description": "Uygulanmış ama hesap planında olmayan kodlar (çoğu yeni cari). Luca çıktısı bunlar Luca'da açılıp mizan yeniden yüklenene kadar durur.",
   "memory.missing_empty": "Planda eksik hesap yok.",
+  "memory.missing_no_plan": "Bu mükellefin hesap planı henüz yüklenmedi; eksik hesap kontrolü yapılamıyor. Önce yukarıdan hesap planını (mizanı) yükleyin.",
+  "memory.scope_note": "Aşağıdaki kurallar, hafıza ve hesap planı yalnızca bu mükellefe aittir; burada yaptığınız değişiklik başka mükellefi etkilemez. \"Ofis şablonu\" kökenli kurallar, mükellef eklenirken ofis şablonundan kopyalanan başlangıç kurallarıdır; kopya da bu mükellefe aittir.",
   "memory.missing_download": "Eksik hesap şablonunu indir",
   "memory.col_account_name": "Hesap adı",
   "memory.col_uses": "Kullanım",

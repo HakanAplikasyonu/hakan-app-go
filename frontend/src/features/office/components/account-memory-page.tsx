@@ -190,6 +190,10 @@ function MissingPanel({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const missing = useMissingPlanAccounts(slug, engagement);
+  // Plan hiç yüklenmemişse "eksik yok" denmez (#572): kontrol yapılamadı.
+  const imports = useAccountPlanImports(slug, engagement);
+  const planMissing =
+    imports.isSuccess && (imports.data?.items ?? []).length === 0;
   const { downloadTemplate } = useAccountMemoryActions(slug, engagement);
   const items = missing.data?.items ?? [];
   const missingColumns = useMemo<ColumnDef<MissingPlanAccount, unknown>[]>(
@@ -220,11 +224,16 @@ function MissingPanel({ engagement }: { engagement: string }) {
       title={t("office.memory.missing_title")}
       description={t("office.memory.missing_description")}
     >
-      {missing.isLoading ? (
+      {missing.isLoading || imports.isLoading ? (
         <Skeleton className="m-4 h-16" />
       ) : items.length === 0 ? (
-        <p className="text-muted-foreground p-4 text-sm">
-          {t("office.memory.missing_empty")}
+        <p
+          className="text-muted-foreground p-4 text-sm"
+          data-testid="missing-accounts-empty"
+        >
+          {planMissing
+            ? t("office.memory.missing_no_plan")
+            : t("office.memory.missing_empty")}
         </p>
       ) : (
         <div className="space-y-3 p-4">
@@ -614,6 +623,17 @@ function AccountMemoryInner() {
         selected={selected}
         onSelect={select}
       />
+      {/* Kimin hafızası (#572): kurallar ve plan yalnız seçili mükellefin. */}
+      {selected ? (
+        <p
+          className="bg-muted/40 text-muted-foreground rounded-lg border px-3 py-2 text-sm"
+          data-testid="memory-scope"
+        >
+          <span className="text-foreground font-medium">{selected.title}</span>
+          {" · "}
+          {t("office.memory.scope_note")}
+        </p>
+      ) : null}
       {/* OfisMizan sırası: kurallar, hafıza (adaylar ve otomatik kodlananlar), hesap planı. */}
       <RulesPanel engagement={engagement} />
       <CandidatesPanel engagement={engagement} />
