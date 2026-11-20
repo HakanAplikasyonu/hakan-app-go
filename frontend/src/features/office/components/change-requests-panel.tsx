@@ -46,7 +46,14 @@ export function ChangeRequestsPanel({
   const { can } = usePermission();
   const canRead = can(Permission.TenantPeriodsRead);
   const canDecide = can(Permission.TenantChangeRequestsDecide);
-  const [expanded, setExpanded] = useState(false);
+  // Komuta Merkezi / Mükellefler'den "?talepler=ac" ile gelinince liste açık
+  // gelir (#710). Panel sayım gelmeden çizilmediği için sunucu çiziminde
+  // fark oluşmaz.
+  const [expanded, setExpanded] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("talepler") === "ac",
+  );
   const cr = useChangeRequests(engagement, canRead && open > 0 && expanded);
 
   if (!canRead || open === 0) return null;

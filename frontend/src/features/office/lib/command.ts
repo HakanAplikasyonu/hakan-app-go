@@ -11,6 +11,8 @@
  * beyan kaydı dönem kaydına bağlanınca eklenir).
  */
 
+import { routes } from "@/config/routes";
+
 import { currentPeriod } from "../period/period";
 import type {
   PeriodMatrixCell,
@@ -36,12 +38,16 @@ export function statusOf(
 }
 
 /**
- * Hücreye tıklayınca açılacak ekran (#567): problemden çözüm ekranına.
+ * Hücreye tıklayınca açılacak ekran (#567, #710): problemden çözüm ekranına.
  * Engelleyici uyarı varsa o uyarılar; açık değişiklik talebi mükellef
- * özetinde çözülür; yalnız engellemeyen uyarı varsa uyarı listesi; iş yoksa
- * mükellef özeti.
+ * ekranında talep listesi açık gelir; yalnız engellemeyen uyarı varsa uyarı
+ * listesi; iş yoksa mükellef özeti.
  */
-export type CellTarget = "blockers" | "warnings" | "overview";
+export type CellTarget =
+  "blockers" | "warnings" | "change_requests" | "overview";
+
+/** Mükellef ekranında talep listesini açık getiren sorgu (#710). */
+export const OPEN_CHANGE_REQUESTS = "talepler=ac";
 
 export function cellTarget(
   cell: Pick<
@@ -50,9 +56,27 @@ export function cellTarget(
   >,
 ): CellTarget {
   if (cell.open_blockers > 0) return "blockers";
-  if (cell.open_change_requests > 0) return "overview";
+  if (cell.open_change_requests > 0) return "change_requests";
   if (cell.open_warnings > 0) return "warnings";
   return "overview";
+}
+
+/** Hedef ekranın adresi (Komuta Merkezi ve Mükellefler aynı kural, #710). */
+export function cellHref(
+  slug: string,
+  engagement: string,
+  target: CellTarget,
+): string {
+  switch (target) {
+    case "blockers":
+      return routes.tenant.engagementBlockers(slug, engagement);
+    case "warnings":
+      return routes.tenant.engagementWarnings(slug, engagement);
+    case "change_requests":
+      return `${routes.tenant.engagement(slug, engagement)}?${OPEN_CHANGE_REQUESTS}`;
+    default:
+      return routes.tenant.engagement(slug, engagement);
+  }
 }
 
 const rank: Record<CellStatus, number> = {

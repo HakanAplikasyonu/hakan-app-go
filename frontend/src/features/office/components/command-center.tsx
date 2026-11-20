@@ -27,6 +27,7 @@ import { useOfficePeriod } from "../period";
 import {
   cellAt,
   cellStatuses,
+  cellHref,
   cellTarget,
   defaultFilter,
   filterRows,
@@ -141,6 +142,7 @@ function useMatrixColumns(
     () => ({
       blockers: t("office.command.goes_blockers"),
       warnings: t("office.command.goes_warnings"),
+      change_requests: t("office.command.goes_change_requests"),
       overview: t("office.command.goes_overview"),
     }),
     [t],
@@ -213,13 +215,7 @@ function useMatrixColumns(
             const cell = cellAt(row.original, p);
             if (!cell) return null;
             const target = cellTarget(cell);
-            const id = row.original.engagement_uuid;
-            const href =
-              target === "blockers"
-                ? routes.tenant.engagementBlockers(slug, id)
-                : target === "warnings"
-                  ? routes.tenant.engagementWarnings(slug, id)
-                  : routes.tenant.engagement(slug, id);
+            const href = cellHref(slug, row.original.engagement_uuid, target);
             return (
               <Link
                 href={href}

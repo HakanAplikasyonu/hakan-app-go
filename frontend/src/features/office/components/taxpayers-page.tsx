@@ -31,6 +31,8 @@ import {
 } from "../hooks/use-office-data";
 import type { EngagementAssignment } from "../services/engagements.service";
 import type { PeriodMatrixRow } from "../services/periods.service";
+import { cellHref, cellTarget } from "../lib/command";
+import { useOfficePeriod } from "../period";
 import { CellBadge } from "./command-center";
 import { Figure } from "./office-ui";
 
@@ -139,6 +141,8 @@ type TaxpayerRow = PeriodMatrixRow;
 
 function useTaxpayerColumns(members: Member[], canWrite: boolean) {
   const { slug } = useTenant();
+  const { t } = useLocale();
+  const { setPeriod } = useOfficePeriod();
   // Atananlar tek istekte gelir; satır başına istek yok (#639).
   const assignments = useOrgAssignments();
   const byEngagement = assignments.data;
@@ -183,9 +187,25 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
         labelKey: "office.col_current_period",
         enableSorting: false,
         // Beyan dönemi: bir önceki ay.
+        // Rozet o dönemin işine götürür (#710): Komuta Merkezi'yle aynı kural.
         cell: ({ row }) => {
           const cell = row.original.cells[0];
-          return cell ? <CellBadge cell={cell} /> : null;
+          if (!cell) return null;
+          const target = cellTarget(cell);
+          return (
+            <Link
+              href={cellHref(slug, row.original.engagement_uuid, target)}
+              data-target={target}
+              onClick={() => setPeriod(cell.period)}
+              className="focus-visible:ring-ring inline-block rounded-md transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span className="sr-only">{`${row.original.taxpayer_title}: `}</span>
+              <CellBadge
+                cell={cell}
+                hint={t(`office.command.goes_${target}`)}
+              />
+            </Link>
+          );
         },
       }),
       createColumn<TaxpayerRow>({
@@ -204,7 +224,7 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
         ),
       }),
     ],
-    [canWrite, members, slug, byEngagement, assignmentsLoading],
+    [canWrite, members, slug, byEngagement, assignmentsLoading, t, setPeriod],
   );
 }
 

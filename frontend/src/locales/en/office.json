@@ -277,6 +277,7 @@
   "command.matrix_description": "Furthest behind first. Status and warning filters apply to the selected period; click a column header to change it. Click a cell to open that period's work: blocking warnings if any, otherwise the open warnings or the taxpayer overview.",
   "command.goes_blockers": "Click to open the blocking warnings",
   "command.goes_warnings": "Click to open the open warnings",
+  "command.goes_change_requests": "Click to open the change requests",
   "command.goes_overview": "Click to open the taxpayer overview",
   "command.computed": "{{cells}} cells",
   "command.no_rows": "No taxpayer matches the filters.",
