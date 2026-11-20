@@ -97,7 +97,7 @@ func (q *Queries) GetExportSettings(ctx context.Context, arg GetExportSettingsPa
 }
 
 const getJournalDraft = `-- name: GetJournalDraft :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at FROM journal_drafts
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason FROM journal_drafts
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 `
 
@@ -129,6 +129,9 @@ func (q *Queries) GetJournalDraft(ctx context.Context, arg GetJournalDraftParams
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApprovalRevertedBy,
+		&i.ApprovalRevertedAt,
+		&i.ApprovalRevertReason,
 	)
 	return i, err
 }
@@ -211,7 +214,7 @@ func (q *Queries) InsertExportBatchItem(ctx context.Context, arg InsertExportBat
 const insertJournalDraft = `-- name: InsertJournalDraft :one
 INSERT INTO journal_drafts (organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, origin, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason
 `
 
 type InsertJournalDraftParams struct {
@@ -262,6 +265,9 @@ func (q *Queries) InsertJournalDraft(ctx context.Context, arg InsertJournalDraft
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApprovalRevertedBy,
+		&i.ApprovalRevertedAt,
+		&i.ApprovalRevertReason,
 	)
 	return i, err
 }
@@ -548,7 +554,7 @@ func (q *Queries) ListExportBatchItems(ctx context.Context, arg ListExportBatchI
 }
 
 const listExportableJournalDrafts = `-- name: ListExportableJournalDrafts :many
-SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at FROM journal_drafts d
+SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason FROM journal_drafts d
 WHERE d.organization_id = $1 AND d.engagement_id = $2
   AND d.status = 'approved'
   AND ($3::text IS NULL OR d.period = $3)
@@ -590,6 +596,9 @@ func (q *Queries) ListExportableJournalDrafts(ctx context.Context, arg ListExpor
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ApprovalRevertedBy,
+			&i.ApprovalRevertedAt,
+			&i.ApprovalRevertReason,
 		); err != nil {
 			return nil, err
 		}
@@ -653,7 +662,7 @@ func (q *Queries) ListJournalDraftLines(ctx context.Context, arg ListJournalDraf
 }
 
 const listJournalDraftsByUUID = `-- name: ListJournalDraftsByUUID :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at FROM journal_drafts
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason FROM journal_drafts
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = ANY($3::uuid[])
 ORDER BY period, entry_date, entry_no
 `
@@ -692,6 +701,9 @@ func (q *Queries) ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDr
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ApprovalRevertedBy,
+			&i.ApprovalRevertedAt,
+			&i.ApprovalRevertReason,
 		); err != nil {
 			return nil, err
 		}
@@ -769,6 +781,37 @@ func (q *Queries) ReverseExportBatchItem(ctx context.Context, arg ReverseExportB
 		arg.ReversedBy,
 		arg.Reason,
 		arg.JournalDraftID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const revertJournalDraftApproval = `-- name: RevertJournalDraftApproval :execrows
+UPDATE journal_drafts
+SET status = 'draft', approved_by = NULL, approved_at = NULL,
+    approval_reverted_by = $1, approval_reverted_at = NOW(), approval_revert_reason = $2
+WHERE organization_id = $3 AND engagement_id = $4 AND id = $5 AND status = 'approved'
+`
+
+type RevertJournalDraftApprovalParams struct {
+	RevertedBy     pgtype.Int8 `json:"reverted_by"`
+	Reason         pgtype.Text `json:"reason"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	ID             int64       `json:"id"`
+}
+
+// Onayı geri al (#566): yalnız onaylı (aktarılmamış) fiş taslağa döner;
+// kim, ne zaman, neden fişte kalır.
+func (q *Queries) RevertJournalDraftApproval(ctx context.Context, arg RevertJournalDraftApprovalParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revertJournalDraftApproval,
+		arg.RevertedBy,
+		arg.Reason,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.ID,
 	)
 	if err != nil {
 		return 0, err

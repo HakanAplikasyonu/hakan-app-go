@@ -7134,6 +7134,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take back the approval of an entry that is not exported yet
+         * @description Requires `tenant.journals.approve` (#566). An approved entry that has
+         *     not been exported becomes a draft again: its lines can be corrected
+         *     and it must be approved again. Who, when and why stay on the entry
+         *     (`approval_reverted`). 409 `ALREADY_EXPORTED` for an exported entry
+         *     (reverse the export first), 409 `NOT_APPROVED` for a draft, 422
+         *     `JOURNAL_BLOCKED` (`period_locked`) for an entry of a locked period.
+         */
+        post: operations["unapproveJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-exports": {
         parameters: {
             query?: never;
@@ -17769,6 +17803,12 @@ export interface components {
              */
             issues?: components["schemas"]["JournalDraftIssue"][];
             export?: components["schemas"]["JournalDraftExport"];
+            /** @description The last time the entry's approval was taken back and why (#566); absent when it never was. */
+            approval_reverted?: {
+                /** Format: date-time */
+                at: string;
+                reason: string;
+            };
         };
         /**
          * @description Where an exported draft went (#574): its live export and the latest
@@ -31768,6 +31808,56 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unapproveJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Draft (a draft again) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `JOURNAL_BLOCKED`: the entry's period is locked */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

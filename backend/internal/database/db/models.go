@@ -1226,24 +1226,27 @@ type InvoiceTaxSummary struct {
 }
 
 type JournalDraft struct {
-	ID             int64              `json:"id"`
-	Uuid           uuid.UUID          `json:"uuid"`
-	OrganizationID int64              `json:"organization_id"`
-	EngagementID   int64              `json:"engagement_id"`
-	TaxpayerID     int64              `json:"taxpayer_id"`
-	Period         string             `json:"period"`
-	EntryNo        int32              `json:"entry_no"`
-	EntryType      string             `json:"entry_type"`
-	EntryDate      pgtype.Date        `json:"entry_date"`
-	Description    string             `json:"description"`
-	DocumentType   pgtype.Text        `json:"document_type"`
-	Status         string             `json:"status"`
-	Origin         []byte             `json:"origin"`
-	ApprovedBy     pgtype.Int8        `json:"approved_by"`
-	ApprovedAt     pgtype.Timestamptz `json:"approved_at"`
-	CreatedBy      pgtype.Int8        `json:"created_by"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	ID                   int64              `json:"id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	OrganizationID       int64              `json:"organization_id"`
+	EngagementID         int64              `json:"engagement_id"`
+	TaxpayerID           int64              `json:"taxpayer_id"`
+	Period               string             `json:"period"`
+	EntryNo              int32              `json:"entry_no"`
+	EntryType            string             `json:"entry_type"`
+	EntryDate            pgtype.Date        `json:"entry_date"`
+	Description          string             `json:"description"`
+	DocumentType         pgtype.Text        `json:"document_type"`
+	Status               string             `json:"status"`
+	Origin               []byte             `json:"origin"`
+	ApprovedBy           pgtype.Int8        `json:"approved_by"`
+	ApprovedAt           pgtype.Timestamptz `json:"approved_at"`
+	CreatedBy            pgtype.Int8        `json:"created_by"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	ApprovalRevertedBy   pgtype.Int8        `json:"approval_reverted_by"`
+	ApprovalRevertedAt   pgtype.Timestamptz `json:"approval_reverted_at"`
+	ApprovalRevertReason pgtype.Text        `json:"approval_revert_reason"`
 }
 
 type JournalDraftLine struct {

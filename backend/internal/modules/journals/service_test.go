@@ -208,6 +208,52 @@ func TestSecondExportRejectedUntilReversed(t *testing.T) {
 	}
 }
 
+// TestUnapprove is the #566 "onaylanmış fişi gerekçesiyle geri alma": only
+// an approved, not yet exported entry goes back to draft; the reason is
+// required and stays on the entry; an exported entry must be reversed first.
+func TestUnapprove(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	d := e.draft(t, oct, debit("770", "10"), credit("320", "10"))
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, d.UUID, "yanlış fiş"); !errors.Is(err, ErrNotApproved) {
+		t.Fatalf("unapprove a draft: %v", err)
+	}
+	e.approve(t, d)
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, d.UUID, "   "); !errors.Is(err, ErrReasonRequired) {
+		t.Fatalf("unapprove without reason: %v", err)
+	}
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, uuid.New(), "x"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unapprove unknown: %v", err)
+	}
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, d.UUID, " Hesap kodu yanlış, düzeltilecek "); err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.svc.GetDraft(ctx, e.scope, d.UUID)
+	if err != nil || got.Status != "draft" || got.ApprovedAt != nil || got.ApprovalReverted == nil ||
+		got.ApprovalReverted.Reason != "Hesap kodu yanlış, düzeltilecek" {
+		t.Fatalf("after unapprove: %+v %+v %v", got.Draft, got.ApprovalReverted, err)
+	}
+	// A draft again: it is not exportable until it is approved again.
+	in := ExportInput{Driver: "journal_test", Drafts: []uuid.UUID{d.UUID}}
+	if _, err := e.svc.Export(ctx, e.scope, e.actor, in); !errors.Is(err, ErrNotApproved) {
+		t.Fatalf("export of an unapproved entry: %v", err)
+	}
+	e.approve(t, d)
+	if _, err := e.svc.Export(ctx, e.scope, e.actor, in); err != nil {
+		t.Fatal(err)
+	}
+	// Exported: the approval cannot be taken back; reverse the export first.
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, d.UUID, "geç kalındı"); !errors.Is(err, ErrAlreadyExported) {
+		t.Fatalf("unapprove an exported entry: %v", err)
+	}
+	if err := e.svc.Reverse(ctx, e.scope, e.actor, d.UUID, "aktarım geri alındı"); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.Unapprove(ctx, e.scope, e.actor, d.UUID, "aktarım geri alındıktan sonra düzeltme"); err != nil {
+		t.Fatalf("unapprove after reverse: %v", err)
+	}
+}
+
 func TestApproveRefusesUnbalanced(t *testing.T) {
 	e := setup(t)
 	d := e.draft(t, oct, debit("770", "10"), credit("320", "9.99"))

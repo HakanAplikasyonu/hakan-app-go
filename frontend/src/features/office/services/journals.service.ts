@@ -135,6 +135,15 @@ export const journalService = {
       { body: { account } },
     );
   },
+  /** Onaylı, henüz aktarılmamış fişin onayını gerekçeyle geri alır (#566). */
+  unapprove(slug: string, engagement: string, draft: string, reason: string) {
+    return tenantRequest<JournalDraftDetail>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/unapprove`,
+      { body: { reason } },
+    );
+  },
   reverse(slug: string, engagement: string, draft: string, reason: string) {
     return tenantRequest<JournalDraftDetail>(
       slug,

@@ -189,6 +189,7 @@ var tenantWrites = map[string]sweepCase{
 	"PATCH /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/lines/{lineNo}":              {body: `{"account":"770.01"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve":                      {},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/reverse":                      {body: `{"reason":"tarama"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove":                    {body: `{"reason":"tarama"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-exports":                                         {body: `{"driver":"luca","period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-exports/check":                                   {body: `{"driver":"luca","period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-exports/{batchUuid}/transfers":                   {},

@@ -48,6 +48,14 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 UPDATE journal_drafts SET status = 'approved', approved_by = @approved_by, approved_at = NOW()
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id AND status = 'draft';
 
+-- name: RevertJournalDraftApproval :execrows
+-- Onayı geri al (#566): yalnız onaylı (aktarılmamış) fiş taslağa döner;
+-- kim, ne zaman, neden fişte kalır.
+UPDATE journal_drafts
+SET status = 'draft', approved_by = NULL, approved_at = NULL,
+    approval_reverted_by = @reverted_by, approval_reverted_at = NOW(), approval_revert_reason = @reason
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id AND status = 'approved';
+
 -- name: ListExportableJournalDrafts :many
 -- Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 SELECT d.* FROM journal_drafts d
