@@ -53,9 +53,11 @@ test.describe("aktarım hata listesi (#710)", () => {
     );
     expect(approved.status(), await approved.text()).toBeLessThan(300);
     const batch = await api.json<{ uuid: string }>(
+      // Dönem çıktısı: aktarım listede "Luca · 2026-10" adıyla görünür
+      // (yalnız fiş seçilerek alınan çıktının dönemi yoktur).
       await api.post(`${base()}/journal-exports`, {
         driver: "luca",
-        drafts: [draft.uuid],
+        period: PERIOD,
       }),
     );
     const transfer = await api.json<Transfer>(
