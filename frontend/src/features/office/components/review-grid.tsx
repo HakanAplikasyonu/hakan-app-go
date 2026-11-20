@@ -1,5 +1,6 @@
 "use client";
 
+import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
@@ -11,7 +12,9 @@ import {
   type EditableGridColumn,
   type GridRowSaveInput,
 } from "@/components/tables";
+import { permissions } from "@/config/permissions";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
@@ -44,6 +47,9 @@ const ACCOUNT_KIND = "account_code";
  */
 export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
   const { t } = useLocale();
+  const { can } = usePermission();
+  // Karar yetkisi yoksa (stajyer, #569) tablo salt okunur, nedeni yazılır.
+  const canDecide = can(permissions.tenant.review.decide);
   const directory = useEngagementDirectory();
   const { period } = useOfficePeriod();
   // Mükellef detayının İnceleme sekmesinde mükellef sabit (#468).
@@ -183,7 +189,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         id: "code",
         header: t("office.review_grid.col_code"),
         value: (s) => accountValue(s.proposed_value).code ?? null,
-        editor: "text",
+        editor: canDecide ? "text" : undefined,
         required: true,
         width: 150,
         suggestions: planAccounts.filter((a) => a.is_leaf).map((a) => a.code),
@@ -202,6 +208,13 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
                   {name}
                 </span>
               ) : null}
+              {/* Kodu düzelt (#569): hücre düzenlenebilir olduğunu gösterir. */}
+              {canDecide ? (
+                <Pencil
+                  className="text-muted-foreground ms-1.5 inline size-3"
+                  aria-hidden
+                />
+              ) : null}
             </span>
           );
         },
@@ -210,7 +223,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         id: "decision",
         header: t("office.review_grid.col_decision"),
         value: () => null,
-        editor: "select",
+        editor: canDecide ? "select" : undefined,
         width: 120,
         options: [
           { value: "accept", label: t("office.review_grid.decision_accept") },
@@ -219,7 +232,7 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         placeholder: t("office.review_grid.decision_auto"),
       },
     ],
-    [t, directory.entries, planAccounts, planNames, invoiceHref],
+    [t, directory.entries, planAccounts, planNames, invoiceHref, canDecide],
   );
 
   const onSaveRow = useCallback(
@@ -272,9 +285,19 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
         </span>
         {viewSwitch}
       </header>
-      <p className="text-muted-foreground max-w-3xl text-sm">
-        {t("office.review_grid.hint")}
-      </p>
+      {canDecide ? (
+        <p className="text-muted-foreground max-w-3xl text-sm">
+          {t("office.review_grid.hint")}
+        </p>
+      ) : (
+        <p
+          role="note"
+          className="bg-surface-2 text-text-2 max-w-3xl rounded-md border px-4 py-3 text-sm"
+          data-testid="review-no-decide"
+        >
+          {t("office.review.no_decide_permission")}
+        </p>
+      )}
       {query.isError ? (
         <ErrorState
           title={t("office.review_api.load_error")}
