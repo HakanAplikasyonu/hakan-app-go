@@ -275,6 +275,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/account-plan/luca-files":           azTenantReadAction,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances":        azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}":                    azTenantRead,
+	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}/export":             azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-rule-candidates":                                       azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rule-candidates/promote":                              azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/account-rules":                                                 azTenantRead,

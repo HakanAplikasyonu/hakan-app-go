@@ -14464,6 +14464,44 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}/export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - name: trialBalance
+        in: path
+        required: true
+        description: "`latest` or a trial balance import uuid"
+        schema: { type: string, examples: [latest] }
+    get:
+      tags: [AccountPlan]
+      operationId: exportEngagementTrialBalance
+      summary: Download a trial balance (mizan) as Excel or PDF (#669)
+      description: |
+        Requires `tenant.account_plan.read`. The same report as GET .../trial-balances/{trialBalance}
+        (same `compare` and `level`), as a file: hesap kodu, adı, borç, alacak, borç / alacak bakiyesi
+        and, with a comparison, önceki bakiye and değişim. 404 when there is no trial balance with amounts.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: format, in: query, required: true, schema: { type: string, enum: [xlsx, pdf] } }
+        - { name: compare, in: query, schema: { type: string, default: previous, examples: [previous, none] } }
+        - { name: level, in: query, schema: { type: integer, minimum: 0, maximum: 10 } }
+        - { name: locale, in: query, schema: { type: string, enum: [tr, en], default: tr } }
+      responses:
+        "200":
+          description: The file (Content-Disposition attachment)
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/accounts:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

@@ -10883,6 +10883,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances/{trialBalance}/export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a trial balance import uuid */
+                trialBalance: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download a trial balance (mizan) as Excel or PDF (#669)
+         * @description Requires `tenant.account_plan.read`. The same report as GET .../trial-balances/{trialBalance}
+         *     (same `compare` and `level`), as a file: hesap kodu, adı, borç, alacak, borç / alacak bakiyesi
+         *     and, with a comparison, önceki bakiye and değişim. 404 when there is no trial balance with amounts.
+         */
+        get: operations["exportEngagementTrialBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/account-plan/accounts": {
         parameters: {
             query?: never;
@@ -38168,6 +38200,47 @@ export interface operations {
                         data: components["schemas"]["TrialBalanceReport"];
                         meta: components["schemas"]["ResponseMeta"];
                     };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    exportEngagementTrialBalance: {
+        parameters: {
+            query: {
+                format: "xlsx" | "pdf";
+                compare?: string;
+                level?: number;
+                locale?: "tr" | "en";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description `latest` or a trial balance import uuid */
+                trialBalance: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file (Content-Disposition attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
                 };
             };
             400: components["responses"]["BadRequest"];
