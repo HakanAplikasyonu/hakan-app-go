@@ -620,4 +620,9 @@ var authzTable = map[string]authzClass{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    azTenantWrite,
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": azTenantWrite,
+
+	// Fişe elle bağlanan cari kartı ve adayları (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/link-candidates/customers":                                    azTenantRead,
 }

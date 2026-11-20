@@ -41,6 +41,7 @@ var kindPermission = map[string]string{
 	"payroll_run":           rbac.PermTenantPayrollRead,
 	"financial_transaction": rbac.PermTenantInvoicesRead,
 	"account":               rbac.PermTenantBankRead,
+	"customer":              rbac.PermTenantInvoicesRead,
 }
 
 // IsSourceKind reports whether kind can be asked for.
