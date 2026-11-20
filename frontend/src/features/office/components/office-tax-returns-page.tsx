@@ -50,12 +50,24 @@ function returnOf(cell: PeriodMatrixCell | undefined, kind: Kind) {
   return cell?.returns.find((r) => r.kind === kind);
 }
 
+/**
+ * Mükelleften bir şey bekleniyor: istenen ya da gelip işlenmeyen belge,
+ * yüklenmemiş banka ekstresi (#568).
+ */
+function waitsForDocuments(c: PeriodMatrixCell) {
+  return !!(
+    c.open_document_tasks ||
+    c.submitted_documents ||
+    c.missing_bank_statements.length
+  );
+}
+
 /** Verilmemiş beyanı, belge bekleyeni ve engeli olanı öne alır. */
 function urgency(cell: PeriodMatrixCell | undefined) {
   let n = 0;
   for (const k of KINDS) if (returnOf(cell, k)?.status !== "filed") n += 4;
   if (cell?.open_blockers) n += 2;
-  if (cell?.open_document_tasks || cell?.submitted_documents) n += 1;
+  if (cell && waitsForDocuments(cell)) n += 1;
   return n;
 }
 
@@ -192,7 +204,7 @@ export function OfficeTaxReturnsPage() {
             case "open":
               return KINDS.some((k) => returnOf(c, k)?.status !== "filed");
             case "documents":
-              return !!(c?.open_document_tasks || c?.submitted_documents);
+              return !!c && waitsForDocuments(c);
             case "blocked":
               return !!c?.open_blockers;
             default:
@@ -213,8 +225,7 @@ export function OfficeTaxReturnsPage() {
       if (k === "filed") out.filed++;
       else if (k === "prepared") out.prepared++;
       else out.open++;
-      if (r.cell?.open_document_tasks || r.cell?.submitted_documents)
-        out.documents++;
+      if (r.cell && waitsForDocuments(r.cell)) out.documents++;
     }
     return out;
   }, [all]);
@@ -269,10 +280,15 @@ export function OfficeTaxReturnsPage() {
         enableSorting: false,
         cell: ({ row }) => {
           const c = row.original.cell;
-          if (!c?.open_document_tasks && !c?.submitted_documents)
+          if (!c || !waitsForDocuments(c))
             return <span className="text-muted-foreground text-xs">—</span>;
           return (
             <span className="flex flex-col text-xs">
+              {c.missing_bank_statements.map((name) => (
+                <span key={name} className="text-status-warning">
+                  {t("office.tax_returns.office.statement_missing", { name })}
+                </span>
+              ))}
               {c.open_document_tasks ? (
                 <span className="text-status-warning">
                   {t("office.tax_returns.office.documents_open", {

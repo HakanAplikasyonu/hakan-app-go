@@ -1010,8 +1010,26 @@ func (m *clientModel) buildBank(w *bigWorld, cps []demo.Counterparty, tax taxDue
 		}
 	}
 	_ = first
+	// Eksik ekstre (#568): bazı sorunlu mükelleflerin beyan ayının banka
+	// ekstresi henüz gelmedi; o ayın hareketleri yüklenmemiş. Dönem
+	// tablosu bu hesabı "ekstre eksik" diye gösterir; sonraki ayın açılış
+	// bakiyesi son yüklenen kapanışla tutmaz (gerçekteki gibi).
+	if m.MissingStatement() {
+		decl := w.periods[len(w.periods)-2]
+		kept := out[:0]
+		for _, t := range out {
+			if t.period != decl {
+				kept = append(kept, t)
+			}
+		}
+		out = kept
+	}
 	m.bank = out
 }
+
+// MissingStatement: the client's bank statement of the declaration month
+// has not arrived (#568).
+func (m *clientModel) MissingStatement() bool { return m.c.Problem && m.c.Index%2 == 0 }
 
 func nextMonday(t time.Time) time.Time {
 	d := (8 - int(t.Weekday())) % 7

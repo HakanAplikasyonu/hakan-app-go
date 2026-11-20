@@ -2127,5 +2127,6 @@
   "tax_returns.office.due_today": "bugün son gün",
   "tax_returns.office.due_passed": "{{count}} gün geçti",
   "tax_returns.office.due_rolled": "(hafta sonu nedeniyle Pazartesi'ye kaydı)",
-  "tax_returns.office.late": "Gecikti"
+  "tax_returns.office.late": "Gecikti",
+  "tax_returns.office.statement_missing": "Banka ekstresi eksik: {{name}}"
 }

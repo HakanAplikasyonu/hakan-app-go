@@ -341,6 +341,7 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	out := usecase.MatrixCounts{
 		Blockers: map[usecase.MatrixKey]int64{}, Warnings: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
 		Returns: map[usecase.MatrixKey][]usecase.CellReturn{}, DocTasks: map[usecase.MatrixKey][2]int64{},
+		MissingStatements: map[usecase.MatrixKey][]string{},
 	}
 	bl, err := p.q.PeriodMatrixBlockers(ctx, db.PeriodMatrixBlockersParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {
@@ -390,6 +391,14 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	}
 	for _, r := range docs {
 		out.DocTasks[usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}] = [2]int64{r.Open, r.Submitted}
+	}
+	missing, err := p.q.PeriodMatrixMissingStatements(ctx, db.PeriodMatrixMissingStatementsParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
+	if err != nil {
+		return out, fmt.Errorf("matrix missing statements: %w", err)
+	}
+	for _, r := range missing {
+		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
+		out.MissingStatements[k] = append(out.MissingStatements[k], r.Name)
 	}
 	return out, nil
 }

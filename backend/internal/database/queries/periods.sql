@@ -125,6 +125,25 @@ WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids
   AND status IN ('open', 'submitted') AND period = ANY(@periods::text[])
 GROUP BY engagement_id, period;
 
+-- name: PeriodMatrixMissingStatements :many
+-- Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
+-- önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
+-- düşer; açık ay (bugünün ayı) sayılmaz.
+SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name
+FROM engagements e
+JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account'
+CROSS JOIN unnest(@periods::text[]) AS p(period)
+WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigint[])
+  AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_transactions t
+    WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period = p.period)
+  AND EXISTS (
+    SELECT 1 FROM bank_transactions t
+    WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period < p.period
+      AND t.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+ORDER BY e.id, p.period, b.name;
+
 -- name: FindOpenChangeRequestByHash :one
 -- Aynı içerik ikinci kez gelirse açık talep tekrar kullanılır.
 SELECT * FROM change_requests

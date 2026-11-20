@@ -23859,7 +23859,7 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements]
       properties:
         period: { $ref: "#/components/schemas/Period" }
         ready: { type: boolean }
@@ -23874,6 +23874,10 @@ components:
           items: { $ref: "#/components/schemas/PeriodMatrixReturn" }
         open_document_tasks: { type: integer, format: int64, description: Documents still expected from the taxpayer }
         submitted_documents: { type: integer, format: int64, description: Documents the taxpayer sent that are not processed yet }
+        missing_bank_statements:
+          type: array
+          description: Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, #568)
+          items: { type: string }
 
     PeriodMatrixReturn:
       type: object
