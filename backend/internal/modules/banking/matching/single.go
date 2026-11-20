@@ -55,6 +55,10 @@ type TransactionView struct {
 	Matchable           bool             `json:"matchable"`
 	Matches             []MatchedInvoice `json:"matches"`
 	Candidates          []CandidateView  `json:"candidates"`
+	// LineMatchable: the movement can be tied to an existing journal line
+	// (any movement that is not cancelled, #669 G).
+	LineMatchable  bool                 `json:"line_matchable"`
+	JournalMatches []MatchedJournalLine `json:"journal_matches"`
 	// Posting is the trial-balance account the movement is booked to (or
 	// proposed for), nil when there is none yet (#565).
 	Posting *PostingView `json:"posting"`
@@ -187,6 +191,7 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 		Counterparty: textPtr(t.CounterpartyName), IBAN: textPtr(t.CounterpartyIban),
 		KindDetail: t.KindDetail, Period: t.Period, MatchStatus: t.MatchStatus, Matchable: matchable(t),
 		Matches: []MatchedInvoice{}, Candidates: []CandidateView{},
+		LineMatchable: lineMatchable(t), JournalMatches: []MatchedJournalLine{},
 	}
 	if v.Counterparty == nil || strings.TrimSpace(*v.Counterparty) == "" {
 		if name := CounterpartyFromDescription(t.Description); name != "" {
@@ -206,6 +211,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	}
 	matches, err := q.ListBankTransactionMatchInvoices(ctx, db.ListBankTransactionMatchInvoicesParams{TaxpayerID: sub.TaxpayerID, BankTransactionID: t.ID})
 	if err != nil {
+		return v, err
+	}
+	if v.JournalMatches, err = s.journalMatches(ctx, q, sub, t); err != nil {
 		return v, err
 	}
 	matched := map[uuid.UUID]bool{}
@@ -285,44 +293,35 @@ func (s *Service) Search(ctx context.Context, sub Subject, id uuid.UUID, term st
 	return out, nil
 }
 
-// Match replaces the movement's matches with the chosen invoices (the
-// accountant's decision, method manual), supersedes a pending bank_match
-// suggestion for it, then refreshes the period's bank
-// warnings so the ones it settles are resolved at once.
-func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices []uuid.UUID, userID int64) (TransactionView, error) {
+// Match replaces the movement's matches with the chosen invoices and / or
+// journal lines (the accountant's decision, method manual) in one step:
+// re-matching needs no separate undo (#669 G). It supersedes a pending
+// bank_match suggestion for the movement, then refreshes the period's bank
+// warnings so the ones it settles are resolved at once. Invoices take the
+// amount first, the lines what is left.
+func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices []uuid.UUID, lines []LineRef, userID int64) (TransactionView, error) {
 	q := database.QueriesFor(s.pool)
 	t, err := s.transaction(ctx, q, sub, id)
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if !matchable(t) {
+	if len(invoices)+len(lines) == 0 {
+		return TransactionView{}, fmt.Errorf("%w: pick an invoice or a journal line", ErrInvalidInvoices)
+	}
+	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
 		return TransactionView{}, ErrNotMatchable
-	}
-	rows, err := q.ListInvoicesForManualMatch(ctx, db.ListInvoicesForManualMatchParams{
-		Currency: t.Currency, BankTransactionID: t.ID, TaxpayerID: sub.TaxpayerID, Uuids: invoices,
-		Direction: invoiceDirection(banking.Direction(t.DebitCredit)),
-	})
-	if err != nil {
-		return TransactionView{}, err
-	}
-	if len(rows) != len(uniqueUUIDs(invoices)) {
-		return TransactionView{}, fmt.Errorf("%w: an invoice is missing, inactive or of the wrong direction or currency", ErrInvalidInvoices)
 	}
 	v := matchValue{BankTransactionID: t.ID, Score: 100}
 	remaining := dec(t.Amount)
-	for _, r := range rows {
-		open := dec(r.ComparableAmount).Sub(dec(r.MatchedAmount))
-		if !open.IsPositive() {
-			return TransactionView{}, fmt.Errorf("%w: invoice %s is already paid", ErrInvalidInvoices, r.InvoiceNumber)
+	if len(invoices) > 0 {
+		if remaining, err = s.pickInvoices(ctx, q, sub, t, invoices, &v, remaining); err != nil {
+			return TransactionView{}, err
 		}
-		amt := decimal.Min(open, remaining)
-		if !amt.IsPositive() {
-			return TransactionView{}, fmt.Errorf("%w: the transaction amount is used up before invoice %s", ErrInvalidInvoices, r.InvoiceNumber)
-		}
-		remaining = remaining.Sub(amt)
-		v.Invoices = append(v.Invoices, matchInvoice{ID: r.ID, Number: r.InvoiceNumber, Amount: amt.StringFixed(4), Score: 100, Parts: map[string]int{"manual": 100}})
 	}
-	v.Combination = len(v.Invoices) > 1
+	picked, err := s.pickLines(ctx, q, sub, t, lines, remaining)
+	if err != nil {
+		return TransactionView{}, err
+	}
 	err = database.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		tq := db.New(tx)
 		if err := tq.DeleteBankTransactionMatches(ctx, db.DeleteBankTransactionMatchesParams{TaxpayerID: sub.TaxpayerID, BankTransactionID: t.ID}); err != nil {
@@ -336,12 +335,45 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 		}); err != nil {
 			return err
 		}
+		if err := writeLines(ctx, tq, sub, t.ID, picked, userID); err != nil {
+			return err
+		}
+		// writeValue marks the movement matched (with or without invoices).
 		return writeValue(ctx, tq, sub.TaxpayerID, v, "manual", &userID)
 	})
 	if err != nil {
 		return TransactionView{}, err
 	}
 	return s.refreshed(ctx, q, sub, t.Uuid, t.Period)
+}
+
+// pickInvoices validates the picked invoices and fills v with the amount
+// each takes; it returns what is left of the movement.
+func (s *Service) pickInvoices(ctx context.Context, q *db.Queries, sub Subject, t db.BankTransaction, invoices []uuid.UUID, v *matchValue, remaining decimal.Decimal) (decimal.Decimal, error) {
+	rows, err := q.ListInvoicesForManualMatch(ctx, db.ListInvoicesForManualMatchParams{
+		Currency: t.Currency, BankTransactionID: t.ID, TaxpayerID: sub.TaxpayerID, Uuids: invoices,
+		Direction: invoiceDirection(banking.Direction(t.DebitCredit)),
+	})
+	if err != nil {
+		return remaining, err
+	}
+	if len(rows) != len(uniqueUUIDs(invoices)) {
+		return remaining, fmt.Errorf("%w: an invoice is missing, inactive or of the wrong direction or currency", ErrInvalidInvoices)
+	}
+	for _, r := range rows {
+		open := dec(r.ComparableAmount).Sub(dec(r.MatchedAmount))
+		if !open.IsPositive() {
+			return remaining, fmt.Errorf("%w: invoice %s is already paid", ErrInvalidInvoices, r.InvoiceNumber)
+		}
+		amt := decimal.Min(open, remaining)
+		if !amt.IsPositive() {
+			return remaining, fmt.Errorf("%w: the transaction amount is used up before invoice %s", ErrInvalidInvoices, r.InvoiceNumber)
+		}
+		remaining = remaining.Sub(amt)
+		v.Invoices = append(v.Invoices, matchInvoice{ID: r.ID, Number: r.InvoiceNumber, Amount: amt.StringFixed(4), Score: 100, Parts: map[string]int{"manual": 100}})
+	}
+	v.Combination = len(v.Invoices) > 1
+	return remaining, nil
 }
 
 // Unmatch removes the movement's matches; it is open again and the period

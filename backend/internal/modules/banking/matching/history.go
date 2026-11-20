@@ -19,17 +19,22 @@ const historyLimit = 50
 // HistoryEntry is one audit event of a movement (#565): who matched,
 // unmatched or booked it, when and with what.
 type HistoryEntry struct {
-	UUID        uuid.UUID `json:"uuid"`
-	Action      string    `json:"action"` // matched | unmatched | booked
-	At          time.Time `json:"at"`
-	ActorName   *string   `json:"actor_name"`
-	Invoices    []string  `json:"invoices"`
-	AccountCode *string   `json:"account_code"`
-	AccountName *string   `json:"account_name"`
+	UUID      uuid.UUID `json:"uuid"`
+	Action    string    `json:"action"` // matched | rematched | unmatched | booked
+	At        time.Time `json:"at"`
+	ActorName *string   `json:"actor_name"`
+	Invoices  []string  `json:"invoices"`
+	// JournalLines are the journal lines (#669 G) as "2026-10 #12/3 120.01".
+	JournalLines []string `json:"journal_lines"`
+	// Replaced: what a re-match replaced (invoices and lines), empty otherwise.
+	Replaced    []string `json:"replaced"`
+	AccountCode *string  `json:"account_code"`
+	AccountName *string  `json:"account_name"`
 }
 
 var historyActions = map[string]string{
 	ActionMatched:   "matched",
+	ActionRematched: "rematched",
 	ActionUnmatched: "unmatched",
 	ActionBooked:    "booked",
 }
@@ -59,15 +64,20 @@ func (s *Service) History(ctx context.Context, sub Subject, id uuid.UUID) ([]His
 			continue
 		}
 		var p struct {
-			Invoices    []string `json:"invoices"`
-			AccountCode string   `json:"account_code"`
-			AccountName string   `json:"account_name"`
+			Invoices             []string `json:"invoices"`
+			JournalLines         []string `json:"journal_lines"`
+			ReplacedInvoices     []string `json:"replaced_invoices"`
+			ReplacedJournalLines []string `json:"replaced_journal_lines"`
+			AccountCode          string   `json:"account_code"`
+			AccountName          string   `json:"account_name"`
 		}
 		_ = json.Unmarshal(r.Payload, &p)
 		e := HistoryEntry{UUID: r.Uuid, Action: action, At: r.CreatedAt.Time, ActorName: actorName(r.ActorName, r.ActorSurname), Invoices: p.Invoices}
 		if e.Invoices == nil {
 			e.Invoices = []string{}
 		}
+		e.JournalLines = append([]string{}, p.JournalLines...)
+		e.Replaced = append(append([]string{}, p.ReplacedInvoices...), p.ReplacedJournalLines...)
 		if p.AccountCode != "" {
 			e.AccountCode = &p.AccountCode
 		}

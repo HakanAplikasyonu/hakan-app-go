@@ -4,6 +4,12 @@ import { tenantRequest } from "@/lib/api/tenant-request";
 export type BankTransactionMatching =
   components["schemas"]["BankTransactionMatching"];
 export type BankMatchCandidate = components["schemas"]["BankMatchCandidate"];
+export type BankMatchJournalLineCandidate =
+  components["schemas"]["BankMatchJournalLineCandidate"];
+export type BankMatchedJournalLine =
+  components["schemas"]["BankMatchedJournalLine"];
+/** Fiş satırı seçimi: fiş + satır no (#669 G). */
+export type BankMatchLineRef = { journal_draft_uuid: string; line_no: number };
 export type BankTransactionHistoryEntry =
   components["schemas"]["BankTransactionHistoryEntry"];
 
@@ -38,6 +44,23 @@ export const bankMatchingKeys = {
       "search",
       q,
     ] as const,
+  lineSearch: (
+    slug: string,
+    engagement: string,
+    transaction: string,
+    q: string,
+    cari: boolean,
+  ) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "bank-matching",
+      engagement,
+      transaction,
+      "line-search",
+      q,
+      cari,
+    ] as const,
 };
 
 /**
@@ -52,17 +75,46 @@ export const bankMatchingService = {
       `${tx(engagement, transaction)}/matching`,
     );
   },
+  /**
+   * Hareketin eşleşmelerini seçilen faturalar ve / veya fiş satırlarıyla
+   * tek adımda değiştirir (#669 G): yeniden eşleştirmede önce geri almak
+   * gerekmez.
+   */
   match(
     slug: string,
     engagement: string,
     transaction: string,
     invoiceUuids: string[],
+    journalLines: BankMatchLineRef[] = [],
   ) {
     return tenantRequest<BankTransactionMatching>(
       slug,
       "PUT",
       `${tx(engagement, transaction)}/matches`,
-      { body: { invoice_uuids: invoiceUuids } },
+      {
+        body:
+          journalLines.length > 0
+            ? { invoice_uuids: invoiceUuids, journal_lines: journalLines }
+            : { invoice_uuids: invoiceUuids },
+      },
+    );
+  },
+  /**
+   * Mevcut fiş satırı / cari hareketi araması (#669 G). Terim boşsa
+   * tutarı tutan satırlar; cari: yalnız cari ana hesaplar (120, 320 …).
+   */
+  searchLines(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    q: string,
+    cari: boolean,
+  ) {
+    return tenantRequest<{ items: BankMatchJournalLineCandidate[] }>(
+      slug,
+      "GET",
+      `${tx(engagement, transaction)}/journal-line-search`,
+      { query: { q, cari: cari ? "1" : "0" } },
     );
   },
   /** Hareketi kim, ne zaman eşleştirdi / geri aldı / hesaba işledi (#565). */

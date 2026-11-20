@@ -38,6 +38,23 @@ describe("bankMatchingService (#528)", () => {
       `${base}/matches`,
     );
   });
+  it("matches journal lines and searches them (#669 G)", () => {
+    const line = { journal_draft_uuid: "j1", line_no: 2 };
+    void bankMatchingService.match("demo", "e1", "t1", [], [line]);
+    expect(tenantRequest).toHaveBeenCalledWith(
+      "demo",
+      "PUT",
+      `${base}/matches`,
+      { body: { invoice_uuids: [], journal_lines: [line] } },
+    );
+    void bankMatchingService.searchLines("demo", "e1", "t1", "120", true);
+    expect(tenantRequest).toHaveBeenLastCalledWith(
+      "demo",
+      "GET",
+      `${base}/journal-line-search`,
+      { query: { q: "120", cari: "1" } },
+    );
+  });
   it("books the movement to an account (#565)", () => {
     void bankMatchingService.setAccount(
       "demo",

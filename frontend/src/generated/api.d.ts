@@ -9097,6 +9097,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/journal-line-search": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Search existing journal lines (fiş satırı / cari hareketi) for a manual match
+         * @description Requires `tenant.bank.read` (#669 G). Lines of this engagement's
+         *     vouchers on the movement's side (money in: credit, money out:
+         *     debit), not generated from a bank movement, with an open amount.
+         *     Without `q`: lines dated 180 days before to 30 days after the
+         *     movement whose amount equals it. With `q` (at least two
+         *     characters): account code prefix, line or voucher description, or
+         *     document number. `cari=1` narrows to current-account main codes
+         *     (120, 320, 159, 340 …). Newest first, at most 20.
+         */
+        get: operations["searchTenantBankTransactionJournalLines"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches": {
         parameters: {
             query?: never;
@@ -9115,21 +9151,25 @@ export interface paths {
         };
         get?: never;
         /**
-         * Match the movement to the chosen invoices (by hand)
+         * Match the movement to the chosen invoices and / or journal lines (by hand)
          * @description Requires `tenant.bank.write` (#528). Replaces the movement's matches
-         *     with the chosen invoices (method `manual`); each closes up to its
-         *     open amount, in the given order of issue date, until the movement's
-         *     amount is used up. The period's bank warnings are refreshed at once,
+         *     with the chosen invoices and journal lines (method `manual`) in one
+         *     step: a re-match needs no undo first (#669 G) and is audited as
+         *     `bank.transaction.rematched` with what it replaced. Invoices close
+         *     up to their open amount, in order of issue date, then journal lines
+         *     take what is left. A journal line must belong to this engagement, be
+         *     on the movement's side (money in: credit, money out: debit), not be
+         *     generated from a bank movement, and have an open amount. The period's bank warnings are refreshed at once,
          *     so the ones this match settles are resolved. 422 when an invoice is
          *     missing, inactive, of the other direction or currency, already paid,
-         *     or the amount is used up before it; 409
-         *     `BANK_TRANSACTION_NOT_MATCHABLE` for a movement that closes no
-         *     invoice.
+         *     or the amount is used up before it (or a line fails the rules
+         *     above); 409 `BANK_TRANSACTION_NOT_MATCHABLE` for invoices on a
+         *     movement that closes no invoice, or for a cancelled movement.
          */
         put: operations["matchTenantBankTransaction"];
         post?: never;
         /**
-         * Remove the movement's invoice matches
+         * Remove the movement's invoice and journal line matches
          * @description Requires `tenant.bank.write` (#528). The movement is `unmatched`
          *     again and the period's bank warnings are refreshed.
          */
@@ -16989,19 +17029,30 @@ export interface components {
         BankTransactionHistoryEntry: {
             /** Format: uuid */
             uuid: string;
-            /** @enum {string} */
-            action: "matched" | "unmatched" | "booked";
+            /**
+             * @description rematched: the movement had matches and was matched again in one step (#669 G)
+             * @enum {string}
+             */
+            action: "matched" | "rematched" | "unmatched" | "booked";
             /** Format: date-time */
             at: string;
             /** @description Who did it; null when the user is gone */
             actor_name: string | null;
             /** @description Invoice numbers matched or unmatched (empty for booked) */
             invoices: string[];
+            /** @description Journal lines matched or unmatched, as `2026-10 #12/3 120.01.001` (#669 G) */
+            journal_lines: string[];
+            /** @description What a re-match replaced (invoice numbers and line labels); empty otherwise */
+            replaced: string[];
             /** @description The account booked to (booked only) */
             account_code: string | null;
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
+            line_matchable: boolean;
+            /** @description Journal lines the movement is tied to (#669 G) */
+            journal_matches: components["schemas"]["BankMatchedJournalLine"][];
             /** @description The bank sent no name; `counterparty_name` is read from the description (#565) */
             counterparty_from_description: boolean;
             /** @description The trial-balance account the movement is booked to or proposed for; null when there is none (#565) */
@@ -17046,6 +17097,42 @@ export interface components {
                 score: number;
             }[];
             candidates: components["schemas"]["BankMatchCandidate"][];
+        };
+        BankMatchedJournalLine: {
+            /** Format: uuid */
+            journal_draft_uuid: string;
+            entry_no: number;
+            /** Format: date */
+            entry_date: string;
+            period: string;
+            /** @enum {string} */
+            journal_status: "draft" | "approved" | "exported";
+            line_no: number;
+            account_code: string;
+            description: string;
+            amount: string;
+            /** @enum {string} */
+            method: "manual";
+            /** @description `2026-10 #12/3 120.01.001` */
+            label: string;
+        };
+        BankMatchJournalLineCandidate: {
+            /** Format: uuid */
+            journal_draft_uuid: string;
+            entry_no: number;
+            /** Format: date */
+            entry_date: string;
+            period: string;
+            /** @enum {string} */
+            journal_status: "draft" | "approved" | "exported";
+            line_no: number;
+            account_code: string;
+            description: string;
+            document_no: string | null;
+            open_amount: string;
+            /** @description The account is under a current-account (cari) main code */
+            cari: boolean;
+            label: string;
         };
         BankMatchCandidate: {
             /** Format: uuid */
@@ -35342,6 +35429,50 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    searchTenantBankTransactionJournalLines: {
+        parameters: {
+            query?: {
+                q?: string;
+                cari?: "0" | "1";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Journal lines the movement could be tied to */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["BankMatchJournalLineCandidate"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     matchTenantBankTransaction: {
         parameters: {
             query?: never;
@@ -35361,7 +35492,13 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    invoice_uuids: string[];
+                    invoice_uuids?: string[];
+                    /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
+                    journal_lines?: {
+                        /** Format: uuid */
+                        journal_draft_uuid: string;
+                        line_no: number;
+                    }[];
                 };
             };
         };
