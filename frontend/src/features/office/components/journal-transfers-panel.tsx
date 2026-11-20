@@ -1,6 +1,16 @@
 "use client";
 
-import { AlertTriangle, Check, RotateCcw, X, XCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Check,
+  CircleCheck,
+  RotateCcw,
+  Scale,
+  X,
+  XCircle,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -13,13 +23,21 @@ import {
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { permissions } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
+import { usePermission } from "@/providers/permission-provider";
 
 import { useJournalActions, useJournalTransfers } from "../hooks/use-journals";
+import { useOfficePeriod } from "../period";
 import type { JournalTransfer } from "../services/journals.service";
+import {
+  reconciliationKeys,
+  reconciliationService,
+} from "../services/reconciliation.service";
 import { Figure, Panel } from "./office-ui";
 
 type Translate = (
@@ -76,8 +94,90 @@ function program(t: Translate, name: string) {
   return msg === key ? name : msg;
 }
 
-function Detail({ tr }: { tr: JournalTransfer }) {
+/**
+ * Aktarım sonrası doğrulama (#574): programa aktarılan dönemin Luca
+ * mizanı uygulamadaki kayıtlarla karşılaştırıldı mı, fark var mı. Mizan
+ * karşılaştırması aktarımdan önceyse ya da hiç yapılmadıysa Mutabakat
+ * ekranına götürür (dönem seçili gelir).
+ */
+function TransferCheck({
+  engagement,
+  tr,
+}: {
+  engagement: string;
+  tr: JournalTransfer;
+}) {
   const { t } = useLocale();
+  const { slug } = useTenant();
+  const router = useRouter();
+  const { setPeriod } = useOfficePeriod();
+  const period = tr.period ?? "";
+  const latest = useQuery({
+    queryKey: reconciliationKeys.run(slug, engagement, period),
+    queryFn: () => reconciliationService.latest(slug, engagement, period),
+    enabled: !!period,
+    retry: (n, e) => !(isApiError(e) && e.status === 404) && n < 2,
+    staleTime: 60_000,
+  });
+  if (!period || latest.isLoading) return null;
+  const run = latest.data?.run;
+  const notRun = isApiError(latest.error) && latest.error.status === 404;
+  if (!run && !notRun) return null;
+  const stale = !!run && !!tr.completed_at && run.created_at < tr.completed_at;
+  const issues = run
+    ? run.summary.differences +
+      run.summary.missing_in_ledger +
+      run.summary.missing_in_sources
+    : 0;
+  const open = () => {
+    setPeriod(period);
+    router.push(routes.tenant.engagementReconciliation(slug, engagement));
+  };
+  if (run && !stale && issues === 0) {
+    return (
+      <span className="text-status-approved inline-flex items-center gap-1">
+        <CircleCheck className="size-3.5" aria-hidden />
+        {t("office.journals.transfer_check_ok")}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2">
+      <span
+        className={
+          run && !stale ? "text-status-blocking" : "text-status-warning"
+        }
+      >
+        {run && !stale
+          ? t("office.journals.transfer_check_differences", { count: issues })
+          : stale
+            ? t("office.journals.transfer_check_stale")
+            : t("office.journals.transfer_check_none")}
+      </span>
+      <Button
+        size="sm"
+        variant="link"
+        className="h-auto p-0 text-xs"
+        onClick={open}
+      >
+        <Scale className="size-3.5" aria-hidden />
+        {run && !stale
+          ? t("office.journals.transfer_check_open")
+          : t("office.journals.transfer_check_run")}
+      </Button>
+    </span>
+  );
+}
+
+function Detail({
+  tr,
+  engagement,
+}: {
+  tr: JournalTransfer;
+  engagement: string;
+}) {
+  const { t } = useLocale();
+  const { can } = usePermission();
   if (tr.status === "failed") {
     return (
       <span className="text-status-blocking text-xs">
@@ -101,6 +201,10 @@ function Detail({ tr }: { tr: JournalTransfer }) {
         <span>{t("office.journals.transfer_import_hint")}</span>
       ) : null}
       {files.length ? <Figure>{files.join(", ")}</Figure> : null}
+      {tr.status === "imported" &&
+      can(permissions.tenant.reconciliation.read) ? (
+        <TransferCheck engagement={engagement} tr={tr} />
+      ) : null}
     </span>
   );
 }
@@ -201,7 +305,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
         labelKey: "office.journals.transfer_col_detail",
         enableSorting: false,
         accessorFn: (r) => r.error_message ?? r.folder_label ?? "",
-        cell: ({ row }) => <Detail tr={row.original} />,
+        cell: ({ row }) => <Detail tr={row.original} engagement={engagement} />,
       }),
       createActionsColumn<JournalTransfer>({
         cell: (tr) => (
@@ -261,6 +365,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
     cancelTransfer,
     completeTransfer,
     confirm,
+    engagement,
     prompt,
     retryTransfer,
     t,
