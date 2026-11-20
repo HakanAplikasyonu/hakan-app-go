@@ -26,6 +26,7 @@ import { useOfficePeriod } from "../period";
 import {
   cellAt,
   cellStatuses,
+  cellTarget,
   defaultFilter,
   filterRows,
   sortByProgress,
@@ -59,7 +60,14 @@ export function monthLabel(period: string, locale: string) {
 }
 
 /** One period of one taxpayer: status, lock, open warnings and requests. */
-export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
+export function CellBadge({
+  cell,
+  hint,
+}: {
+  cell: PeriodMatrixCell;
+  /** Tıklayınca ne açılacağı (ipucu metninin sonuna eklenir, #567). */
+  hint?: string;
+}) {
   const { t } = useLocale();
   const status = statusOf(cell);
   const parts = [t(`office.command.status_${status}`)];
@@ -81,7 +89,7 @@ export function CellBadge({ cell }: { cell: PeriodMatrixCell }) {
         "relative flex h-8 min-w-24 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium whitespace-nowrap",
         statusClass[status],
       )}
-      title={parts.join(" · ")}
+      title={[...parts, hint].filter(Boolean).join(" · ")}
     >
       {cell.locked ? <Lock className="size-3" aria-hidden /> : null}
       {t(`office.command.status_${status}`)}
@@ -122,6 +130,15 @@ function useMatrixColumns(
   // Mükellef adı mükellef detayına (#469), seçili dönemle (#567).
   const { slug } = useTenant();
   const { setPeriod } = useOfficePeriod();
+  const { t } = useLocale();
+  const goes = useMemo(
+    () => ({
+      blockers: t("office.command.goes_blockers"),
+      warnings: t("office.command.goes_warnings"),
+      overview: t("office.command.goes_overview"),
+    }),
+    [t],
+  );
   return useMemo<ColumnDef<PeriodMatrixRow, unknown>[]>(
     () => [
       createColumn<PeriodMatrixRow>({
@@ -183,17 +200,24 @@ function useMatrixColumns(
             headerClassName: "px-1",
             cellClassName: cn("px-1", p === focus && "bg-muted/30"),
           },
-          // Hücre o dönemin işine götürür (#567): dönem seçilir, mükellef
-          // özeti o dönemle açılır.
+          // Hücre o dönemin işine götürür (#567): dönem seçilir; engel varsa
+          // engelleyici uyarılar, yalnız uyarı varsa uyarı listesi, yoksa
+          // mükellef özeti o dönemle açılır.
           cell: ({ row }) => {
             const cell = cellAt(row.original, p);
             if (!cell) return null;
+            const target = cellTarget(cell);
+            const id = row.original.engagement_uuid;
+            const href =
+              target === "blockers"
+                ? routes.tenant.engagementBlockers(slug, id)
+                : target === "warnings"
+                  ? routes.tenant.engagementWarnings(slug, id)
+                  : routes.tenant.engagement(slug, id);
             return (
               <Link
-                href={routes.tenant.engagement(
-                  slug,
-                  row.original.engagement_uuid,
-                )}
+                href={href}
+                data-target={target}
                 onClick={() => setPeriod(p)}
                 className="focus-visible:ring-ring block rounded-md transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none"
               >
@@ -201,14 +225,14 @@ function useMatrixColumns(
                 <span className="sr-only">
                   {`${row.original.taxpayer_title} · ${monthLabel(p, locale)}: `}
                 </span>
-                <CellBadge cell={cell} />
+                <CellBadge cell={cell} hint={goes[target]} />
               </Link>
             );
           },
         }),
       ),
     ],
-    [periods, focus, locale, onPick, slug, setPeriod],
+    [periods, focus, locale, onPick, slug, setPeriod, goes],
   );
 }
 
