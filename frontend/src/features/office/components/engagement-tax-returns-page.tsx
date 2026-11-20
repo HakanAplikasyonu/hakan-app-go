@@ -59,7 +59,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
 import {
   TAX_RETURN_KINDS,
   type TaxReturnAdjustments,
@@ -75,6 +75,7 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnSections } from "./tax-return-sections";
 import { TaxReturnWarnings } from "./tax-return-warnings";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
@@ -162,7 +163,8 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
     (canWrite && settings.data?.final_check_required === false);
   const qc = useQueryClient();
   // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
-  const { focus: period, setPeriod } = useOfficePeriod();
+  // Dönem adreste de durur (#710): bağlantıyla gelen `?period=` geçerli.
+  const { focus: period, setPeriod } = useUrlOfficePeriod();
   const dates = useDates();
   const listState = useUrlListState({ initialPageSize: 50 });
   const rawKind = listState.getParam("kind") as TaxReturnKind | null;
@@ -360,6 +362,12 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             />
           ) : null}
           <TaxReturnSummary p={p} />
+          <TaxReturnSections
+            slug={slug}
+            engagement={engagement}
+            period={period}
+            sections={p.sections}
+          />
           {p.status === "draft" ? (
             <TaxReturnWarnings
               engagement={engagement}

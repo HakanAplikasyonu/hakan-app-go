@@ -26602,7 +26602,7 @@ components:
 
     TaxReturnPreview:
       type: object
-      required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, computed_at, checklist]
+      required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
         kind: { type: string, enum: [kdv1, muhsgk, babs] }
         period: { type: string }
@@ -26621,11 +26621,27 @@ components:
             - $ref: "#/components/schemas/TaxReturnRecord"
             - type: "null"
         open_warnings: { type: array, items: { type: string } }
+        sections:
+          type: array
+          description: The period's sources, processed / total (#710); always live, also for a prepared or filed return
+          items: { $ref: "#/components/schemas/TaxReturnSection" }
         computed_at: { type: string, format: date-time }
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
+
+    TaxReturnSection:
+      type: object
+      description: |
+        One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
+        value, matched bank transaction); ignored was set aside (rejected, cancelled, ignored); the rest still waits.
+      required: [key, total, processed, ignored]
+      properties:
+        key: { type: string, enum: [retail, invoices, bank, expenses] }
+        total: { type: integer, format: int64 }
+        processed: { type: integer, format: int64 }
+        ignored: { type: integer, format: int64 }
 
     JournalDraftManualLink:
       type: object

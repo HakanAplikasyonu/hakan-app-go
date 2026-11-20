@@ -249,6 +249,40 @@ FROM document_tasks
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND period = @period
   AND status IN ('open', 'submitted');
 
+-- name: TaxReturnSectionStats :one
+-- Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+-- (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+-- her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+-- fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+-- eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+-- sayılan banka hareketi.
+SELECT
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = @taxpayer_id AND r.period = @period::text)::bigint AS retail_total,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = @taxpayer_id AND r.period = @period::text
+        AND r.approval_status = 'approved')::bigint AS retail_processed,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = @taxpayer_id AND r.period = @period::text
+        AND r.approval_status = 'rejected')::bigint AS retail_ignored,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = @taxpayer_id
+        AND COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.deleted_at_source IS NULL)::bigint AS invoice_total,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = @taxpayer_id
+        AND COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'active' AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL))::bigint AS invoice_processed,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = @taxpayer_id
+        AND COALESCE(i.vat_deduction_period, i.period) = @period::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'cancelled')::bigint AS invoice_ignored,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = @taxpayer_id AND b.period = @period::text
+        AND NOT b.is_cancelled)::bigint AS bank_total,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = @taxpayer_id AND b.period = @period::text
+        AND NOT b.is_cancelled AND b.match_status = 'matched')::bigint AS bank_processed,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = @taxpayer_id AND b.period = @period::text
+        AND NOT b.is_cancelled AND b.match_status = 'ignored')::bigint AS bank_ignored,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = @taxpayer_id AND e.period = @period::text
+        AND COALESCE(e.tax_amount, 0) > 0)::bigint AS expense_total,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = @taxpayer_id AND e.period = @period::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'approved')::bigint AS expense_processed,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = @taxpayer_id AND e.period = @period::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'rejected')::bigint AS expense_ignored;
+
 -- name: GetTaxReturnSettings :one
 -- Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
 SELECT * FROM tax_return_settings WHERE organization_id = @organization_id;

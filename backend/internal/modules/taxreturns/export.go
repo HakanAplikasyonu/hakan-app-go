@@ -41,6 +41,7 @@ func Workbook(p Preview) ([]byte, error) {
 		w.babs(p, *p.BABS)
 	}
 	w.checklist(p)
+	w.sections(p)
 	if err := w.f.DeleteSheet("Sheet1"); err != nil {
 		return nil, err
 	}
@@ -320,5 +321,28 @@ func (b *book) checklist(p Preview) {
 	}
 	if len(p.Checklist) == 0 {
 		b.line(0, "", "Kontrol listesinde madde yok.")
+	}
+}
+
+// sectionTitles: the period's sources in the section summary (#710).
+var sectionTitles = map[string]string{
+	"retail": "Z raporları", "invoices": "Faturalar", "bank": "Banka hareketleri", "expenses": "KDV'li fişler",
+}
+
+// sections is the period's section summary (#710): per source how many
+// records were processed for the return, set aside and still waiting. It
+// is always live, also for a prepared or filed return.
+func (b *book) sections(p Preview) {
+	if len(p.Sections) == 0 {
+		return
+	}
+	b.newSheet("Bölüm özeti", 40, 14, 14, 14, 14)
+	b.line(b.head, "Bölüm", "Toplam", "İşlenen", "Yok sayılan", "Bekleyen")
+	for _, x := range p.Sections {
+		title := sectionTitles[x.Key]
+		if title == "" {
+			title = x.Key
+		}
+		b.line(0, title, x.Total, x.Processed, x.Ignored, max(x.Total-x.Processed-x.Ignored, 0))
 	}
 }

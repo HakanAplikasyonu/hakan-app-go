@@ -29,7 +29,13 @@ func TestTaxReturnFlow(t *testing.T) {
 		Status       string   `json:"status"`
 		Frozen       bool     `json:"frozen"`
 		OpenWarnings []string `json:"open_warnings"`
-		Calendar     struct {
+		Sections     []struct {
+			Key       string `json:"key"`
+			Total     int64  `json:"total"`
+			Processed int64  `json:"processed"`
+			Ignored   int64  `json:"ignored"`
+		} `json:"sections"`
+		Calendar struct {
 			DueDate string `json:"due_date"`
 		} `json:"calendar"`
 		Checklist []struct {
@@ -115,6 +121,25 @@ func TestTaxReturnFlow(t *testing.T) {
 	if len(p.KDV1.Sales) == 0 {
 		t.Errorf("demo October has sales: %+v", p.KDV1)
 	}
+	// Bölüm özeti (#710): dört kaynak sırayla; işlenen + yok sayılan toplamı
+	// aşmaz; demo Ekim'de fatura var. Donmuş beyanda da canlı gelir.
+	checkSections := func(t *testing.T, x preview) {
+		t.Helper()
+		keys := []string{"retail", "invoices", "bank", "expenses"}
+		if len(x.Sections) != len(keys) {
+			t.Fatalf("sections %+v", x.Sections)
+		}
+		for i, s := range x.Sections {
+			if s.Key != keys[i] || s.Processed < 0 || s.Ignored < 0 || s.Processed+s.Ignored > s.Total {
+				t.Fatalf("section %d = %+v", i, s)
+			}
+		}
+	}
+	checkSections(t, p)
+	if p.Sections[1].Total == 0 || p.Sections[1].Processed == 0 {
+		t.Errorf("demo October invoices: %+v", p.Sections[1])
+	}
+	checkSections(t, sep)
 
 	// Düzeltme: devreden KDV elle.
 	p = call(t, http.MethodPut, base+"/kdv1/2026-10", `{"adjustments":{"carried_in":"100.00"},"note":"Ekim"}`, http.StatusOK)
