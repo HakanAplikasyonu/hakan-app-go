@@ -1072,6 +1072,8 @@ type Querier interface {
 	ListTaxpayerVehicles(ctx context.Context, taxpayerID int64) ([]TaxpayerVehicle, error)
 	ListTaxpayers(ctx context.Context, arg ListTaxpayersParams) ([]Taxpayer, error)
 	// tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
+	// Dönem süzgeci Komuta Merkezi matrisiyle (PeriodMatrixBlockers) aynı: dönemsiz
+	// fatura uyarısı faturanın dönemine sayılır (#669 C).
 	ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error)
 	ListTenantPermissions(ctx context.Context) ([]ListTenantPermissionsRow, error)
 	ListTenantRolePermissionSlugsByRoleID(ctx context.Context, roleID int64) ([]string, error)

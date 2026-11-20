@@ -320,6 +320,19 @@ func (s *Service) controls(ctx context.Context, q *db.Queries, sub Subject, peri
 		}
 	}
 	findings := Controls(in)
+	checks, err := q.BankBalanceCheck(ctx, db.BankBalanceCheckParams{TaxpayerID: sub.TaxpayerID, Period: period})
+	if err != nil {
+		return nil, engine.Report{}, err
+	}
+	balances := make([]Balance, len(checks))
+	for i, c := range checks {
+		balances[i] = Balance{
+			Account: c.CashBoxName, IBAN: c.Iban.String, Currency: c.Currency,
+			Opening: dec(c.Opening), Closing: dec(c.Closing), In: dec(c.InTotal), Out: dec(c.OutTotal),
+			HasOpening: c.Opening.Valid, HasClosing: c.Closing.Valid,
+		}
+	}
+	findings = append(findings, BalanceFindings(balances)...)
 	if s.warnings == nil {
 		return findings, engine.Report{}, nil
 	}
