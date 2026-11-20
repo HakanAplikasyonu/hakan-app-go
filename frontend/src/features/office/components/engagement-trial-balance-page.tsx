@@ -287,8 +287,17 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
       ) : report.isError || !rep ? (
         <p className="text-danger text-sm">{t("office.api.load_error")}</p>
       ) : (
-        <div className="bg-card rounded-xl border">
-          <Table aria-label={t("office.trial_balance.table")}>
+        // Kaydırılan bölge klavyeyle odaklanabilir olmalı (axe scrollable-region-focusable).
+        <div
+          className="bg-card overflow-x-auto rounded-xl border"
+          role="region"
+          tabIndex={0}
+          aria-label={t("office.trial_balance.table")}
+        >
+          <Table
+            aria-label={t("office.trial_balance.table")}
+            containerClassName="overflow-x-visible"
+          >
             <TableHeader>
               <TableRow>
                 <TableHead>{t("office.trial_balance.col_code")}</TableHead>
