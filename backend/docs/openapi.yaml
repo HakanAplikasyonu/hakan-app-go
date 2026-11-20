@@ -12435,10 +12435,15 @@ paths:
           application/json:
             schema:
               type: object
-              description: At least one invoice or journal line.
+              description: At least one invoice, payroll run or journal line.
               additionalProperties: false
               properties:
                 invoice_uuids: { type: array, maxItems: 10, items: { type: string, format: uuid } }
+                payroll_run_uuids:
+                  type: array
+                  maxItems: 3
+                  description: Payroll runs an outgoing payment pays (net salaries, #710); of the movement's month or the two before
+                  items: { type: string, format: uuid }
                 journal_lines:
                   type: array
                   maxItems: 10
@@ -22330,8 +22335,33 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates]
       properties:
+        payroll_matchable: { type: boolean, description: "An outgoing payment can be tied to a payroll run (#710)" }
+        payroll_matches:
+          type: array
+          description: Payroll runs the movement pays (net salaries, #710)
+          items:
+            type: object
+            required: [payroll_run_uuid, period, net_total, amount, method]
+            properties:
+              payroll_run_uuid: { type: string, format: uuid }
+              period: { type: string }
+              net_total: { type: string }
+              amount: { type: string }
+              method: { type: string, enum: [auto, manual] }
+        payroll_candidates:
+          type: array
+          description: Payroll runs of the movement's month and the two before with net still unpaid (#710)
+          items:
+            type: object
+            required: [payroll_run_uuid, period, net_total, open_amount, employee_count]
+            properties:
+              payroll_run_uuid: { type: string, format: uuid }
+              period: { type: string }
+              net_total: { type: string }
+              open_amount: { type: string }
+              employee_count: { type: integer }
         line_matchable: { type: boolean, description: "The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G)" }
         journal_matches:
           type: array

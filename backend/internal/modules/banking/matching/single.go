@@ -63,6 +63,12 @@ type TransactionView struct {
 	// Posting is the trial-balance account the movement is booked to (or
 	// proposed for), nil when there is none yet (#565).
 	Posting *PostingView `json:"posting"`
+	// PayrollMatchable: an outgoing payment can be tied to a payroll run
+	// (net salaries); candidates are the runs of its month and the two
+	// before with something unpaid (#710).
+	PayrollMatchable  bool               `json:"payroll_matchable"`
+	PayrollMatches    []MatchedPayroll   `json:"payroll_matches"`
+	PayrollCandidates []PayrollCandidate `json:"payroll_candidates"`
 }
 
 // PostingView is the movement's counter account: suggested (waits for the
@@ -217,6 +223,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	if v.JournalMatches, err = s.journalMatches(ctx, q, sub, t); err != nil {
 		return v, err
 	}
+	if err := s.payrollView(ctx, q, sub, t, &v); err != nil {
+		return v, err
+	}
 	matched := map[uuid.UUID]bool{}
 	for _, r := range matches {
 		matched[r.InvoiceUuid] = true
@@ -343,12 +352,27 @@ func (s *Service) SearchFiltered(ctx context.Context, sub Subject, id uuid.UUID,
 // warnings so the ones it settles are resolved at once. Invoices take the
 // amount first, the lines what is left.
 func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices []uuid.UUID, lines []LineRef, userID int64) (TransactionView, error) {
+	return s.MatchAll(ctx, sub, id, MatchInput{Invoices: invoices, Lines: lines}, userID)
+}
+
+// MatchInput is what the accountant ties the movement to: invoices,
+// payroll runs (net salaries, #710) and / or journal lines.
+type MatchInput struct {
+	Invoices    []uuid.UUID
+	PayrollRuns []uuid.UUID
+	Lines       []LineRef
+}
+
+// MatchAll is Match with payroll runs. Invoices take the amount first, then
+// the payroll runs, the lines what is left.
+func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in MatchInput, userID int64) (TransactionView, error) {
+	invoices, lines := in.Invoices, in.Lines
 	q := database.QueriesFor(s.pool)
 	t, err := s.transaction(ctx, q, sub, id)
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if len(invoices)+len(lines) == 0 {
+	if len(invoices)+len(lines)+len(in.PayrollRuns) == 0 {
 		return TransactionView{}, fmt.Errorf("%w: pick an invoice or a journal line", ErrInvalidInvoices)
 	}
 	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
@@ -360,6 +384,10 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 		if remaining, err = s.pickInvoices(ctx, q, sub, t, invoices, &v, remaining); err != nil {
 			return TransactionView{}, err
 		}
+	}
+	payroll, remaining, err := s.pickPayroll(ctx, q, sub, t, in.PayrollRuns, remaining)
+	if err != nil {
+		return TransactionView{}, err
 	}
 	picked, err := s.pickLines(ctx, q, sub, t, lines, remaining)
 	if err != nil {
@@ -379,6 +407,9 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 			return err
 		}
 		if err := writeLines(ctx, tq, sub, t.ID, picked, userID); err != nil {
+			return err
+		}
+		if err := writePayroll(ctx, tq, sub, t.ID, payroll, userID); err != nil {
 			return err
 		}
 		// writeValue marks the movement matched (with or without invoices).

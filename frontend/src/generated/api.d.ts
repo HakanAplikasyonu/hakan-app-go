@@ -17355,6 +17355,27 @@ export interface components {
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /** @description An outgoing payment can be tied to a payroll run (#710) */
+            payroll_matchable: boolean;
+            /** @description Payroll runs the movement pays (net salaries, */
+            payroll_matches: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Payroll runs of the movement's month and the two before with net still unpaid (#710) */
+            payroll_candidates: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                open_amount: string;
+                employee_count: number;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -36194,6 +36215,8 @@ export interface operations {
             content: {
                 "application/json": {
                     invoice_uuids?: string[];
+                    /** @description Payroll runs an outgoing payment pays (net salaries, */
+                    payroll_run_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */

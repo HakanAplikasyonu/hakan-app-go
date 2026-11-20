@@ -324,6 +324,54 @@ func (q *Queries) ListBankTransactionMatches(ctx context.Context, arg ListBankTr
 	return items, nil
 }
 
+const listBankTransactionPayrollMatches = `-- name: ListBankTransactionPayrollMatches :many
+SELECT m.amount, m.method, r.uuid AS payroll_run_uuid, r.period, r.net_total
+FROM bank_transaction_matches m
+JOIN payroll_runs r ON r.taxpayer_id = m.taxpayer_id AND r.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'payroll_run'
+ORDER BY r.period
+`
+
+type ListBankTransactionPayrollMatchesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionPayrollMatchesRow struct {
+	Amount         pgtype.Numeric `json:"amount"`
+	Method         string         `json:"method"`
+	PayrollRunUuid uuid.UUID      `json:"payroll_run_uuid"`
+	Period         string         `json:"period"`
+	NetTotal       pgtype.Numeric `json:"net_total"`
+}
+
+// Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+func (q *Queries) ListBankTransactionPayrollMatches(ctx context.Context, arg ListBankTransactionPayrollMatchesParams) ([]ListBankTransactionPayrollMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionPayrollMatches, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionPayrollMatchesRow{}
+	for rows.Next() {
+		var i ListBankTransactionPayrollMatchesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Method,
+			&i.PayrollRunUuid,
+			&i.Period,
+			&i.NetTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionsForControls = `-- name: ListBankTransactionsForControls :many
 SELECT t.id, t.uuid, t.transaction_date, t.debit_credit, t.amount, t.currency, t.kind, t.kind_detail, t.match_status,
        t.counterparty_name, t.counterparty_iban, t.counterparty_tax_number, t.counterparty_identity_number,
@@ -731,6 +779,67 @@ func (q *Queries) ListJournalLinesForManualMatch(ctx context.Context, arg ListJo
 			&i.JournalDraftUuid,
 			&i.EntryNo,
 			&i.Period,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPayrollRunsForBankMatch = `-- name: ListPayrollRunsForBankMatch :many
+SELECT r.id, r.uuid, r.period, r.net_total,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = r.taxpayer_id AND m.target_type = 'payroll_run' AND m.target_id = r.id
+                   AND m.bank_transaction_id <> $1), 0)::numeric(18,2) AS paid,
+       (SELECT count(*) FROM payroll_lines l WHERE l.taxpayer_id = r.taxpayer_id AND l.payroll_run_id = r.id)::int AS employee_count
+FROM payroll_runs r
+WHERE r.taxpayer_id = $2 AND r.period >= $3::text AND r.period <= $4::text
+ORDER BY r.period DESC
+`
+
+type ListPayrollRunsForBankMatchParams struct {
+	BankTransactionID int64  `json:"bank_transaction_id"`
+	TaxpayerID        int64  `json:"taxpayer_id"`
+	PeriodFrom        string `json:"period_from"`
+	PeriodTo          string `json:"period_to"`
+}
+
+type ListPayrollRunsForBankMatchRow struct {
+	ID            int64          `json:"id"`
+	Uuid          uuid.UUID      `json:"uuid"`
+	Period        string         `json:"period"`
+	NetTotal      pgtype.Numeric `json:"net_total"`
+	Paid          pgtype.Numeric `json:"paid"`
+	EmployeeCount int32          `json:"employee_count"`
+}
+
+// Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+// eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+func (q *Queries) ListPayrollRunsForBankMatch(ctx context.Context, arg ListPayrollRunsForBankMatchParams) ([]ListPayrollRunsForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, listPayrollRunsForBankMatch,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.PeriodFrom,
+		arg.PeriodTo,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPayrollRunsForBankMatchRow{}
+	for rows.Next() {
+		var i ListPayrollRunsForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.Period,
+			&i.NetTotal,
+			&i.Paid,
+			&i.EmployeeCount,
 		); err != nil {
 			return nil, err
 		}
