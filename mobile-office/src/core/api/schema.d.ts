@@ -9431,6 +9431,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a duplicate movement out of the account or put it back
+         * @description Requires `tenant.bank.write` (#710). When the statement balance does
+         *     not agree, the office takes a duplicate movement out of the account
+         *     (it no longer counts in totals, matching or warnings; its matches
+         *     are dropped) or puts one it took out back. Who and when are kept;
+         *     the period's bank warnings are refreshed at once. 409
+         *     `BANK_POSTING_DRAFTED` when the movement is already in a journal
+         *     draft, `BANK_TRANSACTION_CANCELLED` when the bank cancelled it.
+         */
+        put: operations["setTenantBankTransactionExclusion"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
         parameters: {
             query?: never;
@@ -36454,6 +36489,56 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    setTenantBankTransactionExclusion: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    excluded: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement's state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: uuid */
+                            uuid: string;
+                            excluded: boolean;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listEasytradeConnections: {
         parameters: {
             query?: never;
@@ -38938,6 +39023,22 @@ export interface operations {
                         data: {
                             period: string;
                             items: components["schemas"]["BankBalanceCheck"][];
+                            /** @description Movements to look at (#710): flagged as possible duplicates by the import, with a twin (same account, day, direction, amount), or taken out by the office */
+                            suspects: {
+                                /** Format: uuid */
+                                uuid: string;
+                                /** Format: uuid */
+                                cash_box_uuid: string;
+                                /** Format: date */
+                                transaction_date: string;
+                                /** @enum {string} */
+                                debit_credit: "A" | "B";
+                                amount: string;
+                                currency: string;
+                                description: string;
+                                possible_duplicate: boolean;
+                                excluded: boolean;
+                            }[];
                         };
                         meta: components["schemas"]["ResponseMeta"];
                     };

@@ -27,7 +27,7 @@ func (q *Queries) DeleteBankTransactionMatches(ctx context.Context, arg DeleteBa
 }
 
 const getBankTransactionByUUID = `-- name: GetBankTransactionByUUID :one
-SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
+SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at, excluded_by, excluded_at FROM bank_transactions WHERE taxpayer_id = $1 AND uuid = $2
 `
 
 type GetBankTransactionByUUIDParams struct {
@@ -86,6 +86,8 @@ func (q *Queries) GetBankTransactionByUUID(ctx context.Context, arg GetBankTrans
 		&i.ContentHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExcludedBy,
+		&i.ExcludedAt,
 	)
 	return i, err
 }
@@ -414,7 +416,7 @@ func (q *Queries) ListBankTransactionsForControls(ctx context.Context, arg ListB
 
 const listBankTransactionsForMatching = `-- name: ListBankTransactionsForMatching :many
 
-SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at FROM bank_transactions
+SELECT id, uuid, taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at, has_time, bank_sequence, transaction_date, value_date, debit_credit, amount, currency, balance_after, balance_before, description, description_extra, description_normalized, bank_reference, receipt_number, bank_txn_code, mt940_code, channel, counterparty_name, counterparty_iban, counterparty_tax_number, counterparty_identity_number, counterparty_bank_code, eft_query_number, payment_purpose, is_cancelled, kind, kind_detail, kind_source, kind_confidence, kind_reason, classified_at, match_status, possible_duplicate_of, period, raw_payload, content_hash, created_at, updated_at, excluded_by, excluded_at FROM bank_transactions
 WHERE taxpayer_id = $1 AND period = $2 AND NOT is_cancelled
   AND kind_detail IN ('customer_collection', 'supplier_payment', 'rent_payment', 'utility_payment')
   AND match_status IN ('unmatched', 'suggested')
@@ -483,6 +485,8 @@ func (q *Queries) ListBankTransactionsForMatching(ctx context.Context, arg ListB
 			&i.ContentHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExcludedBy,
+			&i.ExcludedAt,
 		); err != nil {
 			return nil, err
 		}

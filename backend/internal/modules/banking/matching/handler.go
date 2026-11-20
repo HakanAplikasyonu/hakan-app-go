@@ -103,6 +103,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("DELETE "+tx+"/matches", middleware.Chain(http.HandlerFunc(h.unmatch), authn, org, write, eng))
 	// Book the movement to an account from the same screen (#565).
 	mux.Handle("PUT "+tx+"/account", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
+	// Take a (duplicate) movement out of the account or put it back (#710).
+	mux.Handle("PUT "+tx+"/exclusion", middleware.Chain(http.HandlerFunc(h.exclusion), authn, org, write, eng))
 }
 
 func subjectOf(r *http.Request) Subject {
@@ -276,6 +278,8 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
 	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, ErrCancelledByBank):
+		response.Conflict(w, r, "BANK_TRANSACTION_CANCELLED", "the bank cancelled this movement; it cannot be put back")
 	case errors.Is(err, posting.ErrNotFound):
 		response.NotFound(w, r, "bank transaction not found")
 	case errors.Is(err, posting.ErrDrafted):

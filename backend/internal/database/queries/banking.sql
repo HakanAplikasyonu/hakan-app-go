@@ -273,3 +273,33 @@ FROM tx
 JOIN cash_boxes cb ON cb.id = tx.cash_box_id AND cb.taxpayer_id = @taxpayer_id
 GROUP BY cb.uuid, cb.name, cb.iban, cb.currency
 ORDER BY cb.name, cb.uuid;
+
+-- name: ListBankBalanceSuspects :many
+-- Bakiye uyuşmazlığında bakılacak hareketler (#710): içe aktarmanın olası
+-- mükerrer dediği ya da aynı hesapta aynı gün, yön ve tutarda ikizi olan
+-- hareketler; ofisin hesaptan çıkardıkları da (geri alınabilsin diye).
+SELECT bt.uuid, cb.uuid AS cash_box_uuid, bt.transaction_date, bt.debit_credit, bt.amount, bt.currency,
+       bt.description, bt.is_cancelled, bt.excluded_at, (bt.possible_duplicate_of IS NOT NULL)::bool AS flagged
+FROM bank_transactions bt
+JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
+WHERE bt.taxpayer_id = @taxpayer_id AND bt.period = @period::text
+  AND (bt.excluded_at IS NOT NULL
+       OR (NOT bt.is_cancelled
+           AND (bt.possible_duplicate_of IS NOT NULL
+                OR EXISTS (SELECT 1 FROM bank_transactions o
+                           WHERE o.taxpayer_id = bt.taxpayer_id AND o.cash_box_id = bt.cash_box_id AND o.id <> bt.id
+                             AND NOT o.is_cancelled AND o.transaction_date = bt.transaction_date
+                             AND o.debit_credit = bt.debit_credit AND o.amount = bt.amount))))
+ORDER BY cb.uuid, bt.transaction_date, bt.amount, bt.id
+LIMIT 100;
+
+-- name: SetBankTransactionExcluded :one
+-- Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
+-- iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
+UPDATE bank_transactions
+SET is_cancelled = @excluded::bool,
+    excluded_at  = CASE WHEN @excluded::bool THEN now() ELSE NULL END,
+    excluded_by  = CASE WHEN @excluded::bool THEN sqlc.narg(user_id)::bigint ELSE NULL END
+WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid
+  AND (NOT is_cancelled OR excluded_at IS NOT NULL)
+RETURNING id, period;
