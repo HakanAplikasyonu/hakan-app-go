@@ -179,6 +179,14 @@ export function WarningSheet({
                 ) : null}
               </div>
               <p className="text-sm">{text(current)}</p>
+              {!gone && kind === "invoice" ? (
+                <p
+                  className="text-text-3 text-xs"
+                  data-testid="invoice-fix-hint"
+                >
+                  {t("office.warning_sheet.invoice_hint")}
+                </p>
+              ) : null}
               {gone ? (
                 <p className="text-ok text-sm font-medium">
                   {t("office.warning_sheet.closed")}

@@ -22,6 +22,8 @@ import type {
 export const WARNINGS_WRITE_PERMISSION = Permission.TenantWarningsWrite;
 
 /** A reason shorter than this is not a reason (#529). */
+const INVOICE_ENTITIES = new Set(["invoice", "invoice_item"]);
+
 export const MIN_NOTE = 3;
 export const MAX_NOTE = 500;
 
@@ -35,10 +37,13 @@ export function DecisionNoteForm({
   busy,
   onConfirm,
   onCancel,
+  presets,
 }: {
   label: string;
   confirmLabel: string;
   busy: boolean;
+  /** Hazır gerekçeler (#546): tıklanınca metne yazılır, düzenlenebilir. */
+  presets?: string[];
   onConfirm: (note: string) => void;
   onCancel: () => void;
 }) {
@@ -57,6 +62,26 @@ export function DecisionNoteForm({
       <Label htmlFor={id} className="text-text-2 text-xs font-normal">
         {label}
       </Label>
+      {presets?.length ? (
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label={t("office.warning_decision.presets_label")}
+        >
+          {presets.map((p) => (
+            <Button
+              key={p}
+              type="button"
+              size="sm"
+              variant={note === p ? "secondary" : "outline"}
+              className="h-auto min-h-8 px-2 py-1 text-left text-xs font-normal whitespace-normal"
+              onClick={() => setNote(p)}
+            >
+              {p}
+            </Button>
+          ))}
+        </div>
+      ) : null}
       <Textarea
         id={id}
         autoFocus
@@ -144,6 +169,14 @@ export function ApiWarningActions({
   const { can } = usePermission();
   const decide = useDecideWarning(slug);
   const [action, setAction] = useState<WarningDecisionAction | null>(null);
+  // Fatura kaynağından gelir, ofiste değiştirilmez (#546): karar gerekçeyle
+  // verilir; sık gerekçeler hazır gelir.
+  const presets = INVOICE_ENTITIES.has(warning.entity_type)
+    ? (warning.code === "POSSIBLE_DUPLICATE"
+        ? ["duplicate_keep", "duplicate_cancel"]
+        : ["checked", "correction_requested", "rounding"]
+      ).map((k) => t(`office.warning_decision.preset_${k}`))
+    : undefined;
   if (warning.status !== "open")
     return <WarningDecisionInfo warning={warning} />;
   if (!can(WARNINGS_WRITE_PERMISSION)) return null;
@@ -169,6 +202,7 @@ export function ApiWarningActions({
           label={t(`office.warning_decision.reason_${action}`)}
           confirmLabel={t(`office.warning_decision.confirm_${action}`)}
           busy={decide.isPending}
+          presets={presets}
           onConfirm={(note) => run(action, note)}
           onCancel={() => setAction(null)}
         />
