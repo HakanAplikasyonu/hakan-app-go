@@ -1381,6 +1381,9 @@ type Querier interface {
 	SupersedePeriodSummaryDrafts(ctx context.Context, arg SupersedePeriodSummaryDraftsParams) error
 	// Ba/Bs: karşı tarafa (VKN / TCKN) göre belge sayısı ve KDV hariç tutar (TL).
 	TaxReturnCounterparties(ctx context.Context, arg TaxReturnCounterpartiesParams) ([]TaxReturnCounterpartiesRow, error)
+	// Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
+	// işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
+	TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnDocumentTaskStatsParams) (TaxReturnDocumentTaskStatsRow, error)
 	TaxReturnExpenseStats(ctx context.Context, arg TaxReturnExpenseStatsParams) (TaxReturnExpenseStatsRow, error)
 	// Onaylı, KDV'si indirilebilir masraf fişlerinin (ÖKC, akaryakıt, SMM ...)
 	// oran kırılımı. Maaş, vergi ödemesi ve banka masrafı KDV taşımaz.

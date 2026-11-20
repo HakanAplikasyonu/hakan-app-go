@@ -347,6 +347,38 @@ func (q *Queries) TaxReturnCounterparties(ctx context.Context, arg TaxReturnCoun
 	return items, nil
 }
 
+const taxReturnDocumentTaskStats = `-- name: TaxReturnDocumentTaskStats :one
+SELECT
+    COUNT(*) FILTER (WHERE status = 'open')::bigint AS open,
+    COUNT(*) FILTER (WHERE status = 'submitted')::bigint AS submitted,
+    COALESCE((ARRAY_AGG(COALESCE(NULLIF(title, ''), kind) ORDER BY due_at NULLS LAST, id)
+        FILTER (WHERE status = 'open'))[1], '')::text AS first_open
+FROM document_tasks
+WHERE organization_id = $1 AND engagement_id = $2 AND period = $3
+  AND status IN ('open', 'submitted')
+`
+
+type TaxReturnDocumentTaskStatsParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Period         string `json:"period"`
+}
+
+type TaxReturnDocumentTaskStatsRow struct {
+	Open      int64  `json:"open"`
+	Submitted int64  `json:"submitted"`
+	FirstOpen string `json:"first_open"`
+}
+
+// Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
+// işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
+func (q *Queries) TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnDocumentTaskStatsParams) (TaxReturnDocumentTaskStatsRow, error) {
+	row := q.db.QueryRow(ctx, taxReturnDocumentTaskStats, arg.OrganizationID, arg.EngagementID, arg.Period)
+	var i TaxReturnDocumentTaskStatsRow
+	err := row.Scan(&i.Open, &i.Submitted, &i.FirstOpen)
+	return i, err
+}
+
 const taxReturnExpenseStats = `-- name: TaxReturnExpenseStats :one
 SELECT COUNT(*) FILTER (WHERE e.approval_status = 'pending')::bigint AS pending,
        COUNT(*) FILTER (WHERE e.approval_status = 'approved' AND e.currency <> 'TRY')::bigint AS foreign_currency,

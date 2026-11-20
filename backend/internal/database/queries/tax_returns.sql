@@ -199,3 +199,15 @@ SET status = 'filed', filed_on = @filed_on, accrual_number = sqlc.narg(accrual_n
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
   AND status = 'prepared'
 RETURNING *;
+
+-- name: TaxReturnDocumentTaskStats :one
+-- Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
+-- işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
+SELECT
+    COUNT(*) FILTER (WHERE status = 'open')::bigint AS open,
+    COUNT(*) FILTER (WHERE status = 'submitted')::bigint AS submitted,
+    COALESCE((ARRAY_AGG(COALESCE(NULLIF(title, ''), kind) ORDER BY due_at NULLS LAST, id)
+        FILTER (WHERE status = 'open'))[1], '')::text AS first_open
+FROM document_tasks
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND period = @period
+  AND status IN ('open', 'submitted');

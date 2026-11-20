@@ -237,6 +237,11 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 		x, c := ComputeBABS(in)
 		b.BABS, items = &x, c
 	}
+	docs, err := s.documentItems(ctx, sc, period)
+	if err != nil {
+		return body{}, nil, err
+	}
+	items = append(items, docs...)
 	if items == nil {
 		items = []CheckItem{}
 	}
@@ -246,6 +251,34 @@ func (s *Service) compute(ctx context.Context, sc engagementctx.Scope, kind, per
 	}
 	b.Checklist = items
 	return b, open, nil
+}
+
+// documentItems are the checklist rows of the period's document tasks
+// (#575): a document still expected from the taxpayer is a warning (the
+// return may change when it arrives); one that arrived but was not processed
+// yet is a warning too. Both apply to every return kind.
+func (s *Service) documentItems(ctx context.Context, sc engagementctx.Scope, period string) ([]CheckItem, error) {
+	st, err := s.q.TaxReturnDocumentTaskStats(ctx, db.TaxReturnDocumentTaskStatsParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Period: period})
+	if err != nil {
+		return nil, fmt.Errorf("tax return document tasks: %w", err)
+	}
+	var out []CheckItem
+	if st.Open > 0 {
+		first := st.FirstOpen
+		switch first {
+		case "undocumented_payment":
+			first = "belgesiz banka ödemesi"
+		case "uninvoiced_collection":
+			first = "faturasız tahsilat"
+		}
+		msg := fmt.Sprintf("%d belge mükelleften bekleniyor (ör. %s); gelmeden beyan eksik kalabilir.", st.Open, first)
+		out = append(out, item("OPEN_DOCUMENT_TASKS", SeverityWarning, msg, st.Open))
+	}
+	if st.Submitted > 0 {
+		out = append(out, item("SUBMITTED_DOCUMENTS", SeverityWarning,
+			fmt.Sprintf("Mükellefin gönderdiği %d belge henüz işlenmedi.", st.Submitted), st.Submitted))
+	}
+	return out, nil
 }
 
 // ParseKDV1Adjustments validates the adjustments of a KDV1 draft: known

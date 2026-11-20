@@ -132,6 +132,8 @@ const CHECKLIST_TAB: [RegExp, keyof typeof CHECKLIST_ROUTES][] = [
     "expenses",
   ],
   [/^(PENDING_Z_REPORTS|Z_WITHOUT_BREAKDOWN)$/, "zreports"],
+  // Mükelleften beklenen / gelip işlenmeyen belgeler (#575).
+  [/^(OPEN_DOCUMENT_TASKS|SUBMITTED_DOCUMENTS)$/, "documents"],
   [
     /^(NO_PAYROLL|PAYROLL_ISSUES|SGK_ACCRUAL_MISSING|SGK_ACCRUAL_MISMATCH|MISSING_SGK_NO|MISSING_DAYS|MASKED_NATIONAL_IDS|INCOME_WITHHOLDING)$/,
     "payroll",
@@ -147,6 +149,7 @@ const CHECKLIST_ROUTES = {
   expenses: routes.tenant.engagementExpenses,
   zreports: routes.tenant.engagementZReports,
   payroll: routes.tenant.engagementPayroll,
+  documents: routes.tenant.engagementDocTasks,
 };
 
 /**

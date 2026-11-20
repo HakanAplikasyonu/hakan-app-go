@@ -2,11 +2,16 @@ package httpserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/jackc/pgx/v5"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 )
 
 // Beyanname önizlemesi (#390): demo ofisin verisinden KDV1, MUHSGK ve Ba/Bs;
@@ -200,5 +205,73 @@ func TestTaxReturnFlow(t *testing.T) {
 	}
 	if rec := raw(t, http.MethodGet, base+"/kdv1/2026-13", ""); rec.Code != http.StatusBadRequest {
 		t.Fatalf("bad period: %d", rec.Code)
+	}
+}
+
+// #575: mükelleften beklenen ve gelip işlenmeyen belgeler beyan kontrol
+// listesinde onay isteyen madde olur; belge eşleşince madde kalkar.
+func TestTaxReturnDocumentChecklist(t *testing.T) {
+	e := newSweepEnv(t)
+	eng := e.param(t, "engagementUuid", "")
+	url := "/v1/tenant/engagements/" + eng + "/tax-returns/muhsgk/2026-10"
+	codes := func() map[string]string {
+		t.Helper()
+		rec := e.do(t, http.MethodGet, url, sweepCase{}, false)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("preview: %d %s", rec.Code, rec.Body)
+		}
+		var env struct {
+			Data struct {
+				Checklist []struct {
+					Code     string `json:"code"`
+					Severity string `json:"severity"`
+					Message  string `json:"message"`
+				} `json:"checklist"`
+				OpenWarnings []string `json:"open_warnings"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &env); err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]string{}
+		for _, c := range env.Data.Checklist {
+			out[c.Code] = c.Severity + " " + c.Message
+		}
+		for _, w := range env.Data.OpenWarnings {
+			out["open:"+w] = ""
+		}
+		return out
+	}
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if err := rls.System(context.Background(), e.d.Pool, "test: document tasks", func(ctx context.Context, tx pgx.Tx) error {
+			_, err := tx.Exec(ctx, sql, args...)
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`DELETE FROM document_tasks WHERE engagement_id = $1`, e.engID)
+	if c := codes(); c["OPEN_DOCUMENT_TASKS"] != "" || c["SUBMITTED_DOCUMENTS"] != "" {
+		t.Fatalf("no tasks yet: %v", c)
+	}
+	exec(`INSERT INTO document_tasks (organization_id, engagement_id, taxpayer_id, code, kind, period, status, title, note, due_at,
+			next_reminder_at, created_by, submitted_at)
+		SELECT $1, $2, $3, 'DOC_REQUEST', 'document_request', '2026-10', s, 'Kira sözleşmesi', '', now(), now(),
+		       (SELECT user_id FROM organization_members WHERE organization_id = $1 ORDER BY id LIMIT 1),
+		       CASE WHEN s = 'submitted' THEN now() END
+		FROM unnest(ARRAY['open', 'open', 'submitted']) s`, e.orgID, e.engID, e.tpID)
+	c := codes()
+	if !strings.HasPrefix(c["OPEN_DOCUMENT_TASKS"], "warning 2 belge") || !strings.Contains(c["OPEN_DOCUMENT_TASKS"], "Kira sözleşmesi") ||
+		!strings.HasPrefix(c["SUBMITTED_DOCUMENTS"], "warning") {
+		t.Fatalf("checklist %v", c)
+	}
+	if _, ok := c["open:OPEN_DOCUMENT_TASKS"]; !ok {
+		t.Fatalf("not waiting for acknowledgement: %v", c)
+	}
+	exec(`UPDATE document_tasks SET status = 'matched', matched_at = now(), submitted_at = COALESCE(submitted_at, now())
+		WHERE engagement_id = $1`, e.engID)
+	if c := codes(); c["OPEN_DOCUMENT_TASKS"] != "" || c["SUBMITTED_DOCUMENTS"] != "" {
+		t.Fatalf("after matching: %v", c)
 	}
 }

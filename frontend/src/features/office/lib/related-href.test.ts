@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { routes } from "@/config/routes";
+
 import {
   checklistHref,
   parseFocus,
@@ -79,6 +81,9 @@ describe("checklistHref", () => {
   it("madde kodu ilgili sekmeye", () => {
     expect(checklistHref("demo", "e1", "DRAFT_INVOICES")).toBe(
       `${base}/invoices`,
+    );
+    expect(checklistHref("demo", "e1", "OPEN_DOCUMENT_TASKS")).toBe(
+      routes.tenant.engagementDocTasks("demo", "e1"),
     );
     expect(checklistHref("demo", "e1", "MISSING_COUNTERPARTY_VKN")).toBe(
       `${base}/invoices`,
