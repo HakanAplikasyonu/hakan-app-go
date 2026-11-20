@@ -18,6 +18,7 @@ import { usePeriodMatrix } from "../hooks/use-office-data";
 import { useEngagementInvoices } from "../hooks/use-office-invoices";
 import { useWarningGroups } from "../hooks/use-warnings";
 import { useOfficePeriod, usePeriodText } from "../period";
+import { DocTaskSubmission } from "./doc-task-submission";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
 
 function Stat({
@@ -241,8 +242,15 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
                         ? t("office.engagement.task_overdue")
                         : t("office.engagement.task_waiting")}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm">
-                    {taskTitle(x)}
+                  <span className="min-w-0 flex-1 space-y-1 text-sm">
+                    <span className="block truncate">{taskTitle(x)}</span>
+                    {/* Gelen belge burada açılır ve istek tamamlanır (#571). */}
+                    {x.status === "submitted" ? (
+                      <DocTaskSubmission
+                        engagement={engagement}
+                        task={x.uuid}
+                      />
+                    ) : null}
                   </span>
                   {x.due_at ? (
                     <time

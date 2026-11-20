@@ -93,6 +93,16 @@ export class Api {
     return this.ctx.post(path, { headers: this.headers(), multipart: { [field]: file } });
   }
 
+  /** uploadField, ek başlıklarla (ör. mükellef uçlarında `X-Taxpayer`). */
+  async uploadFieldWith(
+    path: string,
+    field: string,
+    file: { name: string; mimeType: string; buffer: Buffer },
+    headers: Record<string, string>,
+  ) {
+    return this.ctx.post(path, { headers: this.headers(headers), multipart: { [field]: file } });
+  }
+
   /** `data` of a 2xx JSON envelope; fails the test otherwise. */
   async json<T = any>(res: Awaited<ReturnType<APIRequestContext["get"]>>): Promise<T> {
     const text = await res.text();
@@ -310,4 +320,45 @@ export async function addConsentedTaxpayer(
     await tp.context().close();
   }
   return engagementOf(api, taxpayer.title);
+}
+
+/**
+ * addConsentedTaxpayer gibi, ama mükellef kullanıcısının giriş bilgisini de
+ * döner: mükellef tarafındaki uçları (`/v1/taxpayer/...`, `X-Taxpayer`)
+ * çağıran senaryolar için. `taxpayerUuid` X-Taxpayer başlığının değeridir.
+ */
+export async function addConsentedTaxpayerWithUser(
+  browser: Browser,
+  api: Api,
+  taxpayer: { vkn: string; title: string },
+  tag: string,
+): Promise<{ engagement: string; taxpayerUuid: string; email: string; password: string }> {
+  const email = uniqueEmail(tag);
+  const password = "E2e-Parola-123!";
+  const office = await (await browser.newContext()).newPage();
+  try {
+    await uiLogin(office, DEMO.owner);
+    await office.goto(officePath("/taxpayer-requests"));
+    await office.locator('input[name="tax_id"]').fill(taxpayer.vkn);
+    await office.locator('input[name="title"]').fill(taxpayer.title);
+    await office.locator('input[name="contact_email"]').fill(email);
+    await office.getByRole("button", { name: "Onay iste" }).click();
+    await expect(office.getByText(email).first()).toBeVisible();
+  } finally {
+    await office.context().close();
+  }
+  const token = await consentTokenFor(email);
+  const tp = await (await browser.newContext()).newPage();
+  try {
+    await registerWithToken(tp, token, `/consent/${token}`, { name: "E2E", surname: "Mükellef", password });
+    await expect(tp.getByRole("checkbox").first()).toBeVisible();
+    for (const box of await tp.getByRole("checkbox").all()) await box.check();
+    await tp.getByRole("button", { name: "Onayla" }).click();
+    await tp.waitForURL(/\/m\/[0-9a-f-]{36}/);
+  } finally {
+    await tp.context().close();
+  }
+  const engagement = await engagementOf(api, taxpayer.title);
+  const row = await api.json<{ uuid: string }>(await api.get(`/v1/tenant/engagements/${engagement}/taxpayer`));
+  return { engagement, taxpayerUuid: row.uuid, email, password };
 }
