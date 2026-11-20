@@ -223,3 +223,23 @@ LEFT JOIN LATERAL (
 ) t ON TRUE
 WHERE i.organization_id = @organization_id AND i.engagement_id = @engagement_id
   AND i.journal_draft_id = ANY(@ids::bigint[]) AND i.reversed_at IS NULL;
+
+-- name: AddJournalDraftManualLink :execrows
+-- Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi, fişin
+-- origin.manual_links dizisinde {kind, id}. Satırlara, tutarlara ve aktarıma
+-- dokunmaz; yalnız ilişkili kayıtlarda görünür. Aynı bağ ikinci kez eklenmez.
+UPDATE journal_drafts SET origin = jsonb_set(origin, '{manual_links}',
+    (CASE WHEN jsonb_typeof(origin -> 'manual_links') = 'array' THEN origin -> 'manual_links' ELSE '[]'::jsonb END)
+    || jsonb_build_array(jsonb_build_object('kind', @kind::text, 'id', @target_id::bigint)))
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @draft_id
+  AND NOT (CASE WHEN jsonb_typeof(origin -> 'manual_links') = 'array' THEN origin -> 'manual_links' ELSE '[]'::jsonb END)
+      @> jsonb_build_array(jsonb_build_object('kind', @kind::text, 'id', @target_id::bigint));
+
+-- name: RemoveJournalDraftManualLink :execrows
+-- Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
+UPDATE journal_drafts SET origin = jsonb_set(origin, '{manual_links}', COALESCE((
+    SELECT jsonb_agg(x) FROM jsonb_array_elements(origin -> 'manual_links') x
+    WHERE x <> jsonb_build_object('kind', @kind::text, 'id', @target_id::bigint)), '[]'::jsonb))
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @draft_id
+  AND jsonb_typeof(origin -> 'manual_links') = 'array'
+  AND origin -> 'manual_links' @> jsonb_build_array(jsonb_build_object('kind', @kind::text, 'id', @target_id::bigint));

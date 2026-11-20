@@ -611,4 +611,10 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                 azTenantWrite,
 	"POST /v1/public/reconciliation-letters/preview":                                                            azPublic,
 	"POST /v1/public/reconciliation-letters/respond":                                                            azPublic,
+
+	// Fişe elle bağlanan kayıt (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":                 azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": azTenantWrite,
 }
