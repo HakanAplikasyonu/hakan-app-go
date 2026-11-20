@@ -21,6 +21,13 @@ import {
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -39,7 +46,7 @@ import {
   toMinor,
 } from "../lib/decimal";
 import { journalErrorText } from "../lib/journal-error";
-import { Figure, Money, Panel } from "./office-ui";
+import { Figure, Money } from "./office-ui";
 
 type LineRow = {
   account: string;
@@ -211,7 +218,49 @@ const positive = (v: string | null) => !!v && toMinor(v) > BigInt(0);
  * Denge canlı; "Farkı kapat" farkı son satıra yazar. Enter sonraki alana,
  * son satırın sonunda yeni satıra geçer; Ctrl+Enter kaydeder.
  */
+/**
+ * Yeni fiş (#710): sayfada yalnız "Yeni fiş" düğmesi durur; form açılır
+ * pencerede gelir, liste aşağı itilmez. Kaydedilince pencere kapanır ve
+ * sayfa yerinden oynamaz; vazgeçince yarım fiş kalmaz.
+ */
 export function NewDraft({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="flex">
+        <Button size="sm" onClick={() => setOpen(true)}>
+          <Plus className="size-4" aria-hidden />
+          {t("office.journals.new_title")}
+        </Button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>{t("office.journals.new_title")}</DialogTitle>
+            <DialogDescription>
+              {t("office.journals.new_hint")}
+            </DialogDescription>
+          </DialogHeader>
+          {open ? (
+            <NewDraftForm
+              engagement={engagement}
+              onSaved={() => setOpen(false)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function NewDraftForm({
+  engagement,
+  onSaved,
+}: {
+  engagement: string;
+  onSaved: () => void;
+}) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { create } = useJournalActions(slug, engagement);
@@ -438,6 +487,7 @@ export function NewDraft({ engagement }: { engagement: string }) {
         onSuccess: () => {
           setDescription("");
           setLines([emptyLine(), emptyLine()]);
+          onSaved();
         },
       },
     );
@@ -449,8 +499,8 @@ export function NewDraft({ engagement }: { engagement: string }) {
   const options = plan.data?.items ?? [];
 
   return (
-    <Panel title={t("office.journals.new_title")}>
-      <div className="space-y-3 p-4">
+    <div className="space-y-3">
+      <div className="space-y-3">
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 text-xs">
             <Label
@@ -547,11 +597,10 @@ export function NewDraft({ engagement }: { engagement: string }) {
           </p>
         ) : null}
         <p className="text-muted-foreground text-xs">
-          {t("office.journals.new_hint")}{" "}
           {t("office.journals.entry.keyboard_hint")}
         </p>
       </div>
-    </Panel>
+    </div>
   );
 }
 

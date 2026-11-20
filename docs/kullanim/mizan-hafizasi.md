@@ -165,7 +165,7 @@ yeniden kuyruğa düşer, önceden yazılan kodlar değişmez.
 
 ## 6. Luca'ya aktarırken denetim
 
-**Yevmiye ve çıktı** ekranında Luca dosyası alırken fişteki her hesap
+**Fişler ve aktarım** ekranında Luca dosyası alırken fişteki her hesap
 kodu yüklediğiniz mizanda aranır:
 
 - `320 01 002` gibi yazımlar `320.01.002` olarak okunur ve dosyaya bu
