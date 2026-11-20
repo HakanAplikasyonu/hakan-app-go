@@ -11,6 +11,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -22,10 +23,53 @@ import (
 var rePeriod = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)
 
 // Handler serves POST /v1/tenant/engagements/{engagementUuid}/bank-matching.
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc      *Service
+	activity *activity.Recorder
+}
 
 // NewHandler builds the handler.
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+
+// WithActivity records who matched, unmatched or booked a movement, when and
+// with what (#565 audit trail). Without it nothing is recorded.
+func (h *Handler) WithActivity(rec *activity.Recorder) *Handler {
+	h.activity = rec
+	return h
+}
+
+// Audit actions of the single-movement screen.
+const (
+	ActionMatched   = "bank.transaction.matched"
+	ActionUnmatched = "bank.transaction.unmatched"
+	ActionBooked    = "bank.transaction.booked"
+)
+
+// audit writes the event after a successful change. The payload names the
+// engagement, the movement (date, amount) and what it was tied to.
+func (h *Handler) audit(r *http.Request, action string, v TransactionView, extra map[string]any) {
+	if h.activity == nil {
+		return
+	}
+	p, _ := authctx.PrincipalFrom(r.Context())
+	payload := map[string]any{
+		"engagement_uuid":  r.PathValue(engagementctx.PathParam),
+		"transaction_date": v.Date, "amount": v.Amount, "currency": v.Currency, "debit_credit": v.DebitCredit,
+	}
+	for k, val := range extra {
+		payload[k] = val
+	}
+	id := v.UUID
+	h.activity.Record(r.Context(), &p.UserInternal, action, "bank_transaction", &id, payload, r)
+}
+
+func invoiceNumbers(ms []MatchedInvoice) []string {
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, m.InvoiceNumber)
+	}
+	return out
+}
 
 // RegisterRoutes mounts the route behind the active-engagement chain.
 func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
@@ -96,6 +140,9 @@ func (h *Handler) match(w http.ResponseWriter, r *http.Request) {
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
 	v, err := h.svc.Match(r.Context(), subjectOf(r), id, in.InvoiceUUIDs, p.UserInternal)
+	if err == nil {
+		h.audit(r, ActionMatched, v, map[string]any{"invoices": invoiceNumbers(v.Matches)})
+	}
 	h.reply(w, r, v, err)
 }
 
@@ -105,7 +152,12 @@ func (h *Handler) unmatch(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, r, "bank transaction not found")
 		return
 	}
+	// What the undo removes is read first: afterwards it is gone.
+	before, _ := h.svc.Transaction(r.Context(), subjectOf(r), id)
 	v, err := h.svc.Unmatch(r.Context(), subjectOf(r), id)
+	if err == nil && len(before.Matches) > 0 {
+		h.audit(r, ActionUnmatched, v, map[string]any{"invoices": invoiceNumbers(before.Matches)})
+	}
 	h.reply(w, r, v, err)
 }
 
@@ -130,6 +182,9 @@ func (h *Handler) setAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	p, _ := authctx.PrincipalFrom(r.Context())
 	v, err := h.svc.SetAccount(r.Context(), subjectOf(r), id, p.UserInternal, in.AccountCode, in.AccountName)
+	if err == nil && v.Posting != nil {
+		h.audit(r, ActionBooked, v, map[string]any{"account_code": v.Posting.AccountCode, "account_name": v.Posting.AccountName})
+	}
 	h.reply(w, r, v, err)
 }
 
