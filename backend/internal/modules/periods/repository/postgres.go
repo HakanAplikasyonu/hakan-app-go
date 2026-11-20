@@ -340,6 +340,7 @@ func (p *Postgres) MatrixEngagements(ctx context.Context, f usecase.MatrixFilter
 func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids []int64, periods []string) (usecase.MatrixCounts, error) {
 	out := usecase.MatrixCounts{
 		Blockers: map[usecase.MatrixKey]int64{}, Warnings: map[usecase.MatrixKey]int64{}, ChangeRequests: map[usecase.MatrixKey]int64{}, Locks: map[usecase.MatrixKey]time.Time{},
+		Returns: map[usecase.MatrixKey][]usecase.CellReturn{}, DocTasks: map[usecase.MatrixKey][2]int64{},
 	}
 	bl, err := p.q.PeriodMatrixBlockers(ctx, db.PeriodMatrixBlockersParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
 	if err != nil {
@@ -365,6 +366,30 @@ func (p *Postgres) MatrixCounts(ctx context.Context, organizationID int64, ids [
 	}
 	for _, r := range locks {
 		out.Locks[usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}] = r.LockedAt.Time
+	}
+	rets, err := p.q.PeriodMatrixReturns(ctx, db.PeriodMatrixReturnsParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
+	if err != nil {
+		return out, fmt.Errorf("matrix returns: %w", err)
+	}
+	for _, r := range rets {
+		k := usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}
+		c := usecase.CellReturn{Kind: r.Kind, Status: r.Status}
+		if r.PayableAmount.Valid {
+			v := invoicerepo.Dec(r.PayableAmount).StringFixed(2)
+			c.PayableAmount = &v
+		}
+		if r.FiledOn.Valid {
+			v := r.FiledOn.Time.Format("2006-01-02")
+			c.FiledOn = &v
+		}
+		out.Returns[k] = append(out.Returns[k], c)
+	}
+	docs, err := p.q.PeriodMatrixDocumentTasks(ctx, db.PeriodMatrixDocumentTasksParams{OrganizationID: organizationID, EngagementIds: ids, Periods: periods})
+	if err != nil {
+		return out, fmt.Errorf("matrix document tasks: %w", err)
+	}
+	for _, r := range docs {
+		out.DocTasks[usecase.MatrixKey{EngagementID: r.EngagementID, Period: r.Period}] = [2]int64{r.Open, r.Submitted}
 	}
 	return out, nil
 }

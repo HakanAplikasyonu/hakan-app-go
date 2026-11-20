@@ -153,6 +153,8 @@ type MatrixCounts struct {
 	Warnings       map[MatrixKey]int64
 	ChangeRequests map[MatrixKey]int64
 	Locks          map[MatrixKey]time.Time
+	Returns        map[MatrixKey][]CellReturn
+	DocTasks       map[MatrixKey][2]int64 // open, submitted
 }
 
 // MatrixKey addresses one cell.
@@ -170,6 +172,21 @@ type Cell struct {
 	OpenBlockers       int64      `json:"open_blockers"`
 	OpenWarnings       int64      `json:"open_warnings"`
 	OpenChangeRequests int64      `json:"open_change_requests"`
+	// Returns: the period's tax return records (#575); a kind without a
+	// record has not been started.
+	Returns []CellReturn `json:"returns"`
+	// OpenDocumentTasks: documents still expected from the taxpayer;
+	// SubmittedDocuments: sent by the taxpayer, not processed yet.
+	OpenDocumentTasks  int64 `json:"open_document_tasks"`
+	SubmittedDocuments int64 `json:"submitted_documents"`
+}
+
+// CellReturn is one tax return record of a cell.
+type CellReturn struct {
+	Kind          string  `json:"kind"`
+	Status        string  `json:"status"`
+	PayableAmount *string `json:"payable_amount"`
+	FiledOn       *string `json:"filed_on"`
 }
 
 // MatrixRow is one engagement of the matrix.

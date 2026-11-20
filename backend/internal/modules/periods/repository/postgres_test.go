@@ -344,6 +344,44 @@ func TestMatrix(t *testing.T) {
 	if c := cells[eng2]; !c.Ready || c.Locked || c.OpenBlockers != 0 || c.OpenWarnings != 1 {
 		t.Fatalf("other cell: %+v", c)
 	}
+	if c := cells[eng2]; len(c.Returns) != 0 || c.OpenDocumentTasks != 0 {
+		t.Fatalf("no returns yet: %+v", c)
+	}
+	// #575: beyan kayıtları ve mükelleften beklenen belgeler hücrede.
+	if _, err := f.d.Pool.Exec(ctx, `INSERT INTO tax_returns (organization_id, engagement_id, kind, period, status, payable_amount, filed_on, accrual_number, snapshot)
+		VALUES ($1, $2, 'kdv1', $3, 'filed', 1234.5, DATE '2026-11-26', 'T-1', '{}'), ($1, $2, 'muhsgk', $3, 'draft', NULL, NULL, NULL, NULL)`,
+		f.sub.OrganizationID, eng2, ubl.Period); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.d.Pool.Exec(ctx, `INSERT INTO document_tasks (organization_id, engagement_id, taxpayer_id, code, kind, period, status, title, note,
+			due_at, next_reminder_at, created_by, submitted_at)
+		SELECT $1, $2, $3, 'DOC_REQUEST', 'document_request', $4, s, 'Kira sözleşmesi', '', now(), now(), $5,
+		       CASE WHEN s = 'submitted' THEN now() END
+		FROM unnest(ARRAY['open', 'open', 'submitted']) s`, f.sub.OrganizationID, eng2, tp2, ubl.Period, f.user); err != nil {
+		t.Fatal(err)
+	}
+	m, err = f.svc.Matrix(ctx, usecase.MatrixFilter{OrganizationID: f.sub.OrganizationID, AllEngagements: true, Limit: 10}, ubl.Period, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, row := range m.Items {
+		c := row.Cells[0]
+		if row.TaxpayerTaxID == ownVKN {
+			if len(c.Returns) != 0 {
+				t.Fatalf("own returns: %+v", c.Returns)
+			}
+			continue
+		}
+		got := map[string]usecase.CellReturn{}
+		for _, r := range c.Returns {
+			got[r.Kind] = r
+		}
+		k := got["kdv1"]
+		if k.Status != "filed" || k.PayableAmount == nil || *k.PayableAmount != "1234.50" || k.FiledOn == nil || *k.FiledOn != "2026-11-26" ||
+			got["muhsgk"].Status != "draft" || got["muhsgk"].PayableAmount != nil || c.OpenDocumentTasks != 2 || c.SubmittedDocuments != 1 {
+			t.Fatalf("returns cell: %+v", c)
+		}
+	}
 	// Without read_all a member sees only assigned engagements.
 	m, err = f.svc.Matrix(ctx, usecase.MatrixFilter{OrganizationID: f.sub.OrganizationID, UserID: f.user, Limit: 10}, ubl.Period, 1)
 	if err != nil || m.Total != 0 || len(m.Items) != 0 {

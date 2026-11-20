@@ -1158,7 +1158,11 @@ type Querier interface {
 	// açık uyarıların tamamı (#529: mükellef ve dönem bazında açık uyarı sayısı).
 	PeriodMatrixBlockers(ctx context.Context, arg PeriodMatrixBlockersParams) ([]PeriodMatrixBlockersRow, error)
 	PeriodMatrixChangeRequests(ctx context.Context, arg PeriodMatrixChangeRequestsParams) ([]PeriodMatrixChangeRequestsRow, error)
+	// Mükelleften beklenen (open) ve gelip işlenmeyen (submitted) belgeler.
+	PeriodMatrixDocumentTasks(ctx context.Context, arg PeriodMatrixDocumentTasksParams) ([]PeriodMatrixDocumentTasksRow, error)
 	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)
+	// Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
+	PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixReturnsParams) ([]PeriodMatrixReturnsRow, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
 	PeriodVATSummary(ctx context.Context, arg PeriodVATSummaryParams) ([]PeriodVATSummaryRow, error)
 	PingDB(ctx context.Context) (int32, error)

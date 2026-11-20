@@ -36,6 +36,8 @@ test.describe("@a11y ofis paneli", () => {
       "/copilot",
       "/command",
       "/taxpayers",
+      // Ofis beyan dönemi (#575).
+      "/tax-returns",
       "/taxpayer-requests",
       `/invoices?taxpayer=${atlas}`,
       "/review",

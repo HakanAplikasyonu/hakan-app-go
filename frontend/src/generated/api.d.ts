@@ -18878,6 +18878,28 @@ export interface components {
             open_warnings: number;
             /** Format: int64 */
             open_change_requests: number;
+            /** @description Tax return records of the period (#575); a kind without a record has not been started. */
+            returns: components["schemas"]["PeriodMatrixReturn"][];
+            /**
+             * Format: int64
+             * @description Documents still expected from the taxpayer
+             */
+            open_document_tasks: number;
+            /**
+             * Format: int64
+             * @description Documents the taxpayer sent that are not processed yet
+             */
+            submitted_documents: number;
+        };
+        PeriodMatrixReturn: {
+            /** @enum {string} */
+            kind: "kdv1" | "muhsgk" | "babs";
+            /** @enum {string} */
+            status: "draft" | "prepared" | "filed";
+            /** @description Amount payable (TL) once prepared */
+            payable_amount: string | null;
+            /** Format: date */
+            filed_on: string | null;
         };
         PeriodMatrixRow: {
             /** Format: uuid */
