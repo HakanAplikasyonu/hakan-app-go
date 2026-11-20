@@ -30,10 +30,27 @@ import {
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Hint } from "@/components/ui/hint";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DRAFTS_ANCHOR,
   EXPORT_ANCHOR,
@@ -49,11 +66,19 @@ import { useLocale } from "@/providers/locale-provider";
 import {
   useExportDrivers,
   useJournalActions,
+  useJournalDraft,
   useJournalDrafts,
   useJournalExports,
   useJournalTransfers,
 } from "../hooks/use-journals";
-import { formatMoney } from "../lib/decimal";
+import {
+  absDiff,
+  formatMoney,
+  fromMinor,
+  parseAmountInput,
+  sum,
+  toMinor,
+} from "../lib/decimal";
 import { exportIssueText } from "../lib/export-issue";
 import { periodService } from "../services/periods.service";
 import { journalErrorText } from "../lib/journal-error";
@@ -150,6 +175,7 @@ function DraftCheck({
   const { slug } = useTenant();
   const { prompt } = useDialogs();
   const { setLineAccount } = useJournalActions(slug, engagement);
+  const [amountsOpen, setAmountsOpen] = useState(false);
   const { permissions: perms } = useTenant();
   const canUnlock = perms.includes(permissions.tenant.periods.lock);
   const qc = useQueryClient();
@@ -226,51 +252,260 @@ function DraftCheck({
     );
   };
   return (
-    <ul className="space-y-1 text-xs">
-      {issues.map((is, i) => (
-        <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1",
-              is.blocking ? "text-status-blocking" : "text-status-warning",
-            )}
-          >
-            <CircleAlert className="size-3.5 shrink-0" aria-hidden />
-            {issueText(t, is)}
-          </span>
-          {/* Kapalı dönem (#669 A): yetkili kullanıcı dönemi buradan,
+    <>
+      <ul className="space-y-1 text-xs">
+        {issues.map((is, i) => (
+          <li key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1",
+                is.blocking ? "text-status-blocking" : "text-status-warning",
+              )}
+            >
+              <CircleAlert className="size-3.5 shrink-0" aria-hidden />
+              {issueText(t, is)}
+            </span>
+            {/* Kapalı dönem (#669 A): yetkili kullanıcı dönemi buradan,
               gerekçesiyle açar; yetkisi olmayan kime başvuracağını görür. */}
-          {is.code === "period_locked" ? (
-            canUnlock ? (
+            {is.code === "period_locked" ? (
+              canUnlock ? (
+                <Button
+                  size="sm"
+                  variant="link"
+                  className="h-auto p-0 text-xs"
+                  disabled={unlock.isPending}
+                  onClick={() => void openPeriod()}
+                >
+                  {t("office.journals.check.unlock_period")}
+                </Button>
+              ) : (
+                <span className="text-muted-foreground">
+                  {t("office.journals.check.unlock_no_permission")}
+                </span>
+              )
+            ) : null}
+            {is.code === "unbalanced" ? (
               <Button
                 size="sm"
                 variant="link"
                 className="h-auto p-0 text-xs"
-                disabled={unlock.isPending}
-                onClick={() => void openPeriod()}
+                onClick={() => setAmountsOpen(true)}
               >
-                {t("office.journals.check.unlock_period")}
+                {t("office.journals.check.fix_amounts")}
               </Button>
-            ) : (
-              <span className="text-muted-foreground">
-                {t("office.journals.check.unlock_no_permission")}
-              </span>
-            )
-          ) : null}
-          {is.code === "unknown_account" || is.code === "parent_account" ? (
-            <Button
-              size="sm"
-              variant="link"
-              className="h-auto p-0 text-xs"
-              disabled={setLineAccount.isPending}
-              onClick={() => void fix(is)}
-            >
-              {t("office.journals.check.fix_account")}
-            </Button>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+            ) : null}
+            {is.code === "unknown_account" || is.code === "parent_account" ? (
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0 text-xs"
+                disabled={setLineAccount.isPending}
+                onClick={() => void fix(is)}
+              >
+                {t("office.journals.check.fix_account")}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {amountsOpen ? (
+        <DraftAmountsDialog
+          draft={draft}
+          engagement={engagement}
+          onClose={() => setAmountsOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+type AmountEdit = { debit: string; credit: string };
+
+/**
+ * Borç-alacak tutmayan taslağın tutar düzeltmesi (#566): kaynaksız (elle
+ * girilmiş) satırların borç/alacağı yazılır, fark canlı görünür. Belgeden
+ * gelen satırın tutarı belgesinden düzeltilir; burada yalnız okunur.
+ */
+function DraftAmountsDialog({
+  draft,
+  engagement,
+  onClose,
+}: {
+  draft: JournalDraft;
+  engagement: string;
+  onClose: () => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const detail = useJournalDraft(slug, engagement, draft.uuid);
+  const { setLineAmounts } = useJournalActions(slug, engagement);
+  const [edits, setEdits] = useState<Record<number, AmountEdit>>({});
+  const lines = detail.data?.items ?? [];
+  const value = (no: number, side: keyof AmountEdit, current: string) =>
+    edits[no]?.[side] ?? (Number(current) ? current.replace(".", ",") : "");
+  const parsed = lines.map((l) => {
+    const debit = parseAmountInput(value(l.line_no, "debit", l.debit));
+    const credit = parseAmountInput(value(l.line_no, "credit", l.credit));
+    return { line: l, debit, credit };
+  });
+  const invalid = parsed.some(
+    (p) =>
+      p.debit === null ||
+      p.credit === null ||
+      // Tek taraf dolu olmalı: ya borç ya alacak.
+      Number(p.debit || 0) > 0 === Number(p.credit || 0) > 0,
+  );
+  const debitTotal = sum(parsed.map((p) => p.debit || "0"));
+  const creditTotal = sum(parsed.map((p) => p.credit || "0"));
+  const diff = invalid ? null : fromMinor(absDiff(debitTotal, creditTotal));
+  const changed = parsed.filter(
+    (p) =>
+      !p.line.source_kind &&
+      (toMinor(p.debit) !== toMinor(p.line.debit) ||
+        toMinor(p.credit) !== toMinor(p.line.credit)),
+  );
+  const set = (no: number, side: keyof AmountEdit, v: string, l: AmountEdit) =>
+    setEdits((prev) => ({ ...prev, [no]: { ...l, ...prev[no], [side]: v } }));
+  const save = () => {
+    setLineAmounts.mutate(
+      {
+        draft: draft.uuid,
+        lines: changed.map((p) => ({
+          line: p.line.line_no,
+          debit: p.debit || "0",
+          credit: p.credit || "0",
+        })),
+      },
+      {
+        onSuccess: () => {
+          toast.success(
+            t("office.journals.check.amounts_fixed", { count: changed.length }),
+          );
+          onClose();
+        },
+        onError: (err) =>
+          toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+      },
+    );
+  };
+  return (
+    <Dialog open onOpenChange={(open) => (open ? null : onClose())}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
+            {t("office.journals.check.amounts_title", {
+              entry: draft.entry_no,
+            })}
+          </DialogTitle>
+          <DialogDescription>
+            {t("office.journals.check.amounts_description")}
+          </DialogDescription>
+        </DialogHeader>
+        {detail.isPending ? (
+          <Skeleton className="h-24 w-full" />
+        ) : (
+          <Table data-testid="draft-amounts">
+            <TableHeader>
+              <TableRow className="text-muted-foreground text-left text-xs">
+                <TableHead className="py-1 pr-2 font-medium">
+                  {t("office.journals.check.amounts_line")}
+                </TableHead>
+                <TableHead className="py-1 pr-2 font-medium">
+                  {t("office.journals.check.amounts_account")}
+                </TableHead>
+                <TableHead className="py-1 pr-2 text-right font-medium">
+                  {t("office.journals.check.amounts_debit")}
+                </TableHead>
+                <TableHead className="py-1 text-right font-medium">
+                  {t("office.journals.check.amounts_credit")}
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lines.map((l) => {
+                const base = {
+                  debit: value(l.line_no, "debit", l.debit),
+                  credit: value(l.line_no, "credit", l.credit),
+                };
+                return (
+                  <TableRow key={l.line_no} className="border-t align-top">
+                    <TableCell className="py-1.5 pr-2 tabular-nums">
+                      {l.line_no}
+                    </TableCell>
+                    <TableCell className="py-1.5 pr-2">
+                      <span className="font-mono">{l.account}</span>
+                      {l.source_kind ? (
+                        <span className="text-muted-foreground block text-xs">
+                          {t("office.journals.check.amounts_from_source")}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    {(["debit", "credit"] as const).map((side) => (
+                      <TableCell
+                        key={side}
+                        className={cn(
+                          "py-1.5 text-right tabular-nums",
+                          side === "debit" && "pr-2",
+                        )}
+                      >
+                        {l.source_kind ? (
+                          formatMoney(l[side])
+                        ) : (
+                          <Input
+                            inputMode="decimal"
+                            className="h-8 w-32 text-right tabular-nums"
+                            aria-label={t(
+                              `office.journals.check.amounts_${side}_label`,
+                              { line: l.line_no },
+                            )}
+                            value={base[side]}
+                            onChange={(e) =>
+                              set(l.line_no, side, e.target.value, base)
+                            }
+                          />
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+        {lines.length ? (
+          <p
+            className={cn(
+              "text-sm",
+              diff === "0.00" ? "text-status-approved" : "text-status-blocking",
+            )}
+            data-testid="draft-amounts-diff"
+            aria-live="polite"
+          >
+            {diff === null
+              ? t("office.journals.check.amounts_invalid")
+              : diff === "0.00"
+                ? t("office.journals.check.amounts_balanced")
+                : t("office.journals.check.amounts_diff", {
+                    amount: formatMoney(diff),
+                  })}
+          </p>
+        ) : null}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            {t("office.journals.check.amounts_cancel")}
+          </Button>
+          <Button
+            disabled={invalid || !changed.length || setLineAmounts.isPending}
+            onClick={save}
+          >
+            {setLineAmounts.isPending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            {t("office.journals.check.amounts_save")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

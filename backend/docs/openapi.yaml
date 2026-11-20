@@ -9667,11 +9667,16 @@ paths:
     patch:
       tags: [Journals]
       operationId: setJournalDraftLineAccount
-      summary: Fix a draft line's account code
+      summary: Fix a draft line's account code or amount
       description: |
         Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
-        (#566): only drafts (not approved or exported entries) change. The
-        returned draft lists its remaining issues.
+        and "Tutarı düzelt" (#566): only drafts (not approved or exported
+        entries) change. `account` and / or `debit` + `credit` (exactly one
+        side above zero, at most two decimals); at least one is required.
+        An amount changes only on a line without a source (entered by hand
+        or from Excel): a bank, invoice or payroll line's amount is its
+        source's (`409 LINE_FROM_SOURCE`). The returned draft lists its
+        remaining issues.
       security:
         - bearerAuth: []
       requestBody:
@@ -9680,9 +9685,10 @@ paths:
           application/json:
             schema:
               type: object
-              required: [account]
               properties:
                 account: { type: string, example: "770.01" }
+                debit: { type: string, example: "100.00" }
+                credit: { type: string, example: "0" }
       responses:
         "200":
           description: Draft with the changed line
@@ -9691,6 +9697,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
         "400": { $ref: "#/components/responses/BadRequest" }
+        "409":
+          description: "`LINE_FROM_SOURCE`: the line's amount comes from its source document"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }

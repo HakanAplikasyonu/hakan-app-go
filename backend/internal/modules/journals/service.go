@@ -36,6 +36,9 @@ var (
 	ErrBlocked         = errors.New("journals: export blocked by validation issues")
 	ErrNothingToExport = errors.New("journals: no approved entries to export")
 	ErrReasonRequired  = errors.New("journals: a reason is required to reverse an export")
+	// ErrLineFromSource: the line's amount comes from its source (bank,
+	// invoice, payroll); it is corrected there, not on the draft.
+	ErrLineFromSource = errors.New("journals: the line's amount comes from its source document")
 )
 
 // DB is what the service needs from Postgres.

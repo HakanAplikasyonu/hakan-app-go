@@ -1412,6 +1412,10 @@ type Querier interface {
 	SetInvoiceVATDeductionPeriod(ctx context.Context, arg SetInvoiceVATDeductionPeriodParams) (int64, error)
 	// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
 	SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error)
+	// Kontrol ekranında borç-alacak farkı düzeltilir (#566): yalnız taslakta ve
+	// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
+	// satırının tutarı kaynağından gelir.
+	SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
