@@ -573,6 +573,7 @@ var authzTable = map[string]authzClass{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                    azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/runs":                                           azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/runs":                                          azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/latest-by-period":                          azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}":                                  azTenantRead,
 	"PATCH /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}":                             azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/items/{itemUuid}/review":                       azTenantWrite,

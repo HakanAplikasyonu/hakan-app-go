@@ -11077,6 +11077,50 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/latest-by-period:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Reconciliation]
+      operationId: listLatestReconciliationRunsByPeriod
+      summary: Newest reconciliation run of each month in a window
+      description: |
+        Requires `tenant.reconciliation.read` (#389). One answer for a list of periods (the journal transfer list) instead of one
+        `runs/latest` call per row (#639). `runs` has a key for every month from `from` to `to` (at most 60); a month never compared is
+        `null`. 400 when a bound is not `YYYY-MM`, `from` is after `to` or the window is longer than 60 months.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-01" } }
+        - { name: to, in: query, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [runs]
+                    properties:
+                      runs:
+                        type: object
+                        description: "`YYYY-MM` → the period's newest run, `null` when never compared"
+                        additionalProperties:
+                          oneOf:
+                            - $ref: "#/components/schemas/ReconciliationRun"
+                            - type: "null"
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}:
     parameters:
       - $ref: "#/components/parameters/XOrganization"

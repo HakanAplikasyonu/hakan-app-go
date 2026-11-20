@@ -698,6 +698,9 @@ type Querier interface {
 	LatestAccountPlanImport(ctx context.Context, arg LatestAccountPlanImportParams) (LatestAccountPlanImportRow, error)
 	// Dönemin en son çalıştırması (önceki karar ve notları taşımak için).
 	LatestReconciliationRun(ctx context.Context, arg LatestReconciliationRunParams) (ReconciliationRun, error)
+	// Newest run of each period in [from_period, to_period] (#639): one query for
+	// the journal transfer list instead of one per row.
+	LatestReconciliationRunsByPeriod(ctx context.Context, arg LatestReconciliationRunsByPeriodParams) ([]LatestReconciliationRunsByPeriodRow, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
 	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)

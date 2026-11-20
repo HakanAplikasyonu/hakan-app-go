@@ -45,6 +45,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	read, write := rbac.PermTenantReconciliationRead, rbac.PermTenantReconciliationWrite
 	route("GET", "/runs", read, h.listRuns)
 	route("POST", "/runs", write, h.run)
+	route("GET", "/runs/latest-by-period", read, h.latestByPeriod)
 	route("GET", "/runs/{runRef}", read, h.getRun)
 	route("PATCH", "/items/{itemUuid}", write, h.decide)
 	route("POST", "/items/{itemUuid}/review", write, h.review)
@@ -151,6 +152,16 @@ func (h *Handler) run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusCreated, out)
+}
+
+func (h *Handler) latestByPeriod(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	runs, err := h.svc.LatestByPeriod(r.Context(), engagementctx.Must(r.Context()), strings.TrimSpace(q.Get("from")), strings.TrimSpace(q.Get("to")))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"runs": runs})
 }
 
 func (h *Handler) getRun(w http.ResponseWriter, r *http.Request) {

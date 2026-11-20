@@ -36,6 +36,12 @@ export const reconciliationKeys = {
   all: (slug: string, engagement: string) => base(slug, engagement),
   run: (slug: string, engagement: string, period: string) =>
     [...base(slug, engagement), "run", period] as const,
+  latestByPeriod: (
+    slug: string,
+    engagement: string,
+    from: string,
+    to: string,
+  ) => [...base(slug, engagement), "latest-by-period", from, to] as const,
   counterparties: (slug: string, engagement: string, period: string) =>
     [...base(slug, engagement), "counterparties", period] as const,
   babs: (slug: string, engagement: string, period: string) =>
@@ -56,6 +62,15 @@ export const reconciliationService = {
       `${eng(engagement)}/runs/latest`,
       // Dönem henüz karşılaştırılmadıysa 200 + run: null (#639).
       { query: { period }, silent: true },
+    );
+  },
+  /** Penceredeki her ayın son koşusu tek istekte; karşılaştırılmamış ay null (#639). */
+  latestByPeriod(slug: string, engagement: string, from: string, to: string) {
+    return tenantRequest<{ runs: Record<string, ReconciliationRun | null> }>(
+      slug,
+      "GET",
+      `${eng(engagement)}/runs/latest-by-period`,
+      { query: { from, to }, silent: true },
     );
   },
   run(slug: string, engagement: string, period: string) {

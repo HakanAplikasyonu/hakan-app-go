@@ -8368,6 +8368,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/reconciliation/runs/latest-by-period": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Newest reconciliation run of each month in a window
+         * @description Requires `tenant.reconciliation.read` (#389). One answer for a list of periods (the journal transfer list) instead of one
+         *     `runs/latest` call per row (#639). `runs` has a key for every month from `from` to `to` (at most 60); a month never compared is
+         *     `null`. 400 when a bound is not `YYYY-MM`, `from` is after `to` or the window is longer than 60 months.
+         */
+        get: operations["listLatestReconciliationRunsByPeriod"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/reconciliation/runs/{runRef}": {
         parameters: {
             query?: never;
@@ -33855,6 +33885,52 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listLatestReconciliationRunsByPeriod: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** @description `YYYY-MM` → the period's newest run, `null` when never compared */
+                            runs: {
+                                [key: string]: components["schemas"]["ReconciliationRun"] | null;
+                            };
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -137,6 +137,16 @@ WHERE r.organization_id = @organization_id AND r.engagement_id = @engagement_id
 ORDER BY r.period DESC, r.id DESC
 LIMIT @lim;
 
+-- name: LatestReconciliationRunsByPeriod :many
+-- Newest run of each period in [from_period, to_period] (#639): one query for
+-- the journal transfer list instead of one per row.
+SELECT DISTINCT ON (r.period) r.*, i.uuid AS trial_balance_uuid, i.file_name AS trial_balance_file_name
+FROM reconciliation_runs r
+LEFT JOIN account_plan_imports i ON i.organization_id = r.organization_id AND i.id = r.trial_balance_import_id
+WHERE r.organization_id = @organization_id AND r.engagement_id = @engagement_id
+  AND r.period >= @from_period::text AND r.period <= @to_period::text
+ORDER BY r.period DESC, r.id DESC;
+
 -- name: GetReconciliationRun :one
 SELECT r.*, i.uuid AS trial_balance_uuid, i.file_name AS trial_balance_file_name
 FROM reconciliation_runs r

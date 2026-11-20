@@ -35,6 +35,7 @@ import { useJournalActions, useJournalTransfers } from "../hooks/use-journals";
 import { useOfficePeriod } from "../period";
 import type { JournalTransfer } from "../services/journals.service";
 import {
+  type ReconciliationRun,
   reconciliationKeys,
   reconciliationService,
 } from "../services/reconciliation.service";
@@ -98,31 +99,25 @@ function program(t: Translate, name: string) {
  * Aktarım sonrası doğrulama (#574): programa aktarılan dönemin Luca
  * mizanı uygulamadaki kayıtlarla karşılaştırıldı mı, fark var mı. Mizan
  * karşılaştırması aktarımdan önceyse ya da hiç yapılmadıysa Mutabakat
- * ekranına götürür (dönem seçili gelir).
+ * ekranına götürür (dönem seçili gelir). Dönemlerin son koşuları panelde
+ * tek istekle gelir (#639); `run` null ise dönem karşılaştırılmadı,
+ * undefined ise henüz yüklenmedi.
  */
 function TransferCheck({
   engagement,
   tr,
+  run,
 }: {
   engagement: string;
   tr: JournalTransfer;
+  run: ReconciliationRun | null | undefined;
 }) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const router = useRouter();
   const { setPeriod } = useOfficePeriod();
   const period = tr.period ?? "";
-  const latest = useQuery({
-    queryKey: reconciliationKeys.run(slug, engagement, period),
-    queryFn: () => reconciliationService.latest(slug, engagement, period),
-    enabled: !!period,
-    staleTime: 60_000,
-  });
-  if (!period || latest.isLoading) return null;
-  const run = latest.data?.run;
-  // Koşu yoksa uç 200 + run: null döner (#639).
-  const notRun = latest.data?.run === null;
-  if (!run && !notRun) return null;
+  if (!period || run === undefined) return null;
   const stale = !!run && !!tr.completed_at && run.created_at < tr.completed_at;
   const issues = run
     ? run.summary.differences +
@@ -172,9 +167,11 @@ function TransferCheck({
 function Detail({
   tr,
   engagement,
+  checks,
 }: {
   tr: JournalTransfer;
   engagement: string;
+  checks: Record<string, ReconciliationRun | null> | undefined;
 }) {
   const { t } = useLocale();
   const { can } = usePermission();
@@ -203,7 +200,11 @@ function Detail({
       {files.length ? <Figure>{files.join(", ")}</Figure> : null}
       {tr.status === "imported" &&
       can(permissions.tenant.reconciliation.read) ? (
-        <TransferCheck engagement={engagement} tr={tr} />
+        <TransferCheck
+          engagement={engagement}
+          tr={tr}
+          run={tr.period ? checks?.[tr.period] : undefined}
+        />
       ) : null}
     </span>
   );
@@ -227,6 +228,36 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
     () => transfers.data?.items ?? [],
     [transfers.data?.items],
   );
+  // Aktarılmış dönemlerin mizan karşılaştırması tek istekte (#639); satır
+  // başına istek atılmaz.
+  const { can } = usePermission();
+  const span = useMemo(() => {
+    const periods = items
+      .filter((tr) => tr.status === "imported" && tr.period)
+      .map((tr) => tr.period as string)
+      .sort();
+    return periods.length
+      ? { from: periods[0], to: periods[periods.length - 1] }
+      : null;
+  }, [items]);
+  const checks = useQuery({
+    queryKey: reconciliationKeys.latestByPeriod(
+      slug,
+      engagement,
+      span?.from ?? "",
+      span?.to ?? "",
+    ),
+    queryFn: () =>
+      reconciliationService.latestByPeriod(
+        slug,
+        engagement,
+        span!.from,
+        span!.to,
+      ),
+    enabled: !!span && can(permissions.tenant.reconciliation.read),
+    staleTime: 60_000,
+  });
+  const runs = checks.data?.runs;
   const busy =
     completeTransfer.isPending ||
     cancelTransfer.isPending ||
@@ -305,7 +336,9 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
         labelKey: "office.journals.transfer_col_detail",
         enableSorting: false,
         accessorFn: (r) => r.error_message ?? r.folder_label ?? "",
-        cell: ({ row }) => <Detail tr={row.original} engagement={engagement} />,
+        cell: ({ row }) => (
+          <Detail tr={row.original} engagement={engagement} checks={runs} />
+        ),
       }),
       createActionsColumn<JournalTransfer>({
         cell: (tr) => (
@@ -368,6 +401,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
     engagement,
     prompt,
     retryTransfer,
+    runs,
     t,
   ]);
 

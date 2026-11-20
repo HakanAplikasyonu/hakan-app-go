@@ -329,6 +329,87 @@ func (q *Queries) LatestReconciliationRun(ctx context.Context, arg LatestReconci
 	return i, err
 }
 
+const latestReconciliationRunsByPeriod = `-- name: LatestReconciliationRunsByPeriod :many
+SELECT DISTINCT ON (r.period) r.id, r.uuid, r.organization_id, r.engagement_id, r.taxpayer_id, r.period, r.trial_balance_import_id, r.previous_import_id, r.window_from, r.window_to, r.tolerance, r.summary, r.created_by, r.created_at, r.updated_at, i.uuid AS trial_balance_uuid, i.file_name AS trial_balance_file_name
+FROM reconciliation_runs r
+LEFT JOIN account_plan_imports i ON i.organization_id = r.organization_id AND i.id = r.trial_balance_import_id
+WHERE r.organization_id = $1 AND r.engagement_id = $2
+  AND r.period >= $3::text AND r.period <= $4::text
+ORDER BY r.period DESC, r.id DESC
+`
+
+type LatestReconciliationRunsByPeriodParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	FromPeriod     string `json:"from_period"`
+	ToPeriod       string `json:"to_period"`
+}
+
+type LatestReconciliationRunsByPeriodRow struct {
+	ID                   int64              `json:"id"`
+	Uuid                 uuid.UUID          `json:"uuid"`
+	OrganizationID       int64              `json:"organization_id"`
+	EngagementID         int64              `json:"engagement_id"`
+	TaxpayerID           int64              `json:"taxpayer_id"`
+	Period               string             `json:"period"`
+	TrialBalanceImportID pgtype.Int8        `json:"trial_balance_import_id"`
+	PreviousImportID     pgtype.Int8        `json:"previous_import_id"`
+	WindowFrom           string             `json:"window_from"`
+	WindowTo             string             `json:"window_to"`
+	Tolerance            pgtype.Numeric     `json:"tolerance"`
+	Summary              []byte             `json:"summary"`
+	CreatedBy            pgtype.Int8        `json:"created_by"`
+	CreatedAt            pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz `json:"updated_at"`
+	TrialBalanceUuid     pgtype.UUID        `json:"trial_balance_uuid"`
+	TrialBalanceFileName pgtype.Text        `json:"trial_balance_file_name"`
+}
+
+// Newest run of each period in [from_period, to_period] (#639): one query for
+// the journal transfer list instead of one per row.
+func (q *Queries) LatestReconciliationRunsByPeriod(ctx context.Context, arg LatestReconciliationRunsByPeriodParams) ([]LatestReconciliationRunsByPeriodRow, error) {
+	rows, err := q.db.Query(ctx, latestReconciliationRunsByPeriod,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.FromPeriod,
+		arg.ToPeriod,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LatestReconciliationRunsByPeriodRow{}
+	for rows.Next() {
+		var i LatestReconciliationRunsByPeriodRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.TaxpayerID,
+			&i.Period,
+			&i.TrialBalanceImportID,
+			&i.PreviousImportID,
+			&i.WindowFrom,
+			&i.WindowTo,
+			&i.Tolerance,
+			&i.Summary,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TrialBalanceUuid,
+			&i.TrialBalanceFileName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listReconciliationItems = `-- name: ListReconciliationItems :many
 SELECT it.id, it.uuid, it.organization_id, it.engagement_id, it.run_id, it.main_code, it.account_name, it.ledger_debit, it.ledger_credit, it.source_debit, it.source_credit, it.difference, it.result, it.status, it.sources, it.unposted, it.sub_accounts, it.suggestion, it.suggestion_code, it.suggestion_confidence, it.note, it.review_suggestion_id, it.decided_by, it.decided_at, it.created_at, it.updated_at, s.uuid AS review_uuid, s.status AS review_status
 FROM reconciliation_items it
