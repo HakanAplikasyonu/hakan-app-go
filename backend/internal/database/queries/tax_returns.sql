@@ -3,6 +3,8 @@
 -- uyarıyla aynı (vat_forecast.sql): yalnızca aktif ve kaynakta silinmemiş
 -- faturalar; döviz tutarı invoices.exchange_rate ile TL'ye çevrilir ve özet
 -- satırı bazında kuruşa yuvarlanır; kuru olmayan döviz faturası dışarıda.
+-- KDV1 satırları KDV dönemine göre (#640): alış faturasının KDV indirim
+-- dönemi varsa o ay, yoksa belge ayı. Ba/Bs ve MUHSGK belge ayında kalır.
 
 -- name: TaxReturnInvoiceLines :many
 SELECT i.direction, i.type, s.tax_rate,
@@ -15,7 +17,8 @@ SELECT i.direction, i.type, s.tax_rate,
 FROM invoices i
 JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
 WHERE i.taxpayer_id = @taxpayer_id
-  AND i.period = @period
+  AND (i.period = @period OR i.vat_deduction_period = @period)
+  AND COALESCE(i.vat_deduction_period, i.period) = @period
   AND i.status_normalized = 'active'
   AND i.deleted_at_source IS NULL
   AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL)
@@ -34,7 +37,8 @@ SELECT COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_so
        COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate
 FROM invoices i
-WHERE i.taxpayer_id = @taxpayer_id AND i.period = @period;
+WHERE i.taxpayer_id = @taxpayer_id AND (i.period = @period OR i.vat_deduction_period = @period)
+  AND COALESCE(i.vat_deduction_period, i.period) = @period;
 
 -- name: TaxReturnRetailVATLines :many
 -- Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).

@@ -631,7 +631,8 @@ SELECT i.direction, i.type, s.tax_rate,
 FROM invoices i
 JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
 WHERE i.taxpayer_id = $1
-  AND i.period = $2
+  AND (i.period = $2 OR i.vat_deduction_period = $2)
+  AND COALESCE(i.vat_deduction_period, i.period) = $2
   AND i.status_normalized = 'active'
   AND i.deleted_at_source IS NULL
   AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL)
@@ -662,6 +663,8 @@ type TaxReturnInvoiceLinesRow struct {
 // uyarıyla aynı (vat_forecast.sql): yalnızca aktif ve kaynakta silinmemiş
 // faturalar; döviz tutarı invoices.exchange_rate ile TL'ye çevrilir ve özet
 // satırı bazında kuruşa yuvarlanır; kuru olmayan döviz faturası dışarıda.
+// KDV1 satırları KDV dönemine göre (#640): alış faturasının KDV indirim
+// dönemi varsa o ay, yoksa belge ayı. Ba/Bs ve MUHSGK belge ayında kalır.
 func (q *Queries) TaxReturnInvoiceLines(ctx context.Context, arg TaxReturnInvoiceLinesParams) ([]TaxReturnInvoiceLinesRow, error) {
 	rows, err := q.db.Query(ctx, taxReturnInvoiceLines, arg.TaxpayerID, arg.Period)
 	if err != nil {
@@ -702,7 +705,8 @@ SELECT COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_so
        COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND i.tax_summary_source = 'header_estimate')::bigint AS header_estimate
 FROM invoices i
-WHERE i.taxpayer_id = $1 AND i.period = $2
+WHERE i.taxpayer_id = $1 AND (i.period = $2 OR i.vat_deduction_period = $2)
+  AND COALESCE(i.vat_deduction_period, i.period) = $2
 `
 
 type TaxReturnInvoiceStatsParams struct {

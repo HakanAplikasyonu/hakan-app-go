@@ -160,7 +160,8 @@ SELECT COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_so
        COUNT(*) FILTER (WHERE i.status_normalized = 'active' AND i.deleted_at_source IS NULL
                           AND i.currency <> 'TRY' AND i.exchange_rate IS NULL)::bigint AS missing_exchange_rate
 FROM invoices i
-WHERE i.taxpayer_id = $1 AND i.period = $2
+WHERE i.taxpayer_id = $1 AND (i.period = $2 OR i.vat_deduction_period = $2)
+  AND COALESCE(i.vat_deduction_period, i.period) = $2
 `
 
 type VATForecastExcludedParams struct {
@@ -191,7 +192,7 @@ func (q *Queries) VATForecastExcluded(ctx context.Context, arg VATForecastExclud
 }
 
 const vATForecastHistory = `-- name: VATForecastHistory :many
-SELECT i.period::text AS period,
+SELECT COALESCE(i.vat_deduction_period, i.period)::text AS period,
        COALESCE(SUM(CASE WHEN i.direction = 'outgoing'
            THEN ROUND(s.vat * (CASE WHEN i.currency = 'TRY' THEN 1 ELSE i.exchange_rate END), 2)
               - ROUND(s.withholding * (CASE WHEN i.currency = 'TRY' THEN 1 ELSE i.exchange_rate END), 2)
@@ -202,13 +203,13 @@ SELECT i.period::text AS period,
 FROM invoices i
 JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
 WHERE i.taxpayer_id = $1
-  AND i.period >= $2
-  AND i.period < $3
+  AND COALESCE(i.vat_deduction_period, i.period) >= $2::text
+  AND COALESCE(i.vat_deduction_period, i.period) < $3::text
   AND i.status_normalized = 'active'
   AND i.deleted_at_source IS NULL
   AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL)
-GROUP BY i.period
-ORDER BY i.period
+GROUP BY 1
+ORDER BY 1
 `
 
 type VATForecastHistoryParams struct {
@@ -256,7 +257,8 @@ SELECT i.direction, i.type, s.tax_rate,
 FROM invoices i
 JOIN invoice_tax_summaries s ON s.invoice_id = i.id AND s.taxpayer_id = i.taxpayer_id
 WHERE i.taxpayer_id = $1
-  AND i.period = $2
+  AND (i.period = $2 OR i.vat_deduction_period = $2)
+  AND COALESCE(i.vat_deduction_period, i.period) = $2
   AND i.status_normalized = 'active'
   AND i.deleted_at_source IS NULL
   AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL)
@@ -285,7 +287,9 @@ type VATForecastLinesRow struct {
 //   - yalnızca status_normalized = 'active' ve kaynakta silinmemiş faturalar;
 //   - tutarlar TL'ye çevrilir: TRY ise 1, değilse invoices.exchange_rate; kuru
 //     olmayan döviz faturası dışarıda kalır (VATForecastExcluded sayar);
-//   - çevrim özet satırı bazında kuruşa yuvarlanır (ROUND(x * kur, 2)).
+//   - çevrim özet satırı bazında kuruşa yuvarlanır (ROUND(x * kur, 2));
+//   - dönem KDV dönemidir (#640): alış faturasının KDV indirim dönemi
+//     (vat_deduction_period) varsa o ay, yoksa belge ayı.
 //
 // VATForecastLines ile VATForecastHistory aynı formülü kullanır; devir zinciri
 // ekrandaki dönem toplamıyla tutarlı kalır.
