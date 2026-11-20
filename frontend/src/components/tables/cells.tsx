@@ -56,9 +56,22 @@ export const statusToneClass: Record<StatusTone, string> = {
   danger: "bg-danger-tint text-danger",
 };
 
+/** Rozet noktası: tonun rengi (sade rozetin anlamını metin taşır). */
+export const statusDotClass: Record<StatusTone, string> = {
+  neutral: "bg-step-pending",
+  info: "bg-brand-text",
+  ok: "bg-ok",
+  warn: "bg-warn",
+  danger: "bg-danger",
+};
+
+/**
+ * Durum rozeti (EasyTrade dili): ince çerçeve, yüzey zemini, küçük renkli
+ * nokta ve kısa metin. Renk tek başına anlam taşımaz; metin durumu söyler.
+ * `dot` geriye uyum için durur (nokta hep var).
+ */
 export function StatusPill({
   tone = "neutral",
-  dot,
   className,
   children,
 }: {
@@ -69,15 +82,17 @@ export function StatusPill({
 }) {
   return (
     <span
+      data-tone={tone}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap",
-        statusToneClass[tone],
+        "border-line bg-surface inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        tone === "neutral" ? "text-text-2" : "text-foreground",
         className,
       )}
     >
-      {dot ? (
-        <span className="size-1.5 rounded-full bg-current" aria-hidden />
-      ) : null}
+      <span
+        className={cn("size-1.5 shrink-0 rounded-full", statusDotClass[tone])}
+        aria-hidden
+      />
       {children}
     </span>
   );
