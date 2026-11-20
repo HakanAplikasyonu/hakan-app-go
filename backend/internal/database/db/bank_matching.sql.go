@@ -12,8 +12,47 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addSgkPremiumPaid = `-- name: AddSgkPremiumPaid :exec
+UPDATE sgk_premiums
+SET paid_amount = paid_amount + $1::numeric,
+    paid_at = $2::date,
+    bank_transaction_id = $3::bigint
+WHERE taxpayer_id = $4 AND id = $5
+`
+
+type AddSgkPremiumPaidParams struct {
+	Amount            pgtype.Numeric `json:"amount"`
+	PaidAt            pgtype.Date    `json:"paid_at"`
+	BankTransactionID int64          `json:"bank_transaction_id"`
+	TaxpayerID        int64          `json:"taxpayer_id"`
+	ID                int64          `json:"id"`
+}
+
+// Elle bağlanan ödeme primi öder (#565).
+func (q *Queries) AddSgkPremiumPaid(ctx context.Context, arg AddSgkPremiumPaidParams) error {
+	_, err := q.db.Exec(ctx, addSgkPremiumPaid,
+		arg.Amount,
+		arg.PaidAt,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	return err
+}
+
 const deleteBankTransactionMatches = `-- name: DeleteBankTransactionMatches :exec
-DELETE FROM bank_transaction_matches WHERE taxpayer_id = $1 AND bank_transaction_id = $2
+WITH released AS (
+    UPDATE sgk_premiums s
+    SET paid_amount = GREATEST(s.paid_amount - m.total, 0),
+        paid_at = CASE WHEN s.paid_amount - m.total <= 0 THEN NULL ELSE s.paid_at END,
+        bank_transaction_id = CASE WHEN s.bank_transaction_id = $2 THEN NULL ELSE s.bank_transaction_id END
+    FROM (SELECT x.target_id, sum(x.amount) AS total FROM bank_transaction_matches x
+          WHERE x.taxpayer_id = $1 AND x.bank_transaction_id = $2 AND x.target_type = 'sgk_premium'
+          GROUP BY x.target_id) m
+    WHERE s.taxpayer_id = $1 AND s.id = m.target_id
+    RETURNING s.id
+)
+DELETE FROM bank_transaction_matches d WHERE d.taxpayer_id = $1 AND d.bank_transaction_id = $2
 `
 
 type DeleteBankTransactionMatchesParams struct {
@@ -21,6 +60,8 @@ type DeleteBankTransactionMatchesParams struct {
 	BankTransactionID int64 `json:"bank_transaction_id"`
 }
 
+// Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
+// geri alınır (#565): prim yeniden açık borç olur.
 func (q *Queries) DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error {
 	_, err := q.db.Exec(ctx, deleteBankTransactionMatches, arg.TaxpayerID, arg.BankTransactionID)
 	return err
@@ -425,6 +466,53 @@ func (q *Queries) ListBankTransactionPayrollMatches(ctx context.Context, arg Lis
 			&i.PayrollRunUuid,
 			&i.Period,
 			&i.NetTotal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBankTransactionSgkMatches = `-- name: ListBankTransactionSgkMatches :many
+SELECT m.amount, m.method, s.uuid AS sgk_premium_uuid, s.period, s.payable_amount
+FROM bank_transaction_matches m
+JOIN sgk_premiums s ON s.taxpayer_id = m.taxpayer_id AND s.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'sgk_premium'
+ORDER BY s.period
+`
+
+type ListBankTransactionSgkMatchesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionSgkMatchesRow struct {
+	Amount         pgtype.Numeric `json:"amount"`
+	Method         string         `json:"method"`
+	SgkPremiumUuid uuid.UUID      `json:"sgk_premium_uuid"`
+	Period         string         `json:"period"`
+	PayableAmount  pgtype.Numeric `json:"payable_amount"`
+}
+
+func (q *Queries) ListBankTransactionSgkMatches(ctx context.Context, arg ListBankTransactionSgkMatchesParams) ([]ListBankTransactionSgkMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionSgkMatches, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionSgkMatchesRow{}
+	for rows.Next() {
+		var i ListBankTransactionSgkMatchesRow
+		if err := rows.Scan(
+			&i.Amount,
+			&i.Method,
+			&i.SgkPremiumUuid,
+			&i.Period,
+			&i.PayableAmount,
 		); err != nil {
 			return nil, err
 		}
@@ -987,6 +1075,67 @@ func (q *Queries) ListPayrollRunsForBankMatch(ctx context.Context, arg ListPayro
 			&i.NetTotal,
 			&i.Paid,
 			&i.EmployeeCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSgkPremiumsForBankMatch = `-- name: ListSgkPremiumsForBankMatch :many
+SELECT s.id, s.uuid, s.period, s.payable_amount, s.due_date,
+       (s.paid_amount - COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = s.taxpayer_id AND m.target_type = 'sgk_premium' AND m.target_id = s.id
+                   AND m.bank_transaction_id = $1), 0))::numeric(18,2) AS paid
+FROM sgk_premiums s
+WHERE s.taxpayer_id = $2 AND s.payable_amount > 0
+  AND s.period >= $3::text AND s.period <= $4::text
+ORDER BY s.period DESC
+`
+
+type ListSgkPremiumsForBankMatchParams struct {
+	BankTransactionID int64  `json:"bank_transaction_id"`
+	TaxpayerID        int64  `json:"taxpayer_id"`
+	PeriodFrom        string `json:"period_from"`
+	PeriodTo          string `json:"period_to"`
+}
+
+type ListSgkPremiumsForBankMatchRow struct {
+	ID            int64          `json:"id"`
+	Uuid          uuid.UUID      `json:"uuid"`
+	Period        string         `json:"period"`
+	PayableAmount pgtype.Numeric `json:"payable_amount"`
+	DueDate       pgtype.Date    `json:"due_date"`
+	Paid          pgtype.Numeric `json:"paid"`
+}
+
+// Elle bağlanabilecek SGK primleri (#565): dönem aralığında; ödenen tutar
+// bu hareketin payı hariç (yeniden bağlama).
+func (q *Queries) ListSgkPremiumsForBankMatch(ctx context.Context, arg ListSgkPremiumsForBankMatchParams) ([]ListSgkPremiumsForBankMatchRow, error) {
+	rows, err := q.db.Query(ctx, listSgkPremiumsForBankMatch,
+		arg.BankTransactionID,
+		arg.TaxpayerID,
+		arg.PeriodFrom,
+		arg.PeriodTo,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSgkPremiumsForBankMatchRow{}
+	for rows.Next() {
+		var i ListSgkPremiumsForBankMatchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.Period,
+			&i.PayableAmount,
+			&i.DueDate,
+			&i.Paid,
 		); err != nil {
 			return nil, err
 		}
