@@ -64,7 +64,7 @@
   "codes.FILE_UNREADABLE": "The file could not be read. Make sure it is not corrupt or too large and upload it again.",
   "codes.FILE_EMPTY": "The file is empty. Choose a file with content.",
   "codes.UNSUPPORTED_FILE": "This file type is not supported here. Upload the type shown on the screen.",
-  "codes.NOT_PDF": "Payroll documents must be PDF files.",
+  "codes.NOT_PDF": "The file must be a PDF.",
   "codes.DOCUMENT_EXISTS": "The same file is already in the archive.",
   "codes.ARCHIVE_UNAVAILABLE": "The document archive is not available right now. Try again shortly.",
   "codes.RECORD_INCOMPLETE": "The record is incomplete. Fill in the required fields and try again.",

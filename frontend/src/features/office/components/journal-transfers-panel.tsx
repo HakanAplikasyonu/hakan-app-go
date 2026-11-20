@@ -74,9 +74,13 @@ export const TRANSFER_STATUS: Record<string, StatusVariant> = {
 function transferError(t: Translate, tr: JournalTransfer) {
   const key = `office.journals.transfer_error_${tr.error_code ?? ""}`;
   const known = tr.error_code ? t(key) : key;
-  // The agent's own Turkish message is more specific when present.
-  if (tr.error_message) return tr.error_message;
-  return known !== key ? known : t("office.journals.transfer_error_unknown");
+  // Known code first (what to do), the agent's own message as the detail
+  // (e.g. the missing folder's path).
+  if (known !== key)
+    return tr.error_message && tr.error_message !== known
+      ? `${known} (${tr.error_message})`
+      : known;
+  return tr.error_message || t("office.journals.transfer_error_unknown");
 }
 
 function actionErrorText(t: Translate, err: unknown) {
@@ -265,14 +269,19 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
   const actionError =
     completeTransfer.error ?? cancelTransfer.error ?? retryTransfer.error;
 
-  // Hata ekranı: her çıktının son görevi hatalıysa ve yerine yenisi
-  // açılmadıysa listelenir.
-  const openFailures = useMemo(() => {
-    const latest = new Map<string, JournalTransfer>();
+  // Her çıktının son görevi (liste yeniden eskiye). Hata ekranı: son görevi
+  // hatalıysa ve yerine yenisi açılmadıysa listelenir. "Yeniden dene" de
+  // yalnız son görevde: eskisinin yerine yenisi açıldıysa tekrar denenemez.
+  const latest = useMemo(() => {
+    const byBatch = new Map<string, JournalTransfer>();
     for (const tr of items)
-      if (!latest.has(tr.batch_uuid)) latest.set(tr.batch_uuid, tr);
-    return [...latest.values()].filter((tr) => tr.status === "failed");
+      if (!byBatch.has(tr.batch_uuid)) byBatch.set(tr.batch_uuid, tr);
+    return byBatch;
   }, [items]);
+  const openFailures = useMemo(
+    () => [...latest.values()].filter((tr) => tr.status === "failed"),
+    [latest],
+  );
 
   const columns = useMemo<ColumnDef<JournalTransfer, unknown>[]>(() => {
     const markImported = async (tr: JournalTransfer) => {
@@ -378,7 +387,8 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
                 {t("office.journals.transfer_cancel")}
               </Button>
             ) : null}
-            {tr.status === "failed" || tr.status === "cancelled" ? (
+            {(tr.status === "failed" || tr.status === "cancelled") &&
+            latest.get(tr.batch_uuid)?.uuid === tr.uuid ? (
               <Button
                 size="sm"
                 variant="ghost"
@@ -399,6 +409,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
     completeTransfer,
     confirm,
     engagement,
+    latest,
     prompt,
     retryTransfer,
     runs,
