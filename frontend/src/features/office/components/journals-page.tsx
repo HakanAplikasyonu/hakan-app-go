@@ -983,7 +983,10 @@ function JournalsInner() {
   for (const tr of transfers.data?.items ?? [])
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
-  const { approve, unapprove, reverse } = useJournalActions(slug, engagement);
+  const { approve, unapprove, cancelExport } = useJournalActions(
+    slug,
+    engagement,
+  );
   // Hazırlayan stajyer onaylayamaz; fiş müşavirin onayını bekler (#566).
   const canApprove = perms.includes(permissions.tenant.journals.approve);
   // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
@@ -1049,8 +1052,10 @@ function JournalsInner() {
     },
     [approveDraft, prompt, t],
   );
-  const reverseDraft = reverse.mutate;
-  const reversing = reverse.isPending;
+  // Aktarılmış fiş (#710, ofis kararı): düzeltme fişi yok; fiş tamamen
+  // iptal edilir, taslağa döner; programdaki fiş kullanıcı tarafından silinir.
+  const cancelDraftExport = cancelExport.mutate;
+  const cancelling = cancelExport.isPending;
   const unapproveDraft = unapprove.mutate;
   const unapproving = unapprove.isPending;
   const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
@@ -1220,22 +1225,39 @@ function JournalsInner() {
                 {t("office.journals.approve")}
               </Button>
             </Hint>
-          ) : d.status === "exported" ? (
+          ) : d.status === "exported" && canApprove ? (
             <Button
               size="sm"
               variant="ghost"
-              disabled={reversing}
+              disabled={cancelling}
               onClick={async () => {
+                const vars = {
+                  no: d.entry_no,
+                  date: new Date(d.entry_date).toLocaleDateString("tr-TR"),
+                };
                 const reason = await prompt({
-                  title: t("office.journals.reverse"),
-                  description: t("office.journals.reverse_prompt"),
-                  confirmLabel: t("office.journals.reverse"),
+                  title: t("office.journals.cancel_export_title", vars),
+                  description: t(
+                    "office.journals.cancel_export_description",
+                    vars,
+                  ),
+                  placeholder: t("office.journals.cancel_export_reason"),
+                  confirmLabel: t("office.journals.cancel_export"),
                 });
-                if (reason?.trim()) reverseDraft({ draft: d.uuid, reason });
+                if (!reason?.trim()) return;
+                cancelDraftExport(
+                  { draft: d.uuid, reason: reason.trim() },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t("office.journals.cancel_export_done", vars),
+                      ),
+                  },
+                );
               }}
             >
               <Undo2 className="size-4" />
-              {t("office.journals.reverse")}
+              {t("office.journals.cancel_export")}
             </Button>
           ) : null,
       }),
@@ -1247,8 +1269,8 @@ function JournalsInner() {
       engagement,
       picked,
       prompt,
-      reverseDraft,
-      reversing,
+      cancelDraftExport,
+      cancelling,
       t,
       togglePick,
       unapproveDraft,
@@ -1301,7 +1323,7 @@ function JournalsInner() {
   const openDrafts = rows.filter((d) => d.status === "draft");
   const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
   const stoppedDrafts = openDrafts.filter(isBlocked).length;
-  const actionError = approve.error ?? unapprove.error ?? reverse.error;
+  const actionError = approve.error ?? unapprove.error ?? cancelExport.error;
   return (
     <div className="space-y-4">
       {header}
