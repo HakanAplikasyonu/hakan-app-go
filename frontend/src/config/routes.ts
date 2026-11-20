@@ -165,6 +165,9 @@ export const routes = {
     /** Documents + history consents of one engagement (issue #8). */
     engagementDocuments: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/documents`,
+    /** Belge arşivi: faaliyet belgesi, ticaret sicil, İSG … (#669 I). */
+    engagementArchive: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/archive`,
     /** Faturalar sekmesi: mükellef detayı içinde fatura listesi (#468). */
     engagementInvoices: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/invoices`,
