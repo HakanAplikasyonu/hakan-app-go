@@ -22,6 +22,14 @@ export type BankAliasCandidate =
 export type BankStatementReport = components["schemas"]["BankStatementReport"];
 export type BankStatementAnalysis =
   components["schemas"]["BankStatementAnalysis"];
+export type BankStatementPreviewRow =
+  components["schemas"]["BankStatementPreviewRow"];
+/** Tablo önizlemesinde müşavirin kararları (içe aktarmaya gider). */
+export type BankStatementOverrides = {
+  columns: { header: string; field: BankStatementField | "" }[];
+  skip_rows?: number[];
+  edits?: { row: number; column: number; value: string }[];
+};
 export type BankStatementField = components["schemas"]["BankStatementField"];
 export type BankStatementTemplate =
   components["schemas"]["BankStatementTemplate"];
@@ -32,10 +40,16 @@ export type PostingStatus = BankPosting["status"];
 const eng = (engagement: string) =>
   `/v1/tenant/engagements/${encodeURIComponent(engagement)}`;
 
-async function upload<T>(slug: string, path: string, file: File): Promise<T> {
+async function upload<T>(
+  slug: string,
+  path: string,
+  file: File,
+  fields: Record<string, string> = {},
+): Promise<T> {
   const base = apiConfig.baseUrl.replace(/\/$/, "");
   const form = new FormData();
   form.append("file", file);
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
   const response = await fetch(`${base}${path}`, {
     method: "POST",
     credentials: "include",
@@ -163,11 +177,22 @@ export const bankPostingService = {
       `${eng(engagement)}/bank-counterparty-aliases/${encodeURIComponent(alias)}`,
     );
   },
-  importStatement(slug: string, engagement: string, file: File) {
+  /**
+   * Ekstreyi içe aktarır. overrides: tablo önizlemesindeki kararlar (kolon
+   * eşlemesi, dışarıda bırakılan satırlar, düzeltilen hücreler).
+   */
+  importStatement(
+    slug: string,
+    engagement: string,
+    file: File,
+    overrides?: BankStatementOverrides,
+    preview = false,
+  ) {
     return upload<BankStatementReport>(
       slug,
-      `${eng(engagement)}/bank-statements`,
+      `${eng(engagement)}/bank-statements${preview ? "?preview=true" : ""}`,
       file,
+      overrides ? { overrides: JSON.stringify(overrides) } : {},
     );
   },
   analyzeStatement(slug: string, file: File) {

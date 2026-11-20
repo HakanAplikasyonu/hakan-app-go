@@ -6298,6 +6298,80 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/archive-documents:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerArchiveDocuments
+      summary: Ofisin paylaştığı arşiv belgeleri (salt okuma)
+      description: |
+        Mükellef web paneli (#682). Ofisin belge arşivine "Mükellef de görsün"
+        işaretiyle koyduğu belgeler; yalnızca mükellefin sahip rolü görür.
+        Süzgeçler ve `counts` ofis listesindeki gibidir, yalnız paylaşılan
+        belgeler üzerinden.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: category, in: query, schema: { type: string, enum: [general, contract, tax, sgk, trade_registry, isg, other] } }
+        - { name: isg_kind, in: query, schema: { type: string, enum: [isg_training, risk_assessment, health_report, other] } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: expiring, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ArchiveDocumentPage" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/archive-documents/{archiveDocumentUuid}/file:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+      - { name: archiveDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [TaxpayerPortal]
+      operationId: downloadTaxpayerArchiveDocument
+      summary: Paylaşılan arşiv belgesini indir
+      description: |
+        Mükellefe açık bir arşiv belgesi (#682); her zaman ek olarak iner.
+        Paylaşılmamış belge 404.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+            image/jpeg:
+              schema: { type: string, format: binary }
+            image/png:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/taxpayer/context:
     parameters:
       - $ref: "#/components/parameters/XTaxpayer"
@@ -12063,11 +12137,18 @@ paths:
         direction and currency whose number or counterparty name contains
         `q`, or whose VKN/TCKN equals it, outside the candidates' date and
         amount window; newest first, at most 20, fully paid ones left out.
-        Fewer than two characters find nothing. Results carry score 0.
+        Optional filters narrow by issue date (`from`, `to`) and by payable
+        amount in the movement's currency (`min`, `max`), all inclusive; they
+        work without `q`. A `q` shorter than two characters is ignored; with
+        no filter at all nothing is found. Results carry score 0.
       security:
         - bearerAuth: []
       parameters:
-        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date }, description: "Issue date from (inclusive)" }
+        - { name: to, in: query, required: false, schema: { type: string, format: date }, description: "Issue date to (inclusive)" }
+        - { name: min, in: query, required: false, schema: { type: string }, description: "Minimum payable amount (decimal)" }
+        - { name: max, in: query, required: false, schema: { type: string }, description: "Maximum payable amount (decimal)" }
       responses:
         "200":
           description: Matching open invoices
@@ -12086,6 +12167,7 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/BankMatchCandidate" }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -13471,6 +13553,13 @@ paths:
         balance, lookalike) and are classified. A balance that does not add
         up raises `BNK_GAP`; a text PDF whose balance does not add up is
         refused. `?preview=true` reports the same counts without writing.
+        For .xlsx, CSV and text PDF, `overrides` (JSON) carries the
+        accountant's decisions from the table preview (`analyze`): the column
+        mapping (`columns`, header → field, as a template's columns), rows left
+        out (`skip_rows`, 1-based file rows below the header) and corrected
+        cells (`edits`: row, file column, value). The file is read with exactly
+        this mapping; an invalid mapping or an edit outside the movement rows
+        is `INVALID_OVERRIDES` (400). MT940 ignores it.
       security:
         - bearerAuth: []
       parameters:
@@ -13485,6 +13574,9 @@ paths:
               properties:
                 file: { type: string, format: binary }
                 cash_box_uuid: { type: string, format: uuid }
+                overrides:
+                  type: string
+                  description: 'JSON {"columns":[{"header","field"}],"skip_rows":[int],"edits":[{"row","column","value"}]}'
       responses:
         "200":
           description: Preview report (nothing written)
@@ -21758,7 +21850,7 @@ components:
 
     BankStatementAnalysis:
       type: object
-      required: [format, header_row, headers, fingerprint, columns, sample, lines, row_errors, warnings]
+      required: [format, header_row, headers, fingerprint, columns, sample, lines, row_errors, warnings, rows]
       properties:
         format: { type: string, enum: [excel, csv, pdf] }
         bank_id: { type: string }
@@ -21776,6 +21868,24 @@ components:
         lines: { type: integer }
         row_errors: { type: integer }
         warnings: { type: array, items: { type: string } }
+        rows:
+          type: array
+          description: |
+            The table below the header (at most 2000 non-empty rows) as the
+            import reads it with the proposed columns, for the Excel-like
+            preview. kind is movement, error (not readable: fix a cell or
+            leave the row out), skip (totals line and after) or empty when the
+            proposal has no date and amount columns yet.
+          items: { $ref: "#/components/schemas/BankStatementPreviewRow" }
+
+    BankStatementPreviewRow:
+      type: object
+      required: [row, cells, kind]
+      properties:
+        row: { type: integer, description: 1-based row of the file table }
+        cells: { type: array, items: { type: string }, description: "One per analysis column, in that order" }
+        kind: { type: string, enum: [movement, error, skip, ""] }
+        reason: { type: string }
 
     EnvelopeBankStatementTemplate:
       type: object

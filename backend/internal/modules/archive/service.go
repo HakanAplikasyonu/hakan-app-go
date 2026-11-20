@@ -124,7 +124,10 @@ type Filter struct {
 	Q        string
 	// ExpiringOnly lists documents that expired or end within ExpiringDays,
 	// the soonest first.
-	ExpiringOnly  bool
+	ExpiringOnly bool
+	// OnlyVisible: the mükellef panel sees only documents the office marked
+	// "Mükellef de görsün"; the counters follow.
+	OnlyVisible   bool
 	Limit, Offset int32
 }
 
@@ -196,7 +199,7 @@ func (s *Service) List(ctx context.Context, taxpayerID int64, f Filter) (Page, e
 	}
 	today := s.today()
 	soon := today.AddDate(0, 0, ExpiringDays)
-	p := db.ListTaxpayerDocumentsParams{TaxpayerID: taxpayerID, Lim: f.Limit, Off: f.Offset}
+	p := db.ListTaxpayerDocumentsParams{TaxpayerID: taxpayerID, OnlyVisible: f.OnlyVisible, Lim: f.Limit, Off: f.Offset}
 	if f.Category != "" {
 		p.Category = pgtype.Text{String: f.Category, Valid: true}
 	}
@@ -216,7 +219,7 @@ func (s *Service) List(ctx context.Context, taxpayerID int64, f Filter) (Page, e
 	if err != nil {
 		return Page{}, fmt.Errorf("archive: list: %w", err)
 	}
-	c, err := s.q.CountTaxpayerDocuments(ctx, db.CountTaxpayerDocumentsParams{TaxpayerID: taxpayerID, Today: date(today), Soon: date(soon)})
+	c, err := s.q.CountTaxpayerDocuments(ctx, db.CountTaxpayerDocumentsParams{TaxpayerID: taxpayerID, OnlyVisible: f.OnlyVisible, Today: date(today), Soon: date(soon)})
 	if err != nil {
 		return Page{}, fmt.Errorf("archive: counts: %w", err)
 	}
@@ -364,13 +367,14 @@ type File struct {
 	Name        string
 }
 
-// Open opens a document's file.
-func (s *Service) Open(ctx context.Context, taxpayerID int64, id uuid.UUID) (File, error) {
+// Open opens a document's file. onlyVisible (mükellef panel): a document
+// not marked "Mükellef de görsün" is not found.
+func (s *Service) Open(ctx context.Context, taxpayerID int64, id uuid.UUID, onlyVisible bool) (File, error) {
 	if s.store == nil {
 		return File{}, ErrStorageMissing
 	}
 	d, err := s.q.GetTaxpayerDocument(ctx, db.GetTaxpayerDocumentParams{TaxpayerID: taxpayerID, Uuid: id})
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && onlyVisible && !d.VisibleToTaxpayer {
 		return File{}, ErrNotFound
 	}
 	if err != nil {

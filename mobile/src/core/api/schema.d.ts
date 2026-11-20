@@ -4389,6 +4389,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/archive-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ofisin paylaştığı arşiv belgeleri (salt okuma)
+         * @description Mükellef web paneli (#682). Ofisin belge arşivine "Mükellef de görsün"
+         *     işaretiyle koyduğu belgeler; yalnızca mükellefin sahip rolü görür.
+         *     Süzgeçler ve `counts` ofis listesindeki gibidir, yalnız paylaşılan
+         *     belgeler üzerinden.
+         */
+        get: operations["listTaxpayerArchiveDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/archive-documents/{archiveDocumentUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Paylaşılan arşiv belgesini indir
+         * @description Mükellefe açık bir arşiv belgesi (#682); her zaman ek olarak iner.
+         *     Paylaşılmamış belge 404.
+         */
+        get: operations["downloadTaxpayerArchiveDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/context": {
         parameters: {
             query?: never;
@@ -9086,7 +9144,10 @@ export interface paths {
          *     direction and currency whose number or counterparty name contains
          *     `q`, or whose VKN/TCKN equals it, outside the candidates' date and
          *     amount window; newest first, at most 20, fully paid ones left out.
-         *     Fewer than two characters find nothing. Results carry score 0.
+         *     Optional filters narrow by issue date (`from`, `to`) and by payable
+         *     amount in the movement's currency (`min`, `max`), all inclusive; they
+         *     work without `q`. A `q` shorter than two characters is ignored; with
+         *     no filter at all nothing is found. Results carry score 0.
          */
         get: operations["searchTenantBankTransactionInvoices"];
         put?: never;
@@ -10152,6 +10213,13 @@ export interface paths {
          *     balance, lookalike) and are classified. A balance that does not add
          *     up raises `BNK_GAP`; a text PDF whose balance does not add up is
          *     refused. `?preview=true` reports the same counts without writing.
+         *     For .xlsx, CSV and text PDF, `overrides` (JSON) carries the
+         *     accountant's decisions from the table preview (`analyze`): the column
+         *     mapping (`columns`, header → field, as a template's columns), rows left
+         *     out (`skip_rows`, 1-based file rows below the header) and corrected
+         *     cells (`edits`: row, file column, value). The file is read with exactly
+         *     this mapping; an invalid mapping or an edit outside the movement rows
+         *     is `INVALID_OVERRIDES` (400). MT940 ignores it.
          */
         post: operations["importTenantBankStatement"];
         delete?: never;
@@ -16912,6 +16980,23 @@ export interface components {
             lines: number;
             row_errors: number;
             warnings: string[];
+            /**
+             * @description The table below the header (at most 2000 non-empty rows) as the
+             *     import reads it with the proposed columns, for the Excel-like
+             *     preview. kind is movement, error (not readable: fix a cell or
+             *     leave the row out), skip (totals line and after) or empty when the
+             *     proposal has no date and amount columns yet.
+             */
+            rows: components["schemas"]["BankStatementPreviewRow"][];
+        };
+        BankStatementPreviewRow: {
+            /** @description 1-based row of the file table */
+            row: number;
+            /** @description One per analysis column, in that order */
+            cells: string[];
+            /** @enum {string} */
+            kind: "movement" | "error" | "skip" | "";
+            reason?: string;
         };
         EnvelopeBankStatementTemplate: {
             /** @enum {boolean} */
@@ -28101,6 +28186,98 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listTaxpayerArchiveDocuments: {
+        parameters: {
+            query?: {
+                category?: "general" | "contract" | "tax" | "sgk" | "trade_registry" | "isg" | "other";
+                isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
+                q?: string;
+                expiring?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ArchiveDocumentPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadTaxpayerArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/jpeg": string;
+                    "image/png": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getTaxpayerContext: {
         parameters: {
             query?: never;
@@ -35467,8 +35644,16 @@ export interface operations {
     };
     searchTenantBankTransactionInvoices: {
         parameters: {
-            query: {
-                q: string;
+            query?: {
+                q?: string;
+                /** @description Issue date from (inclusive) */
+                from?: string;
+                /** @description Issue date to (inclusive) */
+                to?: string;
+                /** @description Minimum payable amount (decimal) */
+                min?: string;
+                /** @description Maximum payable amount (decimal) */
+                max?: string;
             };
             header: {
                 /**
@@ -35501,6 +35686,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
@@ -37227,6 +37413,8 @@ export interface operations {
                     file: string;
                     /** Format: uuid */
                     cash_box_uuid?: string;
+                    /** @description JSON {"columns":[{"header","field"}],"skip_rows":[int],"edits":[{"row","column","value"}]} */
+                    overrides?: string;
                 };
             };
         };

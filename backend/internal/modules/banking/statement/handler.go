@@ -1,6 +1,7 @@
 package statement
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -101,6 +102,20 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request) {
 		FileName: header.Filename, Data: data,
 	}
 	req.Preview, _ = strconv.ParseBool(r.URL.Query().Get("preview"))
+	// Önizlemede müşavirin kararı (#669 ekstre): kolon eşlemesi, dışarıda
+	// bırakılan satırlar, düzeltilen hücreler.
+	if v := r.FormValue("overrides"); v != "" {
+		var o Overrides
+		if err := json.Unmarshal([]byte(v), &o); err != nil {
+			response.BadRequest(w, r, "INVALID_OVERRIDES", "overrides must be JSON {columns, skip_rows, edits}")
+			return
+		}
+		if len(o.SkipRows) > MaxPreviewRows*5 || len(o.Edits) > 2000 {
+			response.BadRequest(w, r, "INVALID_OVERRIDES", "too many skipped rows or edits")
+			return
+		}
+		req.Overrides = &o
+	}
 	if v := r.FormValue("cash_box_uuid"); v != "" {
 		id, err := uuid.Parse(v)
 		if err != nil {
@@ -160,6 +175,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnsupportedMediaType, "UNSUPPORTED_FILE", "upload MT940, .xlsx, CSV or a text PDF statement")
 	case errors.Is(err, ErrScannedPDF):
 		response.Error(w, r, http.StatusUnprocessableEntity, "SCANNED_PDF", "the PDF has no text layer; scanned statements are not supported yet")
+	case errors.Is(err, ErrInvalidOverrides):
+		response.BadRequest(w, r, "INVALID_OVERRIDES", err.Error())
 	case errors.Is(err, ErrLayoutUnknown):
 		response.Error(w, r, http.StatusUnprocessableEntity, "STATEMENT_LAYOUT_UNKNOWN",
 			"the columns of this file are not known; analyse it with POST /v1/tenant/bank-statement-templates/analyze and save a template")
