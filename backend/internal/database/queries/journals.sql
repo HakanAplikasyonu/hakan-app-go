@@ -59,7 +59,8 @@ FROM journal_draft_lines
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND journal_draft_id = @journal_draft_id;
 
 -- name: ApproveJournalDraft :execrows
-UPDATE journal_drafts SET status = 'approved', approved_by = @approved_by, approved_at = NOW()
+UPDATE journal_drafts SET status = 'approved', approved_by = @approved_by, approved_at = NOW(),
+    approval_warnings = @approval_warnings::text[], approval_note = sqlc.narg(approval_note)
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND id = @id AND status = 'draft';
 
 -- name: RevertJournalDraftApproval :execrows
@@ -162,6 +163,30 @@ SELECT d.id, 'period_locked', 0, '', 0::numeric
 FROM d
 JOIN period_locks pl
   ON pl.organization_id = @organization_id AND pl.engagement_id = @engagement_id AND pl.period = d.period
+UNION ALL
+-- Eksik belge (uyarı): fişteki bir banka hareketi hiçbir belgeye (fatura,
+-- fiş satırı) eşleşmemiş ve satırında belge numarası yok.
+SELECT DISTINCT d.id, 'missing_document', 0, '', 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id
+ AND l.journal_draft_id = d.id AND l.source_kind = 'bank_transaction' AND COALESCE(l.document_no, '') = ''
+JOIN engagements e ON e.organization_id = @organization_id AND e.id = @engagement_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM bank_transaction_matches m
+    WHERE m.taxpayer_id = e.taxpayer_id AND m.bank_transaction_id::text = l.source_id
+  )
+UNION ALL
+-- Mükerrer olabilir (uyarı): aynı kaynak belge (fatura, fiş, banka hareketi)
+-- başka bir fişte de var.
+SELECT DISTINCT d.id, 'possible_duplicate', 0, '', 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = @organization_id AND l.engagement_id = @engagement_id AND l.journal_draft_id = d.id
+ AND l.source_kind IN ('invoice', 'invoice_item', 'receipt', 'bank_transaction')
+JOIN journal_draft_lines o
+  ON o.organization_id = @organization_id AND o.engagement_id = @engagement_id
+ AND o.source_kind = l.source_kind AND o.source_id = l.source_id AND o.journal_draft_id <> d.id
 ORDER BY 1, 3;
 
 -- name: SetJournalDraftLineAccount :execrows

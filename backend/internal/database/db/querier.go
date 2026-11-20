@@ -699,6 +699,10 @@ type Querier interface {
 	// Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
 	// da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
 	// kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+	// Eksik belge (uyarı): fişteki bir banka hareketi hiçbir belgeye (fatura,
+	// fiş satırı) eşleşmemiş ve satırında belge numarası yok.
+	// Mükerrer olabilir (uyarı): aynı kaynak belge (fatura, fiş, banka hareketi)
+	// başka bir fişte de var.
 	JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)

@@ -1250,6 +1250,8 @@ type JournalDraft struct {
 	ApprovalRevertedBy   pgtype.Int8        `json:"approval_reverted_by"`
 	ApprovalRevertedAt   pgtype.Timestamptz `json:"approval_reverted_at"`
 	ApprovalRevertReason pgtype.Text        `json:"approval_revert_reason"`
+	ApprovalWarnings     []string           `json:"approval_warnings"`
+	ApprovalNote         pgtype.Text        `json:"approval_note"`
 }
 
 type JournalDraftLine struct {

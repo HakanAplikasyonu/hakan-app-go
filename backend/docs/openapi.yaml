@@ -9637,9 +9637,18 @@ paths:
       tags: [Journals]
       operationId: approveJournalDraft
       summary: Approve a balanced draft
-      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
+      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details. A draft with warnings (`missing_document`: a bank entry without an invoice / receipt or document number; `possible_duplicate`: its source document is in another entry too) is not blocked, but is refused with `409 JOURNAL_NEEDS_CONFIRMATION` (warning codes as error details) unless the body has `confirm_warnings: true` (#669). The accepted warnings and the optional note stay on the entry (`approval_warnings`, `approval_note`).
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirm_warnings: { type: boolean, description: "Approve although the draft has warnings (missing document / possible duplicate)" }
+                note: { type: string, maxLength: 1000, description: Optional reason kept on the entry }
       responses:
         "200":
           description: Approved draft
@@ -9651,6 +9660,11 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422":
           description: Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: The draft has warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -23287,12 +23301,14 @@ components:
             export's own check stops a code missing from the program's plan).
         code:
           type: string
-          enum: [unbalanced, unknown_account, parent_account, period_locked]
+          enum: [unbalanced, unknown_account, parent_account, period_locked, missing_document, possible_duplicate]
           description: |
             unbalanced: debit and credit differ (or no lines);
             unknown_account: the line's code is not in the imported plan;
             parent_account: the line posts to an account that has sub-accounts;
-            period_locked: the period is closed.
+            period_locked: the period is closed;
+            missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
+            possible_duplicate: a source document of the entry is in another entry too (approve with confirm_warnings).
         line_no: { type: integer, format: int32 }
         account: { type: string }
         difference: { type: string, description: "debit minus credit (unbalanced)" }
@@ -23341,6 +23357,11 @@ components:
             document_type: { type: string }
             origin: { type: object, additionalProperties: true }
             approved_at: { type: string, format: date-time }
+            approval_warnings:
+              type: array
+              description: Warnings the approver accepted (missing_document, possible_duplicate)
+              items: { type: string }
+            approval_note: { type: string, description: Optional reason given with the approval }
             created_at: { type: string, format: date-time }
             items:
               type: array

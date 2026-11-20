@@ -232,6 +232,13 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 // Approve moves a balanced draft to approved. An unbalanced draft is refused
 // (docs/02 §2: blocker before any driver sees it).
 func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID) error {
+	return s.ApproveWith(ctx, scope, actorID, id, Confirmation{Confirmed: true})
+}
+
+// ApproveWith approves a draft. A draft with warnings (missing document,
+// possible duplicate) is approved only with c.Confirmed; the accepted
+// warnings and the note stay on the entry.
+func (s *Service) ApproveWith(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID, c Confirmation) error {
 	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrNotFound
@@ -255,7 +262,20 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	if b := blocking(issues[row.ID]); len(b) > 0 {
 		return &DraftBlockedError{Issues: b}
 	}
-	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID)})
+	warn := confirmable(issues[row.ID])
+	if len(warn) > 0 && !c.Confirmed {
+		return &DraftNeedsConfirmationError{Issues: warn}
+	}
+	codes := []string{}
+	for _, w := range warn {
+		codes = append(codes, w.Code)
+	}
+	note := pgtype.Text{}
+	if t := strings.TrimSpace(c.Note); t != "" && len(warn) > 0 {
+		note = pgtype.Text{String: t, Valid: true}
+	}
+	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID),
+		ApprovalWarnings: codes, ApprovalNote: note})
 	if err != nil {
 		return err
 	}

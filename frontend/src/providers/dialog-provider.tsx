@@ -27,6 +27,8 @@ type PromptOptions = {
   placeholder?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Boş yanıt da onaylanabilir. */
+  optional?: boolean;
 };
 
 type DialogContextValue = {
@@ -120,6 +122,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
         placeholder={promptState?.options.placeholder}
         confirmLabel={promptState?.options.confirmLabel}
         cancelLabel={promptState?.options.cancelLabel}
+        optional={promptState?.options.optional}
         onConfirm={(value) => {
           promptState?.resolve(value);
           setPromptState(null);

@@ -2507,5 +2507,12 @@
   "bank.upload.suggested": "Hesap önerisi hazır: {{count}} hareket; {{high}} tanesi yüksek güvenli.",
   "bank.upload.approve_high": "Yüksek güvenlileri onayla ({{count}})",
   "bank.upload.make_drafts": "Taslak fiş oluştur",
-  "bank.upload.already_loaded": "Bu ekstre daha önce yüklenmiş: {{count}} hareket zaten kayıtlı, yeniden eklenmedi."
+  "bank.upload.already_loaded": "Bu ekstre daha önce yüklenmiş: {{count}} hareket zaten kayıtlı, yeniden eklenmedi.",
+  "journals.check.missing_document": "Eksik belge: banka hareketinin faturası / belgesi yok.",
+  "journals.check.possible_duplicate": "Mükerrer olabilir: aynı kaynak belge başka bir fişte de var.",
+  "journals.check.confirm_title": "Bu fişte uyarı var. Yine de onaylansın mı?",
+  "journals.check.confirm_note": "Gerekçe (isteğe bağlı)",
+  "journals.check.confirm_approve": "Yine de onayla",
+  "journals.check.approve_clean_warned": "{{count}} fişte eksik belge ya da mükerrer olabilir uyarısı var; bunlar da onaylanır ve kim onayladığı kaydedilir.",
+  "journals.error_JOURNAL_NEEDS_CONFIRMATION": "Bu fişte eksik belge ya da mükerrer olabilir uyarısı var; onay için açıkça kabul edin."
 }

@@ -18293,10 +18293,12 @@ export interface components {
              * @description unbalanced: debit and credit differ (or no lines);
              *     unknown_account: the line's code is not in the imported plan;
              *     parent_account: the line posts to an account that has sub-accounts;
-             *     period_locked: the period is closed.
+             *     period_locked: the period is closed;
+             *     missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
+             *     possible_duplicate: a source document of the entry is in another entry too (approve with confirm_warnings).
              * @enum {string}
              */
-            code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked";
+            code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked" | "missing_document" | "possible_duplicate";
             /** Format: int32 */
             line_no?: number;
             account?: string;
@@ -18338,6 +18340,10 @@ export interface components {
             };
             /** Format: date-time */
             approved_at?: string;
+            /** @description Warnings the approver accepted (missing_document, possible_duplicate) */
+            approval_warnings?: string[];
+            /** @description Optional reason given with the approval */
+            approval_note?: string;
             /** Format: date-time */
             created_at: string;
             items: components["schemas"]["JournalDraftLine"][];
@@ -32460,7 +32466,16 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Approve although the draft has warnings (missing document / possible duplicate) */
+                    confirm_warnings?: boolean;
+                    /** @description Optional reason kept on the entry */
+                    note?: string;
+                };
+            };
+        };
         responses: {
             /** @description Approved draft */
             200: {
@@ -32475,6 +32490,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            /** @description The draft has warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`) */
             422: {
                 headers: {
