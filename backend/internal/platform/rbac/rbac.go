@@ -115,6 +115,9 @@ const (
 	PermTenantJournalsRead   = "tenant.journals.read"
 	PermTenantJournalsWrite  = "tenant.journals.write"
 	PermTenantJournalsExport = "tenant.journals.export"
+	// PermTenantJournalsApprove: the final check of a draft (#566); a
+	// stajyer prepares drafts with write, the müşavir approves.
+	PermTenantJournalsApprove = "tenant.journals.approve"
 	// Personel, bordro ve SGK (issue #382).
 	PermTenantPayrollRead  = "tenant.payroll.read"
 	PermTenantPayrollWrite = "tenant.payroll.write"

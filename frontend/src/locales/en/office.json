@@ -383,6 +383,7 @@
   "journals.title": "Journal & export",
   "journals.page_description": "Prepare journal drafts, approve them and download the Luca / Zirve / Excel file.",
   "journals.new_title": "New entry",
+  "journals.awaiting_approval": "Awaiting the adviser’s approval",
   "journals.description": "Entry description",
   "journals.line_description": "Line description",
   "journals.debit": "Debit",

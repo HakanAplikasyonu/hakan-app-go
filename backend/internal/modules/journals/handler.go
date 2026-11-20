@@ -59,6 +59,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 		return middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng, scope)
 	}
 	read, write, export := rbac.PermTenantJournalsRead, rbac.PermTenantJournalsWrite, rbac.PermTenantJournalsExport
+	approve := rbac.PermTenantJournalsApprove
 	mux.Handle("GET /v1/tenant/export-drivers", tenant(read, h.drivers))
 	// Office-wide export settings (#466): integrators Luca fetches itself.
 	mux.Handle("GET /v1/tenant/journal-export-settings", tenant(read, h.getOfficeSettings))
@@ -67,7 +68,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base+"/journal-drafts", engaged(read, h.listDrafts))
 	mux.Handle("POST "+base+"/journal-drafts", engaged(write, h.createDraft))
 	mux.Handle("GET "+base+"/journal-drafts/{draftUuid}", engaged(read, h.getDraft))
-	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/approve", engaged(write, h.approve))
+	// Onay sorumlu müşavirde (#566): hazırlayan stajyer onaylayamaz.
+	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/approve", engaged(approve, h.approve))
 	mux.Handle("PATCH "+base+"/journal-drafts/{draftUuid}/lines/{lineNo}", engaged(write, h.setLineAccount))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))

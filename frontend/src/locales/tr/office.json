@@ -383,6 +383,7 @@
   "journals.title": "Yevmiye ve çıktı",
   "journals.page_description": "Yevmiye taslağı hazırlayın, onaylayın ve Luca / Zirve / Excel dosyasını indirin.",
   "journals.new_title": "Yeni fiş",
+  "journals.awaiting_approval": "Müşavir onayı bekliyor",
   "journals.description": "Fiş açıklaması",
   "journals.line_description": "Satır açıklaması",
   "journals.debit": "Borç",

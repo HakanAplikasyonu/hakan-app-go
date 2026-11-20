@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DRAFTS_ANCHOR, EXPORT_ANCHOR } from "@/config/routes";
+import { permissions } from "@/config/permissions";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -219,13 +220,15 @@ function ApproveClean({
   drafts: JournalDraft[];
 }) {
   const { t } = useLocale();
-  const { slug } = useTenant();
+  const { slug, permissions: perms } = useTenant();
   const { confirm } = useDialogs();
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
   const clean = open.filter((d) => !isBlocked(d));
-  if (!clean.length) return null;
+  // Son onay sorumlu müşavirde (#566).
+  if (!clean.length || !perms.includes(permissions.tenant.journals.approve))
+    return null;
   const run = async () => {
     const ok = await confirm({
       title: t("office.journals.check.approve_clean_title", {
@@ -603,7 +606,7 @@ function SendToAgent({
 function JournalsInner() {
   const { t, locale } = useLocale();
   const { prompt } = useDialogs();
-  const { slug } = useTenant();
+  const { slug, permissions: perms } = useTenant();
   // Mükellef detayının Fişler sekmesinde mükellef sabit (#468).
   const scope = useEngagementScope();
   const { options, selected, select, isLoading, isError } =
@@ -635,6 +638,8 @@ function JournalsInner() {
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
   const { approve, reverse } = useJournalActions(slug, engagement);
+  // Hazırlayan stajyer onaylayamaz; fiş müşavirin onayını bekler (#566).
+  const canApprove = perms.includes(permissions.tenant.journals.approve);
   // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
   // seçim sıfırlanır.
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -753,7 +758,11 @@ function JournalsInner() {
       }),
       createActionsColumn<JournalDraft>({
         cell: (d) =>
-          d.status === "draft" ? (
+          d.status === "draft" && !canApprove ? (
+            <span className="text-muted-foreground text-xs">
+              {t("office.journals.awaiting_approval")}
+            </span>
+          ) : d.status === "draft" ? (
             // Engelli fiş onaylanmaz (#566); nedeni ipucunda.
             <Hint
               label={
@@ -796,6 +805,7 @@ function JournalsInner() {
     [
       approveDraft,
       approving,
+      canApprove,
       engagement,
       picked,
       prompt,

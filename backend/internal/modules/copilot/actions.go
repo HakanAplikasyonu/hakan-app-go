@@ -52,7 +52,7 @@ var Catalog = []ActionSpec{
 	{Name: ActionBankDrafts, Write: true, Permissions: []string{rbac.PermTenantBankWrite, rbac.PermTenantJournalsWrite},
 		Endpoint:    "POST /v1/tenant/engagements/{engagementUuid}/bank-postings/drafts {period}",
 		Description: "Create journal drafts (mahsup fişleri) from the period's approved bank movements."},
-	{Name: ActionJournalsApprove, Write: true, Permissions: []string{rbac.PermTenantJournalsWrite},
+	{Name: ActionJournalsApprove, Write: true, Permissions: []string{rbac.PermTenantJournalsApprove},
 		Endpoint:    "POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/approve (each draft of the period)",
 		Description: "Approve the period's journal drafts so they can be exported."},
 	{Name: ActionExportTransfer, Write: true, Permissions: []string{rbac.PermTenantJournalsExport},
