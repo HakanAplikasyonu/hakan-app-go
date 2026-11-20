@@ -92,10 +92,10 @@ export const bankMatchingService = {
       "PUT",
       `${tx(engagement, transaction)}/matches`,
       {
-        body: {
-          invoice_uuids: invoiceUuids,
-          journal_lines: journalLines,
-        },
+        body:
+          journalLines.length > 0
+            ? { invoice_uuids: invoiceUuids, journal_lines: journalLines }
+            : { invoice_uuids: invoiceUuids },
       },
     );
   },
