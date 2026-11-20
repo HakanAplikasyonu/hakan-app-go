@@ -21,6 +21,7 @@ import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
+import { sourceText } from "@/lib/source-label";
 import { usePermission } from "@/providers/permission-provider";
 
 import {
@@ -28,6 +29,12 @@ import {
   useChangeRequests,
   type ChangeRequest,
 } from "../hooks/use-change-requests";
+import {
+  changeFieldLabel,
+  changeFieldOrder,
+  changeFieldValue,
+  periodText,
+} from "../lib/change-request-text";
 
 /**
  * Kilitli döneme gelen değişiklik talepleri (#518, B2): dönem şeridinin
@@ -152,23 +159,30 @@ function RequestCard({
   const { t, locale } = useLocale();
   const { slug } = useTenant();
   const d = readDiff(req.diff);
+  const fields = [...d.fields].sort(
+    (a, b) => changeFieldOrder(a.field) - changeFieldOrder(b.field),
+  );
+  const cur = d.fields.find((f) => f.field === "currency");
+  const currency =
+    cur && cur.new !== "—" ? cur.new : cur && cur.old !== "—" ? cur.old : "TRY";
+  const source = sourceText(d.source, d.method, t);
   return (
     <article className="bg-surface border-line space-y-3 rounded-lg border p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <StatusPill tone={req.kind === "create" ? "info" : "warn"}>
           {t(`office.change_requests.kind_${req.kind}`)}
         </StatusPill>
-        <span className="font-mono tabular-nums">{req.period}</span>
-        {d.source ? (
+        <span>{periodText(req.period, locale)}</span>
+        {source ? (
           <span className="text-text-3">
-            {t("office.change_requests.from", { source: d.source })}
+            {t("office.change_requests.from", { source })}
           </span>
         ) : null}
         <span className="text-text-3 ml-auto text-xs">
           {formatCellDate(req.created_at, locale, "datetime")}
         </span>
       </div>
-      {d.fields.length > 0 ? (
+      {fields.length > 0 ? (
         <Table className="w-full text-sm">
           <TableCaption className="sr-only">
             {t("office.change_requests.fields")}
@@ -196,22 +210,22 @@ function RequestCard({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {d.fields.map((f) => (
+            {fields.map((f) => (
               <TableRow
                 key={f.field}
                 className="border-line hover:bg-transparent"
               >
                 <TableHead
                   scope="row"
-                  className="text-foreground h-auto px-0 py-1.5 pr-3 font-mono text-xs font-normal"
+                  className="text-foreground h-auto px-0 py-1.5 pr-3 text-sm font-normal"
                 >
-                  {f.field}
+                  {changeFieldLabel(f.field, t)}
                 </TableHead>
                 <TableCell className="text-text-3 px-0 py-1.5 pr-3 break-all whitespace-normal line-through">
-                  {f.old}
+                  {changeFieldValue(f.field, f.old, t, locale, currency)}
                 </TableCell>
                 <TableCell className="px-0 py-1.5 font-medium break-all">
-                  {f.new}
+                  {changeFieldValue(f.field, f.new, t, locale, currency)}
                 </TableCell>
               </TableRow>
             ))}
