@@ -74,9 +74,13 @@ export const TRANSFER_STATUS: Record<string, StatusVariant> = {
 function transferError(t: Translate, tr: JournalTransfer) {
   const key = `office.journals.transfer_error_${tr.error_code ?? ""}`;
   const known = tr.error_code ? t(key) : key;
-  // The agent's own Turkish message is more specific when present.
-  if (tr.error_message) return tr.error_message;
-  return known !== key ? known : t("office.journals.transfer_error_unknown");
+  // Known code first (what to do), the agent's own message as the detail
+  // (e.g. the missing folder's path).
+  if (known !== key)
+    return tr.error_message && tr.error_message !== known
+      ? `${known} (${tr.error_message})`
+      : known;
+  return tr.error_message || t("office.journals.transfer_error_unknown");
 }
 
 function actionErrorText(t: Translate, err: unknown) {
