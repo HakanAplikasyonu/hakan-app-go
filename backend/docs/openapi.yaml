@@ -11042,6 +11042,8 @@ paths:
       summary: A reconciliation run with its account items
       description: |
         Requires `tenant.reconciliation.read` (#389). `latest` is the newest run (of `period` when given). Items are sorted by main account.
+        When `latest` finds no run yet (the period was never compared) the answer is `200` with `run: null` and no items: an empty state,
+        not an error (#639). 404 is kept for an unknown run uuid or engagement.
       security:
         - bearerAuth: []
       parameters:
@@ -11056,7 +11058,7 @@ paths:
                 required: [success, data, meta]
                 properties:
                   success: { type: boolean, enum: [true] }
-                  data: { $ref: "#/components/schemas/ReconciliationRunDetail" }
+                  data: { $ref: "#/components/schemas/ReconciliationLatestRunDetail" }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
@@ -25632,6 +25634,16 @@ components:
       required: [run, items]
       properties:
         run: { $ref: "#/components/schemas/ReconciliationRun" }
+        items: { type: array, items: { $ref: "#/components/schemas/ReconciliationItem" } }
+    ReconciliationLatestRunDetail:
+      type: object
+      description: A run with its items; `run` is null (and `items` empty) when `latest` finds no run yet (#639).
+      required: [run, items]
+      properties:
+        run:
+          oneOf:
+            - $ref: "#/components/schemas/ReconciliationRun"
+            - type: "null"
         items: { type: array, items: { $ref: "#/components/schemas/ReconciliationItem" } }
     ReconciliationCounterparty:
       type: object

@@ -6,6 +6,8 @@ import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 type S = components["schemas"];
 export type ReconciliationRun = S["ReconciliationRun"];
 export type ReconciliationRunDetail = S["ReconciliationRunDetail"];
+/** `runs/latest`: `run` null ise dönem henüz karşılaştırılmadı (#639). */
+export type ReconciliationLatestRunDetail = S["ReconciliationLatestRunDetail"];
 export type ReconciliationItem = S["ReconciliationItem"];
 export type ReconciliationCounterparty = S["ReconciliationCounterparty"];
 export type ReconciliationCounterpartyPage =
@@ -48,11 +50,11 @@ export const reconciliationKeys = {
  */
 export const reconciliationService = {
   latest(slug: string, engagement: string, period: string) {
-    return tenantRequest<ReconciliationRunDetail>(
+    return tenantRequest<ReconciliationLatestRunDetail>(
       slug,
       "GET",
       `${eng(engagement)}/runs/latest`,
-      // 404: bu dönem henüz karşılaştırılmadı; ekran boş durumunu gösterir.
+      // Dönem henüz karşılaştırılmadıysa 200 + run: null (#639).
       { query: { period }, silent: true },
     );
   },

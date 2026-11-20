@@ -60,6 +60,7 @@ import { useOfficePeriod, usePeriodText } from "../period";
 import {
   type DecisionStatus,
   type ReconciliationItem,
+  type ReconciliationLatestRunDetail,
   type ReconciliationRunDetail,
   reconciliationKeys,
   reconciliationService,
@@ -119,9 +120,12 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
   const latest = useQuery({
     queryKey: reconciliationKeys.run(slug, engagement, period),
     queryFn: () => reconciliationService.latest(slug, engagement, period),
-    retry: (n, e) => !(isApiError(e) && e.status === 404) && n < 2,
   });
-  const notRun = isApiError(latest.error) && latest.error.status === 404;
+  // Koşu yoksa uç 200 + run: null döner (#639); boş durum gösterilir.
+  const notRun = latest.data?.run === null;
+  const detail: ReconciliationRunDetail | null = latest.data?.run
+    ? { run: latest.data.run, items: latest.data.items }
+    : null;
 
   const run = useMutation({
     mutationFn: () => reconciliationService.run(slug, engagement, period),
@@ -166,7 +170,7 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
               className={cn("size-4", run.isPending && "animate-spin")}
               aria-hidden
             />
-            {latest.data
+            {detail
               ? t("office.reconciliation.rerun")
               : t("office.reconciliation.run")}
           </Button>
@@ -192,7 +196,7 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
         <LettersView engagement={engagement} canWrite={canWrite} />
       ) : latest.isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : notRun || !latest.data ? (
+      ) : notRun || !detail ? (
         <div className="border-line bg-surface rounded-xl border p-8 text-center">
           <Scale className="text-text-3 mx-auto size-8" aria-hidden />
           <h2 className="mt-3 font-semibold">
@@ -214,7 +218,7 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
         <AccountsView
           engagement={engagement}
           period={period}
-          detail={latest.data}
+          detail={detail}
           canWrite={canWrite}
         />
       )}
@@ -246,7 +250,7 @@ function AccountsView({
   const sum = detail.run.summary;
 
   const update = (item: ReconciliationItem) => {
-    qc.setQueryData<ReconciliationRunDetail>(
+    qc.setQueryData<ReconciliationLatestRunDetail>(
       reconciliationKeys.run(slug, engagement, period),
       (old) =>
         old && {
