@@ -22294,6 +22294,25 @@ components:
             Problems found on a draft (#566); only on drafts. Approving a
             draft with a blocking issue returns 422 JOURNAL_BLOCKED.
           items: { $ref: "#/components/schemas/JournalDraftIssue" }
+        export:
+          $ref: "#/components/schemas/JournalDraftExport"
+
+    JournalDraftExport:
+      type: object
+      description: |
+        Where an exported draft went (#574): its live export and the latest
+        transfer of that export to the accounting program. Only on exported
+        drafts in the list.
+      required: [batch_uuid, driver, exported_at]
+      properties:
+        batch_uuid: { type: string, format: uuid }
+        driver: { type: string }
+        exported_at: { type: string, format: date-time }
+        transfer_status:
+          type: string
+          enum: [queued, claimed, delivered, imported, failed, cancelled]
+          description: Empty / missing when the files were only downloaded.
+        transfer_error: { type: string }
 
     JournalDraftIssue:
       type: object

@@ -17513,6 +17513,25 @@ export interface components {
              *     draft with a blocking issue returns 422 JOURNAL_BLOCKED.
              */
             issues?: components["schemas"]["JournalDraftIssue"][];
+            export?: components["schemas"]["JournalDraftExport"];
+        };
+        /**
+         * @description Where an exported draft went (#574): its live export and the latest
+         *     transfer of that export to the accounting program. Only on exported
+         *     drafts in the list.
+         */
+        JournalDraftExport: {
+            /** Format: uuid */
+            batch_uuid: string;
+            driver: string;
+            /** Format: date-time */
+            exported_at: string;
+            /**
+             * @description Empty / missing when the files were only downloaded.
+             * @enum {string}
+             */
+            transfer_status?: "queued" | "claimed" | "delivered" | "imported" | "failed" | "cancelled";
+            transfer_error?: string;
         };
         JournalDraftIssue: {
             /**

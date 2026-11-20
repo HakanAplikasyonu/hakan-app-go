@@ -125,6 +125,20 @@ type Draft struct {
 	Lines   int32           `json:"lines"`
 	// Issues: why a draft cannot be approved yet (#566); only on drafts.
 	Issues []DraftIssue `json:"issues,omitempty"`
+	// Export: the live export of an exported draft and its latest
+	// transfer to the program (#574).
+	Export *DraftExport `json:"export,omitempty"`
+}
+
+// DraftExport is where an exported draft went.
+type DraftExport struct {
+	BatchUUID  uuid.UUID `json:"batch_uuid"`
+	Driver     string    `json:"driver"`
+	ExportedAt time.Time `json:"exported_at"`
+	// TransferStatus: queued / claimed / delivered / imported / failed /
+	// cancelled; empty when the files were only downloaded.
+	TransferStatus string `json:"transfer_status,omitempty"`
+	TransferError  string `json:"transfer_error,omitempty"`
 }
 
 // CreateDraft stores a new draft (status draft). The entry number is the next

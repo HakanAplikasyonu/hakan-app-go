@@ -56,13 +56,20 @@ func (s *Service) ListDrafts(ctx context.Context, scope engagementctx.Scope, f D
 	if err != nil {
 		return DraftPage{}, err
 	}
-	var open []int64
+	var open, exported []int64
 	for _, r := range rows {
-		if r.Status == "draft" {
+		switch r.Status {
+		case "draft":
 			open = append(open, r.ID)
+		case "exported":
+			exported = append(exported, r.ID)
 		}
 	}
 	issues, err := s.draftIssues(ctx, scope, open)
+	if err != nil {
+		return DraftPage{}, err
+	}
+	exports, err := s.draftExports(ctx, scope, exported)
 	if err != nil {
 		return DraftPage{}, err
 	}
@@ -71,8 +78,27 @@ func (s *Service) ListDrafts(ctx context.Context, scope engagementctx.Scope, f D
 		out.Items = append(out.Items, Draft{
 			UUID: r.Uuid, Period: r.Period, EntryNo: r.EntryNo, Type: r.EntryType, Date: r.EntryDate.Time, Status: r.Status,
 			Debit: repository.Dec(r.TotalDebit), Credit: repository.Dec(r.TotalCredit), Lines: r.LineCount,
-			Issues: issues[r.ID],
+			Issues: issues[r.ID], Export: exports[r.ID],
 		})
+	}
+	return out, nil
+}
+
+// draftExports returns the live export (and its latest transfer) of ids.
+func (s *Service) draftExports(ctx context.Context, scope engagementctx.Scope, ids []int64) (map[int64]*DraftExport, error) {
+	out := map[int64]*DraftExport{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := s.q.JournalDraftExports(ctx, db.JournalDraftExportsParams{
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Ids: ids,
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		out[r.JournalDraftID] = &DraftExport{BatchUUID: r.BatchUuid, Driver: r.Driver, ExportedAt: r.ExportedAt.Time,
+			TransferStatus: r.TransferStatus, TransferError: r.TransferError}
 	}
 	return out, nil
 }
