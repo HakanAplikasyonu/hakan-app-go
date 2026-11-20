@@ -730,6 +730,8 @@
   "drawer.fx_save": "Save rate",
   "drawer.fx_saved": "Rate saved; KDV and the TL amount are updated.",
   "drawer.fx_error": "Could not save the rate.",
+  "drawer.fx_entered": "{{currency}} rate {{rate}} TL: entered in the office by {{name}} ({{date}}).",
+  "drawer.fx_entered_unknown": "a deleted user",
   "drawer.loading": "Loading invoice",
   "drawer.preview": "Preview",
   "drawer.preview_of": "Open invoice {{number}} in the drawer",

@@ -22404,12 +22404,21 @@ components:
       allOf:
         - $ref: "#/components/schemas/TaxpayerInvoiceDetail"
         - type: object
-          required: [has_ubl, warnings]
+          required: [has_ubl, warnings, exchange_rate_entry]
           properties:
             has_ubl: { type: boolean, description: "A UBL-TR XML is stored (GET .../ubl)" }
             warnings:
               type: array
               items: { $ref: "#/components/schemas/OfficeInvoiceWarning" }
+            exchange_rate_entry:
+              description: Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [set_by_name, set_at]
+                  properties:
+                    set_by_name: { type: string, description: "Empty when the user was deleted" }
+                    set_at: { type: string, format: date-time }
 
     EnvelopeOfficeInvoicePage:
       type: object

@@ -31,7 +31,7 @@ func (q *Queries) DeleteInvoiceChildren(ctx context.Context, arg DeleteInvoiceCh
 }
 
 const findInvoicesByETTN = `-- name: FindInvoicesByETTN :many
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1 AND ettn = $2
 ORDER BY id
 `
@@ -109,6 +109,8 @@ func (q *Queries) FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTN
 			&i.DeletedAtSource,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExchangeRateSetBy,
+			&i.ExchangeRateSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -121,7 +123,7 @@ func (q *Queries) FindInvoicesByETTN(ctx context.Context, arg FindInvoicesByETTN
 }
 
 const findInvoicesByPartyNumberDate = `-- name: FindInvoicesByPartyNumberDate :many
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1
   AND invoice_number = $2
   AND issue_date = $3
@@ -211,6 +213,8 @@ func (q *Queries) FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInv
 			&i.DeletedAtSource,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExchangeRateSetBy,
+			&i.ExchangeRateSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -223,7 +227,7 @@ func (q *Queries) FindInvoicesByPartyNumberDate(ctx context.Context, arg FindInv
 }
 
 const findPossibleDuplicateInvoices = `-- name: FindPossibleDuplicateInvoices :many
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1
   AND issue_date = $2
   AND direction = $3
@@ -321,6 +325,8 @@ func (q *Queries) FindPossibleDuplicateInvoices(ctx context.Context, arg FindPos
 			&i.DeletedAtSource,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExchangeRateSetBy,
+			&i.ExchangeRateSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -333,7 +339,7 @@ func (q *Queries) FindPossibleDuplicateInvoices(ctx context.Context, arg FindPos
 }
 
 const getInvoice = `-- name: GetInvoice :one
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1 AND uuid = $2
 `
 
@@ -403,12 +409,14 @@ func (q *Queries) GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice
 		&i.DeletedAtSource,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateSetBy,
+		&i.ExchangeRateSetAt,
 	)
 	return i, err
 }
 
 const getInvoiceByID = `-- name: GetInvoiceByID :one
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1 AND id = $2
 `
 
@@ -478,12 +486,14 @@ func (q *Queries) GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) 
 		&i.DeletedAtSource,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateSetBy,
+		&i.ExchangeRateSetAt,
 	)
 	return i, err
 }
 
 const getInvoiceBySource = `-- name: GetInvoiceBySource :one
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1 AND source_system = $2 AND source_id = $3
 `
 
@@ -554,6 +564,8 @@ func (q *Queries) GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySource
 		&i.DeletedAtSource,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ExchangeRateSetBy,
+		&i.ExchangeRateSetAt,
 	)
 	return i, err
 }
@@ -829,6 +841,31 @@ func (q *Queries) InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoice
 	return err
 }
 
+const invoiceExchangeRateEntry = `-- name: InvoiceExchangeRateEntry :one
+SELECT i.exchange_rate_set_at, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.name, u.surname)), ''), u.email::text, '')::text AS set_by_name
+FROM invoices i
+LEFT JOIN users u ON u.id = i.exchange_rate_set_by
+WHERE i.taxpayer_id = $1 AND i.id = $2 AND i.exchange_rate_set_at IS NOT NULL
+`
+
+type InvoiceExchangeRateEntryParams struct {
+	TaxpayerID int64 `json:"taxpayer_id"`
+	ID         int64 `json:"id"`
+}
+
+type InvoiceExchangeRateEntryRow struct {
+	ExchangeRateSetAt pgtype.Timestamptz `json:"exchange_rate_set_at"`
+	SetByName         string             `json:"set_by_name"`
+}
+
+// Elle girilen kurun kim tarafından ne zaman girildiği (#571).
+func (q *Queries) InvoiceExchangeRateEntry(ctx context.Context, arg InvoiceExchangeRateEntryParams) (InvoiceExchangeRateEntryRow, error) {
+	row := q.db.QueryRow(ctx, invoiceExchangeRateEntry, arg.TaxpayerID, arg.ID)
+	var i InvoiceExchangeRateEntryRow
+	err := row.Scan(&i.ExchangeRateSetAt, &i.SetByName)
+	return i, err
+}
+
 const listInvoiceItems = `-- name: ListInvoiceItems :many
 SELECT id, taxpayer_id, invoice_id, line_no, name, description, product_code, quantity, unit_code, unit_price, line_extension_amount, own_allowance_amount, allowance_total_amount, tax_exclusive_amount, tax_rate, total_tax_amount, tax_inclusive_amount, withholding_code, withholding_rate, withholding_amount, tax_exemption_code, special_tax_base_code, special_tax_base_amount, export_registered_code, gtip_code, diib_line_code, excise_rate, excise_amount, communications_tax_rate, communications_tax_amount, income_tax_withholding_amount, expense_category_id, line_type, tax_breakdowns FROM invoice_items
 WHERE taxpayer_id = $1 AND invoice_id = $2
@@ -937,7 +974,7 @@ func (q *Queries) ListInvoiceTaxSummaries(ctx context.Context, arg ListInvoiceTa
 }
 
 const listInvoicesByPeriod = `-- name: ListInvoicesByPeriod :many
-SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at FROM invoices
+SELECT id, uuid, taxpayer_id, source_system, source_id, capture_method, ettn, invoice_number, direction, type, invoice_type_code_raw, profile, profile_raw, document_class, status, status_normalized, issue_date, issue_time, payment_due_date, period, customer_id, customer_tax_number, customer_identity_number, customer_name, currency, exchange_rate, line_extension_amount, allowance_total_amount, tax_exclusive_amount, tax_amount, tax_inclusive_amount, withholding_amount, excise_amount, communications_tax_amount, income_tax_withholding_amount, income_tax_withholding_rate, payable_amount, payable_amount_try, global_tax_exemption_code, original_invoice_number, original_invoice_issue_date, order_reference, is_internet_sale, sgk, despatch_id, notes, payment_status, remaining_amount, has_items, tax_summary_source, ubl_attachment_id, raw_payload, content_hash, source_updated_at, deleted_at_source, created_at, updated_at, exchange_rate_set_by, exchange_rate_set_at FROM invoices
 WHERE taxpayer_id = $1 AND period = $2
 ORDER BY issue_date, id
 LIMIT $4 OFFSET $3
@@ -1022,6 +1059,8 @@ func (q *Queries) ListInvoicesByPeriod(ctx context.Context, arg ListInvoicesByPe
 			&i.DeletedAtSource,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ExchangeRateSetBy,
+			&i.ExchangeRateSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1218,13 +1257,15 @@ func (q *Queries) ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceC
 const setMissingInvoiceExchangeRate = `-- name: SetMissingInvoiceExchangeRate :execrows
 UPDATE invoices SET
     exchange_rate = $1::numeric,
-    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * $1::numeric, 2))
-WHERE taxpayer_id = $2 AND id = $3
+    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * $1::numeric, 2)),
+    exchange_rate_set_by = $2, exchange_rate_set_at = NOW()
+WHERE taxpayer_id = $3 AND id = $4
   AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0)
 `
 
 type SetMissingInvoiceExchangeRateParams struct {
 	Rate       pgtype.Numeric `json:"rate"`
+	SetBy      pgtype.Int8    `json:"set_by"`
 	TaxpayerID int64          `json:"taxpayer_id"`
 	ID         int64          `json:"id"`
 }
@@ -1232,7 +1273,12 @@ type SetMissingInvoiceExchangeRateParams struct {
 // Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 // boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 func (q *Queries) SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error) {
-	result, err := q.db.Exec(ctx, setMissingInvoiceExchangeRate, arg.Rate, arg.TaxpayerID, arg.ID)
+	result, err := q.db.Exec(ctx, setMissingInvoiceExchangeRate,
+		arg.Rate,
+		arg.SetBy,
+		arg.TaxpayerID,
+		arg.ID,
+	)
 	if err != nil {
 		return 0, err
 	}
