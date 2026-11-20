@@ -44,6 +44,7 @@ import { AmountWaterfall } from "./amount-waterfall";
 import { InvoiceStateBadge } from "./invoices-page";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { Figure, useWarningText } from "./office-ui";
+import { RelatedRecordsTable } from "./related-records";
 
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
 const INVOICES_WRITE = "tenant.invoices.write";
@@ -412,6 +413,24 @@ export function InvoiceDrawer({
                   features={LINE_TABLE_FEATURES}
                   emptyDescription=""
                 />
+              </section>
+
+              {/* İlişkili banka / cari / fiş kayıtları (#571): tam fatura
+                  sayfasındakiyle aynı tablo; bağlantılar mükellef detayında açılır. */}
+              <section aria-labelledby="drawer-related">
+                <h3
+                  id="drawer-related"
+                  className="text-text-3 mb-2 text-xs font-semibold tracking-wide uppercase"
+                >
+                  {t("office.related.title")}
+                </h3>
+                <div className="border-line overflow-x-auto rounded-lg border">
+                  <RelatedRecordsTable
+                    engagement={engagement}
+                    kind="invoice"
+                    uuid={d.uuid}
+                  />
+                </div>
               </section>
             </div>
 
