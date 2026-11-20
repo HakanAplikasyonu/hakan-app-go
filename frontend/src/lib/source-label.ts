@@ -14,12 +14,15 @@ function known(t: Translate, key: string): string | null {
   return v === key ? null : v;
 }
 
-/** "vakif_katilim" → "Vakif Katilim" (bilinmeyen banka / entegratör adı). */
+/**
+ * "vakif_katilim" → "Vakif Katilim" (bilinmeyen banka / entegratör adı).
+ * Kod ASCII; marka adı Türkçe büyük harf kuralıyla "İzibiz" olmasın.
+ */
 function titled(code: string) {
   return code
     .split("_")
     .filter(Boolean)
-    .map((w) => w.charAt(0).toLocaleUpperCase("tr-TR") + w.slice(1))
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 }
 
