@@ -67,6 +67,19 @@ export class Api {
     return this.ctx.post(path, { headers: this.headers(headers), data });
   }
 
+  async delete(path: string, headers?: Record<string, string>) {
+    return this.ctx.delete(path, { headers: this.headers(headers) });
+  }
+
+  /** Dosya ve ek form alanları (ör. mizan yüklemesinde `period`). */
+  async uploadWith(
+    path: string,
+    file: { name: string; mimeType: string; buffer: Buffer },
+    fields: Record<string, string>,
+  ) {
+    return this.ctx.post(path, { headers: this.headers(), multipart: { ...fields, file } });
+  }
+
   async put(path: string, data: unknown = {}, headers?: Record<string, string>) {
     return this.ctx.put(path, { headers: this.headers(headers), data });
   }
