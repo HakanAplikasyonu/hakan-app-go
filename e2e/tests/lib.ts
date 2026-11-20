@@ -207,8 +207,24 @@ export function deriveUbl(file: string, vkn: string, title: string): { name: str
 
 /** Ofis ekranlarındaki mükellef seçimi (yerel <select>). */
 export async function pickTaxpayer(page: Page, title: string) {
+  // Aranabilir seçici (#573): düğme "Mükellef: …", içinde arama ve liste.
+  const picker = page.getByRole("combobox", { name: /^Mükellef:/ }).first();
   const select = page.locator(`select:has(option:text-matches("^${escapeRe(title)}"))`).first();
-  await expect(select).toBeVisible();
+  await expect(picker.or(select)).toBeVisible();
+  if (await picker.isVisible()) {
+    const name = new RegExp(`^Mükellef: ${escapeRe(title)}`);
+    if (name.test((await picker.getAttribute("aria-label")) ?? "")) return;
+    const before = new URL(page.url()).searchParams.get("taxpayer");
+    await picker.click();
+    await page.getByPlaceholder("Unvan ya da VKN ara").fill(title);
+    await page.getByRole("option", { name: new RegExp(escapeRe(title)) }).first().click();
+    await expect(picker).toHaveAccessibleName(name);
+    await page.waitForURL((u) => {
+      const now = u.searchParams.get("taxpayer");
+      return !!now && now !== before;
+    });
+    return;
+  }
   const option = select.locator("option", { hasText: title }).first();
   const value = await option.getAttribute("value");
   await select.selectOption(value!);

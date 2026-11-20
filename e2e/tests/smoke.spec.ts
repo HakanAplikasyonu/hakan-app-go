@@ -226,6 +226,34 @@ test("yevmiye: taslak, onay, Luca ve Zirve dosyası indirme", async () => {
   await exportAndDownload(office, "zirve");
 });
 
+test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydolur (#573)", async () => {
+  await office.goto(officePath("/journals"));
+  await pickTaxpayer(office, DEMO.atlas.title);
+  await expect(office.getByText("E2E Luca fişi").first()).toBeVisible();
+
+  await pickTaxpayer(office, DEMO.selin.title);
+  await expect(office.getByText("E2E Luca fişi")).toHaveCount(0);
+  await office.getByPlaceholder(/açıklama/i).first().fill("E2E Selin fişi");
+  const rows = office.locator('tbody tr:has(input[placeholder="770.01"])');
+  await rows.nth(0).locator("input").nth(0).fill("770.01");
+  await rows.nth(0).locator("input").nth(2).fill("150,00");
+  await rows.nth(1).locator("input").nth(0).fill("100.01");
+  await office.getByRole("button", { name: "Farkı kapat" }).click();
+  await office.getByRole("button", { name: "Taslağı kaydet" }).click();
+  await expect(office.locator("tr", { hasText: "E2E Selin fişi" }).first()).toBeVisible();
+
+  // Fiş Selin'e kaydoldu: API'de Selin'in taslakları arasında, Atlas'ta yok.
+  const selin = await engagementOf(api, DEMO.selin.title);
+  const drafts = async (eng: string) =>
+    JSON.stringify(await api.json(await api.get(`/v1/tenant/engagements/${eng}/journal-drafts?status=draft&limit=200`)));
+  expect(await drafts(selin)).toContain("E2E Selin fişi");
+  expect(await drafts(atlas)).not.toContain("E2E Selin fişi");
+
+  await pickTaxpayer(office, DEMO.atlas.title);
+  await expect(office.getByText("E2E Luca fişi").first()).toBeVisible();
+  await expect(office.getByText("E2E Selin fişi")).toHaveCount(0);
+});
+
 test("mükellef web paneli: ofisin yüklediği faturalar görünüyor", async ({ browser }) => {
   const page = await (await browser.newContext()).newPage();
   try {
