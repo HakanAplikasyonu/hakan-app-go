@@ -2139,5 +2139,13 @@
   "journals.transfer_check_stale": "Trial balance was compared before this transfer",
   "journals.transfer_check_none": "Not compared with the trial balance",
   "journals.transfer_check_open": "See differences",
-  "journals.transfer_check_run": "Compare with trial balance"
+  "journals.transfer_check_run": "Compare with trial balance",
+  "journals.entry.account_malformed": "Invalid account code (e.g. 770.01)",
+  "journals.entry.account_not_in_plan": "Not in the chart of accounts",
+  "journals.entry.account_parent": "Parent account: {{name}} · pick a sub-account",
+  "journals.entry.amount_invalid": "The amount on line {{line}} can't be read (e.g. 1.250,50).",
+  "journals.entry.line_incomplete": "Line {{line}} needs an account and only a debit or a credit amount.",
+  "journals.entry.no_lines": "Enter an account and an amount on at least one line.",
+  "journals.entry.close_difference": "Close difference",
+  "journals.entry.keyboard_hint": "Search by account code or name. Enter moves to the next field and opens a new line at the end; Ctrl+Enter saves the draft."
 }
