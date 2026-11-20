@@ -1161,6 +1161,10 @@ type Querier interface {
 	// Mükelleften beklenen (open) ve gelip işlenmeyen (submitted) belgeler.
 	PeriodMatrixDocumentTasks(ctx context.Context, arg PeriodMatrixDocumentTasksParams) ([]PeriodMatrixDocumentTasksRow, error)
 	PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksParams) ([]PeriodMatrixLocksRow, error)
+	// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
+	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
+	// düşer; açık ay (bugünün ayı) sayılmaz.
+	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
 	// Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
 	PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixReturnsParams) ([]PeriodMatrixReturnsRow, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).

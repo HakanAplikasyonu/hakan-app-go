@@ -238,9 +238,13 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 		for _, p := range periods {
 			k := MatrixKey{EngagementID: e.ID, Period: p}
 			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k],
-				Returns: c.Returns[k], OpenDocumentTasks: c.DocTasks[k][0], SubmittedDocuments: c.DocTasks[k][1]}
+				Returns: c.Returns[k], OpenDocumentTasks: c.DocTasks[k][0], SubmittedDocuments: c.DocTasks[k][1],
+				MissingBankStatements: c.MissingStatements[k]}
 			if cell.Returns == nil {
 				cell.Returns = []CellReturn{}
+			}
+			if cell.MissingBankStatements == nil {
+				cell.MissingBankStatements = []string{}
 			}
 			if at, ok := c.Locks[k]; ok {
 				cell.Locked, cell.LockedAt = true, &at

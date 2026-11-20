@@ -868,6 +868,58 @@ func (q *Queries) PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksPa
 	return items, nil
 }
 
+const periodMatrixMissingStatements = `-- name: PeriodMatrixMissingStatements :many
+SELECT e.id AS engagement_id, p.period::text AS period, b.name::text AS name
+FROM engagements e
+JOIN cash_boxes b ON b.taxpayer_id = e.taxpayer_id AND b.type = 'bank_account'
+CROSS JOIN unnest($1::text[]) AS p(period)
+WHERE e.organization_id = $2 AND e.id = ANY($3::bigint[])
+  AND p.period < to_char(now() AT TIME ZONE 'Europe/Istanbul', 'YYYY-MM')
+  AND NOT EXISTS (
+    SELECT 1 FROM bank_transactions t
+    WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period = p.period)
+  AND EXISTS (
+    SELECT 1 FROM bank_transactions t
+    WHERE t.taxpayer_id = e.taxpayer_id AND t.cash_box_id = b.id AND t.period < p.period
+      AND t.period >= to_char(to_date(p.period || '-01', 'YYYY-MM-DD') - interval '3 months', 'YYYY-MM'))
+ORDER BY e.id, p.period, b.name
+`
+
+type PeriodMatrixMissingStatementsParams struct {
+	Periods        []string `json:"periods"`
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+}
+
+type PeriodMatrixMissingStatementsRow struct {
+	EngagementID int64  `json:"engagement_id"`
+	Period       string `json:"period"`
+	Name         string `json:"name"`
+}
+
+// Eksik banka ekstresi (#568): kapanmış bir ayda hiç hareketi olmayan, ama
+// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
+// düşer; açık ay (bugünün ayı) sayılmaz.
+func (q *Queries) PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixMissingStatements, arg.Periods, arg.OrganizationID, arg.EngagementIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixMissingStatementsRow{}
+	for rows.Next() {
+		var i PeriodMatrixMissingStatementsRow
+		if err := rows.Scan(&i.EngagementID, &i.Period, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const periodMatrixReturns = `-- name: PeriodMatrixReturns :many
 SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on
 FROM tax_returns

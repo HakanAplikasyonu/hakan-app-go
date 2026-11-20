@@ -155,6 +155,8 @@ type MatrixCounts struct {
 	Locks          map[MatrixKey]time.Time
 	Returns        map[MatrixKey][]CellReturn
 	DocTasks       map[MatrixKey][2]int64 // open, submitted
+	// MissingStatements: bank accounts without a statement for the period.
+	MissingStatements map[MatrixKey][]string
 }
 
 // MatrixKey addresses one cell.
@@ -179,6 +181,10 @@ type Cell struct {
 	// SubmittedDocuments: sent by the taxpayer, not processed yet.
 	OpenDocumentTasks  int64 `json:"open_document_tasks"`
 	SubmittedDocuments int64 `json:"submitted_documents"`
+	// MissingBankStatements: bank accounts (names) with movements in the
+	// three months before but none in this closed month: the statement has
+	// not been loaded (#568).
+	MissingBankStatements []string `json:"missing_bank_statements"`
 }
 
 // CellReturn is one tax return record of a cell.

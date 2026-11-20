@@ -118,10 +118,10 @@ func checkBigLedger(t *testing.T, d *testdb.DB) {
 			WHERE engagement_id IN (` + big + `) AND is_leaf GROUP BY 1 HAVING sum(debit) <> sum(credit)) x`},
 		{"negative bank balance", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND balance_after < 0`},
 		// Mizan 102 (Ekim) = ekstrenin Ekim sonu bakiyesi − kayda alınmamış hareketler.
-		{"mizan 102 ≠ bank", `SELECT count(*) FROM (` + big + `) e
+		{"mizan bank account ≠ bank", `SELECT count(*) FROM (` + big + `) e
 			JOIN bank_ledger_accounts a ON a.engagement_id = e.id
 			JOIN account_plan_imports i ON i.engagement_id = e.id AND i.period = '2026-10'
-			JOIN trial_balance_lines l ON l.import_id = i.id AND l.code = '102'
+			JOIN trial_balance_lines l ON l.import_id = i.id AND l.code = a.account_code
 			WHERE l.balance <> (SELECT b.balance_after FROM bank_transactions b WHERE b.cash_box_id = a.cash_box_id
 			      AND b.period <= '2026-10' ORDER BY b.booked_at DESC, b.id DESC LIMIT 1)
 			  - COALESCE((SELECT sum(CASE WHEN b.debit_credit = 'A' THEN b.amount ELSE -b.amount END) FROM bank_transactions b
@@ -212,6 +212,12 @@ func checkBigRealLife(t *testing.T, d *testdb.DB) {
 		{"partial payments", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND description LIKE '%KISMI ODEME'`, 1},
 		{"foreign currency collections", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND kind = 'YABANCI_PARA_HAVALE'`, 1},
 		{"kur farkı lines", `SELECT count(*) FROM journal_draft_lines WHERE engagement_id IN (` + big + `) AND account_code IN ('646.01', '656.01') AND description LIKE 'Kur farkı DOVIZ%'`, 1},
+		{"bank accounts without the declaration month's statement", `SELECT count(*) FROM cash_boxes b
+			JOIN engagements e ON e.taxpayer_id = b.taxpayer_id WHERE e.id IN (` + big + `)
+			AND NOT EXISTS (SELECT 1 FROM bank_transactions t WHERE t.cash_box_id = b.id
+				AND t.period = '2026-10')
+			AND EXISTS (SELECT 1 FROM bank_transactions t WHERE t.cash_box_id = b.id
+				AND t.period = '2026-09')`, 1},
 		{"own account transfers", `SELECT count(*) FROM bank_transactions WHERE source_system = 'bank_demo_big' AND kind_detail = 'own_account_transfer'`, 2},
 		{"duplicate invoices", `SELECT count(*) FROM data_warnings WHERE engagement_id IN (` + big + `) AND code = 'POSSIBLE_DUPLICATE'`, 1},
 		{"drafts on a parent account", `SELECT count(*) FROM journal_draft_lines WHERE engagement_id IN (` + big + `) AND account_code ~ '^7[0-9]{2}$'`, 1},

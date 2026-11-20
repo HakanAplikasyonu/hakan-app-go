@@ -18891,6 +18891,8 @@ export interface components {
              * @description Documents the taxpayer sent that are not processed yet
              */
             submitted_documents: number;
+            /** @description Bank accounts (names) with movements in the three months before but none in this closed month (statement not loaded, */
+            missing_bank_statements: string[];
         };
         PeriodMatrixReturn: {
             /** @enum {string} */

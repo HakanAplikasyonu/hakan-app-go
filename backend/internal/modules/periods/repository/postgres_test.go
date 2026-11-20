@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -360,6 +362,22 @@ func TestMatrix(t *testing.T) {
 		FROM unnest(ARRAY['open', 'open', 'submitted']) s`, f.sub.OrganizationID, eng2, tp2, ubl.Period, f.user); err != nil {
 		t.Fatal(err)
 	}
+	// #568: a bank account with movements last month but none in this
+	// (closed) month misses its statement; one with movements does not.
+	prev, _ := time.Parse("2006-01", ubl.Period)
+	prevPeriod := prev.AddDate(0, -1, 0).Format("2006-01")
+	for i, b := range []struct{ name, period string }{{"Ziraat TL vadesiz", prevPeriod}, {"Garanti TL vadesiz", ubl.Period}} {
+		var box int64
+		if err := f.d.Pool.QueryRow(ctx, `INSERT INTO cash_boxes (taxpayer_id, name, currency) VALUES ($1, $2, 'TRY') RETURNING id`, tp2, b.name).Scan(&box); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.d.Pool.Exec(ctx, `INSERT INTO bank_transactions (taxpayer_id, cash_box_id, source_system, source_id, capture_method, booked_at,
+				transaction_date, debit_credit, amount, currency, description, period)
+			VALUES ($1, $2, 'bank_test', $3, 'api', $4::date, $4::date, 'A', 100, 'TRY', 'x', $5)`,
+			tp2, box, fmt.Sprintf("m%d", i), b.period+"-10", b.period); err != nil {
+			t.Fatal(err)
+		}
+	}
 	m, err = f.svc.Matrix(ctx, usecase.MatrixFilter{OrganizationID: f.sub.OrganizationID, AllEngagements: true, Limit: 10}, ubl.Period, 1)
 	if err != nil {
 		t.Fatal(err)
@@ -367,10 +385,13 @@ func TestMatrix(t *testing.T) {
 	for _, row := range m.Items {
 		c := row.Cells[0]
 		if row.TaxpayerTaxID == ownVKN {
-			if len(c.Returns) != 0 {
-				t.Fatalf("own returns: %+v", c.Returns)
+			if len(c.Returns) != 0 || len(c.MissingBankStatements) != 0 {
+				t.Fatalf("own cell: %+v", c)
 			}
 			continue
+		}
+		if len(c.MissingBankStatements) != 1 || c.MissingBankStatements[0] != "Ziraat TL vadesiz" {
+			t.Fatalf("missing statements: %+v", c.MissingBankStatements)
 		}
 		got := map[string]usecase.CellReturn{}
 		for _, r := range c.Returns {

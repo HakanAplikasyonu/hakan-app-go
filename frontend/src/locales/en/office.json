@@ -2127,5 +2127,6 @@
   "tax_returns.office.due_today": "due today",
   "tax_returns.office.due_passed": "{{count}} days overdue",
   "tax_returns.office.due_rolled": "(moved to Monday because of the weekend)",
-  "tax_returns.office.late": "Overdue"
+  "tax_returns.office.late": "Overdue",
+  "tax_returns.office.statement_missing": "Bank statement missing: {{name}}"
 }
