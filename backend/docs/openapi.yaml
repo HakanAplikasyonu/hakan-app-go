@@ -16187,6 +16187,57 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/tax-return-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTaxReturnSettings
+      summary: The office's tax return final check setting (#710)
+      description: |
+        Requires `tenant.tax_returns.read`. `final_check_required` (default
+        true): "kontrol edildi" and "verildi" are marked only by the
+        responsible (`tenant.tax_returns.approve`). When the office turns it
+        off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+        too; who and when are recorded either way.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putTaxReturnSettings
+      summary: Set the office's tax return final check setting (#710)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [final_check_required]
+              additionalProperties: false
+              properties:
+                final_check_required: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16947,7 +16998,9 @@ paths:
       description: |
         Requires `tenant.tax_returns.approve` (#669, office decision: everyone
         prepares returns; only the responsible person, owner or admin, marks
-        "kontrol edildi" and "verildi"). Who and when are kept
+        "kontrol edildi" and "verildi"). When the office turned the final
+        check off (`/v1/tenant/tax-return-settings`, #710),
+        `tenant.tax_returns.write` is enough. Who and when are kept
         (`record.checked_by_name`, `record.checked_at`). Only a prepared
         return (`409 TAX_RETURN_NOT_PREPARED`).
       security:
@@ -17007,7 +17060,8 @@ paths:
       operationId: fileEngagementTaxReturn
       summary: Record that the prepared return was filed
       description: |
-        Requires `tenant.tax_returns.approve` (#669: only the responsible
+        Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+        office turned the final check off, #710) (#669: only the responsible
         person marks "verildi"; filing also marks the return checked when it
         was not). `filed_on` is not before the period's last day nor in the
         future; `accrual_number` is the tahakkuk fiş no. Only a prepared
@@ -25560,6 +25614,21 @@ components:
         rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
         updated_at: { type: string, format: date-time }
         default: { type: boolean, description: True while the office has not set one }
+    TaxReturnSettings:
+      type: object
+      required: [final_check_required]
+      properties:
+        final_check_required:
+          type: boolean
+          description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
+        updated_at: { type: string, format: date-time }
+    EnvelopeTaxReturnSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxReturnSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeAccountRuleSettings:
       type: object
       required: [success, data, meta]
