@@ -47,6 +47,15 @@ export function OfficeDpaCard({ slug }: { slug: string }) {
       </EntitySectionCard>
     );
   }
+  if (query.data === null) {
+    return (
+      <EntitySectionCard title={title}>
+        <p className="text-muted-foreground text-sm">
+          {t("legal.dpa_not_published")}
+        </p>
+      </EntitySectionCard>
+    );
+  }
   if (!query.data) {
     return (
       <EntitySectionCard title={title}>

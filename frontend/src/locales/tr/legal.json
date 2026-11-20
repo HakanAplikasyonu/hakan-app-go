@@ -30,6 +30,7 @@
   "dpa_title": "Veri İşleyen Sözleşmesi",
   "dpa_description": "Mükelleflerinizin verileri bakımından veri sorumlusu ofisinizdir; platform bu verileri ofisiniz adına ve talimatınızla işler (KVKK md. 12/2). Bu ilişki Veri İşleyen Sözleşmesi ile düzenlenir.",
   "dpa_status_none": "Henüz kabul edilmedi",
+  "dpa_not_published": "Sözleşme henüz yayımlanmadı. Yayımlandığında burada kabul edebilirsiniz.",
   "dpa_status_accepted": "Sürüm {{version}} kabul edildi",
   "dpa_status_new_version": "Yeni sürüm mevcut (sürüm {{version}})",
   "dpa_accepted_by": "Sürüm {{version}}, {{user}} tarafından {{date}} tarihinde kabul edildi.",
