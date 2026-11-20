@@ -7,6 +7,7 @@ import {
   CircleCheck,
   Download,
   FileSpreadsheet,
+  ListTree,
   Loader2,
   MonitorUp,
   Undo2,
@@ -77,6 +78,7 @@ import {
   TRANSFER_STATUS,
 } from "./journal-transfers-panel";
 import { FilterSelect, Figure, Panel } from "./office-ui";
+import { JournalDraftLines } from "./journal-draft-lines";
 import { NewDraft } from "./journal-new-draft";
 import { useRelatedColumn } from "./related-column";
 import {
@@ -714,6 +716,8 @@ function JournalsInner() {
     setPickedFor(`${engagement}|${period}`);
     setPicked(new Set());
   }
+  // Kalemleri açık fiş: hangi hesap borçlu, hangisi alacaklı orada görünür.
+  const [linesOf, setLinesOf] = useState<JournalDraft | null>(null);
   const togglePick = useCallback((uuid: string, on: boolean) => {
     setPicked((prev) => {
       const next = new Set(prev);
@@ -783,15 +787,36 @@ function JournalsInner() {
         accessorKey: "entry_type",
         meta: { cellClassName: "text-xs" },
       }),
+      // Fişin toplamları: dengeli fişte borç ve alacak toplamı hep eşittir;
+      // hangi hesabın borçlu olduğu "Kalemler"de görünür.
       createMoneyColumn<JournalDraft>({
         id: "debit",
-        labelKey: "office.journals.debit",
+        labelKey: "office.journals.debit_total",
         accessor: (d) => d.debit,
       }),
       createMoneyColumn<JournalDraft>({
         id: "credit",
-        labelKey: "office.journals.credit",
+        labelKey: "office.journals.credit_total",
         accessor: (d) => d.credit,
+      }),
+      createColumn<JournalDraft>({
+        id: "lines",
+        labelKey: "office.journals.lines.col",
+        accessorKey: "lines",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setLinesOf(row.original)}
+            aria-label={t("office.journals.lines.open_entry", {
+              entry: row.original.entry_no,
+            })}
+          >
+            <ListTree className="size-4" />
+            {t("office.journals.lines.open", { count: row.original.lines })}
+          </Button>
+        ),
       }),
       createColumn<JournalDraft>({
         id: "status",
@@ -1022,9 +1047,15 @@ function JournalsInner() {
             getRowId={(d) => d.uuid}
             bordered={false}
             features={embeddedTable}
+            onRowClick={setLinesOf}
           />
         )}
       </Panel>
+      <JournalDraftLines
+        engagement={engagement}
+        draft={linesOf}
+        onClose={() => setLinesOf(null)}
+      />
 
       <ExportPanel
         engagement={engagement}

@@ -21906,7 +21906,7 @@ components:
         success: { type: boolean, enum: [true] }
         data: 
           type: object
-          required: [drafts, transactions, skipped_foreign_currency]
+          required: [drafts, transactions, skipped_foreign_currency, skipped_same_account]
           properties:
             drafts:
               type: array
@@ -21925,6 +21925,13 @@ components:
                   lines: { type: integer }
             transactions: { type: integer }
             skipped_foreign_currency: { type: integer }
+            skipped_same_account:
+              type: integer
+              description: >-
+                Movements whose counter account is the bank account itself
+                (or its main / sub account). They are not drafted (the entry
+                would carry the same account on its debit and credit side)
+                and go back to review for another account.
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeBankLedgerAccountList:
@@ -22989,6 +22996,12 @@ components:
       properties:
         line_no: { type: integer, format: int32 }
         account: { type: string }
+        account_name:
+          type: string
+          description: >-
+            The account's name: the engagement's loaded account plan or the
+            cari hafızası, else the Tek Düzen Hesap Planı main account.
+            Absent when unknown.
         description: { type: string }
         debit: { type: string }
         credit: { type: string }

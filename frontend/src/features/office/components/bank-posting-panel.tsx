@@ -158,6 +158,14 @@ export function BankPostingPanel({
           count: r.transactions,
         }),
       );
+      // Karşı hesabı banka hesabının kendisi olan hareket fişe girmez
+      // (aynı hesap hem borçta hem alacakta olurdu); incelemeye döner.
+      if (r.skipped_same_account > 0)
+        toast.warning(
+          t("office.bank.posting.drafts_same_account", {
+            count: r.skipped_same_account,
+          }),
+        );
       refresh();
     },
     onError: (e) => toast.error(errText(e, t("office.bank.posting.failed"))),

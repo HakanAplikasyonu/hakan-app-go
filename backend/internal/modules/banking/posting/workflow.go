@@ -101,7 +101,7 @@ type RunResult struct {
 
 func movementOf(r db.ListBankTransactionsForPostingRow) Movement {
 	m := Movement{ID: r.ID, Direction: banking.Direction(r.DebitCredit), Description: r.Description,
-		Detail: banking.Detail(r.KindDetail), MatchedTaxID: r.MatchedTaxID, MatchedName: r.MatchedName,
+		Kind: banking.Kind(r.Kind), Detail: banking.Detail(r.KindDetail), MatchedTaxID: r.MatchedTaxID, MatchedName: r.MatchedName,
 		Counterparty: Counterparty{Name: r.CounterpartyName.String, IBAN: r.CounterpartyIban.String,
 			TaxID: r.CounterpartyTaxNumber.String + r.CounterpartyIdentityNumber.String, Direction: banking.Direction(r.DebitCredit)}}
 	if v, err := r.Amount.Value(); err == nil && v != nil {
@@ -390,6 +390,21 @@ type DraftResult struct {
 	Drafts         []journals.Draft `json:"drafts"`
 	Transactions   int              `json:"transactions"`
 	SkippedForeign int              `json:"skipped_foreign_currency"`
+	// SkippedSameAccount: movements whose counter account is the bank
+	// account itself (or its main / sub account); they would book the bank
+	// against itself, so they go back to review for another account.
+	SkippedSameAccount int `json:"skipped_same_account"`
+}
+
+// SameAccount reports whether two account codes are the same account or
+// one contains the other (102 and 102.01): a two-line entry between them
+// leaves the account unchanged, the same amount on its debit and credit.
+func SameAccount(a, b string) bool {
+	a, b = strings.TrimSpace(a), strings.TrimSpace(b)
+	if a == "" || b == "" {
+		return false
+	}
+	return a == b || strings.HasPrefix(a, b+".") || strings.HasPrefix(b, a+".")
 }
 
 // CreateDrafts books the approved movements that are in no draft yet: one
@@ -397,6 +412,8 @@ type DraftResult struct {
 // account against the counter account), source_kind bank_transaction.
 // The drafts follow the journals flow (approval, Luca / Zirve export).
 // Foreign-currency movements are left out: their TRY amount is not known.
+// A movement booked to the bank account itself is left out and sent back
+// to review (SameAccount).
 func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, userID int64, period string) (DraftResult, error) {
 	res := DraftResult{Drafts: []journals.Draft{}}
 	if w.drafts == nil {
@@ -421,6 +438,15 @@ func (w *Workflow) CreateDrafts(ctx context.Context, scope engagementctx.Scope, 
 	for _, r := range rows {
 		if r.Currency != "TRY" {
 			res.SkippedForeign++
+			continue
+		}
+		if SameAccount(r.AccountCode, r.BankAccountCode) {
+			// Back to review: the accountant picks the real counter account.
+			if _, err := q.UnapproveBankPosting(ctx, db.UnapproveBankPostingParams{OrganizationID: scope.OrganizationID,
+				EngagementID: scope.ID, BankTransactionID: r.BankTransactionID, AccountCode: r.AccountCode}); err != nil {
+				return res, err
+			}
+			res.SkippedSameAccount++
 			continue
 		}
 		k := fmt.Sprintf("%d|%s", r.CashBoxID, r.TransactionDate.Time.Format("2006-01-02"))

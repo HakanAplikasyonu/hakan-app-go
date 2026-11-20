@@ -896,6 +896,9 @@ type Querier interface {
 	// Elle eşleştirmede seçilen faturalar: aynı yön, aktif; açık tutar bu
 	// hareketin eski eşleşmeleri hariç (yeniden eşleştirme).
 	ListInvoicesForManualMatch(ctx context.Context, arg ListInvoicesForManualMatchParams) ([]ListInvoicesForManualMatchRow, error)
+	// Fiş ekranında hesap adları: önce etkin hesap planı (son yüklenen hedef),
+	// yoksa cari hafızası. Planda adı olmayan kod listede yoktur.
+	ListJournalAccountNames(ctx context.Context, arg ListJournalAccountNamesParams) ([]ListJournalAccountNamesRow, error)
 	ListJournalDraftLines(ctx context.Context, arg ListJournalDraftLinesParams) ([]JournalDraftLine, error)
 	// Yevmiye ve çıktı uçları (issue #143): ofis panelindeki listeler.
 	ListJournalDrafts(ctx context.Context, arg ListJournalDraftsParams) ([]ListJournalDraftsRow, error)
