@@ -84,6 +84,10 @@ export class Api {
     return this.ctx.put(path, { headers: this.headers(headers), data });
   }
 
+  async patch(path: string, data: unknown = {}, headers?: Record<string, string>) {
+    return this.ctx.patch(path, { headers: this.headers(headers), data });
+  }
+
   async upload(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
     return this.ctx.post(path, { headers: this.headers(), multipart: { file } });
   }

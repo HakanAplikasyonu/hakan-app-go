@@ -154,6 +154,23 @@ export function useJournalActions(slug: string, engagement: string) {
         ),
       onSuccess: refresh,
     }),
+    setLineAmounts: useMutation({
+      mutationFn: async (v: {
+        draft: string;
+        lines: { line: number; debit: string; credit: string }[];
+      }) => {
+        for (const l of v.lines)
+          await journalService.setLineAmounts(
+            slug,
+            engagement,
+            v.draft,
+            l.line,
+            l.debit,
+            l.credit,
+          );
+      },
+      onSettled: refresh,
+    }),
     unapprove: useMutation({
       mutationFn: (v: { draft: string; reason: string }) =>
         journalService.unapprove(slug, engagement, v.draft, v.reason),

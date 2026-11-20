@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
@@ -85,5 +86,48 @@ func TestDraftIssuesBlockApproval(t *testing.T) {
 	}
 	if err := e.svc.Approve(ctx, e.scope, e.actor, ok.UUID); !errors.As(err, &blocked) || blocked.Issues[0].Code != IssuePeriodLocked || !blocked.Issues[0].Blocking {
 		t.Fatalf("approve in locked period err = %v", err)
+	}
+}
+
+// #566: borç-alacak farkı kontrol ekranında satır tutarıyla düzeltilir.
+// Kaynaklı (banka / fatura) satırın tutarı değişmez; onaylı fiş değişmez.
+func TestSetLineAmountsFixesUnbalanced(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	d := e.draft(t, oct, debit("770.01", "100"), credit("320.01", "90"))
+	det, err := e.svc.GetDraft(ctx, e.scope, d.UUID)
+	if err != nil || len(det.Issues) != 1 || det.Issues[0].Code != IssueUnbalanced || !det.Issues[0].Blocking ||
+		det.Issues[0].Difference == nil || !det.Issues[0].Difference.Equal(dec("10")) {
+		t.Fatalf("unbalanced issues %+v err %v", det.Issues, err)
+	}
+	if err := e.svc.Approve(ctx, e.scope, e.actor, d.UUID); !errors.Is(err, ErrUnbalanced) {
+		t.Fatalf("approve unbalanced err = %v", err)
+	}
+	if err := e.svc.SetLineAmounts(ctx, e.scope, d.UUID, 2, dec("100"), dec("100")); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("both sides err = %v", err)
+	}
+	if err := e.svc.SetLineAmounts(ctx, e.scope, d.UUID, 9, dec("0"), dec("100")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing line err = %v", err)
+	}
+	if err := e.svc.SetLineAmounts(ctx, e.scope, d.UUID, 2, dec("0"), dec("100")); err != nil {
+		t.Fatal(err)
+	}
+	det, err = e.svc.GetDraft(ctx, e.scope, d.UUID)
+	if err != nil || len(det.Issues) != 0 || !det.Credit.Equal(dec("100")) || !det.Debit.Equal(dec("100")) {
+		t.Fatalf("fixed draft %+v err %v", det.Draft, err)
+	}
+	e.approve(t, d)
+	if err := e.svc.SetLineAmounts(ctx, e.scope, d.UUID, 2, dec("0"), dec("90")); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("approved draft amount change err = %v", err)
+	}
+
+	// Kaynaklı satır: tutarı kaynağından gelir.
+	src := e.draft(t, oct, LineInput{Account: "120", Debit: dec("120"), SourceKind: "invoice", SourceID: uuid.NewString()}, credit("600", "100"))
+	if err := e.svc.SetLineAmounts(ctx, e.scope, src.UUID, 1, dec("100"), dec("0")); !errors.Is(err, ErrLineFromSource) {
+		t.Fatalf("sourced line err = %v", err)
+	}
+	// Kaynaksız satırı düzeltmek serbest.
+	if err := e.svc.SetLineAmounts(ctx, e.scope, src.UUID, 2, dec("0"), dec("120")); err != nil {
+		t.Fatal(err)
 	}
 }

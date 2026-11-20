@@ -7195,10 +7195,15 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Fix a draft line's account code
+         * Fix a draft line's account code or amount
          * @description Requires `tenant.journals.write`. The control screen's "Hesabı düzelt"
-         *     (#566): only drafts (not approved or exported entries) change. The
-         *     returned draft lists its remaining issues.
+         *     and "Tutarı düzelt" (#566): only drafts (not approved or exported
+         *     entries) change. `account` and / or `debit` + `credit` (exactly one
+         *     side above zero, at most two decimals); at least one is required.
+         *     An amount changes only on a line without a source (entered by hand
+         *     or from Excel): a bank, invoice or payroll line's amount is its
+         *     source's (`409 LINE_FROM_SOURCE`). The returned draft lists its
+         *     remaining issues.
          */
         patch: operations["setJournalDraftLineAccount"];
         trace?: never;
@@ -32331,7 +32336,11 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @example 770.01 */
-                    account: string;
+                    account?: string;
+                    /** @example 100.00 */
+                    debit?: string;
+                    /** @example 0 */
+                    credit?: string;
                 };
             };
         };
@@ -32349,6 +32358,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            /** @description `LINE_FROM_SOURCE`: the line's amount comes from its source document */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
