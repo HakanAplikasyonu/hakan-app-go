@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
@@ -193,6 +194,44 @@ func (s *Service) Unassign(ctx context.Context, orgID, engagementID int64, userU
 		return ErrAssignmentNotFound
 	}
 	return orgctx.Invalidate(ctx, s.invalidator, orgID)
+}
+
+// EngagementAssignments is one engagement's assignees in the office-wide list.
+type EngagementAssignments struct {
+	EngagementUUID uuid.UUID    `json:"engagement_uuid"`
+	Items          []Assignment `json:"items"`
+}
+
+// ListOrgAssignments lists the assignees of every engagement the caller can
+// see (all with read_all, otherwise the ones the caller is assigned to), so
+// office lists do not ask once per row (#639). Engagements without an
+// assignee are left out.
+func (s *Service) ListOrgAssignments(ctx context.Context, scope orgctx.Scope, userID int64, status string) ([]EngagementAssignments, error) {
+	st := pgtype.Text{}
+	switch status {
+	case "":
+	case engagementctx.StatusActive, engagementctx.StatusEnded:
+		st = pgtype.Text{String: status, Valid: true}
+	default:
+		return nil, fmt.Errorf("%w: status must be active or ended", ErrInvalidRequest)
+	}
+	rows, err := s.store.ListOrgAssignments(ctx, db.ListOrgEngagementAssignmentsParams{
+		OrganizationID: scope.ID, Status: st, ReadAll: scope.Has(rbac.PermTenantEngagementsReadAll), UserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := []EngagementAssignments{}
+	for _, r := range rows {
+		if n := len(out); n == 0 || out[n-1].EngagementUUID != r.EngagementUuid {
+			out = append(out, EngagementAssignments{EngagementUUID: r.EngagementUuid, Items: []Assignment{}})
+		}
+		last := &out[len(out)-1]
+		last.Items = append(last.Items, Assignment{
+			UserUUID: r.UserUuid, Email: r.Email, Name: r.Name, Surname: r.Surname, AssignedAt: r.CreatedAt.Time,
+		})
+	}
+	return out, nil
 }
 
 // ListAssignments lists the members assigned to an engagement.

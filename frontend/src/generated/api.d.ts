@@ -2805,6 +2805,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagement-assignments": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assignees of every engagement the caller can see
+         * @description Requires `tenant.engagements.read`. Office lists use it instead of one request per engagement (#639).
+         *     With `tenant.engagements.read_all` every engagement of the office; otherwise only the ones the caller is assigned to.
+         *     Engagements without an assignee are left out. Not paged; capped at 5000 assignment rows.
+         */
+        get: operations["listTenantOrgEngagementAssignments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/assignments": {
         parameters: {
             query?: never;
@@ -16491,6 +16519,13 @@ export interface components {
         EngagementAssignmentList: {
             items: components["schemas"]["EngagementAssignment"][];
         };
+        OrgEngagementAssignmentList: {
+            items: {
+                /** Format: uuid */
+                engagement_uuid: string;
+                items: components["schemas"]["EngagementAssignment"][];
+            }[];
+        };
         CreateEngagementRequest: {
             /** Format: uuid */
             taxpayer_uuid: string;
@@ -25360,6 +25395,43 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTenantOrgEngagementAssignments: {
+        parameters: {
+            query?: {
+                status?: "active" | "ended";
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Assignments per engagement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["OrgEngagementAssignmentList"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

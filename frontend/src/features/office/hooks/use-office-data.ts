@@ -65,6 +65,21 @@ export function useEngagementAssignments(engagement: string, enabled = true) {
   });
 }
 
+/**
+ * Ofis geneli atamalar, ilişki uuid'sine göre (#639): mükellefler listesi
+ * satır başına istek atmaz.
+ */
+export function useOrgAssignments() {
+  const { slug } = useTenant();
+  return useQuery({
+    queryKey: engagementKeys.orgAssignments(slug),
+    queryFn: () => engagementService.orgAssignments(slug),
+    staleTime: 60_000,
+    select: (data) =>
+      new Map(data.items.map((e) => [e.engagement_uuid, e.items] as const)),
+  });
+}
+
 export function useToggleAssignment(engagement: string) {
   const { slug } = useTenant();
   const qc = useQueryClient();
@@ -74,9 +89,14 @@ export function useToggleAssignment(engagement: string) {
         ? engagementService.unassign(slug, engagement, user)
         : engagementService.assign(slug, engagement, user),
     onSettled: () =>
-      qc.invalidateQueries({
-        queryKey: engagementKeys.assignments(slug, engagement),
-      }),
+      Promise.all([
+        qc.invalidateQueries({
+          queryKey: engagementKeys.assignments(slug, engagement),
+        }),
+        qc.invalidateQueries({
+          queryKey: engagementKeys.orgAssignments(slug),
+        }),
+      ]),
   });
 }
 

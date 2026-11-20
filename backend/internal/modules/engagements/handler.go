@@ -82,6 +82,17 @@ type assignmentList struct {
 	Items []Assignment `json:"items"`
 }
 
+func (h *Handler) listOrgAssignments(w http.ResponseWriter, r *http.Request) {
+	s := orgctx.Must(r.Context())
+	p, _ := authctx.PrincipalFrom(r.Context())
+	items, err := h.svc.ListOrgAssignments(r.Context(), s, p.UserInternal, strings.TrimSpace(r.URL.Query().Get("status")))
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+}
+
 func (h *Handler) listAssignments(w http.ResponseWriter, r *http.Request) {
 	e := engagementctx.Must(r.Context())
 	items, err := h.svc.ListAssignments(r.Context(), e.OrganizationID, e.ID)

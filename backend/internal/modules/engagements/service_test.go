@@ -159,6 +159,10 @@ func (f *fakeStore) DeleteAssignment(_ context.Context, _, engagementID, userID 
 	return 1, nil
 }
 
+func (f *fakeStore) ListOrgAssignments(context.Context, db.ListOrgEngagementAssignmentsParams) ([]db.ListOrgEngagementAssignmentsRow, error) {
+	return nil, nil
+}
+
 func (f *fakeStore) ListAssignments(context.Context, int64, int64) ([]db.ListEngagementAssignmentsRow, error) {
 	return nil, nil
 }
