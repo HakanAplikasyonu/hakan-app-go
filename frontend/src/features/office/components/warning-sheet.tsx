@@ -279,6 +279,7 @@ export function WarningSheet({
               ) : (
                 <ApiWarningActions
                   warning={current}
+                  requestText={text(current)}
                   onDecided={() => {
                     // Karar verilen uyarı listeden düşecek; sıradakine geç.
                     const after = items[index + 1] ?? items[index - 1];
