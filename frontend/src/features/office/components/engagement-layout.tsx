@@ -131,6 +131,11 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       permission: Permission.TenantDocumentsRead,
     },
     {
+      href: routes.tenant.engagementArchive(slug, engagement),
+      label: t("office.engagement.tab_archive"),
+      permission: Permission.TenantDocumentsRead,
+    },
+    {
       href: routes.tenant.engagementUpload(slug, engagement),
       label: t("office.engagement.tab_upload"),
     },
