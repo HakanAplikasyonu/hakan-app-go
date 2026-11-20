@@ -130,8 +130,12 @@ type DraftDetail struct {
 	DocumentType string         `json:"document_type,omitempty"`
 	Origin       map[string]any `json:"origin"`
 	ApprovedAt   *time.Time     `json:"approved_at,omitempty"`
-	CreatedAt    time.Time      `json:"created_at"`
-	Items        []DraftLine    `json:"items"`
+	// ApprovalWarnings and ApprovalNote: warnings the approver accepted
+	// (missing_document, possible_duplicate) and the optional reason (#669).
+	ApprovalWarnings []string    `json:"approval_warnings,omitempty"`
+	ApprovalNote     string      `json:"approval_note,omitempty"`
+	CreatedAt        time.Time   `json:"created_at"`
+	Items            []DraftLine `json:"items"`
 }
 
 // GetDraft returns one draft with its lines.
@@ -157,6 +161,7 @@ func (s *Service) GetDraft(ctx context.Context, scope engagementctx.Scope, id uu
 	if row.ApprovedAt.Valid {
 		t := row.ApprovedAt.Time
 		out.ApprovedAt = &t
+		out.ApprovalWarnings, out.ApprovalNote = row.ApprovalWarnings, row.ApprovalNote.String
 	}
 	codes := make([]string, 0, len(lines))
 	for _, l := range lines {

@@ -113,11 +113,23 @@ export const journalService = {
       { body: input },
     );
   },
-  approve(slug: string, engagement: string, draft: string) {
+  /**
+   * Uyarılı fiş (eksik belge / mükerrer olabilir) yalnız `confirm` ile
+   * onaylanır; yoksa 409 JOURNAL_NEEDS_CONFIRMATION (#669).
+   */
+  approve(
+    slug: string,
+    engagement: string,
+    draft: string,
+    opts?: { confirm?: boolean; note?: string },
+  ) {
     return tenantRequest<JournalDraftDetail>(
       slug,
       "POST",
       `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/approve`,
+      opts?.confirm
+        ? { body: { confirm_warnings: true, note: opts.note || undefined } }
+        : undefined,
     );
   },
   /** Kontrol ekranında satırın hesap kodu düzeltilir (#566). */

@@ -13,20 +13,25 @@ import (
 )
 
 const approveJournalDraft = `-- name: ApproveJournalDraft :execrows
-UPDATE journal_drafts SET status = 'approved', approved_by = $1, approved_at = NOW()
-WHERE organization_id = $2 AND engagement_id = $3 AND id = $4 AND status = 'draft'
+UPDATE journal_drafts SET status = 'approved', approved_by = $1, approved_at = NOW(),
+    approval_warnings = $2::text[], approval_note = $3
+WHERE organization_id = $4 AND engagement_id = $5 AND id = $6 AND status = 'draft'
 `
 
 type ApproveJournalDraftParams struct {
-	ApprovedBy     pgtype.Int8 `json:"approved_by"`
-	OrganizationID int64       `json:"organization_id"`
-	EngagementID   int64       `json:"engagement_id"`
-	ID             int64       `json:"id"`
+	ApprovedBy       pgtype.Int8 `json:"approved_by"`
+	ApprovalWarnings []string    `json:"approval_warnings"`
+	ApprovalNote     pgtype.Text `json:"approval_note"`
+	OrganizationID   int64       `json:"organization_id"`
+	EngagementID     int64       `json:"engagement_id"`
+	ID               int64       `json:"id"`
 }
 
 func (q *Queries) ApproveJournalDraft(ctx context.Context, arg ApproveJournalDraftParams) (int64, error) {
 	result, err := q.db.Exec(ctx, approveJournalDraft,
 		arg.ApprovedBy,
+		arg.ApprovalWarnings,
+		arg.ApprovalNote,
 		arg.OrganizationID,
 		arg.EngagementID,
 		arg.ID,
@@ -97,7 +102,7 @@ func (q *Queries) GetExportSettings(ctx context.Context, arg GetExportSettingsPa
 }
 
 const getJournalDraft = `-- name: GetJournalDraft :one
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason FROM journal_drafts
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason, approval_warnings, approval_note FROM journal_drafts
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = $3
 `
 
@@ -132,6 +137,8 @@ func (q *Queries) GetJournalDraft(ctx context.Context, arg GetJournalDraftParams
 		&i.ApprovalRevertedBy,
 		&i.ApprovalRevertedAt,
 		&i.ApprovalRevertReason,
+		&i.ApprovalWarnings,
+		&i.ApprovalNote,
 	)
 	return i, err
 }
@@ -214,7 +221,7 @@ func (q *Queries) InsertExportBatchItem(ctx context.Context, arg InsertExportBat
 const insertJournalDraft = `-- name: InsertJournalDraft :one
 INSERT INTO journal_drafts (organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, origin, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason
+RETURNING id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason, approval_warnings, approval_note
 `
 
 type InsertJournalDraftParams struct {
@@ -268,6 +275,8 @@ func (q *Queries) InsertJournalDraft(ctx context.Context, arg InsertJournalDraft
 		&i.ApprovalRevertedBy,
 		&i.ApprovalRevertedAt,
 		&i.ApprovalRevertReason,
+		&i.ApprovalWarnings,
+		&i.ApprovalNote,
 	)
 	return i, err
 }
@@ -420,6 +429,26 @@ SELECT d.id, 'period_locked', 0, '', 0::numeric
 FROM d
 JOIN period_locks pl
   ON pl.organization_id = $1 AND pl.engagement_id = $2 AND pl.period = d.period
+UNION ALL
+SELECT DISTINCT d.id, 'missing_document', 0, '', 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2
+ AND l.journal_draft_id = d.id AND l.source_kind = 'bank_transaction' AND COALESCE(l.document_no, '') = ''
+JOIN engagements e ON e.organization_id = $1 AND e.id = $2
+WHERE NOT EXISTS (
+    SELECT 1 FROM bank_transaction_matches m
+    WHERE m.taxpayer_id = e.taxpayer_id AND m.bank_transaction_id::text = l.source_id
+  )
+UNION ALL
+SELECT DISTINCT d.id, 'possible_duplicate', 0, '', 0::numeric
+FROM d
+JOIN journal_draft_lines l
+  ON l.organization_id = $1 AND l.engagement_id = $2 AND l.journal_draft_id = d.id
+ AND l.source_kind IN ('invoice', 'invoice_item', 'receipt', 'bank_transaction')
+JOIN journal_draft_lines o
+  ON o.organization_id = $1 AND o.engagement_id = $2
+ AND o.source_kind = l.source_kind AND o.source_id = l.source_id AND o.journal_draft_id <> d.id
 ORDER BY 1, 3
 `
 
@@ -440,6 +469,10 @@ type JournalDraftIssuesRow struct {
 // Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
 // da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
 // kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+// Eksik belge (uyarı): fişteki bir banka hareketi hiçbir belgeye (fatura,
+// fiş satırı) eşleşmemiş ve satırında belge numarası yok.
+// Mükerrer olabilir (uyarı): aynı kaynak belge (fatura, fiş, banka hareketi)
+// başka bir fişte de var.
 func (q *Queries) JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error) {
 	rows, err := q.db.Query(ctx, journalDraftIssues, arg.OrganizationID, arg.EngagementID, arg.DraftIds)
 	if err != nil {
@@ -554,7 +587,7 @@ func (q *Queries) ListExportBatchItems(ctx context.Context, arg ListExportBatchI
 }
 
 const listExportableJournalDrafts = `-- name: ListExportableJournalDrafts :many
-SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason FROM journal_drafts d
+SELECT d.id, d.uuid, d.organization_id, d.engagement_id, d.taxpayer_id, d.period, d.entry_no, d.entry_type, d.entry_date, d.description, d.document_type, d.status, d.origin, d.approved_by, d.approved_at, d.created_by, d.created_at, d.updated_at, d.approval_reverted_by, d.approval_reverted_at, d.approval_revert_reason, d.approval_warnings, d.approval_note FROM journal_drafts d
 WHERE d.organization_id = $1 AND d.engagement_id = $2
   AND d.status = 'approved'
   AND ($3::text IS NULL OR d.period = $3)
@@ -599,6 +632,8 @@ func (q *Queries) ListExportableJournalDrafts(ctx context.Context, arg ListExpor
 			&i.ApprovalRevertedBy,
 			&i.ApprovalRevertedAt,
 			&i.ApprovalRevertReason,
+			&i.ApprovalWarnings,
+			&i.ApprovalNote,
 		); err != nil {
 			return nil, err
 		}
@@ -708,7 +743,7 @@ func (q *Queries) ListJournalDraftLines(ctx context.Context, arg ListJournalDraf
 }
 
 const listJournalDraftsByUUID = `-- name: ListJournalDraftsByUUID :many
-SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason FROM journal_drafts
+SELECT id, uuid, organization_id, engagement_id, taxpayer_id, period, entry_no, entry_type, entry_date, description, document_type, status, origin, approved_by, approved_at, created_by, created_at, updated_at, approval_reverted_by, approval_reverted_at, approval_revert_reason, approval_warnings, approval_note FROM journal_drafts
 WHERE organization_id = $1 AND engagement_id = $2 AND uuid = ANY($3::uuid[])
 ORDER BY period, entry_date, entry_no
 `
@@ -750,6 +785,8 @@ func (q *Queries) ListJournalDraftsByUUID(ctx context.Context, arg ListJournalDr
 			&i.ApprovalRevertedBy,
 			&i.ApprovalRevertedAt,
 			&i.ApprovalRevertReason,
+			&i.ApprovalWarnings,
+			&i.ApprovalNote,
 		); err != nil {
 			return nil, err
 		}

@@ -139,8 +139,12 @@ export function useJournalActions(slug: string, engagement: string) {
       onSuccess: refresh,
     }),
     approve: useMutation({
-      mutationFn: (draft: string) =>
-        journalService.approve(slug, engagement, draft),
+      mutationFn: (
+        v: string | { draft: string; confirm?: boolean; note?: string },
+      ) =>
+        typeof v === "string"
+          ? journalService.approve(slug, engagement, v)
+          : journalService.approve(slug, engagement, v.draft, v),
       onSuccess: refresh,
     }),
     setLineAccount: useMutation({

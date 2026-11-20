@@ -148,6 +148,10 @@ function driverLabel(t: Translate, name: string) {
 
 /** Onayı durduran engel var mı (#566); hesap kodu sorunları uyarıdır. */
 const isBlocked = (d: JournalDraft) => !!d.issues?.some((i) => i.blocking);
+/** Onayı engellemeyen ama açıkça sorulan uyarılar (#669, ofis kararı). */
+const CONFIRM_CODES = ["missing_document", "possible_duplicate"];
+const warningsOf = (d: JournalDraft) =>
+  (d.issues ?? []).filter((i) => CONFIRM_CODES.includes(i.code));
 
 function issueText(
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -522,7 +526,7 @@ function ApproveClean({
 }) {
   const { t } = useLocale();
   const { slug, permissions: perms } = useTenant();
-  const { confirm } = useDialogs();
+  const { confirm, prompt } = useDialogs();
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
@@ -530,24 +534,46 @@ function ApproveClean({
   // Son onay sorumlu müşavirde (#566).
   if (!clean.length || !perms.includes(permissions.tenant.journals.approve))
     return null;
+  const warned = clean.filter((d) => warningsOf(d).length > 0).length;
   const run = async () => {
-    const ok = await confirm({
-      title: t("office.journals.check.approve_clean_title", {
-        count: clean.length,
-      }),
-      description: t("office.journals.check.approve_clean_description", {
-        blocked: open.length - clean.length,
-      }),
-      confirmLabel: t("office.journals.approve"),
+    const description = t("office.journals.check.approve_clean_description", {
+      blocked: open.length - clean.length,
     });
-    if (!ok) return;
+    // Uyarılı fiş varsa kaç tanesi olduğu açıkça söylenir; gerekçe isteğe bağlı.
+    let note = "";
+    if (warned > 0) {
+      const answer = await prompt({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description: `${description} ${t("office.journals.check.approve_clean_warned", { count: warned })}`,
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (answer === null) return;
+      note = answer.trim();
+    } else {
+      const ok = await confirm({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description,
+        confirmLabel: t("office.journals.approve"),
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     let done = 0;
     let failed = 0;
     let reason = "";
     for (const d of clean) {
       try {
-        await approve.mutateAsync(d.uuid);
+        await approve.mutateAsync(
+          warningsOf(d).length
+            ? { draft: d.uuid, confirm: true, note }
+            : d.uuid,
+        );
         done += 1;
       } catch (err) {
         failed += 1;
@@ -965,6 +991,27 @@ function JournalsInner() {
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
   const approveDraft = approve.mutate;
   const approving = approve.isPending;
+  // Uyarılı fiş (eksik belge / mükerrer olabilir, #669): engellenmez, ama
+  // onaydan önce açıkça sorulur; gerekçe isteğe bağlı, fişte kalır.
+  const approveOne = useCallback(
+    async (d: JournalDraft) => {
+      const warnings = warningsOf(d);
+      if (!warnings.length) {
+        approveDraft(d.uuid);
+        return;
+      }
+      const note = await prompt({
+        title: t("office.journals.check.confirm_title"),
+        description: warnings.map((w) => issueText(t, w)).join(" "),
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (note === null) return;
+      approveDraft({ draft: d.uuid, confirm: true, note: note.trim() });
+    },
+    [approveDraft, prompt, t],
+  );
   const reverseDraft = reverse.mutate;
   const reversing = reverse.isPending;
   const unapproveDraft = unapprove.mutate;
@@ -1130,7 +1177,7 @@ function JournalsInner() {
                 size="sm"
                 variant="outline"
                 disabled={approving || isBlocked(d)}
-                onClick={() => approveDraft(d.uuid)}
+                onClick={() => void approveOne(d)}
               >
                 <Check className="size-4" />
                 {t("office.journals.approve")}
@@ -1157,7 +1204,7 @@ function JournalsInner() {
       }),
     ],
     [
-      approveDraft,
+      approveOne,
       approving,
       canApprove,
       engagement,

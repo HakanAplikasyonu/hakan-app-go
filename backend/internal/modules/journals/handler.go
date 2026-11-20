@@ -162,9 +162,24 @@ func (h *Handler) approve(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Gövde isteğe bağlı: {"confirm_warnings": true, "note": "..."} (#669).
+	var in struct {
+		ConfirmWarnings bool   `json:"confirm_warnings"`
+		Note            string `json:"note"`
+	}
+	if r.ContentLength != 0 {
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil && !errors.Is(err, io.EOF) {
+			response.BadRequest(w, r, "INVALID_BODY", "body must be {\"confirm_warnings\": true, \"note\": \"...\"}")
+			return
+		}
+	}
+	if len(in.Note) > 1000 {
+		response.BadRequest(w, r, "INVALID_BODY", "note must be at most 1000 characters")
+		return
+	}
 	s := engagementctx.Must(r.Context())
 	p, _ := authctx.PrincipalFrom(r.Context())
-	if err := h.svc.Approve(r.Context(), s, p.UserInternal, id); err != nil {
+	if err := h.svc.ApproveWith(r.Context(), s, p.UserInternal, id, Confirmation{Confirmed: in.ConfirmWarnings, Note: in.Note}); err != nil {
 		h.fail(w, r, err)
 		return
 	}
@@ -458,7 +473,15 @@ func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	var blocked *BlockedError
 	var draftBlocked *DraftBlockedError
+	var needsConfirm *DraftNeedsConfirmationError
 	switch {
+	case errors.As(err, &needsConfirm):
+		details := make([]response.Detail, 0, len(needsConfirm.Issues))
+		for _, is := range needsConfirm.Issues {
+			details = append(details, response.Detail{Code: is.Code})
+		}
+		response.ErrorWithDetails(w, r, http.StatusConflict, "JOURNAL_NEEDS_CONFIRMATION",
+			"the draft has warnings (missing document / possible duplicate); approve with confirm_warnings", details)
 	case errors.As(err, &draftBlocked):
 		details := make([]response.Detail, 0, len(draftBlocked.Issues))
 		for _, is := range draftBlocked.Issues {

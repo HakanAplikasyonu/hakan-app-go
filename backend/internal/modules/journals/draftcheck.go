@@ -23,7 +23,37 @@ const (
 	IssueUnknownAccount = "unknown_account"
 	IssueParentAccount  = "parent_account"
 	IssuePeriodLocked   = "period_locked"
+	// Uyarılar (#669, ofis kararı): onay engellenmez ama açıkça sorulur.
+	IssueMissingDocument   = "missing_document"
+	IssuePossibleDuplicate = "possible_duplicate"
 )
+
+// confirmable keeps the warnings the approver must accept explicitly.
+func confirmable(issues []DraftIssue) []DraftIssue {
+	var out []DraftIssue
+	for _, is := range issues {
+		if is.Code == IssueMissingDocument || is.Code == IssuePossibleDuplicate {
+			out = append(out, is)
+		}
+	}
+	return out
+}
+
+// DraftNeedsConfirmationError: the draft has warnings (missing document,
+// possible duplicate); the approval needs the explicit confirmation.
+type DraftNeedsConfirmationError struct{ Issues []DraftIssue }
+
+func (e *DraftNeedsConfirmationError) Error() string {
+	return fmt.Sprintf("journals: draft has %d warning(s) to confirm", len(e.Issues))
+}
+
+// Confirmation is the approver's answer to the draft's warnings.
+type Confirmation struct {
+	// Confirmed: "eksik belge / mükerrer olabilir; yine de onaylıyorum".
+	Confirmed bool
+	// Note: optional reason, kept on the entry.
+	Note string
+}
 
 // DraftIssue is a problem the control screen shows on a draft. Blocking
 // ones (unbalanced, locked period) stop the approval; account code problems
