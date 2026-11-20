@@ -54,12 +54,18 @@ export function StepChain({
   next,
   compact = false,
   hrefFor,
+  onNavigate,
 }: {
   steps: CopilotStep[];
   next?: CopilotStepKey | null;
   compact?: boolean;
   /** Verilirse her rozet adımın ekranına bağlantı olur (#562). */
   hrefFor?: (key: CopilotStepKey) => string;
+  /**
+   * Rozete tıklanınca (gezinmeden önce): çağıran, zincirin sayıldığı dönemi
+   * üst çubuğa sabitler ki açılan ekran aynı dönemi göstersin (#566).
+   */
+  onNavigate?: () => void;
 }) {
   const { t } = useLocale();
   return (
@@ -102,7 +108,10 @@ export function StepChain({
                   <Link
                     href={hrefFor(s.key)}
                     className={chipClass}
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigate?.();
+                    }}
                   >
                     {chipBody}
                   </Link>

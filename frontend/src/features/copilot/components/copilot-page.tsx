@@ -61,7 +61,11 @@ export function CopilotPage() {
   const { slug } = useTenant();
   const { can } = usePermission();
   const router = useRouter();
-  const { focus } = useOfficePeriod();
+  const { focus, setPeriod } = useOfficePeriod();
+  // Sıradaki iş bu dönem (focus) için sayılır. Üst çubuk "Tüm dönemler"
+  // iken Fişler gibi tek dönemlik ekranlar bu ayı gösterir; işe gidilirken
+  // dönem sabitlenmezse sayılan kayıtlar açılan ekranda görünmez (#566).
+  const pinPeriod = () => setPeriod(focus);
   const copilot = useCopilot();
   const [search, setSearch] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(true);
@@ -100,6 +104,7 @@ export function CopilotPage() {
     const step = nextStepOf(row);
     if (!step?.action) return;
     if (!isWriteAction(step.action)) {
+      pinPeriod();
       router.push(actionHref(slug, step.action, row.engagement_uuid));
       return;
     }
@@ -188,6 +193,7 @@ export function CopilotPage() {
               steps={row.original.steps}
               next={row.original.next_step}
               hrefFor={(k) => stepHref(slug, k, row.original.engagement_uuid)}
+              onNavigate={pinPeriod}
             />
             <p className="text-text-3 text-xs tabular-nums">
               {t("office.copilot.progress", {
