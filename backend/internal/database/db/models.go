@@ -422,6 +422,8 @@ type BankTransaction struct {
 	ContentHash                pgtype.Text        `json:"content_hash"`
 	CreatedAt                  pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
+	ExcludedBy                 pgtype.Int8        `json:"excluded_by"`
+	ExcludedAt                 pgtype.Timestamptz `json:"excluded_at"`
 }
 
 type BankTransactionDocument struct {
@@ -2238,6 +2240,13 @@ type TaxReturn struct {
 	AccrualUploadedAt pgtype.Timestamptz `json:"accrual_uploaded_at"`
 	CheckedBy         pgtype.Int8        `json:"checked_by"`
 	CheckedAt         pgtype.Timestamptz `json:"checked_at"`
+}
+
+type TaxReturnSetting struct {
+	OrganizationID     int64              `json:"organization_id"`
+	FinalCheckRequired bool               `json:"final_check_required"`
+	UpdatedBy          pgtype.Int8        `json:"updated_by"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Taxpayer struct {

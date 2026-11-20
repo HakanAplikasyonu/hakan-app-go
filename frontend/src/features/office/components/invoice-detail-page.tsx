@@ -31,6 +31,7 @@ import { AmountWaterfall } from "./amount-waterfall";
 import type { InvoiceLine } from "../types";
 import { carryListParams, useEngagementScope } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { sourceSystemLabel } from "@/lib/source-label";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoiceAccountCodes } from "./invoice-account-codes";
 import { InvoicePreview } from "./invoice-preview";
@@ -204,8 +205,10 @@ function InvoiceDetailInner({ id }: { id: string }) {
               </Field>
               <Field label={t("office.col_source")}>
                 {d.sources.length
-                  ? d.sources.map((s) => s.source_system).join(", ")
-                  : d.source_system}
+                  ? d.sources
+                      .map((s) => sourceSystemLabel(s.source_system, t))
+                      .join(", ")
+                  : sourceSystemLabel(d.source_system, t)}
               </Field>
               <Field label={t("office.api.col_period")}>
                 <Figure>{d.period}</Figure>

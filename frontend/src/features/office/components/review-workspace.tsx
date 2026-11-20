@@ -89,6 +89,7 @@ import {
 } from "../services/review.service";
 import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
+import { ReviewTaxpayers, useReviewTaxpayers } from "./review-taxpayers";
 import { FilterSelect, Figure } from "./office-ui";
 import { ReviewCounts } from "./review-counts";
 import { ReviewGrid, ReviewHeading } from "./review-grid";
@@ -610,6 +611,17 @@ function ReviewWorkspaceInner() {
     kind: kind === "all" ? undefined : kind,
     period,
   };
+  // Mükellef bazında sayılar (#710): seçili mükellefin işi bitince sıradaki.
+  const byTaxpayer = useReviewTaxpayers({
+    kind: scopeFilter.kind,
+    period: scopeFilter.period,
+  });
+  const nextTaxpayer =
+    scope || engagement === "all"
+      ? undefined
+      : byTaxpayer.data?.items.find(
+          (x) => x.engagement_uuid !== engagement && x.total > 0,
+        );
   const query = useReviewSuggestions({
     status: "pending",
     ...scopeFilter,
@@ -1054,11 +1066,31 @@ function ReviewWorkspaceInner() {
             : t("office.review_empty_description")
         }
         action={
-          undoTarget ? (
-            <Button variant="outline" onClick={undo} disabled={undoBusy}>
-              <Undo2 className="size-4" />
-              {t("office.studio.undo")}
-            </Button>
+          undoTarget || nextTaxpayer ? (
+            <div className="flex flex-wrap justify-center gap-2">
+              {undoTarget ? (
+                <Button variant="outline" onClick={undo} disabled={undoBusy}>
+                  <Undo2 className="size-4" />
+                  {t("office.studio.undo")}
+                </Button>
+              ) : null}
+              {nextTaxpayer ? (
+                <Button
+                  onClick={() => {
+                    setEngagement(nextTaxpayer.engagement_uuid);
+                    setCursor(0);
+                    setPinned(undefined);
+                  }}
+                >
+                  {t("office.review.next_taxpayer", {
+                    name:
+                      directory.entries.get(nextTaxpayer.engagement_uuid)
+                        ?.title ?? "—",
+                    count: nextTaxpayer.total,
+                  })}
+                </Button>
+              ) : null}
+            </div>
           ) : undefined
         }
       />
@@ -1419,6 +1451,18 @@ function ReviewWorkspaceInner() {
         pending={left}
         filtered={engagement !== "all" || kind !== "all" || !!period}
       />
+      {scope ? null : (
+        <ReviewTaxpayers
+          kind={scopeFilter.kind}
+          period={scopeFilter.period}
+          selected={engagement}
+          onSelect={(v) => {
+            setEngagement(v);
+            setCursor(0);
+            setPinned(undefined);
+          }}
+        />
+      )}
       <header className="flex flex-wrap items-center gap-3">
         <ReviewHeading scoped={!!scope} />
         <span

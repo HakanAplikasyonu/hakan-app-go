@@ -114,22 +114,35 @@ export const journalService = {
     );
   },
   /**
-   * Uyarılı fiş (eksik belge / mükerrer olabilir) yalnız `confirm` ile
-   * onaylanır; yoksa 409 JOURNAL_NEEDS_CONFIRMATION (#669).
+   * Eksik belgeli fiş yalnız `confirm` ile onaylanır; yoksa 409
+   * JOURNAL_NEEDS_CONFIRMATION (#669). Mükerrer fiş engellidir (409
+   * JOURNAL_DUPLICATE); yalnız `sendDuplicate` ve gerekçeyle geçer (#710).
    */
   approve(
     slug: string,
     engagement: string,
     draft: string,
-    opts?: { confirm?: boolean; note?: string },
+    opts?: {
+      confirm?: boolean;
+      note?: string;
+      sendDuplicate?: boolean;
+      reason?: string;
+    },
   ) {
+    const body: Record<string, unknown> = {};
+    if (opts?.confirm) {
+      body.confirm_warnings = true;
+      if (opts.note) body.note = opts.note;
+    }
+    if (opts?.sendDuplicate) {
+      body.send_duplicate = true;
+      body.reason = opts.reason ?? "";
+    }
     return tenantRequest<JournalDraftDetail>(
       slug,
       "POST",
       `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/approve`,
-      opts?.confirm
-        ? { body: { confirm_warnings: true, note: opts.note || undefined } }
-        : undefined,
+      Object.keys(body).length ? { body } : undefined,
     );
   },
   /** Kontrol ekranında satırın hesap kodu düzeltilir (#566). */

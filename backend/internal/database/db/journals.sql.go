@@ -12,6 +12,40 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addJournalDraftManualLink = `-- name: AddJournalDraftManualLink :execrows
+UPDATE journal_drafts SET origin = jsonb_set(origin, '{manual_links}',
+    (CASE WHEN jsonb_typeof(origin -> 'manual_links') = 'array' THEN origin -> 'manual_links' ELSE '[]'::jsonb END)
+    || jsonb_build_array(jsonb_build_object('kind', $1::text, 'id', $2::bigint)))
+WHERE organization_id = $3 AND engagement_id = $4 AND id = $5
+  AND NOT (CASE WHEN jsonb_typeof(origin -> 'manual_links') = 'array' THEN origin -> 'manual_links' ELSE '[]'::jsonb END)
+      @> jsonb_build_array(jsonb_build_object('kind', $1::text, 'id', $2::bigint))
+`
+
+type AddJournalDraftManualLinkParams struct {
+	Kind           string `json:"kind"`
+	TargetID       int64  `json:"target_id"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	DraftID        int64  `json:"draft_id"`
+}
+
+// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi, fişin
+// origin.manual_links dizisinde {kind, id}. Satırlara, tutarlara ve aktarıma
+// dokunmaz; yalnız ilişkili kayıtlarda görünür. Aynı bağ ikinci kez eklenmez.
+func (q *Queries) AddJournalDraftManualLink(ctx context.Context, arg AddJournalDraftManualLinkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, addJournalDraftManualLink,
+		arg.Kind,
+		arg.TargetID,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.DraftID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const approveJournalDraft = `-- name: ApproveJournalDraft :execrows
 UPDATE journal_drafts SET status = 'approved', approved_by = $1, approved_at = NOW(),
     approval_warnings = $2::text[], approval_note = $3
@@ -834,6 +868,38 @@ func (q *Queries) NextJournalEntryNo(ctx context.Context, arg NextJournalEntryNo
 	var next_no int32
 	err := row.Scan(&next_no)
 	return next_no, err
+}
+
+const removeJournalDraftManualLink = `-- name: RemoveJournalDraftManualLink :execrows
+UPDATE journal_drafts SET origin = jsonb_set(origin, '{manual_links}', COALESCE((
+    SELECT jsonb_agg(x) FROM jsonb_array_elements(origin -> 'manual_links') x
+    WHERE x <> jsonb_build_object('kind', $1::text, 'id', $2::bigint)), '[]'::jsonb))
+WHERE organization_id = $3 AND engagement_id = $4 AND id = $5
+  AND jsonb_typeof(origin -> 'manual_links') = 'array'
+  AND origin -> 'manual_links' @> jsonb_build_array(jsonb_build_object('kind', $1::text, 'id', $2::bigint))
+`
+
+type RemoveJournalDraftManualLinkParams struct {
+	Kind           string `json:"kind"`
+	TargetID       int64  `json:"target_id"`
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	DraftID        int64  `json:"draft_id"`
+}
+
+// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
+func (q *Queries) RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, removeJournalDraftManualLink,
+		arg.Kind,
+		arg.TargetID,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.DraftID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const reverseExportBatchItem = `-- name: ReverseExportBatchItem :execrows

@@ -16,6 +16,10 @@ import {
  * koyar. Personel hazırlar ama işaretleyemez (sunucu 403, ekranda düğme
  * pasif ve nedeni yazılı); sahip işaretler; kim / ne zaman görünür.
  *
+ * Ofis ayarı (#710): son kontrol varsayılan açık; ofis kapatınca personel de
+ * "kontrol edildi" işaretler (ekranda düğme etkin). Ayar test sonunda yine
+ * açılır (ayar ofis genelidir; ona bağlı tek test bu dosyadır).
+ *
  * Veri: demo ofisine her koşuda yeni mükellef ve personel rolüyle davet
  * edilen yeni bir kullanıcı; beyan o mükellefin önceki ay KDV1'i.
  */
@@ -36,7 +40,7 @@ type Preview = {
   record: { checked_at: string | null; checked_by_name?: string; filed_by_name?: string; prepared_by_name?: string } | null;
 };
 
-test("beyan: personel hazırlar, yalnız sorumlu kontrol edildi / verildi işaretler", async ({ browser, page }) => {
+test("beyan: personel hazırlar, yalnız sorumlu işaretler; ofis ayarı kapatınca personel de işaretler (#710)", async ({ browser, page }) => {
   test.setTimeout(240_000);
   const owner = await Api.login(DEMO.owner);
   const engagement = await addConsentedTaxpayer(browser, owner, taxpayer, "sonkontrol");
@@ -77,6 +81,27 @@ test("beyan: personel hazırlar, yalnız sorumlu kontrol edildi / verildi işare
   await expect(status.getByRole("button", { name: "Verildi olarak işaretle" })).toBeDisabled();
   await expect(status).toContainText(ONLY);
   await expect(status.getByTestId("tax-return-trail")).toContainText("Hazırlayan: Ece Personel");
+
+  // Ofis ayarı (#710): varsayılan açık; kapatılınca personel de işaretler.
+  const settings = "/v1/tenant/tax-return-settings";
+  const current = await owner.json<{ final_check_required: boolean }>(await owner.get(settings));
+  expect(current.final_check_required).toBe(true);
+  expect((await staff.put(settings, { final_check_required: false })).status()).toBe(403);
+  try {
+    const off = await owner.put(settings, { final_check_required: false });
+    expect(off.status(), await off.text()).toBe(200);
+    await page.reload();
+    await expect(status).not.toContainText(ONLY);
+    await status.getByRole("button", { name: "Kontrol edildi olarak işaretle" }).click();
+    await expect
+      .poll(async () => (await staff.json<Preview>(await staff.get(url))).record?.checked_by_name)
+      .toBe("Ece Personel");
+  } finally {
+    const on = await owner.put(settings, { final_check_required: true });
+    expect(on.status(), await on.text()).toBe(200);
+  }
+  // Ayar yeniden açık: personel yine işaretleyemez.
+  expect((await staff.post(`${url}/file`, { filed_on: filedOn })).status()).toBe(403);
 
   // Sorumlu (sahip) kontrol edildi ve verildi işaretler; kim / ne zaman kaydedilir.
   const checked = await owner.json<Preview>(await owner.post(`${url}/check`));
