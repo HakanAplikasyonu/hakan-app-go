@@ -80,6 +80,41 @@ FROM (
     )
 
     UNION ALL
+    -- Elle bağlanan kayıt → fiş (#710): fişin origin.manual_links dizisi.
+    SELECT 'journal_draft', j.uuid::text, 'manual',
+           COALESCE(to_char(j.entry_date, 'YYYY-MM-DD'), ''),
+           COALESCE((SELECT SUM(l.debit) FROM journal_draft_lines l
+                     WHERE l.organization_id = j.organization_id AND l.engagement_id = j.engagement_id AND l.journal_draft_id = j.id)::text, ''),
+           'TRY', j.status, j.description, j.entry_no::text
+    FROM journal_drafts j
+    WHERE $1::text IN ('invoice', 'bank_transaction')
+      AND j.organization_id = $5 AND j.engagement_id = $4
+      AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
+      AND j.origin -> 'manual_links' @> jsonb_build_array(jsonb_build_object('kind', $1::text, 'id', $3::bigint))
+
+    UNION ALL
+    -- Fiş → elle bağlanan faturalar ve banka hareketleri (#710).
+    SELECT 'invoice', i.uuid::text, 'manual',
+           COALESCE(to_char(i.issue_date, 'YYYY-MM-DD'), ''), COALESCE(i.payable_amount::text, ''), i.currency,
+           i.status_normalized, i.invoice_number, COALESCE(i.customer_name, '')
+    FROM journal_drafts j
+    JOIN invoices i ON i.taxpayer_id = $2 AND i.id IN (
+        SELECT (x ->> 'id')::bigint FROM jsonb_array_elements(CASE WHEN jsonb_typeof(j.origin -> 'manual_links') = 'array' THEN j.origin -> 'manual_links' ELSE '[]'::jsonb END) x WHERE x ->> 'kind' = 'invoice')
+    WHERE $1::text = 'journal_draft' AND j.organization_id = $5 AND j.engagement_id = $4
+      AND j.id = $3 AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
+      AND engagement_document_visible($4::bigint, i.issue_date)
+
+    UNION ALL
+    SELECT 'bank_transaction', b.uuid::text, 'manual',
+           COALESCE(to_char(b.transaction_date, 'YYYY-MM-DD'), ''), COALESCE(b.amount::text, ''), b.currency,
+           b.match_status, b.description, b.debit_credit
+    FROM journal_drafts j
+    JOIN bank_transactions b ON b.taxpayer_id = $2 AND b.id IN (
+        SELECT (x ->> 'id')::bigint FROM jsonb_array_elements(CASE WHEN jsonb_typeof(j.origin -> 'manual_links') = 'array' THEN j.origin -> 'manual_links' ELSE '[]'::jsonb END) x WHERE x ->> 'kind' = 'bank_transaction')
+    WHERE $1::text = 'journal_draft' AND j.organization_id = $5 AND j.engagement_id = $4
+      AND j.id = $3 AND jsonb_typeof(j.origin -> 'manual_links') = 'array'
+
+    UNION ALL
     -- Fiş → kaynak faturalar (fatura ya da fatura satırı kaynaklı satırlar).
     SELECT DISTINCT 'invoice', i.uuid::text, 'source',
            COALESCE(to_char(i.issue_date, 'YYYY-MM-DD'), ''), COALESCE(i.payable_amount::text, ''), i.currency,

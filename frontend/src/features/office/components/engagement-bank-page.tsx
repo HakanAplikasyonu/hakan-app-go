@@ -28,7 +28,7 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementScope } from "../engagement-scope";
 import { downloadFile } from "../services/download";
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
 import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
@@ -195,7 +195,8 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
 function EngagementBankInner({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
-  const { period } = useOfficePeriod();
+  // Dönem adreste (`?period=`): uyarıdan gelen bağlantı o ayı açar (#710).
+  const { period } = useUrlOfficePeriod();
   // Sayfa, sayfa boyutu ve eşleşme süzgeci URL'de (#381).
   const listState = useUrlListState({ initialPageSize: PAGE });
   const rawMatch = listState.getParam("match") as MatchFilter | null;

@@ -11,7 +11,10 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/testdb"
 )
 
@@ -170,6 +173,57 @@ func TestRelatedChain(t *testing.T) {
 	must(err)
 	if !has(res, "bank_transaction", "source", btUUID.String()) {
 		t.Errorf("warning → bank: %+v", res.Items)
+	}
+
+	// Elle bağ (#710): kaynağı olmayan fişe fatura ve banka hareketi
+	// bağlanır; iki yönde "manual" görünür; ikinci bağ eklenmez; bağ
+	// kaldırılınca kaybolur. Başka mükellefin faturası bağlanamaz.
+	var handID int64
+	var handUUID uuid.UUID
+	must(d.Pool.QueryRow(ctx, `INSERT INTO journal_drafts (organization_id, engagement_id, taxpayer_id, period, entry_no, entry_date, description)
+		VALUES ($1, $2, $3, to_char($4::date, 'YYYY-MM'), 8, $4::date, 'Elle fiş') RETURNING id, uuid`,
+		org, eng, tp, today).Scan(&handID, &handUUID))
+	_, err = d.Pool.Exec(ctx, `INSERT INTO journal_draft_lines (organization_id, engagement_id, journal_draft_id, line_no, account_code, debit, credit)
+		VALUES ($1, $2, $3, 1, '102.01', 500, 0), ($1, $2, $3, 2, '120.01', 0, 500)`, org, eng, handID)
+	must(err)
+	jsvc := journals.New(d.Pool, storage.NewMemory())
+	scope := engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: tp}
+	for i := 0; i < 2; i++ {
+		if on, err := jsvc.SetManualLink(ctx, scope, handUUID, journals.LinkInvoice, invUUID, true); err != nil || !on {
+			t.Fatalf("link invoice: %v %v", on, err)
+		}
+	}
+	if _, err := jsvc.SetManualLink(ctx, scope, handUUID, journals.LinkBankTransaction, btUUID, true); err != nil {
+		t.Fatal(err)
+	}
+	res, err = svc.List(ctx, sub, "journal_draft", handUUID, all)
+	must(err)
+	if !has(res, "invoice", "manual", invUUID.String()) || !has(res, "bank_transaction", "manual", btUUID.String()) || len(res.Items) != 2 {
+		t.Errorf("hand draft: %+v", res.Items)
+	}
+	res, err = svc.List(ctx, sub, "invoice", invUUID, all)
+	must(err)
+	if !has(res, "journal_draft", "manual", handUUID.String()) {
+		t.Errorf("invoice → hand draft: %+v", res.Items)
+	}
+	if on, err := jsvc.SetManualLink(ctx, scope, handUUID, journals.LinkInvoice, invUUID, false); err != nil || on {
+		t.Fatalf("unlink: %v %v", on, err)
+	}
+	res, err = svc.List(ctx, sub, "journal_draft", handUUID, all)
+	must(err)
+	if has(res, "invoice", "manual", "") || !has(res, "bank_transaction", "manual", btUUID.String()) {
+		t.Errorf("after unlink: %+v", res.Items)
+	}
+	var lines int
+	must(d.Pool.QueryRow(ctx, `SELECT count(*) FROM journal_draft_lines WHERE journal_draft_id = $1 AND source_kind IS NULL`, handID).Scan(&lines))
+	if lines != 2 {
+		t.Errorf("lines changed: %d without source", lines)
+	}
+	tpX := d.Taxpayer(t, "legal", "9200000025")
+	engX := d.Engagement(t, org, tpX)
+	if _, err := jsvc.SetManualLink(ctx, engagementctx.Scope{ID: engX, OrganizationID: org, TaxpayerID: tpX}, handUUID,
+		journals.LinkInvoice, invUUID, true); !errors.Is(err, journals.ErrNotFound) {
+		t.Errorf("other engagement: %v", err)
 	}
 
 	// Banka izni olmayan hareketi görmez.
