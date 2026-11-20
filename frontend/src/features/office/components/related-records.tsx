@@ -300,8 +300,11 @@ export function FocusedRecord({ engagement }: { engagement: string }) {
     if (!kind) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      const el = e.target as HTMLElement | null;
-      if (el?.closest("input, textarea, select, [contenteditable=true]"))
+      const el = e.target;
+      if (
+        el instanceof Element &&
+        el.closest("input, textarea, select, [contenteditable=true]")
+      )
         return;
       if (e.key === "j") step(1);
       else if (e.key === "k") step(-1);

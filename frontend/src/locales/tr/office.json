@@ -963,6 +963,7 @@
   "review_grid.col_item": "Kalem",
   "review_grid.col_proposed": "Önerilen",
   "review_grid.col_confidence": "Güven",
+  "review_grid.pending": "{{count}} hesap kodu önerisi bekliyor",
   "review_grid.col_source": "Öneren",
   "review_grid.open_document": "Belgeyi aç",
   "review_grid.col_code": "Hesap kodu",
