@@ -57,6 +57,7 @@ import (
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/entegrator"
+	excelcustomers "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/customers"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
 	excelmapping "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/mapping"
 	excelimportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/usecase"
@@ -700,7 +701,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			WithTarget(excelmapping.Payroll, payrollSvc.ExcelTarget()).
 			WithTarget(excelmapping.Expenses, receiptsSvc.ExpenseTarget()).
 			WithTarget(excelmapping.RetailSales, receiptsSvc.RetailSaleTarget()).
-			WithTarget(excelmapping.BankTransactions, bankImporter.ExcelTarget())),
+			WithTarget(excelmapping.BankTransactions, bankImporter.ExcelTarget()).
+			WithTarget(excelmapping.Customers, excelcustomers.New(deps.DB))),
 		warnings: warningshandler.New(warningsusecase.NewRules(warningsrepository.NewConfig(deps.Queries))).
 			WithWarnings(warningsusecase.NewWarnings(warningsrepository.NewWarnings(deps.Queries))).
 			WithControls(warningscontrols.New(deps.Queries, warningEngine)).
