@@ -81,6 +81,8 @@ export const Permission = {
   TenantChangeRequestsDecide: "tenant.change_requests.decide",
   TenantTaxReturnsRead: "tenant.tax_returns.read",
   TenantTaxReturnsWrite: "tenant.tax_returns.write",
+  /** Beyan son kontrolü (#669): kontrol edildi / verildi yalnız sorumlu. */
+  TenantTaxReturnsApprove: "tenant.tax_returns.approve",
   /** Belge arşivi ve İSG evrakları (issue #393). */
   TenantDocumentsRead: "tenant.documents.read",
   TenantDocumentsWrite: "tenant.documents.write",

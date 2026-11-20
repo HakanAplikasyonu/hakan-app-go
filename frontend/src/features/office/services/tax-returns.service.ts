@@ -96,6 +96,15 @@ export const taxReturnsService = {
       { silent: true },
     );
   },
+  /** Son kontrol (#669): yalnız sorumlu (tenant.tax_returns.approve). */
+  check(slug: string, engagement: string, kind: TaxReturnKind, period: string) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "POST",
+      `${one(engagement, kind, period)}/check`,
+      { silent: true },
+    );
+  },
   file(
     slug: string,
     engagement: string,

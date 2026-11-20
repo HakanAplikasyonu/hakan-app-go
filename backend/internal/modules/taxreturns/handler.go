@@ -41,13 +41,15 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 		mux.Handle(method+" /v1/tenant/engagements/{"+engagementctx.PathParam+"}/tax-returns"+path,
 			middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng))
 	}
-	read, write := rbac.PermTenantTaxReturnsRead, rbac.PermTenantTaxReturnsWrite
+	read, write, approve := rbac.PermTenantTaxReturnsRead, rbac.PermTenantTaxReturnsWrite, rbac.PermTenantTaxReturnsApprove
 	route("GET", "", read, h.list)
 	route("GET", "/{returnKind}/{period}", read, h.get)
 	route("PUT", "/{returnKind}/{period}", write, h.saveDraft)
 	route("POST", "/{returnKind}/{period}/prepare", write, h.prepare)
 	route("POST", "/{returnKind}/{period}/reopen", write, h.reopen)
-	route("POST", "/{returnKind}/{period}/file", write, h.file)
+	// Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu.
+	route("POST", "/{returnKind}/{period}/check", approve, h.check)
+	route("POST", "/{returnKind}/{period}/file", approve, h.file)
 	route("GET", "/{returnKind}/{period}/export", read, h.export)
 	route("PUT", "/{returnKind}/{period}/accrual-document", write, h.uploadAccrual)
 	route("GET", "/{returnKind}/{period}/accrual-document", read, h.accrualFile)
@@ -163,6 +165,16 @@ func (h *Handler) prepare(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) reopen(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
 	p, err := h.svc.Reopen(r.Context(), s, r.PathValue("returnKind"), r.PathValue("period"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	p, err := h.svc.Check(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"))
 	if err != nil {
 		h.fail(w, r, err)
 		return

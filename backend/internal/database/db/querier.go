@@ -62,6 +62,8 @@ type Querier interface {
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
+	CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error)
 	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
 	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
 	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
@@ -1506,6 +1508,8 @@ type Querier interface {
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
 	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
+	// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
+	TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	// Mükellefin entegratör bağlantıları (entegrator_<ad>): kaynağı entegratör

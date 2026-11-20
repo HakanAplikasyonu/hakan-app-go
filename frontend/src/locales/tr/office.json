@@ -2527,5 +2527,11 @@
   "bank.upload.suggested": "Hesap önerisi hazır: {{count}} hareket; {{high}} tanesi yüksek güvenli.",
   "bank.upload.approve_high": "Yüksek güvenlileri onayla ({{count}})",
   "bank.upload.make_drafts": "Taslak fiş oluştur",
-  "bank.upload.already_loaded": "Bu ekstre daha önce yüklenmiş: {{count}} hareket zaten kayıtlı, yeniden eklenmedi."
+  "bank.upload.already_loaded": "Bu ekstre daha önce yüklenmiş: {{count}} hareket zaten kayıtlı, yeniden eklenmedi.",
+  "tax_returns.mark_checked": "Kontrol edildi olarak işaretle",
+  "tax_returns.checked": "Beyan kontrol edildi olarak işaretlendi.",
+  "tax_returns.approve_only_responsible": "Kontrol edildi ve verildi işaretini yalnız sorumlu (ofis sahibi ya da yönetici) koyar; siz beyanı hazırlayabilirsiniz.",
+  "tax_returns.trail_prepared": "Hazırlayan: {{who}} ({{date}})",
+  "tax_returns.trail_checked": "Kontrol eden: {{who}} ({{date}})",
+  "tax_returns.trail_filed": "Veren: {{who}} ({{date}})"
 }

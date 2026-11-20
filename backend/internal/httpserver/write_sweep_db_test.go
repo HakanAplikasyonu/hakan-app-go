@@ -300,6 +300,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                  {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                  {body: `{"adjustments":{"additional_vat":"0.00"},"acknowledged":["CARRY_UNKNOWN"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare":         {body: `{"acknowledged":["PENDING_EXPENSES","PENDING_Z_REPORTS","Z_WITHOUT_BREAKDOWN","HEADER_ESTIMATE","MISSING_EXCHANGE_RATE"]}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check":           {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/file":            {body: `{"filed_on":"2026-11-10","accrual_number":"TARAMA-1"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen":          {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document": {file: "file", fileName: "tahakkuk.pdf", fileBody: "%PDF-1.4\n% tahakkuk taramasi\n", late: true},
