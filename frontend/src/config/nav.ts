@@ -8,6 +8,7 @@ import {
   MessageCircle,
   MonitorSmartphone,
   ClipboardCheck,
+  FileCheck2,
   FileText,
   TriangleAlert,
   Building2,
@@ -324,6 +325,12 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.nav_taxpayers",
             href: routes.tenant.taxpayers(slug),
             icon: Building2,
+          },
+          {
+            id: "tax-returns",
+            titleKey: "office.nav_tax_returns",
+            href: routes.tenant.taxReturns(slug),
+            icon: FileCheck2,
           },
           {
             id: "invoices",

@@ -23854,7 +23854,7 @@ components:
 
     PeriodMatrixCell:
       type: object
-      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests]
+      required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents]
       properties:
         period: { $ref: "#/components/schemas/Period" }
         ready: { type: boolean }
@@ -23863,6 +23863,21 @@ components:
         open_blockers: { type: integer, format: int64 }
         open_warnings: { type: integer, format: int64, description: "Every open data warning of the period, whatever its severity (blockers included)" }
         open_change_requests: { type: integer, format: int64 }
+        returns:
+          type: array
+          description: Tax return records of the period (#575); a kind without a record has not been started.
+          items: { $ref: "#/components/schemas/PeriodMatrixReturn" }
+        open_document_tasks: { type: integer, format: int64, description: Documents still expected from the taxpayer }
+        submitted_documents: { type: integer, format: int64, description: Documents the taxpayer sent that are not processed yet }
+
+    PeriodMatrixReturn:
+      type: object
+      required: [kind, status, payable_amount, filed_on]
+      properties:
+        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        status: { type: string, enum: [draft, prepared, filed] }
+        payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
+        filed_on: { type: [string, "null"], format: date }
 
     PeriodMatrixRow:
       type: object

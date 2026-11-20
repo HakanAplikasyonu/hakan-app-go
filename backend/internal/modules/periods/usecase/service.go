@@ -235,7 +235,11 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 		row := MatrixRow{EngagementUUID: e.UUID, TaxpayerUUID: e.TaxpayerUUID, TaxpayerTitle: e.TaxpayerTitle, TaxpayerTaxID: e.TaxpayerTaxID, Cells: make([]Cell, 0, len(periods))}
 		for _, p := range periods {
 			k := MatrixKey{EngagementID: e.ID, Period: p}
-			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k]}
+			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k],
+				Returns: c.Returns[k], OpenDocumentTasks: c.DocTasks[k][0], SubmittedDocuments: c.DocTasks[k][1]}
+			if cell.Returns == nil {
+				cell.Returns = []CellReturn{}
+			}
 			if at, ok := c.Locks[k]; ok {
 				cell.Locked, cell.LockedAt = true, &at
 			}

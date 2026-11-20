@@ -123,6 +123,8 @@ export const routes = {
     /** Office setup wizard (issue #273). */
     setup: (slug: string) => `/t/${encodeURIComponent(slug)}/setup`,
     taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
+    /** Ofisin beyan dönemi: mükellef bazında KDV1 / MUHSGK durumu (#575). */
+    taxReturns: (slug: string) => `/t/${encodeURIComponent(slug)}/tax-returns`,
     /** "Mükellef ekle": consent requests the office sent (issue #7). */
     taxpayerRequests: (slug: string) =>
       `/t/${encodeURIComponent(slug)}/taxpayer-requests`,

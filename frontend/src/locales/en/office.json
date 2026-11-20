@@ -2105,5 +2105,20 @@
   "journals.pick_col": "Select",
   "journals.pick_entry": "Select entry {{entry}} for export",
   "journals.transfer_col": "Program transfer",
-  "journals.transfer_file_only": "File only"
+  "journals.transfer_file_only": "File only",
+  "nav_tax_returns": "Tax returns",
+  "tax_returns.office.description": "{{period}} filing period: each taxpayer's KDV1 and MUHSGK status, documents expected from the taxpayer and open blockers. Click a row to open the taxpayer's returns.",
+  "tax_returns.office.not_started": "Not started",
+  "tax_returns.office.col_documents": "Expected documents",
+  "tax_returns.office.col_blockers": "Blockers",
+  "tax_returns.office.documents_open": "{{count}} documents expected",
+  "tax_returns.office.documents_submitted": "{{count}} documents not processed",
+  "tax_returns.office.blockers": "{{count}} blockers",
+  "tax_returns.office.filter": "Show",
+  "tax_returns.office.filter_all": "All",
+  "tax_returns.office.filter_open": "With a return not filed",
+  "tax_returns.office.filter_documents": "Waiting for documents",
+  "tax_returns.office.filter_blocked": "With blockers",
+  "tax_returns.office.summary": "{{total}} taxpayers · KDV1: {{filed}} filed, {{prepared}} prepared, {{open}} not prepared · documents expected for {{documents}}",
+  "tax_returns.office.empty": "No taxpayer matches this filter"
 }

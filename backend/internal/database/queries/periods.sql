@@ -108,6 +108,23 @@ FROM period_locks
 WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
   AND period = ANY(@periods::text[]);
 
+-- name: PeriodMatrixReturns :many
+-- Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
+SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on
+FROM tax_returns
+WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
+  AND period = ANY(@periods::text[]);
+
+-- name: PeriodMatrixDocumentTasks :many
+-- Mükelleften beklenen (open) ve gelip işlenmeyen (submitted) belgeler.
+SELECT engagement_id, period::text AS period,
+       (count(*) FILTER (WHERE status = 'open'))::bigint AS open,
+       (count(*) FILTER (WHERE status = 'submitted'))::bigint AS submitted
+FROM document_tasks
+WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
+  AND status IN ('open', 'submitted') AND period = ANY(@periods::text[])
+GROUP BY engagement_id, period;
+
 -- name: FindOpenChangeRequestByHash :one
 -- Aynı içerik ikinci kez gelirse açık talep tekrar kullanılır.
 SELECT * FROM change_requests

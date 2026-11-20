@@ -1,5 +1,6 @@
 export { OfficeHome } from "./components/office-home";
 export { TaxpayersPage } from "./components/taxpayers-page";
+export { OfficeTaxReturnsPage } from "./components/office-tax-returns-page";
 export { InvoicesPage } from "./components/invoices-page";
 export { InvoiceDetailPage } from "./components/invoice-detail-page";
 export { WarningsPage } from "./components/warnings-page";

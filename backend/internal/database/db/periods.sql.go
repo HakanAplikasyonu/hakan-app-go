@@ -780,6 +780,55 @@ func (q *Queries) PeriodMatrixChangeRequests(ctx context.Context, arg PeriodMatr
 	return items, nil
 }
 
+const periodMatrixDocumentTasks = `-- name: PeriodMatrixDocumentTasks :many
+SELECT engagement_id, period::text AS period,
+       (count(*) FILTER (WHERE status = 'open'))::bigint AS open,
+       (count(*) FILTER (WHERE status = 'submitted'))::bigint AS submitted
+FROM document_tasks
+WHERE organization_id = $1 AND engagement_id = ANY($2::bigint[])
+  AND status IN ('open', 'submitted') AND period = ANY($3::text[])
+GROUP BY engagement_id, period
+`
+
+type PeriodMatrixDocumentTasksParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+	Periods        []string `json:"periods"`
+}
+
+type PeriodMatrixDocumentTasksRow struct {
+	EngagementID int64  `json:"engagement_id"`
+	Period       string `json:"period"`
+	Open         int64  `json:"open"`
+	Submitted    int64  `json:"submitted"`
+}
+
+// Mükelleften beklenen (open) ve gelip işlenmeyen (submitted) belgeler.
+func (q *Queries) PeriodMatrixDocumentTasks(ctx context.Context, arg PeriodMatrixDocumentTasksParams) ([]PeriodMatrixDocumentTasksRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixDocumentTasks, arg.OrganizationID, arg.EngagementIds, arg.Periods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixDocumentTasksRow{}
+	for rows.Next() {
+		var i PeriodMatrixDocumentTasksRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.Open,
+			&i.Submitted,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const periodMatrixLocks = `-- name: PeriodMatrixLocks :many
 SELECT engagement_id, period::text AS period, locked_at
 FROM period_locks
@@ -809,6 +858,56 @@ func (q *Queries) PeriodMatrixLocks(ctx context.Context, arg PeriodMatrixLocksPa
 	for rows.Next() {
 		var i PeriodMatrixLocksRow
 		if err := rows.Scan(&i.EngagementID, &i.Period, &i.LockedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const periodMatrixReturns = `-- name: PeriodMatrixReturns :many
+SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on
+FROM tax_returns
+WHERE organization_id = $1 AND engagement_id = ANY($2::bigint[])
+  AND period = ANY($3::text[])
+`
+
+type PeriodMatrixReturnsParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementIds  []int64  `json:"engagement_ids"`
+	Periods        []string `json:"periods"`
+}
+
+type PeriodMatrixReturnsRow struct {
+	EngagementID  int64          `json:"engagement_id"`
+	Period        string         `json:"period"`
+	Kind          string         `json:"kind"`
+	Status        string         `json:"status"`
+	PayableAmount pgtype.Numeric `json:"payable_amount"`
+	FiledOn       pgtype.Date    `json:"filed_on"`
+}
+
+// Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
+func (q *Queries) PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixReturnsParams) ([]PeriodMatrixReturnsRow, error) {
+	rows, err := q.db.Query(ctx, periodMatrixReturns, arg.OrganizationID, arg.EngagementIds, arg.Periods)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []PeriodMatrixReturnsRow{}
+	for rows.Next() {
+		var i PeriodMatrixReturnsRow
+		if err := rows.Scan(
+			&i.EngagementID,
+			&i.Period,
+			&i.Kind,
+			&i.Status,
+			&i.PayableAmount,
+			&i.FiledOn,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
