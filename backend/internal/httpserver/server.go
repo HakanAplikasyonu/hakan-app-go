@@ -663,8 +663,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	payrollmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, payrollH)
 	payrollmodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, payrollH)
 	// Beyanname formatına uygunluk (#390): KDV1, MUHSGK ve Ba/Bs önizlemesi, beyan kayıtları.
+	// Tahakkuk PDF'i (#575) aynı nesne deposunda durur.
+	taxreturnsSvc := taxreturnsmodule.New(deps.DB)
+	if deps.Storage != nil {
+		taxreturnsSvc.WithStore(deps.Storage)
+	}
 	taxreturnsmodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		taxreturnsmodule.NewHandler(taxreturnsmodule.New(deps.DB)))
+		taxreturnsmodule.NewHandler(taxreturnsSvc))
 	// Belge arşivi ve İSG evrakları (#393).
 	var archiveStore archivemodule.ObjectStore
 	if deps.Storage != nil {

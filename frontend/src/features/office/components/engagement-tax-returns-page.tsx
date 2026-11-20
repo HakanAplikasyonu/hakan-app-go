@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Download,
   FileCheck2,
+  FileUp,
   Info,
   Landmark,
   RotateCcw,
@@ -20,6 +21,7 @@ import {
   useCallback,
   useId,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { toast } from "sonner";
@@ -307,6 +309,14 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             onReopen={() => reopen.mutate()}
             onFile={(v) => file.mutate(v)}
           />
+          {p.status === "filed" ? (
+            <AccrualDocument
+              p={p}
+              canWrite={canWrite}
+              onSaved={onSaved}
+              engagement={engagement}
+            />
+          ) : null}
           <TaxReturnSummary p={p} />
           {p.status === "draft" ? (
             <TaxReturnWarnings
@@ -588,6 +598,109 @@ function StatusBar({
           </Button>
         </form>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Tahakkuk fişi (#575): beyan GİB'e verildikten sonra alınan tahakkuk PDF'i
+ * beyannamenin kaydına eklenir; ekip ve denetim için buradan indirilir.
+ */
+function AccrualDocument({
+  p,
+  canWrite,
+  onSaved,
+  engagement,
+}: {
+  p: TaxReturnPreview;
+  canWrite: boolean;
+  onSaved: (p: TaxReturnPreview) => void;
+  engagement: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const input = useRef<HTMLInputElement>(null);
+  const kind = p.kind as TaxReturnKind;
+  const doc = p.record?.accrual_document ?? null;
+  const upload = useMutation({
+    mutationFn: (file: File) =>
+      taxReturnsService.uploadAccrual(slug, engagement, kind, p.period, file),
+    onSuccess: (x) => {
+      onSaved(x);
+      toast.success(t("office.tax_returns.accrual_saved"));
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.accrual_failed"))),
+  });
+  return (
+    <section
+      aria-label={t("office.tax_returns.accrual_title")}
+      className="bg-surface border-line flex flex-wrap items-center gap-3 rounded-xl border p-4 text-sm"
+    >
+      <span className="font-semibold">
+        {t("office.tax_returns.accrual_title")}
+      </span>
+      {doc ? (
+        <span className="text-text-2 min-w-0 truncate">{doc.file_name}</span>
+      ) : (
+        <span className="text-warn">
+          {t("office.tax_returns.accrual_missing")}
+        </span>
+      )}
+      <div className="ms-auto flex flex-wrap gap-2">
+        {doc ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="max-md:min-h-11"
+            onClick={() =>
+              void taxReturnsService
+                .downloadAccrual(
+                  slug,
+                  engagement,
+                  kind,
+                  p.period,
+                  doc.file_name,
+                )
+                .catch(() =>
+                  toast.error(t("office.tax_returns.accrual_download_failed")),
+                )
+            }
+          >
+            <Download className="size-4" aria-hidden />
+            {t("office.tax_returns.accrual_download")}
+          </Button>
+        ) : null}
+        {canWrite ? (
+          <>
+            <input
+              ref={input}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="sr-only"
+              aria-label={t("office.tax_returns.accrual_pick")}
+              tabIndex={-1}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) upload.mutate(f);
+              }}
+            />
+            <Button
+              size="sm"
+              variant={doc ? "outline" : "default"}
+              className="max-md:min-h-11"
+              disabled={upload.isPending}
+              onClick={() => input.current?.click()}
+            >
+              <FileUp className="size-4" aria-hidden />
+              {doc
+                ? t("office.tax_returns.accrual_replace")
+                : t("office.tax_returns.accrual_upload")}
+            </Button>
+          </>
+        ) : null}
+      </div>
     </section>
   );
 }

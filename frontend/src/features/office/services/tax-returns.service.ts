@@ -1,5 +1,6 @@
 import { apiConfig } from "@/config/api";
 import type { components } from "@/generated/api";
+import { unwrap } from "@/lib/api";
 import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 
 export type TaxReturnKind = "kdv1" | "muhsgk" | "babs";
@@ -108,6 +109,52 @@ export const taxReturnsService = {
       `${one(engagement, kind, period)}/file`,
       { body, silent: true },
     );
+  },
+  /** Tahakkuk PDF'i (#575): verilmiş beyana eklenir; yenisi eskisinin yerine geçer. */
+  async uploadAccrual(
+    slug: string,
+    engagement: string,
+    kind: TaxReturnKind,
+    period: string,
+    file: File,
+  ) {
+    const base = apiConfig.baseUrl.replace(/\/$/, "");
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(
+      `${base}${one(engagement, kind, period)}/accrual-document`,
+      {
+        method: "PUT",
+        credentials: "include",
+        headers: { Accept: "application/json", [ORGANIZATION_HEADER]: slug },
+        body: form,
+      },
+    );
+    const payload = await response.json().catch(() => undefined);
+    return unwrap<TaxReturnPreview>({ data: payload, response });
+  },
+  async downloadAccrual(
+    slug: string,
+    engagement: string,
+    kind: TaxReturnKind,
+    period: string,
+    fileName: string,
+  ) {
+    const base = apiConfig.baseUrl.replace(/\/$/, "");
+    const response = await fetch(
+      `${base}${one(engagement, kind, period)}/accrual-document`,
+      { credentials: "include", headers: { [ORGANIZATION_HEADER]: slug } },
+    );
+    if (!response.ok) throw new Error(`accrual ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
   },
   async exportFile(
     slug: string,

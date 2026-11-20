@@ -1370,6 +1370,9 @@ type Querier interface {
 	// Sayfa sonrası ilerleme; yarıda kalan pencere buradan sürer (deneme sayısı artmaz).
 	SetSyncWindowCursor(ctx context.Context, arg SetSyncWindowCursorParams) (int64, error)
 	SetSyncWindowStatus(ctx context.Context, arg SetSyncWindowStatusParams) (int64, error)
+	// Tahakkuk PDF'i (#575) yalnızca verilmiş beyana eklenir; yenisi eskisinin
+	// yerine geçer. Dönen satır eski anahtarı taşımaz; eskisini çağıran siler.
+	SetTaxReturnAccrualDocument(ctx context.Context, arg SetTaxReturnAccrualDocumentParams) (TaxReturn, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
 	SetUserSMMMRegistryNo(ctx context.Context, arg SetUserSMMMRegistryNoParams) error

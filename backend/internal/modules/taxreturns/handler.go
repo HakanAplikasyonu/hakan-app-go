@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -48,6 +49,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("POST", "/{returnKind}/{period}/reopen", write, h.reopen)
 	route("POST", "/{returnKind}/{period}/file", write, h.file)
 	route("GET", "/{returnKind}/{period}/export", read, h.export)
+	route("PUT", "/{returnKind}/{period}/accrual-document", write, h.uploadAccrual)
+	route("GET", "/{returnKind}/{period}/accrual-document", read, h.accrualFile)
 }
 
 func userID(r *http.Request) int64 {
@@ -77,6 +80,12 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "TAX_RETURN_NOT_DRAFT", "the return is prepared or filed; reopen it first")
 	case errors.Is(err, ErrNotPrepared):
 		response.Conflict(w, r, "TAX_RETURN_NOT_PREPARED", "the return must be prepared first")
+	case errors.Is(err, ErrNotFiled):
+		response.Conflict(w, r, "TAX_RETURN_NOT_FILED", "the accrual slip is attached after the return is filed")
+	case errors.Is(err, ErrNotPDF):
+		response.Error(w, r, http.StatusUnsupportedMediaType, "NOT_PDF", "the accrual slip must be a PDF file")
+	case errors.Is(err, ErrStorageMissing):
+		response.Error(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "file storage is not configured")
 	case errors.Is(err, ErrNotFound):
 		response.NotFound(w, r, "not found")
 	default:
@@ -186,4 +195,53 @@ func (h *Handler) export(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	_, _ = w.Write(data)
+}
+
+// uploadAccrual: multipart "file" (the GİB tahakkuk PDF) of a filed return.
+func (h *Handler) uploadAccrual(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	r.Body = http.MaxBytesReader(w, r.Body, MaxAccrualBytes+(1<<20))
+	if err := r.ParseMultipartForm(4 << 20); err != nil {
+		response.Error(w, r, http.StatusRequestEntityTooLarge, "UPLOAD_TOO_LARGE", "file is too large or the form is invalid")
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		response.Error(w, r, http.StatusBadRequest, "FILE_REQUIRED", "multipart field \"file\" is required")
+		return
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(io.LimitReader(file, MaxAccrualBytes+1))
+	if err != nil {
+		response.Error(w, r, http.StatusBadRequest, "FILE_UNREADABLE", "could not read the file")
+		return
+	}
+	p, err := h.svc.UploadAccrual(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"), header.Filename, data)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) accrualFile(w http.ResponseWriter, r *http.Request) {
+	f, err := h.svc.OpenAccrual(r.Context(), engagementctx.Must(r.Context()), r.PathValue("returnKind"), r.PathValue("period"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	defer func() { _ = f.Body.Close() }()
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if f.Size > 0 {
+		w.Header().Set("Content-Length", strconv.FormatInt(f.Size, 10))
+	}
+	safe := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '_' || r == '-' {
+			return r
+		}
+		return '_'
+	}, f.Name)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`, safe, url.PathEscape(f.Name)))
+	_, _ = io.Copy(w, f.Body)
 }
