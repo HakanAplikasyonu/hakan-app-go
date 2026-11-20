@@ -6,8 +6,12 @@ import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
  * Konsol ve ağ bekçisi (#639): ana ofis ekranları gezilirken
  * - 4xx/5xx yanıt olmaz (boş durum 404/503 ile bildirilmez),
  * - konsol hatası ve yakalanmamış sayfa hatası olmaz,
- * - bir sayfa açılışında aynı uca 3'ten fazla istek gitmez (satır başına
- *   istek, N+1).
+ * - bir sayfa açılışında aynı API isteği 3'ten fazla gitmez. "Aynı istek":
+ *   yöntem + yol + sorgu; içindeki uuid ve sayılar soyutlanır. Böylece
+ *   satır başına istek (N+1: /engagements/:id/taxpayer × satır sayısı) ve
+ *   yeniden çekme döngüsü yakalanır; aynı ucu farklı süzgeçle isteyen ayrı
+ *   sorgular (dönem matrisi 1 ay / 12 ay gibi) sayılmaz. Next.js'in bağlantı
+ *   ön yüklemeleri (/t/... sayfa istekleri) API değildir, sayılmaz.
  * Bilinçli istisnalar aşağıdaki izin listelerinde gerekçesiyle durur.
  *
  * Yalnızca okur; demo verisini değiştirmez. Her ekran yumuşak denetlenir:
@@ -15,7 +19,7 @@ import { Api, DEMO, engagementOf, officePath, uiLogin } from "./lib";
  * koşuda listeler.
  */
 
-const MAX_SAME_ENDPOINT = 3;
+const MAX_SAME_REQUEST = 3;
 
 const OFFICE = ["", "/taxpayers", "/command", "/warnings", "/journals", "/transfers"];
 
@@ -42,11 +46,15 @@ const ENGAGEMENT = [
 /** İzin verilen hata yanıtları: [yöntem + uç kalıbı, durum, gerekçe]. */
 const ALLOWED_ERRORS: { re: RegExp; status: number; why: string }[] = [];
 
-/** Aynı uca 3'ten fazla isteğe izin verilenler: [uç kalıbı, gerekçe]. */
+/** Aynı isteğin 3'ten fazla gitmesine izin verilenler: [istek kalıbı, gerekçe]. */
 const ALLOWED_REPEATS: { re: RegExp; why: string }[] = [
   {
-    re: /^GET \/api\/v1\/tenant\/(engagements\/:id\/)?warnings$/,
-    why: "Uyarılar: her uyarı grubu ilk 5 satırını ayrı ister (WarningGroupCard). Toplu uç kararı #639'da bekliyor.",
+    re: /^GET \/api\/v1\/tenant\/engagements\/:id\/taxpayer$/,
+    why: "Mükellef seçici (useEngagementOptions) her mükellefin adını ayrı ister; tek isteğe indiren düzeltme ayrı PR'da (#639).",
+  },
+  {
+    re: /^GET \/api\/v1\/tenant\/engagements\/:id\/assignments$/,
+    why: "Mükellefler listesi her satırın atananlarını ayrı ister; toplu uç gerekiyor, ayrı PR'da (#639).",
   },
 ];
 
@@ -58,13 +66,23 @@ function endpoint(method: string, url: string): string {
   return `${method} ${u.pathname.replace(UUID, ":id").replace(/\/\d+(?=\/|$)/g, "/:n")}`;
 }
 
+/** Uç adı + soyutlanmış, sıralı sorgu: "aynı istek" anahtarı. */
+function requestKey(method: string, url: string): string {
+  const u = new URL(url);
+  const params = [...u.searchParams]
+    .map(([k, v]) => `${k}=${v.replace(UUID, ":id")}`)
+    .sort()
+    .join("&");
+  return params ? `${endpoint(method, url)}?${params}` : endpoint(method, url);
+}
+
 type Findings = { errors: string[]; console: string[]; requests: Map<string, number> };
 
 function watch(page: Page, origin: string) {
   let f: Findings = { errors: [], console: [], requests: new Map() };
   page.on("request", (req) => {
-    if (!req.url().startsWith(origin) || !["fetch", "xhr"].includes(req.resourceType())) return;
-    const key = endpoint(req.method(), req.url());
+    if (!req.url().startsWith(`${origin}/api/`) || !["fetch", "xhr"].includes(req.resourceType())) return;
+    const key = requestKey(req.method(), req.url());
     f.requests.set(key, (f.requests.get(key) ?? 0) + 1);
   });
   page.on("response", (res) => {
@@ -109,10 +127,10 @@ async function scan(page: Page, w: ReturnType<typeof watch>, path: string) {
     expect.soft(f.errors, `${path}: hata dönen istek\n${f.errors.join("\n")}`).toEqual([]);
     expect.soft(f.console, `${path}: konsol hatası\n${f.console.join("\n")}`).toEqual([]);
     const repeated = [...f.requests]
-      .filter(([key, n]) => n > MAX_SAME_ENDPOINT && !ALLOWED_REPEATS.some((a) => a.re.test(key)))
+      .filter(([key, n]) => n > MAX_SAME_REQUEST && !ALLOWED_REPEATS.some((a) => a.re.test(key.split("?")[0])))
       .map(([key, n]) => `${n}× ${key}`);
     expect
-      .soft(repeated, `${path}: aynı uca ${MAX_SAME_ENDPOINT}'ten fazla istek\n${repeated.join("\n")}`)
+      .soft(repeated, `${path}: aynı istek ${MAX_SAME_REQUEST}'ten fazla\n${repeated.join("\n")}`)
       .toEqual([]);
   });
 }
