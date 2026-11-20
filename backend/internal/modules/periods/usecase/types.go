@@ -200,9 +200,20 @@ type MatrixRow struct {
 
 // Matrix is the office "command center" view (docs/01 §3).
 type Matrix struct {
-	Periods []string    `json:"periods"`
-	Items   []MatrixRow `json:"items"`
-	Total   int64       `json:"total"`
-	Limit   int32       `json:"limit"`
-	Offset  int32       `json:"offset"`
+	Periods []string `json:"periods"`
+	// Deadlines: filing deadline of each tracked return for every period
+	// (#575), the same rule the return screen uses (weekend → Monday).
+	Deadlines []Deadline  `json:"deadlines"`
+	Items     []MatrixRow `json:"items"`
+	Total     int64       `json:"total"`
+	Limit     int32       `json:"limit"`
+	Offset    int32       `json:"offset"`
+}
+
+// Deadline is the filing deadline of one return kind for one period.
+type Deadline struct {
+	Period        string `json:"period"`
+	Kind          string `json:"kind"`
+	DueDate       string `json:"due_date"`
+	RolledForward bool   `json:"rolled_forward"`
 }

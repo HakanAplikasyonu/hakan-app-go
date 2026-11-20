@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/taxreturns"
 )
 
 // Store persists locks and change requests; repository.Postgres is the real one.
@@ -219,7 +221,7 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 	if err != nil {
 		return Matrix{}, err
 	}
-	out := Matrix{Periods: periods, Items: make([]MatrixRow, 0, len(engs)), Total: total, Limit: f.Limit, Offset: f.Offset}
+	out := Matrix{Periods: periods, Deadlines: deadlines(periods), Items: make([]MatrixRow, 0, len(engs)), Total: total, Limit: f.Limit, Offset: f.Offset}
 	if len(engs) == 0 {
 		return out, nil
 	}
@@ -249,4 +251,19 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 		out.Items = append(out.Items, row)
 	}
 	return out, nil
+}
+
+// deadlines lists the filing deadlines of the tracked returns per period.
+func deadlines(periods []string) []Deadline {
+	out := make([]Deadline, 0, len(periods)*len(taxreturns.Kinds))
+	for _, p := range periods {
+		for _, k := range taxreturns.Kinds {
+			due, rolled, err := taxreturns.DueDate(k, p)
+			if err != nil {
+				continue
+			}
+			out = append(out, Deadline{Period: p, Kind: k, DueDate: due.Format(time.DateOnly), RolledForward: rolled})
+		}
+	}
+	return out
 }
