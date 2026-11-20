@@ -42,6 +42,8 @@ func RegisterRoutes(
 	mux.Handle("GET /v1/tenant/engagements/{engagementUuid}/context", middleware.Chain(http.HandlerFunc(h.context), authn, org, read, eng))
 	mux.Handle("POST /v1/tenant/engagements/{engagementUuid}/end", middleware.Chain(http.HandlerFunc(h.end), authn, org, write, engAny))
 
+	// Ofis geneli atamalar (#639): listeler satır başına istek atmaz.
+	mux.Handle("GET /v1/tenant/engagement-assignments", middleware.Chain(http.HandlerFunc(h.listOrgAssignments), authn, org, read))
 	mux.Handle("GET /v1/tenant/engagements/{engagementUuid}/assignments", middleware.Chain(http.HandlerFunc(h.listAssignments), authn, org, read, engAny))
 	mux.Handle("PUT /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}", middleware.Chain(http.HandlerFunc(h.assign), authn, org, write, eng))
 	mux.Handle("DELETE /v1/tenant/engagements/{engagementUuid}/assignments/{userUuid}", middleware.Chain(http.HandlerFunc(h.unassign), authn, org, write, engAny))

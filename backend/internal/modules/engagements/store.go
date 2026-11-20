@@ -31,6 +31,7 @@ type Store interface {
 	AddAssignment(ctx context.Context, orgID, engagementID, userID int64) error
 	DeleteAssignment(ctx context.Context, orgID, engagementID, userID int64) (int64, error)
 	ListAssignments(ctx context.Context, orgID, engagementID int64) ([]db.ListEngagementAssignmentsRow, error)
+	ListOrgAssignments(ctx context.Context, arg db.ListOrgEngagementAssignmentsParams) ([]db.ListOrgEngagementAssignmentsRow, error)
 }
 
 // Postgres implements Store with sqlc queries.
@@ -118,4 +119,8 @@ func (p *Postgres) DeleteAssignment(ctx context.Context, orgID, engagementID, us
 
 func (p *Postgres) ListAssignments(ctx context.Context, orgID, engagementID int64) ([]db.ListEngagementAssignmentsRow, error) {
 	return p.q.ListEngagementAssignments(ctx, db.ListEngagementAssignmentsParams{OrganizationID: orgID, EngagementID: engagementID})
+}
+
+func (p *Postgres) ListOrgAssignments(ctx context.Context, arg db.ListOrgEngagementAssignmentsParams) ([]db.ListOrgEngagementAssignmentsRow, error) {
+	return p.q.ListOrgEngagementAssignments(ctx, arg)
 }

@@ -418,6 +418,75 @@ func (q *Queries) ListEngagementsByOrg(ctx context.Context, arg ListEngagementsB
 	return items, nil
 }
 
+const listOrgEngagementAssignments = `-- name: ListOrgEngagementAssignments :many
+SELECT e.uuid AS engagement_uuid, a.created_at, u.uuid AS user_uuid, u.email, u.name, u.surname
+FROM engagement_assignments a
+INNER JOIN engagements e ON e.id = a.engagement_id AND e.organization_id = a.organization_id
+INNER JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
+WHERE a.organization_id = $1
+  AND ($2::text IS NULL OR e.status = $2)
+  AND (
+      $3::boolean
+      OR EXISTS (
+          SELECT 1 FROM engagement_assignments me
+          WHERE me.organization_id = e.organization_id
+            AND me.engagement_id = e.id
+            AND me.user_id = $4
+      )
+  )
+ORDER BY e.id, a.created_at, a.id
+`
+
+type ListOrgEngagementAssignmentsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	Status         pgtype.Text `json:"status"`
+	ReadAll        bool        `json:"read_all"`
+	UserID         int64       `json:"user_id"`
+}
+
+type ListOrgEngagementAssignmentsRow struct {
+	EngagementUuid uuid.UUID          `json:"engagement_uuid"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UserUuid       uuid.UUID          `json:"user_uuid"`
+	Email          string             `json:"email"`
+	Name           string             `json:"name"`
+	Surname        string             `json:"surname"`
+}
+
+// Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
+// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar.
+func (q *Queries) ListOrgEngagementAssignments(ctx context.Context, arg ListOrgEngagementAssignmentsParams) ([]ListOrgEngagementAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, listOrgEngagementAssignments,
+		arg.OrganizationID,
+		arg.Status,
+		arg.ReadAll,
+		arg.UserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOrgEngagementAssignmentsRow{}
+	for rows.Next() {
+		var i ListOrgEngagementAssignmentsRow
+		if err := rows.Scan(
+			&i.EngagementUuid,
+			&i.CreatedAt,
+			&i.UserUuid,
+			&i.Email,
+			&i.Name,
+			&i.Surname,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const resolveEngagementAccess = `-- name: ResolveEngagementAccess :one
 SELECT e.id, e.uuid, e.organization_id, e.taxpayer_id, e.status, e.started_at, e.ended_at,
        e.archive_until,

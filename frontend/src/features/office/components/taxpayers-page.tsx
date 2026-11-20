@@ -25,10 +25,11 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import {
-  useEngagementAssignments,
+  useOrgAssignments,
   usePeriodMatrix,
   useToggleAssignment,
 } from "../hooks/use-office-data";
+import type { EngagementAssignment } from "../services/engagements.service";
 import type { PeriodMatrixRow } from "../services/periods.service";
 import { CellBadge } from "./command-center";
 import { Figure } from "./office-ui";
@@ -54,23 +55,26 @@ function useAssignableMembers(): Member[] {
 /** Assignees of one engagement, with a picker for users who may change them. */
 function Assignees({
   engagement,
+  items,
+  isLoading,
   members,
   canWrite,
 }: {
   engagement: string;
+  items: EngagementAssignment[];
+  isLoading: boolean;
   members: Member[];
   canWrite: boolean;
 }) {
   const { t } = useLocale();
-  const { data, isLoading } = useEngagementAssignments(engagement);
   const toggle = useToggleAssignment(engagement);
-  const assigned = new Set((data?.items ?? []).map((a) => a.user_uuid));
+  const assigned = new Set(items.map((a) => a.user_uuid));
 
   const chips = isLoading ? (
     <Skeleton className="h-5 w-24" />
-  ) : data?.items.length ? (
+  ) : items.length ? (
     <div className="flex flex-wrap gap-1">
-      {data.items.map((a) => (
+      {items.map((a) => (
         <span
           key={a.user_uuid}
           className="bg-secondary rounded-md px-1.5 py-0.5 text-xs"
@@ -135,6 +139,10 @@ type TaxpayerRow = PeriodMatrixRow;
 
 function useTaxpayerColumns(members: Member[], canWrite: boolean) {
   const { slug } = useTenant();
+  // Atananlar tek istekte gelir; satır başına istek yok (#639).
+  const assignments = useOrgAssignments();
+  const byEngagement = assignments.data;
+  const assignmentsLoading = assignments.isLoading;
   return useMemo<ColumnDef<TaxpayerRow, unknown>[]>(
     () => [
       createColumn<TaxpayerRow>({
@@ -188,20 +196,22 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
         cell: ({ row }) => (
           <Assignees
             engagement={row.original.engagement_uuid}
+            items={byEngagement?.get(row.original.engagement_uuid) ?? []}
+            isLoading={assignmentsLoading}
             members={members}
             canWrite={canWrite}
           />
         ),
       }),
     ],
-    [canWrite, members, slug],
+    [canWrite, members, slug, byEngagement, assignmentsLoading],
   );
 }
 
 /**
  * Office taxpayers (active engagements). Rows come from the period matrix
  * (issue #32), which also gives the current period's state; assignments are
- * read and changed per engagement.
+ * read for the whole office in one request (#639) and changed per engagement.
  */
 export function TaxpayersPage() {
   const { t } = useLocale();

@@ -92,3 +92,23 @@ INNER JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
 WHERE a.organization_id = sqlc.arg(organization_id)
   AND a.engagement_id = sqlc.arg(engagement_id)
 ORDER BY a.created_at, a.id;
+
+-- name: ListOrgEngagementAssignments :many
+-- Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
+-- atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar.
+SELECT e.uuid AS engagement_uuid, a.created_at, u.uuid AS user_uuid, u.email, u.name, u.surname
+FROM engagement_assignments a
+INNER JOIN engagements e ON e.id = a.engagement_id AND e.organization_id = a.organization_id
+INNER JOIN users u ON u.id = a.user_id AND u.deleted_at IS NULL
+WHERE a.organization_id = sqlc.arg(organization_id)
+  AND (sqlc.narg(status)::text IS NULL OR e.status = sqlc.narg(status))
+  AND (
+      sqlc.arg(read_all)::boolean
+      OR EXISTS (
+          SELECT 1 FROM engagement_assignments me
+          WHERE me.organization_id = e.organization_id
+            AND me.engagement_id = e.id
+            AND me.user_id = sqlc.arg(user_id)
+      )
+  )
+ORDER BY e.id, a.created_at, a.id;

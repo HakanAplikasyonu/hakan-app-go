@@ -931,6 +931,9 @@ type Querier interface {
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
 	ListOpenSgkPremiums(ctx context.Context, taxpayerID int64) ([]SgkPremium, error)
+	// Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
+	// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar.
+	ListOrgEngagementAssignments(ctx context.Context, arg ListOrgEngagementAssignmentsParams) ([]ListOrgEngagementAssignmentsRow, error)
 	ListOrganizationInvitations(ctx context.Context, arg ListOrganizationInvitationsParams) ([]ListOrganizationInvitationsRow, error)
 	ListOrganizationMembersByOrg(ctx context.Context, arg ListOrganizationMembersByOrgParams) ([]ListOrganizationMembersByOrgRow, error)
 	ListOrganizationMembershipsByUser(ctx context.Context, userID int64) ([]ListOrganizationMembershipsByUserRow, error)

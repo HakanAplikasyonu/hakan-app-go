@@ -4342,6 +4342,38 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagement-assignments:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Engagements]
+      operationId: listTenantOrgEngagementAssignments
+      summary: Assignees of every engagement the caller can see
+      description: |
+        Requires `tenant.engagements.read`. Office lists use it instead of one request per engagement (#639).
+        With `tenant.engagements.read_all` every engagement of the office; otherwise only the ones the caller is assigned to.
+        Engagements without an assignee are left out.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [active, ended] } }
+      responses:
+        "200":
+          description: Assignments per engagement
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/OrgEngagementAssignmentList" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/assignments:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21160,6 +21192,21 @@ components:
         items:
           type: array
           items: { $ref: "#/components/schemas/EngagementAssignment" }
+
+    OrgEngagementAssignmentList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [engagement_uuid, items]
+            properties:
+              engagement_uuid: { type: string, format: uuid }
+              items:
+                type: array
+                items: { $ref: "#/components/schemas/EngagementAssignment" }
 
     CreateEngagementRequest:
       type: object

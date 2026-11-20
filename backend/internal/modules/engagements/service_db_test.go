@@ -76,3 +76,52 @@ func TestEngagementCarriesTaxpayerTitleWithinOffice(t *testing.T) {
 		t.Fatalf("other office list = %+v %v", items, err)
 	}
 }
+
+// #639: ofis geneli atama listesi tek istekte gelir; ofis kapsamındadır,
+// read_all yoksa yalnız çağıranın atandığı ilişkiler görünür.
+func TestListOrgAssignmentsScopedToOfficeAndCaller(t *testing.T) {
+	d := testdb.Open(t)
+	ctx := context.Background()
+	org, other := d.Organization(t), d.Organization(t)
+	me, colleague := d.User(t), d.User(t)
+	d.Member(t, org, me, "member")
+	d.Member(t, org, colleague, "member")
+	d.Member(t, other, me, "member")
+
+	e1 := d.Engagement(t, org, d.Taxpayer(t, "legal", "1234567811"))
+	e2 := d.Engagement(t, org, d.Taxpayer(t, "legal", "1234567812"))
+	_ = d.Engagement(t, org, d.Taxpayer(t, "legal", "1234567813")) // atanmamış
+	e4 := d.Engagement(t, other, d.Taxpayer(t, "legal", "1234567814"))
+	d.Assign(t, org, e1, me)
+	d.Assign(t, org, e1, colleague)
+	d.Assign(t, org, e2, colleague)
+	d.Assign(t, other, e4, me)
+
+	uuidOf := func(id int64) uuid.UUID {
+		var u uuid.UUID
+		if err := d.Pool.QueryRow(ctx, `SELECT uuid FROM engagements WHERE id = $1`, id).Scan(&u); err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	svc := New(NewPostgres(db.New(d.Pool)), nil)
+
+	owner := orgctx.Scope{ID: org, Permissions: []string{rbac.PermTenantEngagementsRead, rbac.PermTenantEngagementsReadAll}}
+	got, err := svc.ListOrgAssignments(ctx, owner, me, "")
+	if err != nil || len(got) != 2 {
+		t.Fatalf("read_all = %+v %v", got, err)
+	}
+	if got[0].EngagementUUID != uuidOf(e1) || len(got[0].Items) != 2 || got[1].EngagementUUID != uuidOf(e2) || len(got[1].Items) != 1 {
+		t.Fatalf("read_all groups = %+v", got)
+	}
+
+	member := orgctx.Scope{ID: org, Permissions: []string{rbac.PermTenantEngagementsRead}}
+	got, err = svc.ListOrgAssignments(ctx, member, me, "active")
+	if err != nil || len(got) != 1 || got[0].EngagementUUID != uuidOf(e1) || len(got[0].Items) != 2 {
+		t.Fatalf("assigned only = %+v %v", got, err)
+	}
+
+	if _, err := svc.ListOrgAssignments(ctx, member, me, "bogus"); err == nil {
+		t.Fatal("invalid status accepted")
+	}
+}
