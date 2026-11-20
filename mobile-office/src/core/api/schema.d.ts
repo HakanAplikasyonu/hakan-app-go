@@ -2619,6 +2619,7 @@ export interface paths {
          *     the company never had another office); nothing dated on or after it
          *     ended. An ended engagement is readable only while its archive window
          *     is open (`engagement_archive_days` in the office settings, default 0).
+         *     `period` narrows the list to one month (the office's top-bar period).
          */
         get: operations["getTenantEngagementDocuments"];
         put?: never;
@@ -24567,6 +24568,7 @@ export interface operations {
             query?: {
                 limit?: components["parameters"]["Limit"];
                 offset?: components["parameters"]["Offset"];
+                period?: string;
             };
             header: {
                 /**
@@ -24591,6 +24593,7 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeEngagementDocumentList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];

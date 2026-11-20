@@ -72,15 +72,18 @@ SELECT i.uuid, i.invoice_number, i.issue_date, i.direction, i.payable_amount, i.
 FROM invoices i
 WHERE i.taxpayer_id = $1
   AND engagement_document_visible($2::bigint, i.issue_date)
+  -- Üst çubuktaki ofis dönemi (#576); boşsa bütün dönemler.
+  AND ($3::text IS NULL OR i.period = $3::text)
 ORDER BY i.issue_date DESC, i.id DESC
-LIMIT $4 OFFSET $3
+LIMIT $5 OFFSET $4
 `
 
 type ListEngagementVisibleInvoicesParams struct {
-	TaxpayerID   int64 `json:"taxpayer_id"`
-	EngagementID int64 `json:"engagement_id"`
-	OffsetCount  int32 `json:"offset_count"`
-	LimitCount   int32 `json:"limit_count"`
+	TaxpayerID   int64       `json:"taxpayer_id"`
+	EngagementID int64       `json:"engagement_id"`
+	Period       pgtype.Text `json:"period"`
+	OffsetCount  int32       `json:"offset_count"`
+	LimitCount   int32       `json:"limit_count"`
 }
 
 type ListEngagementVisibleInvoicesRow struct {
@@ -98,6 +101,7 @@ func (q *Queries) ListEngagementVisibleInvoices(ctx context.Context, arg ListEng
 	rows, err := q.db.Query(ctx, listEngagementVisibleInvoices,
 		arg.TaxpayerID,
 		arg.EngagementID,
+		arg.Period,
 		arg.OffsetCount,
 		arg.LimitCount,
 	)

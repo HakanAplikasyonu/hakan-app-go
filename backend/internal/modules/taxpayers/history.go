@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -192,12 +193,13 @@ type Document struct {
 
 // OfficeDocuments lists the invoices the engagement may see, under RLS:
 // its own period, history the mükellef shared, nothing after it ended.
-func (h *History) OfficeDocuments(ctx context.Context, e engagementctx.Scope, limit, offset int32) ([]Document, error) {
+func (h *History) OfficeDocuments(ctx context.Context, e engagementctx.Scope, period string, limit, offset int32) ([]Document, error) {
 	var rows []db.ListEngagementVisibleInvoicesRow
 	err := rls.WithScope(ctx, h.pool, rls.FromRequest(ctx), func(ctx context.Context, tx pgx.Tx) error {
 		var err error
 		rows, err = h.q.WithTx(tx).ListEngagementVisibleInvoices(ctx, db.ListEngagementVisibleInvoicesParams{
 			TaxpayerID: e.TaxpayerID, EngagementID: e.ID, LimitCount: limit, OffsetCount: offset,
+			Period: pgtype.Text{String: period, Valid: period != ""},
 		})
 		return err
 	})
@@ -318,9 +320,17 @@ func (x *HistoryHandler) revoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// periodRe: YYYY-MM.
+var periodRe = regexp.MustCompile(`^[0-9]{4}-(0[1-9]|1[0-2])$`)
+
 func (x *HistoryHandler) officeDocuments(w http.ResponseWriter, r *http.Request) {
 	limit, offset := pageParams(r)
-	items, err := x.h.OfficeDocuments(r.Context(), engagementctx.Must(r.Context()), limit, offset)
+	period := r.URL.Query().Get("period")
+	if period != "" && !periodRe.MatchString(period) {
+		response.BadRequest(w, r, response.CodeValidationError, "period must be YYYY-MM")
+		return
+	}
+	items, err := x.h.OfficeDocuments(r.Context(), engagementctx.Must(r.Context()), period, limit, offset)
 	if err != nil {
 		writeHistoryError(w, r, err)
 		return

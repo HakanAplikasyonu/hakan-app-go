@@ -4155,11 +4155,15 @@ paths:
         the company never had another office); nothing dated on or after it
         ended. An ended engagement is readable only while its archive window
         is open (`engagement_archive_days` in the office settings, default 0).
+        `period` narrows the list to one month (the office's top-bar period).
       security:
         - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/Limit"
         - $ref: "#/components/parameters/Offset"
+        - name: period
+          in: query
+          schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
       responses:
         "200":
           description: Documents
@@ -4167,6 +4171,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeEngagementDocumentList"
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }

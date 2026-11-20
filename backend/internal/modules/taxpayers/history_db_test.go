@@ -100,7 +100,13 @@ func (e transferEnv) officeCtx(org, user, eng int64) context.Context {
 
 func (e transferEnv) docs(t *testing.T, org, user, eng int64) []string {
 	t.Helper()
-	items, err := e.hist.OfficeDocuments(e.officeCtx(org, user, eng), engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: e.tp}, 100, 0)
+	return e.docsIn(t, org, user, eng, "")
+}
+
+// docsIn lists the office's documents of period ("" = all periods).
+func (e transferEnv) docsIn(t *testing.T, org, user, eng int64, period string) []string {
+	t.Helper()
+	items, err := e.hist.OfficeDocuments(e.officeCtx(org, user, eng), engagementctx.Scope{ID: eng, OrganizationID: org, TaxpayerID: e.tp}, period, 100, 0)
 	if err != nil {
 		t.Fatalf("documents: %v", err)
 	}
@@ -141,6 +147,13 @@ func TestNewOfficeSeesHistoryOnlyWithConsent(t *testing.T) {
 	}
 	if got := e.docs(t, e.orgA, e.staffA, e.engA); !eq(got, "ESKI-1", "YENI-1") {
 		t.Fatalf("with range consent sees %v, want ESKI-1 YENI-1", got)
+	}
+	// The period filter (top-bar period, #576) narrows the same list.
+	if got := e.docsIn(t, e.orgA, e.staffA, e.engA, e.today[:7]); !eq(got, "YENI-1") {
+		t.Fatalf("period %s sees %v, want YENI-1", e.today[:7], got)
+	}
+	if got := e.docsIn(t, e.orgA, e.staffA, e.engA, e.duringB[:7]); !eq(got, "ESKI-1") {
+		t.Fatalf("period %s sees %v, want ESKI-1", e.duringB[:7], got)
 	}
 	// The office can see what it was given.
 	shares, _ := e.hist.OfficeShares(ctx, engagementctx.Scope{ID: e.engA, OrganizationID: e.orgA, TaxpayerID: e.tp})

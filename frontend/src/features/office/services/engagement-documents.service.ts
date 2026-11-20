@@ -12,6 +12,7 @@ export const engagementDocumentKeys = {
     slug: string,
     engagement: string,
     page: { limit: number; offset: number },
+    period?: string,
   ) =>
     [
       "tenant",
@@ -19,6 +20,7 @@ export const engagementDocumentKeys = {
       "engagements",
       engagement.toLowerCase(),
       "documents",
+      period ?? "all",
       page,
     ] as const,
   historyShares: (slug: string, engagement: string) =>
@@ -41,12 +43,13 @@ export const engagementDocumentService = {
     slug: string,
     engagement: string,
     page: { limit: number; offset: number },
+    period?: string,
   ) {
     return tenantRequest<EngagementDocumentList>(
       slug,
       "GET",
       `/v1/tenant/engagements/${encodeURIComponent(engagement)}/documents`,
-      { query: page },
+      { query: { ...page, ...(period ? { period } : {}) } },
     );
   },
   historyShares(slug: string, engagement: string) {
