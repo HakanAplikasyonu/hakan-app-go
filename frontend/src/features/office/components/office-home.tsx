@@ -436,6 +436,7 @@ export function OfficeHome() {
               ? t("office.home.kpi_today_sub", {
                   invoices: d.uploads.invoices,
                   receipts: d.uploads.receipts,
+                  documents: d.uploads.documents,
                 })
               : undefined
           }
