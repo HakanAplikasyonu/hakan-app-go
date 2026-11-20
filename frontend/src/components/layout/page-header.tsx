@@ -35,19 +35,19 @@ export function PageHeader({
           <Heading
             className={
               headingLevel === 2
-                ? "font-display flex items-center gap-2.5 text-xl font-semibold tracking-tight"
-                : "font-display flex items-center gap-2.5 text-2xl font-semibold tracking-tight"
+                ? "font-display flex items-center gap-2 text-lg font-semibold tracking-tight"
+                : "font-display flex items-center gap-2 text-xl font-semibold tracking-tight"
             }
           >
             {icon ? (
-              <span className="text-muted-foreground inline-flex shrink-0">
+              <span className="text-text-3 inline-flex shrink-0 [&_svg]:size-5">
                 {icon}
               </span>
             ) : null}
             {title}
           </Heading>
           {description ? (
-            <p className="text-muted-foreground">{description}</p>
+            <p className="text-text-2 max-w-3xl text-sm">{description}</p>
           ) : null}
         </div>
         {actions ? (

@@ -12,6 +12,7 @@ export {
   MoneyCell,
   DateCell,
   StatusPill,
+  statusDotClass,
   statusToneClass,
   type StatusTone,
 } from "./cells";

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StepMarker, type StepState } from "@/components/ui/step-marker";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
@@ -43,11 +44,18 @@ import { Figure, FilterSelect, Panel } from "./office-ui";
 
 const PERIOD_COUNT = 6;
 
+/** Dönem durumu → akış işareti ve hücre zemini (sade; anlamı metin taşır). */
+const statusStep: Record<CellStatus, StepState> = {
+  open: "pending",
+  collected: "current",
+  checked: "done",
+  approved: "done",
+};
 const statusClass: Record<CellStatus, string> = {
-  open: "bg-muted text-muted-foreground",
-  collected: "bg-status-review/20 text-foreground",
-  checked: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
-  approved: "bg-status-approved text-status-approved-foreground",
+  open: "text-text-3",
+  collected: "text-foreground",
+  checked: "text-foreground",
+  approved: "bg-brand-tint/60 text-foreground",
 };
 
 export function monthLabel(period: string, locale: string) {
@@ -83,34 +91,32 @@ export function CellBadge({
         count: cell.open_change_requests,
       }),
     );
+  const blocked = !!(cell.open_blockers || cell.open_change_requests);
   return (
     <div
       className={cn(
-        "relative flex h-8 min-w-24 items-center justify-center gap-1 rounded-md px-2 text-xs font-medium whitespace-nowrap",
+        "border-line bg-surface flex h-8 min-w-24 items-center justify-center gap-1.5 rounded-md border px-2 text-xs font-medium whitespace-nowrap",
         statusClass[status],
       )}
       title={[...parts, hint].filter(Boolean).join(" · ")}
     >
-      {cell.locked ? <Lock className="size-3" aria-hidden /> : null}
+      {/* #310: işaret süsleyici; durum ve engel metni sr-only olarak okunur. */}
+      <StepMarker state={blocked ? "error" : statusStep[status]} />
+      {cell.locked ? <Lock className="text-text-3 size-3" aria-hidden /> : null}
       {t(`office.command.status_${status}`)}
       {cell.open_warnings > 0 ? (
-        <span className="tabular-nums" aria-hidden>
+        <span
+          className={cn(
+            "tabular-nums",
+            blocked ? "text-status-blocking" : "text-text-3",
+          )}
+          aria-hidden
+        >
           · {cell.open_warnings}
         </span>
       ) : null}
-      {others > 0 && !cell.open_blockers && !cell.open_change_requests ? (
+      {parts.length > 1 ? (
         <span className="sr-only">{parts.slice(1).join(", ")}</span>
-      ) : null}
-      {cell.open_blockers || cell.open_change_requests ? (
-        <>
-          {/* #310: aria-label on a role-less span is not read (axe
-              aria-prohibited-attr); the dot is decorative, the text is sr-only. */}
-          <span
-            className="bg-status-blocking ring-card absolute -top-1 -right-1 size-2.5 rounded-full ring-2"
-            aria-hidden
-          />
-          <span className="sr-only">{parts.slice(1).join(", ")}</span>
-        </>
       ) : null}
     </div>
   );
@@ -331,10 +337,7 @@ export function CommandCenterPage() {
             aria-pressed={filter.status === s}
           >
             <span className="flex items-center gap-1.5 text-xs">
-              <span
-                className={cn("size-2.5 rounded-sm", statusClass[s])}
-                aria-hidden
-              />
+              <StepMarker state={statusStep[s]} />
               <span className="text-muted-foreground">
                 {t(`office.command.status_${s}`)}
               </span>
