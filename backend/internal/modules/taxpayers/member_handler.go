@@ -3,6 +3,7 @@ package taxpayers
 import (
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,9 +21,20 @@ import (
 const (
 	limitWindow        = 15 * time.Minute
 	limitPreviewPerIP  = 60
-	limitAcceptPerIP   = 20
 	limitInvitesPerOrg = 50
 )
+
+// limitAcceptPerIP caps invitation accepts and consent decisions per IP.
+// RATE_LIMIT_TAXPAYER_ACCEPT_LIMIT overrides it: the e2e suite approves many
+// consents from one IP in one run (scripts/e2e-up.sh), like the login limit.
+var limitAcceptPerIP = envLimit("RATE_LIMIT_TAXPAYER_ACCEPT_LIMIT", 20)
+
+func envLimit(name string, def int) int {
+	if v, err := strconv.Atoi(strings.TrimSpace(os.Getenv(name))); err == nil && v > 0 {
+		return v
+	}
+	return def
+}
 
 // MemberHandler serves mükellef invitations and the mükellef shell context.
 type MemberHandler struct {
