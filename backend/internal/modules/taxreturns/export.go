@@ -75,6 +75,9 @@ type book struct {
 	head, bold, money, ti int
 	sheet                 string
 	row                   int
+	// sheets records every written cell too, so the same form renders as
+	// PDF (summaryPDF).
+	sheets []*recSheet
 }
 
 func newBook() *book {
@@ -92,6 +95,7 @@ func ptr[T any](v T) *T { return &v }
 func (b *book) newSheet(name string, widths ...float64) {
 	_, _ = b.f.NewSheet(name)
 	b.sheet, b.row = name, 1
+	b.sheets = append(b.sheets, &recSheet{name: name, widths: widths, cells: map[int]map[int]recCell{}})
 	for i, w := range widths {
 		col, _ := excelize.ColumnNumberToName(i + 1)
 		_ = b.f.SetColWidth(name, col, col, w)
@@ -123,6 +127,7 @@ func (b *book) cell(col int, v any, style int) {
 	if style != 0 {
 		_ = b.f.SetCellStyle(b.sheet, ref, ref, style)
 	}
+	b.record(col, v, style)
 }
 
 // line writes one row: the values from column 1.

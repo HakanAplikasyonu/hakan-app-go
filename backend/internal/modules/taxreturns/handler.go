@@ -186,12 +186,21 @@ func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) export(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
-	data, name, err := h.svc.Export(r.Context(), s, r.PathValue("returnKind"), r.PathValue("period"))
+	export, contentType := h.svc.Export, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+	switch r.URL.Query().Get("format") {
+	case "", "xlsx":
+	case "pdf": // beyan özeti (#669 H)
+		export, contentType = h.svc.ExportPDF, "application/pdf"
+	default:
+		response.BadRequest(w, r, response.CodeValidationError, "format must be xlsx or pdf")
+		return
+	}
+	data, name, err := export(r.Context(), s, r.PathValue("returnKind"), r.PathValue("period"))
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	_, _ = w.Write(data)

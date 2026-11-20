@@ -16639,7 +16639,7 @@ paths:
     get:
       tags: [TaxReturns]
       operationId: exportEngagementTaxReturn
-      summary: Download the return as an Excel workbook
+      summary: Download the return as an Excel workbook or a PDF summary
       description: |
         Requires `tenant.tax_returns.read`. `.xlsx` in the form's order,
         field names as on the GİB form and amounts as numbers, for
@@ -16655,13 +16655,20 @@ paths:
         Every workbook ends with `Kontrol listesi`. A prepared or filed
         return exports its snapshot; a draft the live preview (the title row
         says "Taslak"). GİB e-beyanname XML is not produced.
+
+        `format=pdf` (#669 H): the same form as a PDF beyan özeti, one page
+        (or more) per workbook sheet; wide sheets are landscape.
       security:
         - bearerAuth: []
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [xlsx, pdf], default: xlsx } }
       responses:
         "200":
-          description: Workbook
+          description: Workbook or PDF
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
+            application/pdf:
               schema: { type: string, format: binary }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }

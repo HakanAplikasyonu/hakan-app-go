@@ -161,10 +161,11 @@ export const taxReturnsService = {
     engagement: string,
     kind: TaxReturnKind,
     period: string,
+    format: "xlsx" | "pdf" = "xlsx",
   ) {
     const base = apiConfig.baseUrl.replace(/\/$/, "");
     const response = await fetch(
-      `${base}${one(engagement, kind, period)}/export`,
+      `${base}${one(engagement, kind, period)}/export?format=${format}`,
       { credentials: "include", headers: { [ORGANIZATION_HEADER]: slug } },
     );
     if (!response.ok) throw new Error(`export ${response.status}`);
@@ -172,7 +173,7 @@ export const taxReturnsService = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${kind}-${period}.xlsx`;
+    a.download = `${kind}-${period}.${format}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
