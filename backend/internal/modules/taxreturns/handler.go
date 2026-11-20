@@ -41,15 +41,21 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 		mux.Handle(method+" /v1/tenant/engagements/{"+engagementctx.PathParam+"}/tax-returns"+path,
 			middleware.Chain(fn, authn, org, middleware.RequireTenantPermission(perm), eng))
 	}
-	read, write, approve := rbac.PermTenantTaxReturnsRead, rbac.PermTenantTaxReturnsWrite, rbac.PermTenantTaxReturnsApprove
+	read, write := rbac.PermTenantTaxReturnsRead, rbac.PermTenantTaxReturnsWrite
+	// Ofis ayarı (#710): son kontrolün sorumluda olup olmadığı.
+	mux.Handle("GET /v1/tenant/tax-return-settings",
+		middleware.Chain(http.HandlerFunc(h.getSettings), authn, org, middleware.RequireTenantPermission(read)))
+	mux.Handle("PUT /v1/tenant/tax-return-settings",
+		middleware.Chain(http.HandlerFunc(h.putSettings), authn, org, middleware.RequireTenantPermission(rbac.PermTenantSettingsWrite)))
 	route("GET", "", read, h.list)
 	route("GET", "/{returnKind}/{period}", read, h.get)
 	route("PUT", "/{returnKind}/{period}", write, h.saveDraft)
 	route("POST", "/{returnKind}/{period}/prepare", write, h.prepare)
 	route("POST", "/{returnKind}/{period}/reopen", write, h.reopen)
-	// Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu.
-	route("POST", "/{returnKind}/{period}/check", approve, h.check)
-	route("POST", "/{returnKind}/{period}/file", approve, h.file)
+	// Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu; ofis
+	// ayarı kapalıysa hazırlayan da işaretler (#710, finalCheck).
+	route("POST", "/{returnKind}/{period}/check", write, h.finalCheck(h.check))
+	route("POST", "/{returnKind}/{period}/file", write, h.finalCheck(h.file))
 	route("GET", "/{returnKind}/{period}/export", read, h.export)
 	route("PUT", "/{returnKind}/{period}/accrual-document", write, h.uploadAccrual)
 	route("GET", "/{returnKind}/{period}/accrual-document", read, h.accrualFile)
@@ -170,6 +176,57 @@ func (h *Handler) reopen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, r, http.StatusOK, p)
+}
+
+// finalCheck lets fn through for the responsible (tenant.tax_returns.approve)
+// and, when the office turned the final check off (#710), for whoever
+// prepares the return; otherwise 403 as before (#669).
+func (h *Handler) finalCheck(fn http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		scope := orgctx.Must(r.Context())
+		if !scope.Has(rbac.PermTenantTaxReturnsApprove) {
+			st, err := h.svc.Settings(r.Context(), scope.ID)
+			if err != nil {
+				response.InternalErr(w, r, err, "could not load tax return settings")
+				return
+			}
+			if st.FinalCheckRequired {
+				response.Forbidden(w, r, "Missing permission: "+rbac.PermTenantTaxReturnsApprove)
+				return
+			}
+		}
+		fn(w, r)
+	}
+}
+
+// getSettings: GET /v1/tenant/tax-return-settings (#710).
+func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
+	st, err := h.svc.Settings(r.Context(), orgctx.Must(r.Context()).ID)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not load tax return settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
+}
+
+// putSettings: PUT /v1/tenant/tax-return-settings {"final_check_required": bool}.
+func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		FinalCheckRequired *bool `json:"final_check_required"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.FinalCheckRequired == nil {
+		response.BadRequest(w, r, "INVALID_BODY", "final_check_required is required")
+		return
+	}
+	st, err := h.svc.SaveSettings(r.Context(), orgctx.Must(r.Context()).ID, userID(r), Settings{FinalCheckRequired: *in.FinalCheckRequired})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not save tax return settings")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, st)
 }
 
 func (h *Handler) check(w http.ResponseWriter, r *http.Request) {

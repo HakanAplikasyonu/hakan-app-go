@@ -65,6 +65,7 @@ import {
   reconciliationKeys,
   reconciliationService,
 } from "../services/reconciliation.service";
+import { differenceMeaning } from "../lib/reconciliation-text";
 import { Money } from "./office-ui";
 import {
   BabsView,
@@ -226,6 +227,46 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
   );
 }
 
+/**
+ * "Mizanla karşılaştır" ne yapar, sade dille (#710): mizan programdaki
+ * bakiye, kaynaklar uygulamadaki kayıtların fişleri, fark ikisinin farkı;
+ * fark çıkınca ilk bakılacak yerler.
+ */
+function ReconciliationExplainer() {
+  const { t } = useLocale();
+  return (
+    <section
+      aria-label={t("office.reconciliation.explain_title_box")}
+      data-testid="reconciliation-explainer"
+      className="border-line bg-surface space-y-2 rounded-xl border p-4 text-sm"
+    >
+      <h3 className="font-semibold">
+        {t("office.reconciliation.explain_title_box")}
+      </h3>
+      <p>{t("office.reconciliation.explain_what")}</p>
+      <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[auto_1fr]">
+        <dt className="font-medium">{t("office.reconciliation.col_ledger")}</dt>
+        <dd className="text-text-2">
+          {t("office.reconciliation.explain_ledger")}
+        </dd>
+        <dt className="font-medium">
+          {t("office.reconciliation.col_sources")}
+        </dt>
+        <dd className="text-text-2">
+          {t("office.reconciliation.explain_sources")}
+        </dd>
+        <dt className="font-medium">
+          {t("office.reconciliation.col_difference")}
+        </dt>
+        <dd className="text-text-2">
+          {t("office.reconciliation.explain_difference")}
+        </dd>
+      </dl>
+      <p className="text-text-2">{t("office.reconciliation.explain_causes")}</p>
+    </section>
+  );
+}
+
 function AccountsView({
   engagement,
   period,
@@ -335,6 +376,20 @@ function AccountsView({
         labelKey: "office.reconciliation.col_difference",
         accessor: (x) => x.difference,
         className: "font-semibold",
+      }),
+      createColumn<ReconciliationItem>({
+        id: "meaning",
+        labelKey: "office.reconciliation.col_meaning",
+        accessorFn: (x) => x.result,
+        meta: { cellClassName: "min-w-56 max-w-sm" },
+        cell: ({ row }) => {
+          const m = differenceMeaning(row.original);
+          return (
+            <p className="text-sm" data-testid="reconciliation-meaning">
+              {t(m.key, m.vars)}
+            </p>
+          );
+        },
       }),
       createColumn<ReconciliationItem>({
         id: "result",
@@ -454,6 +509,7 @@ function AccountsView({
 
   return (
     <div className="space-y-4">
+      <ReconciliationExplainer />
       <SummaryCards
         cards={[
           {

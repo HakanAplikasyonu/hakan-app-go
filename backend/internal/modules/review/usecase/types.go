@@ -212,6 +212,15 @@ type Store interface {
 	// ImpactCounts aggregates the office's suggestions decided in the last
 	// f.Months months against f.Threshold.
 	ImpactCounts(ctx context.Context, f ImpactFilter) (ImpactCounts, error)
+	// ByEngagement counts the filtered suggestions per engagement (#710).
+	ByEngagement(ctx context.Context, f Filter) ([]EngagementCount, error)
+}
+
+// EngagementCount is one taxpayer's share of the queue (#710).
+type EngagementCount struct {
+	EngagementUUID uuid.UUID
+	Total          int64
+	Oldest         time.Time
 }
 
 // ImpactFilter scopes a threshold-impact aggregate.

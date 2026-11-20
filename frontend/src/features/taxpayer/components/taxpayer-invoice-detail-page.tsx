@@ -27,6 +27,7 @@ import {
   taxpayerPanelService,
   type TaxpayerInvoiceDetail,
 } from "@/features/taxpayer/services/taxpayer.service";
+import { sourceText } from "@/lib/source-label";
 import { useLocale } from "@/providers/locale-provider";
 
 import { formatDate } from "./format";
@@ -269,9 +270,7 @@ export function TaxpayerInvoiceDetailPage({
           <CardContent className="space-y-1 text-sm">
             {inv.sources.map((s, i) => (
               <div key={i} className="flex justify-between gap-2">
-                <span>
-                  {s.source_system} · {s.capture_method}
-                </span>
+                <span>{sourceText(s.source_system, s.capture_method, t)}</span>
                 <span className="text-muted-foreground">
                   {formatDate(s.first_seen_at, locale)}
                 </span>

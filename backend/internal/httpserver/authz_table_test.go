@@ -63,6 +63,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/account-rules/preview":                              azTenantReadAction,
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules/preview": azTenantReadAction,
 	"GET /v1/tenant/account-rule-settings":                               azTenantRead,
+	"GET /v1/tenant/tax-return-settings":                                 azTenantRead,
+	"PUT /v1/tenant/tax-return-settings":                                 azTenantWrite,
 	"GET /v1/tenant/support-settings":                                    azTenantRead,
 	"PUT /v1/tenant/support-settings":                                    azTenantWrite,
 	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
@@ -306,6 +308,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":                       azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-matching":                                                azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account":                   azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search":            azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/journal-line-search":       azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/history":                   azTenantRead,
@@ -540,6 +543,7 @@ var authzTable = map[string]authzClass{
 	"PUT /v1/tenant/review/settings":                                                                            azTenantWrite,
 	"DELETE /v1/tenant/review/settings/{kind}":                                                                  azTenantWrite,
 	"GET /v1/tenant/review/suggestions":                                                                         azTenantRead,
+	"GET /v1/tenant/review/taxpayers": azTenantRead,
 	"GET /v1/tenant/role-permissions":                                                                           azTenantRead,
 	"GET /v1/tenant/roles":                                                                                      azTenantRead,
 	"POST /v1/tenant/roles":                                                                                     azTenantWrite,
@@ -607,4 +611,10 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/reconciliation/letters/{letterUuid}/response":                 azTenantWrite,
 	"POST /v1/public/reconciliation-letters/preview":                                                            azPublic,
 	"POST /v1/public/reconciliation-letters/respond":                                                            azPublic,
+
+	// Fişe elle bağlanan kayıt (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":                 azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": azTenantWrite,
 }
