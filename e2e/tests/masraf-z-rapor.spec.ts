@@ -56,12 +56,22 @@ test.describe("masraf ve Z raporu", () => {
     // Onay durumu filtresi.
     const status = page.getByRole("group", { name: "Onay durumu" });
     await status.getByRole("button", { name: "Bekliyor" }).click();
+    await expect(page).toHaveURL(/[?&]status=pending/);
     await expect(rows.filter({ hasText: "Bekliyor" }).first()).toBeVisible();
     await expect(rows.filter({ hasText: "Onaylandı" })).toHaveCount(0);
     await status.getByRole("button", { name: "Tümü" }).click();
+    // Süzgeçler adrese yazılır: bir sonraki süzgeç, önceki adres oturmadan
+    // seçilirse ikisi aynı eski adres üzerinden yazılabilir (olası kararsızlık).
+    await expect(page).not.toHaveURL(/[?&]status=/);
 
-    // Kategori filtresi: yalnızca seçilen kategori.
+    // Kategori filtresi: yalnızca seçilen kategori. Süzülmüş liste sunucudan
+    // gelene dek eski satırlar ekranda kalır (keepPreviousData): yanıt beklenir.
+    const filtered = page.waitForResponse(
+      (r) => /\/expenses\?/.test(r.url()) && new URL(r.url()).searchParams.has("category") && r.request().method() === "GET",
+    );
     await page.getByRole("combobox", { name: "Kategori" }).first().selectOption({ label: "Akaryakıt" });
+    await expect(page).toHaveURL(/[?&]category=/);
+    expect((await filtered).status()).toBe(200);
     // Onaylı satırda kategori metindir, bekleyende seçim kutusu.
     await expect
       .poll(async () => {
