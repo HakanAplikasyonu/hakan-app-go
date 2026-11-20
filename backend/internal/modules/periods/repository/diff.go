@@ -20,6 +20,19 @@ type Diff struct {
 	Kind   string                `json:"kind"`
 	Source DiffSource            `json:"source"`
 	Fields map[string]FieldDelta `json:"fields"`
+	// Summary names the incoming invoice for the plain sentence on screen
+	// (#710: "Kapalı Ağustos 2026 dönemine yeni bir satış faturası geldi:
+	// …"), whether or not these values changed.
+	Summary DiffSummary `json:"summary"`
+}
+
+// DiffSummary is the incoming invoice in a few words.
+type DiffSummary struct {
+	InvoiceNumber string `json:"invoice_number"`
+	Direction     string `json:"direction"`
+	Counterparty  string `json:"counterparty"`
+	PayableAmount string `json:"payable_amount"`
+	Currency      string `json:"currency"`
 }
 
 // DiffSource is where the new content came from.
@@ -35,7 +48,11 @@ type FieldDelta struct {
 }
 
 func invoiceDiff(old *db.Invoice, inv model.Invoice) Diff {
-	d := Diff{Kind: KindCreate, Source: DiffSource{System: inv.SourceSystem, CaptureMethod: inv.CaptureMethod}, Fields: map[string]FieldDelta{}}
+	d := Diff{Kind: KindCreate, Source: DiffSource{System: inv.SourceSystem, CaptureMethod: inv.CaptureMethod}, Fields: map[string]FieldDelta{},
+		Summary: DiffSummary{
+			InvoiceNumber: inv.InvoiceNumber, Direction: string(inv.Direction), Counterparty: inv.Counterparty.Name,
+			PayableAmount: inv.Amounts.PayableAmount.String(), Currency: inv.Currency,
+		}}
 	issue := inv.IssueDate.Format("2006-01-02")
 	newFields := []struct {
 		name string

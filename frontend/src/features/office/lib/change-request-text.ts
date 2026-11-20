@@ -100,3 +100,46 @@ export function changeFieldValue(
       return value;
   }
 }
+
+/** Talebin özeti (`readDiff(...).summary`). */
+export type ChangeSummary = {
+  number: string;
+  direction: string;
+  counterparty: string;
+  payable: string;
+  currency: string;
+};
+
+/**
+ * Talebin sade cümlesi (#710): "Kapalı Ağustos 2026 dönemine yeni bir satış
+ * faturası geldi: GEC2026000000128, Ali Yılmaz, ₺ 492,00."
+ */
+export function changeSentence(
+  kind: string,
+  period: string,
+  s: ChangeSummary,
+  changed: number,
+  t: Translate,
+  locale: string,
+): string {
+  const invoice =
+    s.direction === "incoming" || s.direction === "outgoing"
+      ? t(`office.change_requests.invoice_${s.direction}`)
+      : t("office.change_requests.invoice_any");
+  const detail = [
+    s.number,
+    s.counterparty,
+    s.payable ? formatMoney(s.payable, s.currency || "TRY") : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const month = periodText(period, locale);
+  return kind === "create"
+    ? t("office.change_requests.sentence_create", { month, invoice, detail })
+    : t("office.change_requests.sentence_update", {
+        month,
+        invoice,
+        detail,
+        count: changed,
+      });
+}

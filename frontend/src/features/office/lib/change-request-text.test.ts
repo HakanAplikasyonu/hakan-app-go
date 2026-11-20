@@ -7,6 +7,7 @@ import {
   CHANGE_FIELDS,
   changeFieldLabel,
   changeFieldValue,
+  changeSentence,
 } from "./change-request-text";
 
 const dict: Record<string, Record<string, string>> = { office, sources };
@@ -57,6 +58,35 @@ describe("değişiklik talebi Türkçe (#710)", () => {
   it("bilinmeyen kaynak da ham görünmez", () => {
     const out = changeFieldValue("source", "yeni_sistem/yeni_yol", t, "tr");
     expect(out).toBe("Diğer kaynak · Diğer yol");
+    expect(out).not.toMatch(RAW);
+  });
+});
+
+describe("değişiklik talebi cümlesi (#710)", () => {
+  const sum = {
+    number: "GEC2026000000128",
+    direction: "outgoing",
+    counterparty: "Ali Yılmaz",
+    payable: "492.00",
+    currency: "TRY",
+  };
+  it("yeni fatura", () => {
+    expect(changeSentence("create", "2026-08", sum, 9, t, "tr")).toBe(
+      "Kapalı Ağustos 2026 dönemine yeni bir satış faturası geldi: GEC2026000000128, Ali Yılmaz, ₺ 492,00.",
+    );
+  });
+  it("değişen fatura", () => {
+    const out = changeSentence(
+      "update",
+      "2026-08",
+      { ...sum, direction: "incoming" },
+      2,
+      t,
+      "tr",
+    );
+    expect(out).toBe(
+      "Kapalı Ağustos 2026 dönemindeki alış faturası değişmiş olarak yeniden geldi: GEC2026000000128, Ali Yılmaz, ₺ 492,00. 2 bilgi farklı.",
+    );
     expect(out).not.toMatch(RAW);
   });
 });

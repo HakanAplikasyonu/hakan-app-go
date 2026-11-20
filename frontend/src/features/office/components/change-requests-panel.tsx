@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp, FileClock } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -29,10 +30,12 @@ import {
   useChangeRequests,
   type ChangeRequest,
 } from "../hooks/use-change-requests";
+import { useOfficePeriod } from "../period";
 import {
   changeFieldLabel,
   changeFieldOrder,
   changeFieldValue,
+  changeSentence,
   periodText,
 } from "../lib/change-request-text";
 
@@ -166,13 +169,30 @@ function RequestCard({
   const currency =
     cur && cur.new !== "—" ? cur.new : cur && cur.old !== "—" ? cur.old : "TRY";
   const source = sourceText(d.source, d.method, t);
+  const month = periodText(req.period, locale);
+  const kind = req.kind === "create" ? "create" : "update";
+  const router = useRouter();
+  const { setPeriod } = useOfficePeriod();
   return (
-    <article className="bg-surface border-line space-y-3 rounded-lg border p-3">
+    <article
+      data-testid="change-request"
+      className="bg-surface border-line space-y-3 rounded-lg border p-3"
+    >
+      <p className="text-sm font-medium">
+        {changeSentence(
+          req.kind,
+          req.period,
+          d.summary,
+          d.fields.length,
+          t,
+          locale,
+        )}
+      </p>
+      <p className="text-text-2 text-sm">{t("office.change_requests.why")}</p>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <StatusPill tone={req.kind === "create" ? "info" : "warn"}>
           {t(`office.change_requests.kind_${req.kind}`)}
         </StatusPill>
-        <span>{periodText(req.period, locale)}</span>
         {source ? (
           <span className="text-text-3">
             {t("office.change_requests.from", { source })}
@@ -238,7 +258,25 @@ function RequestCard({
             : t("office.change_requests.no_fields")}
         </p>
       )}
+      {canDecide ? (
+        <ul className="text-text-2 list-disc space-y-1 pl-5 text-sm">
+          <li>{t(`office.change_requests.apply_effect_${kind}`, { month })}</li>
+          <li>
+            {t(`office.change_requests.reject_effect_${kind}`, { month })}
+          </li>
+        </ul>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setPeriod(req.period);
+            router.push(routes.tenant.engagementInvoices(slug, engagement));
+          }}
+        >
+          {t("office.change_requests.open_period", { month })}
+        </Button>
         {req.invoice_uuid ? (
           <Button asChild variant="ghost" size="sm">
             <Link
