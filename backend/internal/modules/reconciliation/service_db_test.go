@@ -223,6 +223,9 @@ func TestReconciliationRunAgainstPostgres(t *testing.T) {
 	if _, err := svc.Detail(ctx, sc, "latest", "2025-01"); !errors.Is(err, ErrNoRun) || !errors.Is(err, ErrNotFound) {
 		t.Fatalf("no run: %v", err)
 	}
+	if _, err := svc.Counterparties(ctx, sc, "latest", "2025-01"); !errors.Is(err, ErrNoRun) {
+		t.Fatalf("no run counterparties: %v", err)
+	}
 
 	// Başka engagement görmez.
 	osc := engagementctx.Scope{ID: otherEng, OrganizationID: org, TaxpayerID: otherTp}
