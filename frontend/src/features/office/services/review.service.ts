@@ -28,6 +28,8 @@ export type ReviewListFilter = {
   kind?: string;
   /** Global dönem seçici (#326): YYYY-MM; boş = bütün dönemler. */
   period?: string;
+  /** Yalnız bu faturadan okunan öneriler (#669 F). */
+  invoice?: string;
   limit: number;
   offset: number;
 };
@@ -89,6 +91,7 @@ export const reviewService = {
         status: filter.status,
         kind: filter.kind,
         period: filter.period,
+        invoice: filter.invoice,
         limit: filter.limit,
         offset: filter.offset,
       },

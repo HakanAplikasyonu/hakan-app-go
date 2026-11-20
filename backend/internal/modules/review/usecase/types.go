@@ -189,7 +189,10 @@ type Filter struct {
 	Kind           string
 	RuleCandidate  *bool
 	Period         string // YYYY-MM, the suggestion's period (#333); "" = any
-	Limit, Offset  int32
+	// Invoice: suggestions read from one invoice (provenance input
+	// invoice_uuid, #669 F); "" = any.
+	Invoice       string
+	Limit, Offset int32
 }
 
 // ListRow is a listed suggestion with its engagement's public id.

@@ -67,6 +67,7 @@ WHERE s.organization_id = @organization_id
   AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text)
   AND (sqlc.narg(rule_candidate)::bool IS NULL OR s.rule_candidate = sqlc.narg(rule_candidate)::bool)
   AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(invoice_uuid)::text IS NULL OR s.inputs->>'invoice_uuid' = sqlc.narg(invoice_uuid)::text)
 ORDER BY CASE WHEN s.status = 'pending' THEN s.confidence END ASC NULLS LAST, s.updated_at DESC, s.id DESC
 LIMIT @lim OFFSET @off;
 
@@ -82,7 +83,8 @@ WHERE s.organization_id = @organization_id
   AND (sqlc.narg(status)::text IS NULL OR s.status = sqlc.narg(status)::text)
   AND (sqlc.narg(kind)::text IS NULL OR s.kind = sqlc.narg(kind)::text)
   AND (sqlc.narg(rule_candidate)::bool IS NULL OR s.rule_candidate = sqlc.narg(rule_candidate)::bool)
-  AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text);
+  AND (sqlc.narg(period)::text IS NULL OR s.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(invoice_uuid)::text IS NULL OR s.inputs->>'invoice_uuid' = sqlc.narg(invoice_uuid)::text);
 
 -- name: ListReviewSettings :many
 -- Ofis satırları ve, engagement verilirse, onun satırları.
