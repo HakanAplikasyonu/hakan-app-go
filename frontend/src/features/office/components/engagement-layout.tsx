@@ -350,7 +350,17 @@ export function EngagementLayout({
       </div>
     );
   }
-  if (matrix.isError || !row) {
+  // Yükleme hatası "mükellef bulunamadı" değildir (#710): yeniden denenir.
+  if (matrix.isError) {
+    return (
+      <ErrorState
+        title={t("office.api.load_error")}
+        onRetry={() => void matrix.refetch()}
+        retryLabel={t("common.retry")}
+      />
+    );
+  }
+  if (!row) {
     return (
       <ErrorState
         title={t("office.engagement.not_found")}
