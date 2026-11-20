@@ -44,9 +44,13 @@ test.describe("stajyer (Personel)", () => {
   test("atanmadığı mükellef ekranlarda yok", async ({ page }) => {
     for (const screen of ["/journals", "/upload", "/invoices"]) {
       await page.goto(officePath(screen));
-      const picker = page.locator(`select:has(option:text-matches("^${DEMO.selin.title}"))`).first();
+      // Aranabilir mükellef seçici (#573): listede yalnız atandığı mükellef.
+      const picker = page.getByRole("combobox", { name: /^Mükellef:/ }).first();
       await expect(picker).toBeVisible();
-      await expect(picker.locator("option", { hasText: DEMO.atlas.title })).toHaveCount(0);
+      await picker.click();
+      await expect(page.getByRole("option", { name: new RegExp(DEMO.selin.title) })).toBeVisible();
+      await expect(page.getByRole("option", { name: new RegExp(DEMO.atlas.title) })).toHaveCount(0);
+      await page.keyboard.press("Escape");
     }
   });
 

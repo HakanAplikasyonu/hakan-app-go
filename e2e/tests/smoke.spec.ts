@@ -147,9 +147,13 @@ test("inceleme ızgarası: Excel'den yapıştır, satırı kaydet (#394)", async
 
   await office.goto(officePath("/review?view=grid"));
   const grid = office.getByRole("grid", { name: "Hesap kodu önerileri" });
-  // İlk veri satırının "Karar" hücresi (1: satır başlığı, 8: karar).
+  // İlk veri satırının "Karar" hücresi; sütunun yeri başlıktan okunur
+  // (yeni sütun eklenince kaymasın, #569).
+  const header = grid.getByRole("columnheader", { name: "Karar", exact: true });
+  await expect(header).toBeVisible();
+  const col = await header.getAttribute("aria-colindex");
   const decision = grid.locator(
-    '[role=row][aria-rowindex="2"] [role=gridcell][aria-colindex="8"]',
+    `[role=row][aria-rowindex="2"] [role=gridcell][aria-colindex="${col}"]`,
   );
   await expect(decision).toBeVisible();
   await decision.click();
