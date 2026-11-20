@@ -33,6 +33,18 @@ export const periodKeys = {
  * the taxpayer title next to each engagement.
  */
 export const periodService = {
+  /**
+   * Kilitli dönemi gerekçeyle açar (#669 A); gerekçe dönemin kilit
+   * geçmişine yazılır. `tenant.periods.lock` ister.
+   */
+  unlock(slug: string, engagement: string, period: string, reason: string) {
+    return tenantRequest<unknown>(
+      slug,
+      "POST",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/periods/${encodeURIComponent(period)}/unlock`,
+      { body: { reason } },
+    );
+  },
   matrix(slug: string, query: PeriodMatrixQuery) {
     return tenantRequest<PeriodMatrix>(
       slug,

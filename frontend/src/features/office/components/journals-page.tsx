@@ -12,6 +12,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -53,6 +54,7 @@ import {
 } from "../hooks/use-journals";
 import { formatMoney } from "../lib/decimal";
 import { exportIssueText } from "../lib/export-issue";
+import { periodService } from "../services/periods.service";
 import { journalErrorText } from "../lib/journal-error";
 import {
   journalService,
@@ -146,6 +148,32 @@ function DraftCheck({
   const { slug } = useTenant();
   const { prompt } = useDialogs();
   const { setLineAccount } = useJournalActions(slug, engagement);
+  const { permissions: perms } = useTenant();
+  const canUnlock = perms.includes(permissions.tenant.periods.lock);
+  const qc = useQueryClient();
+  const unlock = useMutation({
+    mutationFn: (reason: string) =>
+      periodService.unlock(slug, engagement, draft.period, reason),
+    onSuccess: () => {
+      toast.success(
+        t("office.journals.check.unlocked", { period: draft.period }),
+      );
+      // Fiş engelleri ve dönem durumu (şerit, komuta merkezi) yenilenir.
+      void qc.invalidateQueries({
+        queryKey: ["tenant", slug.toLowerCase()],
+      });
+    },
+    onError: (err) =>
+      toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+  });
+  const openPeriod = async () => {
+    const reason = await prompt({
+      title: t("office.journals.check.unlock_title", { period: draft.period }),
+      description: t("office.journals.check.unlock_prompt"),
+      confirmLabel: t("office.journals.check.unlock_period"),
+    });
+    if (reason?.trim()) unlock.mutate(reason.trim());
+  };
   const issues = draft.issues ?? [];
   if (draft.status !== "draft") return null;
   if (!issues.length) {
@@ -208,6 +236,25 @@ function DraftCheck({
             <CircleAlert className="size-3.5 shrink-0" aria-hidden />
             {issueText(t, is)}
           </span>
+          {/* Kapalı dönem (#669 A): yetkili kullanıcı dönemi buradan,
+              gerekçesiyle açar; yetkisi olmayan kime başvuracağını görür. */}
+          {is.code === "period_locked" ? (
+            canUnlock ? (
+              <Button
+                size="sm"
+                variant="link"
+                className="h-auto p-0 text-xs"
+                disabled={unlock.isPending}
+                onClick={() => void openPeriod()}
+              >
+                {t("office.journals.check.unlock_period")}
+              </Button>
+            ) : (
+              <span className="text-muted-foreground">
+                {t("office.journals.check.unlock_no_permission")}
+              </span>
+            )
+          ) : null}
           {is.code === "unknown_account" || is.code === "parent_account" ? (
             <Button
               size="sm"
