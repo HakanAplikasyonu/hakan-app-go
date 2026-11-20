@@ -53,9 +53,19 @@ test("ofis girişi: genel bakış API'den yükleniyor", async () => {
   await uiLogin(office, DEMO.owner);
   await office.goto(officePath());
   await expect(office.getByText("İnceleme bekleyen öneri")).toBeVisible();
-  await expect(office.getByText(DEMO.atlas.title).first()).toBeVisible();
-  await expect(office.getByText(DEMO.selin.title).first()).toBeVisible();
   await expect(office.getByText("Demo verisi")).toHaveCount(0);
+  // Genel bakıştaki "işi geride olan mükellefler" listesi yalnızca ilk 8
+  // mükellefi gösterir; öbür senaryolar koşu sırasında yeni mükellef
+  // eklediği için demo mükellefleri o listeden düşebilir. Gerçek veriden
+  // geldikleri tam listede (Mükellefler) aranarak doğrulanır.
+  await office.goto(officePath("/taxpayers"));
+  const search = office.getByPlaceholder("Unvan ya da VKN ara");
+  for (const demo of [DEMO.atlas, DEMO.selin]) {
+    await search.fill(demo.title);
+    const row = office.getByRole("row").filter({ hasText: demo.title });
+    await expect(row.first()).toBeVisible();
+    await expect(row.first()).toContainText(demo.taxId);
+  }
 });
 
 test("oturum uçları: realtime ve KVKK onayı 403 vermiyor", async () => {
