@@ -114,15 +114,17 @@ type DraftInput struct {
 
 // Draft is the API view of a draft.
 type Draft struct {
-	UUID    uuid.UUID       `json:"uuid"`
-	Period  string          `json:"period"`
-	EntryNo int32           `json:"entry_no"`
-	Type    string          `json:"entry_type"`
-	Date    time.Time       `json:"entry_date"`
-	Status  string          `json:"status"`
-	Debit   decimal.Decimal `json:"debit"`
-	Credit  decimal.Decimal `json:"credit"`
-	Lines   int32           `json:"lines"`
+	UUID    uuid.UUID `json:"uuid"`
+	Period  string    `json:"period"`
+	EntryNo int32     `json:"entry_no"`
+	Type    string    `json:"entry_type"`
+	Date    time.Time `json:"entry_date"`
+	// Description: the entry's açıklama, shown in the list (#573).
+	Description string          `json:"description"`
+	Status      string          `json:"status"`
+	Debit       decimal.Decimal `json:"debit"`
+	Credit      decimal.Decimal `json:"credit"`
+	Lines       int32           `json:"lines"`
 	// Issues: why a draft cannot be approved yet (#566); only on drafts.
 	Issues []DraftIssue `json:"issues,omitempty"`
 	// Export: the live export of an exported draft and its latest
@@ -207,7 +209,7 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 	if err := tx.Commit(ctx); err != nil {
 		return Draft{}, err
 	}
-	return Draft{UUID: row.Uuid, Period: period, EntryNo: row.EntryNo, Type: row.EntryType, Date: in.Date, Status: row.Status,
+	return Draft{UUID: row.Uuid, Period: period, EntryNo: row.EntryNo, Type: row.EntryType, Date: in.Date, Description: in.Description, Status: row.Status,
 		Debit: debit, Credit: credit, Lines: int32(len(in.Lines))}, nil //nolint:gosec // small
 }
 
