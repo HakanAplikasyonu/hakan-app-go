@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { idleLabel, mobileTarget, nextStepOf, openFirst, progressLabel, stepDetail, stepLabels, type Row, type Step } from './format.ts';
+import { actionLabels, idleLabel, nextActionLabel, mobileTarget, nextStepOf, openFirst, progressLabel, stepDetail, stepLabels, type Row, type Step } from './format.ts';
 
 const steps = (over: Partial<Record<Step['key'], Partial<Step>>> = {}): Step[] =>
   (['documents', 'bank', 'review', 'journals', 'transfer', 'report'] as const).map((key) => ({
@@ -47,4 +47,10 @@ test('rows with work come first, order kept', () => {
   const b = { id: 'b', next_step: 'bank' as const, steps: [], done_steps: 0, active_steps: 1 };
   const c = { id: 'c', next_step: 'report' as const, steps: [], done_steps: 0, active_steps: 1 };
   assert.deepEqual(openFirst([a, b, c]).map((r) => r.id), ['b', 'c', 'a']);
+});
+
+test('sıradaki iş etiketi: onay ve aktarım kontrol ekranına götürür (#566)', () => {
+  assert.equal(nextActionLabel('journals_approve'), 'Taslak fişleri kontrol et');
+  assert.equal(nextActionLabel('export_transfer'), 'Aktarımı kontrol et');
+  assert.equal(nextActionLabel('open_review'), actionLabels.open_review);
 });
