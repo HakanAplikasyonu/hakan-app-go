@@ -176,6 +176,9 @@ type Querier interface {
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
 	CountTenantSuggestions(ctx context.Context, arg CountTenantSuggestionsParams) (int64, error)
+	// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+	// kullanıcının görebildiği mükellefler; çok olan önce.
+	CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error)
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
@@ -540,6 +543,8 @@ type Querier interface {
 	// Müşavir mobil inceleme kuyruğu (issue #239).
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
+	// Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
+	GetTaxReturnSettings(ctx context.Context, organizationID int64) (TaxReturnSetting, error)
 	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
@@ -1655,6 +1660,7 @@ type Querier interface {
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	// Taslağın düzeltme alanları ve onaylanan maddeler; yalnızca taslakken.
 	UpsertTaxReturnDraft(ctx context.Context, arg UpsertTaxReturnDraftParams) (TaxReturn, error)
+	UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)

@@ -196,6 +196,23 @@ func (q *Queries) GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (Tax
 	return i, err
 }
 
+const getTaxReturnSettings = `-- name: GetTaxReturnSettings :one
+SELECT organization_id, final_check_required, updated_by, updated_at FROM tax_return_settings WHERE organization_id = $1
+`
+
+// Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
+func (q *Queries) GetTaxReturnSettings(ctx context.Context, organizationID int64) (TaxReturnSetting, error) {
+	row := q.db.QueryRow(ctx, getTaxReturnSettings, organizationID)
+	var i TaxReturnSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.FinalCheckRequired,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listTaxReturns = `-- name: ListTaxReturns :many
 SELECT id, uuid, organization_id, engagement_id, kind, period, status, adjustments, acknowledged, snapshot, payable_amount, carry_out, filed_on, accrual_number, note, prepared_by, prepared_at, filed_by, filed_at, created_by, created_at, updated_at, accrual_storage_key, accrual_file_name, accrual_size_bytes, accrual_sha256, accrual_uploaded_by, accrual_uploaded_at, checked_by, checked_at FROM tax_returns
 WHERE organization_id = $1 AND engagement_id = $2
@@ -1204,6 +1221,32 @@ func (q *Queries) UpsertTaxReturnDraft(ctx context.Context, arg UpsertTaxReturnD
 		&i.AccrualUploadedAt,
 		&i.CheckedBy,
 		&i.CheckedAt,
+	)
+	return i, err
+}
+
+const upsertTaxReturnSettings = `-- name: UpsertTaxReturnSettings :one
+INSERT INTO tax_return_settings (organization_id, final_check_required, updated_by, updated_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, final_check_required, updated_by, updated_at
+`
+
+type UpsertTaxReturnSettingsParams struct {
+	OrganizationID     int64       `json:"organization_id"`
+	FinalCheckRequired bool        `json:"final_check_required"`
+	UpdatedBy          pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error) {
+	row := q.db.QueryRow(ctx, upsertTaxReturnSettings, arg.OrganizationID, arg.FinalCheckRequired, arg.UpdatedBy)
+	var i TaxReturnSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.FinalCheckRequired,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

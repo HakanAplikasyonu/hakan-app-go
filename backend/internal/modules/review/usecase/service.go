@@ -206,6 +206,18 @@ func (s *Service) List(ctx context.Context, f Filter) ([]ListRow, int64, error) 
 	return s.store.List(ctx, f)
 }
 
+// ByEngagement counts the queue per taxpayer with the same filter as List
+// (status, kind, period, visibility), largest first (#710).
+func (s *Service) ByEngagement(ctx context.Context, f Filter) ([]EngagementCount, error) {
+	if f.Status != "" && !Status(f.Status).Valid() {
+		return nil, fmt.Errorf("%w: unknown status", ErrInvalid)
+	}
+	if f.Kind != "" && !identRe.MatchString(f.Kind) {
+		return nil, fmt.Errorf("%w: kind", ErrInvalid)
+	}
+	return s.store.ByEngagement(ctx, f)
+}
+
 func (s *Service) decide(ctx context.Context, sub Subject, id uuid.UUID,
 	fn func(context.Context, Tx, *Suggestion) (Decision, error), userID int64) (Suggestion, error) {
 	var out Suggestion

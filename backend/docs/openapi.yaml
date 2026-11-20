@@ -6437,6 +6437,50 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/taxpayers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listOfficeReviewTaxpayers
+      summary: Review queue per taxpayer
+      description: |
+        Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
+        - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
+        - { name: kind, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Counts per taxpayer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items, total]
+                    properties:
+                      total: { type: integer }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required: [engagement_uuid, total, oldest_created_at]
+                          properties:
+                            engagement_uuid: { type: string, format: uuid }
+                            total: { type: integer }
+                            oldest_created_at: { type: string, format: date-time }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/review/settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -9794,7 +9838,7 @@ paths:
       tags: [Journals]
       operationId: approveJournalDraft
       summary: Approve a balanced draft
-      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details. A draft with warnings (`missing_document`: a bank entry without an invoice / receipt or document number; `possible_duplicate`: its source document is in another entry too) is not blocked, but is refused with `409 JOURNAL_NEEDS_CONFIRMATION` (warning codes as error details) unless the body has `confirm_warnings: true` (#669). The accepted warnings and the optional note stay on the entry (`approval_warnings`, `approval_note`).
+      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details. A possible duplicate (`possible_duplicate`: its source document is in another entry too) is blocked (#710): refused with `409 JOURNAL_DUPLICATE` unless the body has the separate `send_duplicate: true` with a non-empty `reason` (`400 REASON_REQUIRED` without one); `confirm_warnings` does not pass it. A missing document (`missing_document`: a bank entry without an invoice / receipt or document number) is not blocked, but is refused with `409 JOURNAL_NEEDS_CONFIRMATION` (warning codes as error details) unless the body has `confirm_warnings: true` (#669). The accepted warnings and the note (the reason, for a duplicate) stay on the entry (`approval_warnings`, `approval_note`).
       security:
         - bearerAuth: []
       requestBody:
@@ -9804,8 +9848,10 @@ paths:
             schema:
               type: object
               properties:
-                confirm_warnings: { type: boolean, description: "Approve although the draft has warnings (missing document / possible duplicate)" }
+                confirm_warnings: { type: boolean, description: "Approve although the draft has a missing document warning" }
                 note: { type: string, maxLength: 1000, description: Optional reason kept on the entry }
+                send_duplicate: { type: boolean, description: "Send a possible duplicate anyway (#710); needs reason" }
+                reason: { type: string, maxLength: 1000, description: "Required with send_duplicate; kept on the entry" }
       responses:
         "200":
           description: Approved draft
@@ -9821,7 +9867,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
         "409":
-          description: The draft has warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`)
+          description: A possible duplicate to send anyway (`JOURNAL_DUPLICATE`) or warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -16187,6 +16233,57 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/tax-return-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTaxReturnSettings
+      summary: The office's tax return final check setting (#710)
+      description: |
+        Requires `tenant.tax_returns.read`. `final_check_required` (default
+        true): "kontrol edildi" and "verildi" are marked only by the
+        responsible (`tenant.tax_returns.approve`). When the office turns it
+        off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+        too; who and when are recorded either way.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putTaxReturnSettings
+      summary: Set the office's tax return final check setting (#710)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [final_check_required]
+              additionalProperties: false
+              properties:
+                final_check_required: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16947,7 +17044,9 @@ paths:
       description: |
         Requires `tenant.tax_returns.approve` (#669, office decision: everyone
         prepares returns; only the responsible person, owner or admin, marks
-        "kontrol edildi" and "verildi"). Who and when are kept
+        "kontrol edildi" and "verildi"). When the office turned the final
+        check off (`/v1/tenant/tax-return-settings`, #710),
+        `tenant.tax_returns.write` is enough. Who and when are kept
         (`record.checked_by_name`, `record.checked_at`). Only a prepared
         return (`409 TAX_RETURN_NOT_PREPARED`).
       security:
@@ -17007,7 +17106,8 @@ paths:
       operationId: fileEngagementTaxReturn
       summary: Record that the prepared return was filed
       description: |
-        Requires `tenant.tax_returns.approve` (#669: only the responsible
+        Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+        office turned the final check off, #710) (#669: only the responsible
         person marks "verildi"; filing also marks the return checked when it
         was not). `filed_on` is not before the period's last day nor in the
         future; `accrual_number` is the tahakkuk fiş no. Only a prepared
@@ -23588,7 +23688,7 @@ components:
             parent_account: the line posts to an account that has sub-accounts;
             period_locked: the period is closed;
             missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
-            possible_duplicate: a source document of the entry is in another entry too (approve with confirm_warnings).
+            possible_duplicate: a source document of the entry is in another entry too (blocked; send_duplicate with a reason passes it, #710).
         line_no: { type: integer, format: int32 }
         account: { type: string }
         difference: { type: string, description: "debit minus credit (unbalanced)" }
@@ -25561,6 +25661,21 @@ components:
         rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
         updated_at: { type: string, format: date-time }
         default: { type: boolean, description: True while the office has not set one }
+    TaxReturnSettings:
+      type: object
+      required: [final_check_required]
+      properties:
+        final_check_required:
+          type: boolean
+          description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
+        updated_at: { type: string, format: date-time }
+    EnvelopeTaxReturnSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxReturnSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeAccountRuleSettings:
       type: object
       required: [success, data, meta]

@@ -282,3 +282,14 @@ SELECT
         AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'approved')::bigint AS expense_processed,
     (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = @taxpayer_id AND e.period = @period::text
         AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'rejected')::bigint AS expense_ignored;
+
+-- name: GetTaxReturnSettings :one
+-- Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
+SELECT * FROM tax_return_settings WHERE organization_id = @organization_id;
+
+-- name: UpsertTaxReturnSettings :one
+INSERT INTO tax_return_settings (organization_id, final_check_required, updated_by, updated_at)
+VALUES (@organization_id, @final_check_required, sqlc.narg(updated_by), NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET final_check_required = EXCLUDED.final_check_required, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING *;

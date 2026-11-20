@@ -152,6 +152,13 @@ const isBlocked = (d: JournalDraft) => !!d.issues?.some((i) => i.blocking);
 const CONFIRM_CODES = ["missing_document", "possible_duplicate"];
 const warningsOf = (d: JournalDraft) =>
   (d.issues ?? []).filter((i) => CONFIRM_CODES.includes(i.code));
+/**
+ * Mükerrer olabilir (#710, ofis kararı): onay engellenir; yalnız fişin
+ * kendi satırındaki ayrı "Yine de gönder" ve zorunlu gerekçeyle geçer.
+ * Toplu onay bu fişleri atlar.
+ */
+const isDuplicate = (d: JournalDraft) =>
+  !!d.issues?.some((i) => i.code === "possible_duplicate");
 
 function issueText(
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -530,15 +537,25 @@ function ApproveClean({
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
-  const clean = open.filter((d) => !isBlocked(d));
+  const clean = open.filter((d) => !isBlocked(d) && !isDuplicate(d));
+  const duplicates = open.filter((d) => !isBlocked(d) && isDuplicate(d));
   // Son onay sorumlu müşavirde (#566).
   if (!clean.length || !perms.includes(permissions.tenant.journals.approve))
     return null;
   const warned = clean.filter((d) => warningsOf(d).length > 0).length;
   const run = async () => {
-    const description = t("office.journals.check.approve_clean_description", {
-      blocked: open.length - clean.length,
-    });
+    const description = [
+      t("office.journals.check.approve_clean_description", {
+        blocked: open.length - clean.length - duplicates.length,
+      }),
+      duplicates.length
+        ? t("office.journals.check.approve_clean_duplicates", {
+            count: duplicates.length,
+          })
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     // Uyarılı fiş varsa kaç tanesi olduğu açıkça söylenir; gerekçe isteğe bağlı.
     let note = "";
     if (warned > 0) {
@@ -998,6 +1015,26 @@ function JournalsInner() {
       const warnings = warningsOf(d);
       if (!warnings.length) {
         approveDraft(d.uuid);
+        return;
+      }
+      if (isDuplicate(d)) {
+        // Engel: ayrı ve açık "yine de gönder", gerekçe zorunlu (#710).
+        const reason = await prompt({
+          title: t("office.journals.check.duplicate_title"),
+          description: [
+            ...warnings.map((w) => issueText(t, w)),
+            t("office.journals.check.duplicate_description"),
+          ].join(" "),
+          placeholder: t("office.journals.check.duplicate_reason"),
+          confirmLabel: t("office.journals.check.duplicate_send"),
+        });
+        if (reason === null || !reason.trim()) return;
+        approveDraft({
+          draft: d.uuid,
+          confirm: true,
+          sendDuplicate: true,
+          reason: reason.trim(),
+        });
         return;
       }
       const note = await prompt({

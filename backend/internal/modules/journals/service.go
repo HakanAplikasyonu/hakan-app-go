@@ -256,9 +256,9 @@ func (s *Service) Approve(ctx context.Context, scope engagementctx.Scope, actorI
 	return s.ApproveWith(ctx, scope, actorID, id, Confirmation{Confirmed: true})
 }
 
-// ApproveWith approves a draft. A draft with warnings (missing document,
-// possible duplicate) is approved only with c.Confirmed; the accepted
-// warnings and the note stay on the entry.
+// ApproveWith approves a draft. A possible duplicate is refused unless
+// c.SendDuplicate with a reason (#710); a missing document needs
+// c.Confirmed. The accepted warnings and the note / reason stay on the entry.
 func (s *Service) ApproveWith(ctx context.Context, scope engagementctx.Scope, actorID int64, id uuid.UUID, c Confirmation) error {
 	row, err := s.q.GetJournalDraft(ctx, db.GetJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, Uuid: id})
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -284,16 +284,32 @@ func (s *Service) ApproveWith(ctx context.Context, scope engagementctx.Scope, ac
 		return &DraftBlockedError{Issues: b}
 	}
 	warn := confirmable(issues[row.ID])
-	if len(warn) > 0 && !c.Confirmed {
-		return &DraftNeedsConfirmationError{Issues: warn}
+	// Mükerrer fiş engellenir (#710); yalnız ayrı "yine de gönder" ve
+	// gerekçeyle geçer. Eksik belge açık onayla geçer (#705).
+	dup, other := splitDuplicates(warn)
+	reason := strings.TrimSpace(c.Reason)
+	if len(dup) > 0 {
+		if !c.SendDuplicate {
+			return &DraftDuplicateError{Issues: dup}
+		}
+		if reason == "" {
+			return ErrReasonRequired
+		}
+	}
+	if len(other) > 0 && !c.Confirmed {
+		return &DraftNeedsConfirmationError{Issues: other}
 	}
 	codes := []string{}
 	for _, w := range warn {
 		codes = append(codes, w.Code)
 	}
 	note := pgtype.Text{}
-	if t := strings.TrimSpace(c.Note); t != "" && len(warn) > 0 {
-		note = pgtype.Text{String: t, Valid: true}
+	text := strings.TrimSpace(c.Note)
+	if len(dup) > 0 {
+		text = reason
+	}
+	if text != "" && len(warn) > 0 {
+		note = pgtype.Text{String: text, Valid: true}
 	}
 	n, err := s.q.ApproveJournalDraft(ctx, db.ApproveJournalDraftParams{OrganizationID: scope.OrganizationID, EngagementID: scope.ID, ID: row.ID, ApprovedBy: actor(actorID),
 		ApprovalWarnings: codes, ApprovalNote: note})

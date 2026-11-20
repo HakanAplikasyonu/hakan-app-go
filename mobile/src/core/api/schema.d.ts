@@ -4501,6 +4501,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/review/taxpayers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review queue per taxpayer
+         * @description Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+         */
+        get: operations["listOfficeReviewTaxpayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/review/settings": {
         parameters: {
             query?: never;
@@ -12323,6 +12349,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/tax-return-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's tax return final check setting (#710)
+         * @description Requires `tenant.tax_returns.read`. `final_check_required` (default
+         *     true): "kontrol edildi" and "verildi" are marked only by the
+         *     responsible (`tenant.tax_returns.approve`). When the office turns it
+         *     off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+         *     too; who and when are recorded either way.
+         */
+        get: operations["getTaxReturnSettings"];
+        /**
+         * Set the office's tax return final check setting (#710)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putTaxReturnSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rule-settings": {
         parameters: {
             query?: never;
@@ -13001,7 +13061,9 @@ export interface paths {
          * Mark the prepared return as checked (final check)
          * @description Requires `tenant.tax_returns.approve` (#669, office decision: everyone
          *     prepares returns; only the responsible person, owner or admin, marks
-         *     "kontrol edildi" and "verildi"). Who and when are kept
+         *     "kontrol edildi" and "verildi"). When the office turned the final
+         *     check off (`/v1/tenant/tax-return-settings`, #710),
+         *     `tenant.tax_returns.write` is enough. Who and when are kept
          *     (`record.checked_by_name`, `record.checked_at`). Only a prepared
          *     return (`409 TAX_RETURN_NOT_PREPARED`).
          */
@@ -13067,7 +13129,8 @@ export interface paths {
         put?: never;
         /**
          * Record that the prepared return was filed
-         * @description Requires `tenant.tax_returns.approve` (#669: only the responsible
+         * @description Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+         *     office turned the final check off, #710) (#669: only the responsible
          *     person marks "verildi"; filing also marks the return checked when it
          *     was not). `filed_on` is not before the period's last day nor in the
          *     future; `accrual_number` is the tahakkuk fiş no. Only a prepared
@@ -18523,7 +18586,7 @@ export interface components {
              *     parent_account: the line posts to an account that has sub-accounts;
              *     period_locked: the period is closed;
              *     missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
-             *     possible_duplicate: a source document of the entry is in another entry too (approve with confirm_warnings).
+             *     possible_duplicate: a source document of the entry is in another entry too (blocked; send_duplicate with a reason passes it, #710).
              * @enum {string}
              */
             code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked" | "missing_document" | "possible_duplicate";
@@ -20273,6 +20336,18 @@ export interface components {
             updated_at?: string;
             /** @description True while the office has not set one */
             default: boolean;
+        };
+        TaxReturnSettings: {
+            /** @description Only the responsible marks "kontrol edildi" / "verildi" (default true) */
+            final_check_required: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeTaxReturnSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxReturnSettings"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeAccountRuleSettings: {
             /** @enum {boolean} */
@@ -28631,6 +28706,61 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listOfficeReviewTaxpayers: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
+                /** @description Default pending; all = any status */
+                status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
+                kind?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts per taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            total: number;
+                            items: {
+                                /** Format: uuid */
+                                engagement_uuid: string;
+                                total: number;
+                                /** Format: date-time */
+                                oldest_created_at: string;
+                            }[];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getOfficeReviewSettings: {
         parameters: {
             query?: never;
@@ -32888,10 +33018,14 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Approve although the draft has warnings (missing document / possible duplicate) */
+                    /** @description Approve although the draft has a missing document warning */
                     confirm_warnings?: boolean;
                     /** @description Optional reason kept on the entry */
                     note?: string;
+                    /** @description Send a possible duplicate anyway (#710); needs reason */
+                    send_duplicate?: boolean;
+                    /** @description Required with send_duplicate; kept on the entry */
+                    reason?: string;
                 };
             };
         };
@@ -32909,7 +33043,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description The draft has warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
+            /** @description A possible duplicate to send anyway (`JOURNAL_DUPLICATE`) or warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -40855,6 +40989,71 @@ export interface operations {
                     "application/json": components["schemas"]["EnvelopeClickFixIdentity"];
                 };
             };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    final_check_required: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
