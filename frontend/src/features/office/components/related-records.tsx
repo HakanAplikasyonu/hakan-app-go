@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect } from "react";
@@ -28,7 +28,12 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useRelatedRecords } from "../hooks/use-related";
 import { focusNeighbor } from "../lib/focus-step";
-import { FOCUS_PARAM, parseFocus, relatedHref } from "../lib/related-href";
+import {
+  FOCUS_PARAM,
+  panelTarget,
+  parseFocus,
+  relatedHref,
+} from "../lib/related-href";
 import type {
   RelatedRecord,
   RelatedSourceKind,
@@ -108,18 +113,30 @@ function Detail({ item }: { item: RelatedRecord }) {
   return null;
 }
 
+/** İlişkili kaydı panelin içinde açan geri çağrı (#564). */
+export type OpenRelated = (target: {
+  kind: RelatedSourceKind;
+  uuid: string;
+  label: string;
+}) => void;
+
 /**
  * Bir kaydın ilişkili kayıtları (#469): tür, kayıt, tarih, tutar, durum.
  * Bağlantılar mükellef detayında açılır; sekme çubuğu kaybolmaz.
+ * `onOpen` verilirse panelin gösterebildiği kayıtlar (banka hareketi,
+ * fatura, Z raporu, masraf) aynı panelde açılır, kendi sayfası ikincil
+ * bağlantı olarak kalır (#564).
  */
 export function RelatedRecordsTable({
   engagement,
   kind,
   uuid,
+  onOpen,
 }: {
   engagement: string;
   kind: RelatedSourceKind;
   uuid: string;
+  onOpen?: OpenRelated;
 }) {
   const { t } = useLocale();
   const tr = useTr();
@@ -200,7 +217,38 @@ export function RelatedRecordsTable({
                 </div>
               </TableCell>
               <TableCell className="px-4 py-2 align-top">
-                {href ? (
+                {onOpen && panelTarget(item) ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="text-brand-text h-auto p-0 text-left font-normal whitespace-normal"
+                      aria-label={`${kindLabel}: ${recordName(item)}`}
+                      data-testid="related-open-in-panel"
+                      onClick={() => {
+                        const target = panelTarget(item);
+                        if (target)
+                          onOpen({ ...target, label: recordName(item) });
+                      }}
+                    >
+                      <RecordLabel item={item} />
+                    </Button>
+                    {href ? (
+                      <Link
+                        href={href}
+                        className="text-text-3 hover:text-brand-text"
+                        aria-label={t("office.related.open_page", {
+                          record: `${kindLabel}: ${recordName(item)}`,
+                        })}
+                        title={t("office.related.open_page", {
+                          record: kindLabel,
+                        })}
+                      >
+                        <ExternalLink className="size-3.5" aria-hidden />
+                      </Link>
+                    ) : null}
+                  </span>
+                ) : href ? (
                   <Link
                     href={href}
                     className="text-brand-text hover:underline"

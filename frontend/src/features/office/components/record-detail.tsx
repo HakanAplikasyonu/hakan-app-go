@@ -14,7 +14,7 @@ import type { RelatedSourceKind } from "../services/related.service";
 import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
 import { ExpenseQuickView } from "./expense-quick-view";
 import { InvoiceQuickView } from "./invoice-quick-view";
-import { RelatedRecordsTable } from "./related-records";
+import { type OpenRelated, RelatedRecordsTable } from "./related-records";
 import { ZReportQuickView } from "./zreport-quick-view";
 import { useEntityLabel } from "./warnings-page";
 
@@ -31,6 +31,7 @@ export function RecordDetail({
   uuid,
   warning,
   onChanged,
+  onOpenRelated,
   children,
 }: {
   engagement: string;
@@ -40,6 +41,8 @@ export function RecordDetail({
   /** Kaydı olmayan uyarıda ilişkili kayıtların kaynağı. */
   warning?: string;
   onChanged?: () => void;
+  /** Verilirse ilişkili kayıtlar aynı panelde açılır (#564). */
+  onOpenRelated?: OpenRelated;
   children?: ReactNode;
 }) {
   const { t } = useLocale();
@@ -97,6 +100,7 @@ export function RecordDetail({
             engagement={engagement}
             kind={related.kind}
             uuid={related.uuid}
+            onOpen={onOpenRelated}
           />
         </section>
       ) : null}
