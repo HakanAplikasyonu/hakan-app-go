@@ -6437,6 +6437,50 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/taxpayers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listOfficeReviewTaxpayers
+      summary: Review queue per taxpayer
+      description: |
+        Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
+        - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
+        - { name: kind, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Counts per taxpayer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items, total]
+                    properties:
+                      total: { type: integer }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required: [engagement_uuid, total, oldest_created_at]
+                          properties:
+                            engagement_uuid: { type: string, format: uuid }
+                            total: { type: integer }
+                            oldest_created_at: { type: string, format: date-time }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/review/settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
