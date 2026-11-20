@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { addConsentedTaxpayer, Api, DEMO, officePath, uiLogin, uniqueVkn } from "./lib";
+import { addConsentedTaxpayer, Api, DEMO, officePath, uiLogin, uniqueVkn, openNewEntry } from "./lib";
 
 /**
  * Yevmiye fiş girişi alanları (#573, #597).
@@ -86,6 +86,7 @@ test.afterAll(async () => {
 
 test("hesap kodu plandan aranır; altında adı ya da uyarısı görünür (#573)", async () => {
   await office.goto(officePath(`/journals?taxpayer=${engagement}`));
+  await openNewEntry(office);
   await expect(entryDescription()).toBeVisible();
 
   // Adla arama: "kargo" yalnız 770.02'yi önerir.
@@ -172,9 +173,12 @@ test("Enter alanlar arasında ilerler, satır açar; Ctrl+Enter kaydeder (#573)"
   await expect(office.getByText("Dengeli", { exact: true })).toBeVisible();
 
   await office.keyboard.press("Control+Enter");
-  // Kaydedilince form boşalır.
+  // Kaydedilince pencere kapanır (#710); yeniden açılan form boştur.
+  await expect(office.getByRole("dialog", { name: "Yeni fiş" })).toBeHidden();
+  await openNewEntry(office);
   await expect(entryDescription()).toHaveValue("");
   await expect(account(3)).toHaveCount(0);
+  await office.keyboard.press("Escape");
 
   const base = `/v1/tenant/engagements/${engagement}/journal-drafts`;
   const list = await api.json<{ items: Draft[] }>(await api.get(`${base}?status=draft&limit=50`));

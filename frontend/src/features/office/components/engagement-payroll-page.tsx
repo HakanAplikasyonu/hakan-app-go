@@ -19,6 +19,7 @@ import {
   Upload,
   Users,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -43,6 +44,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
+import { FOCUS_PARAM } from "../lib/related-href";
 import { useOfficePeriod, usePeriodText } from "../period";
 import {
   payrollKeys,
@@ -172,8 +174,15 @@ function RunsView({ engagement }: { engagement: string }) {
   });
   const items = runs.data?.items ?? [];
   const [picked, setPicked] = useState<string | null>(null);
+  // Bankadan ya da ilişkili kayıttan gelen bağlantı (`?kayit=payroll_run:…`)
+  // o dönemin bordrosunu ve personel dökümünü açar (#710).
+  const focused = useSearchParams().get(FOCUS_PARAM) ?? "";
+  const focusRun = focused.startsWith("payroll_run:")
+    ? focused.slice("payroll_run:".length)
+    : null;
   const selected =
     items.find((r) => r.uuid === picked) ??
+    items.find((r) => r.uuid === focusRun) ??
     items.find((r) => r.period === focus) ??
     items[0];
   const detail = useQuery({

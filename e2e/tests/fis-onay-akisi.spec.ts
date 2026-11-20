@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, engagementOf, officePath, pickTaxpayer, uiLogin } from "./lib";
+import { Api, DEMO, engagementOf, officePath, pickTaxpayer, uiLogin, openNewEntry } from "./lib";
 
 /**
  * Fiş onayı → aktarım → mizan (#566, #574): personel taslak hazırlar ama
@@ -24,6 +24,7 @@ test("personel fişi hazırlar, onaylayamaz (#566)", async ({ page }) => {
   await page.goto(officePath("/journals"));
   await pickTaxpayer(page, DEMO.selin.title);
 
+  await openNewEntry(page);
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
   await rows.nth(0).locator("input").nth(0).fill("770.01");
