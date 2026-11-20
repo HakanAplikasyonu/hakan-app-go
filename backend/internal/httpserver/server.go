@@ -675,8 +675,10 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	if deps.Storage != nil {
 		archiveStore = deps.Storage
 	}
-	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
-		archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore)))
+	archiveH := archivemodule.NewHandler(archivemodule.New(database.Ambient{Pool: deps.DB}, archiveStore))
+	archivemodule.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, archiveH)
+	// Mükellef paneli: "Mükellef de görsün" işaretli belgeler (#682).
+	archivemodule.RegisterTaxpayerRoutes(mux, tokens, loader, taxpayerResolver, archiveH)
 	// Mutabakat (#389): mizan – kaynak çifte mutabakatı ve cari mutabakat.
 	reconciliationH := reconciliationmodule.NewHandler(reconciliationmodule.New(database.Ambient{Pool: deps.DB}, reviewSvc).
 		WithLetters(reconciliationmodule.LetterConfig{Secret: cfg.Encryption.Key, FrontendURL: cfg.Auth.FrontendURL}))

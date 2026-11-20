@@ -241,6 +241,8 @@ export const routes = {
     report: (uuid: string) => `/m/${encodeURIComponent(uuid)}/report`,
     /** Bordro PDF'leri, salt okuma (#382). */
     payroll: (uuid: string) => `/m/${encodeURIComponent(uuid)}/payroll`,
+    /** Müşavirin paylaştığı arşiv belgeleri, salt okuma (#682). */
+    archive: (uuid: string) => `/m/${encodeURIComponent(uuid)}/archive`,
   },
   /** Organization invitation link (public; the token is the credential). */
   invite: (token: string) => `/invite/${encodeURIComponent(token)}`,

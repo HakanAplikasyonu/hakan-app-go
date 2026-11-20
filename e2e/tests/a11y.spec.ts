@@ -170,7 +170,7 @@ test.describe("@a11y mükellef paneli", () => {
     await uiLogin(page, DEMO.taxpayerUser);
     await page.waitForURL(/\/m\/[0-9a-f-]{36}/);
     const base = new URL(page.url()).pathname;
-    for (const s of ["", "/invoices", "/receipts", "/uploads", "/payroll", "/report", "/requests"]) {
+    for (const s of ["", "/invoices", "/receipts", "/uploads", "/payroll", "/archive", "/report", "/requests"]) {
       await test.step(s || "/", async () => {
         await page.goto(base + s);
         await scan(page, base + s);

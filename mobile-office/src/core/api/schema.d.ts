@@ -4389,6 +4389,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/taxpayer/archive-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ofisin paylaştığı arşiv belgeleri (salt okuma)
+         * @description Mükellef web paneli (#682). Ofisin belge arşivine "Mükellef de görsün"
+         *     işaretiyle koyduğu belgeler; yalnızca mükellefin sahip rolü görür.
+         *     Süzgeçler ve `counts` ofis listesindeki gibidir, yalnız paylaşılan
+         *     belgeler üzerinden.
+         */
+        get: operations["listTaxpayerArchiveDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/taxpayer/archive-documents/{archiveDocumentUuid}/file": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Paylaşılan arşiv belgesini indir
+         * @description Mükellefe açık bir arşiv belgesi (#682); her zaman ek olarak iner.
+         *     Paylaşılmamış belge 404.
+         */
+        get: operations["downloadTaxpayerArchiveDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/taxpayer/context": {
         parameters: {
             query?: never;
@@ -28085,6 +28143,98 @@ export interface operations {
                 };
                 content: {
                     "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerArchiveDocuments: {
+        parameters: {
+            query?: {
+                category?: "general" | "contract" | "tax" | "sgk" | "trade_registry" | "isg" | "other";
+                isg_kind?: "isg_training" | "risk_assessment" | "health_report" | "other";
+                q?: string;
+                expiring?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: components["schemas"]["ArchiveDocumentPage"];
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            /** @description `NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    downloadTaxpayerArchiveDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Mükellef (taxpayer uuid) of a `/v1/taxpayer/*` request. The BFF
+                 *     forwards it on `/api/v1/taxpayer/*` only.
+                 */
+                "X-Taxpayer": components["parameters"]["XTaxpayer"];
+            };
+            path: {
+                archiveDocumentUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                    "image/jpeg": string;
+                    "image/png": string;
                 };
             };
             401: components["responses"]["Unauthenticated"];

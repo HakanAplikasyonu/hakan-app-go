@@ -221,6 +221,8 @@ var authzTable = map[string]authzClass{
 	"GET /v1/taxpayer/document-tasks":                                                azTaxpayerRead,
 	"GET /v1/taxpayer/payroll/documents":                                             azTaxpayerRead,
 	"GET /v1/taxpayer/payroll/documents/{documentUuid}/file":                         azTaxpayerRead,
+	"GET /v1/taxpayer/archive-documents":                                             azTaxpayerRead,
+	"GET /v1/taxpayer/archive-documents/{archiveDocumentUuid}/file":                  azTaxpayerRead,
 	"GET /v1/taxpayer/document-tasks/{taskUuid}":                                     azTaxpayerRead,
 	"POST /v1/taxpayer/document-tasks/{taskUuid}/uploads":                            azTaxpayerWrite,
 	"GET /v1/taxpayer/document-tasks/{taskUuid}/uploads/{uploadUuid}/file":           azTaxpayerRead,

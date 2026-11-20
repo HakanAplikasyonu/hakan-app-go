@@ -164,6 +164,7 @@ type Querier interface {
 	CountTaxpayerDocumentTasks(ctx context.Context, arg CountTaxpayerDocumentTasksParams) (int64, error)
 	// Sekme sayaçları ve bitiş uyarısı: kategori başına sayı, süresi dolan ve
 	// soon tarihine kadar bitecek evrak (bütün arşiv ve yalnızca İSG).
+	// only_visible: mükellef panelinde yalnızca "Mükellef de görsün" işaretliler.
 	CountTaxpayerDocuments(ctx context.Context, arg CountTaxpayerDocumentsParams) (CountTaxpayerDocumentsRow, error)
 	CountTaxpayerInvoices(ctx context.Context, arg CountTaxpayerInvoicesParams) (int64, error)
 	// tenant-lint: cross-org mükellef panelinde kendi fişleri; taxpayer_id ile sınırlı
