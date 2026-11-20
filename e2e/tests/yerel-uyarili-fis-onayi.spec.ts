@@ -26,7 +26,7 @@ test("uyarılı fiş: açık onay penceresi, gerekçe kaydı, API 409, toplu ona
   const api = await Api.login(DEMO.owner);
   const engagement = await addConsentedTaxpayer(browser, api, taxpayer, "uyarili");
   const base = `/v1/tenant/engagements/${engagement}`;
-  const { date } = declarationPeriod();
+  const { date, period } = declarationPeriod();
 
   const make = async (description: string, source: { source_kind: string; source_id: string }) => {
     const res = await api.post(`${base}/journal-drafts`, {
@@ -52,7 +52,7 @@ test("uyarılı fiş: açık onay penceresi, gerekçe kaydı, API 409, toplu ona
   expect(JSON.stringify(body.error)).toContain("possible_duplicate");
 
   await uiLogin(page, DEMO.owner);
-  await page.goto(officePath(`/journals?taxpayer=${engagement}`));
+  await page.goto(officePath(`/journals?taxpayer=${engagement}&period=${period}`));
   const row = page.locator("tr", { hasText: `E2E banka masrafı ${run}` }).first();
   await expect(row).toContainText("Eksik belge");
   await expect(page.locator("tr", { hasText: `E2E fatura A ${run}` }).first()).toContainText("Mükerrer olabilir");
