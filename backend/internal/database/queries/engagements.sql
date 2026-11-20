@@ -95,7 +95,8 @@ ORDER BY a.created_at, a.id;
 
 -- name: ListOrgEngagementAssignments :many
 -- Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
--- atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar.
+-- atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar. Üst
+-- sınır 5000 satır (birkaç yüz mükellef × birkaç atanan).
 SELECT e.uuid AS engagement_uuid, a.created_at, u.uuid AS user_uuid, u.email, u.name, u.surname
 FROM engagement_assignments a
 INNER JOIN engagements e ON e.id = a.engagement_id AND e.organization_id = a.organization_id
@@ -111,4 +112,5 @@ WHERE a.organization_id = sqlc.arg(organization_id)
             AND me.user_id = sqlc.arg(user_id)
       )
   )
-ORDER BY e.id, a.created_at, a.id;
+ORDER BY e.id, a.created_at, a.id
+LIMIT 5000;

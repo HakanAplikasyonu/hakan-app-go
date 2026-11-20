@@ -435,6 +435,7 @@ WHERE a.organization_id = $1
       )
   )
 ORDER BY e.id, a.created_at, a.id
+LIMIT 5000
 `
 
 type ListOrgEngagementAssignmentsParams struct {
@@ -454,7 +455,8 @@ type ListOrgEngagementAssignmentsRow struct {
 }
 
 // Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
-// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar.
+// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar. Üst
+// sınır 5000 satır (birkaç yüz mükellef × birkaç atanan).
 func (q *Queries) ListOrgEngagementAssignments(ctx context.Context, arg ListOrgEngagementAssignmentsParams) ([]ListOrgEngagementAssignmentsRow, error) {
 	rows, err := q.db.Query(ctx, listOrgEngagementAssignments,
 		arg.OrganizationID,

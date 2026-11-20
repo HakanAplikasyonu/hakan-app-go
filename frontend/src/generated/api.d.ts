@@ -2822,7 +2822,7 @@ export interface paths {
          * Assignees of every engagement the caller can see
          * @description Requires `tenant.engagements.read`. Office lists use it instead of one request per engagement (#639).
          *     With `tenant.engagements.read_all` every engagement of the office; otherwise only the ones the caller is assigned to.
-         *     Engagements without an assignee are left out.
+         *     Engagements without an assignee are left out. Not paged; capped at 5000 assignment rows.
          */
         get: operations["listTenantOrgEngagementAssignments"];
         put?: never;
