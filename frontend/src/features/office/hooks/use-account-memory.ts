@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { keepPreviousWithin } from "@/lib/query/keep-previous";
 
 import {
   accountMemoryKeys,
@@ -102,7 +99,7 @@ export function useRulePreview(
     ],
     queryFn: () => accountMemoryService.previewRule(slug, engagement, input!),
     enabled: !!input && !!engagement,
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousWithin(engagement),
     staleTime: 60_000,
     retry: false,
   });

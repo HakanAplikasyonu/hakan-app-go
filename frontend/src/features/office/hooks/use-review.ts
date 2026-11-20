@@ -10,6 +10,7 @@ import { useCallback } from "react";
 
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
+import { keepPreviousWithin } from "@/lib/query/keep-previous";
 import { useLocale } from "@/providers/locale-provider";
 
 import {
@@ -64,7 +65,7 @@ export function useAccountPlanAccounts(
     queryKey: reviewKeys.accounts(slug, engagement ?? "", q),
     queryFn: () => reviewService.accounts(slug, engagement ?? "", q),
     enabled: enabled && !!engagement,
-    placeholderData: keepPreviousData,
+    placeholderData: keepPreviousWithin(engagement ?? ""),
     staleTime: 60_000,
     retry: false,
   });
