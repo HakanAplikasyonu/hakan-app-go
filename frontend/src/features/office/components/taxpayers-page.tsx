@@ -199,7 +199,6 @@ function useTaxpayerColumns(members: Member[], canWrite: boolean) {
               onClick={() => setPeriod(cell.period)}
               className="focus-visible:ring-ring inline-block rounded-md transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:outline-none"
             >
-              <span className="sr-only">{`${row.original.taxpayer_title}: `}</span>
               <CellBadge
                 cell={cell}
                 hint={t(`office.command.goes_${target}`)}

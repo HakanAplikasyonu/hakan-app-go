@@ -12,7 +12,7 @@ import {
 
 /**
  * "Bekleyen iş" gerçek içeriğe götürür (#710): kilitli Ekim 2026'ya gelen
- * fatura değişiklik talebi açar; dönem "Bekleyen iş var" olur. Mükellefler
+ * fatura değişiklik talebi açar; dönem rozeti talebe götürür. Mükellefler
  * listesindeki ve Komuta Merkezi'ndeki rozet mükellef ekranını talep listesi
  * AÇIK olarak getirir (yalnız özet değil).
  *
@@ -60,8 +60,10 @@ test("bekleyen iş: Mükellefler ve Komuta Merkezi rozeti talep listesini açık
   // Mükellefler: beyan dönemi (Ekim) rozeti.
   await page.goto(officePath("/taxpayers"));
   await page.getByPlaceholder("Unvan ya da VKN ara").fill(taxpayer.vkn);
+  // Kilitli dönem "Onaylandı (kilitli)" yazar; açık talep varken rozet
+  // talep listesine götürür.
   const badge = page.locator('a[data-target="change_requests"]', {
-    hasText: "Bekleyen iş var",
+    hasText: "Onaylandı (kilitli)",
   });
   await expect(badge).toHaveCount(1);
   await badge.click();
