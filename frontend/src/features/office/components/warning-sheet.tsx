@@ -29,6 +29,7 @@ import {
 import { RecordDetail } from "./record-detail";
 import type { OpenRelated } from "./related-records";
 import { ApiWarningActions } from "./warning-actions";
+import { WarningCodeFix } from "./warning-code-fix";
 import { WarningTransactions } from "./warning-transactions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
 
@@ -119,6 +120,14 @@ export function WarningSheet({
   useEffect(() => {
     if (depth > 0) backRef.current?.focus();
   }, [depth, top?.uuid]);
+
+  // Karar verilen uyarı listeden düşecek; sıradakine geç.
+  const afterDecided = () => {
+    if (!current) return;
+    const after = items[index + 1] ?? items[index - 1];
+    if (after && after.uuid !== current.uuid) open(after, Math.max(index, 0));
+    else close();
+  };
 
   const goPrev = () => prev && open(prev, items.indexOf(prev));
   const goNext = () => next && open(next, items.indexOf(next));
@@ -280,13 +289,7 @@ export function WarningSheet({
                 <ApiWarningActions
                   warning={current}
                   requestText={text(current)}
-                  onDecided={() => {
-                    // Karar verilen uyarı listeden düşecek; sıradakine geç.
-                    const after = items[index + 1] ?? items[index - 1];
-                    if (after && after.uuid !== current.uuid)
-                      open(after, Math.max(index, 0));
-                    else close();
-                  }}
+                  onDecided={afterDecided}
                 />
               )}
               {gone && next ? (
@@ -296,6 +299,14 @@ export function WarningSheet({
                 </Button>
               ) : null}
             </section>
+            {/* Fatura kalemi uyarısı (#570): kalemin hesap kodu burada düzeltilir. */}
+            {!gone ? (
+              <WarningCodeFix
+                key={current.uuid}
+                warning={current}
+                onDone={afterDecided}
+              />
+            ) : null}
             {current.code === BALANCE_WARNING_CODE &&
             current.period &&
             current.engagement_uuid ? (
