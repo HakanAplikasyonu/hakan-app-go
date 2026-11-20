@@ -26,6 +26,7 @@ const OFFICE = ["", "/taxpayers", "/command", "/warnings", "/journals", "/transf
 const ENGAGEMENT = [
   "",
   "/documents",
+  "/archive",
   "/invoices",
   "/bank",
   "/review",

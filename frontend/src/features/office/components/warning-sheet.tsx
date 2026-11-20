@@ -36,6 +36,8 @@ import { useApiWarningText, useEntityLabel } from "./warnings-page";
 
 /** Açık uyarının adres parametresi: dönünce kalınan yer korunur (#529). */
 export const WARNING_PARAM = "uyari";
+// Kapanan uyarıdan sıradakine geçmeden önce "kapandı" bildiriminin süresi.
+const AUTO_NEXT_MS = 2500;
 
 /**
  * Uyarı yan panelinin durumu (#529): hangi uyarının açık olduğu adreste
@@ -132,6 +134,26 @@ export function WarningSheet({
 
   const goPrev = () => prev && open(prev, items.indexOf(prev));
   const goNext = () => next && open(next, items.indexOf(next));
+
+  // Panelde yapılan işlem (eşleştirme, hesaba işleme …) uyarıyı kapatınca
+  // panel kısa bir bildirimden sonra sıradakine geçer (#570). Yalnız panel
+  // açıkken kapanan uyarıda ("gone" ancak listeden açılmış uyarıda olur);
+  // "Burada kal" geçişi durdurur.
+  const [stay, setStay] = useState<string | null>(null);
+  // Kapanan uyarı listenin sonundaysa bir öncekine geçilir.
+  const after = gone ? (next ?? prev) : undefined;
+  const autoNext = !!after && !!current && stay !== current.uuid && depth === 0;
+  const nextUuid = after?.uuid;
+  useEffect(() => {
+    if (!autoNext || !after) return;
+    const timer = window.setTimeout(
+      () => open(after, items.indexOf(after)),
+      AUTO_NEXT_MS,
+    );
+    return () => window.clearTimeout(timer);
+    // next / items her çizimde yeni dizi; uuid yeter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNext, nextUuid]);
 
   const onKey = (e: React.KeyboardEvent) => {
     const el = e.target as HTMLElement;
@@ -293,11 +315,33 @@ export function WarningSheet({
                   onDecided={afterDecided}
                 />
               )}
-              {gone && next ? (
-                <Button size="sm" onClick={goNext}>
-                  {t("office.warning_sheet.next")}
-                  <ChevronRight className="size-4" aria-hidden />
-                </Button>
+              {gone && after ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => open(after, items.indexOf(after))}
+                  >
+                    {t("office.warning_sheet.next")}
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                  {autoNext ? (
+                    <>
+                      <span
+                        className="text-text-3 text-xs"
+                        data-testid="warning-auto-next"
+                      >
+                        {t("office.warning_sheet.auto_next")}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setStay(current.uuid)}
+                      >
+                        {t("office.warning_sheet.stay")}
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
             </section>
             {/* Fatura kalemi uyarısı (#570): kalemin hesap kodu burada düzeltilir. */}
