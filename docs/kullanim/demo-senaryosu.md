@@ -157,7 +157,7 @@ Kenar menüden **Fişler ve aktarım**.
 
 Faturalar demoya bilerek yüklenmez; yükleme akışı canlı gösterilir. Depodaki
 `backend/internal/demo/ubl/` klasöründen `atlas-` ile başlayan XML dosyalarını
-**UBL yükle** ekranında Atlas Gıda'ya yükleyin.
+**e-Fatura yükle** ekranında Atlas Gıda'ya yükleyin.
 
 - **Yükleme raporu** eklenen faturaları gösterir.
 - **İnceleme kuyruğu**nda hesap kodu önerileri belirir.
