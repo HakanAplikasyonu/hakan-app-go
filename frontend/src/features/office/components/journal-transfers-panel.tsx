@@ -116,12 +116,12 @@ function TransferCheck({
     queryKey: reconciliationKeys.run(slug, engagement, period),
     queryFn: () => reconciliationService.latest(slug, engagement, period),
     enabled: !!period,
-    retry: (n, e) => !(isApiError(e) && e.status === 404) && n < 2,
     staleTime: 60_000,
   });
   if (!period || latest.isLoading) return null;
   const run = latest.data?.run;
-  const notRun = isApiError(latest.error) && latest.error.status === 404;
+  // Koşu yoksa uç 200 + run: null döner (#639).
+  const notRun = latest.data?.run === null;
   if (!run && !notRun) return null;
   const stale = !!run && !!tr.completed_at && run.created_at < tr.completed_at;
   const issues = run

@@ -29,6 +29,10 @@ var (
 	ErrNoReview       = errors.New("reconciliation: review queue is not configured")
 	ErrMatched        = errors.New("reconciliation: the account has no difference")
 	ErrInReview       = errors.New("reconciliation: the item is waiting in the review queue")
+	// ErrNoRun: "latest" asked but the engagement (or the period) has no
+	// run yet. An empty state, not a missing resource (#639): getRun answers
+	// 200 with a null run; other callers still see ErrNotFound.
+	ErrNoRun = fmt.Errorf("%w: no run yet", ErrNotFound)
 )
 
 // SuggestionKind is the review queue kind of a reconciliation item.
@@ -724,7 +728,7 @@ func (s *Service) pickRun(ctx context.Context, sc engagementctx.Scope, which, pe
 			return Run{}, err
 		}
 		if len(rows) == 0 {
-			return Run{}, ErrNotFound
+			return Run{}, ErrNoRun
 		}
 		r := rows[0]
 		return runView(r.ID, r.Uuid, r.Period, r.WindowFrom, r.WindowTo, r.Tolerance, r.Summary, r.CreatedAt, r.TrialBalanceUuid, r.TrialBalanceFileName), nil

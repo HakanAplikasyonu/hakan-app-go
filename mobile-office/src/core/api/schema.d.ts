@@ -8354,6 +8354,8 @@ export interface paths {
         /**
          * A reconciliation run with its account items
          * @description Requires `tenant.reconciliation.read` (#389). `latest` is the newest run (of `period` when given). Items are sorted by main account.
+         *     When `latest` finds no run yet (the period was never compared) the answer is `200` with `run: null` and no items: an empty state,
+         *     not an error (#639). 404 is kept for an unknown run uuid or engagement.
          */
         get: operations["getReconciliationRun"];
         put?: never;
@@ -20425,6 +20427,11 @@ export interface components {
         };
         ReconciliationRunDetail: {
             run: components["schemas"]["ReconciliationRun"];
+            items: components["schemas"]["ReconciliationItem"][];
+        };
+        /** @description A run with its items; `run` is null (and `items` empty) when `latest` finds no run yet (#639). */
+        ReconciliationLatestRunDetail: {
+            run: components["schemas"]["ReconciliationRun"] | null;
             items: components["schemas"]["ReconciliationItem"][];
         };
         ReconciliationCounterparty: {
@@ -33791,7 +33798,7 @@ export interface operations {
                     "application/json": {
                         /** @enum {boolean} */
                         success: true;
-                        data: components["schemas"]["ReconciliationRunDetail"];
+                        data: components["schemas"]["ReconciliationLatestRunDetail"];
                         meta: components["schemas"]["ResponseMeta"];
                     };
                 };

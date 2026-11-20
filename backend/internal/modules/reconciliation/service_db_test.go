@@ -211,6 +211,11 @@ func TestReconciliationRunAgainstPostgres(t *testing.T) {
 		t.Fatalf("september %+v", sepRun.Run)
 	}
 
+	// Koşusu olmayan dönem: boş durum ErrNoRun (handler 200 + run null döner, #639).
+	if _, err := svc.Detail(ctx, sc, "latest", "2025-01"); !errors.Is(err, ErrNoRun) || !errors.Is(err, ErrNotFound) {
+		t.Fatalf("no run: %v", err)
+	}
+
 	// Başka engagement görmez.
 	osc := engagementctx.Scope{ID: otherEng, OrganizationID: org, TaxpayerID: otherTp}
 	if _, err := svc.Detail(ctx, osc, run.UUID.String(), ""); !errors.Is(err, ErrNotFound) {

@@ -267,8 +267,10 @@ test("ajan dosyayı klasöre bırakır, müşavir programa aktarıldı der", asy
 });
 
 test("karşılaştırılmamış dönem: 'Mizanla karşılaştır' Mutabakat ekranına götürür", async () => {
-  // Henüz mizan yok, karşılaştırma yapılmadı.
-  expect((await latestRun()).status()).toBe(404);
+  // Henüz mizan yok, karşılaştırma yapılmadı: boş durum 200 + run null (#639).
+  const none = await latestRun();
+  expect(none.status()).toBe(200);
+  expect((await api.json<{ run: unknown; items: unknown[] }>(none)).run).toBeNull();
 
   const row = transferRow();
   await expect(row).toContainText("Programa aktarıldı");
