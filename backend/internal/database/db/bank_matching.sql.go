@@ -99,7 +99,7 @@ INSERT INTO bank_transaction_matches (
     $1, $2, $3, $4, $5, $6, $7, $8, $9
 )
 ON CONFLICT (taxpayer_id, bank_transaction_id, target_type, target_id) DO NOTHING
-RETURNING id, uuid, taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by, matched_at
+RETURNING id, uuid, taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by, matched_at, fx_rate_invoice, fx_rate_payment, fx_diff_try
 `
 
 type InsertBankTransactionMatchParams struct {
@@ -140,6 +140,9 @@ func (q *Queries) InsertBankTransactionMatch(ctx context.Context, arg InsertBank
 		&i.Evidence,
 		&i.MatchedBy,
 		&i.MatchedAt,
+		&i.FxRateInvoice,
+		&i.FxRatePayment,
+		&i.FxDiffTry,
 	)
 	return i, err
 }
@@ -204,9 +207,51 @@ func (q *Queries) ListBankTransactionFinancialMatches(ctx context.Context, arg L
 	return items, nil
 }
 
+const listBankTransactionFxMatches = `-- name: ListBankTransactionFxMatches :many
+SELECT m.id, m.amount, i.exchange_rate
+FROM bank_transaction_matches m
+JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
+WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2
+  AND m.target_type = 'invoice' AND i.currency <> 'TRY'
+ORDER BY m.id
+`
+
+type ListBankTransactionFxMatchesParams struct {
+	TaxpayerID        int64 `json:"taxpayer_id"`
+	BankTransactionID int64 `json:"bank_transaction_id"`
+}
+
+type ListBankTransactionFxMatchesRow struct {
+	ID           int64          `json:"id"`
+	Amount       pgtype.Numeric `json:"amount"`
+	ExchangeRate pgtype.Numeric `json:"exchange_rate"`
+}
+
+// Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+func (q *Queries) ListBankTransactionFxMatches(ctx context.Context, arg ListBankTransactionFxMatchesParams) ([]ListBankTransactionFxMatchesRow, error) {
+	rows, err := q.db.Query(ctx, listBankTransactionFxMatches, arg.TaxpayerID, arg.BankTransactionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBankTransactionFxMatchesRow{}
+	for rows.Next() {
+		var i ListBankTransactionFxMatchesRow
+		if err := rows.Scan(&i.ID, &i.Amount, &i.ExchangeRate); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBankTransactionMatchInvoices = `-- name: ListBankTransactionMatchInvoices :many
 SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
-       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
+       m.fx_rate_invoice, m.fx_rate_payment, m.fx_diff_try,
+       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount, i.exchange_rate
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
 WHERE m.taxpayer_id = $1 AND m.bank_transaction_id = $2 AND m.target_type = 'invoice'
@@ -224,12 +269,16 @@ type ListBankTransactionMatchInvoicesRow struct {
 	Method        string             `json:"method"`
 	MatchedAt     pgtype.Timestamptz `json:"matched_at"`
 	Evidence      []byte             `json:"evidence"`
+	FxRateInvoice pgtype.Numeric     `json:"fx_rate_invoice"`
+	FxRatePayment pgtype.Numeric     `json:"fx_rate_payment"`
+	FxDiffTry     pgtype.Numeric     `json:"fx_diff_try"`
 	InvoiceUuid   uuid.UUID          `json:"invoice_uuid"`
 	InvoiceNumber string             `json:"invoice_number"`
 	IssueDate     pgtype.Date        `json:"issue_date"`
 	CustomerName  pgtype.Text        `json:"customer_name"`
 	Currency      string             `json:"currency"`
 	PayableAmount pgtype.Numeric     `json:"payable_amount"`
+	ExchangeRate  pgtype.Numeric     `json:"exchange_rate"`
 }
 
 func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error) {
@@ -247,12 +296,16 @@ func (q *Queries) ListBankTransactionMatchInvoices(ctx context.Context, arg List
 			&i.Method,
 			&i.MatchedAt,
 			&i.Evidence,
+			&i.FxRateInvoice,
+			&i.FxRatePayment,
+			&i.FxDiffTry,
 			&i.InvoiceUuid,
 			&i.InvoiceNumber,
 			&i.IssueDate,
 			&i.CustomerName,
 			&i.Currency,
 			&i.PayableAmount,
+			&i.ExchangeRate,
 		); err != nil {
 			return nil, err
 		}
@@ -345,7 +398,7 @@ func (q *Queries) ListBankTransactionMatchJournalLines(ctx context.Context, arg 
 }
 
 const listBankTransactionMatches = `-- name: ListBankTransactionMatches :many
-SELECT id, uuid, taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by, matched_at FROM bank_transaction_matches
+SELECT id, uuid, taxpayer_id, bank_transaction_id, target_type, target_id, amount, score, method, evidence, matched_by, matched_at, fx_rate_invoice, fx_rate_payment, fx_diff_try FROM bank_transaction_matches
 WHERE taxpayer_id = $1 AND bank_transaction_id = $2
 ORDER BY id
 `
@@ -377,6 +430,9 @@ func (q *Queries) ListBankTransactionMatches(ctx context.Context, arg ListBankTr
 			&i.Evidence,
 			&i.MatchedBy,
 			&i.MatchedAt,
+			&i.FxRateInvoice,
+			&i.FxRatePayment,
+			&i.FxDiffTry,
 		); err != nil {
 			return nil, err
 		}
@@ -1198,6 +1254,31 @@ func (q *Queries) SearchJournalLinesForBankMatch(ctx context.Context, arg Search
 		return nil, err
 	}
 	return items, nil
+}
+
+const setBankTransactionMatchFx = `-- name: SetBankTransactionMatchFx :exec
+UPDATE bank_transaction_matches
+SET fx_rate_invoice = $1, fx_rate_payment = $2, fx_diff_try = $3
+WHERE taxpayer_id = $4 AND id = $5 AND target_type = 'invoice'
+`
+
+type SetBankTransactionMatchFxParams struct {
+	FxRateInvoice pgtype.Numeric `json:"fx_rate_invoice"`
+	FxRatePayment pgtype.Numeric `json:"fx_rate_payment"`
+	FxDiffTry     pgtype.Numeric `json:"fx_diff_try"`
+	TaxpayerID    int64          `json:"taxpayer_id"`
+	ID            int64          `json:"id"`
+}
+
+func (q *Queries) SetBankTransactionMatchFx(ctx context.Context, arg SetBankTransactionMatchFxParams) error {
+	_, err := q.db.Exec(ctx, setBankTransactionMatchFx,
+		arg.FxRateInvoice,
+		arg.FxRatePayment,
+		arg.FxDiffTry,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	return err
 }
 
 const setBankTransactionMatchStatus = `-- name: SetBankTransactionMatchStatus :exec

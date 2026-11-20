@@ -12800,6 +12800,54 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: setTenantBankTransactionFxRate
+      summary: Payment day rate of a foreign currency movement (exchange difference)
+      description: |
+        Requires `tenant.bank.write` (#565). The office enters the payment
+        day rate of a foreign currency movement; for each foreign currency
+        invoice it closes, the closed amount × (payment rate − invoice rate)
+        is stored as the exchange difference (gain 646, loss 656; a payment
+        reverses the sign). `null` clears it. 409 `BANK_FX_NOT_APPLICABLE`
+        when the movement is in TRY or closes no foreign currency invoice;
+        422 `INVOICE_EXCHANGE_RATE_MISSING` when a matched invoice has no
+        rate.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rate]
+              additionalProperties: false
+              properties:
+                rate: { type: [string, "null"], description: "TRY per unit of the movement's currency" }
+      responses:
+        "200":
+          description: The movement with its exchange difference
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`INVOICE_EXCHANGE_RATE_MISSING`: a matched invoice has no exchange rate"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22708,8 +22756,21 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, financial_matches, financial_candidates]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, financial_matches, financial_candidates, fx]
       properties:
+        fx:
+          type: [object, "null"]
+          description: |
+            Exchange difference of a foreign currency movement closing foreign
+            currency invoices (#565); null for a TRY movement or one with no
+            such match. `diff_try` is positive for a gain (646 Kambiyo
+            kârları), negative for a loss (656 Kambiyo zararları).
+          required: [rate_payment, diff_try, account_code, missing_invoice_rate]
+          properties:
+            rate_payment: { type: [string, "null"], description: "Payment day rate entered by the office (TRY per unit)" }
+            diff_try: { type: [string, "null"] }
+            account_code: { type: [string, "null"], enum: ["646", "656", null] }
+            missing_invoice_rate: { type: boolean, description: "A matched invoice has no exchange rate; enter it on the invoice first" }
         payroll_matchable: { type: boolean, description: "An outgoing payment can be tied to a payroll run (#710)" }
         payroll_matches:
           type: array

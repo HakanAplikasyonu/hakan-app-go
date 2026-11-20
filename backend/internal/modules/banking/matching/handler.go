@@ -49,6 +49,8 @@ const (
 	ActionRematched = "bank.transaction.rematched"
 	ActionUnmatched = "bank.transaction.unmatched"
 	ActionBooked    = "bank.transaction.booked"
+	// ActionFxRate: the payment day rate and exchange difference (#565).
+	ActionFxRate = "bank.transaction.fx_rate"
 )
 
 // audit writes the event after a successful change. The payload names the
@@ -104,6 +106,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	// Book the movement to an account from the same screen (#565).
 	mux.Handle("PUT "+tx+"/account", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
 	// Take a (duplicate) movement out of the account or put it back (#710).
+	// Payment day rate of a foreign currency movement: exchange difference (#565).
+	mux.Handle("PUT "+tx+"/fx-rate", middleware.Chain(http.HandlerFunc(h.setFxRate), authn, org, write, eng))
 	mux.Handle("PUT "+tx+"/exclusion", middleware.Chain(http.HandlerFunc(h.exclusion), authn, org, write, eng))
 }
 
@@ -294,6 +298,36 @@ func (h *Handler) setAccount(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
+type fxRateBody struct {
+	// Rate: TRY per unit of the movement's currency; null clears it.
+	Rate *decimal.Decimal `json:"rate"`
+}
+
+// setFxRate: PUT .../bank-transactions/{transactionUuid}/fx-rate (#565).
+func (h *Handler) setFxRate(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	var in fxRateBody
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&in); err != nil || (in.Rate != nil && (!in.Rate.IsPositive() || in.Rate.GreaterThan(decimal.NewFromInt(1_000_000)))) {
+		response.BadRequest(w, r, "VALIDATION_ERROR", "rate must be a positive number or null")
+		return
+	}
+	v, err := h.svc.SetFxRate(r.Context(), subjectOf(r), id, in.Rate)
+	if err == nil {
+		var rate any
+		if in.Rate != nil {
+			rate = in.Rate.String()
+		}
+		h.audit(r, ActionFxRate, v, map[string]any{"rate": rate})
+	}
+	h.reply(w, r, v, err)
+}
+
 func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error) {
 	switch {
 	case err == nil:
@@ -304,6 +338,10 @@ func (h *Handler) reply(w http.ResponseWriter, r *http.Request, v any, err error
 		response.Conflict(w, r, "BANK_TRANSACTION_NOT_MATCHABLE", "this movement is neither a collection nor a payment, or it is cancelled")
 	case errors.Is(err, ErrInvalidInvoices), errors.Is(err, ErrInvalidLines), errors.Is(err, ErrInvalidPayroll), errors.Is(err, ErrInvalidFinancial), errors.Is(err, posting.ErrInvalid), errors.Is(err, reviewusecase.ErrInvalid):
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
+	case errors.Is(err, ErrFxNotApplicable):
+		response.Conflict(w, r, "BANK_FX_NOT_APPLICABLE", "the movement closes no foreign currency invoice")
+	case errors.Is(err, ErrFxInvoiceRate):
+		response.Error(w, r, http.StatusUnprocessableEntity, "INVOICE_EXCHANGE_RATE_MISSING", "a matched invoice has no exchange rate; enter it on the invoice first")
 	case errors.Is(err, ErrCancelledByBank):
 		response.Conflict(w, r, "BANK_TRANSACTION_CANCELLED", "the bank cancelled this movement; it cannot be put back")
 	case errors.Is(err, posting.ErrNotFound):

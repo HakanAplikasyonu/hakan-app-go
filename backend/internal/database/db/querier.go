@@ -796,6 +796,8 @@ type Querier interface {
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
 	ListBankTransactionFinancialMatches(ctx context.Context, arg ListBankTransactionFinancialMatchesParams) ([]ListBankTransactionFinancialMatchesRow, error)
+	// Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+	ListBankTransactionFxMatches(ctx context.Context, arg ListBankTransactionFxMatchesParams) ([]ListBankTransactionFxMatchesRow, error)
 	ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error)
 	// Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
 	// kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
@@ -1443,6 +1445,7 @@ type Querier interface {
 	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
 	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
 	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
+	SetBankTransactionMatchFx(ctx context.Context, arg SetBankTransactionMatchFxParams) error
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error

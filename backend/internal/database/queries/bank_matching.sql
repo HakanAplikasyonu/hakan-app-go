@@ -79,7 +79,8 @@ SELECT * FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND uuid = @uui
 
 -- name: ListBankTransactionMatchInvoices :many
 SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
-       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
+       m.fx_rate_invoice, m.fx_rate_payment, m.fx_diff_try,
+       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount, i.exchange_rate
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
 WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'invoice'
@@ -244,3 +245,17 @@ WHERE f.taxpayer_id = @taxpayer_id AND f.direction = @direction::text
   AND COALESCE(f.due_date, f.transaction_date) BETWEEN @date_from::date AND @date_to::date
 ORDER BY abs(f.amount_try - @amount::numeric), f.transaction_date DESC
 LIMIT 20;
+
+-- Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+-- name: ListBankTransactionFxMatches :many
+SELECT m.id, m.amount, i.exchange_rate
+FROM bank_transaction_matches m
+JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id
+  AND m.target_type = 'invoice' AND i.currency <> 'TRY'
+ORDER BY m.id;
+
+-- name: SetBankTransactionMatchFx :exec
+UPDATE bank_transaction_matches
+SET fx_rate_invoice = sqlc.narg(fx_rate_invoice), fx_rate_payment = sqlc.narg(fx_rate_payment), fx_diff_try = sqlc.narg(fx_diff_try)
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND target_type = 'invoice';
