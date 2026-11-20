@@ -49,10 +49,6 @@ const ALLOWED_ERRORS: { re: RegExp; status: number; why: string }[] = [];
 /** Aynı isteğin 3'ten fazla gitmesine izin verilenler: [istek kalıbı, gerekçe]. */
 const ALLOWED_REPEATS: { re: RegExp; why: string }[] = [
   {
-    re: /^GET \/api\/v1\/tenant\/engagements\/:id\/taxpayer$/,
-    why: "Mükellef seçici (useEngagementOptions) her mükellefin adını ayrı ister; tek isteğe indiren düzeltme ayrı PR'da (#639).",
-  },
-  {
     re: /^GET \/api\/v1\/tenant\/engagements\/:id\/assignments$/,
     why: "Mükellefler listesi her satırın atananlarını ayrı ister; toplu uç gerekiyor, ayrı PR'da (#639).",
   },
