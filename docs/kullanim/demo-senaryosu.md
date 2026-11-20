@@ -95,7 +95,7 @@ Başka parola için `make demo` öncesinde `DEMO_PASSWORD`, `SA_EMAIL` ve
   Oğuz Yılmaz carisine eşleşti.
 - **Deniz Yıldırım** havalesi (4.800,00 TL) kuyrukta bekler. Gösterimde
   cariyi seçip **Onayla**'ya, sonra **Fiş taslağı oluştur**'a basın. Fiş
-  **Yevmiye ve çıktı** ekranında taslak olarak belirir.
+  **Fişler ve aktarım** ekranında taslak olarak belirir.
 
 ### 4. Masraflar ve Z raporları
 
@@ -109,9 +109,9 @@ Başka parola için `make demo` öncesinde `DEMO_PASSWORD`, `SA_EMAIL` ve
   geçmişini, finansal işlemlerini ve Z raporlarını gösterir. Bu bağlantı
   demodadır ve dışarıya istek atmaz.
 
-### 5. Yevmiye ve çıktı
+### 5. Fişler ve aktarım
 
-Kenar menüden **Yevmiye ve çıktı**.
+Kenar menüden **Fişler ve aktarım**.
 
 - Ekim fişleri: aktarılanlar (banka, bordro, masraf, kira, akaryakıt) ve
   bekleyen Z taslakları.

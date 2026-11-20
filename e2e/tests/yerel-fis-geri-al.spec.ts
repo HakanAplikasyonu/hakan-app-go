@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, engagementOf, officePath, pickTaxpayer, uiLogin } from "./lib";
+import { Api, DEMO, engagementOf, officePath, pickTaxpayer, uiLogin, openNewEntry } from "./lib";
 
 /**
  * Onaylanmış ama henüz programa aktarılmamış fişin onayı gerekçeyle geri
@@ -21,6 +21,7 @@ test("onaylı fişin onayı gerekçeyle geri alınır, fiş taslağa döner ve y
   await pickTaxpayer(page, DEMO.selin.title);
 
   // Dengeli iki satırlı fiş: kaydet ve onayla.
+  await openNewEntry(page);
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const lines = page.locator('tbody tr:has(input[placeholder="770.01"])');
   await lines.nth(0).locator("input").nth(0).fill("770.01");
