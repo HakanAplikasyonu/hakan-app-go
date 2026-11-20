@@ -20,14 +20,18 @@ import (
 
 // Service is the tax return use case layer.
 type Service struct {
-	q   *db.Queries
-	now func() time.Time
+	q     *db.Queries
+	now   func() time.Time
+	store ObjectStore
 }
 
 // New builds the service on pool (statements join the request's RLS scope).
 func New(pool database.Pool) *Service {
 	return &Service{q: database.QueriesFor(pool), now: time.Now}
 }
+
+// WithStore sets the object store of the accrual slips (#575).
+func (s *Service) WithStore(store ObjectStore) *Service { s.store = store; return s }
 
 // WithClock replaces the clock (tests).
 func (s *Service) WithClock(now func() time.Time) *Service { s.now = now; return s }
@@ -50,7 +54,9 @@ type Record struct {
 	FiledOn       *string         `json:"filed_on"`
 	AccrualNumber *string         `json:"accrual_number"`
 	FiledAt       *time.Time      `json:"filed_at"`
-	UpdatedAt     time.Time       `json:"updated_at"`
+	// AccrualDocument is the GİB tahakkuk PDF attached after filing (#575).
+	AccrualDocument *AccrualDocument `json:"accrual_document"`
+	UpdatedAt       time.Time        `json:"updated_at"`
 }
 
 // body is what a snapshot freezes.
@@ -156,6 +162,11 @@ func recordView(r *db.TaxReturn) *Record {
 	}
 	if len(v.Adjustments) == 0 {
 		v.Adjustments = json.RawMessage(`{}`)
+	}
+	if r.AccrualStorageKey.Valid {
+		v.AccrualDocument = &AccrualDocument{
+			FileName: r.AccrualFileName.String, SizeBytes: r.AccrualSizeBytes.Int64, UploadedAt: r.AccrualUploadedAt.Time,
+		}
 	}
 	if r.PreparedAt.Valid {
 		t := r.PreparedAt.Time

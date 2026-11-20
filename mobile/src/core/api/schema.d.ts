@@ -12457,6 +12457,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Download the attached tahakkuk PDF
+         * @description Requires `tenant.tax_returns.read` (#575). `404` when none is attached.
+         */
+        get: operations["downloadEngagementTaxReturnAccrual"];
+        /**
+         * Attach the GİB tahakkuk PDF to a filed return
+         * @description Requires `tenant.tax_returns.write` (#575). The tahakkuk fişi
+         *     downloaded from GİB after filing; PDF only (content checked), up to
+         *     10 MB. Only a filed return (`409 TAX_RETURN_NOT_FILED`). A new file
+         *     replaces the attached one. The record's `accrual_document` names it.
+         */
+        put: operations["uploadEngagementTaxReturnAccrual"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export": {
         parameters: {
             query?: never;
@@ -19677,6 +19715,14 @@ export interface components {
             accrual_number: string | null;
             /** Format: date-time */
             filed_at: string | null;
+            /** @description The GİB tahakkuk PDF attached after filing (#575); null when none. */
+            accrual_document: null | {
+                file_name: string;
+                /** Format: int64 */
+                size_bytes: number;
+                /** Format: date-time */
+                uploaded_at: string;
+            };
             /** Format: date-time */
             updated_at: string;
         };
@@ -40014,6 +40060,113 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    downloadEngagementTaxReturnAccrual: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+            /** @description `STORAGE_UNAVAILABLE`: storage is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    uploadEngagementTaxReturnAccrual: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The return with the attached slip */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `UPLOAD_TOO_LARGE` */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `NOT_PDF` */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            500: components["responses"]["InternalError"];
+            /** @description `STORAGE_UNAVAILABLE`: storage is not configured */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     exportEngagementTaxReturn: {

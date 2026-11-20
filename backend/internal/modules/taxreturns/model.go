@@ -60,6 +60,12 @@ var (
 	ErrNotFound       = errors.New("taxreturns: return not found")
 	ErrUnacknowledged = errors.New("taxreturns: checklist warnings are not acknowledged")
 	ErrInvalidInput   = errors.New("taxreturns: invalid input")
+	// ErrNotFiled: the accrual slip belongs to a filed return (#575).
+	ErrNotFiled = errors.New("taxreturns: return is not filed")
+	// ErrNotPDF: the accrual slip must be a PDF.
+	ErrNotPDF = errors.New("taxreturns: accrual slip is not a PDF")
+	// ErrStorageMissing: no object store is configured.
+	ErrStorageMissing = errors.New("taxreturns: storage is not configured")
 )
 
 var periodRe = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)

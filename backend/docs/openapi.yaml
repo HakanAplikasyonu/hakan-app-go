@@ -16225,6 +16225,67 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    put:
+      tags: [TaxReturns]
+      operationId: uploadEngagementTaxReturnAccrual
+      summary: Attach the GİB tahakkuk PDF to a filed return
+      description: |
+        Requires `tenant.tax_returns.write` (#575). The tahakkuk fişi
+        downloaded from GİB after filing; PDF only (content checked), up to
+        10 MB. Only a filed return (`409 TAX_RETURN_NOT_FILED`). A new file
+        replaces the attached one. The record's `accrual_document` names it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "200":
+          description: The return with the attached slip
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { description: "`UPLOAD_TOO_LARGE`" }
+        "415": { description: "`NOT_PDF`" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { description: "`STORAGE_UNAVAILABLE`: storage is not configured" }
+    get:
+      tags: [TaxReturns]
+      operationId: downloadEngagementTaxReturnAccrual
+      summary: Download the attached tahakkuk PDF
+      description: Requires `tenant.tax_returns.read` (#575). `404` when none is attached.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { description: "`STORAGE_UNAVAILABLE`: storage is not configured" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -24757,7 +24818,7 @@ components:
 
     TaxReturnRecord:
       type: object
-      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, updated_at]
+      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, accrual_document, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -24768,6 +24829,16 @@ components:
         filed_on: { type: [string, "null"], format: date }
         accrual_number: { type: [string, "null"] }
         filed_at: { type: [string, "null"], format: date-time }
+        accrual_document:
+          description: The GİB tahakkuk PDF attached after filing (#575); null when none.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [file_name, size_bytes, uploaded_at]
+              properties:
+                file_name: { type: string }
+                size_bytes: { type: integer, format: int64 }
+                uploaded_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
     TaxReturnKDV1Adjustments:

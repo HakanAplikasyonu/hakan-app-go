@@ -37,8 +37,12 @@ func TestTaxReturnFlow(t *testing.T) {
 			Severity string `json:"severity"`
 		} `json:"checklist"`
 		Record *struct {
-			Status        string  `json:"status"`
-			AccrualNumber *string `json:"accrual_number"`
+			Status          string  `json:"status"`
+			AccrualNumber   *string `json:"accrual_number"`
+			AccrualDocument *struct {
+				FileName  string `json:"file_name"`
+				SizeBytes int64  `json:"size_bytes"`
+			} `json:"accrual_document"`
 		} `json:"record"`
 		KDV1 *struct {
 			Sales []struct {
@@ -165,6 +169,39 @@ func TestTaxReturnFlow(t *testing.T) {
 		t.Fatalf("reopen filed: %d %s", rec.Code, rec.Body)
 	}
 
+	// Tahakkuk PDF'i (#575): yalnızca verilmiş beyana, yalnızca PDF; indirilebilir.
+	pdf := func(name, body string) sweepCase { return sweepCase{file: "file", fileName: name, fileBody: body} }
+	accrual := base + "/kdv1/2026-10/accrual-document"
+	if rec := e.do(t, http.MethodGet, accrual, sweepCase{}, false); rec.Code != http.StatusNotFound {
+		t.Fatalf("accrual before upload: %d %s", rec.Code, rec.Body)
+	}
+	if rec := e.do(t, http.MethodPut, accrual, pdf("tahakkuk.txt", "not a pdf"), false); rec.Code != http.StatusUnsupportedMediaType {
+		t.Fatalf("accrual not pdf: %d %s", rec.Code, rec.Body)
+	}
+	if rec := e.do(t, http.MethodPut, base+"/muhsgk/2026-10/accrual-document", pdf("t.pdf", "%PDF-1.4\n"), false); rec.Code != http.StatusConflict {
+		t.Fatalf("accrual on unfiled return: %d %s", rec.Code, rec.Body)
+	}
+	if rec := e.do(t, http.MethodPut, accrual, pdf("eski.pdf", "%PDF-1.4\n% eski\n"), false); rec.Code != http.StatusOK {
+		t.Fatalf("accrual upload: %d %s", rec.Code, rec.Body)
+	}
+	rec := e.do(t, http.MethodPut, accrual, pdf("KDV Tahakkuk Ekim.pdf", "%PDF-1.4\n% tahakkuk\n"), false)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("accrual replace: %d %s", rec.Code, rec.Body)
+	}
+	p = call(t, http.MethodGet, base+"/kdv1/2026-10", "", http.StatusOK)
+	if d := p.Record.AccrualDocument; d == nil || d.FileName != "KDV Tahakkuk Ekim.pdf" || d.SizeBytes != 20 {
+		t.Fatalf("accrual document %+v", p.Record)
+	}
+	rec = e.do(t, http.MethodGet, accrual, sweepCase{}, false)
+	if rec.Code != http.StatusOK || rec.Body.String() != "%PDF-1.4\n% tahakkuk\n" ||
+		!strings.Contains(rec.Header().Get("Content-Disposition"), "KDV%20Tahakkuk%20Ekim.pdf") {
+		t.Fatalf("accrual download: %d %v %q", rec.Code, rec.Header(), rec.Body)
+	}
+	if n := e.one(t, `SELECT count(*)::text FROM tax_returns WHERE organization_id = $1 AND engagement_id = $2 AND $3::bigint > 0
+		AND kind = 'kdv1' AND period = '2026-10' AND accrual_storage_key IS NOT NULL`, "n"); n != "1" {
+		t.Fatalf("accrual rows %s", n)
+	}
+
 	// MUHSGK: demo Ekim bordrosundan; TCKN maskeli.
 	m := call(t, http.MethodGet, base+"/muhsgk/2026-10", "", http.StatusOK)
 	if m.MUHSGK == nil || m.MUHSGK.Payroll == nil || m.MUHSGK.Payroll.EmployeeCount == 0 || m.Calendar.DueDate != "2026-11-26" {
@@ -186,7 +223,7 @@ func TestTaxReturnFlow(t *testing.T) {
 	}
 
 	// Excel çıktısı: verilmiş KDV1 donmuş görüntüsüyle.
-	rec := raw(t, http.MethodGet, base+"/kdv1/2026-10/export", "")
+	rec = raw(t, http.MethodGet, base+"/kdv1/2026-10/export", "")
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Disposition"), "kdv1-2026-10.xlsx") ||
 		!bytes.HasPrefix(rec.Body.Bytes(), []byte("PK")) {
 		t.Fatalf("export: %d %v", rec.Code, rec.Header())

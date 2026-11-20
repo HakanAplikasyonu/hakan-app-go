@@ -200,6 +200,16 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
   AND status = 'prepared'
 RETURNING *;
 
+-- name: SetTaxReturnAccrualDocument :one
+-- Tahakkuk PDF'i (#575) yalnızca verilmiş beyana eklenir; yenisi eskisinin
+-- yerine geçer. Dönen satır eski anahtarı taşımaz; eskisini çağıran siler.
+UPDATE tax_returns
+SET accrual_storage_key = @storage_key::text, accrual_file_name = @file_name::text,
+    accrual_size_bytes = @size_bytes::bigint, accrual_sha256 = @sha256::text, accrual_uploaded_by = sqlc.narg(uploaded_by), accrual_uploaded_at = NOW()
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND kind = @kind AND period = @period
+  AND status = 'filed'
+RETURNING *;
+
 -- name: TaxReturnDocumentTaskStats :one
 -- Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
 -- işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
