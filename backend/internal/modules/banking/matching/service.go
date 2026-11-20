@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +17,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
 )
@@ -48,7 +50,21 @@ type Service struct {
 	pool     *pgxpool.Pool
 	review   Submitter
 	warnings WarningEngine
+	accounts AccountBooker
 	opt      Options
+}
+
+// AccountBooker books one movement to a trial-balance account (the bank
+// posting workflow, #383).
+type AccountBooker interface {
+	SetAccount(ctx context.Context, sub posting.Subject, userID int64, txn uuid.UUID, code, name string) error
+}
+
+// WithAccounts lets the single-movement screen book the movement to an
+// account (#565). Without it SetAccount answers ErrNoAccounts.
+func (s *Service) WithAccounts(a AccountBooker) *Service {
+	s.accounts = a
+	return s
 }
 
 // NewService builds the service. review and warnings may be nil (tests,
@@ -283,7 +299,8 @@ func (Applier) Revert(ctx context.Context, tx reviewusecase.Tx, sug reviewusecas
 }
 
 func (s *Service) controls(ctx context.Context, q *db.Queries, sub Subject, period string) ([]Finding, engine.Report, error) {
-	rows, err := q.ListBankTransactionsForControls(ctx, db.ListBankTransactionsForControlsParams{TaxpayerID: sub.TaxpayerID, Period: period})
+	rows, err := q.ListBankTransactionsForControls(ctx, db.ListBankTransactionsForControlsParams{
+		OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID, Period: period})
 	if err != nil {
 		return nil, engine.Report{}, err
 	}
@@ -292,7 +309,9 @@ func (s *Service) controls(ctx context.Context, q *db.Queries, sub Subject, peri
 		in[i] = Row{
 			ID: r.ID, UUID: r.Uuid.String(), Date: r.TransactionDate.Time.Format("2006-01-02"),
 			Direction: banking.Direction(r.DebitCredit), Amount: dec(r.Amount), Currency: r.Currency,
-			Detail: banking.Detail(r.KindDetail), Matched: r.MatchStatus == "matched",
+			// A movement the accountant booked to an account by hand (cari,
+			// advance, expense) is settled like a matched one (#565).
+			Detail: banking.Detail(r.KindDetail), Matched: r.MatchStatus == "matched" || r.BookedByHand,
 			Counterparty: r.CounterpartyName.String, TaxNumber: r.CounterpartyTaxNumber.String,
 			IdentityNumber: r.CounterpartyIdentityNumber.String, PaymentPurpose: r.PaymentPurpose.String,
 		}

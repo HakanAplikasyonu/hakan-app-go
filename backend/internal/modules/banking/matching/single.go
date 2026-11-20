@@ -16,6 +16,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 )
 
 // Errors of the single-transaction screen (#528).
@@ -27,6 +28,8 @@ var (
 	// ErrInvalidInvoices: an invoice is missing, of the wrong direction or
 	// currency, inactive, or already fully paid by other movements.
 	ErrInvalidInvoices = errors.New("invoices cannot be matched to this transaction")
+	// ErrNoAccounts: the posting workflow is not wired (tenancy off).
+	ErrNoAccounts = errors.New("bank posting is not configured")
 )
 
 // maxCandidates on the screen; the matcher scores up to 200.
@@ -35,20 +38,36 @@ const maxCandidates = 20
 // TransactionView is one bank movement with its invoice matches and the
 // scored open invoices it could close (#528).
 type TransactionView struct {
-	UUID         uuid.UUID        `json:"uuid"`
-	Date         string           `json:"transaction_date"`
-	DebitCredit  string           `json:"debit_credit"`
-	Amount       string           `json:"amount"`
-	Currency     string           `json:"currency"`
-	Description  string           `json:"description"`
-	Counterparty *string          `json:"counterparty_name"`
-	IBAN         *string          `json:"counterparty_iban"`
-	KindDetail   string           `json:"kind_detail"`
-	Period       string           `json:"period"`
-	MatchStatus  string           `json:"match_status"`
-	Matchable    bool             `json:"matchable"`
-	Matches      []MatchedInvoice `json:"matches"`
-	Candidates   []CandidateView  `json:"candidates"`
+	UUID         uuid.UUID `json:"uuid"`
+	Date         string    `json:"transaction_date"`
+	DebitCredit  string    `json:"debit_credit"`
+	Amount       string    `json:"amount"`
+	Currency     string    `json:"currency"`
+	Description  string    `json:"description"`
+	Counterparty *string   `json:"counterparty_name"`
+	// CounterpartyGuessed: the bank sent no name; it is read from the
+	// description (#565) and shown as such.
+	CounterpartyGuessed bool             `json:"counterparty_from_description"`
+	IBAN                *string          `json:"counterparty_iban"`
+	KindDetail          string           `json:"kind_detail"`
+	Period              string           `json:"period"`
+	MatchStatus         string           `json:"match_status"`
+	Matchable           bool             `json:"matchable"`
+	Matches             []MatchedInvoice `json:"matches"`
+	Candidates          []CandidateView  `json:"candidates"`
+	// Posting is the trial-balance account the movement is booked to (or
+	// proposed for), nil when there is none yet (#565).
+	Posting *PostingView `json:"posting"`
+}
+
+// PostingView is the movement's counter account: suggested (waits for the
+// accountant), approved, or drafted (already in a journal draft).
+type PostingView struct {
+	Status           string     `json:"status"`
+	AccountCode      string     `json:"account_code"`
+	AccountName      string     `json:"account_name"`
+	Source           string     `json:"source"`
+	JournalDraftUUID *uuid.UUID `json:"journal_draft_uuid"`
 }
 
 // MatchedInvoice is an invoice the movement closes (fully or in part).
@@ -168,6 +187,22 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 		Counterparty: textPtr(t.CounterpartyName), IBAN: textPtr(t.CounterpartyIban),
 		KindDetail: t.KindDetail, Period: t.Period, MatchStatus: t.MatchStatus, Matchable: matchable(t),
 		Matches: []MatchedInvoice{}, Candidates: []CandidateView{},
+	}
+	if v.Counterparty == nil || strings.TrimSpace(*v.Counterparty) == "" {
+		if name := CounterpartyFromDescription(t.Description); name != "" {
+			v.Counterparty, v.CounterpartyGuessed = &name, true
+		}
+	}
+	p, err := q.GetBankPostingView(ctx, db.GetBankPostingViewParams{OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, BankTransactionID: t.ID})
+	switch {
+	case err == nil:
+		v.Posting = &PostingView{Status: p.Status, AccountCode: p.AccountCode, AccountName: p.AccountName, Source: p.Source}
+		if p.JournalDraftUuid.Valid {
+			id := uuid.UUID(p.JournalDraftUuid.Bytes)
+			v.Posting.JournalDraftUUID, v.Posting.Status = &id, "drafted"
+		}
+	case !errors.Is(err, pgx.ErrNoRows):
+		return v, err
 	}
 	matches, err := q.ListBankTransactionMatchInvoices(ctx, db.ListBankTransactionMatchInvoicesParams{TaxpayerID: sub.TaxpayerID, BankTransactionID: t.ID})
 	if err != nil {
@@ -325,6 +360,31 @@ func (s *Service) Unmatch(ctx context.Context, sub Subject, id uuid.UUID) (Trans
 		return tq.SetBankTransactionMatchStatus(ctx, db.SetBankTransactionMatchStatusParams{MatchStatus: "unmatched", TaxpayerID: sub.TaxpayerID, ID: t.ID})
 	})
 	if err != nil {
+		return TransactionView{}, err
+	}
+	return s.refreshed(ctx, q, sub, t.Uuid, t.Period)
+}
+
+// SetAccount books the movement to the account the accountant chose
+// (cari 120/320, advance, salary, tax, rent, bank cost ...), with or
+// without an invoice match, and refreshes the period warnings: a movement
+// booked by hand no longer counts as an uninvoiced collection or an
+// undocumented payment (#565). The decision is kept in the review queue
+// (who, when, which account) and can be reverted there.
+func (s *Service) SetAccount(ctx context.Context, sub Subject, id uuid.UUID, userID int64, code, name string) (TransactionView, error) {
+	if s.accounts == nil {
+		return TransactionView{}, ErrNoAccounts
+	}
+	q := database.QueriesFor(s.pool)
+	t, err := s.transaction(ctx, q, sub, id)
+	if err != nil {
+		return TransactionView{}, err
+	}
+	if t.IsCancelled {
+		return TransactionView{}, ErrNotMatchable
+	}
+	psub := posting.Subject{OrganizationID: sub.OrganizationID, EngagementID: sub.EngagementID, TaxpayerID: sub.TaxpayerID}
+	if err := s.accounts.SetAccount(ctx, psub, userID, t.Uuid, code, name); err != nil {
 		return TransactionView{}, err
 	}
 	return s.refreshed(ctx, q, sub, t.Uuid, t.Period)

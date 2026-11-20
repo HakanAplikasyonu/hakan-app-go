@@ -63,6 +63,24 @@ export const bankMatchingService = {
       { query: { q } },
     );
   },
+  /**
+   * Hareketi seçilen mizan hesabına işler (#565): cari, avans, gider…
+   * Dönemin banka uyarıları yenilenir.
+   */
+  setAccount(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    accountCode: string,
+    accountName: string,
+  ) {
+    return tenantRequest<BankTransactionMatching>(
+      slug,
+      "PUT",
+      `${tx(engagement, transaction)}/account`,
+      { body: { account_code: accountCode, account_name: accountName } },
+    );
+  },
   unmatch(slug: string, engagement: string, transaction: string) {
     return tenantRequest<BankTransactionMatching>(
       slug,

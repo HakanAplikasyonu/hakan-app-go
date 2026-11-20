@@ -752,6 +752,8 @@ type Querier interface {
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
+	// booked_by_hand (#565): müşavir hareketi bu angajmanda kendi kararıyla bir
+	// hesaba işledi (öneriyi onayladı ya da hesabı seçti; otomatik onay sayılmaz).
 	ListBankTransactionsForControls(ctx context.Context, arg ListBankTransactionsForControlsParams) ([]ListBankTransactionsForControlsRow, error)
 	// Bir hesabın tarih aralığındaki iptal edilmemiş hareketleri, ekstre
 	// sırasıyla; daha önce kaç kez dışa aktarıldıkları ile.

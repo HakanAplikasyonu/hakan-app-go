@@ -12,6 +12,7 @@ import (
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
 	reviewrepository "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/repository"
 	reviewusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/review/usecase"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/warnings/engine"
@@ -82,9 +83,10 @@ func TestSampleMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	review := reviewusecase.New(reviewrepository.New(d.Pool, q)).Register(SuggestionKind, Applier{})
+	review := reviewusecase.New(reviewrepository.New(d.Pool, q)).Register(SuggestionKind, Applier{}).
+		Register(posting.SuggestionKind, posting.Applier{})
 	warn := engine.New(warningsrepository.NewWarnings(q), warningsrepository.NewConfig(q))
-	svc := NewService(d.Pool, review, warn, Options{FeeTolerance: d25})
+	svc := NewService(d.Pool, review, warn, Options{FeeTolerance: d25}).WithAccounts(posting.NewWorkflow(d.Pool, review, nil))
 	sub := Subject{OrganizationID: org, EngagementID: eng, TaxpayerID: tp}
 
 	res, err := svc.Run(ctx, sub, "2026-10")
@@ -276,6 +278,42 @@ func TestSampleMonth(t *testing.T) {
 	}
 	if _, err := svc.Search(ctx, sub, txUUID("f"), "geç"); !errors.Is(err, ErrNotMatchable) {
 		t.Fatalf("search on interest: %v", err)
+	}
+	// Book to an account by hand (#565): the invoice of "d" never comes, the
+	// accountant books the payment to the supplier's cari. The movement has
+	// no invoice match, but it is no longer an undocumented payment.
+	if _, err := svc.SetAccount(ctx, sub, txUUID("d"), user, "32x", ""); !errors.Is(err, posting.ErrInvalid) {
+		t.Fatalf("bad account code: %v", err)
+	}
+	view, err = svc.SetAccount(ctx, sub, txUUID("d"), user, "320.01.049", "Geç Tedarikçi")
+	if err != nil || view.Posting == nil || view.Posting.Status != "approved" || view.Posting.AccountCode != "320.01.049" ||
+		view.Posting.AccountName != "Geç Tedarikçi" || view.MatchStatus != "unmatched" {
+		t.Fatalf("book d: %+v %+v %v", view, view.Posting, err)
+	}
+	if got := undocumented(); got != "" {
+		t.Fatalf("a movement booked by hand must resolve the undocumented payment warning: %q", got)
+	}
+	// The accountant changes their mind: another account, still settled.
+	view, err = svc.SetAccount(ctx, sub, txUUID("d"), user, "159.01", "Verilen sipariş avansı")
+	if err != nil || view.Posting == nil || view.Posting.AccountCode != "159.01" || undocumented() != "" {
+		t.Fatalf("rebook d: %+v %+v %v", view, view.Posting, err)
+	}
+	// An uninvoiced collection booked as an advance closes its warning too.
+	var uninvoiced int
+	countUninvoiced := func() int {
+		_ = d.Pool.QueryRow(ctx, `SELECT count(*) FROM data_warnings WHERE engagement_id = $1 AND code = $2 AND status = 'open'`,
+			eng, CodeUninvoicedCollection).Scan(&uninvoiced)
+		return uninvoiced
+	}
+	if countUninvoiced() != 1 {
+		t.Fatalf("uninvoiced before booking e = %d", uninvoiced)
+	}
+	if view, err := svc.SetAccount(ctx, sub, txUUID("e"), user, "340.01", "Alınan sipariş avansı"); err != nil || view.Posting == nil || countUninvoiced() != 0 {
+		t.Fatalf("book e: %+v %v open=%d", view, err, uninvoiced)
+	}
+	// Movements with no posting say so.
+	if view, err := svc.Transaction(ctx, sub, txUUID("j")); err != nil || view.Posting != nil {
+		t.Fatalf("view j posting: %+v %v", view.Posting, err)
 	}
 	// Interest is neither a collection nor a payment of an invoice.
 	if view, err := svc.Transaction(ctx, sub, txUUID("f")); err != nil || view.Matchable || len(view.Candidates) != 0 {

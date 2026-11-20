@@ -8877,6 +8877,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Book the movement to the chosen account from its own screen
+         * @description Requires `tenant.bank.write` (#565). Books the movement to the
+         *     trial-balance account the accountant chose (cari 120/320, advance,
+         *     salary, tax, rent, bank cost ...), with or without an invoice match;
+         *     same rules as `PUT .../bank-postings/{transactionUuid}`. The
+         *     period's bank warnings are refreshed at once: a movement the
+         *     accountant booked by hand no longer counts as an uninvoiced
+         *     collection or an undocumented payment. The decision is kept in the
+         *     review queue (who, when, which account) and can be reverted there.
+         *     409 `BANK_POSTING_DRAFTED` when the movement is already in a journal
+         *     draft, `BANK_TRANSACTION_NOT_MATCHABLE` when it is cancelled.
+         */
+        put: operations["setTenantBankTransactionAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
         parameters: {
             query?: never;
@@ -16569,6 +16607,18 @@ export interface components {
             meta: components["schemas"]["ResponseMeta"];
         };
         BankTransactionMatching: {
+            /** @description The bank sent no name; `counterparty_name` is read from the description (#565) */
+            counterparty_from_description: boolean;
+            /** @description The trial-balance account the movement is booked to or proposed for; null when there is none (#565) */
+            posting: null | {
+                /** @enum {string} */
+                status: "suggested" | "approved" | "drafted";
+                account_code: string;
+                account_name: string;
+                source: string;
+                /** Format: uuid */
+                journal_draft_uuid: string | null;
+            };
             /** Format: uuid */
             uuid: string;
             /** Format: date */
@@ -34453,6 +34503,59 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankTransactionAccount: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 320.01.007 */
+                    account_code: string;
+                    /** @example Kalem Kırtasiye Ltd. Şti. */
+                    account_name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement after the booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `VALIDATION_ERROR`: the account code is malformed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

@@ -11826,6 +11826,57 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: setTenantBankTransactionAccount
+      summary: Book the movement to the chosen account from its own screen
+      description: |
+        Requires `tenant.bank.write` (#565). Books the movement to the
+        trial-balance account the accountant chose (cari 120/320, advance,
+        salary, tax, rent, bank cost ...), with or without an invoice match;
+        same rules as `PUT .../bank-postings/{transactionUuid}`. The
+        period's bank warnings are refreshed at once: a movement the
+        accountant booked by hand no longer counts as an uninvoiced
+        collection or an undocumented payment. The decision is kept in the
+        review queue (who, when, which account) and can be reverted there.
+        409 `BANK_POSTING_DRAFTED` when the movement is already in a journal
+        draft, `BANK_TRANSACTION_NOT_MATCHABLE` when it is cancelled.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account_code]
+              additionalProperties: false
+              properties:
+                account_code: { type: string, example: "320.01.007" }
+                account_name: { type: string, example: "Kalem Kırtasiye Ltd. Şti." }
+      responses:
+        "200":
+          description: The movement after the booking
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankTransactionMatching" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: the account code is malformed"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21300,8 +21351,21 @@ components:
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting]
       properties:
+        counterparty_from_description: { type: boolean, description: "The bank sent no name; `counterparty_name` is read from the description (#565)" }
+        posting:
+          description: The trial-balance account the movement is booked to or proposed for; null when there is none (#565)
+          oneOf:
+            - { type: "null" }
+            - type: object
+              required: [status, account_code, account_name, source, journal_draft_uuid]
+              properties:
+                status: { type: string, enum: [suggested, approved, drafted] }
+                account_code: { type: string }
+                account_name: { type: string }
+                source: { type: string }
+                journal_draft_uuid: { type: [string, "null"], format: uuid }
         uuid: { type: string, format: uuid }
         transaction_date: { type: string, format: date }
         debit_credit: { type: string, enum: [A, B], description: "A: money in, B: money out" }

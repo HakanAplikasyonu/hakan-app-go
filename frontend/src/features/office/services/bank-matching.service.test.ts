@@ -38,6 +38,23 @@ describe("bankMatchingService (#528)", () => {
       `${base}/matches`,
     );
   });
+  it("books the movement to an account (#565)", () => {
+    void bankMatchingService.setAccount(
+      "demo",
+      "e1",
+      "t1",
+      "320.01.007",
+      "Kalem",
+    );
+    expect(tenantRequest).toHaveBeenCalledWith(
+      "demo",
+      "PUT",
+      `${base}/account`,
+      {
+        body: { account_code: "320.01.007", account_name: "Kalem" },
+      },
+    );
+  });
   it("keys per office, engagement and movement", () => {
     expect(bankMatchingKeys.one("Demo", "e1", "t1")).toEqual([
       "tenant",
