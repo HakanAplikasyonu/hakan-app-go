@@ -1,22 +1,25 @@
 import { expect, test } from "@playwright/test";
 
-import { Api, DEMO, deriveUbl, engagementOf, officePath, uiLogin } from "./lib";
+import { addConsentedTaxpayer, Api, DEMO, deriveUbl, officePath, uiLogin, uniqueVkn, waitForUploads } from "./lib";
 
 /**
  * Eksik kur (#571): kaynakta kur gelmeyen dövizli fatura KDV hesabına
  * girmez; müşavir belge yan panelinden faturanın tarihindeki kuru girer.
  *
- * Veri: Atlas Gıda'ya bu ayın tarihli, kur bilgisi çıkarılmış bir USD
- * faturası yüklenir (demo atlas-06'dan türetilir; benzersiz numara ve ETTN).
- * Bu ay kilitli değildir; dosya yalnızca kendi yüklediği faturaya dokunur.
+ * Veri: her koşuda yeni bir mükellef (Atlas'ın yükleme sayımına dokunmaz);
+ * ona bu ayın tarihli, kur bilgisi çıkarılmış bir USD faturası yüklenir
+ * (demo atlas-06'dan türetilir; benzersiz numara ve ETTN).
  */
-test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page }) => {
+test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page, browser }) => {
+  test.setTimeout(240_000);
+  const run = `${Date.now()}`.slice(-6);
+  const taxpayer = { vkn: uniqueVkn(), title: `Kur Dış Ticaret ${run} A.Ş.` };
   const api = await Api.login(DEMO.owner);
-  const atlas = await engagementOf(api, DEMO.atlas.title);
+  const eng = await addConsentedTaxpayer(browser, api, taxpayer, "kur");
 
   const today = new Date().toISOString().slice(0, 10);
   const number = `EKR${today.slice(0, 4)}${String(Date.now()).slice(-9)}`;
-  const ubl = deriveUbl("atlas-06-doviz-usd.xml", DEMO.atlas.taxId, DEMO.atlas.title);
+  const ubl = deriveUbl("atlas-06-doviz-usd.xml", taxpayer.vkn, taxpayer.title);
   const xml = ubl.buffer
     .toString("utf8")
     .replace(/<PricingExchangeRate\b[\s\S]*?<\/PricingExchangeRate>\s*/, "")
@@ -25,12 +28,14 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page })
     .join(today);
   expect(xml).not.toContain("CalculationRate");
   await api.json(
-    await api.upload(`/v1/tenant/engagements/${atlas}/ubl-uploads`, {
+    await api.upload(`/v1/tenant/engagements/${eng}/ubl-uploads`, {
       ...ubl,
       name: `e2e-eksik-kur-${number}.xml`,
       buffer: Buffer.from(xml, "utf8"),
     }),
   );
+
+  await waitForUploads(api, eng, 1);
 
   type Inv = { uuid: string; invoice_number: string; currency: string; exchange_rate?: string };
   let invoice: Inv | undefined;
@@ -38,7 +43,7 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page })
     .poll(
       async () => {
         const list = await api.json<{ items: Inv[] }>(
-          await api.get(`/v1/tenant/engagements/${atlas}/invoices?limit=100`),
+          await api.get(`/v1/tenant/engagements/${eng}/invoices?limit=100`),
         );
         invoice = list.items.find((i) => i.invoice_number === number);
         return !!invoice;
@@ -50,7 +55,7 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page })
   expect(invoice!.exchange_rate ?? "").toBe("");
 
   await uiLogin(page, DEMO.owner);
-  await page.goto(officePath(`/engagements/${atlas}/documents?belge=${invoice!.uuid}`));
+  await page.goto(officePath(`/engagements/${eng}/documents?belge=${invoice!.uuid}`));
   const box = page.getByRole("region", { name: "Kur eksik: USD fatura" });
   await expect(box).toBeVisible();
   await box.getByRole("textbox", { name: "USD kuru (TL)" }).fill("38,5");
@@ -59,9 +64,9 @@ test("dövizli faturada eksik kur panelden tamamlanır (#571)", async ({ page })
   await expect(box).toHaveCount(0);
 
   // Sunucu kuru tuttu; ikinci kez girilemez.
-  const detail = await api.json<Inv>(await api.get(`/v1/tenant/engagements/${atlas}/invoices/${invoice!.uuid}`));
+  const detail = await api.json<Inv>(await api.get(`/v1/tenant/engagements/${eng}/invoices/${invoice!.uuid}`));
   expect(Number(detail.exchange_rate)).toBe(38.5);
-  const again = await api.put(`/v1/tenant/engagements/${atlas}/invoices/${invoice!.uuid}/exchange-rate`, { rate: "40" });
+  const again = await api.put(`/v1/tenant/engagements/${eng}/invoices/${invoice!.uuid}/exchange-rate`, { rate: "40" });
   expect(again.status()).toBe(409);
   expect(await again.text()).toContain("EXCHANGE_RATE_SET");
   await api.dispose();
