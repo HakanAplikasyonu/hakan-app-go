@@ -752,19 +752,30 @@ WHERE i.taxpayer_id = $2
   AND i.direction = $3
   AND i.status_normalized = 'active'
   AND (i.currency = $1::text OR ($1::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
-  AND (i.invoice_number ILIKE '%' || $4::text || '%'
+  AND ($4::text IS NULL
+       OR i.invoice_number ILIKE '%' || $4::text || '%'
        OR i.customer_name ILIKE '%' || $4::text || '%'
        OR i.customer_tax_number = $4::text
        OR i.customer_identity_number = $4::text)
+  AND ($5::date IS NULL OR i.issue_date >= $5::date)
+  AND ($6::date IS NULL OR i.issue_date <= $6::date)
+  AND ($7::numeric IS NULL
+       OR (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END) >= $7::numeric)
+  AND ($8::numeric IS NULL
+       OR (CASE WHEN i.currency = $1::text THEN i.payable_amount ELSE i.payable_amount_try END) <= $8::numeric)
 ORDER BY i.issue_date DESC, i.id
 LIMIT 50
 `
 
 type SearchInvoicesForBankMatchParams struct {
-	Currency   string `json:"currency"`
-	TaxpayerID int64  `json:"taxpayer_id"`
-	Direction  string `json:"direction"`
-	Term       string `json:"term"`
+	Currency   string         `json:"currency"`
+	TaxpayerID int64          `json:"taxpayer_id"`
+	Direction  string         `json:"direction"`
+	Term       pgtype.Text    `json:"term"`
+	DateFrom   pgtype.Date    `json:"date_from"`
+	DateTo     pgtype.Date    `json:"date_to"`
+	AmountMin  pgtype.Numeric `json:"amount_min"`
+	AmountMax  pgtype.Numeric `json:"amount_max"`
 }
 
 type SearchInvoicesForBankMatchRow struct {
@@ -779,13 +790,18 @@ type SearchInvoicesForBankMatchRow struct {
 
 // Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 // dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
-// faturalar.
+// faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
+// fatura tutarı aralığı (hareketin para biriminde); boş olan uygulanmaz.
 func (q *Queries) SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error) {
 	rows, err := q.db.Query(ctx, searchInvoicesForBankMatch,
 		arg.Currency,
 		arg.TaxpayerID,
 		arg.Direction,
 		arg.Term,
+		arg.DateFrom,
+		arg.DateTo,
+		arg.AmountMin,
+		arg.AmountMax,
 	)
 	if err != nil {
 		return nil, err

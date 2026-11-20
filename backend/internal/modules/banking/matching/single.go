@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -253,10 +254,33 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	return v, nil
 }
 
+// SearchFilter narrows the manual invoice search (#565). Every field is
+// optional; an empty filter finds nothing.
+type SearchFilter struct {
+	// Term: invoice number or counterparty name (contains), VKN/TCKN (equals);
+	// at least two characters.
+	Term string
+	// From / To: invoice issue date range, inclusive.
+	From, To *time.Time
+	// Min / Max: invoice payable amount in the movement's currency, inclusive.
+	Min, Max *decimal.Decimal
+}
+
+func (f SearchFilter) empty() bool {
+	return f.Term == "" && f.From == nil && f.To == nil && f.Min == nil && f.Max == nil
+}
+
 // Search finds open invoices for a manual match by number, name or tax
 // id, outside the candidates' date and amount window (#565). The movement
 // must be matchable; results carry no score.
 func (s *Service) Search(ctx context.Context, sub Subject, id uuid.UUID, term string) ([]CandidateView, error) {
+	return s.SearchFiltered(ctx, sub, id, SearchFilter{Term: term})
+}
+
+// SearchFiltered is Search with a date and amount range (#565): the
+// accountant narrows by "around this date" or "about this much" when the
+// number or name is not known.
+func (s *Service) SearchFiltered(ctx context.Context, sub Subject, id uuid.UUID, f SearchFilter) ([]CandidateView, error) {
 	q := database.QueriesFor(s.pool)
 	t, err := s.transaction(ctx, q, sub, id)
 	if err != nil {
@@ -265,15 +289,34 @@ func (s *Service) Search(ctx context.Context, sub Subject, id uuid.UUID, term st
 	if !matchable(t) {
 		return nil, ErrNotMatchable
 	}
-	term = strings.TrimSpace(term)
+	f.Term = strings.TrimSpace(f.Term)
 	out := []CandidateView{}
-	if len([]rune(term)) < 2 {
+	if f.Term != "" && len([]rune(f.Term)) < 2 {
+		f.Term = ""
+	}
+	if f.empty() {
 		return out, nil
 	}
-	rows, err := q.SearchInvoicesForBankMatch(ctx, db.SearchInvoicesForBankMatchParams{
-		Currency: t.Currency, TaxpayerID: sub.TaxpayerID, Term: term,
+	p := db.SearchInvoicesForBankMatchParams{
+		Currency: t.Currency, TaxpayerID: sub.TaxpayerID,
 		Direction: invoiceDirection(banking.Direction(t.DebitCredit)),
-	})
+	}
+	if f.Term != "" {
+		p.Term = pgtype.Text{String: f.Term, Valid: true}
+	}
+	if f.From != nil {
+		p.DateFrom = pgtype.Date{Time: *f.From, Valid: true}
+	}
+	if f.To != nil {
+		p.DateTo = pgtype.Date{Time: *f.To, Valid: true}
+	}
+	if f.Min != nil {
+		p.AmountMin = numeric(*f.Min)
+	}
+	if f.Max != nil {
+		p.AmountMax = numeric(*f.Max)
+	}
+	rows, err := q.SearchInvoicesForBankMatch(ctx, p)
 	if err != nil {
 		return nil, err
 	}

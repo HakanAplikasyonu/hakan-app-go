@@ -9144,7 +9144,10 @@ export interface paths {
          *     direction and currency whose number or counterparty name contains
          *     `q`, or whose VKN/TCKN equals it, outside the candidates' date and
          *     amount window; newest first, at most 20, fully paid ones left out.
-         *     Fewer than two characters find nothing. Results carry score 0.
+         *     Optional filters narrow by issue date (`from`, `to`) and by payable
+         *     amount in the movement's currency (`min`, `max`), all inclusive; they
+         *     work without `q`. A `q` shorter than two characters is ignored; with
+         *     no filter at all nothing is found. Results carry score 0.
          */
         get: operations["searchTenantBankTransactionInvoices"];
         put?: never;
@@ -35617,8 +35620,16 @@ export interface operations {
     };
     searchTenantBankTransactionInvoices: {
         parameters: {
-            query: {
-                q: string;
+            query?: {
+                q?: string;
+                /** @description Issue date from (inclusive) */
+                from?: string;
+                /** @description Issue date to (inclusive) */
+                to?: string;
+                /** @description Minimum payable amount (decimal) */
+                min?: string;
+                /** @description Maximum payable amount (decimal) */
+                max?: string;
             };
             header: {
                 /**
@@ -35651,6 +35662,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];

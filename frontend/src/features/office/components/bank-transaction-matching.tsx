@@ -21,6 +21,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/config/routes";
@@ -77,6 +78,17 @@ export function BankTransactionMatchingPanel({
   const [pickedLines, setPickedLines] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
+  // Elle arama süzgeçleri (#565): düzenleme tarihi ve tutar aralığı.
+  const [range, setRange] = useState({ from: "", to: "", min: "", max: "" });
+  const deferredRange = useDeferredValue(range);
+  const filter = {
+    q: deferred.length >= 2 ? deferred : "",
+    from: deferredRange.from,
+    to: deferredRange.to,
+    min: deferredRange.min.trim().replace(",", "."),
+    max: deferredRange.max.trim().replace(",", "."),
+  };
+  const searching = Object.values(filter).some((v) => v !== "");
 
   const q = useQuery({
     queryKey: key,
@@ -171,10 +183,10 @@ export function BankTransactionMatchingPanel({
   const busy = match.isPending || unmatch.isPending || book.isPending;
   // Elle arama (#565): aday penceresinin dışındaki faturalar.
   const search = useQuery({
-    queryKey: bankMatchingKeys.search(slug, engagement, transaction, deferred),
+    queryKey: bankMatchingKeys.search(slug, engagement, transaction, filter),
     queryFn: () =>
-      bankMatchingService.search(slug, engagement, transaction, deferred),
-    enabled: deferred.length >= 2 && !!q.data?.matchable,
+      bankMatchingService.search(slug, engagement, transaction, filter),
+    enabled: searching && !!q.data?.matchable,
   });
 
   if (q.isPending) return <Skeleton className="h-32 w-full" />;
@@ -374,7 +386,39 @@ export function BankTransactionMatchingPanel({
                   aria-label={t("office.bank.matching.search_placeholder")}
                 />
               </InputGroup>
-              {deferred.length >= 2 ? (
+              <div
+                className="grid max-w-md grid-cols-2 gap-2"
+                data-testid="bank-invoice-search-range"
+              >
+                {(
+                  [
+                    ["from", "date"],
+                    ["to", "date"],
+                    ["min", "text"],
+                    ["max", "text"],
+                  ] as const
+                ).map(([key, type]) => (
+                  <div key={key} className="space-y-1">
+                    <Label
+                      htmlFor={`bank-search-${transaction}-${key}`}
+                      className="text-text-2 text-xs"
+                    >
+                      {t(`office.bank.matching.search_${key}`)}
+                    </Label>
+                    <Input
+                      id={`bank-search-${transaction}-${key}`}
+                      type={type}
+                      inputMode={type === "text" ? "decimal" : undefined}
+                      value={range[key]}
+                      onChange={(e) =>
+                        setRange((r) => ({ ...r, [key]: e.target.value }))
+                      }
+                      className="h-8"
+                    />
+                  </div>
+                ))}
+              </div>
+              {searching ? (
                 search.isLoading ? (
                   <Skeleton className="h-16 w-full" />
                 ) : (search.data?.items ?? []).length === 0 ? (

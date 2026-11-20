@@ -12137,11 +12137,18 @@ paths:
         direction and currency whose number or counterparty name contains
         `q`, or whose VKN/TCKN equals it, outside the candidates' date and
         amount window; newest first, at most 20, fully paid ones left out.
-        Fewer than two characters find nothing. Results carry score 0.
+        Optional filters narrow by issue date (`from`, `to`) and by payable
+        amount in the movement's currency (`min`, `max`), all inclusive; they
+        work without `q`. A `q` shorter than two characters is ignored; with
+        no filter at all nothing is found. Results carry score 0.
       security:
         - bearerAuth: []
       parameters:
-        - { name: q, in: query, required: true, schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: false, schema: { type: string, format: date }, description: "Issue date from (inclusive)" }
+        - { name: to, in: query, required: false, schema: { type: string, format: date }, description: "Issue date to (inclusive)" }
+        - { name: min, in: query, required: false, schema: { type: string }, description: "Minimum payable amount (decimal)" }
+        - { name: max, in: query, required: false, schema: { type: string }, description: "Maximum payable amount (decimal)" }
       responses:
         "200":
           description: Matching open invoices
@@ -12160,6 +12167,7 @@ paths:
                         type: array
                         items: { $ref: "#/components/schemas/BankMatchCandidate" }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }

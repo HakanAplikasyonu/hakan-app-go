@@ -5,8 +5,11 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
@@ -117,14 +120,42 @@ func (h *Handler) transaction(w http.ResponseWriter, r *http.Request) {
 	h.reply(w, r, v, err)
 }
 
-// search: GET .../invoice-search?q= (#565).
+// search: GET .../invoice-search?q=&from=&to=&min=&max= (#565).
 func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(r.PathValue("transactionUuid"))
 	if err != nil {
 		response.NotFound(w, r, "bank transaction not found")
 		return
 	}
-	items, err := h.svc.Search(r.Context(), subjectOf(r), id, r.URL.Query().Get("q"))
+	qs := r.URL.Query()
+	f := SearchFilter{Term: qs.Get("q")}
+	for _, d := range []struct {
+		key string
+		dst **time.Time
+	}{{"from", &f.From}, {"to", &f.To}} {
+		if v := strings.TrimSpace(qs.Get(d.key)); v != "" {
+			t, err := time.Parse("2006-01-02", v)
+			if err != nil {
+				response.BadRequest(w, r, "VALIDATION_ERROR", d.key+" must be YYYY-MM-DD")
+				return
+			}
+			*d.dst = &t
+		}
+	}
+	for _, a := range []struct {
+		key string
+		dst **decimal.Decimal
+	}{{"min", &f.Min}, {"max", &f.Max}} {
+		if v := strings.TrimSpace(qs.Get(a.key)); v != "" {
+			n, err := decimal.NewFromString(v)
+			if err != nil || n.IsNegative() {
+				response.BadRequest(w, r, "VALIDATION_ERROR", a.key+" must be a non-negative amount")
+				return
+			}
+			*a.dst = &n
+		}
+	}
+	items, err := h.svc.SearchFiltered(r.Context(), subjectOf(r), id, f)
 	h.reply(w, r, map[string]any{"items": items}, err)
 }
 
