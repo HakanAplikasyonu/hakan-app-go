@@ -1521,6 +1521,7 @@
   "copilot.command.example_reports": "Tüm mükelleflerin ekim raporunu gönder",
   "copilot.command.hint": "The co-pilot only proposes existing actions and asks for your approval on each step.",
   "copilot.engagement_title": "Next work · {{period}}",
+  "copilot.scope_all_note": "All periods are selected; only {{period}} is counted here.",
   "copilot.all_taxpayers": "All taxpayers",
   "copilot.recent.title": "Your latest commands",
   "copilot.recent.steps": "{{done}} of {{total}} steps done",
