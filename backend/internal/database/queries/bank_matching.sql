@@ -220,3 +220,27 @@ SELECT r.id, r.uuid, r.period, r.net_total,
 FROM payroll_runs r
 WHERE r.taxpayer_id = @taxpayer_id AND r.period >= @period_from::text AND r.period <= @period_to::text
 ORDER BY r.period DESC;
+
+-- name: ListBankTransactionFinancialMatches :many
+SELECT m.amount, m.method, f.uuid AS financial_uuid, f.transaction_date, f.due_date, f.payment_method_type,
+       f.amount_try, f.description, f.customer_name, f.reference_document_no, f.source_system
+FROM bank_transaction_matches m
+JOIN source_financial_transactions f ON f.taxpayer_id = m.taxpayer_id AND f.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'financial_transaction'
+ORDER BY f.transaction_date, f.id;
+
+-- Elle bağlanabilecek kaynak finansal işlemleri (#565): çek, senet, kredi
+-- kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
+-- 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
+-- name: ListFinancialTransactionsForBankMatch :many
+SELECT f.id, f.uuid, f.transaction_date, f.due_date, f.payment_method_type, f.amount_try, f.description,
+       f.customer_name, f.reference_document_no, f.source_system,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = f.taxpayer_id AND m.target_type = 'financial_transaction' AND m.target_id = f.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric(18,2) AS matched
+FROM source_financial_transactions f
+WHERE f.taxpayer_id = @taxpayer_id AND f.direction = @direction::text
+  AND f.payment_method_type = ANY(@methods::text[])
+  AND COALESCE(f.due_date, f.transaction_date) BETWEEN @date_from::date AND @date_to::date
+ORDER BY abs(f.amount_try - @amount::numeric), f.transaction_date DESC
+LIMIT 20;

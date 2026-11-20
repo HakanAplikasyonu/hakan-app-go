@@ -17626,6 +17626,42 @@ export interface components {
                 open_amount: string;
                 employee_count: number;
             }[];
+            /** @description Source financial transactions (cheque, promissory note) the movement settles (#565) */
+            financial_matches: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Cheques / notes of the same direction around the movement's date not yet settled (#565) */
+            financial_candidates: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                open_amount: string;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -36763,6 +36799,8 @@ export interface operations {
                     invoice_uuids?: string[];
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
+                    /** @description Source financial transactions (cheque, promissory note from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+                    financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */

@@ -12643,6 +12643,11 @@ paths:
                   maxItems: 3
                   description: Payroll runs an outgoing payment pays (net salaries, #710); of the movement's month or the two before
                   items: { type: string, format: uuid }
+                financial_transaction_uuids:
+                  type: array
+                  maxItems: 5
+                  description: Source financial transactions (cheque, promissory note from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after
+                  items: { type: string, format: uuid }
                 journal_lines:
                   type: array
                   maxItems: 10
@@ -22703,7 +22708,7 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates, financial_matches, financial_candidates]
       properties:
         payroll_matchable: { type: boolean, description: "An outgoing payment can be tied to a payroll run (#710)" }
         payroll_matches:
@@ -22730,6 +22735,41 @@ components:
               net_total: { type: string }
               open_amount: { type: string }
               employee_count: { type: integer }
+        financial_matches:
+          type: array
+          description: Source financial transactions (cheque, promissory note) the movement settles (#565)
+          items:
+            type: object
+            required: [financial_transaction_uuid, transaction_date, due_date, payment_method_type, amount_try, description, counterparty_name, document_no, source_system, amount, method]
+            properties:
+              financial_transaction_uuid: { type: string, format: uuid }
+              transaction_date: { type: string, format: date }
+              due_date: { type: [string, "null"], format: date }
+              payment_method_type: { type: string, enum: [check, promissory_note, credit_card] }
+              amount_try: { type: string }
+              description: { type: string }
+              counterparty_name: { type: [string, "null"] }
+              document_no: { type: [string, "null"] }
+              source_system: { type: string }
+              amount: { type: string }
+              method: { type: string, enum: [auto, manual] }
+        financial_candidates:
+          type: array
+          description: Cheques / notes of the same direction around the movement's date not yet settled (#565)
+          items:
+            type: object
+            required: [financial_transaction_uuid, transaction_date, due_date, payment_method_type, amount_try, open_amount, description, counterparty_name, document_no, source_system]
+            properties:
+              financial_transaction_uuid: { type: string, format: uuid }
+              transaction_date: { type: string, format: date }
+              due_date: { type: [string, "null"], format: date }
+              payment_method_type: { type: string, enum: [check, promissory_note, credit_card] }
+              amount_try: { type: string }
+              description: { type: string }
+              counterparty_name: { type: [string, "null"] }
+              document_no: { type: [string, "null"] }
+              source_system: { type: string }
+              open_amount: { type: string }
         line_matchable: { type: boolean, description: "The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G)" }
         journal_matches:
           type: array

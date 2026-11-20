@@ -59,6 +59,9 @@ func EasytradeBatch() sources.Batch {
 		{"et-fin-6", "retail_sale", "credit_card", "6420.00", "Perakende müşteri", "", "Garanti POS", "valor", "Perakende satış", 21},
 		{"et-fin-7", "income", "cash", "3100.00", "Mehmet Demir", "", "Merkez Kasa", "cash", "Ekim tahsilatı", 24},
 		{"et-fin-8", "expense", "credit_card", "1500.00", "Boğaz Petrol A.Ş.", "1111111111", "Şirket kartı", "credit_card", "Akaryakıt", 6},
+		// Çek ve senetle ödeme (#565): banka hareketi bunlara bağlanır.
+		{"et-fin-9", "expense", "check", "18600.00", "Anadolu Un Sanayi A.Ş.", "4444444444", "Çek portföyü", "check", "Un alımı · çek no 0047812", 20},
+		{"et-fin-10", "expense", "promissory_note", "9400.00", "Ege Ambalaj Ltd.", "5555555555", "Senet portföyü", "promissory_note", "Ambalaj alımı · senet no S-2026-118", 23},
 	} {
 		dir := map[string]string{"income": "in", "retail_sale": "in", "expense": "out"}[f.typ]
 		a := amt(f.amount)

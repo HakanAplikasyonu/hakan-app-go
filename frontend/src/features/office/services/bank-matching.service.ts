@@ -104,6 +104,7 @@ export const bankMatchingService = {
     invoiceUuids: string[],
     journalLines: BankMatchLineRef[] = [],
     payrollRunUuids: string[] = [],
+    financialUuids: string[] = [],
   ) {
     return tenantRequest<BankTransactionMatching>(
       slug,
@@ -116,6 +117,10 @@ export const bankMatchingService = {
           // Bordroya bağlama (#710): net maaş ödemesi.
           ...(payrollRunUuids.length > 0
             ? { payroll_run_uuids: payrollRunUuids }
+            : {}),
+          // Çek / senede bağlama (#565): entegrasyondan gelen finansal işlem.
+          ...(financialUuids.length > 0
+            ? { financial_transaction_uuids: financialUuids }
             : {}),
         },
       },

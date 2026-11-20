@@ -83,6 +83,8 @@ export function BankTransactionMatchingPanel({
   const [pickedLines, setPickedLines] = useState<string[]>([]);
   // Seçilen bordrolar (#710): net maaş ödemesi.
   const [pickedPayroll, setPickedPayroll] = useState<string[]>([]);
+  // Seçilen çek / senetler (#565): entegrasyondan gelen finansal işlem.
+  const [pickedFinancial, setPickedFinancial] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
   // Elle arama süzgeçleri (#565): düzenleme tarihi ve tutar aralığı.
@@ -107,6 +109,7 @@ export function BankTransactionMatchingPanel({
     setPicked([]);
     setPickedLines([]);
     setPickedPayroll([]);
+    setPickedFinancial([]);
     void qc.invalidateQueries({
       queryKey: [
         "tenant",
@@ -143,6 +146,7 @@ export function BankTransactionMatchingPanel({
       invoices: string[];
       lines: BankMatchLineRef[];
       payroll: string[];
+      financial: string[];
     }) =>
       bankMatchingService.match(
         slug,
@@ -151,6 +155,7 @@ export function BankTransactionMatchingPanel({
         m.invoices,
         m.lines,
         m.payroll,
+        m.financial,
       ),
     onSuccess: (v) =>
       settle(
@@ -160,7 +165,9 @@ export function BankTransactionMatchingPanel({
             ? "office.bank.matching.matched"
             : v.payroll_matches.length > 0
               ? "office.bank.matching.matched_payroll"
-              : "office.bank.matching.matched_lines",
+              : v.financial_matches.length > 0
+                ? "office.bank.matching.matched_financial"
+                : "office.bank.matching.matched_lines",
         ),
       ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
@@ -224,12 +231,31 @@ export function BankTransactionMatchingPanel({
     `${routes.tenant.engagementPayroll(slug, engagement)}?${FOCUS_PARAM}=${encodeURIComponent(`payroll_run:${id}`)}`;
   const togglePayroll = (id: string, on: boolean) =>
     setPickedPayroll((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const toggleFinancial = (id: string, on: boolean) =>
+    setPickedFinancial((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const financialLabel = (f: {
+    payment_method_type: string;
+    document_no: string | null;
+    description: string;
+  }) =>
+    t(`office.bank.matching.financial_method_${f.payment_method_type}`) +
+    " · " +
+    (f.document_no || f.description);
   const hasMatches =
-    v.matches.length + v.journal_matches.length + v.payroll_matches.length > 0;
-  const pickedCount = picked.length + pickedLines.length + pickedPayroll.length;
+    v.matches.length +
+      v.journal_matches.length +
+      v.payroll_matches.length +
+      v.financial_matches.length >
+    0;
+  const pickedCount =
+    picked.length +
+    pickedLines.length +
+    pickedPayroll.length +
+    pickedFinancial.length;
   const submit = () =>
     match.mutate({
       payroll: pickedPayroll,
+      financial: pickedFinancial,
       invoices: picked,
       lines: pickedLines.map((k) => {
         const [uuid, no] = k.split(":");
@@ -299,7 +325,9 @@ export function BankTransactionMatchingPanel({
                 ? t("office.bank.matching.matches_title")
                 : v.payroll_matches.length > 0
                   ? t("office.bank.matching.payroll_matches_title")
-                  : t("office.bank.matching.line_matches_title")}
+                  : v.financial_matches.length > 0
+                    ? t("office.bank.matching.financial_matches_title")
+                    : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -364,6 +392,29 @@ export function BankTransactionMatchingPanel({
                   <span className="text-muted-foreground">
                     {t("office.bank.matching.payroll_net")}{" "}
                     <Money value={m.net_total} currency={v.currency} />
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.financial_matches.length > 0 ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-financial-matches"
+            >
+              {v.financial_matches.map((m) => (
+                <li
+                  key={m.financial_transaction_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <span className="font-medium">{financialLabel(m)}</span>
+                  <span className="text-muted-foreground">
+                    {m.counterparty_name ?? "—"} ·{" "}
+                    {trDate(m.due_date ?? m.transaction_date)}
                   </span>
                   <Money value={m.amount} currency={v.currency} />
                   <Badge variant="secondary">
@@ -543,6 +594,50 @@ export function BankTransactionMatchingPanel({
                   {t("office.bank.matching.payroll_employees", {
                     count: c.employee_count,
                   })}
+                </span>
+                <span className="ms-auto">
+                  {t("office.bank.matching.open")}{" "}
+                  <Money value={c.open_amount} currency={v.currency} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {canWrite && v.financial_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-financial-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.financial_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.financial_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.financial_candidates.map((c) => (
+              <li
+                key={c.financial_transaction_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <Checkbox
+                  checked={pickedFinancial.includes(
+                    c.financial_transaction_uuid,
+                  )}
+                  onCheckedChange={(on) =>
+                    toggleFinancial(c.financial_transaction_uuid, on === true)
+                  }
+                  aria-label={t("office.bank.matching.pick_financial", {
+                    label: financialLabel(c),
+                  })}
+                />
+                <span className="font-medium">{financialLabel(c)}</span>
+                <span className="text-muted-foreground">
+                  {c.counterparty_name ?? "—"} ·{" "}
+                  {c.due_date
+                    ? t("office.bank.matching.financial_due", {
+                        date: trDate(c.due_date),
+                      })
+                    : trDate(c.transaction_date)}
                 </span>
                 <span className="ms-auto">
                   {t("office.bank.matching.open")}{" "}
