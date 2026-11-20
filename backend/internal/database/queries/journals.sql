@@ -39,6 +39,20 @@ SELECT * FROM journal_draft_lines
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND journal_draft_id = @journal_draft_id
 ORDER BY line_no;
 
+-- name: ListJournalAccountNames :many
+-- Fiş ekranında hesap adları: önce etkin hesap planı (son yüklenen hedef),
+-- yoksa cari hafızası. Planda adı olmayan kod listede yoktur.
+SELECT DISTINCT ON (code) code::text AS code, name::text AS name FROM (
+    SELECT a.code, a.name, 0 AS rank, a.id FROM account_plan_accounts a
+    WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+      AND a.code = ANY(@codes::text[]) AND a.name <> ''
+    UNION ALL
+    SELECT c.account_code, c.account_name, 1 AS rank, c.id FROM counterparty_accounts c
+    WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
+      AND c.account_code = ANY(@codes::text[]) AND c.account_name <> ''
+) n
+ORDER BY code, rank, id DESC;
+
 -- name: JournalDraftTotals :one
 SELECT COALESCE(SUM(debit), 0)::numeric AS debit, COALESCE(SUM(credit), 0)::numeric AS credit, COUNT(*)::int AS lines
 FROM journal_draft_lines

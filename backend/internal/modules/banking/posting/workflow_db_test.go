@@ -206,3 +206,89 @@ func TestPostingWorkflow(t *testing.T) {
 		t.Fatalf("automatic approvals counted: %+v", als)
 	}
 }
+
+// Bir fişte banka hesabı kendisine karşı yazılmaz (102 borç / 102 alacak):
+// virmanın karşı hesabı önerilmez, karşı hesabı banka hesabının kendisi
+// olan hareket fişe girmez ve incelemeye döner; kredi kartı ödemesi 309'a
+// önerilir. Fiş ayrıntısında her kalemin hesap adı vardır.
+func TestDraftsNeverBookTheBankAgainstItself(t *testing.T) {
+	f := setupFlow(t)
+	ctx := context.Background()
+	day := time.Date(2026, 10, 3, 0, 0, 0, 0, time.UTC)
+	const otherIBAN = "TR330006100519786457841326"
+	if _, err := f.q.InsertCashBox(ctx, db.InsertCashBoxParams{TaxpayerID: f.sub.TaxpayerID, Type: "bank_account", Currency: "TRY",
+		Name: "Garanti TL", Iban: pgtype.Text{String: otherIBAN, Valid: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.flow.SetLedgerAccount(ctx, f.sub, f.user, f.box.Uuid, "102.01"); err != nil {
+		t.Fatal(err)
+	}
+	f.ingest(t,
+		mv("v1", day, banking.DirOut, "20000", "EFT GONDERIM", "Kendi hesabımız", otherIBAN, ""),
+		mv("k1", day, banking.DirOut, "1500", "KREDI KARTI ODEME", "", "", ""),
+	)
+	if _, err := f.flow.Run(ctx, f.sub, "2026-10"); err != nil {
+		t.Fatal(err)
+	}
+	if it := f.item(t, "2026-10", "EFT GONDERIM"); it.AccountCode != "" {
+		t.Fatalf("own transfer must get no counter account proposal, got %+v", it)
+	}
+	card := f.item(t, "2026-10", "KREDI KARTI ODEME")
+	if card.AccountCode != "309" || card.Status != "suggested" {
+		t.Fatalf("card payment %+v", card)
+	}
+	if ap, err := f.flow.Approve(ctx, f.sub, f.user, []uuid.UUID{card.UUID}); err != nil || ap.Approved != 1 {
+		t.Fatalf("approve %+v %v", ap, err)
+	}
+	// The accountant books the virman to the bank account itself by mistake.
+	virman := f.item(t, "2026-10", "EFT GONDERIM")
+	if err := f.flow.SetAccount(ctx, f.sub, f.user, virman.UUID, "102.01", ""); err != nil {
+		t.Fatal(err)
+	}
+	scope := engagementctx.Scope{ID: f.sub.EngagementID, OrganizationID: f.sub.OrganizationID, TaxpayerID: f.sub.TaxpayerID}
+	dr, err := f.flow.CreateDrafts(ctx, scope, f.user, "2026-10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dr.Drafts) != 1 || dr.Transactions != 1 || dr.SkippedSameAccount != 1 {
+		t.Fatalf("drafts %+v", dr)
+	}
+	if it := f.item(t, "2026-10", "EFT GONDERIM"); it.Status != "suggested" || it.JournalDraftUUID != nil {
+		t.Fatalf("same-account movement must go back to review, got %+v", it)
+	}
+	det, err := journals.New(f.d.Pool, nil).GetDraft(ctx, scope, dr.Drafts[0].UUID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(det.Items) != 2 {
+		t.Fatalf("lines %+v", det.Items)
+	}
+	debit, credit := det.Items[0], det.Items[1]
+	if debit.Debit.IsZero() {
+		debit, credit = credit, debit
+	}
+	if debit.Account != "309" || !debit.Credit.IsZero() || debit.AccountName != "Diğer mali borçlar" ||
+		credit.Account != "102.01" || !credit.Debit.IsZero() || credit.AccountName != "Bankalar" ||
+		!debit.Debit.Equal(credit.Credit) {
+		t.Fatalf("card payment lines: %+v / %+v", debit, credit)
+	}
+
+	// With the other bank account the virman is drafted: 102.02 / 102.01.
+	if err := f.flow.SetAccount(ctx, f.sub, f.user, virman.UUID, "102.02", "Garanti TL"); err != nil {
+		t.Fatal(err)
+	}
+	dr, err = f.flow.CreateDrafts(ctx, scope, f.user, "2026-10")
+	if err != nil || len(dr.Drafts) != 1 || dr.SkippedSameAccount != 0 {
+		t.Fatalf("second run %+v %v", dr, err)
+	}
+	var same int
+	if err := f.d.Pool.QueryRow(ctx, `SELECT count(*) FROM (
+		  SELECT l.journal_draft_id, l.account_code FROM journal_draft_lines l
+		  WHERE l.source_kind = 'bank_transaction'
+		  GROUP BY 1, 2 HAVING bool_or(l.debit > 0) AND bool_or(l.credit > 0)) x`).Scan(&same); err != nil {
+		t.Fatal(err)
+	}
+	if same != 0 {
+		t.Fatalf("%d drafts carry the same account on both sides", same)
+	}
+}

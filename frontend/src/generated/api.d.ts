@@ -17088,6 +17088,8 @@ export interface components {
                 }[];
                 transactions: number;
                 skipped_foreign_currency: number;
+                /** @description Movements whose counter account is the bank account itself (or its main / sub account). They are not drafted (the entry would carry the same account on its debit and credit side) and go back to review for another account. */
+                skipped_same_account: number;
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -18084,6 +18086,8 @@ export interface components {
             /** Format: int32 */
             line_no: number;
             account: string;
+            /** @description The account's name: the engagement's loaded account plan or the cari hafızası, else the Tek Düzen Hesap Planı main account. Absent when unknown. */
+            account_name?: string;
             description: string;
             debit: string;
             credit: string;

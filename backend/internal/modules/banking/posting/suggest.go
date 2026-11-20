@@ -27,7 +27,10 @@ const (
 const DefaultBankAccount = "102"
 
 // kindDefault is the usual counter account of a classified movement
-// (Tek Düzen Hesap Planı). conf is the most the default may claim; the
+// (Tek Düzen Hesap Planı). Own transfers and FX trades have none: their
+// counter account is the other bank account, which only the accountant
+// knows; a bare "102" would book the bank against itself (102 borç / 102
+// alacak in one entry). conf is the most the default may claim; the
 // classification's own confidence lowers it.
 type kindDefault struct {
 	code, name string
@@ -37,7 +40,6 @@ type kindDefault struct {
 var kindDefaults = map[banking.Detail]kindDefault{
 	banking.DetailCustomerCollection: {"120", "Alıcılar", 0.40},
 	banking.DetailSupplierPayment:    {"320", "Satıcılar", 0.40},
-	banking.DetailOwnTransfer:        {"102", "Bankalar", 0.70},
 	banking.DetailBankFee:            {"780", "Finansman giderleri", 0.75},
 	banking.DetailCommission:         {"780", "Finansman giderleri", 0.75},
 	banking.DetailBSMV:               {"780", "Finansman giderleri", 0.75},
@@ -55,11 +57,13 @@ var kindDefaults = map[banking.Detail]kindDefault{
 	banking.DetailPOSCommission:      {"780", "Finansman giderleri", 0.65},
 	banking.DetailInsurancePayment:   {"770", "Genel yönetim giderleri", 0.55},
 	banking.DetailVehicleToll:        {"770", "Genel yönetim giderleri", 0.55},
-	banking.DetailFXTrade:            {"102", "Bankalar", 0.60},
 	banking.DetailCashDeposit:        {"100", "Kasa", 0.70},
 	banking.DetailCashWithdrawal:     {"100", "Kasa", 0.70},
 	banking.DetailPrivate:            {"331", "Ortaklara borçlar", 0.50},
 }
+
+// cardPayment is the counter account of a credit card payment (KK_ODEMESI).
+var cardPayment = kindDefault{"309", "Diğer mali borçlar (kredi kartı)", 0.60}
 
 // cariDetails: movements whose counter account is the counterparty's cari.
 var cariDetails = map[banking.Detail]bool{
@@ -74,6 +78,7 @@ type Movement struct {
 	Amount         decimal.Decimal
 	Description    string
 	Counterparty   Counterparty
+	Kind           banking.Kind
 	Detail         banking.Detail
 	KindConfidence *decimal.Decimal
 	// MatchedTaxID: VKN / TCKN of the invoice the movement is matched to.
@@ -131,6 +136,11 @@ func Suggest(ctx context.Context, q *db.Queries, sub Subject, m Movement) (*Sugg
 		}
 	}
 	d, ok := kindDefaults[m.Detail]
+	if m.Kind == banking.KindKKOdemesi {
+		// A credit card payment is classified as an own transfer, but its
+		// counter account is the card debt, not another bank account.
+		d, ok = cardPayment, true
+	}
 	if !ok {
 		return nil, nil
 	}
@@ -146,7 +156,11 @@ func Suggest(ctx context.Context, q *db.Queries, sub Subject, m Movement) (*Sugg
 	if who := strings.TrimSpace(firstNonEmpty(m.Counterparty.Name, m.MatchedName)); who != "" && (d.code == "120" || d.code == "320") {
 		name = who
 	}
-	reason := fmt.Sprintf("İşlem türü (%s): %s %s", detailLabel(m.Detail), d.code, d.name)
+	label := detailLabel(m.Detail)
+	if m.Kind == banking.KindKKOdemesi {
+		label = "kredi kartı ödemesi"
+	}
+	reason := fmt.Sprintf("İşlem türü (%s): %s %s", label, d.code, d.name)
 	if d.code == "120" || d.code == "320" {
 		reason += "; carisi bulunamadı, alt hesap seçilmeli"
 	}

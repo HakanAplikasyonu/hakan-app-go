@@ -31,6 +31,19 @@ export function useJournalDrafts(
   });
 }
 
+/** One draft with its lines; draft "" = nothing open. */
+export function useJournalDraft(
+  slug: string,
+  engagement: string,
+  draft: string,
+) {
+  return useQuery({
+    queryKey: journalKeys.draft(slug, engagement, draft),
+    queryFn: () => journalService.draft(slug, engagement, draft),
+    enabled: !!engagement && !!draft,
+  });
+}
+
 export function useJournalExports(slug: string, engagement: string) {
   return useQuery({
     queryKey: journalKeys.exports(slug, engagement),

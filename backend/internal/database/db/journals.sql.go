@@ -610,6 +610,52 @@ func (q *Queries) ListExportableJournalDrafts(ctx context.Context, arg ListExpor
 	return items, nil
 }
 
+const listJournalAccountNames = `-- name: ListJournalAccountNames :many
+SELECT DISTINCT ON (code) code::text AS code, name::text AS name FROM (
+    SELECT a.code, a.name, 0 AS rank, a.id FROM account_plan_accounts a
+    WHERE a.organization_id = $1 AND a.engagement_id = $2
+      AND a.code = ANY($3::text[]) AND a.name <> ''
+    UNION ALL
+    SELECT c.account_code, c.account_name, 1 AS rank, c.id FROM counterparty_accounts c
+    WHERE c.organization_id = $1 AND c.engagement_id = $2
+      AND c.account_code = ANY($3::text[]) AND c.account_name <> ''
+) n
+ORDER BY code, rank, id DESC
+`
+
+type ListJournalAccountNamesParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementID   int64    `json:"engagement_id"`
+	Codes          []string `json:"codes"`
+}
+
+type ListJournalAccountNamesRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// Fiş ekranında hesap adları: önce etkin hesap planı (son yüklenen hedef),
+// yoksa cari hafızası. Planda adı olmayan kod listede yoktur.
+func (q *Queries) ListJournalAccountNames(ctx context.Context, arg ListJournalAccountNamesParams) ([]ListJournalAccountNamesRow, error) {
+	rows, err := q.db.Query(ctx, listJournalAccountNames, arg.OrganizationID, arg.EngagementID, arg.Codes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListJournalAccountNamesRow{}
+	for rows.Next() {
+		var i ListJournalAccountNamesRow
+		if err := rows.Scan(&i.Code, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listJournalDraftLines = `-- name: ListJournalDraftLines :many
 SELECT id, organization_id, engagement_id, journal_draft_id, line_no, account_code, description, debit, credit, quantity, currency, exchange_rate, foreign_amount, document_no, document_date, source_kind, source_id, confidence FROM journal_draft_lines
 WHERE organization_id = $1 AND engagement_id = $2 AND journal_draft_id = $3

@@ -106,8 +106,11 @@ func (s *Service) draftExports(ctx context.Context, scope engagementctx.Scope, i
 
 // DraftLine is one stored line.
 type DraftLine struct {
-	LineNo        int32            `json:"line_no"`
-	Account       string           `json:"account"`
+	LineNo  int32  `json:"line_no"`
+	Account string `json:"account"`
+	// AccountName: the account's name (plan, cari hafızası or TDHP main
+	// account); empty when unknown.
+	AccountName   string           `json:"account_name,omitempty"`
 	Description   string           `json:"description"`
 	Debit         decimal.Decimal  `json:"debit"`
 	Credit        decimal.Decimal  `json:"credit"`
@@ -155,9 +158,17 @@ func (s *Service) GetDraft(ctx context.Context, scope engagementctx.Scope, id uu
 		t := row.ApprovedAt.Time
 		out.ApprovedAt = &t
 	}
+	codes := make([]string, 0, len(lines))
+	for _, l := range lines {
+		codes = append(codes, l.AccountCode)
+	}
+	names, err := s.accountNames(ctx, scope, codes)
+	if err != nil {
+		return DraftDetail{}, err
+	}
 	for _, l := range lines {
 		d := DraftLine{
-			LineNo: l.LineNo, Account: l.AccountCode, Description: l.Description,
+			LineNo: l.LineNo, Account: l.AccountCode, AccountName: names[l.AccountCode], Description: l.Description,
 			Debit: repository.Dec(l.Debit), Credit: repository.Dec(l.Credit),
 			Quantity: decPtr(l.Quantity), Currency: l.Currency.String, ExchangeRate: decPtr(l.ExchangeRate),
 			ForeignAmount: decPtr(l.ForeignAmount), DocumentNo: l.DocumentNo.String,
