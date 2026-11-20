@@ -24,7 +24,9 @@ WHERE w.organization_id = $3
         SELECT e.id FROM engagements e
         WHERE e.organization_id = $3 AND e.status = 'active')
   AND w.code = $7 AND w.status = 'open'
-  AND ($8::text IS NULL OR w.period = $8::text)
+  AND ($8::text IS NULL OR COALESCE(w.period, (
+        SELECT inv.period FROM invoices inv
+        WHERE w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id)) = $8::text)
 `
 
 type AcknowledgeTenantDataWarningsByCodeParams struct {
@@ -101,12 +103,13 @@ func (q *Queries) AutoResolveDataWarnings(ctx context.Context, arg AutoResolveDa
 const countTenantDataWarnings = `-- name: CountTenantDataWarnings :one
 SELECT count(*)::bigint
 FROM data_warnings w
+LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 WHERE w.organization_id = $1
   AND ($2::bigint IS NULL OR w.engagement_id = $2::bigint)
   AND ($3::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = $1 AND a.user_id = $4))
-  AND ($5::text IS NULL OR w.period = $5::text)
+  AND ($5::text IS NULL OR COALESCE(w.period, inv.period) = $5::text)
   AND ($6::text IS NULL OR w.code = $6::text)
   AND ($7::text IS NULL OR w.severity = $7::text)
   AND ($8::text IS NULL OR w.status = $8::text)
@@ -206,12 +209,13 @@ SELECT w.code,
        count(DISTINCT w.engagement_id)::bigint AS engagement_count,
        max(w.updated_at)::timestamptz AS latest_at
 FROM data_warnings w
+LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 WHERE w.organization_id = $1
   AND ($2::bigint IS NULL OR w.engagement_id = $2::bigint)
   AND ($3::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = $1 AND a.user_id = $4))
-  AND ($5::text IS NULL OR w.period = $5::text)
+  AND ($5::text IS NULL OR COALESCE(w.period, inv.period) = $5::text)
   AND ($6::text IS NULL OR w.severity = $6::text)
   AND ($7::text IS NULL OR w.status = $7::text)
 GROUP BY w.code
@@ -300,7 +304,7 @@ WHERE w.organization_id = $1
   AND ($3::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = $1 AND a.user_id = $4))
-  AND ($5::text IS NULL OR w.period = $5::text)
+  AND ($5::text IS NULL OR COALESCE(w.period, inv.period) = $5::text)
   AND ($6::text IS NULL OR w.code = $6::text)
   AND ($7::text IS NULL OR w.severity = $7::text)
   AND ($8::text IS NULL OR w.status = $8::text)
@@ -353,6 +357,8 @@ type ListTenantDataWarningsRow struct {
 }
 
 // tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
+// Dönem süzgeci Komuta Merkezi matrisiyle (PeriodMatrixBlockers) aynı: dönemsiz
+// fatura uyarısı faturanın dönemine sayılır (#669 C).
 func (q *Queries) ListTenantDataWarnings(ctx context.Context, arg ListTenantDataWarningsParams) ([]ListTenantDataWarningsRow, error) {
 	rows, err := q.db.Query(ctx, listTenantDataWarnings,
 		arg.OrganizationID,

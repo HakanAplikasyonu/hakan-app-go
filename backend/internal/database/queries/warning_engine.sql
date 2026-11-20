@@ -23,6 +23,8 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND NOT (code = ANY(@keep::text[]));
 
 -- tenant-lint: org-wide ofis uyarı listesi; read_all yoksa engagement_assignments ile süzülür
+-- Dönem süzgeci Komuta Merkezi matrisiyle (PeriodMatrixBlockers) aynı: dönemsiz
+-- fatura uyarısı faturanın dönemine sayılır (#669 C).
 -- name: ListTenantDataWarnings :many
 SELECT w.id, w.uuid, w.engagement_id, e.uuid AS engagement_uuid, w.period, w.entity_type, w.entity_id,
        inv.uuid AS invoice_uuid, cust.uuid AS customer_uuid,
@@ -50,7 +52,7 @@ WHERE w.organization_id = @organization_id
   AND (@all_engagements::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
-  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE(w.period, inv.period) = sqlc.narg(period)::text)
   AND (sqlc.narg(code)::text IS NULL OR w.code = sqlc.narg(code)::text)
   AND (sqlc.narg(severity)::text IS NULL OR w.severity = sqlc.narg(severity)::text)
   AND (sqlc.narg(status)::text IS NULL OR w.status = sqlc.narg(status)::text)
@@ -63,12 +65,13 @@ LIMIT @lim OFFSET @off;
 -- name: CountTenantDataWarnings :one
 SELECT count(*)::bigint
 FROM data_warnings w
+LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 WHERE w.organization_id = @organization_id
   AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
   AND (@all_engagements::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
-  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE(w.period, inv.period) = sqlc.narg(period)::text)
   AND (sqlc.narg(code)::text IS NULL OR w.code = sqlc.narg(code)::text)
   AND (sqlc.narg(severity)::text IS NULL OR w.severity = sqlc.narg(severity)::text)
   AND (sqlc.narg(status)::text IS NULL OR w.status = sqlc.narg(status)::text)
@@ -84,12 +87,13 @@ SELECT w.code,
        count(DISTINCT w.engagement_id)::bigint AS engagement_count,
        max(w.updated_at)::timestamptz AS latest_at
 FROM data_warnings w
+LEFT JOIN invoices inv ON w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id
 WHERE w.organization_id = @organization_id
   AND (sqlc.narg(engagement_id)::bigint IS NULL OR w.engagement_id = sqlc.narg(engagement_id)::bigint)
   AND (@all_engagements::bool OR w.engagement_id IN (
         SELECT a.engagement_id FROM engagement_assignments a
         WHERE a.organization_id = @organization_id AND a.user_id = @user_id))
-  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text)
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE(w.period, inv.period) = sqlc.narg(period)::text)
   AND (sqlc.narg(severity)::text IS NULL OR w.severity = sqlc.narg(severity)::text)
   AND (sqlc.narg(status)::text IS NULL OR w.status = sqlc.narg(status)::text)
 GROUP BY w.code
@@ -110,4 +114,6 @@ WHERE w.organization_id = @organization_id
         SELECT e.id FROM engagements e
         WHERE e.organization_id = @organization_id AND e.status = 'active')
   AND w.code = @code AND w.status = 'open'
-  AND (sqlc.narg(period)::text IS NULL OR w.period = sqlc.narg(period)::text);
+  AND (sqlc.narg(period)::text IS NULL OR COALESCE(w.period, (
+        SELECT inv.period FROM invoices inv
+        WHERE w.entity_type = 'invoice' AND inv.id = w.entity_id AND inv.taxpayer_id = w.taxpayer_id)) = sqlc.narg(period)::text);

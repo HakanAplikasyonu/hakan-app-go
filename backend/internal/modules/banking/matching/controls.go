@@ -12,8 +12,9 @@ import (
 // pre-accounting side (expense records, cash payments, payroll, cash_box
 // balance) that no adapter delivers yet: BNK_FEES_NOT_BOOKED,
 // BNK_SALARY_VS_PAYROLL, BNK_PAYMENT_METHOD_MISMATCH, BNK_CASH_LIMIT,
-// BNK_POS_VS_SALES, BNK_BALANCE_MISMATCH. They are not owned here, so this
-// producer never auto-resolves them.
+// BNK_POS_VS_SALES. They are not owned here, so this producer never
+// auto-resolves them. BNK_BALANCE_MISMATCH comes from the statement balance
+// check (BalanceFindings, #669 C).
 const (
 	CodeUninvoicedCollection = "BNK_UNINVOICED_COLLECTION"
 	CodeUndocumentedPayment  = "BNK_UNDOCUMENTED_PAYMENT"
@@ -22,12 +23,68 @@ const (
 	CodeRentWithholding      = "BNK_RENT_WITHHOLDING"
 	CodeNonBusiness          = "BNK_NON_BUSINESS"
 	CodeUnclassified         = "BNK_UNCLASSIFIED"
+	CodeBalanceMismatch      = "BNK_BALANCE_MISMATCH"
 )
 
 // OwnedCodes are the codes this producer raises and resolves.
 var OwnedCodes = []string{
 	CodeUninvoicedCollection, CodeUndocumentedPayment, CodeInterest, CodeTaxPaid,
-	CodeRentWithholding, CodeNonBusiness, CodeUnclassified,
+	CodeRentWithholding, CodeNonBusiness, CodeUnclassified, CodeBalanceMismatch,
+}
+
+// Balance is one account's statement balance for the period, as the
+// bank-balance-check endpoint computes it: the opening balance before the
+// first movement, the totals in and out, and the closing balance after the
+// last one. HasOpening / HasClosing are false when the statement carries no
+// balance (Excel / PDF statements often lack it): the check is then skipped.
+type Balance struct {
+	Account    string
+	IBAN       string
+	Currency   string
+	Opening    decimal.Decimal
+	Closing    decimal.Decimal
+	In         decimal.Decimal
+	Out        decimal.Decimal
+	HasOpening bool
+	HasClosing bool
+}
+
+type balanceAccount struct {
+	Account    string `json:"account"`
+	IBAN       string `json:"iban,omitempty"`
+	Currency   string `json:"currency"`
+	Opening    string `json:"opening"`
+	Expected   string `json:"expected_closing"`
+	Closing    string `json:"closing"`
+	Difference string `json:"difference"`
+}
+
+// BalanceFindings raises BNK_BALANCE_MISMATCH (#669 C) when, on any account,
+// opening + in − out differs from the closing balance the bank reported:
+// movements are missing or duplicated. It is the same rule as the live
+// balance check, so the warning and the panel never disagree; once the
+// statement balances the warning auto-resolves.
+func BalanceFindings(balances []Balance) []Finding {
+	var accounts []balanceAccount
+	for _, b := range balances {
+		if !b.HasOpening || !b.HasClosing {
+			continue
+		}
+		expected := b.Opening.Add(b.In).Sub(b.Out)
+		diff := b.Closing.Sub(expected).Round(2)
+		if diff.IsZero() {
+			continue
+		}
+		accounts = append(accounts, balanceAccount{
+			Account: b.Account, IBAN: b.IBAN, Currency: b.Currency,
+			Opening: b.Opening.StringFixed(2), Expected: expected.StringFixed(2),
+			Closing: b.Closing.StringFixed(2), Difference: diff.StringFixed(2),
+		})
+	}
+	if len(accounts) == 0 {
+		return nil
+	}
+	return []Finding{{Code: CodeBalanceMismatch, Params: map[string]any{"accounts": accounts}}}
 }
 
 // Row is one valid movement of the period.
