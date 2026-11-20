@@ -371,3 +371,27 @@ export async function addConsentedTaxpayerWithUser(
   const row = await api.json<{ uuid: string }>(await api.get(`/v1/tenant/engagements/${engagement}/taxpayer`));
   return { engagement, taxpayerUuid: row.uuid, email, password };
 }
+
+/**
+ * Açık açılır pencerenin (Radix Popover) giriş animasyonu bitene ve yeri
+ * iki karede sabit kalana kadar bekler; içindeki düğmeye tıklarken
+ * "element is not stable" düşmelerini önler. Pencereyi döndürür.
+ */
+export async function settledPopover(page: Page) {
+  const pop = page.locator('[data-slot="popover-content"][data-state="open"]').last();
+  await expect(pop).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        pop.evaluate(async (el) => {
+          await Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => undefined)));
+          const frame = () => new Promise((r) => requestAnimationFrame(() => r(el.getBoundingClientRect())));
+          const a = (await frame()) as DOMRect;
+          const b = (await frame()) as DOMRect;
+          return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+        }),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  return pop;
+}
