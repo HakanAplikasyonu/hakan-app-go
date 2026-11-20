@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DOC_TASKS_ANCHOR, routes } from "@/config/routes";
-import { useOfficePeriod } from "@/features/office/period";
+import { ALL_PERIODS, useOfficePeriod } from "@/features/office/period";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
@@ -50,7 +50,7 @@ export function EngagementNextWork({
   const { can } = usePermission();
   const router = useRouter();
   const copilot = useOptionalCopilot();
-  const { focus, setPeriod } = useOfficePeriod();
+  const { choice, focus, setPeriod } = useOfficePeriod();
   // Sayılan dönem açılan ekranda da seçili olsun (#566).
   const pinPeriod = () => setPeriod(focus);
   const query = useEngagementWorkflow(slug, engagement, focus);
@@ -121,6 +121,17 @@ export function EngagementNextWork({
   const title = t("office.copilot.engagement_title", {
     period: periodLabel(locale, row.period),
   });
+  // Liste "Tümü"yken zincir yine tek ayı sayar; "bu dönem hareket yok"
+  // listede hareket görünürken çelişkili okunmasın diye hangi ayın
+  // sayıldığı söylenir.
+  const scope =
+    choice === ALL_PERIODS ? (
+      <p className="text-text-3 text-xs" data-testid="copilot-scope-note">
+        {t("office.copilot.scope_all_note", {
+          period: periodLabel(locale, row.period),
+        })}
+      </p>
+    ) : null;
 
   if (variant === "card") {
     return (
@@ -186,6 +197,7 @@ export function EngagementNextWork({
           hrefFor={(k) => stepHref(slug, k, engagement, true)}
           onNavigate={pinPeriod}
         />
+        {scope}
       </div>
       {next}
     </section>
