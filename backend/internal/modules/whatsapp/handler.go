@@ -169,6 +169,9 @@ func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 		}
 		in.TaskUUID = &id
 	}
+	// A document saved without a task may answer the engagement's only
+	// open request (#571); only for a user who may answer document tasks.
+	in.AutoLink = orgctx.Must(r.Context()).Has(rbac.PermTenantDocTasksWrite)
 	v, err := h.svc.Capture(r.Context(), engagementctx.Must(r.Context()), userID(r), in)
 	if err != nil {
 		writeError(w, r, err)
@@ -179,6 +182,32 @@ func (h *Handler) Capture(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusOK
 	}
 	response.JSON(w, r, status, v)
+}
+
+// LinkTask: PUT /v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task
+// {"task_uuid": "..."} (#571). Needs tenant.doc_tasks.write as well.
+func (h *Handler) LinkTask(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "captureUuid")
+	if !ok {
+		return
+	}
+	if !orgctx.Must(r.Context()).Has(rbac.PermTenantDocTasksWrite) {
+		response.Forbidden(w, r, "tenant.doc_tasks.write is required to answer a document task")
+		return
+	}
+	var in struct {
+		TaskUUID uuid.UUID `json:"task_uuid"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil || in.TaskUUID == uuid.Nil {
+		response.BadRequest(w, r, response.CodeValidationError, "task_uuid is required")
+		return
+	}
+	v, err := h.svc.LinkTask(r.Context(), engagementctx.Must(r.Context()), userID(r), id, in.TaskUUID)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, v)
 }
 
 // ListCaptures: GET /v1/tenant/whatsapp/captures.
@@ -245,6 +274,8 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnsupportedMediaType, "IMAGE_REQUIRED", "expense and income are read from a photo; save a PDF as a document")
 	case errors.Is(err, ErrLinkedElsewhere):
 		response.Conflict(w, r, "CHAT_LINKED_ELSEWHERE", "This chat is linked to a taxpayer you cannot see")
+	case errors.Is(err, ErrAlreadyLinked):
+		response.Conflict(w, r, "CAPTURE_NOT_LINKABLE", "The document already answers a task or is not kept here")
 	case errors.Is(err, doctasks.ErrNotFound):
 		response.NotFound(w, r, "Document task not found")
 	case errors.Is(err, doctasks.ErrClosed):

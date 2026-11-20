@@ -254,6 +254,37 @@ func (q *Queries) InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppC
 	return uuid, err
 }
 
+const linkWhatsAppCaptureTask = `-- name: LinkWhatsAppCaptureTask :execrows
+UPDATE whatsapp_captures c
+SET document_task_id = dt.id
+FROM document_tasks dt
+WHERE c.organization_id = $1 AND c.engagement_id = $2 AND c.uuid = $3
+  AND c.target = 'document' AND c.document_task_id IS NULL
+  AND dt.organization_id = c.organization_id AND dt.engagement_id = c.engagement_id AND dt.uuid = $4
+`
+
+type LinkWhatsAppCaptureTaskParams struct {
+	OrganizationID int64     `json:"organization_id"`
+	EngagementID   int64     `json:"engagement_id"`
+	Uuid           uuid.UUID `json:"uuid"`
+	TaskUuid       uuid.UUID `json:"task_uuid"`
+}
+
+// Görevsiz kaydedilmiş belge sonradan bir belge isteğine bağlanır (#571).
+// Yalnız hâlâ görevsiz olan "belge" kaydı; görev aynı ofis ve mükellefin.
+func (q *Queries) LinkWhatsAppCaptureTask(ctx context.Context, arg LinkWhatsAppCaptureTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, linkWhatsAppCaptureTask,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.Uuid,
+		arg.TaskUuid,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listWhatsAppCaptures = `-- name: ListWhatsAppCaptures :many
 SELECT c.uuid, c.target, c.file_name, c.content_type, c.size_bytes, c.created_at,
        e.uuid AS engagement_uuid, t.uuid AS taxpayer_uuid, t.title AS taxpayer_title,

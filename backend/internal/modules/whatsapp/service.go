@@ -107,6 +107,8 @@ type ReceiptCapturer interface {
 // TaskUploader is the doctasks subset.
 type TaskUploader interface {
 	OfficeUpload(ctx context.Context, scope engagementctx.Scope, taskID uuid.UUID, userID int64, fileName string, data []byte) (doctasks.UploadResult, error)
+	// OpenRequests: the engagement's open document requests (#571).
+	OpenRequests(ctx context.Context, scope engagementctx.Scope) ([]doctasks.Task, error)
 }
 
 // ObjectStore is the storage subset.
@@ -257,6 +259,10 @@ type CaptureInput struct {
 	Data     []byte
 	// TaskUUID (document only): the open document task the file answers.
 	TaskUUID *uuid.UUID
+	// AutoLink (document without TaskUUID, #571): the caller may answer
+	// document tasks, so a document saved without a task is tied to the
+	// engagement's open request when there is exactly one.
+	AutoLink bool
 }
 
 // Capture is the API view of an extension upload.
@@ -278,6 +284,14 @@ type Capture struct {
 	CreatedAt time.Time `json:"created_at"`
 	// Replayed: the same file was already saved to the same target.
 	Replayed bool `json:"replayed"`
+	// AutoLinked: the document was saved without a task and tied to the
+	// engagement's only open document request (#571). Only on the answer
+	// of the save.
+	AutoLinked bool `json:"auto_linked"`
+	// OpenRequests: how many open document requests the engagement had when
+	// a document was saved without a task; with 2 or more nothing is tied
+	// and the office chooses (#571). Only on the answer of the save.
+	OpenRequests int `json:"open_requests"`
 }
 
 // Capture saves one file the user clicked in WhatsApp Web. The same file
@@ -325,6 +339,7 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 		ChatKey: chat, FileName: name, ContentType: contentType, SizeBytes: int64(len(in.Data)), Sha256: sha,
 		CreatedBy: pgtype.Int8{Int64: userID, Valid: userID > 0},
 	}
+	autoLinked, openRequests := false, 0
 	switch in.Target {
 	case TargetExpense, TargetIncome:
 		if kind != "image" || contentType == "image/heic" {
@@ -355,6 +370,26 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 			ins.AttachmentUuid = pgtype.UUID{Bytes: res.Upload.AttachmentUUID, Valid: true}
 			break
 		}
+		// No task named (#571): when the engagement waits for exactly one
+		// document, this is it. With several open requests nothing is
+		// guessed; the document is kept and the office ties it by hand.
+		if in.AutoLink && s.tasks != nil {
+			open, err := s.tasks.OpenRequests(ctx, sc)
+			if err != nil {
+				return Capture{}, fmt.Errorf("whatsapp: open requests: %w", err)
+			}
+			openRequests = len(open)
+			if len(open) == 1 {
+				res, err := s.tasks.OfficeUpload(ctx, sc, open[0].UUID, userID, name, in.Data)
+				if err != nil {
+					return Capture{}, err
+				}
+				ins.TaskUuid = pgtype.UUID{Bytes: open[0].UUID, Valid: true}
+				ins.AttachmentUuid = pgtype.UUID{Bytes: res.Upload.AttachmentUUID, Valid: true}
+				autoLinked = true
+				break
+			}
+		}
 		att, err := s.storeAttachment(ctx, sc.TaxpayerID, name, contentType, kind, ext, sha, in.Data)
 		if err != nil {
 			return Capture{}, err
@@ -377,8 +412,55 @@ func (s *Service) Capture(ctx context.Context, sc engagementctx.Scope, userID in
 	if err != nil {
 		return Capture{}, fmt.Errorf("whatsapp: capture: %w", err)
 	}
-	s.log.Info("whatsapp_capture", "organization_id", sc.OrganizationID, "engagement", sc.UUID, "target", in.Target, "size", len(in.Data))
-	return s.get(ctx, sc, id)
+	s.log.Info("whatsapp_capture", "organization_id", sc.OrganizationID, "engagement", sc.UUID, "target", in.Target, "size", len(in.Data), "auto_linked", autoLinked)
+	v, err := s.get(ctx, sc, id)
+	v.AutoLinked, v.OpenRequests = autoLinked, openRequests
+	return v, err
+}
+
+// ErrAlreadyLinked: the capture answers a task already, or is not a
+// document kept here.
+var ErrAlreadyLinked = errors.New("whatsapp: capture cannot be linked to a task")
+
+// LinkTask ties a document that was saved without a task to an open
+// document request afterwards (#571): the stored file becomes an upload of
+// the task (the task is "submitted", the office sees the file on the request)
+// and the capture names the task.
+func (s *Service) LinkTask(ctx context.Context, sc engagementctx.Scope, userID int64, captureID, taskID uuid.UUID) (Capture, error) {
+	if s.tasks == nil {
+		return Capture{}, errors.New("whatsapp: document tasks are not configured")
+	}
+	cur, err := s.get(ctx, sc, captureID)
+	if err != nil {
+		return Capture{}, err
+	}
+	if cur.Target != TargetDocument || cur.TaskUUID != nil || !cur.HasFile {
+		return Capture{}, ErrAlreadyLinked
+	}
+	f, err := s.CaptureFile(ctx, sc, captureID)
+	if err != nil {
+		return Capture{}, err
+	}
+	data, err := io.ReadAll(io.LimitReader(f.Body, MaxFileBytes+1))
+	_ = f.Body.Close()
+	if err != nil {
+		return Capture{}, fmt.Errorf("whatsapp: read stored file: %w", err)
+	}
+	// The task must be open (or submitted): OfficeUpload refuses a closed
+	// one and a task of another engagement.
+	if _, err := s.tasks.OfficeUpload(ctx, sc, taskID, userID, cur.FileName, data); err != nil {
+		return Capture{}, err
+	}
+	n, err := s.q.LinkWhatsAppCaptureTask(ctx, db.LinkWhatsAppCaptureTaskParams{
+		OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Uuid: captureID, TaskUuid: taskID,
+	})
+	if err != nil {
+		return Capture{}, fmt.Errorf("whatsapp: link task: %w", err)
+	}
+	if n == 0 {
+		return Capture{}, ErrAlreadyLinked
+	}
+	return s.get(ctx, sc, captureID)
 }
 
 // storeAttachment keeps a document that answers no task: content-addressed

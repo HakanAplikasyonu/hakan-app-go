@@ -159,6 +159,28 @@ func (s *Service) Complete(ctx context.Context, scope engagementctx.Scope, id uu
 	return t, nil
 }
 
+// openRequestScan is how many open tasks OpenRequests looks at; an
+// engagement with more open requests than this never auto-links anyway.
+const openRequestScan = 100
+
+// OpenRequests lists the engagement's open document requests (the office
+// asked, nothing uploaded yet), soonest due first. A document that arrives
+// outside the request (WhatsApp, #571) is tied to the request only when this
+// list has exactly one entry; with more the office chooses.
+func (s *Service) OpenRequests(ctx context.Context, scope engagementctx.Scope) ([]Task, error) {
+	all, _, err := s.List(ctx, scope, Filter{Status: StatusOpen, Limit: openRequestScan})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Task, 0, len(all))
+	for _, t := range all {
+		if t.Kind == KindDocumentRequest {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 // ErrNotSubmitted: only a submitted task can be asked again.
 var ErrNotSubmitted = errors.New("doctasks: task is not submitted")
 

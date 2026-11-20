@@ -702,6 +702,9 @@ type Querier interface {
 	// the journal transfer list instead of one per row.
 	LatestReconciliationRunsByPeriod(ctx context.Context, arg LatestReconciliationRunsByPeriodParams) ([]LatestReconciliationRunsByPeriodRow, error)
 	LinkCashBoxToBankConnection(ctx context.Context, arg LinkCashBoxToBankConnectionParams) (CashBox, error)
+	// Görevsiz kaydedilmiş belge sonradan bir belge isteğine bağlanır (#571).
+	// Yalnız hâlâ görevsiz olan "belge" kaydı; görev aynı ofis ve mükellefin.
+	LinkWhatsAppCaptureTask(ctx context.Context, arg LinkWhatsAppCaptureTaskParams) (int64, error)
 	ListAccountAssignmentsForTargets(ctx context.Context, arg ListAccountAssignmentsForTargetsParams) ([]AccountAssignment, error)
 	ListAccountPlanAccounts(ctx context.Context, arg ListAccountPlanAccountsParams) ([]AccountPlanAccount, error)
 	// Çıktı (journals, #26) için etkin planın bütün kodları.

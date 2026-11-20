@@ -12979,6 +12979,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/whatsapp/captures/{captureUuid}/task": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                captureUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Tie a document saved without a task to an open document request
+         * @description Requires `tenant.receipts.write`, `tenant.doc_tasks.write` and
+         *     engagement access (#571). The stored file becomes an upload of the
+         *     task (the task is `submitted`) and the capture names the task. 409
+         *     `CAPTURE_NOT_LINKABLE` when the capture already answers a task or is
+         *     not a document kept here; 409 `TASK_CLOSED` when the task is no
+         *     longer open; 404 for an unknown capture or task.
+         */
+        put: operations["linkWhatsAppCaptureTask"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -20371,6 +20405,10 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             replayed: boolean;
+            /** @description Only on the answer of the save: the document was saved without a task and tied to the engagement's only open document request (#571). */
+            auto_linked?: boolean;
+            /** @description Only on the answer of the save: open document requests of the engagement when a document was saved without a task; with 2 or more nothing is tied (#571). */
+            open_requests?: number;
         };
         EnvelopeWhatsAppCapture: {
             /** @enum {boolean} */
@@ -41047,6 +41085,48 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    linkWhatsAppCaptureTask: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                captureUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    task_uuid: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The capture, now naming the task */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeWhatsAppCapture"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

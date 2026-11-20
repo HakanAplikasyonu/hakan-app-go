@@ -29,6 +29,7 @@ import { usePermission } from "@/providers/permission-provider";
 import { appToast } from "@/providers/toast-provider";
 
 import { formatChatKey, receiptStatusKey } from "../lib/whatsapp";
+import { WhatsAppLinkTask } from "./whatsapp-link-task";
 import {
   useCreateWhatsAppPairing,
   useDeleteWhatsAppLink,
@@ -207,6 +208,8 @@ function CapturesSection() {
   const { t } = useLocale();
   const { slug } = useTenant();
   const [target, setTarget] = useState<WhatsAppTarget | "">("");
+  const { can } = usePermission();
+  const canLinkTask = can(permissions.tenant.docTasks.write);
   const list = useServerListState({ initialPageSize: 20 });
   const query = useWhatsAppCaptures(slug, {
     target: target || undefined,
@@ -281,23 +284,29 @@ function CapturesSection() {
       createActionsColumn<WhatsAppCapture>({
         cell: (c) =>
           c.has_file ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() =>
-                void whatsappService
-                  .downloadFile(slug, c)
-                  .catch(() =>
-                    appToast.error(t("office.whatsapp.download_error")),
-                  )
-              }
-            >
-              {t("office.whatsapp.download")}
-            </Button>
+            <span className="flex items-center justify-end gap-1">
+              {/* Görevsiz belge açık bir belge isteğine bağlanır (#571). */}
+              {c.target === "document" && !c.task_uuid && canLinkTask ? (
+                <WhatsAppLinkTask capture={c} />
+              ) : null}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  void whatsappService
+                    .downloadFile(slug, c)
+                    .catch(() =>
+                      appToast.error(t("office.whatsapp.download_error")),
+                    )
+                }
+              >
+                {t("office.whatsapp.download")}
+              </Button>
+            </span>
           ) : null,
       }),
     ],
-    [slug, t],
+    [slug, t, canLinkTask],
   );
 
   return (

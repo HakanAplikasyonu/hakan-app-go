@@ -103,6 +103,15 @@ export class Api {
     return this.ctx.post(path, { headers: this.headers(headers), multipart: { [field]: file } });
   }
 
+  /** Birden çok alanlı multipart form (dosya + metin alanları). */
+  async postForm(
+    path: string,
+    form: Record<string, string | { name: string; mimeType: string; buffer: Buffer }>,
+    headers?: Record<string, string>,
+  ) {
+    return this.ctx.post(path, { headers: this.headers(headers), multipart: form });
+  }
+
   /** `data` of a 2xx JSON envelope; fails the test otherwise. */
   async json<T = any>(res: Awaited<ReturnType<APIRequestContext["get"]>>): Promise<T> {
     const text = await res.text();

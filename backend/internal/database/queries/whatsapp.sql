@@ -63,6 +63,16 @@ INSERT INTO whatsapp_captures (
 ON CONFLICT (organization_id, engagement_id, target, sha256) DO NOTHING
 RETURNING uuid;
 
+-- name: LinkWhatsAppCaptureTask :execrows
+-- Görevsiz kaydedilmiş belge sonradan bir belge isteğine bağlanır (#571).
+-- Yalnız hâlâ görevsiz olan "belge" kaydı; görev aynı ofis ve mükellefin.
+UPDATE whatsapp_captures c
+SET document_task_id = dt.id
+FROM document_tasks dt
+WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id AND c.uuid = @uuid
+  AND c.target = 'document' AND c.document_task_id IS NULL
+  AND dt.organization_id = c.organization_id AND dt.engagement_id = c.engagement_id AND dt.uuid = @task_uuid;
+
 -- name: GetWhatsAppCaptureByFile :one
 SELECT uuid
 FROM whatsapp_captures
