@@ -7,7 +7,7 @@ import { errorMessage } from '@/core/api/envelope';
 import { periodLabel } from '@/features/warnings/format';
 
 import { useEngagementWorkflow, type WorkflowRow } from './api';
-import { actionLabels, idleLabel, mobileTarget, nextStepOf, progressLabel, statusLabels, stepDetail, stepLabels } from './format';
+import { actionLabels, idleLabel, mobileTarget, nextActionLabel, nextStepOf, progressLabel, statusLabels, stepDetail, stepLabels } from './format';
 
 /**
  * Mükellef ayrıntısında "Sıradaki iş" kartı (#392, mobilde #454): dönem
@@ -62,7 +62,7 @@ function WorkflowBody({ row, engagement, title }: { row: WorkflowRow; engagement
           </Text>
           {step.action && target === 'web' ? (
             <Text variant="caption" tone="muted">
-              {actionLabels[step.action]}: onay gerektirdiği için ofis panelinde çalışır.
+              {nextActionLabel(step.action)}: ofis panelinde yapılır.
             </Text>
           ) : null}
         </View>

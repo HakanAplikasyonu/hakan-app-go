@@ -85,6 +85,16 @@ export const actionLabels: Record<Action, string> = {
   open_journals: 'Aktarımı kontrol et',
 };
 
+/**
+ * Sıradaki iş olarak gösterilen etiket (#566): onay ve aktarım doğrudan
+ * yapılmaz, ofis panelindeki kontrol ekranına götürür (web ile aynı).
+ */
+export function nextActionLabel(action: Action): string {
+  if (action === 'journals_approve') return 'Taslak fişleri kontrol et';
+  if (action === 'export_transfer') return 'Aktarımı kontrol et';
+  return actionLabels[action];
+}
+
 /** Satırın sıradaki adımı (ilk `todo` / `blocked`), yoksa null. */
 export function nextStepOf(row: Row): Step | null {
   if (!row.next_step) return null;
