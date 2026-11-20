@@ -36799,7 +36799,7 @@ export interface operations {
                     invoice_uuids?: string[];
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
-                    /** @description Source financial transactions (cheque, promissory note from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+                    /** @description Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
                     financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
