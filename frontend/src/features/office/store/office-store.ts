@@ -215,7 +215,7 @@ function createOfficeStore(slug: string) {
             if (twin)
               codes.push({
                 code: "POSSIBLE_DUPLICATE",
-                params: { count: 1 },
+                params: { count: "1" },
               });
 
             for (const line of invoice.lines) {
