@@ -1,15 +1,29 @@
 "use client";
 
+import { Check, ChevronsUpDown } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import {
   useEngagementOptions,
   type EngagementOption,
 } from "../hooks/use-office-invoices";
-import { FilterSelect } from "./office-ui";
 
 /** URL parameter holding the selected engagement (taxpayer) uuid. */
 export const ENGAGEMENT_PARAM = "taxpayer";
@@ -50,6 +64,10 @@ export function useSelectedEngagement(
   return { options, selected, select, isLoading, isError };
 }
 
+/**
+ * Mükellef seçici (#573): unvan ya da VKN ile aranır; seçili mükellef
+ * düğmede açıkça yazar. Seçim adreste (?taxpayer=) tutulur.
+ */
 export function EngagementPicker({
   options,
   selected,
@@ -60,15 +78,81 @@ export function EngagementPicker({
   onSelect: (engagement: string) => void;
 }) {
   const { t } = useLocale();
+  const [open, setOpen] = useState(false);
+  const label = (o: EngagementOption) => o.title || o.taxId || o.engagement;
+  const sorted = [...options].sort((a, b) =>
+    label(a).localeCompare(label(b), "tr"),
+  );
   return (
-    <FilterSelect
-      label={t("office.col_taxpayer")}
-      value={selected?.engagement ?? ""}
-      onChange={onSelect}
-      options={options.map((o) => ({
-        value: o.engagement,
-        label: o.title ? `${o.title} · ${o.taxId}` : o.engagement,
-      }))}
-    />
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          aria-label={`${t("office.col_taxpayer")}: ${selected ? label(selected) : ""}`}
+          className="h-9 max-w-full min-w-64 justify-between gap-2 font-normal"
+        >
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="text-muted-foreground shrink-0 text-xs">
+              {t("office.col_taxpayer")}
+            </span>
+            <span className="truncate font-medium">
+              {selected ? label(selected) : t("office.picker.choose")}
+            </span>
+            {selected?.taxId && selected.title ? (
+              <span className="text-muted-foreground shrink-0 font-mono text-xs">
+                {selected.taxId}
+              </span>
+            ) : null}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 opacity-50" aria-hidden />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <Command
+          filter={(value, search) => {
+            const o = options.find((x) => x.engagement === value);
+            if (!o) return 0;
+            const q = search.toLocaleLowerCase("tr").trim();
+            return o.title.toLocaleLowerCase("tr").includes(q) ||
+              o.taxId.includes(q)
+              ? 1
+              : 0;
+          }}
+        >
+          <CommandInput placeholder={t("office.picker.search")} />
+          <CommandList>
+            <CommandEmpty>{t("office.picker.empty")}</CommandEmpty>
+            {sorted.map((o) => (
+              <CommandItem
+                key={o.engagement}
+                value={o.engagement}
+                onSelect={() => {
+                  onSelect(o.engagement);
+                  setOpen(false);
+                }}
+              >
+                <Check
+                  className={cn(
+                    "size-4",
+                    o.engagement === selected?.engagement
+                      ? "opacity-100"
+                      : "opacity-0",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1 truncate">{label(o)}</span>
+                {o.title && o.taxId ? (
+                  <span className="text-muted-foreground font-mono text-xs">
+                    {o.taxId}
+                  </span>
+                ) : null}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }

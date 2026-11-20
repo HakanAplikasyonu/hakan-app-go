@@ -2080,5 +2080,8 @@
   "journals.check.summary_clean": "{{drafts}} taslak · hepsi kontrolden geçti",
   "journals.error_JOURNAL_BLOCKED": "Fişte düzeltilmesi gereken engel var; Kontrol sütununa bakın.",
   "copilot.next.journals_approve": "Taslak fişleri kontrol et",
-  "copilot.next.export_transfer": "Aktarımı kontrol et"
+  "copilot.next.export_transfer": "Aktarımı kontrol et",
+  "picker.choose": "Mükellef seçin",
+  "picker.search": "Unvan ya da VKN ara",
+  "picker.empty": "Mükellef bulunamadı."
 }
