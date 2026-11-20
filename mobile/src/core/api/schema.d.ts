@@ -12098,7 +12098,7 @@ export interface paths {
         };
         /**
          * In-period VAT forecast of a taxpayer
-         * @description Requires `tenant.vat.read`, `tenant.engagements.read` and engagement access. Source: active, not deleted-at-source invoices of the period and their `invoice_tax_summaries`, converted to TL with `invoices.exchange_rate` (rounded per row). Outgoing = hesaplanan KDV (vat − tevkifat), incoming = indirilecek KDV (whole vat; the withheld part is reported as `input_withholding`, KDV2). Devreden KDV runs over earlier periods from the nearest opening carry-forward. Deadline: `due_day` (VAT_DEADLINE_NEAR param, default 28) of the next month, moved to Monday on weekends; public holidays are not applied.
+         * @description Requires `tenant.vat.read`, `tenant.engagements.read` and engagement access. Source: active, not deleted-at-source invoices of the period and their `invoice_tax_summaries`, converted to TL with `invoices.exchange_rate` (rounded per row). Outgoing = hesaplanan KDV (vat − tevkifat), incoming = indirilecek KDV (whole vat; the withheld part is reported as `input_withholding`, KDV2). Devreden KDV runs over earlier periods from the nearest opening carry-forward. Deadline: `due_day` (VAT_DEADLINE_NEAR param, default 28) of the next month, moved to the next working day when it falls on a weekend or a full-day public holiday (Ramazan/Kurban Bayramı listed per year; arife half days do not move it).
          */
         get: operations["getEngagementVATForecast"];
         put?: never;
@@ -18915,7 +18915,7 @@ export interface components {
             kind: "kdv1" | "muhsgk" | "babs";
             /** Format: date */
             due_date: string;
-            /** @description The deadline fell on a weekend and moved to Monday */
+            /** @description The deadline fell on a weekend or public holiday and moved to the next working day */
             rolled_forward: boolean;
         };
         PeriodMatrixRow: {
@@ -18964,7 +18964,7 @@ export interface components {
             success: true;
             data: {
                 periods: components["schemas"]["Period"][];
-                /** @description Filing deadline of each tracked return per period (weekend → Monday; public holidays not applied). */
+                /** @description Filing deadline of each tracked return per period (weekend or public holiday → next working day). */
                 deadlines: components["schemas"]["PeriodMatrixDeadline"][];
                 items: components["schemas"]["PeriodMatrixRow"][];
                 /** Format: int64 */
@@ -19390,9 +19390,9 @@ export interface components {
             due_day: number;
             /** @description Negative once the deadline has passed */
             days_left: number;
-            /** @description Due day fell on a weekend and moved to Monday */
+            /** @description Due day fell on a weekend or public holiday and moved to the next working day */
             rolled_forward: boolean;
-            /** @description Always false: public holidays are not applied yet */
+            /** @description True when the year's religious holidays are in the calendar; false means only weekends and fixed holidays were applied */
             holidays_checked: boolean;
         };
         VATChecks: {

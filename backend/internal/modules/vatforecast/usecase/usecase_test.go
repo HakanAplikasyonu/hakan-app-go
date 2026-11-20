@@ -93,7 +93,7 @@ func TestComputeTotalsTevkifatAndRates(t *testing.T) {
 	}
 	check("rate 20 output", f.Rates[2].OutputVAT, "260")
 	check("rate 20 input", f.Rates[2].InputVAT, "30")
-	if f.Calendar.DueDate != "2026-11-30" || f.Calendar.DaysLeft != 15 || !f.Calendar.RolledForward || f.Calendar.HolidaysChecked {
+	if f.Calendar.DueDate != "2026-11-30" || f.Calendar.DaysLeft != 15 || !f.Calendar.RolledForward || !f.Calendar.HolidaysChecked {
 		t.Errorf("calendar %+v", f.Calendar)
 	}
 	if f.Checks.DeadlineNear || f.Checks.PayableLimit != nil {

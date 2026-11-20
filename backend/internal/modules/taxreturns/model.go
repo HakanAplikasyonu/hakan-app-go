@@ -16,6 +16,7 @@ package taxreturns
 import (
 	"encoding/json"
 	"errors"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/workday"
 	"regexp"
 	"time"
 
@@ -85,8 +86,8 @@ func PreviousPeriod(p string) string {
 }
 
 // DueDate is the filing deadline of kind for period: the kind's day of the
-// following month (clamped to the month's last day), moved to Monday when it
-// falls on a weekend. Public holidays are not applied.
+// following month (clamped to the month's last day), moved to the next
+// working day when it falls on a weekend or a public holiday (see workday).
 func DueDate(kind, period string) (time.Time, bool, error) {
 	start, err := ParsePeriod(period)
 	if err != nil {
@@ -101,13 +102,9 @@ func DueDate(kind, period string) (time.Time, bool, error) {
 		day = last
 	}
 	due := time.Date(next.Year(), next.Month(), day, 0, 0, 0, 0, Istanbul)
-	switch due.Weekday() {
-	case time.Saturday:
-		return due.AddDate(0, 0, 2), true, nil
-	case time.Sunday:
-		return due.AddDate(0, 0, 1), true, nil
-	}
-	return due, false, nil
+	// VUK 18: hafta sonu ya da resmi tatil ilk iş gününe kayar (#575).
+	due, moved := workday.Next(due)
+	return due, moved, nil
 }
 
 // Money is a TL amount; JSON is a string with two decimals.
