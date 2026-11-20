@@ -421,3 +421,12 @@ export async function expectNoRawText(target: Locator): Promise<void> {
     .replace(/https?:\/\/\S+/g, " ");
   expect(text.match(RAW_TEXT) ?? [], text).toEqual([]);
 }
+
+/**
+ * Fişler ekranında yeni fiş formunu açar (#710): form açılır pencerede
+ * gelir; kaydedilince pencere kapanır.
+ */
+export async function openNewEntry(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Yeni fiş", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Yeni fiş" })).toBeVisible();
+}

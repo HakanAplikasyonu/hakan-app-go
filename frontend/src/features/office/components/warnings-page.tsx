@@ -479,9 +479,22 @@ function WarningGroupCard({
           <Loading label={t("common.loading")} />
         </div>
       ) : rows.isError ? (
-        <p className="text-danger px-5 py-4 text-sm">
-          {t("office.warnings_api.load_error")}
-        </p>
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 px-5 py-4 text-sm"
+        >
+          <span className="text-danger">
+            {t("office.warnings_api.load_error")}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => void rows.refetch()}
+          >
+            {t("common.retry")}
+          </Button>
+        </div>
       ) : (
         <ul className="divide-line divide-y">
           {items.map((w, i) => {
