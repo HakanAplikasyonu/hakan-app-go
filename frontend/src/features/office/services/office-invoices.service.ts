@@ -134,6 +134,20 @@ export const officeInvoiceService = {
       { body: { rate }, silent: true },
     );
   },
+  /** Eksik/geçersiz karşı taraf VKN/TCKN'sini girer; cari bağlanır, uyarı çözülür. */
+  setCounterpartyTaxID(
+    slug: string,
+    engagement: string,
+    invoice: string,
+    taxID: string,
+  ) {
+    return tenantRequest<OfficeInvoiceDetail>(
+      slug,
+      "PUT",
+      `${eng(engagement)}/invoices/${encodeURIComponent(invoice)}/counterparty-tax-id`,
+      { body: { tax_id: taxID }, silent: true },
+    );
+  },
   /**
    * KDV indirim dönemi (#640): alış faturasının KDV'si sonraki bir aya alınır;
    * `null` belge ayına döndürür. Faturanın yeni hâli döner.

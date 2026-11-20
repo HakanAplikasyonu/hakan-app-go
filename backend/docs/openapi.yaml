@@ -9339,6 +9339,52 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Invoices]
+      operationId: setEngagementInvoiceCounterpartyTaxId
+      summary: Enter the missing counterparty VKN/TCKN of an invoice (INVALID_TAX_ID)
+      description: |
+        Requires `tenant.invoices.write` and engagement access. Only for an
+        invoice that has neither a VKN nor a TCKN for the counterparty (the
+        source sent none or an invalid one). The number is checked (VKN 10
+        digits, TCKN 11 digits, both with their check digits; spaces are
+        ignored). The counterparty (cari) with that number is linked, or
+        created; the open INVALID_TAX_ID warning of the invoice is resolved;
+        who and when are recorded. The invoice then counts in Ba/Bs and in
+        bank matching by number.
+        400 `INVALID_TAX_ID`; 409 `TAX_ID_SET` (already has a number),
+        `PERIOD_LOCKED` (the invoice's period is locked).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tax_id]
+              properties:
+                tax_id: { type: string, example: "9000000017" }
+      responses:
+        "200":
+          description: The invoice after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23164,7 +23210,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/TaxpayerInvoiceDetail"
         - type: object
-          required: [has_ubl, warnings, exchange_rate_entry, vat_deduction_period, vat_deduction_entry]
+          required: [has_ubl, warnings, exchange_rate_entry, counterparty_tax_id_entry, vat_deduction_period, vat_deduction_entry]
           properties:
             has_ubl: { type: boolean, description: "A UBL-TR XML is stored (GET .../ubl)" }
             warnings:
@@ -23172,6 +23218,15 @@ components:
               items: { $ref: "#/components/schemas/OfficeInvoiceWarning" }
             exchange_rate_entry:
               description: Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [set_by_name, set_at]
+                  properties:
+                    set_by_name: { type: string, description: "Empty when the user was deleted" }
+                    set_at: { type: string, format: date-time }
+            counterparty_tax_id_entry:
+              description: Who entered the missing counterparty VKN/TCKN in the office, and when; null when it came with the source.
               oneOf:
                 - type: "null"
                 - type: object

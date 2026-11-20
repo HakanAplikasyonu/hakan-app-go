@@ -85,6 +85,8 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 		)
 	}
 	mux.Handle("PUT "+base+"/{invoiceUuid}/exchange-rate", write(h.setExchangeRate))
+	// Eksik / geçersiz VKN'nin ofiste tamamlanması (#669, INVALID_TAX_ID).
+	mux.Handle("PUT "+base+"/{invoiceUuid}/counterparty-tax-id", write(h.setCounterpartyTaxID))
 	// KDV indirim dönemi (#640): alış faturasının KDV'si sonraki bir aya alınır.
 	mux.Handle("PUT "+base+"/{invoiceUuid}/vat-deduction-period", write(h.setVATDeductionPeriod))
 	mux.Handle("DELETE "+base+"/{invoiceUuid}/vat-deduction-period", write(h.clearVATDeductionPeriod))
@@ -379,6 +381,9 @@ type Detail struct {
 	// ExchangeRateEntry: who entered the missing rate in the office, and
 	// when (#571); null when the rate came with the source.
 	ExchangeRateEntry *RateEntry `json:"exchange_rate_entry"`
+	// CounterpartyTaxIDEntry: who entered the missing VKN / TCKN in the
+	// office, and when (#669); null when it came with the source.
+	CounterpartyTaxIDEntry *RateEntry `json:"counterparty_tax_id_entry"`
 	// VATDeductionPeriod: the KDV indirim dönemi when moved forward from the
 	// document month (#640); null = the document month.
 	VATDeductionPeriod *string `json:"vat_deduction_period"`
@@ -449,6 +454,12 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		out.ExchangeRateEntry = &RateEntry{SetByName: e.SetByName, SetAt: e.ExchangeRateSetAt.Time}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		response.InternalErr(w, r, err, "could not load the exchange rate entry")
+		return
+	}
+	if e, err := h.q.InvoiceCounterpartyTaxIDEntry(r.Context(), db.InvoiceCounterpartyTaxIDEntryParams{TaxpayerID: s.TaxpayerID, ID: inv.ID}); err == nil {
+		out.CounterpartyTaxIDEntry = &RateEntry{SetByName: e.SetByName, SetAt: e.CounterpartyTaxIDSetAt.Time}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		response.InternalErr(w, r, err, "could not load the tax id entry")
 		return
 	}
 	out.VATDeductionPeriod = textPtr(inv.VatDeductionPeriod)

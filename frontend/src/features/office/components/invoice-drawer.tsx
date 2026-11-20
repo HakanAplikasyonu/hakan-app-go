@@ -132,6 +132,83 @@ function MissingExchangeRate({
 }
 
 /**
+ * Karşı tarafın VKN/TCKN'si kaynakta yok ya da geçersizse (INVALID_TAX_ID)
+ * fatura Ba/Bs'ye ve numarayla banka eşleşmesine girmez; ofis doğru numarayı
+ * girer. Sunucu numarayı denetler, cariyi bağlar, uyarıyı çözer. Kilitli
+ * dönemde ya da numarası olan faturada reddeder.
+ */
+function MissingTaxID({
+  engagement,
+  invoice,
+}: {
+  engagement: string;
+  invoice: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const qc = useQueryClient();
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: () =>
+      officeInvoiceService.setCounterpartyTaxID(
+        slug,
+        engagement,
+        invoice,
+        value.trim(),
+      ),
+    onSuccess: (d) => {
+      qc.setQueryData(officeInvoiceKeys.invoice(slug, engagement, invoice), d);
+      void qc.invalidateQueries({
+        queryKey: [
+          "tenant",
+          slug.toLowerCase(),
+          "engagements",
+          engagement.toLowerCase(),
+        ],
+      });
+      toast.success(t("office.drawer.taxid_saved"));
+    },
+    onError: (err) =>
+      toast.error(err.message || t("office.drawer.taxid_error")),
+  });
+  return (
+    <section
+      aria-labelledby="drawer-taxid"
+      className="border-warn bg-warn-tint space-y-2 rounded-lg border p-3 text-sm"
+    >
+      <h3 id="drawer-taxid" className="font-semibold">
+        {t("office.drawer.taxid_title")}
+      </h3>
+      <p className="text-text-2 text-xs">{t("office.drawer.taxid_hint")}</p>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (value.trim()) save.mutate();
+        }}
+      >
+        <Input
+          className="h-9 w-44"
+          inputMode="numeric"
+          maxLength={14}
+          placeholder="1234567890"
+          aria-label={t("office.drawer.taxid_label")}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!value.trim() || save.isPending}
+        >
+          {t("office.drawer.taxid_save")}
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+/**
  * Gömülü kalem tablosu (#381): araç çubuğu, sayfalama, seçim ve kolon
  * yönetimi kapalı; sıra belgedeki kalem sırası olduğundan sıralama da kapalı.
  */
@@ -364,6 +441,29 @@ export function InvoiceDrawer({
                   currency={d.currency}
                   date={dateText}
                 />
+              ) : null}
+
+              {d.warnings.some(
+                (w) => w.code === "INVALID_TAX_ID" && w.status === "open",
+              ) && can(INVOICES_WRITE) ? (
+                <MissingTaxID engagement={engagement} invoice={d.uuid} />
+              ) : null}
+
+              {d.counterparty_tax_id_entry ? (
+                <p className="text-text-2 text-sm">
+                  {t("office.drawer.taxid_entered", {
+                    name:
+                      d.counterparty_tax_id_entry.set_by_name ||
+                      t("office.drawer.fx_entered_unknown"),
+                    date: new Date(
+                      d.counterparty_tax_id_entry.set_at,
+                    ).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  })}
+                </p>
               ) : null}
 
               {d.exchange_rate_entry ? (

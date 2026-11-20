@@ -687,6 +687,8 @@ type Querier interface {
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	// Elle girilen VKN/TCKN'nin kim tarafından ne zaman girildiği (#669).
+	InvoiceCounterpartyTaxIDEntry(ctx context.Context, arg InvoiceCounterpartyTaxIDEntryParams) (InvoiceCounterpartyTaxIDEntryRow, error)
 	// Elle girilen kurun kim tarafından ne zaman girildiği (#571).
 	InvoiceExchangeRateEntry(ctx context.Context, arg InvoiceExchangeRateEntryParams) (InvoiceExchangeRateEntryRow, error)
 	// KDV indirim dönemini kimin ne zaman değiştirdiği (#640).
@@ -1313,6 +1315,9 @@ type Querier interface {
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
+	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
+	// zaman, not.
+	ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error)
 	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
 	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
 	// faturadan gelir.
@@ -1418,6 +1423,9 @@ type Querier interface {
 	// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
 	// satırının tutarı kaynağından gelir.
 	SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error)
+	// Karşı tarafın VKN/TCKN'si kaynakta yoksa ya da geçersizse ofis girer
+	// (#669, INVALID_TAX_ID): cari bağlanır. Numarası olan faturaya dokunulmaz.
+	SetMissingInvoiceCounterpartyTaxID(ctx context.Context, arg SetMissingInvoiceCounterpartyTaxIDParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
