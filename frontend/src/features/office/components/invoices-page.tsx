@@ -299,7 +299,7 @@ function InvoicesInner() {
         errorTitle={t("office.api.load_error")}
         onRetry={() => void list.refetch()}
         emptyTitle={t("office.invoices_empty")}
-        emptyDescription=""
+        emptyDescription={t("office.invoices_empty_hint")}
         state={listState.tableState}
         rowCount={total}
         pageSizeOptions={[25, 50, 100]}

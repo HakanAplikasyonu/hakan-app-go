@@ -152,7 +152,7 @@ function DocumentsSection({
         errorTitle={t("common.error_generic")}
         onRetry={() => void query.refetch()}
         emptyTitle={t("office.engagement_documents_empty")}
-        emptyDescription=""
+        emptyDescription={t("office.engagement_documents_empty_hint")}
         bordered={false}
         state={{
           pagination: listState.pagination,

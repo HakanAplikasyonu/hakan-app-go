@@ -1039,7 +1039,11 @@ function JournalsInner() {
         {drafts.isLoading ? (
           <Skeleton className="m-4 h-32" />
         ) : rows.length === 0 ? (
-          <EmptyState className="m-4" title={t("office.journals.empty")} />
+          <EmptyState
+            className="m-4"
+            title={t("office.journals.empty")}
+            description={t("office.journals.empty_hint")}
+          />
         ) : (
           <DataTable<JournalDraft>
             columns={draftColumns}
