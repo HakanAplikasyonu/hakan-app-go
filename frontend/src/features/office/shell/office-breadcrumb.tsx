@@ -2,8 +2,8 @@
 
 import { Check, ChevronsUpDown } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import {
   Breadcrumb,
@@ -35,14 +35,16 @@ import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementTabs } from "../components/engagement-layout";
 import { useEngagementDirectory } from "../hooks/use-engagement-directory";
+import { FOCUS_PARAM } from "../lib/related-href";
 import {
   engagementInPath,
   matchByPath,
   swapEngagement,
 } from "../lib/office-location";
+import { isPeriod, PERIOD_PARAM } from "../period";
 
 /**
- * Üst çubuğun ekmek kırıntısı (#521): ofis → mükellef → sayfa. Kullanıcı
+ * Üst çubuğun ekmek kırıntısı (#521): ofis → mükellef → sayfa → işlem (#710). Kullanıcı
  * nerede olduğunu buradan okur; mükellef ayrıntısında mükellef adı hızlı
  * değiştiricidir (aynı sekmede başka mükellefe geçer). Dar ekranda yalnızca
  * son iki, telefonda yalnızca en yakın bağlam görünür.
@@ -106,13 +108,71 @@ function EngagementCrumbs({ engagement }: { engagement: string }) {
         <TaxpayerSwitcher engagement={engagement} />
       </BreadcrumbItem>
       {tab ? (
-        <>
-          <BreadcrumbSeparator className="hidden sm:list-item" />
-          <BreadcrumbItem className="hidden sm:inline-flex">
-            <BreadcrumbPage>{tab.label}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </>
+        <Suspense fallback={<TabCrumb tab={tab} deeper={false} back="" />}>
+          <TabCrumbs tab={tab} />
+        </Suspense>
       ) : null}
+    </>
+  );
+}
+
+/**
+ * Sekme ve işlem kırıntısı (#710): sekmenin altındaki bir kayıttaysa
+ * (alt yol ya da `?kayit=`) sekme adı listeye geri dönüş bağlantısıdır
+ * (dönem korunur), son kırıntı "Kayıt"tır. Ofis → mükellef → sayfa →
+ * işlem; dönem hemen yandaki seçicidedir.
+ */
+function TabCrumbs({ tab }: { tab: { href: string; label: string } }) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const base = tab.href.split("?")[0]!.replace(/\/+$/, "");
+  const path = pathname.replace(/\/+$/, "");
+  const deeper = path !== base || params.has(FOCUS_PARAM);
+  const period = params.get(PERIOD_PARAM);
+  const back =
+    period && isPeriod(period)
+      ? `${base}?${PERIOD_PARAM}=${encodeURIComponent(period)}`
+      : base;
+  return <TabCrumb tab={tab} deeper={deeper} back={back} />;
+}
+
+function TabCrumb({
+  tab,
+  deeper,
+  back,
+}: {
+  tab: { href: string; label: string };
+  deeper: boolean;
+  back: string;
+}) {
+  const { t } = useLocale();
+  if (!deeper) {
+    return (
+      <>
+        <BreadcrumbSeparator className="hidden sm:list-item" />
+        <BreadcrumbItem className="hidden sm:inline-flex">
+          <BreadcrumbPage>{tab.label}</BreadcrumbPage>
+        </BreadcrumbItem>
+      </>
+    );
+  }
+  return (
+    <>
+      <BreadcrumbSeparator className="hidden sm:list-item" />
+      <BreadcrumbItem className="hidden sm:inline-flex">
+        <BreadcrumbLink asChild>
+          <Link
+            href={back}
+            aria-label={t("office.shell.breadcrumb_back", { page: tab.label })}
+          >
+            {tab.label}
+          </Link>
+        </BreadcrumbLink>
+      </BreadcrumbItem>
+      <BreadcrumbSeparator className="hidden md:list-item" />
+      <BreadcrumbItem className="hidden md:inline-flex">
+        <BreadcrumbPage>{t("office.shell.breadcrumb_record")}</BreadcrumbPage>
+      </BreadcrumbItem>
     </>
   );
 }

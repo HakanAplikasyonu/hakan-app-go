@@ -2333,6 +2333,8 @@
   "excel.template_delete_body": "Aynı düzendeki dosyalar bundan sonra yeniden eşlenir. Yapılmış aktarımlar etkilenmez.",
   "excel.template_deleted": "Şablon silindi",
   "shell.breadcrumb_label": "Konum",
+  "shell.breadcrumb_back": "{{page}} listesine dön",
+  "shell.breadcrumb_record": "Kayıt",
   "shell.taxpayer_switch": "Mükellef değiştir: {{name}}",
   "shell.taxpayer_search": "Mükellef ara…",
   "shell.taxpayer_none": "Mükellef bulunamadı",

@@ -2333,6 +2333,8 @@
   "excel.template_delete_body": "Files with the same layout will be mapped again from now on. Finished imports are not affected.",
   "excel.template_deleted": "Template deleted",
   "shell.breadcrumb_label": "Location",
+  "shell.breadcrumb_back": "Back to {{page}}",
+  "shell.breadcrumb_record": "Record",
   "shell.taxpayer_switch": "Switch taxpayer: {{name}}",
   "shell.taxpayer_search": "Search taxpayers…",
   "shell.taxpayer_none": "No taxpayer found",
