@@ -146,6 +146,11 @@ func (h *Handler) CreateRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t, err := h.svc.CreateRequest(r.Context(), engagementctx.Must(r.Context()), userID(r), body)
+	if errors.Is(err, ErrRequestExists) {
+		// Açık talep zaten var: yenisi açılmadı, var olan döner.
+		response.JSON(w, r, http.StatusOK, t)
+		return
+	}
 	if err != nil {
 		writeError(w, r, err)
 		return

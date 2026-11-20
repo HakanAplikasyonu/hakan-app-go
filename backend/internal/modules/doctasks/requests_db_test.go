@@ -47,6 +47,16 @@ func TestDocumentRequestFlow(t *testing.T) {
 		t.Fatalf("notification: %+v", in)
 	}
 
+	// Asking again for the same open document opens nothing new and sends
+	// no second notification (#568).
+	dup, err := w.svc.CreateRequest(ctx, w.scope, creator, RequestInput{Title: "kira kontratı", DueDays: 3})
+	if !errors.Is(err, ErrRequestExists) || dup.UUID != task.UUID {
+		t.Fatalf("repeat request: %v %+v", err, dup)
+	}
+	if w.notif.count(TemplateRequested) != 1 {
+		t.Fatalf("repeat request notified: %d", w.notif.count(TemplateRequested))
+	}
+
 	// The mükellef sees it among its tasks.
 	mine, err := w.svc.GetMine(ctx, w.taxpayerID, task.UUID)
 	if err != nil || mine.Title != "Kira kontratı" || mine.Kind != KindDocumentRequest || mine.OrganizationName == "" {
