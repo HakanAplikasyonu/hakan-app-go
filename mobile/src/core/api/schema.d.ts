@@ -18902,6 +18902,16 @@ export interface components {
             /** Format: date */
             filed_on: string | null;
         };
+        PeriodMatrixDeadline: {
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            kind: "kdv1" | "muhsgk" | "babs";
+            /** Format: date */
+            due_date: string;
+            /** @description The deadline fell on a weekend and moved to Monday */
+            rolled_forward: boolean;
+        };
         PeriodMatrixRow: {
             /** Format: uuid */
             engagement_uuid: string;
@@ -18948,6 +18958,8 @@ export interface components {
             success: true;
             data: {
                 periods: components["schemas"]["Period"][];
+                /** @description Filing deadline of each tracked return per period (weekend → Monday; public holidays not applied). */
+                deadlines: components["schemas"]["PeriodMatrixDeadline"][];
                 items: components["schemas"]["PeriodMatrixRow"][];
                 /** Format: int64 */
                 total: number;

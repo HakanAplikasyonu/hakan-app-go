@@ -64,3 +64,25 @@ func TestValidation(t *testing.T) {
 		t.Fatalf("bad status: %v", err)
 	}
 }
+
+// TestDeadlines: the office tax returns view shows each return's deadline
+// (#575). Ekim 2026: KDV1 28 Kasım Cumartesi → 30 Kasım Pazartesi.
+func TestDeadlines(t *testing.T) {
+	got := map[string]Deadline{}
+	for _, d := range deadlines([]string{"2026-10"}) {
+		got[d.Kind] = d
+	}
+	want := map[string]Deadline{
+		"kdv1":   {Period: "2026-10", Kind: "kdv1", DueDate: "2026-11-30", RolledForward: true},
+		"muhsgk": {Period: "2026-10", Kind: "muhsgk", DueDate: "2026-11-26"},
+		"babs":   {Period: "2026-10", Kind: "babs", DueDate: "2026-11-30"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("deadlines = %+v", got)
+	}
+	for k, w := range want {
+		if got[k] != w {
+			t.Errorf("%s = %+v, want %+v", k, got[k], w)
+		}
+	}
+}

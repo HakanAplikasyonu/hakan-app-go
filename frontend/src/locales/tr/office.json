@@ -2107,7 +2107,7 @@
   "journals.transfer_col": "Programa aktarım",
   "journals.transfer_file_only": "Yalnız dosya alındı",
   "nav_tax_returns": "Beyannameler",
-  "tax_returns.office.description": "{{period}} beyan dönemi: her mükellefin KDV1 ve MUHSGK durumu, mükelleften beklenen belgeler ve açık engeller. Satıra tıklayınca mükellefin beyan ekranı açılır.",
+  "tax_returns.office.description": "{{period}} beyan dönemi: her mükellefin KDV1, MUHSGK ve Ba/Bs durumu, mükelleften beklenen belgeler ve açık engeller. Satıra tıklayınca mükellefin beyan ekranı açılır.",
   "tax_returns.office.not_started": "Başlanmadı",
   "tax_returns.office.col_documents": "Beklenen belge",
   "tax_returns.office.col_blockers": "Engel",
@@ -2120,5 +2120,12 @@
   "tax_returns.office.filter_documents": "Belge bekleyen",
   "tax_returns.office.filter_blocked": "Engeli olan",
   "tax_returns.office.summary": "{{total}} mükellef · KDV1: {{filed}} verildi, {{prepared}} hazırlandı, {{open}} hazırlanmadı · {{documents}} mükellefte belge bekleniyor",
-  "tax_returns.office.empty": "Bu süzgeçte mükellef yok"
+  "tax_returns.office.empty": "Bu süzgeçte mükellef yok",
+  "tax_returns.office.deadlines": "Beyan son günleri",
+  "tax_returns.office.due": "son gün {{date}}",
+  "tax_returns.office.due_left": "{{count}} gün kaldı",
+  "tax_returns.office.due_today": "bugün son gün",
+  "tax_returns.office.due_passed": "{{count}} gün geçti",
+  "tax_returns.office.due_rolled": "(hafta sonu nedeniyle Pazartesi'ye kaydı)",
+  "tax_returns.office.late": "Gecikti"
 }

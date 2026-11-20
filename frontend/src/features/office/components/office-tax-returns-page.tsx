@@ -11,23 +11,34 @@ import { createColumn, StatusPill } from "@/components/tables";
 import type { StatusTone } from "@/components/tables";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
+import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { usePeriodMatrixAt } from "../hooks/use-office-data";
 import { useOfficePeriod, usePeriodText } from "../period";
 import type {
+  PeriodMatrix,
   PeriodMatrixCell,
   PeriodMatrixRow,
 } from "../services/periods.service";
 import { FilterSelect, Figure, Money } from "./office-ui";
 
-/** Ofis görünümünde izlenen beyanlar: aylık KDV1 ve MUHSGK. */
-const KINDS = ["kdv1", "muhsgk"] as const;
+/** Ofis görünümünde izlenen aylık beyanlar: KDV1, MUHSGK ve Ba/Bs. */
+const KINDS = ["kdv1", "muhsgk", "babs"] as const;
 type Kind = (typeof KINDS)[number];
 
 type Filter = "all" | "open" | "documents" | "blocked";
 
 type Row = PeriodMatrixRow & { cell?: PeriodMatrixCell };
+type Deadline = PeriodMatrix["deadlines"][number];
+
+/** Son güne kalan gün (bugün 0, geçmişse eksi), tarayıcının gününe göre. */
+export function daysLeft(due: string, today = new Date()): number {
+  const [y, m, d] = due.split("-").map(Number);
+  const a = Date.UTC(y, m - 1, d);
+  const b = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((a - b) / 86_400_000);
+}
 
 const statusTone: Record<string, StatusTone> = {
   draft: "warn",
@@ -48,20 +59,44 @@ function urgency(cell: PeriodMatrixCell | undefined) {
   return n;
 }
 
-function ReturnCell({ cell, kind }: { cell?: PeriodMatrixCell; kind: Kind }) {
+function ReturnCell({
+  cell,
+  kind,
+  late,
+}: {
+  cell?: PeriodMatrixCell;
+  kind: Kind;
+  /** Son gün geçti: verilmemiş beyan "gecikti" görünür. */
+  late: boolean;
+}) {
   const { t } = useLocale();
   const r = returnOf(cell, kind);
   if (!r)
     return (
-      <StatusPill tone="neutral">
-        {t("office.tax_returns.office.not_started")}
+      <StatusPill tone={late ? "danger" : "neutral"}>
+        {t(
+          late
+            ? "office.tax_returns.office.late"
+            : "office.tax_returns.office.not_started",
+        )}
       </StatusPill>
     );
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <StatusPill tone={statusTone[r.status] ?? "neutral"}>
+      <StatusPill
+        tone={
+          late && r.status !== "filed"
+            ? "danger"
+            : (statusTone[r.status] ?? "neutral")
+        }
+      >
         {t(`office.tax_returns.status_${r.status}`)}
       </StatusPill>
+      {late && r.status !== "filed" ? (
+        <span className="text-status-blocking text-xs">
+          {t("office.tax_returns.office.late")}
+        </span>
+      ) : null}
       {r.payable_amount && r.status !== "draft" ? (
         <Money value={r.payable_amount} className="text-xs" />
       ) : null}
@@ -69,9 +104,65 @@ function ReturnCell({ cell, kind }: { cell?: PeriodMatrixCell; kind: Kind }) {
   );
 }
 
+/** Dönemin beyan son günleri; yaklaşan uyarı, geçen kırmızı görünür. */
+function DeadlineStrip({
+  deadlines,
+}: {
+  deadlines: Partial<Record<Kind, Deadline>>;
+}) {
+  const { t, locale } = useLocale();
+  const items = KINDS.flatMap((k) => {
+    const d = deadlines[k];
+    return d ? [{ kind: k, d, left: daysLeft(d.due_date) }] : [];
+  });
+  if (!items.length) return null;
+  return (
+    <ul
+      className="flex flex-wrap gap-x-5 gap-y-1 text-xs"
+      aria-label={t("office.tax_returns.office.deadlines")}
+    >
+      {items.map(({ kind, d, left }) => (
+        <li key={kind} className="flex items-baseline gap-1.5">
+          <span className="font-medium">
+            {t(`office.tax_returns.kind_${kind}`)}
+          </span>
+          <span className="text-muted-foreground">
+            {t("office.tax_returns.office.due", {
+              date: new Date(`${d.due_date}T00:00:00`).toLocaleDateString(
+                locale,
+                { day: "numeric", month: "long", weekday: "short" },
+              ),
+            })}
+          </span>
+          <span
+            className={cn(
+              left < 0
+                ? "text-status-blocking"
+                : left <= 3
+                  ? "text-status-warning"
+                  : "text-muted-foreground",
+            )}
+          >
+            {left < 0
+              ? t("office.tax_returns.office.due_passed", { count: -left })
+              : left === 0
+                ? t("office.tax_returns.office.due_today")
+                : t("office.tax_returns.office.due_left", { count: left })}
+          </span>
+          {d.rolled_forward ? (
+            <span className="text-muted-foreground">
+              {t("office.tax_returns.office.due_rolled")}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * `/t/{slug}/tax-returns` (#575): ofisin beyan dönemi tek tabloda. Her
- * mükellefin KDV1 ve MUHSGK durumu, ödenecek tutar, mükelleften beklenen
+ * mükellefin KDV1, MUHSGK ve Ba/Bs durumu ve son günler, ödenecek tutar, mükelleften beklenen
  * belgeler ve açık engeller; satır mükellefin beyan ekranını açar. Dönem
  * üst çubuktaki ofis dönemidir.
  */
@@ -128,6 +219,19 @@ export function OfficeTaxReturnsPage() {
     return out;
   }, [all]);
 
+  // Bu dönemin beyan son günleri (sunucudaki kural: hafta sonu → Pazartesi).
+  const deadlines = useMemo(() => {
+    const out: Partial<Record<Kind, Deadline>> = {};
+    for (const d of matrix.data?.deadlines ?? []) {
+      if (d.period === period) out[d.kind as Kind] = d;
+    }
+    return out;
+  }, [matrix.data, period]);
+  const lateKey = KINDS.map((k) => {
+    const d = deadlines[k];
+    return d && daysLeft(d.due_date) < 0 ? k : "";
+  }).join(",");
+
   const columns = useMemo<ColumnDef<Row, unknown>[]>(
     () => [
       createColumn<Row>({
@@ -151,7 +255,11 @@ export function OfficeTaxReturnsPage() {
           labelKey: `office.tax_returns.kind_${kind}`,
           enableSorting: false,
           cell: ({ row }) => (
-            <ReturnCell cell={row.original.cell} kind={kind} />
+            <ReturnCell
+              cell={row.original.cell}
+              kind={kind}
+              late={lateKey.split(",").includes(kind)}
+            />
           ),
         }),
       ),
@@ -199,7 +307,7 @@ export function OfficeTaxReturnsPage() {
         },
       }),
     ],
-    [t],
+    [t, lateKey],
   );
 
   return (
@@ -244,6 +352,7 @@ export function OfficeTaxReturnsPage() {
           </span>
         ) : null}
       </div>
+      <DeadlineStrip deadlines={deadlines} />
       <EntityTable<Row>
         columns={columns}
         data={rows}
