@@ -96,6 +96,9 @@ export function StatementRequest({
         title,
         note: t("office.tax_returns.office.statement_request_note"),
         due_days: 3,
+        // Ekstrenin dönemi: istek o dönemin belge isteklerinde görünür
+        // (yoksa son günün ayına, sonraki aya düşerdi).
+        period,
       }),
     onSuccess: () => {
       toast.success(t("office.tax_returns.office.statement_requested"));
