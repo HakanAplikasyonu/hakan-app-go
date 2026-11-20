@@ -220,6 +220,7 @@
   "accounting.bind_failed": "Şirket bağlanamadı.",
   "accounting.create_failed": "Bağlantı başlatılamadı.",
   "accounting.not_configured": "Bu bağlantı sunucuda henüz ayarlanmamış; yöneticinize bildirin.",
+  "accounting.server_disabled": "Bu bağlantı sunucuda henüz etkin değil.",
   "accounting.sync_now": "Son 30 günü çek",
   "accounting.synced": "{{invoices}} fatura, {{expenses}} masraf yazıldı.",
   "accounting.throttled": "Son çekimin üzerinden 5 dakika geçmedi; biraz sonra yeniden deneyin.",

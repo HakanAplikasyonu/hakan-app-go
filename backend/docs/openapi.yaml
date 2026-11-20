@@ -17332,9 +17332,12 @@ components:
         success: { type: boolean, enum: [true] }
         data: 
           type: object
-          required: [items]
+          required: [items, configured]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/KolayBiConnection" } }
+            configured:
+              type: boolean
+              description: "false when the server lacks this integration's settings or the secret vault: connecting, authorizing and syncing would answer 503, so the panel shows an empty state instead (#639)"
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeKolayBiConnect:
       type: object
@@ -17609,9 +17612,12 @@ components:
         success: { type: boolean, enum: [true] }
         data: 
           type: object
-          required: [items]
+          required: [items, configured]
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/ParasutConnection" } }
+            configured:
+              type: boolean
+              description: "false when the server lacks this integration's settings or the secret vault: connecting, authorizing and syncing would answer 503, so the panel shows an empty state instead (#639)"
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeParasutCompanyList:
       type: object

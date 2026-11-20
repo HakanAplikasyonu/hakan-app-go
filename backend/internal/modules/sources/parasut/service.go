@@ -91,6 +91,12 @@ func (s *Service) view(row db.SourceConnection) Connection {
 	return c
 }
 
+// Configured reports whether the server can open and use this connection
+// (application settings and the secret vault). The connection list carries
+// it so the web panel shows an empty state instead of calling routes that
+// would answer 503 (#639).
+func (s *Service) Configured() bool { return s.app.Configured() && s.vault != nil }
+
 func (s *Service) ready() error {
 	if !s.app.Configured() {
 		return ErrNotConfigured

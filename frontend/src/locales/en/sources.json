@@ -220,6 +220,7 @@
   "accounting.bind_failed": "Could not connect the company.",
   "accounting.create_failed": "Could not start the connection.",
   "accounting.not_configured": "This connection is not set up on the server yet; tell your administrator.",
+  "accounting.server_disabled": "This connection is not enabled on the server yet.",
   "accounting.sync_now": "Read the last 30 days",
   "accounting.synced": "{{invoices}} invoices, {{expenses}} expenses written.",
   "accounting.throttled": "Less than 5 minutes since the last sync; try again shortly.",

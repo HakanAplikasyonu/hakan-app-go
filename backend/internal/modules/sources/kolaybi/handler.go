@@ -50,7 +50,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items, "configured": h.svc.Configured()})
 }
 
 func (h *Handler) connect(w http.ResponseWriter, r *http.Request) {

@@ -134,6 +134,17 @@ function Fact({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Bağlantı sunucuda yapılandırılmamış: boş durum, hata değil (#639). */
+function ServerDisabled({ off }: { off: boolean }) {
+  const { t } = useLocale();
+  if (!off) return null;
+  return (
+    <p className="bg-surface-2 text-text-2 rounded-lg px-3 py-2 text-sm">
+      {t("sources.accounting.server_disabled")}
+    </p>
+  );
+}
+
 function Problem({ text }: { text?: string }) {
   if (!text) return null;
   return (
@@ -234,13 +245,16 @@ function CompanyPicker({
 
 function ParasutCard({
   engagement,
-  canWrite,
+  canWrite: canEdit,
 }: {
   engagement: string;
   canWrite: boolean;
 }) {
   const { t } = useLocale();
   const p = useParasut(engagement);
+  // Sunucuda kapalıysa (#639) hiçbir eylem gösterilmez, istek atılmaz.
+  const off = p.connections.data?.configured === false;
+  const canWrite = canEdit && !off;
   // Oldest first: the newest connection is the one being set up.
   const conn = p.connections.data?.items.at(-1);
   const step = conn ? accountingStep(conn) : undefined;
@@ -286,6 +300,7 @@ function ParasutCard({
       <p className="text-text-3 text-sm">
         {t("sources.accounting.parasut_desc")}
       </p>
+      <ServerDisabled off={off} />
       <Problem text={conn?.error} />
       {canWrite && !conn ? (
         <Button
@@ -362,13 +377,16 @@ function ParasutCard({
 
 function KolayBiCard({
   engagement,
-  canWrite,
+  canWrite: canEdit,
 }: {
   engagement: string;
   canWrite: boolean;
 }) {
   const { t } = useLocale();
   const k = useKolayBi(engagement);
+  // Sunucuda kapalıysa (#639) hiçbir eylem gösterilmez, istek atılmaz.
+  const off = k.connections.data?.configured === false;
+  const canWrite = canEdit && !off;
   const conn = k.connections.data?.items.at(-1);
   const step = conn ? accountingStep(conn) : undefined;
   const [apiKey, setApiKey] = useState("");
@@ -419,6 +437,7 @@ function KolayBiCard({
       <p className="text-text-3 text-sm">
         {t("sources.accounting.kolaybi_desc")}
       </p>
+      <ServerDisabled off={off} />
       <Problem text={conn?.error} />
       {canWrite &&
       (!conn ||
