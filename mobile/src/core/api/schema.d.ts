@@ -17593,6 +17593,26 @@ export interface components {
                 open_amount: string;
                 employee_count: number;
             }[];
+            /** @description SGK premiums the movement pays (#565) */
+            sgk_matches: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description SGK premiums of the movement's month and the three before still unpaid (#565); only for an outgoing payment */
+            sgk_candidates: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                open_amount: string;
+                /** Format: date */
+                due_date: string;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -36724,6 +36744,8 @@ export interface operations {
                     invoice_uuids?: string[];
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
+                    /** @description SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back */
+                    sgk_premium_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */
