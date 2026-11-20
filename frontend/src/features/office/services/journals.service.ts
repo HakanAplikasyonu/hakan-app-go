@@ -113,11 +113,36 @@ export const journalService = {
       { body: input },
     );
   },
-  approve(slug: string, engagement: string, draft: string) {
+  /**
+   * Eksik belgeli fiş yalnız `confirm` ile onaylanır; yoksa 409
+   * JOURNAL_NEEDS_CONFIRMATION (#669). Mükerrer fiş engellidir (409
+   * JOURNAL_DUPLICATE); yalnız `sendDuplicate` ve gerekçeyle geçer (#710).
+   */
+  approve(
+    slug: string,
+    engagement: string,
+    draft: string,
+    opts?: {
+      confirm?: boolean;
+      note?: string;
+      sendDuplicate?: boolean;
+      reason?: string;
+    },
+  ) {
+    const body: Record<string, unknown> = {};
+    if (opts?.confirm) {
+      body.confirm_warnings = true;
+      if (opts.note) body.note = opts.note;
+    }
+    if (opts?.sendDuplicate) {
+      body.send_duplicate = true;
+      body.reason = opts.reason ?? "";
+    }
     return tenantRequest<JournalDraftDetail>(
       slug,
       "POST",
       `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/approve`,
+      Object.keys(body).length ? { body } : undefined,
     );
   },
   /** Kontrol ekranında satırın hesap kodu düzeltilir (#566). */
@@ -168,6 +193,20 @@ export const journalService = {
       slug,
       "POST",
       `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/reverse`,
+      { body: { reason } },
+    );
+  },
+  /** Aktarılmış fişin tamamen iptali (#710): aktarımdan çıkar, taslağa döner. */
+  cancelExport(
+    slug: string,
+    engagement: string,
+    draft: string,
+    reason: string,
+  ) {
+    return tenantRequest<JournalDraftDetail>(
+      slug,
+      "POST",
+      `${eng(engagement)}/journal-drafts/${encodeURIComponent(draft)}/cancel-export`,
       { body: { reason } },
     );
   },

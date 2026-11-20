@@ -29,6 +29,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/model"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/ublmap"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rls"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
@@ -228,11 +229,33 @@ func (s *Service) Upload(ctx context.Context, scope engagementctx.Scope, actorID
 	if err != nil {
 		return Job{}, err
 	}
-	if _, err := s.queue.Enqueue(task, asynq.Queue(queue.QueueImports), asynq.MaxRetry(3)); err != nil {
+	opts := []asynq.Option{asynq.Queue(queue.QueueImports), asynq.MaxRetry(3)}
+	if _, inTx := dbtx.Tx(ctx); inTx {
+		// The job row is written in the request's transaction (#166) and is
+		// invisible to the worker until it commits. Enqueued before the
+		// commit, the worker can claim nothing, take the job as already
+		// done and leave it "queued" for good (#710: smoke e2e saw one of
+		// seven uploads stay queued). Enqueue once the transaction commits;
+		// without commit hooks, delay the task instead.
+		id := row.Uuid
+		if dbtx.AfterCommit(ctx, func(ctx context.Context) {
+			if _, err := s.queue.Enqueue(task, opts...); err != nil {
+				s.log.ErrorContext(ctx, "ubl_upload_enqueue_after_commit_failed", "job", id, "error", err)
+			}
+		}) {
+			return view(row), nil
+		}
+		opts = append(opts, asynq.ProcessIn(enqueueAfterCommit))
+	}
+	if _, err := s.queue.Enqueue(task, opts...); err != nil {
 		return Job{}, err
 	}
 	return view(row), nil
 }
+
+// enqueueAfterCommit delays the task when the transaction owner runs no
+// commit hooks, so the job row is committed before the worker claims it.
+const enqueueAfterCommit = 2 * time.Second
 
 // Get returns one job of the engagement.
 func (s *Service) Get(ctx context.Context, scope engagementctx.Scope, id uuid.UUID) (Job, error) {

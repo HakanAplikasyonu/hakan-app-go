@@ -84,5 +84,35 @@ func (h *Handler) balanceChecks(w http.ResponseWriter, r *http.Request) {
 	for i, row := range rows {
 		items[i] = balanceCheck(row)
 	}
-	response.JSON(w, r, http.StatusOK, map[string]any{"period": period, "items": items})
+	rows2, err := h.q.ListBankBalanceSuspects(r.Context(), db.ListBankBalanceSuspectsParams{TaxpayerID: scope.TaxpayerID, Period: period})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not check bank balances")
+		return
+	}
+	suspects := make([]BalanceSuspect, len(rows2))
+	for i, row := range rows2 {
+		suspects[i] = BalanceSuspect{
+			UUID: row.Uuid, CashBoxUUID: row.CashBoxUuid, Date: row.TransactionDate.Time.Format(time.DateOnly),
+			DebitCredit: row.DebitCredit, Amount: decimalOf(row.Amount).StringFixed(2), Currency: row.Currency,
+			Description: row.Description, Flagged: row.Flagged, Excluded: row.ExcludedAt.Valid,
+		}
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"period": period, "items": items, "suspects": suspects})
+}
+
+// BalanceSuspect is a movement to look at when the balance does not agree
+// (#710): one the import flagged as a possible duplicate, one with a twin
+// (same account, day, direction and amount), or one the office took out.
+type BalanceSuspect struct {
+	UUID        uuid.UUID `json:"uuid"`
+	CashBoxUUID uuid.UUID `json:"cash_box_uuid"`
+	Date        string    `json:"transaction_date"`
+	DebitCredit string    `json:"debit_credit"`
+	Amount      string    `json:"amount"`
+	Currency    string    `json:"currency"`
+	Description string    `json:"description"`
+	// Flagged: the import marked it as a possible duplicate.
+	Flagged bool `json:"possible_duplicate"`
+	// Excluded: the office took it out of the account; it can be put back.
+	Excluded bool `json:"excluded"`
 }

@@ -21,6 +21,8 @@ type PromptDialogProps = {
   placeholder?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Boş yanıt da onaylanabilir (isteğe bağlı gerekçe). */
+  optional?: boolean;
   onConfirm: (value: string) => void;
   onCancel: () => void;
 };
@@ -30,6 +32,7 @@ export function PromptDialog({
   title,
   description,
   placeholder,
+  optional,
   confirmLabel,
   cancelLabel,
   onConfirm,
@@ -78,7 +81,7 @@ export function PromptDialog({
               onConfirm(value);
               setValue("");
             }}
-            disabled={!value.trim()}
+            disabled={!optional && !value.trim()}
           >
             {confirmLabel ?? t("common.confirm")}
           </Button>

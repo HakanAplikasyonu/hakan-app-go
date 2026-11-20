@@ -54,6 +54,11 @@ type Record struct {
 	FiledOn       *string         `json:"filed_on"`
 	AccrualNumber *string         `json:"accrual_number"`
 	FiledAt       *time.Time      `json:"filed_at"`
+	// Son kontrol (#669): kim hazırladı, kim kontrol etti, kim verdi.
+	CheckedAt      *time.Time `json:"checked_at"`
+	PreparedByName string     `json:"prepared_by_name,omitempty"`
+	CheckedByName  string     `json:"checked_by_name,omitempty"`
+	FiledByName    string     `json:"filed_by_name,omitempty"`
 	// AccrualDocument is the GİB tahakkuk PDF attached after filing (#575).
 	AccrualDocument *AccrualDocument `json:"accrual_document"`
 	UpdatedAt       time.Time        `json:"updated_at"`
@@ -79,7 +84,42 @@ type Preview struct {
 	Calendar     Calendar `json:"calendar"`
 	Record       *Record  `json:"record"`
 	OpenWarnings []string `json:"open_warnings"`
+	// Sections: the period's source records, processed / total (#710).
+	// Always live, also for a prepared or filed return.
+	Sections []Section `json:"sections"`
 	body
+}
+
+// Section keys of Preview.Sections, in screen order.
+const (
+	SectionRetail   = "retail"
+	SectionInvoices = "invoices"
+	SectionBank     = "bank"
+	SectionExpenses = "expenses"
+)
+
+// Section is one source of the period: how many records there are, how
+// many were processed (they count for the return) and how many were set
+// aside on purpose (rejected, cancelled, ignored). The rest still waits.
+type Section struct {
+	Key       string `json:"key"`
+	Total     int64  `json:"total"`
+	Processed int64  `json:"processed"`
+	Ignored   int64  `json:"ignored"`
+}
+
+// sections loads the period's section summary.
+func (s *Service) sections(ctx context.Context, sc engagementctx.Scope, period string) ([]Section, error) {
+	st, err := s.q.TaxReturnSectionStats(ctx, db.TaxReturnSectionStatsParams{TaxpayerID: sc.TaxpayerID, Period: period})
+	if err != nil {
+		return nil, fmt.Errorf("tax return sections: %w", err)
+	}
+	return []Section{
+		{Key: SectionRetail, Total: st.RetailTotal, Processed: st.RetailProcessed, Ignored: st.RetailIgnored},
+		{Key: SectionInvoices, Total: st.InvoiceTotal, Processed: st.InvoiceProcessed, Ignored: st.InvoiceIgnored},
+		{Key: SectionBank, Total: st.BankTotal, Processed: st.BankProcessed, Ignored: st.BankIgnored},
+		{Key: SectionExpenses, Total: st.ExpenseTotal, Processed: st.ExpenseProcessed, Ignored: st.ExpenseIgnored},
+	}, nil
 }
 
 // Summary is one row of the return list.
@@ -176,7 +216,35 @@ func recordView(r *db.TaxReturn) *Record {
 		t := r.FiledAt.Time
 		v.FiledAt = &t
 	}
+	if r.CheckedAt.Valid {
+		t := r.CheckedAt.Time
+		v.CheckedAt = &t
+	}
 	return v
+}
+
+// withNames fills who prepared, checked and filed the return.
+func (s *Service) withNames(ctx context.Context, sc engagementctx.Scope, v *Record, r *db.TaxReturn) error {
+	if v == nil || r == nil {
+		return nil
+	}
+	for _, f := range []struct {
+		id  pgtype.Int8
+		out *string
+	}{{r.PreparedBy, &v.PreparedByName}, {r.CheckedBy, &v.CheckedByName}, {r.FiledBy, &v.FiledByName}} {
+		if !f.id.Valid {
+			continue
+		}
+		name, err := s.q.TaxReturnUserName(ctx, db.TaxReturnUserNameParams{OrganizationID: sc.OrganizationID, UserID: f.id.Int64})
+		if errors.Is(err, pgx.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("tax return user: %w", err)
+		}
+		*f.out = name
+	}
+	return nil
 }
 
 func acksOf(raw []byte) []string {
@@ -199,6 +267,12 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 	p := Preview{
 		Kind: kind, Period: period, EngagementUUID: sc.UUID, Status: StatusDraft,
 		Calendar: s.calendar(kind, period), Record: recordView(rec), OpenWarnings: []string{},
+	}
+	if err := s.withNames(ctx, sc, p.Record, rec); err != nil {
+		return Preview{}, err
+	}
+	if p.Sections, err = s.sections(ctx, sc, period); err != nil {
+		return Preview{}, err
 	}
 	if rec != nil {
 		p.Status = rec.Status
@@ -633,6 +707,23 @@ func (s *Service) Reopen(ctx context.Context, sc engagementctx.Scope, kind, peri
 }
 
 // File records that the prepared return was filed (verildi).
+// Check marks a prepared return as checked by the responsible person (#669).
+func (s *Service) Check(ctx context.Context, sc engagementctx.Scope, actorID int64, kind, period string) (Preview, error) {
+	if err := check(kind, period); err != nil {
+		return Preview{}, err
+	}
+	_, err := s.q.CheckTaxReturn(ctx, db.CheckTaxReturnParams{
+		CheckedBy: actor(actorID), OrganizationID: sc.OrganizationID, EngagementID: sc.ID, Kind: kind, Period: period,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Preview{}, ErrNotPrepared
+	}
+	if err != nil {
+		return Preview{}, fmt.Errorf("check tax return: %w", err)
+	}
+	return s.Preview(ctx, sc, kind, period)
+}
+
 func (s *Service) File(ctx context.Context, sc engagementctx.Scope, actorID int64, kind, period string, in FileInput) (Preview, error) {
 	if err := check(kind, period); err != nil {
 		return Preview{}, err

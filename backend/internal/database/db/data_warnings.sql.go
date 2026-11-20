@@ -164,6 +164,42 @@ func (q *Queries) ListEntityDataWarnings(ctx context.Context, arg ListEntityData
 	return items, nil
 }
 
+const resolveEntityDataWarnings = `-- name: ResolveEntityDataWarnings :execrows
+UPDATE data_warnings
+SET status = 'resolved', resolved_by = $1, resolved_at = NOW(), resolution_note = $2
+WHERE organization_id = $3 AND engagement_id = $4
+  AND entity_type = $5 AND entity_id = $6
+  AND code = $7 AND status = 'open'
+`
+
+type ResolveEntityDataWarningsParams struct {
+	ResolvedBy     pgtype.Int8 `json:"resolved_by"`
+	Note           pgtype.Text `json:"note"`
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   int64       `json:"engagement_id"`
+	EntityType     string      `json:"entity_type"`
+	EntityID       pgtype.Int8 `json:"entity_id"`
+	Code           string      `json:"code"`
+}
+
+// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
+// zaman, not.
+func (q *Queries) ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, resolveEntityDataWarnings,
+		arg.ResolvedBy,
+		arg.Note,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.EntityType,
+		arg.EntityID,
+		arg.Code,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const upsertOpenDataWarning = `-- name: UpsertOpenDataWarning :one
 INSERT INTO data_warnings (organization_id, engagement_id, taxpayer_id, period, entity_type, entity_id, code, severity, params, producer)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

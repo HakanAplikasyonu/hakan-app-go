@@ -37,6 +37,10 @@ type Querier interface {
 	// hedefi; plan yoksa 'luca'.
 	ActiveAccountPlanTarget(ctx context.Context, arg ActiveAccountPlanTargetParams) (string, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
+	// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi, fişin
+	// origin.manual_links dizisinde {kind, id}. Satırlara, tutarlara ve aktarıma
+	// dokunmaz; yalnız ilişkili kayıtlarda görünür. Aynı bağ ikinci kez eklenmez.
+	AddJournalDraftManualLink(ctx context.Context, arg AddJournalDraftManualLinkParams) (int64, error)
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
@@ -62,6 +66,8 @@ type Querier interface {
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
+	CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error)
 	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
 	// (ajan kapandı) görev üstlenilebilir; iki ajan aynı görevi alamaz.
 	ClaimAccountingTransfer(ctx context.Context, arg ClaimAccountingTransferParams) (AccountingTransfer, error)
@@ -174,6 +180,9 @@ type Querier interface {
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
 	CountTenantSuggestions(ctx context.Context, arg CountTenantSuggestionsParams) (int64, error)
+	// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+	// kullanıcının görebildiği mükellefler; çok olan önce.
+	CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error)
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
@@ -444,7 +453,11 @@ type Querier interface {
 	GetInvoiceAttachment(ctx context.Context, arg GetInvoiceAttachmentParams) (Attachment, error)
 	GetInvoiceByID(ctx context.Context, arg GetInvoiceByIDParams) (Invoice, error)
 	GetInvoiceBySource(ctx context.Context, arg GetInvoiceBySourceParams) (Invoice, error)
+	// Faturanın karşı tarafına onaylanmış cari hesap (account_assignments,
+	// target customer); yoksa boş.
+	GetInvoiceCustomerAccount(ctx context.Context, arg GetInvoiceCustomerAccountParams) (string, error)
 	GetInvoiceForAccounting(ctx context.Context, arg GetInvoiceForAccountingParams) (GetInvoiceForAccountingRow, error)
+	GetInvoiceJournalLink(ctx context.Context, arg GetInvoiceJournalLinkParams) (GetInvoiceJournalLinkRow, error)
 	GetInvoiceSourceBySource(ctx context.Context, arg GetInvoiceSourceBySourceParams) (InvoiceSource, error)
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
 	GetJournalDraftByID(ctx context.Context, arg GetJournalDraftByIDParams) (JournalDraft, error)
@@ -534,6 +547,8 @@ type Querier interface {
 	// Müşavir mobil inceleme kuyruğu (issue #239).
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
+	// Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
+	GetTaxReturnSettings(ctx context.Context, organizationID int64) (TaxReturnSetting, error)
 	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
 	GetTaxpayerByTaxID(ctx context.Context, taxID string) (Taxpayer, error)
 	// Engagements (issue #2): ofis <-> mükellef hizmet ilişkisi ve üye atamaları.
@@ -641,6 +656,9 @@ type Querier interface {
 	InsertImportedRetailSale(ctx context.Context, arg InsertImportedRetailSaleParams) (RetailSale, error)
 	InsertInvoice(ctx context.Context, arg InsertInvoiceParams) (InsertInvoiceRow, error)
 	InsertInvoiceItem(ctx context.Context, arg InsertInvoiceItemParams) (int64, error)
+	// Faturadan muhasebe fişi (#669, Oğuz kararı 20.11).
+	// Bir iş bir faturadan tek fiş üretir; ikinci istek 0 satır döner.
+	InsertInvoiceJournalLink(ctx context.Context, arg InsertInvoiceJournalLinkParams) (int64, error)
 	InsertInvoiceTaxSummary(ctx context.Context, arg InsertInvoiceTaxSummaryParams) error
 	InsertJournalDraft(ctx context.Context, arg InsertJournalDraftParams) (JournalDraft, error)
 	InsertJournalDraftLine(ctx context.Context, arg InsertJournalDraftLineParams) error
@@ -687,6 +705,8 @@ type Querier interface {
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
+	// Elle girilen VKN/TCKN'nin kim tarafından ne zaman girildiği (#669).
+	InvoiceCounterpartyTaxIDEntry(ctx context.Context, arg InvoiceCounterpartyTaxIDEntryParams) (InvoiceCounterpartyTaxIDEntryRow, error)
 	// Elle girilen kurun kim tarafından ne zaman girildiği (#571).
 	InvoiceExchangeRateEntry(ctx context.Context, arg InvoiceExchangeRateEntryParams) (InvoiceExchangeRateEntryRow, error)
 	// KDV indirim dönemini kimin ne zaman değiştirdiği (#640).
@@ -699,6 +719,10 @@ type Querier interface {
 	// Taslak fişin onayını engelleyen sorunlar (#566): borç-alacak tutmuyor ya
 	// da satır yok, hesap planında olmayan kod, ana (alt hesabı olan) hesaba
 	// kayıt, kilitli dönem. Planı yüklenmemiş mükellefte kod denetlenmez.
+	// Eksik belge (uyarı): fişteki bir banka hareketi hiçbir belgeye (fatura,
+	// fiş satırı) eşleşmemiş ve satırında belge numarası yok.
+	// Mükerrer olabilir (uyarı): aynı kaynak belge (fatura, fiş, banka hareketi)
+	// başka bir fişte de var.
 	JournalDraftIssues(ctx context.Context, arg JournalDraftIssuesParams) ([]JournalDraftIssuesRow, error)
 	JournalDraftTotals(ctx context.Context, arg JournalDraftTotalsParams) (JournalDraftTotalsRow, error)
 	LastSyncRunStartedAt(ctx context.Context, arg LastSyncRunStartedAtParams) (pgtype.Timestamptz, error)
@@ -750,6 +774,10 @@ type Querier interface {
 	ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBabsDeclarations(ctx context.Context, arg ListBabsDeclarationsParams) ([]BabsDeclaration, error)
+	// Bakiye uyuşmazlığında bakılacak hareketler (#710): içe aktarmanın olası
+	// mükerrer dediği ya da aynı hesapta aynı gün, yön ve tutarda ikizi olan
+	// hareketler; ofisin hesaptan çıkardıkları da (geri alınabilsin diye).
+	ListBankBalanceSuspects(ctx context.Context, arg ListBankBalanceSuspectsParams) ([]ListBankBalanceSuspectsRow, error)
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -773,6 +801,8 @@ type Querier interface {
 	// eşleşmeyi taxpayer_id ile süzer.
 	ListBankTransactionMatchJournalLines(ctx context.Context, arg ListBankTransactionMatchJournalLinesParams) ([]ListBankTransactionMatchJournalLinesRow, error)
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
+	// Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
+	ListBankTransactionPayrollMatches(ctx context.Context, arg ListBankTransactionPayrollMatchesParams) ([]ListBankTransactionPayrollMatchesRow, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
 	// booked_by_hand (#565): müşavir hareketi bu angajmanda kendi kararıyla bir
@@ -849,6 +879,8 @@ type Querier interface {
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
 	// faturalar; ofis yalnızca kendi dönemini ve mükellefin paylaştığı geçmişi
 	// görür (engagement_document_visible, issue #8).
+	// Dönem süzgecinde KDV'si o aya alınan alış faturası da gelir (#640): ofis
+	// geç gelen faturayı beyan ettiği ayda görür.
 	// Sayfa önce yalnızca kimliklerle seçilir; açık uyarı sayısı yalnızca dönen
 	// satırlar için hesaplanır (OFFSET'te atlanan satırlar için değil, #182).
 	ListEngagementInvoices(ctx context.Context, arg ListEngagementInvoicesParams) ([]ListEngagementInvoicesRow, error)
@@ -893,6 +925,8 @@ type Querier interface {
 	ListImportChangesForJob(ctx context.Context, jobID int64) ([]ImportChange, error)
 	ListImportJobsForActor(ctx context.Context, arg ListImportJobsForActorParams) ([]ImportJob, error)
 	ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error)
+	// Satırlar ve onaylı hesap kodları (account_assignments).
+	ListInvoiceItemsForPosting(ctx context.Context, arg ListInvoiceItemsForPostingParams) ([]ListInvoiceItemsForPostingRow, error)
 	// Adaylar: aynı mükellef, aynı yön, aktif, tamamen kapanmamış faturalar;
 	// tarih penceresi içinde ve tutar / karşı taraf / fatura no'dan en az biri
 	// tutuyor. Tutar, hareketin para biriminde: aynı para birimi ise ödenecek,
@@ -974,6 +1008,9 @@ type Querier interface {
 	// Dönem bordroları, yeniden eskiye: net maaş ödemesine eşlenen banka
 	// tutarı, SGK tahakkuk/ödeme durumu ve fiş taslağı.
 	ListPayrollRuns(ctx context.Context, arg ListPayrollRunsParams) ([]ListPayrollRunsRow, error)
+	// Elle bağlanabilecek bordrolar: dönem aralığında; ödenen net bu hareketin
+	// eşleşmeleri hariç (yeniden bağlama), personel sayısıyla (#710).
+	ListPayrollRunsForBankMatch(ctx context.Context, arg ListPayrollRunsForBankMatchParams) ([]ListPayrollRunsForBankMatchRow, error)
 	// Mükellef panelinde sahibin göreceği bekleyen talepler (mükellefin kendi
 	// VKN'si için). Ofislerin kendi kayıtlarıdır ama yalnızca talebin hedefi
 	// olan mükellefe gösterilir.
@@ -1109,6 +1146,9 @@ type Querier interface {
 	// Kritik uyarı bildirimi (issue #241). Zamanlanmış iş bütün ofisleri tarar.
 	// tenant-lint: cross-org zamanlanmış iş bütün ofislerin bildirilmemiş açık engelleyicilerini tarar
 	ListUnalertedBlockerWarnings(ctx context.Context, arg ListUnalertedBlockerWarningsParams) ([]ListUnalertedBlockerWarningsRow, error)
+	// Fişi olmayan, bu fiş dönemine düşen faturalar: satış belge ayında, alış
+	// KDV indirim ayında (#640). Görünürlük ofisin dönemine göre (#8).
+	ListUnpostedInvoices(ctx context.Context, arg ListUnpostedInvoicesParams) ([]ListUnpostedInvoicesRow, error)
 	ListUserLegalAcceptances(ctx context.Context, userID int64) ([]ListUserLegalAcceptancesRow, error)
 	ListUserRoleSlugs(ctx context.Context, userID int64) ([]string, error)
 	ListUserRolesByUserID(ctx context.Context, userID int64) ([]Role, error)
@@ -1280,6 +1320,8 @@ type Querier interface {
 	// Üretilen kod cari hafızasına da yazılır; incelemede verilmiş bir karar
 	// varsa ona dokunulmaz.
 	RememberGeneratedCounterpartyAccount(ctx context.Context, arg RememberGeneratedCounterpartyAccountParams) error
+	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
+	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)
@@ -1311,6 +1353,9 @@ type Querier interface {
 	// hatırlatma baştan kurulur.
 	RerequestDocumentTask(ctx context.Context, arg RerequestDocumentTaskParams) (int64, error)
 	ResolveEngagementAccess(ctx context.Context, arg ResolveEngagementAccessParams) (ResolveEngagementAccessRow, error)
+	// Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
+	// zaman, not.
+	ResolveEntityDataWarnings(ctx context.Context, arg ResolveEntityDataWarningsParams) (int64, error)
 	// Fiş satırlarının kaynak faturası: satırın source_id'si fatura (invoice) ya
 	// da kalem (invoice_item) kimliğidir; ETTN, numara, tarih ve kaynak sistem
 	// faturadan gelir.
@@ -1388,6 +1433,9 @@ type Querier interface {
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
+	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
+	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
+	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
@@ -1416,6 +1464,9 @@ type Querier interface {
 	// kaynağı olmayan (elle / Excel'den girilen) satırda; banka, fatura, bordro
 	// satırının tutarı kaynağından gelir.
 	SetJournalDraftLineAmounts(ctx context.Context, arg SetJournalDraftLineAmountsParams) (int64, error)
+	// Karşı tarafın VKN/TCKN'si kaynakta yoksa ya da geçersizse ofis girer
+	// (#669, INVALID_TAX_ID): cari bağlanır. Numarası olan faturaya dokunulmaz.
+	SetMissingInvoiceCounterpartyTaxID(ctx context.Context, arg SetMissingInvoiceCounterpartyTaxIDParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
 	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
 	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
@@ -1506,6 +1557,15 @@ type Querier interface {
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)
 	// Onaylı, faturaya bağlanmamış Z raporlarının oran kırılımı (TL).
 	TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnRetailVATLinesParams) ([]TaxReturnRetailVATLinesRow, error)
+	// Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+	// (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+	// her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+	// fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+	// eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+	// sayılan banka hareketi.
+	TaxReturnSectionStats(ctx context.Context, arg TaxReturnSectionStatsParams) (TaxReturnSectionStatsRow, error)
+	// Hazırlayan / kontrol eden / veren kişinin adı (ofis üyesi).
+	TaxReturnUserName(ctx context.Context, arg TaxReturnUserNameParams) (string, error)
 	// Karşı tarafın geçmişi yoksa mükellefin aynı yöndeki son 12 ayı.
 	TaxpayerAmountsBefore(ctx context.Context, arg TaxpayerAmountsBeforeParams) ([]pgtype.Numeric, error)
 	// Mükellefin entegratör bağlantıları (entegrator_<ad>): kaynağı entegratör
@@ -1618,6 +1678,7 @@ type Querier interface {
 	UpsertSyncWindow(ctx context.Context, arg UpsertSyncWindowParams) (SyncWindow, error)
 	// Taslağın düzeltme alanları ve onaylanan maddeler; yalnızca taslakken.
 	UpsertTaxReturnDraft(ctx context.Context, arg UpsertTaxReturnDraftParams) (TaxReturn, error)
+	UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)

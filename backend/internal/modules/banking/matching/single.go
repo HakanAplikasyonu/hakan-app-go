@@ -63,6 +63,12 @@ type TransactionView struct {
 	// Posting is the trial-balance account the movement is booked to (or
 	// proposed for), nil when there is none yet (#565).
 	Posting *PostingView `json:"posting"`
+	// PayrollMatchable: an outgoing payment can be tied to a payroll run
+	// (net salaries); candidates are the runs of its month and the two
+	// before with something unpaid (#710).
+	PayrollMatchable  bool               `json:"payroll_matchable"`
+	PayrollMatches    []MatchedPayroll   `json:"payroll_matches"`
+	PayrollCandidates []PayrollCandidate `json:"payroll_candidates"`
 }
 
 // PostingView is the movement's counter account: suggested (waits for the
@@ -84,6 +90,9 @@ type MatchedInvoice struct {
 	Amount        string    `json:"amount"`
 	Method        string    `json:"method"`
 	Score         int       `json:"score"`
+	// Parts: why the matcher proposed it (21 §6.2 score parts); empty for
+	// a match made by hand (#710).
+	Parts map[string]int `json:"parts"`
 }
 
 // CandidateView is an open invoice with its 21 §6.2 score.
@@ -217,12 +226,16 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	if v.JournalMatches, err = s.journalMatches(ctx, q, sub, t); err != nil {
 		return v, err
 	}
+	if err := s.payrollView(ctx, q, sub, t, &v); err != nil {
+		return v, err
+	}
 	matched := map[uuid.UUID]bool{}
 	for _, r := range matches {
 		matched[r.InvoiceUuid] = true
 		v.Matches = append(v.Matches, MatchedInvoice{
 			InvoiceUUID: r.InvoiceUuid, InvoiceNumber: r.InvoiceNumber, IssueDate: r.IssueDate.Time.Format("2006-01-02"),
 			Counterparty: textPtr(r.CustomerName), Amount: dec(r.Amount).StringFixed(2), Method: r.Method, Score: int(r.Score),
+			Parts: evidenceParts(r.Evidence, r.Method),
 		})
 	}
 	if !v.Matchable {
@@ -235,7 +248,9 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	ranked := make([]Score, 0, len(cands))
 	for _, c := range cands {
 		if c.Open.IsPositive() && !matched[byID[c.ID].Uuid] {
-			ranked = append(ranked, ScoreCandidate(m, c, s.opt))
+			if sc := ScoreCandidate(m, c, s.opt); Relevant(sc) {
+				ranked = append(ranked, sc)
+			}
 		}
 	}
 	sort.SliceStable(ranked, func(i, j int) bool {
@@ -343,12 +358,27 @@ func (s *Service) SearchFiltered(ctx context.Context, sub Subject, id uuid.UUID,
 // warnings so the ones it settles are resolved at once. Invoices take the
 // amount first, the lines what is left.
 func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices []uuid.UUID, lines []LineRef, userID int64) (TransactionView, error) {
+	return s.MatchAll(ctx, sub, id, MatchInput{Invoices: invoices, Lines: lines}, userID)
+}
+
+// MatchInput is what the accountant ties the movement to: invoices,
+// payroll runs (net salaries, #710) and / or journal lines.
+type MatchInput struct {
+	Invoices    []uuid.UUID
+	PayrollRuns []uuid.UUID
+	Lines       []LineRef
+}
+
+// MatchAll is Match with payroll runs. Invoices take the amount first, then
+// the payroll runs, the lines what is left.
+func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in MatchInput, userID int64) (TransactionView, error) {
+	invoices, lines := in.Invoices, in.Lines
 	q := database.QueriesFor(s.pool)
 	t, err := s.transaction(ctx, q, sub, id)
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if len(invoices)+len(lines) == 0 {
+	if len(invoices)+len(lines)+len(in.PayrollRuns) == 0 {
 		return TransactionView{}, fmt.Errorf("%w: pick an invoice or a journal line", ErrInvalidInvoices)
 	}
 	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
@@ -360,6 +390,10 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 		if remaining, err = s.pickInvoices(ctx, q, sub, t, invoices, &v, remaining); err != nil {
 			return TransactionView{}, err
 		}
+	}
+	payroll, remaining, err := s.pickPayroll(ctx, q, sub, t, in.PayrollRuns, remaining)
+	if err != nil {
+		return TransactionView{}, err
 	}
 	picked, err := s.pickLines(ctx, q, sub, t, lines, remaining)
 	if err != nil {
@@ -379,6 +413,9 @@ func (s *Service) Match(ctx context.Context, sub Subject, id uuid.UUID, invoices
 			return err
 		}
 		if err := writeLines(ctx, tq, sub, t.ID, picked, userID); err != nil {
+			return err
+		}
+		if err := writePayroll(ctx, tq, sub, t.ID, payroll, userID); err != nil {
 			return err
 		}
 		// writeValue marks the movement matched (with or without invoices).
@@ -470,6 +507,22 @@ func (s *Service) refreshed(ctx context.Context, q *db.Queries, sub Subject, id 
 		return TransactionView{}, err
 	}
 	return s.Transaction(ctx, sub, id)
+}
+
+// evidenceParts reads the score parts kept with an automatic or suggested
+// match; a manual match has no reason to show.
+func evidenceParts(raw []byte, method string) map[string]int {
+	out := map[string]int{}
+	if method == "manual" {
+		return out
+	}
+	var e struct {
+		Parts map[string]int `json:"parts"`
+	}
+	if json.Unmarshal(raw, &e) == nil && e.Parts != nil {
+		out = e.Parts
+	}
+	return out
 }
 
 func uniqueUUIDs(ids []uuid.UUID) map[uuid.UUID]bool {

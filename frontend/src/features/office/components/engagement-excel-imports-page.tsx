@@ -34,6 +34,7 @@ import { datetime } from "@/lib/utils/format";
 import { useDialogs } from "@/providers/dialog-provider";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
+import { sourceSystemLabel } from "@/lib/source-label";
 
 import {
   duplicateFields,
@@ -290,7 +291,10 @@ function TemplatesSection({
                         t("office.excel.type_unknown")}
                     </span>
                     {x.source_system ? (
-                      <span className="text-text-2"> · {x.source_system}</span>
+                      <span className="text-text-2">
+                        {" "}
+                        · {sourceSystemLabel(x.source_system, t)}
+                      </span>
                     ) : null}
                     <span className="text-text-3 block text-xs">
                       {t("office.excel.template_columns", {

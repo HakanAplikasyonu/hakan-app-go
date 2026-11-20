@@ -4501,6 +4501,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/review/taxpayers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review queue per taxpayer
+         * @description Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+         */
+        get: operations["listOfficeReviewTaxpayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/review/settings": {
         parameters: {
             query?: never;
@@ -4911,7 +4937,7 @@ export interface paths {
         /**
          * Upload an Excel / CSV export
          * @description Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
-         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
+         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports), `bank_transactions` (#395) and `customers` (cari cards, #669) are accepted; for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
          */
         post: operations["uploadExcelImport"];
         delete?: never;
@@ -6970,6 +6996,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Enter the missing counterparty VKN/TCKN of an invoice (INVALID_TAX_ID)
+         * @description Requires `tenant.invoices.write` and engagement access. Only for an
+         *     invoice that has neither a VKN nor a TCKN for the counterparty (the
+         *     source sent none or an invalid one). The number is checked (VKN 10
+         *     digits, TCKN 11 digits, both with their check digits; spaces are
+         *     ignored). The counterparty (cari) with that number is linked, or
+         *     created; the open INVALID_TAX_ID warning of the invoice is resolved;
+         *     who and when are recorded. The invoice then counts in Ba/Bs and in
+         *     bank matching by number.
+         *     The answer does not depend on whether the number is registered on
+         *     the platform (D1b): only this taxpayer's own counterparties are
+         *     looked up, and the response is the invoice.
+         *     400 `INVALID_TAX_ID`; 422 `TAX_ID_SET` (the invoice already has a
+         *     number), `PERIOD_LOCKED` (the invoice's period is locked). No 409:
+         *     a conflict answer would read as an existence answer.
+         */
+        put: operations["setEngagementInvoiceCounterpartyTaxId"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period": {
         parameters: {
             query?: never;
@@ -7008,6 +7076,86 @@ export interface paths {
          *     document month must be open. Recorded in the activity log.
          */
         delete: operations["clearEngagementInvoiceVatDeductionPeriod"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/journal-draft": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The journal draft that books the invoice (#669)
+         * @description Requires `tenant.invoices.read` and engagement access. `draft` is
+         *     null while the invoice has no entry.
+         */
+        get: operations["getEngagementInvoiceJournalDraft"];
+        put?: never;
+        /**
+         * Book a purchase / sales invoice as a journal draft (#669)
+         * @description Requires `tenant.journals.write` and engagement access. Purchase:
+         *     line accounts (153 / 150 / 7xx) debit net, 191 debit KDV, 320 cari
+         *     credit total. Sales: 120 cari debit total, line accounts (600 / 601 /
+         *     602) credit net, 391 credit KDV. Line accounts are the approved
+         *     account codes; KDV goes to the plan's 191 / 391 sub-account for the
+         *     rate. The entry is dated the document date; a purchase whose KDV
+         *     was moved (#640) is dated the first day of the deduction month.
+         *     Document number and date stay on the lines.
+         *
+         *     One draft per invoice: a second call returns the existing draft
+         *     (`outcome: existing`, 200). Invoices the first version cannot book
+         *     correctly are refused with a reason (`outcome: refused`, 200):
+         *     `NOT_ACTIVE`, `FOREIGN_CURRENCY`, `RETURN_INVOICE`, `WITHHOLDING`,
+         *     `EXEMPTION`, `SPECIAL_TAX`, `UNSUPPORTED_TYPE`, `NO_ITEMS`,
+         *     `TOTALS_MISMATCH`, `ITEM_ACCOUNT_MISSING`.
+         */
+        post: operations["postEngagementInvoiceJournalDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/invoice-postings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Book the period's invoices as journal drafts (#669)
+         * @description Requires `tenant.journals.write` and engagement access. Books every
+         *     active invoice of the entry period that has no draft yet: sales of
+         *     the document month, purchases of their KDV deduction month (#640).
+         *     Each invoice is booked as in `POST …/invoices/{invoiceUuid}/journal-draft`;
+         *     refused invoices are listed with their reason.
+         */
+        post: operations["postEngagementInvoicePostings"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7291,6 +7439,125 @@ export interface paths {
          */
         post: operations["reverseJournalDraftExport"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an entry already transferred to the program completely (#710)
+         * @description Office decision (#710 A.4): before the e-defter there is no correction
+         *     entry. In one transaction the entry leaves its export (who, when and
+         *     why on the export item) and goes back to draft with the same reason,
+         *     so it can be corrected, approved and exported again. The user deletes
+         *     the entry in the program. Requires `tenant.journals.export` and
+         *     `tenant.journals.approve`. A locked period gives `JOURNAL_BLOCKED`
+         *     (`period_locked`); an entry not in a live export `NOT_EXPORTED`.
+         */
+        post: operations["cancelJournalDraftExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link an invoice to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftInvoice"];
+        post?: never;
+        /**
+         * Unlink an invoice to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftInvoice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link a bank transaction to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftBankTransaction"];
+        post?: never;
+        /**
+         * Unlink a bank transaction to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The link is kept on the draft
+         *     (origin.manual_links) and shows in the related records of both sides
+         *     with relation `manual`; lines, amounts and the export are not
+         *     changed, so it is allowed in every status. Linking twice or unlinking
+         *     a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftBankTransaction"];
         options?: never;
         head?: never;
         patch?: never;
@@ -9276,6 +9543,41 @@ export interface paths {
          *     draft, `BANK_TRANSACTION_NOT_MATCHABLE` when it is cancelled.
          */
         put: operations["setTenantBankTransactionAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a duplicate movement out of the account or put it back
+         * @description Requires `tenant.bank.write` (#710). When the statement balance does
+         *     not agree, the office takes a duplicate movement out of the account
+         *     (it no longer counts in totals, matching or warnings; its matches
+         *     are dropped) or puts one it took out back. Who and when are kept;
+         *     the period's bank warnings are refreshed at once. 409
+         *     `BANK_POSTING_DRAFTED` when the movement is already in a journal
+         *     draft, `BANK_TRANSACTION_CANCELLED` when the bank cancelled it.
+         */
+        put: operations["setTenantBankTransactionExclusion"];
         post?: never;
         delete?: never;
         options?: never;
@@ -12201,6 +12503,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/tax-return-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's tax return final check setting (#710)
+         * @description Requires `tenant.tax_returns.read`. `final_check_required` (default
+         *     true): "kontrol edildi" and "verildi" are marked only by the
+         *     responsible (`tenant.tax_returns.approve`). When the office turns it
+         *     off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+         *     too; who and when are recorded either way.
+         */
+        get: operations["getTaxReturnSettings"];
+        /**
+         * Set the office's tax return final check setting (#710)
+         * @description Requires `tenant.settings.write` (office owner / admin).
+         */
+        put: operations["putTaxReturnSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/account-rule-settings": {
         parameters: {
             query?: never;
@@ -12855,6 +13191,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the prepared return as checked (final check)
+         * @description Requires `tenant.tax_returns.approve` (#669, office decision: everyone
+         *     prepares returns; only the responsible person, owner or admin, marks
+         *     "kontrol edildi" and "verildi"). When the office turned the final
+         *     check off (`/v1/tenant/tax-return-settings`, #710),
+         *     `tenant.tax_returns.write` is enough. Who and when are kept
+         *     (`record.checked_by_name`, `record.checked_at`). Only a prepared
+         *     return (`409 TAX_RETURN_NOT_PREPARED`).
+         */
+        post: operations["checkEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen": {
         parameters: {
             query?: never;
@@ -12910,10 +13283,12 @@ export interface paths {
         put?: never;
         /**
          * Record that the prepared return was filed
-         * @description Requires `tenant.tax_returns.write`. `filed_on` is not before the
-         *     period's last day nor in the future; `accrual_number` is the
-         *     tahakkuk fiş no. Only a prepared return (`409
-         *     TAX_RETURN_NOT_PREPARED`).
+         * @description Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+         *     office turned the final check off, #710) (#669: only the responsible
+         *     person marks "verildi"; filing also marks the return checked when it
+         *     was not). `filed_on` is not before the period's last day nor in the
+         *     future; `accrual_number` is the tahakkuk fiş no. Only a prepared
+         *     return (`409 TAX_RETURN_NOT_PREPARED`).
          */
         post: operations["fileEngagementTaxReturn"];
         delete?: never;
@@ -14464,7 +14839,7 @@ export interface components {
         };
         ExcelImportMappingInput: {
             /** @enum {string} */
-            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             source_system?: string;
             columns?: {
                 column: string;
@@ -14491,7 +14866,7 @@ export interface components {
         };
         ExcelImportDataType: {
             /** @enum {string} */
-            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             /** @example Banka hareketleri */
             label: string;
             fields: {
@@ -17197,6 +17572,27 @@ export interface components {
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /** @description An outgoing payment can be tied to a payroll run (#710) */
+            payroll_matchable: boolean;
+            /** @description Payroll runs the movement pays (net salaries, */
+            payroll_matches: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Payroll runs of the movement's month and the two before with net still unpaid (#710) */
+            payroll_candidates: {
+                /** Format: uuid */
+                payroll_run_uuid: string;
+                period: string;
+                net_total: string;
+                open_amount: string;
+                employee_count: number;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -17243,6 +17639,10 @@ export interface components {
                 /** @enum {string} */
                 method: "auto" | "suggested_accepted" | "manual";
                 score: number;
+                /** @description Why the matcher proposed it (21 §6.2 parts); empty for a manual match */
+                parts: {
+                    [key: string]: number;
+                };
             }[];
             candidates: components["schemas"]["BankMatchCandidate"][];
         };
@@ -18175,6 +18575,13 @@ export interface components {
                 /** Format: date-time */
                 set_at: string;
             };
+            /** @description Who entered the missing counterparty VKN/TCKN in the office, and when; null when it came with the source. */
+            counterparty_tax_id_entry: null | {
+                /** @description Empty when the user was deleted */
+                set_by_name: string;
+                /** Format: date-time */
+                set_at: string;
+            };
             /** @description KDV indirim dönemi when moved forward from the document month (#640); null = the document month. */
             vat_deduction_period: string | null;
             /** @description Who moved the KDV deduction, and when (#640); null when it is in the document month. */
@@ -18195,6 +18602,60 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["OfficeInvoiceDetail"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoiceJournalDraftRef: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: int32 */
+            entry_no: number;
+            /** @example 2026-10 */
+            period: string;
+            /** @enum {string} */
+            status: "draft" | "approved" | "exported";
+        };
+        InvoiceJournalLink: {
+            draft: components["schemas"]["InvoiceJournalDraftRef"] | null;
+        };
+        EnvelopeInvoiceJournalLink: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoiceJournalLink"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoicePostingResult: {
+            /** Format: uuid */
+            invoice_uuid: string;
+            invoice_number: string;
+            /** @enum {string} */
+            outcome: "created" | "existing" | "refused";
+            draft?: components["schemas"]["InvoiceJournalDraftRef"];
+            /**
+             * @description Why it was refused.
+             * @enum {string}
+             */
+            reason?: "NOT_ACTIVE" | "FOREIGN_CURRENCY" | "RETURN_INVOICE" | "WITHHOLDING" | "EXEMPTION" | "SPECIAL_TAX" | "UNSUPPORTED_TYPE" | "NO_ITEMS" | "TOTALS_MISMATCH" | "ITEM_ACCOUNT_MISSING";
+            /** @description ITEM_ACCOUNT_MISSING: the line without an account code. */
+            line_no?: number;
+            detail?: string;
+        };
+        EnvelopeInvoicePostingResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoicePostingResult"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        InvoicePostingBatch: {
+            /** @example 2026-10 */
+            period: string;
+            created: number;
+            refused: number;
+            items: components["schemas"]["InvoicePostingResult"][];
+        };
+        EnvelopeInvoicePostingBatch: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["InvoicePostingBatch"];
             meta: components["schemas"]["ResponseMeta"];
         };
         JournalDraftLineInput: {
@@ -18298,10 +18759,12 @@ export interface components {
              * @description unbalanced: debit and credit differ (or no lines);
              *     unknown_account: the line's code is not in the imported plan;
              *     parent_account: the line posts to an account that has sub-accounts;
-             *     period_locked: the period is closed.
+             *     period_locked: the period is closed;
+             *     missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
+             *     possible_duplicate: a source document of the entry is in another entry too (blocked; send_duplicate with a reason passes it, #710).
              * @enum {string}
              */
-            code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked";
+            code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked" | "missing_document" | "possible_duplicate";
             /** Format: int32 */
             line_no?: number;
             account?: string;
@@ -18343,6 +18806,10 @@ export interface components {
             };
             /** Format: date-time */
             approved_at?: string;
+            /** @description Warnings the approver accepted (missing_document, possible_duplicate) */
+            approval_warnings?: string[];
+            /** @description Optional reason given with the approval */
+            approval_note?: string;
             /** Format: date-time */
             created_at: string;
             items: components["schemas"]["JournalDraftLine"][];
@@ -20045,6 +20512,18 @@ export interface components {
             /** @description True while the office has not set one */
             default: boolean;
         };
+        TaxReturnSettings: {
+            /** @description Only the responsible marks "kontrol edildi" / "verildi" (default true) */
+            final_check_required: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        EnvelopeTaxReturnSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxReturnSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         EnvelopeAccountRuleSettings: {
             /** @enum {boolean} */
             success: true;
@@ -20336,10 +20815,10 @@ export interface components {
              */
             uuid: string | null;
             /**
-             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart. Rejected, reverted and superseded suggestions are not listed.
+             * @description payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart; manual: linked to a journal draft by hand (#710). Rejected, reverted and superseded suggestions are not listed.
              * @enum {string}
              */
-            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account" | "possible";
+            relation: "payment" | "journal" | "source" | "warning" | "review" | "rule" | "counterparty_account" | "possible" | "manual";
             /** Format: date */
             date: string | null;
             /** @description Decimal; matched amount for payments, debit total for journals */
@@ -20459,6 +20938,17 @@ export interface components {
             accrual_number: string | null;
             /** Format: date-time */
             filed_at: string | null;
+            /**
+             * Format: date-time
+             * @description Final check by the responsible person (#669)
+             */
+            checked_at: string | null;
+            /** @description Who prepared the return */
+            prepared_by_name?: string;
+            /** @description Who marked it checked */
+            checked_by_name?: string;
+            /** @description Who marked it filed */
+            filed_by_name?: string;
             /** @description The GİB tahakkuk PDF attached after filing (#575); null when none. */
             accrual_document: null | {
                 file_name: string;
@@ -20659,12 +21149,41 @@ export interface components {
             };
             record: components["schemas"]["TaxReturnRecord"] | null;
             open_warnings: string[];
+            /** @description The period's sources, processed / total (#710); always live, also for a prepared or filed return */
+            sections: components["schemas"]["TaxReturnSection"][];
             /** Format: date-time */
             computed_at: string;
             checklist: components["schemas"]["TaxReturnCheckItem"][];
             kdv1?: components["schemas"]["TaxReturnKDV1"];
             muhsgk?: components["schemas"]["TaxReturnMUHSGK"];
             babs?: components["schemas"]["TaxReturnBABS"];
+        };
+        /**
+         * @description One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
+         *     value, matched bank transaction); ignored was set aside (rejected, cancelled, ignored); the rest still waits.
+         */
+        TaxReturnSection: {
+            /** @enum {string} */
+            key: "retail" | "invoices" | "bank" | "expenses";
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            processed: number;
+            /** Format: int64 */
+            ignored: number;
+        };
+        JournalDraftManualLink: {
+            /** @enum {string} */
+            kind: "invoice" | "bank_transaction";
+            /** Format: uuid */
+            uuid: string;
+            linked: boolean;
+        };
+        EnvelopeJournalDraftManualLink: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["JournalDraftManualLink"];
+            meta: components["schemas"]["ResponseMeta"];
         };
         TaxReturnSummary: {
             /** Format: uuid */
@@ -28375,6 +28894,61 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listOfficeReviewTaxpayers: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
+                /** @description Default pending; all = any status */
+                status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
+                kind?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts per taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            total: number;
+                            items: {
+                                /** Format: uuid */
+                                engagement_uuid: string;
+                                total: number;
+                                /** Format: date-time */
+                                oldest_created_at: string;
+                            }[];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getOfficeReviewSettings: {
         parameters: {
             query?: never;
@@ -28971,7 +29545,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
                     /** @example bizimhesap */
                     source_system?: string;
                     /** @example 2026-10 */
@@ -32091,6 +32665,56 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    setEngagementInvoiceCounterpartyTaxId: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 9000000017 */
+                    tax_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The invoice after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `TAX_ID_SET`, `PERIOD_LOCKED` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
     setEngagementInvoiceVatDeductionPeriod: {
         parameters: {
             query?: never;
@@ -32183,6 +32807,120 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getEngagementInvoiceJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice's draft, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoiceJournalLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postEngagementInvoiceJournalDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The existing draft, or the reason it was refused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingResult"];
+                };
+            };
+            /** @description The new draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingResult"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    postEngagementInvoicePostings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-10 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description What happened to each invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeInvoicePostingBatch"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -32465,7 +33203,20 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** @description Approve although the draft has a missing document warning */
+                    confirm_warnings?: boolean;
+                    /** @description Optional reason kept on the entry */
+                    note?: string;
+                    /** @description Send a possible duplicate anyway (#710); needs reason */
+                    send_duplicate?: boolean;
+                    /** @description Required with send_duplicate; kept on the entry */
+                    reason?: string;
+                };
+            };
+        };
         responses: {
             /** @description Approved draft */
             200: {
@@ -32480,6 +33231,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            /** @description A possible duplicate to send anyway (`JOURNAL_DUPLICATE`) or warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`) */
             422: {
                 headers: {
@@ -32581,6 +33341,192 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    cancelJournalDraftExport: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Draft (back to draft) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `JOURNAL_BLOCKED` (period_locked) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    linkJournalDraftInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftInvoice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    linkJournalDraftBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftBankTransaction: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
@@ -35776,6 +36722,8 @@ export interface operations {
             content: {
                 "application/json": {
                     invoice_uuids?: string[];
+                    /** @description Payroll runs an outgoing payment pays (net salaries, */
+                    payroll_run_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */
@@ -35895,6 +36843,56 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankTransactionExclusion: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    excluded: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement's state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            /** Format: uuid */
+                            uuid: string;
+                            excluded: boolean;
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -38382,6 +39380,22 @@ export interface operations {
                         data: {
                             period: string;
                             items: components["schemas"]["BankBalanceCheck"][];
+                            /** @description Movements to look at (#710): flagged as possible duplicates by the import, with a twin (same account, day, direction, amount), or taken out by the office */
+                            suspects: {
+                                /** Format: uuid */
+                                uuid: string;
+                                /** Format: uuid */
+                                cash_box_uuid: string;
+                                /** Format: date */
+                                transaction_date: string;
+                                /** @enum {string} */
+                                debit_credit: "A" | "B";
+                                amount: string;
+                                currency: string;
+                                description: string;
+                                possible_duplicate: boolean;
+                                excluded: boolean;
+                            }[];
                         };
                         meta: components["schemas"]["ResponseMeta"];
                     };
@@ -40422,6 +41436,71 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    getTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Setting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putTaxReturnSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    final_check_required: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturnSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     getAccountRuleSettings: {
         parameters: {
             query?: never;
@@ -41400,6 +42479,43 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    checkEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Checked return */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

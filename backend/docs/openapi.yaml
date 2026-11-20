@@ -6437,6 +6437,50 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/review/taxpayers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Review]
+      operationId: listOfficeReviewTaxpayers
+      summary: Review queue per taxpayer
+      description: |
+        Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PeriodFilter"
+        - { name: status, in: query, required: false, description: "Default pending; all = any status", schema: { type: string, enum: [pending, auto_accepted, accepted, corrected, rejected, reverted, superseded, all] } }
+        - { name: kind, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Counts per taxpayer
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items, total]
+                    properties:
+                      total: { type: integer }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required: [engagement_uuid, total, oldest_created_at]
+                          properties:
+                            engagement_uuid: { type: string, format: uuid }
+                            total: { type: integer }
+                            oldest_created_at: { type: string, format: date-time }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/review/settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -6854,7 +6898,7 @@ paths:
       summary: Upload an Excel / CSV export
       description: |
         Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
-        Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
+        Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports), `bank_transactions` (#395) and `customers` (cari cards, #669) are accepted; for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
       security:
         - bearerAuth: []
       requestBody:
@@ -6866,7 +6910,7 @@ paths:
               required: [file]
               properties:
                 file: { type: string, format: binary }
-                data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
+                data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions, customers] }
                 source_system: { type: string, example: bizimhesap }
                 period: { type: string, example: "2026-10" }
                 sheet: { type: string }
@@ -9339,6 +9383,60 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Invoices]
+      operationId: setEngagementInvoiceCounterpartyTaxId
+      summary: Enter the missing counterparty VKN/TCKN of an invoice (INVALID_TAX_ID)
+      description: |
+        Requires `tenant.invoices.write` and engagement access. Only for an
+        invoice that has neither a VKN nor a TCKN for the counterparty (the
+        source sent none or an invalid one). The number is checked (VKN 10
+        digits, TCKN 11 digits, both with their check digits; spaces are
+        ignored). The counterparty (cari) with that number is linked, or
+        created; the open INVALID_TAX_ID warning of the invoice is resolved;
+        who and when are recorded. The invoice then counts in Ba/Bs and in
+        bank matching by number.
+        The answer does not depend on whether the number is registered on
+        the platform (D1b): only this taxpayer's own counterparties are
+        looked up, and the response is the invoice.
+        400 `INVALID_TAX_ID`; 422 `TAX_ID_SET` (the invoice already has a
+        number), `PERIOD_LOCKED` (the invoice's period is locked). No 409:
+        a conflict answer would read as an existence answer.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tax_id]
+              properties:
+                tax_id: { type: string, example: "9000000017" }
+      responses:
+        "200":
+          description: The invoice after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: "`TAX_ID_SET`, `PERIOD_LOCKED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -9415,6 +9513,109 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/journal-draft:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Invoices]
+      operationId: getEngagementInvoiceJournalDraft
+      summary: The journal draft that books the invoice (#669)
+      description: |
+        Requires `tenant.invoices.read` and engagement access. `draft` is
+        null while the invoice has no entry.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The invoice's draft, or null
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoiceJournalLink"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Invoices]
+      operationId: postEngagementInvoiceJournalDraft
+      summary: Book a purchase / sales invoice as a journal draft (#669)
+      description: |
+        Requires `tenant.journals.write` and engagement access. Purchase:
+        line accounts (153 / 150 / 7xx) debit net, 191 debit KDV, 320 cari
+        credit total. Sales: 120 cari debit total, line accounts (600 / 601 /
+        602) credit net, 391 credit KDV. Line accounts are the approved
+        account codes; KDV goes to the plan's 191 / 391 sub-account for the
+        rate. The entry is dated the document date; a purchase whose KDV
+        was moved (#640) is dated the first day of the deduction month.
+        Document number and date stay on the lines.
+
+        One draft per invoice: a second call returns the existing draft
+        (`outcome: existing`, 200). Invoices the first version cannot book
+        correctly are refused with a reason (`outcome: refused`, 200):
+        `NOT_ACTIVE`, `FOREIGN_CURRENCY`, `RETURN_INVOICE`, `WITHHOLDING`,
+        `EXEMPTION`, `SPECIAL_TAX`, `UNSUPPORTED_TYPE`, `NO_ITEMS`,
+        `TOTALS_MISMATCH`, `ITEM_ACCOUNT_MISSING`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The existing draft, or the reason it was refused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingResult"
+        "201":
+          description: The new draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingResult"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/invoice-postings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Invoices]
+      operationId: postEngagementInvoicePostings
+      summary: Book the period's invoices as journal drafts (#669)
+      description: |
+        Requires `tenant.journals.write` and engagement access. Books every
+        active invoice of the entry period that has no draft yet: sales of
+        the document month, purchases of their KDV deduction month (#640).
+        Each invoice is booked as in `POST …/invoices/{invoiceUuid}/journal-draft`;
+        refused invoices are listed with their reason.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period]
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-10" }
+      responses:
+        "200":
+          description: What happened to each invoice
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeInvoicePostingBatch"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/export-drivers:
@@ -9637,9 +9838,20 @@ paths:
       tags: [Journals]
       operationId: approveJournalDraft
       summary: Approve a balanced draft
-      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details.
+      description: Requires `tenant.journals.approve` (the müşavir's final check, #566; a role with only `tenant.journals.write` prepares drafts but cannot approve them). An unbalanced draft is refused with `422 JOURNAL_UNBALANCED`; a draft in a locked period (#566) with `422 JOURNAL_BLOCKED` listing the blocking issues as error details. A possible duplicate (`possible_duplicate`: its source document is in another entry too) is blocked (#710): refused with `409 JOURNAL_DUPLICATE` unless the body has the separate `send_duplicate: true` with a non-empty `reason` (`400 REASON_REQUIRED` without one); `confirm_warnings` does not pass it. A missing document (`missing_document`: a bank entry without an invoice / receipt or document number) is not blocked, but is refused with `409 JOURNAL_NEEDS_CONFIRMATION` (warning codes as error details) unless the body has `confirm_warnings: true` (#669). The accepted warnings and the note (the reason, for a duplicate) stay on the entry (`approval_warnings`, `approval_note`).
       security:
         - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirm_warnings: { type: boolean, description: "Approve although the draft has a missing document warning" }
+                note: { type: string, maxLength: 1000, description: Optional reason kept on the entry }
+                send_duplicate: { type: boolean, description: "Send a possible duplicate anyway (#710); needs reason" }
+                reason: { type: string, maxLength: 1000, description: "Required with send_duplicate; kept on the entry" }
       responses:
         "200":
           description: Approved draft
@@ -9651,6 +9863,11 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422":
           description: Not balanced (`JOURNAL_UNBALANCED`) or blocked by issues (`JOURNAL_BLOCKED`)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: A possible duplicate to send anyway (`JOURNAL_DUPLICATE`) or warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -9739,6 +9956,159 @@ paths:
               schema:
                 $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
         "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Journals]
+      operationId: cancelJournalDraftExport
+      summary: Cancel an entry already transferred to the program completely (#710)
+      description: |
+        Office decision (#710 A.4): before the e-defter there is no correction
+        entry. In one transaction the entry leaves its export (who, when and
+        why on the export item) and goes back to draft with the same reason,
+        so it can be corrected, approved and exported again. The user deletes
+        the entry in the program. Requires `tenant.journals.export` and
+        `tenant.journals.approve`. A locked period gives `JOURNAL_BLOCKED`
+        (`period_locked`); an entry not in a live export `NOT_EXPORTED`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Draft (back to draft)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`JOURNAL_BLOCKED` (period_locked)"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Journals]
+      operationId: linkJournalDraftInvoice
+      summary: Link an invoice to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Journals]
+      operationId: unlinkJournalDraftInvoice
+      summary: Unlink an invoice to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Journals]
+      operationId: linkJournalDraftBankTransaction
+      summary: Link a bank transaction to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Journals]
+      operationId: unlinkJournalDraftBankTransaction
+      summary: Unlink a bank transaction to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The link is kept on the draft
+        (origin.manual_links) and shows in the related records of both sides
+        with relation `manual`; lines, amounts and the export are not
+        changed, so it is allowed in every status. Linking twice or unlinking
+        a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
         "404": { $ref: "#/components/responses/NotFound" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/EngagementForbidden" }
@@ -12264,10 +12634,15 @@ paths:
           application/json:
             schema:
               type: object
-              description: At least one invoice or journal line.
+              description: At least one invoice, payroll run or journal line.
               additionalProperties: false
               properties:
                 invoice_uuids: { type: array, maxItems: 10, items: { type: string, format: uuid } }
+                payroll_run_uuids:
+                  type: array
+                  maxItems: 3
+                  description: Payroll runs an outgoing payment pays (net salaries, #710); of the movement's month or the two before
+                  items: { type: string, format: uuid }
                 journal_lines:
                   type: array
                   maxItems: 10
@@ -12365,6 +12740,59 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Bank]
+      operationId: setTenantBankTransactionExclusion
+      summary: Take a duplicate movement out of the account or put it back
+      description: |
+        Requires `tenant.bank.write` (#710). When the statement balance does
+        not agree, the office takes a duplicate movement out of the account
+        (it no longer counts in totals, matching or warnings; its matches
+        are dropped) or puts one it took out back. Who and when are kept;
+        the period's bank warnings are refreshed at once. 409
+        `BANK_POSTING_DRAFTED` when the movement is already in a journal
+        draft, `BANK_TRANSACTION_CANCELLED` when the bank cancelled it.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [excluded]
+              additionalProperties: false
+              properties:
+                excluded: { type: boolean }
+      responses:
+        "200":
+          description: The movement's state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [uuid, excluded]
+                    properties:
+                      uuid: { type: string, format: uuid }
+                      excluded: { type: boolean }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
   /v1/tenant/engagements/{engagementUuid}/easytrade-connections:
@@ -14345,12 +14773,28 @@ paths:
                   success: { type: boolean, enum: [true] }
                   data:
                     type: object
-                    required: [period, items]
+                    required: [period, items, suspects]
                     properties:
                       period: { type: string }
                       items:
                         type: array
                         items: { $ref: "#/components/schemas/BankBalanceCheck" }
+                      suspects:
+                        type: array
+                        description: "Movements to look at (#710): flagged as possible duplicates by the import, with a twin (same account, day, direction, amount), or taken out by the office"
+                        items:
+                          type: object
+                          required: [uuid, cash_box_uuid, transaction_date, debit_credit, amount, currency, description, possible_duplicate, excluded]
+                          properties:
+                            uuid: { type: string, format: uuid }
+                            cash_box_uuid: { type: string, format: uuid }
+                            transaction_date: { type: string, format: date }
+                            debit_credit: { type: string, enum: [A, B] }
+                            amount: { type: string }
+                            currency: { type: string }
+                            description: { type: string }
+                            possible_duplicate: { type: boolean }
+                            excluded: { type: boolean }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
@@ -16016,6 +16460,57 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/tax-return-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getTaxReturnSettings
+      summary: The office's tax return final check setting (#710)
+      description: |
+        Requires `tenant.tax_returns.read`. `final_check_required` (default
+        true): "kontrol edildi" and "verildi" are marked only by the
+        responsible (`tenant.tax_returns.approve`). When the office turns it
+        off, whoever prepares returns (`tenant.tax_returns.write`) marks them
+        too; who and when are recorded either way.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putTaxReturnSettings
+      summary: Set the office's tax return final check setting (#710)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [final_check_required]
+              additionalProperties: false
+              properties:
+                final_check_required: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeTaxReturnSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16763,6 +17258,40 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: checkEngagementTaxReturn
+      summary: Mark the prepared return as checked (final check)
+      description: |
+        Requires `tenant.tax_returns.approve` (#669, office decision: everyone
+        prepares returns; only the responsible person, owner or admin, marks
+        "kontrol edildi" and "verildi"). When the office turned the final
+        check off (`/v1/tenant/tax-return-settings`, #710),
+        `tenant.tax_returns.write` is enough. Who and when are kept
+        (`record.checked_by_name`, `record.checked_at`). Only a prepared
+        return (`409 TAX_RETURN_NOT_PREPARED`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Checked return
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16804,10 +17333,12 @@ paths:
       operationId: fileEngagementTaxReturn
       summary: Record that the prepared return was filed
       description: |
-        Requires `tenant.tax_returns.write`. `filed_on` is not before the
-        period's last day nor in the future; `accrual_number` is the
-        tahakkuk fiş no. Only a prepared return (`409
-        TAX_RETURN_NOT_PREPARED`).
+        Requires `tenant.tax_returns.approve` (`tenant.tax_returns.write` when the
+        office turned the final check off, #710) (#669: only the responsible
+        person marks "verildi"; filing also marks the return checked when it
+        was not). `filed_on` is not before the period's last day nor in the
+        future; `accrual_number` is the tahakkuk fiş no. Only a prepared
+        return (`409 TAX_RETURN_NOT_PREPARED`).
       security:
         - bearerAuth: []
       requestBody:
@@ -18790,7 +19321,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
+        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions, customers] }
         source_system: { type: string }
         columns:
           type: array
@@ -18827,7 +19358,7 @@ components:
       type: object
       required: [data_type, label, fields, required, available]
       properties:
-        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions] }
+        data_type: { type: string, enum: [outgoing_invoices, incoming_invoices, payroll, expenses, retail_sales, bank_transactions, customers] }
         label: { type: string, example: Banka hareketleri }
         fields:
           type: array
@@ -22126,8 +22657,33 @@ components:
         account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
-      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches]
+      required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting, line_matchable, journal_matches, payroll_matchable, payroll_matches, payroll_candidates]
       properties:
+        payroll_matchable: { type: boolean, description: "An outgoing payment can be tied to a payroll run (#710)" }
+        payroll_matches:
+          type: array
+          description: Payroll runs the movement pays (net salaries, #710)
+          items:
+            type: object
+            required: [payroll_run_uuid, period, net_total, amount, method]
+            properties:
+              payroll_run_uuid: { type: string, format: uuid }
+              period: { type: string }
+              net_total: { type: string }
+              amount: { type: string }
+              method: { type: string, enum: [auto, manual] }
+        payroll_candidates:
+          type: array
+          description: Payroll runs of the movement's month and the two before with net still unpaid (#710)
+          items:
+            type: object
+            required: [payroll_run_uuid, period, net_total, open_amount, employee_count]
+            properties:
+              payroll_run_uuid: { type: string, format: uuid }
+              period: { type: string }
+              net_total: { type: string }
+              open_amount: { type: string }
+              employee_count: { type: integer }
         line_matchable: { type: boolean, description: "The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G)" }
         journal_matches:
           type: array
@@ -22162,7 +22718,7 @@ components:
           type: array
           items:
             type: object
-            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, amount, method, score]
+            required: [invoice_uuid, invoice_number, issue_date, counterparty_name, amount, method, score, parts]
             properties:
               invoice_uuid: { type: string, format: uuid }
               invoice_number: { type: string }
@@ -22171,6 +22727,7 @@ components:
               amount: { type: string }
               method: { type: string, enum: [auto, suggested_accepted, manual] }
               score: { type: integer }
+              parts: { type: object, additionalProperties: { type: integer }, description: "Why the matcher proposed it (21 §6.2 parts); empty for a manual match" }
         candidates:
           type: array
           items: { $ref: "#/components/schemas/BankMatchCandidate" }
@@ -23164,7 +23721,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/TaxpayerInvoiceDetail"
         - type: object
-          required: [has_ubl, warnings, exchange_rate_entry, vat_deduction_period, vat_deduction_entry]
+          required: [has_ubl, warnings, exchange_rate_entry, counterparty_tax_id_entry, vat_deduction_period, vat_deduction_entry]
           properties:
             has_ubl: { type: boolean, description: "A UBL-TR XML is stored (GET .../ubl)" }
             warnings:
@@ -23172,6 +23729,15 @@ components:
               items: { $ref: "#/components/schemas/OfficeInvoiceWarning" }
             exchange_rate_entry:
               description: Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [set_by_name, set_at]
+                  properties:
+                    set_by_name: { type: string, description: "Empty when the user was deleted" }
+                    set_at: { type: string, format: date-time }
+            counterparty_tax_id_entry:
+              description: Who entered the missing counterparty VKN/TCKN in the office, and when; null when it came with the source.
               oneOf:
                 - type: "null"
                 - type: object
@@ -23206,6 +23772,74 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/OfficeInvoiceDetail" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoiceJournalDraftRef:
+      type: object
+      required: [uuid, entry_no, period, status]
+      properties:
+        uuid: { type: string, format: uuid }
+        entry_no: { type: integer, format: int32 }
+        period: { type: string, example: "2026-10" }
+        status: { type: string, enum: [draft, approved, exported] }
+
+    InvoiceJournalLink:
+      type: object
+      required: [draft]
+      properties:
+        draft:
+          oneOf:
+            - $ref: "#/components/schemas/InvoiceJournalDraftRef"
+            - type: "null"
+
+    EnvelopeInvoiceJournalLink:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoiceJournalLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoicePostingResult:
+      type: object
+      required: [invoice_uuid, invoice_number, outcome]
+      properties:
+        invoice_uuid: { type: string, format: uuid }
+        invoice_number: { type: string }
+        outcome: { type: string, enum: [created, existing, refused] }
+        draft: { $ref: "#/components/schemas/InvoiceJournalDraftRef" }
+        reason:
+          type: string
+          description: Why it was refused.
+          enum: [NOT_ACTIVE, FOREIGN_CURRENCY, RETURN_INVOICE, WITHHOLDING, EXEMPTION, SPECIAL_TAX, UNSUPPORTED_TYPE, NO_ITEMS, TOTALS_MISMATCH, ITEM_ACCOUNT_MISSING]
+        line_no: { type: integer, description: "ITEM_ACCOUNT_MISSING: the line without an account code." }
+        detail: { type: string }
+
+    EnvelopeInvoicePostingResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoicePostingResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    InvoicePostingBatch:
+      type: object
+      required: [period, created, refused, items]
+      properties:
+        period: { type: string, example: "2026-10" }
+        created: { type: integer }
+        refused: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InvoicePostingResult" }
+
+    EnvelopeInvoicePostingBatch:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/InvoicePostingBatch" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     JournalDraftLineInput:
@@ -23299,12 +23933,14 @@ components:
             export's own check stops a code missing from the program's plan).
         code:
           type: string
-          enum: [unbalanced, unknown_account, parent_account, period_locked]
+          enum: [unbalanced, unknown_account, parent_account, period_locked, missing_document, possible_duplicate]
           description: |
             unbalanced: debit and credit differ (or no lines);
             unknown_account: the line's code is not in the imported plan;
             parent_account: the line posts to an account that has sub-accounts;
-            period_locked: the period is closed.
+            period_locked: the period is closed;
+            missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
+            possible_duplicate: a source document of the entry is in another entry too (blocked; send_duplicate with a reason passes it, #710).
         line_no: { type: integer, format: int32 }
         account: { type: string }
         difference: { type: string, description: "debit minus credit (unbalanced)" }
@@ -23353,6 +23989,11 @@ components:
             document_type: { type: string }
             origin: { type: object, additionalProperties: true }
             approved_at: { type: string, format: date-time }
+            approval_warnings:
+              type: array
+              description: Warnings the approver accepted (missing_document, possible_duplicate)
+              items: { type: string }
+            approval_note: { type: string, description: Optional reason given with the approval }
             created_at: { type: string, format: date-time }
             items:
               type: array
@@ -25272,6 +25913,21 @@ components:
         rule_candidate_decisions: { type: string, enum: [corrections_only, corrections_and_accepts] }
         updated_at: { type: string, format: date-time }
         default: { type: boolean, description: True while the office has not set one }
+    TaxReturnSettings:
+      type: object
+      required: [final_check_required]
+      properties:
+        final_check_required:
+          type: boolean
+          description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
+        updated_at: { type: string, format: date-time }
+    EnvelopeTaxReturnSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/TaxReturnSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeAccountRuleSettings:
       type: object
       required: [success, data, meta]
@@ -25608,8 +26264,8 @@ components:
         uuid: { type: [string, "null"], format: uuid, description: "null for rule and account" }
         relation:
           type: string
-          enum: [payment, journal, source, warning, review, rule, counterparty_account, possible]
-          description: "payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart. Rejected, reverted and superseded suggestions are not listed."
+          enum: [payment, journal, source, warning, review, rule, counterparty_account, possible, manual]
+          description: "payment: matched bank payment; journal: journal draft produced from the record; source: document the record comes from; warning / review: warnings and decided review suggestions about it; counterparty_account: approved posting account; possible: not confirmed yet (a pending review suggestion or a suggested posting account), an estimate shown apart; manual: linked to a journal draft by hand (#710). Rejected, reverted and superseded suggestions are not listed."
         date: { type: [string, "null"], format: date }
         amount: { type: [string, "null"], description: "Decimal; matched amount for payments, debit total for journals" }
         currency: { type: [string, "null"] }
@@ -25734,7 +26390,7 @@ components:
 
     TaxReturnRecord:
       type: object
-      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, accrual_document, updated_at]
+      required: [uuid, status, adjustments, acknowledged, note, prepared_at, filed_on, accrual_number, filed_at, checked_at, accrual_document, updated_at]
       properties:
         uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -25745,6 +26401,10 @@ components:
         filed_on: { type: [string, "null"], format: date }
         accrual_number: { type: [string, "null"] }
         filed_at: { type: [string, "null"], format: date-time }
+        checked_at: { type: [string, "null"], format: date-time, description: "Final check by the responsible person (#669)" }
+        prepared_by_name: { type: string, description: Who prepared the return }
+        checked_by_name: { type: string, description: Who marked it checked }
+        filed_by_name: { type: string, description: Who marked it filed }
         accrual_document:
           description: The GİB tahakkuk PDF attached after filing (#575); null when none.
           oneOf:
@@ -25972,7 +26632,7 @@ components:
 
     TaxReturnPreview:
       type: object
-      required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, computed_at, checklist]
+      required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
         kind: { type: string, enum: [kdv1, muhsgk, babs] }
         period: { type: string }
@@ -25991,11 +26651,43 @@ components:
             - $ref: "#/components/schemas/TaxReturnRecord"
             - type: "null"
         open_warnings: { type: array, items: { type: string } }
+        sections:
+          type: array
+          description: The period's sources, processed / total (#710); always live, also for a prepared or filed return
+          items: { $ref: "#/components/schemas/TaxReturnSection" }
         computed_at: { type: string, format: date-time }
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
+
+    TaxReturnSection:
+      type: object
+      description: |
+        One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
+        value, matched bank transaction); ignored was set aside (rejected, cancelled, ignored); the rest still waits.
+      required: [key, total, processed, ignored]
+      properties:
+        key: { type: string, enum: [retail, invoices, bank, expenses] }
+        total: { type: integer, format: int64 }
+        processed: { type: integer, format: int64 }
+        ignored: { type: integer, format: int64 }
+
+    JournalDraftManualLink:
+      type: object
+      required: [kind, uuid, linked]
+      properties:
+        kind: { type: string, enum: [invoice, bank_transaction] }
+        uuid: { type: string, format: uuid }
+        linked: { type: boolean }
+
+    EnvelopeJournalDraftManualLink:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/JournalDraftManualLink" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     TaxReturnSummary:
       type: object

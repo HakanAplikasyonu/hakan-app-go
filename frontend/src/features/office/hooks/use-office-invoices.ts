@@ -163,3 +163,23 @@ export function useCreateUBLUploads(slug: string, engagement: string) {
     },
   });
 }
+
+/** Faturadan fiş (#669): dönemin faturaları taslak fişe; Fişler tazelenir. */
+export function usePostInvoices(slug: string, engagement: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (period: string) =>
+      officeInvoiceService.postPeriod(slug, engagement, period),
+    onSettled: () => {
+      void qc.invalidateQueries({
+        queryKey: [
+          "tenant",
+          slug.toLowerCase(),
+          "engagements",
+          engagement.toLowerCase(),
+          "journals",
+        ],
+      });
+    },
+  });
+}

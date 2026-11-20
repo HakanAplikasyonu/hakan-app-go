@@ -381,3 +381,49 @@ func (e env) scoped(t *testing.T) context.Context {
 	})
 	return ctx
 }
+
+// TestCancelExport is the #710 office decision: an entry already
+// transferred to the program is cancelled completely, without a correction
+// entry. It leaves its export and goes back to draft in one step with the
+// reason, can be corrected, approved and exported again; only an exported
+// entry can be cancelled and the reason is required.
+func TestCancelExport(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	d := e.draft(t, oct, debit("770", "10"), credit("320", "10"))
+	e.approve(t, d)
+	if err := e.svc.CancelExport(ctx, e.scope, e.actor, d.UUID, "x"); !errors.Is(err, ErrNotExported) {
+		t.Fatalf("cancel of an approved entry: %v", err)
+	}
+	in := ExportInput{Driver: "journal_test", Drafts: []uuid.UUID{d.UUID}}
+	if _, err := e.svc.Export(ctx, e.scope, e.actor, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.CancelExport(ctx, e.scope, e.actor, d.UUID, "  "); !errors.Is(err, ErrReasonRequired) {
+		t.Fatalf("cancel without reason: %v", err)
+	}
+	if err := e.svc.CancelExport(ctx, e.scope, e.actor, uuid.New(), "x"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("cancel unknown: %v", err)
+	}
+	if err := e.svc.CancelExport(ctx, e.scope, e.actor, d.UUID, " Luca'da silindi, tutar düzeltilecek "); err != nil {
+		t.Fatal(err)
+	}
+	got, err := e.svc.GetDraft(ctx, e.scope, d.UUID)
+	if err != nil || got.Status != "draft" || got.ApprovalReverted == nil ||
+		got.ApprovalReverted.Reason != "Luca'da silindi, tutar düzeltilecek" {
+		t.Fatalf("after cancel: %+v %+v %v", got.Draft, got.ApprovalReverted, err)
+	}
+	var reversed int
+	if err := e.pool.QueryRow(ctx, `SELECT count(*) FROM export_batch_items WHERE journal_draft_id = (SELECT id FROM journal_drafts WHERE uuid = $1)
+		AND reversed_at IS NOT NULL AND reversal_reason = 'Luca''da silindi, tutar düzeltilecek'`, d.UUID).Scan(&reversed); err != nil || reversed != 1 {
+		t.Fatalf("export item reversed: %d %v", reversed, err)
+	}
+	// A second cancel finds no live export; approved again it exports again.
+	if err := e.svc.CancelExport(ctx, e.scope, e.actor, d.UUID, "x"); !errors.Is(err, ErrNotExported) {
+		t.Fatalf("second cancel: %v", err)
+	}
+	e.approve(t, d)
+	if _, err := e.svc.Export(ctx, e.scope, e.actor, in); err != nil {
+		t.Fatalf("export after cancel: %v", err)
+	}
+}

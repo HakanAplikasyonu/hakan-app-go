@@ -24,3 +24,12 @@ ORDER BY id;
 UPDATE data_warnings
 SET status = @status, resolved_by = sqlc.narg(resolved_by), resolved_at = NOW(), resolution_note = sqlc.narg(note)
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND uuid = @uuid AND status = 'open';
+
+-- name: ResolveEntityDataWarnings :execrows
+-- Varlıktaki açık uyarı ofiste giderildi (ör. VKN girildi, #669): kim, ne
+-- zaman, not.
+UPDATE data_warnings
+SET status = 'resolved', resolved_by = sqlc.narg(resolved_by), resolved_at = NOW(), resolution_note = sqlc.narg(note)
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND entity_type = @entity_type AND entity_id = @entity_id
+  AND code = @code AND status = 'open';

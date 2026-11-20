@@ -35,6 +35,7 @@ import {
   createDateColumn,
   createMoneyColumn,
   createStatusColumn,
+  StatusPill,
   type StatusVariant,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-import { useOfficePeriod } from "../period";
+import { useUrlOfficePeriod } from "../period";
 import {
   TAX_RETURN_KINDS,
   type TaxReturnAdjustments,
@@ -75,11 +76,13 @@ import {
   taxReturnKeys,
   taxReturnsService,
 } from "../services/tax-returns.service";
+import { TaxReturnSections } from "./tax-return-sections";
 import { TaxReturnWarnings } from "./tax-return-warnings";
 import { Money } from "./office-ui";
 import { SummaryCards } from "./receipts-ui";
 import { useEngagementScope } from "../engagement-scope";
 import { checklistHref } from "../lib/related-href";
+import { useTaxReturnSettings } from "../hooks/use-tax-return-settings";
 
 /** Form alanı etiketi: soluk, normal kalınlıkta (önceki görünümle aynı). */
 const FIELD_LABEL = "text-text-2 leading-normal font-normal";
@@ -153,9 +156,16 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
   const { slug } = useTenant();
   const { can } = usePermission();
   const canWrite = can(Permission.TenantTaxReturnsWrite);
+  // Son kontrol (#669): kontrol edildi / verildi yalnız sorumlu (sahip,
+  // yönetici); ofis ayarı kapalıysa hazırlayan da işaretler (#710).
+  const settings = useTaxReturnSettings(slug, canWrite);
+  const canApprove =
+    can(Permission.TenantTaxReturnsApprove) ||
+    (canWrite && settings.data?.final_check_required === false);
   const qc = useQueryClient();
   // Beyan tek döneme aittir: "Tüm dönemler"de beyan dönemi (önceki ay).
-  const { focus: period, setPeriod } = useOfficePeriod();
+  // Dönem adreste de durur (#710): bağlantıyla gelen `?period=` geçerli.
+  const { focus: period, setPeriod } = useUrlOfficePeriod();
   const dates = useDates();
   const listState = useUrlListState({ initialPageSize: 50 });
   const rawKind = listState.getParam("kind") as TaxReturnKind | null;
@@ -216,6 +226,15 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
   const reopen = useMutation({
     mutationFn: () => taxReturnsService.reopen(slug, engagement, kind, period),
     onSuccess: onSaved,
+    onError: (e) =>
+      toast.error(errText(e, t("office.tax_returns.save_failed"))),
+  });
+  const checkReturn = useMutation({
+    mutationFn: () => taxReturnsService.check(slug, engagement, kind, period),
+    onSuccess: (x) => {
+      onSaved(x);
+      toast.success(t("office.tax_returns.checked"));
+    },
     onError: (e) =>
       toast.error(errText(e, t("office.tax_returns.save_failed"))),
   });
@@ -323,7 +342,14 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
               p.record?.filed_on ? dates.day(p.record.filed_on) : undefined
             }
             canWrite={canWrite}
-            busy={prepare.isPending || reopen.isPending || file.isPending}
+            canApprove={canApprove}
+            busy={
+              prepare.isPending ||
+              reopen.isPending ||
+              file.isPending ||
+              checkReturn.isPending
+            }
+            onCheck={() => checkReturn.mutate()}
             onPrepare={() => prepare.mutate()}
             onReopen={() => reopen.mutate()}
             onFile={(v) => file.mutate(v)}
@@ -337,6 +363,12 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             />
           ) : null}
           <TaxReturnSummary p={p} />
+          <TaxReturnSections
+            slug={slug}
+            engagement={engagement}
+            period={period}
+            sections={p.sections}
+          />
           {p.status === "draft" ? (
             <TaxReturnWarnings
               engagement={engagement}
@@ -456,7 +488,9 @@ function StatusBar({
   dueLabel,
   filedLabel,
   canWrite,
+  canApprove,
   busy,
+  onCheck,
   onPrepare,
   onReopen,
   onFile,
@@ -466,7 +500,9 @@ function StatusBar({
   dueLabel: string;
   filedLabel?: string;
   canWrite: boolean;
+  canApprove: boolean;
   busy: boolean;
+  onCheck: () => void;
   onPrepare: () => void;
   onReopen: () => void;
   onFile: (v: { filed_on: string; accrual_number: string }) => void;
@@ -481,6 +517,32 @@ function StatusBar({
   const open = p.open_warnings.length;
   const days = p.calendar.days_left;
   const tone = statusVariants[p.status]?.tone ?? "neutral";
+  const dates = useDates();
+  const rec = p.record;
+  // Kim, ne zaman (#669): hazırlayan, kontrol eden, veren.
+  const trail = [
+    rec?.prepared_at && p.status !== "draft"
+      ? t("office.tax_returns.trail_prepared", {
+          who: rec.prepared_by_name || "—",
+          date: dates.day(rec.prepared_at.slice(0, 10)),
+        })
+      : "",
+    rec?.checked_at
+      ? t("office.tax_returns.trail_checked", {
+          who: rec.checked_by_name || "—",
+          date: dates.day(rec.checked_at.slice(0, 10)),
+        })
+      : "",
+    rec?.filed_at
+      ? t("office.tax_returns.trail_filed", {
+          who: rec.filed_by_name || "—",
+          date: dates.day(rec.filed_at.slice(0, 10)),
+        })
+      : "",
+  ].filter(Boolean);
+  const approveHint = canApprove
+    ? undefined
+    : t("office.tax_returns.approve_only_responsible");
   return (
     <section
       aria-label={t("office.tax_returns.status_label")}
@@ -492,18 +554,9 @@ function StatusBar({
         </span>
         <span className="font-display text-lg font-bold">{periodLabel}</span>
       </div>
-      <span
-        className={cn(
-          "rounded-md px-2.5 py-1 text-xs font-semibold",
-          tone === "ok"
-            ? "bg-ok-tint text-ok"
-            : tone === "info"
-              ? "bg-brand-tint text-brand-text"
-              : "bg-surface-3 text-text-2",
-        )}
-      >
+      <StatusPill tone={tone}>
         {t(`office.tax_returns.status_${p.status}`)}
-      </span>
+      </StatusPill>
       <span className="text-text-2 flex items-center gap-1.5 text-sm">
         <CalendarClock className="size-4" aria-hidden />
         {t("office.tax_returns.due", { date: dueLabel })}
@@ -550,31 +603,61 @@ function StatusBar({
             </Button>
           </Hint>
         ) : null}
-        {canWrite && p.status === "prepared" ? (
+        {(canWrite || canApprove) && p.status === "prepared" ? (
           <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="max-md:min-h-11"
-              disabled={busy}
-              onClick={onReopen}
-            >
-              <RotateCcw className="size-4" aria-hidden />
-              {t("office.tax_returns.reopen")}
-            </Button>
-            <Button
-              size="sm"
-              className="max-md:min-h-11"
-              disabled={busy}
-              aria-expanded={filing}
-              onClick={() => setFiling((v) => !v)}
-            >
-              <CheckCircle2 className="size-4" aria-hidden />
-              {t("office.tax_returns.mark_filed")}
-            </Button>
+            {canWrite ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="max-md:min-h-11"
+                disabled={busy}
+                onClick={onReopen}
+              >
+                <RotateCcw className="size-4" aria-hidden />
+                {t("office.tax_returns.reopen")}
+              </Button>
+            ) : null}
+            {/* Son kontrol (#669): yetkisi olmayana düğme pasif, nedeni ipucunda. */}
+            {!rec?.checked_at ? (
+              <Hint label={approveHint} wrap={!canApprove || busy}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="max-md:min-h-11"
+                  disabled={busy || !canApprove}
+                  onClick={onCheck}
+                >
+                  <FileCheck2 className="size-4" aria-hidden />
+                  {t("office.tax_returns.mark_checked")}
+                </Button>
+              </Hint>
+            ) : null}
+            <Hint label={approveHint} wrap={!canApprove || busy}>
+              <Button
+                size="sm"
+                className="max-md:min-h-11"
+                disabled={busy || !canApprove}
+                aria-expanded={filing}
+                onClick={() => setFiling((v) => !v)}
+              >
+                <CheckCircle2 className="size-4" aria-hidden />
+                {t("office.tax_returns.mark_filed")}
+              </Button>
+            </Hint>
           </>
         ) : null}
       </div>
+      {trail.length ? (
+        <p
+          className="text-text-2 w-full text-xs"
+          data-testid="tax-return-trail"
+        >
+          {trail.join(" · ")}
+        </p>
+      ) : null}
+      {!canApprove && p.status === "prepared" ? (
+        <p className="text-text-3 w-full text-xs">{approveHint}</p>
+      ) : null}
       {canWrite && p.status === "draft" && open > 0 ? (
         <p className="text-warn w-full text-sm">
           {t("office.tax_returns.open_warnings", { count: open })}
@@ -758,9 +841,8 @@ function Checklist({
                 key={c.code}
                 className={cn(
                   "flex flex-wrap items-start gap-3 rounded-lg border px-3 py-2",
-                  warn && !c.acknowledged
-                    ? "border-warn/40 bg-warn-tint"
-                    : "border-line",
+                  // Onaylanmamış uyarı bağırmaz (#708 dili): ince sarı çerçeve.
+                  warn && !c.acknowledged ? "border-warn/60" : "border-line",
                 )}
               >
                 <Icon

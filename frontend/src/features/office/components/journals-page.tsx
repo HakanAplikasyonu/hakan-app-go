@@ -12,7 +12,14 @@ import {
   MonitorUp,
   Undo2,
 } from "lucide-react";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -27,6 +34,7 @@ import {
   DataTable,
   StatusPill,
   type DataTableFeatures,
+  type StatusTone,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -115,10 +123,12 @@ import {
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
-const statusClass: Record<JournalDraft["status"], string> = {
-  draft: "bg-secondary text-secondary-foreground",
-  approved: "bg-status-approved/12 text-status-approved",
-  exported: "bg-brand/12 text-brand",
+// Fiş durumu ortak sade rozetle (#708 dili, #710): taslak gri, onaylı
+// yeşil, aktarılmış ana renk nokta; anlamı metin taşır.
+const statusTone: Record<JournalDraft["status"], StatusTone> = {
+  draft: "neutral",
+  approved: "ok",
+  exported: "info",
 };
 
 type Translate = (key: string) => string;
@@ -148,6 +158,17 @@ function driverLabel(t: Translate, name: string) {
 
 /** Onayı durduran engel var mı (#566); hesap kodu sorunları uyarıdır. */
 const isBlocked = (d: JournalDraft) => !!d.issues?.some((i) => i.blocking);
+/** Onayı engellemeyen ama açıkça sorulan uyarılar (#669, ofis kararı). */
+const CONFIRM_CODES = ["missing_document", "possible_duplicate"];
+const warningsOf = (d: JournalDraft) =>
+  (d.issues ?? []).filter((i) => CONFIRM_CODES.includes(i.code));
+/**
+ * Mükerrer olabilir (#710, ofis kararı): onay engellenir; yalnız fişin
+ * kendi satırındaki ayrı "Yine de gönder" ve zorunlu gerekçeyle geçer.
+ * Toplu onay bu fişleri atlar.
+ */
+const isDuplicate = (d: JournalDraft) =>
+  !!d.issues?.some((i) => i.code === "possible_duplicate");
 
 function issueText(
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -522,32 +543,64 @@ function ApproveClean({
 }) {
   const { t } = useLocale();
   const { slug, permissions: perms } = useTenant();
-  const { confirm } = useDialogs();
+  const { confirm, prompt } = useDialogs();
   const { approve } = useJournalActions(slug, engagement);
   const [busy, setBusy] = useState(false);
   const open = drafts.filter((d) => d.status === "draft");
-  const clean = open.filter((d) => !isBlocked(d));
+  const clean = open.filter((d) => !isBlocked(d) && !isDuplicate(d));
+  const duplicates = open.filter((d) => !isBlocked(d) && isDuplicate(d));
   // Son onay sorumlu müşavirde (#566).
   if (!clean.length || !perms.includes(permissions.tenant.journals.approve))
     return null;
+  const warned = clean.filter((d) => warningsOf(d).length > 0).length;
   const run = async () => {
-    const ok = await confirm({
-      title: t("office.journals.check.approve_clean_title", {
-        count: clean.length,
+    const description = [
+      t("office.journals.check.approve_clean_description", {
+        blocked: open.length - clean.length - duplicates.length,
       }),
-      description: t("office.journals.check.approve_clean_description", {
-        blocked: open.length - clean.length,
-      }),
-      confirmLabel: t("office.journals.approve"),
-    });
-    if (!ok) return;
+      duplicates.length
+        ? t("office.journals.check.approve_clean_duplicates", {
+            count: duplicates.length,
+          })
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    // Uyarılı fiş varsa kaç tanesi olduğu açıkça söylenir; gerekçe isteğe bağlı.
+    let note = "";
+    if (warned > 0) {
+      const answer = await prompt({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description: `${description} ${t("office.journals.check.approve_clean_warned", { count: warned })}`,
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (answer === null) return;
+      note = answer.trim();
+    } else {
+      const ok = await confirm({
+        title: t("office.journals.check.approve_clean_title", {
+          count: clean.length,
+        }),
+        description,
+        confirmLabel: t("office.journals.approve"),
+      });
+      if (!ok) return;
+    }
     setBusy(true);
     let done = 0;
     let failed = 0;
     let reason = "";
     for (const d of clean) {
       try {
-        await approve.mutateAsync(d.uuid);
+        await approve.mutateAsync(
+          warningsOf(d).length
+            ? { draft: d.uuid, confirm: true, note }
+            : d.uuid,
+        );
         done += 1;
       } catch (err) {
         failed += 1;
@@ -696,11 +749,11 @@ function ExportPanel({
             }))}
           />
           {chosen && !chosen.verified ? (
-            <span className="bg-status-warning/12 text-status-warning rounded-md px-2 py-0.5 text-xs">
+            <StatusPill tone="warn">
               {t("office.journals.template_unverified", {
                 version: chosen.template_version,
               })}
-            </span>
+            </StatusPill>
           ) : null}
           <Button
             size="sm"
@@ -925,8 +978,12 @@ function JournalsInner() {
   // bölüme götürür (#566): liste
   // yüklendikten sonra kaydırılır, yoksa tarayıcı boş sayfada kalır.
   const loaded = drafts.isSuccess;
+  // Yalnız ilk yüklemede (#710): kayıt / aktarım sonrası liste yeniden
+  // yüklenince sayfa bölüme ya da en alta atılmaz, kaydırma konumu kalır.
+  const scrolled = useRef(false);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || scrolled.current) return;
+    scrolled.current = true;
     const id = window.location.hash.slice(1);
     if (![DRAFTS_ANCHOR, EXPORT_ANCHOR, TRANSFERS_ANCHOR].includes(id)) return;
     const el = document.getElementById(id);
@@ -940,7 +997,10 @@ function JournalsInner() {
   for (const tr of transfers.data?.items ?? [])
     if (!latestTransfer.has(tr.batch_uuid))
       latestTransfer.set(tr.batch_uuid, tr);
-  const { approve, unapprove, reverse } = useJournalActions(slug, engagement);
+  const { approve, unapprove, cancelExport } = useJournalActions(
+    slug,
+    engagement,
+  );
   // Hazırlayan stajyer onaylayamaz; fiş müşavirin onayını bekler (#566).
   const canApprove = perms.includes(permissions.tenant.journals.approve);
   // Çıktıya alınacak onaylı fişler (#574); mükellef ya da dönem değişince
@@ -965,8 +1025,51 @@ function JournalsInner() {
     new Date(d).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-GB");
   const approveDraft = approve.mutate;
   const approving = approve.isPending;
-  const reverseDraft = reverse.mutate;
-  const reversing = reverse.isPending;
+  // Uyarılı fiş (eksik belge / mükerrer olabilir, #669): engellenmez, ama
+  // onaydan önce açıkça sorulur; gerekçe isteğe bağlı, fişte kalır.
+  const approveOne = useCallback(
+    async (d: JournalDraft) => {
+      const warnings = warningsOf(d);
+      if (!warnings.length) {
+        approveDraft(d.uuid);
+        return;
+      }
+      if (isDuplicate(d)) {
+        // Engel: ayrı ve açık "yine de gönder", gerekçe zorunlu (#710).
+        const reason = await prompt({
+          title: t("office.journals.check.duplicate_title"),
+          description: [
+            ...warnings.map((w) => issueText(t, w)),
+            t("office.journals.check.duplicate_description"),
+          ].join(" "),
+          placeholder: t("office.journals.check.duplicate_reason"),
+          confirmLabel: t("office.journals.check.duplicate_send"),
+        });
+        if (reason === null || !reason.trim()) return;
+        approveDraft({
+          draft: d.uuid,
+          confirm: true,
+          sendDuplicate: true,
+          reason: reason.trim(),
+        });
+        return;
+      }
+      const note = await prompt({
+        title: t("office.journals.check.confirm_title"),
+        description: warnings.map((w) => issueText(t, w)).join(" "),
+        placeholder: t("office.journals.check.confirm_note"),
+        confirmLabel: t("office.journals.check.confirm_approve"),
+        optional: true,
+      });
+      if (note === null) return;
+      approveDraft({ draft: d.uuid, confirm: true, note: note.trim() });
+    },
+    [approveDraft, prompt, t],
+  );
+  // Aktarılmış fiş (#710, ofis kararı): düzeltme fişi yok; fiş tamamen
+  // iptal edilir, taslağa döner; programdaki fiş kullanıcı tarafından silinir.
+  const cancelDraftExport = cancelExport.mutate;
+  const cancelling = cancelExport.isPending;
   const unapproveDraft = unapprove.mutate;
   const unapproving = unapprove.isPending;
   const baseDraftColumns = useMemo<ColumnDef<JournalDraft, unknown>[]>(
@@ -1058,14 +1161,9 @@ function JournalsInner() {
         labelKey: "office.col_status",
         accessorKey: "status",
         cell: ({ row }) => (
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 text-xs font-medium",
-              statusClass[row.original.status],
-            )}
-          >
+          <StatusPill tone={statusTone[row.original.status]}>
             {t(`office.journals.status_${row.original.status}`)}
-          </span>
+          </StatusPill>
         ),
       }),
       createColumn<JournalDraft>({
@@ -1130,41 +1228,58 @@ function JournalsInner() {
                 size="sm"
                 variant="outline"
                 disabled={approving || isBlocked(d)}
-                onClick={() => approveDraft(d.uuid)}
+                onClick={() => void approveOne(d)}
               >
                 <Check className="size-4" />
                 {t("office.journals.approve")}
               </Button>
             </Hint>
-          ) : d.status === "exported" ? (
+          ) : d.status === "exported" && canApprove ? (
             <Button
               size="sm"
               variant="ghost"
-              disabled={reversing}
+              disabled={cancelling}
               onClick={async () => {
+                const vars = {
+                  no: d.entry_no,
+                  date: new Date(d.entry_date).toLocaleDateString("tr-TR"),
+                };
                 const reason = await prompt({
-                  title: t("office.journals.reverse"),
-                  description: t("office.journals.reverse_prompt"),
-                  confirmLabel: t("office.journals.reverse"),
+                  title: t("office.journals.cancel_export_title", vars),
+                  description: t(
+                    "office.journals.cancel_export_description",
+                    vars,
+                  ),
+                  placeholder: t("office.journals.cancel_export_reason"),
+                  confirmLabel: t("office.journals.cancel_export"),
                 });
-                if (reason?.trim()) reverseDraft({ draft: d.uuid, reason });
+                if (!reason?.trim()) return;
+                cancelDraftExport(
+                  { draft: d.uuid, reason: reason.trim() },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        t("office.journals.cancel_export_done", vars),
+                      ),
+                  },
+                );
               }}
             >
               <Undo2 className="size-4" />
-              {t("office.journals.reverse")}
+              {t("office.journals.cancel_export")}
             </Button>
           ) : null,
       }),
     ],
     [
-      approveDraft,
+      approveOne,
       approving,
       canApprove,
       engagement,
       picked,
       prompt,
-      reverseDraft,
-      reversing,
+      cancelDraftExport,
+      cancelling,
       t,
       togglePick,
       unapproveDraft,
@@ -1217,7 +1332,7 @@ function JournalsInner() {
   const openDrafts = rows.filter((d) => d.status === "draft");
   const blockedDrafts = openDrafts.filter((d) => d.issues?.length).length;
   const stoppedDrafts = openDrafts.filter(isBlocked).length;
-  const actionError = approve.error ?? unapprove.error ?? reverse.error;
+  const actionError = approve.error ?? unapprove.error ?? cancelExport.error;
   return (
     <div className="space-y-4">
       {header}

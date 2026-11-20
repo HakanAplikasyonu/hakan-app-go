@@ -103,16 +103,21 @@ export const bankMatchingService = {
     transaction: string,
     invoiceUuids: string[],
     journalLines: BankMatchLineRef[] = [],
+    payrollRunUuids: string[] = [],
   ) {
     return tenantRequest<BankTransactionMatching>(
       slug,
       "PUT",
       `${tx(engagement, transaction)}/matches`,
       {
-        body:
-          journalLines.length > 0
-            ? { invoice_uuids: invoiceUuids, journal_lines: journalLines }
-            : { invoice_uuids: invoiceUuids },
+        body: {
+          invoice_uuids: invoiceUuids,
+          ...(journalLines.length > 0 ? { journal_lines: journalLines } : {}),
+          // Bordroya bağlama (#710): net maaş ödemesi.
+          ...(payrollRunUuids.length > 0
+            ? { payroll_run_uuids: payrollRunUuids }
+            : {}),
+        },
       },
     );
   },

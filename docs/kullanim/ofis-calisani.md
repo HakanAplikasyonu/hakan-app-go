@@ -26,7 +26,7 @@ saklanır.
 3. **UBL yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
 4. **İnceleme kuyruğu:** hesap kodu önerilerini karara bağlayın.
 5. **Uyarılar:** kontrollerin bulduğu sorunları kapatın.
-6. **Yevmiye ve çıktı:** fişi onaylayın, Luca / Zirve dosyasını indirin
+6. **Fişler ve aktarım:** fişi onaylayın, Luca / Zirve dosyasını indirin
    (yetkiniz varsa).
 
 ## UBL yükleme

@@ -208,6 +208,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":              {body: `{"invoice_uuids":["00000000-0000-0000-0000-000000000001"]}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":           {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account":              {body: `{"account_code":"120.01.001"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {body: `{"excluded":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                   {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":             {body: sweepRange},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":                 {body: `{"sync_interval_minutes":60}`},
@@ -283,6 +284,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/account-rules/preview":                                                          {body: `{"role":"line","account_code":"770.01","conditions":{"item_name_contains":["hizmet"]}}`},
 	"PUT /v1/tenant/support-settings":                                                                {body: `{"clickfix_widget_id":"ofis-destek"}`},
 	"PUT /v1/tenant/account-rule-settings":                                                           {body: `{"rule_candidate_min_count":4,"rule_candidate_decisions":"corrections_only"}`},
+	"PUT /v1/tenant/tax-return-settings":                                                             {body: `{"final_check_required":true}`},
 	"PUT /v1/tenant/account-rules/{ruleKey}":                                                         {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
 	"DELETE /v1/tenant/account-rules/{ruleKey}":                                                      {},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules":                                     {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
@@ -293,16 +295,29 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rule-candidates/promote":                   {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/account-suggestions":        {body: `{}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/exchange-rate":               {body: `{"rate":"38.5"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/counterparty-tax-id":         {body: `{"tax_id":"9000000017"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period":        {body: `{"period":"2027-01"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period":     {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/journal-draft":              {},
+	"POST /v1/tenant/engagements/{engagementUuid}/invoice-postings":                                  {body: `{"period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate":                             {body: `{}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                     {body: `{"amount":"100.00"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":                  {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}":                  {body: `{"adjustments":{"additional_vat":"0.00"},"acknowledged":["CARRY_UNKNOWN"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/prepare":         {body: `{"acknowledged":["PENDING_EXPENSES","PENDING_Z_REPORTS","Z_WITHOUT_BREAKDOWN","HEADER_ESTIMATE","MISSING_EXCHANGE_RATE"]}`, late: true},
+	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/check":           {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/file":            {body: `{"filed_on":"2026-11-10","accrual_number":"TARAMA-1"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/reopen":          {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document": {file: "file", fileName: "tahakkuk.pdf", fileBody: "%PDF-1.4\n% tahakkuk taramasi\n", late: true},
+
+	// Aktarılmış fişin tamamen iptali (#710).
+	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},
+
+	// Fişe elle bağlanan kayıt (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":                 {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              {late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": {late: true},
 }
 
 type sweepEnv struct {

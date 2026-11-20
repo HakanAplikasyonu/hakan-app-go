@@ -21,12 +21,14 @@ import {
 } from "@/features/tenant/hooks/use-tenant-admin";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
+import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
-type SectionId = "office" | "support" | "ai" | "agents" | "appearance";
+type SectionId =
+  "office" | "tax-returns" | "support" | "ai" | "agents" | "appearance";
 
 /** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
 function SettingsNav({
@@ -120,6 +122,10 @@ export function TenantSettingsPage() {
   const showAgents = can(permissions.tenant.agents.read);
   const sections: { id: SectionId; label: string }[] = [
     { id: "office", label: t("tenant.settings_section_office") },
+    {
+      id: "tax-returns",
+      label: t("tenant.settings_section_tax_returns"),
+    },
     { id: "support", label: t("tenant.settings_section_support") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
@@ -205,6 +211,17 @@ export function TenantSettingsPage() {
               </EntitySectionCard>
             ) : null}
             <OfficeDpaCard slug={tenant.slug} />
+          </Section>
+          {/* Beyan son kontrolü (#710): varsayılan açık, kapatılabilir. */}
+          <Section
+            id="tax-returns"
+            title={t("tenant.settings_section_tax_returns")}
+            description={t("tenant.settings_section_tax_returns_description")}
+          >
+            <TaxReturnFinalCheckSetting
+              slug={tenant.slug}
+              canWrite={canWrite}
+            />
           </Section>
           {/* Destek (#387): ofisin ClickFix widget kimliği. */}
           <Section
