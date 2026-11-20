@@ -47,12 +47,7 @@ const ENGAGEMENT = [
 const ALLOWED_ERRORS: { re: RegExp; status: number; why: string }[] = [];
 
 /** Aynı isteğin 3'ten fazla gitmesine izin verilenler: [istek kalıbı, gerekçe]. */
-const ALLOWED_REPEATS: { re: RegExp; why: string }[] = [
-  {
-    re: /^GET \/api\/v1\/tenant\/engagements\/:id\/assignments$/,
-    why: "Mükellefler listesi her satırın atananlarını ayrı ister; toplu uç gerekiyor, ayrı PR'da (#639).",
-  },
-];
+const ALLOWED_REPEATS: { re: RegExp; why: string }[] = [];
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
