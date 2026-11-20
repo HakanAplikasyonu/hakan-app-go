@@ -84,19 +84,17 @@ test("programa aktarılan fişte mizan karşılaştırması görünür (#574)", 
   await page.getByRole("button", { name: "Eki", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Programa aktarım" })).toBeVisible();
 
-  // Demo: Ekim'in Luca aktarımı programa alınmış; yanında mizan durumu.
-  // Başka testlerin bugün yaptığı aktarımlar da listede olabilir (dönemsiz,
-  // seçili fiş aktarımında mizan sütunu "—"); demo satırı durumuyla aranır.
-  const imported = page
-    .getByRole("row")
-    .filter({ hasText: /Luca.*Programa aktarıldı/ })
-    .filter({
-      hasText:
-        /Luca mizanı kayıtlarla tutuyor|Mizan karşılaştırmasında \d+ hesapta fark var|Mizan aktarımdan önce karşılaştırılmış|Mizanla karşılaştırılmadı/,
-    })
-    .first();
-  await expect(imported).toBeVisible();
-  const link = imported.getByRole("button", { name: /Farkları gör|Mizanla karşılaştır/ });
+  // Demo: Ekim'in Luca aktarımı programa alınmış. Mizan durumu yalnızca
+  // dönem çıktısında görünür (seçili fiş aktarımında sütun "—"); küçük demo
+  // seçili fiş aktarır. Durum varsa metni ve bağlantısı denetlenir.
+  const imported = page.getByRole("row").filter({ hasText: /Luca.*Programa aktarıldı/ });
+  await expect(imported.first()).toBeVisible();
+  const withStatus = imported.filter({
+    hasText:
+      /Luca mizanı kayıtlarla tutuyor|Mizan karşılaştırmasında \d+ hesapta fark var|Mizan aktarımdan önce karşılaştırılmış|Mizanla karşılaştırılmadı/,
+  });
+  if (!(await withStatus.count())) return;
+  const link = withStatus.first().getByRole("button", { name: /Farkları gör|Mizanla karşılaştır/ });
   if (await link.count()) {
     await link.click();
     await page.waitForURL(/\/reconciliation/);

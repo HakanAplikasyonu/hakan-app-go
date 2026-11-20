@@ -232,7 +232,8 @@ test.describe("@docs masaüstü görüntüleri", () => {
   test("klasör izleme çalışıyor", async ({ page }) => {
     await page.addInitScript(tauriMock(true));
     await page.goto(ui);
-    await expect(page.locator("#agent-badge")).toHaveText("Çevrimiçi");
+    // Atlas klasöründe kalıcı bir hata (notlar.xml) var: rozet "Sorun var".
+    await expect(page.locator("#agent-badge")).toHaveText("Sorun var");
     await page.evaluate(() => {
       const emit = (window as unknown as { __emit: (n: string, p: unknown) => void }).__emit;
       const eng = "7c2f9a1e-0000-4000-8000-000000000001";
