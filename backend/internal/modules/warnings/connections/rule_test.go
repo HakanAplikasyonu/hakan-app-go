@@ -17,7 +17,7 @@ var now = time.Date(2026, 11, 20, 10, 0, 0, 0, time.UTC)
 
 func ago(d time.Duration) *time.Time { t := now.Add(-d); return &t }
 
-// defaults is the seeded configuration (000129_connection_warnings).
+// defaults is the seeded configuration (000136_connection_warnings).
 func defaults() map[string]engine.Effective {
 	return map[string]engine.Effective{
 		CodeFailed: {Code: CodeFailed, Enabled: true, Severity: catalog.SeverityBlocker, Params: map[string]any{}},

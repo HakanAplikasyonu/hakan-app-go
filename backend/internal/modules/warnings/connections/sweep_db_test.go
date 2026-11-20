@@ -16,7 +16,7 @@ import (
 
 // The sweep opens INT_CONNECTION_FAILED for failing connections across
 // offices, closes last month's warning and that of a recovered connection
-// (seed 000129 supplies the codes' configuration). A taxpayer has one active
+// (seed 000136 supplies the codes' configuration). A taxpayer has one active
 // engagement, so the two offices follow two taxpayers.
 func TestSweepDB(t *testing.T) {
 	d := testdb.Open(t)

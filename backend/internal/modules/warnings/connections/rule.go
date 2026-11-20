@@ -21,7 +21,7 @@ import (
 // Producer of the connection warnings (05 §1: control:<rule>).
 const Producer = "control:source_connection"
 
-// Codes (05 §3.5, seed 000129_connection_warnings).
+// Codes (05 §3.5, seed 000136_connection_warnings).
 const (
 	CodeFailed = "INT_CONNECTION_FAILED"
 	CodeStale  = "INT_SYNC_STALE"
