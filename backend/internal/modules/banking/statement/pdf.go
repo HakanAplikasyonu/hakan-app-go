@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ledongthuc/pdf"
 
@@ -23,7 +25,11 @@ var ErrPDFBalance = errors.New("pdf: running balance does not add up")
 
 type pdfText struct {
 	x, y float64
+	// end: right edge of the run (glyph widths; estimated when the font
+	// gives none).
+	end  float64
 	s    string
+	size float64
 }
 
 // ReadPDFRows turns a text-based statement PDF into a virtual sheet: the
@@ -51,14 +57,20 @@ func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
 	if len(rows) == 0 {
 		return nil, ErrScannedPDF
 	}
+	return tableFromRuns(rows, tpls), nil
+}
 
+// tableFromRuns lays the text runs out under the header columns.
+func tableFromRuns(rows [][]pdfText, tpls []Template) [][]string {
 	var out [][]string
 	var bounds []float64 // start x of each header column
+	var ends []float64   // right edge of each header cell
 	for _, row := range rows {
 		if isHeaderRow(row) || isTemplateHeader(row, tpls) {
-			bounds = bounds[:0]
+			bounds, ends = bounds[:0], ends[:0]
 			for _, t := range row {
 				bounds = append(bounds, t.x)
+				ends = append(ends, t.end)
 			}
 			cells := make([]string, len(row))
 			for j, t := range row {
@@ -79,6 +91,9 @@ func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
 		cells := make([]string, len(bounds))
 		for _, t := range row {
 			j := columnOf(bounds, t.x)
+			if k := rightAligned(bounds, ends, t); k >= 0 {
+				j = k
+			}
 			if cells[j] != "" {
 				cells[j] += " "
 			}
@@ -86,7 +101,31 @@ func ReadPDFRowsWith(data []byte, tpls []Template) ([][]string, error) {
 		}
 		out = append(out, cells)
 	}
-	return out, nil
+	return out
+}
+
+// reAmountRun: a run that is an amount (decimal part, optional sign / currency).
+var reAmountRun = regexp.MustCompile(`^[-+]?\d[\d.,' ]*[.,]\d{2}\s*(?:TL|TRY)?\s*[-+]?(?:\s*\((?:A|B|ALACAK|BORÇ|BORC)\))?$`)
+
+// rightAligned: amounts are right-aligned under their header, so a wide
+// amount can start left of its header (even under the previous column).
+// An amount run goes to the header whose right edge is nearest to its own
+// right edge (within 60pt); -1 when the run is not an amount or no header
+// edge is near.
+func rightAligned(bounds, ends []float64, t pdfText) int {
+	if !reAmountRun.MatchString(t.s) || t.end <= t.x {
+		return -1
+	}
+	best, bestD := -1, 60.0
+	for i := range bounds {
+		if i >= len(ends) || ends[i] <= bounds[i] || t.end < bounds[i]-12 {
+			continue
+		}
+		if d := math.Abs(t.end - ends[i]); d <= bestD {
+			best, bestD = i, d
+		}
+	}
+	return best
 }
 
 // pageRows groups glyphs into text runs and runs into rows. Glyphs of one
@@ -100,10 +139,11 @@ func pageRows(glyphs []pdf.Text) [][]pdfText {
 		n := len(runs)
 		if n > 0 && math.Abs(g.Y-runs[n-1].y) < 1 && (g.X == lastX || (g.X > lastX && g.X-lastX < g.FontSize*1.2)) {
 			runs[n-1].s += g.S
+			runs[n-1].end = math.Max(runs[n-1].end, g.X+g.W)
 			lastX = g.X
 			continue
 		}
-		runs = append(runs, pdfText{x: g.X, y: g.Y, s: g.S})
+		runs = append(runs, pdfText{x: g.X, y: g.Y, end: g.X + g.W, s: g.S, size: g.FontSize})
 		lastX = g.X
 	}
 	// Rows top to bottom (PDF y grows upwards), runs left to right.
@@ -118,6 +158,10 @@ func pageRows(glyphs []pdf.Text) [][]pdfText {
 		r.s = strings.Join(strings.Fields(r.s), " ")
 		if r.s == "" {
 			continue
+		}
+		if r.end <= r.x {
+			// Core fonts give no widths: about half an em per character.
+			r.end = r.x + float64(utf8.RuneCountInString(r.s))*r.size*0.5
 		}
 		n := len(rows)
 		if n > 0 && math.Abs(rows[n-1][0].y-r.y) < 2 {
