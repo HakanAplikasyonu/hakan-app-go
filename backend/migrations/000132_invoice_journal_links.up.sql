@@ -21,4 +21,10 @@ CREATE TABLE invoice_journal_links (
         FOREIGN KEY (engagement_id, journal_draft_id) REFERENCES journal_drafts (engagement_id, id) ON DELETE CASCADE
 );
 
+-- Yabancı anahtar sütunları indeksli (M15).
+CREATE INDEX idx_invoice_journal_links_org_engagement ON invoice_journal_links (organization_id, engagement_id);
+CREATE INDEX idx_invoice_journal_links_taxpayer ON invoice_journal_links (taxpayer_id);
+CREATE INDEX idx_invoice_journal_links_invoice ON invoice_journal_links (invoice_id);
+CREATE INDEX idx_invoice_journal_links_created_by ON invoice_journal_links (created_by);
+
 SELECT rls_apply_engagement('invoice_journal_links'::regclass);
