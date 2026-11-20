@@ -40,7 +40,7 @@ Mükellef portalının faturalar ekranı (portal-04) da çekirdeğe taşındıkt
 | 8 | [ofis-08-fatura-cekmecesi.png](ofis-08-fatura-cekmecesi.png) | Fatura çekmecesi: tutar şelalesi, satırlar, "Mükelleften düzeltme iste". |
 | 9 | [ofis-09-banka.png](ofis-09-banka.png) | Banka: Ziraat ekstresi hareketleri ve eşleme durumları. |
 | 10 | [ofis-10-mizan-hafizasi.png](ofis-10-mizan-hafizasi.png) | Mizan hafızası (Oğuz Gıda): etkin kural, soru sorulmadan kodlanan kalemler, Luca hesap planı. |
-| 11 | [ofis-11-yevmiye-ve-cikti.png](ofis-11-yevmiye-ve-cikti.png) | Yevmiye ve çıktı: yeni fiş, aktarılmış fişler, Luca / Zirve / Excel çıktısı. |
+| 11 | [ofis-11-yevmiye-ve-cikti.png](ofis-11-yevmiye-ve-cikti.png) | Fişler ve aktarım: yeni fiş, aktarılmış fişler, Luca / Zirve / Excel çıktısı. |
 | 12 | [ofis-12-ayarlar-yapay-zeka-esik.png](ofis-12-ayarlar-yapay-zeka-esik.png) | Ayarlar → Yapay zekâ ve onay: otomatik onay eşiği ve mizan hafızasının kural adayı eşiği. |
 | 13 | [ofis-13-kurulum-sihirbazi.png](ofis-13-kurulum-sihirbazi.png) | Ofis kurulum sihirbazı (6 adım). |
 | 14 | [ofis-14-masaustu-ajanlari.png](ofis-14-masaustu-ajanlari.png) | Masaüstü ajanları listesi. |

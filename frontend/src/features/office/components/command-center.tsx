@@ -5,6 +5,7 @@ import { Lock, Search, Waypoints } from "lucide-react";
 import Link from "next/link";
 import { useDeferredValue, useId, useMemo, useState } from "react";
 
+import { ErrorState } from "@/components/common/error-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { DataTable, createColumn } from "@/components/tables";
 import { Button } from "@/components/ui/button";
@@ -361,9 +362,12 @@ export function CommandCenterPage() {
             <Skeleton className="h-8 w-full" />
           </div>
         ) : matrix.isError ? (
-          <p className="text-destructive p-4 text-sm">
-            {t("office.load_failed")}
-          </p>
+          <ErrorState
+            className="m-4 border-0 py-8"
+            title={t("office.load_failed")}
+            onRetry={() => void matrix.refetch()}
+            retryLabel={t("common.retry")}
+          />
         ) : (
           <DataTable<PeriodMatrixRow>
             columns={columns}

@@ -13,6 +13,7 @@ import {
   registerWithToken,
   uiLogin,
   waitForUploads,
+  openNewEntry,
 } from "./lib";
 import { exportAndDownload, newApprovedEntry } from "./journal";
 
@@ -247,6 +248,7 @@ test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydo
 
   await pickTaxpayer(office, DEMO.selin.title);
   await expect(office.getByText("E2E Luca fişi")).toHaveCount(0);
+  await openNewEntry(office);
   await office.getByPlaceholder(/açıklama/i).first().fill("E2E Selin fişi");
   const rows = office.locator('tbody tr:has(input[placeholder="770.01"])');
   await rows.nth(0).locator("input").nth(0).fill("770.01");
