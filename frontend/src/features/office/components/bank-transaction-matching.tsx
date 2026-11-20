@@ -845,6 +845,21 @@ function AccountSection({
           >
             {t(`office.bank.matching.account_status_${posting.status}`)}
           </Badge>
+          {/* Öneri "onay bekliyor" diyorsa onay burada (#710): yeni müşavir
+              inceleme kuyruğunu aramadan öneriyi tek tıkla onaylar. */}
+          {posting.status === "suggested" && canWrite ? (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() =>
+                onBook(posting.account_code, posting.account_name ?? "")
+              }
+            >
+              {t("office.bank.matching.account_approve", {
+                code: posting.account_code,
+              })}
+            </Button>
+          ) : null}
         </p>
       ) : (
         <p className="text-muted-foreground text-sm">

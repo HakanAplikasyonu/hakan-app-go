@@ -2416,6 +2416,7 @@
   "bank.matching.account_title": "Ledger account",
   "bank.matching.account_none": "This movement is not booked to an account yet.",
   "bank.matching.account_status_suggested": "Suggested, awaiting approval",
+  "bank.matching.account_approve": "Approve suggested account ({{code}})",
   "bank.matching.account_status_approved": "Booked to account",
   "bank.matching.account_status_drafted": "In a journal entry",
   "bank.matching.account_drafted_hint": "The movement is in a journal entry. Reverse the entry first to change the account.",
