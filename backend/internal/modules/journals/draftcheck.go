@@ -47,12 +47,38 @@ func (e *DraftNeedsConfirmationError) Error() string {
 	return fmt.Sprintf("journals: draft has %d warning(s) to confirm", len(e.Issues))
 }
 
+// DraftDuplicateError: the draft's source document is in another entry too
+// (#710, ofis kararı: mükerrer fiş engellenir). It passes only with the
+// separate, explicit "yine de gönder" and a reason.
+type DraftDuplicateError struct{ Issues []DraftIssue }
+
+func (e *DraftDuplicateError) Error() string {
+	return "journals: draft is a possible duplicate"
+}
+
 // Confirmation is the approver's answer to the draft's warnings.
 type Confirmation struct {
-	// Confirmed: "eksik belge / mükerrer olabilir; yine de onaylıyorum".
+	// Confirmed: "eksik belge var; yine de onaylıyorum".
 	Confirmed bool
 	// Note: optional reason, kept on the entry.
 	Note string
+	// SendDuplicate: "mükerrer olabilir; yine de gönder" (#710). Needs
+	// Reason; the reason is kept on the entry.
+	SendDuplicate bool
+	Reason        string
+}
+
+// splitDuplicates separates the possible-duplicate warnings (a block that
+// only "yine de gönder" passes) from the ones a confirmation passes.
+func splitDuplicates(warn []DraftIssue) (dup, other []DraftIssue) {
+	for _, is := range warn {
+		if is.Code == IssuePossibleDuplicate {
+			dup = append(dup, is)
+		} else {
+			other = append(other, is)
+		}
+	}
+	return dup, other
 }
 
 // DraftIssue is a problem the control screen shows on a draft. Blocking
