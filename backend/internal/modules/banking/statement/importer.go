@@ -62,6 +62,9 @@ type Request struct {
 	CashBoxID int64
 	// Preview parses and dry-runs the duplicate checks without writing.
 	Preview bool
+	// Overrides: the accountant's mapping, left-out rows and corrected cells
+	// from the table preview (Excel, CSV, PDF only).
+	Overrides *Overrides
 }
 
 // AccountResult is the report of one account block.
@@ -123,7 +126,15 @@ func (im *Importer) Import(ctx context.Context, req Request) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	sts, format, err := ParseWith(req.FileName, req.Data, tpls)
+	var sts []Statement
+	format := Detect(req.FileName, req.Data)
+	if req.Overrides != nil && format != "mt940" {
+		var st Statement
+		st, err = parseWithOverrides(format, req.Data, tpls, *req.Overrides)
+		sts = []Statement{st}
+	} else {
+		sts, format, err = ParseWith(req.FileName, req.Data, tpls)
+	}
 	if err != nil {
 		return Report{}, parseError{err}
 	}

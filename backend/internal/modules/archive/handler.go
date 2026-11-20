@@ -17,6 +17,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/orgctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/taxpayerctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/pkg/response"
 )
 
@@ -46,6 +47,47 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("POST", "", write, h.upload)
 	route("GET", "/{archiveDocumentUuid}/file", read, h.file)
 	route("DELETE", "/{archiveDocumentUuid}", write, h.remove)
+}
+
+// RegisterTaxpayerRoutes mounts the mükellef panel routes: the documents the
+// office marked "Mükellef de görsün", read only, for the taxpayer's owner
+// (contracts, tax and SGK papers; like the payroll PDFs).
+func RegisterTaxpayerRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.IdentityLoader,
+	tpResolver taxpayerctx.Resolver, h *Handler,
+) {
+	if tpResolver == nil || h == nil {
+		return
+	}
+	authn := middleware.Authenticate(tokens, loader)
+	tp := middleware.RequireTaxpayer(tpResolver)
+	mux.Handle("GET /v1/taxpayer/archive-documents", middleware.Chain(http.HandlerFunc(h.myList), authn, tp))
+	mux.Handle("GET /v1/taxpayer/archive-documents/{archiveDocumentUuid}/file", middleware.Chain(http.HandlerFunc(h.myFile), authn, tp))
+}
+
+// ownerOnly: the archive's shared documents are for the taxpayer's owner.
+func ownerOnly(w http.ResponseWriter, r *http.Request) (taxpayerctx.Scope, bool) {
+	s := taxpayerctx.Must(r.Context())
+	if s.Role != taxpayerctx.RoleOwner {
+		response.Forbidden(w, r, "archive documents are visible to the taxpayer's owner")
+		return s, false
+	}
+	return s, true
+}
+
+func (h *Handler) myList(w http.ResponseWriter, r *http.Request) {
+	s, ok := ownerOnly(w, r)
+	if !ok {
+		return
+	}
+	h.listFor(w, r, s.ID, true)
+}
+
+func (h *Handler) myFile(w http.ResponseWriter, r *http.Request) {
+	s, ok := ownerOnly(w, r)
+	if !ok {
+		return
+	}
+	h.fileFor(w, r, s.ID, true)
 }
 
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
@@ -80,6 +122,10 @@ func intParam(w http.ResponseWriter, r *http.Request, name string, def, lo, hi i
 
 // list: GET ?category=&isg_kind=&q=&expiring=true&limit=&offset=.
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
+	h.listFor(w, r, engagementctx.Must(r.Context()).TaxpayerID, false)
+}
+
+func (h *Handler) listFor(w http.ResponseWriter, r *http.Request, taxpayerID int64, onlyVisible bool) {
 	limit, ok := intParam(w, r, "limit", 50, 1, 200)
 	if !ok {
 		return
@@ -103,9 +149,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "expiring must be true or false")
 		return
 	}
-	p, err := h.svc.List(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, Filter{
+	p, err := h.svc.List(r.Context(), taxpayerID, Filter{
 		Category: strings.TrimSpace(q.Get("category")), ISGKind: strings.TrimSpace(q.Get("isg_kind")), Q: search, ExpiringOnly: expiring,
-		Limit: int32(limit), Offset: int32(offset), //nolint:gosec // bounded above
+		OnlyVisible: onlyVisible,
+		Limit:       int32(limit), Offset: int32(offset), //nolint:gosec // bounded above
 	})
 	if err != nil {
 		h.fail(w, r, err)
@@ -159,11 +206,15 @@ func pathUUID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 }
 
 func (h *Handler) file(w http.ResponseWriter, r *http.Request) {
+	h.fileFor(w, r, engagementctx.Must(r.Context()).TaxpayerID, false)
+}
+
+func (h *Handler) fileFor(w http.ResponseWriter, r *http.Request, taxpayerID int64, onlyVisible bool) {
 	id, ok := pathUUID(w, r)
 	if !ok {
 		return
 	}
-	f, err := h.svc.Open(r.Context(), engagementctx.Must(r.Context()).TaxpayerID, id)
+	f, err := h.svc.Open(r.Context(), taxpayerID, id, onlyVisible)
 	if err != nil {
 		h.fail(w, r, err)
 		return

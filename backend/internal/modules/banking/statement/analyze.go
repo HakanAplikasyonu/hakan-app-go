@@ -48,6 +48,9 @@ type Analysis struct {
 	Lines     int      `json:"lines"`
 	RowErrors int      `json:"row_errors"`
 	Warnings  []string `json:"warnings"`
+	// Rows: the table below the header as the import would read it with the
+	// proposed columns (at most MaxPreviewRows), for the Excel-like preview.
+	Rows []PreviewRow `json:"rows"`
 }
 
 // ColumnRequest is the masked view the AI mapper receives.
@@ -78,21 +81,10 @@ func (im *Importer) Analyze(ctx context.Context, org, userID int64, name string,
 // AnalyzeFile is Analyze without the database.
 func AnalyzeFile(ctx context.Context, name string, data []byte, tpls []Template, ai ColumnSuggester, req ColumnRequest) (Analysis, error) {
 	format := Detect(name, data)
-	var rows [][]string
-	var err error
-	switch format {
-	case "mt940":
+	if format == "mt940" {
 		return Analysis{Format: format}, ErrNoTemplateNeeded
-	case "pdf":
-		rows, err = ReadPDFRowsWith(data, tpls)
-	case "excel":
-		rows, err = ReadXLSX(data)
-	case "csv":
-		text, _ := Decode(data)
-		rows, err = ReadCSV(text)
-	default:
-		return Analysis{Format: format}, fmt.Errorf("%w: %s", ErrUnsupported, format)
 	}
+	rows, err := readTable(format, data, tpls)
 	if err != nil {
 		return Analysis{Format: format}, err
 	}
@@ -158,8 +150,10 @@ func AnalyzeFile(ctx context.Context, name string, data []byte, tpls []Template,
 		if st, err := ParseTabularWith(rows, format, []Template{t}); err == nil {
 			a.Lines, a.RowErrors = len(st.Lines), len(st.Errors)
 		}
+		a.Rows = previewRows(rows, hdr, format, a.Columns, t)
 	} else {
 		a.Warnings = append(a.Warnings, "tarih ve tutar (ya da borç ve alacak) kolonları seçilmeli")
+		a.Rows = previewRows(rows, hdr, format, a.Columns, Template{})
 	}
 	return a, nil
 }

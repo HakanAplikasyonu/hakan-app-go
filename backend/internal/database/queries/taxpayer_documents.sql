@@ -14,6 +14,7 @@ RETURNING *;
 SELECT d.*, count(*) OVER ()::bigint AS total_count
 FROM taxpayer_documents d
 WHERE d.taxpayer_id = @taxpayer_id
+  AND (NOT @only_visible::bool OR d.visible_to_taxpayer)
   AND (sqlc.narg(category)::text IS NULL OR d.category = sqlc.narg(category)::text)
   AND (sqlc.narg(isg_kind)::text IS NULL OR d.isg_kind = sqlc.narg(isg_kind)::text)
   AND (sqlc.narg(q)::text IS NULL
@@ -28,6 +29,7 @@ LIMIT @lim OFFSET @off;
 -- name: CountTaxpayerDocuments :one
 -- Sekme sayaçları ve bitiş uyarısı: kategori başına sayı, süresi dolan ve
 -- soon tarihine kadar bitecek evrak (bütün arşiv ve yalnızca İSG).
+-- only_visible: mükellef panelinde yalnızca "Mükellef de görsün" işaretliler.
 SELECT count(*)::bigint AS total,
        count(*) FILTER (WHERE category = 'isg')::bigint AS isg,
        count(*) FILTER (WHERE valid_until < @today::date)::bigint AS expired,
@@ -35,7 +37,8 @@ SELECT count(*)::bigint AS total,
        count(*) FILTER (WHERE category = 'isg' AND valid_until < @today::date)::bigint AS isg_expired,
        count(*) FILTER (WHERE category = 'isg' AND valid_until >= @today::date AND valid_until <= @soon::date)::bigint AS isg_expiring
 FROM taxpayer_documents
-WHERE taxpayer_id = @taxpayer_id;
+WHERE taxpayer_id = @taxpayer_id
+  AND (NOT @only_visible::bool OR visible_to_taxpayer);
 
 -- name: GetTaxpayerDocument :one
 SELECT * FROM taxpayer_documents WHERE taxpayer_id = @taxpayer_id AND uuid = @uuid;

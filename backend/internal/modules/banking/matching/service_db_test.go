@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -275,6 +276,26 @@ func TestSampleMonth(t *testing.T) {
 	}
 	if found, _ := svc.Search(ctx, sub, txUUID("d"), "X"); len(found) != 0 {
 		t.Fatalf("short term: %+v", found)
+	}
+	// Date and amount range without a term (#565): the late invoice is
+	// 7.000,00 issued on 11 October.
+	day := func(d int) *time.Time { t := time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC); return &t }
+	amt := func(s string) *decimal.Decimal { v := decimal.RequireFromString(s); return &v }
+	found, err = svc.SearchFiltered(ctx, sub, txUUID("d"), SearchFilter{From: day(10), To: day(12), Min: amt("6900"), Max: amt("7100")})
+	if err != nil || len(found) != 1 || found[0].InvoiceUUID != late {
+		t.Fatalf("search by date and amount: %+v %v", found, err)
+	}
+	if found, _ := svc.SearchFiltered(ctx, sub, txUUID("d"), SearchFilter{From: day(12)}); len(found) != 0 {
+		t.Fatalf("issued before the range: %+v", found)
+	}
+	if found, _ := svc.SearchFiltered(ctx, sub, txUUID("d"), SearchFilter{Max: amt("6999.99")}); len(found) != 0 {
+		t.Fatalf("above the amount range: %+v", found)
+	}
+	if found, _ := svc.SearchFiltered(ctx, sub, txUUID("d"), SearchFilter{Term: "geç", Min: amt("7000"), Max: amt("7000")}); len(found) != 1 {
+		t.Fatalf("term and exact amount: %+v", found)
+	}
+	if found, _ := svc.SearchFiltered(ctx, sub, txUUID("d"), SearchFilter{}); len(found) != 0 {
+		t.Fatalf("empty filter: %+v", found)
 	}
 	if _, err := svc.Search(ctx, sub, txUUID("f"), "geç"); !errors.Is(err, ErrNotMatchable) {
 		t.Fatalf("search on interest: %v", err)

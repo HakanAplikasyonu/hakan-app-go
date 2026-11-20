@@ -64,7 +64,7 @@
   "codes.FILE_UNREADABLE": "Dosya okunamadı. Dosyanın bozuk ya da çok büyük olmadığından emin olup tekrar yükleyin.",
   "codes.FILE_EMPTY": "Dosya boş. İçeriği olan bir dosya seçin.",
   "codes.UNSUPPORTED_FILE": "Bu dosya türü burada desteklenmiyor. Ekranda belirtilen türde bir dosya yükleyin.",
-  "codes.NOT_PDF": "Bordro belgeleri PDF olmalı.",
+  "codes.NOT_PDF": "Dosya PDF olmalı.",
   "codes.DOCUMENT_EXISTS": "Aynı dosya arşivde zaten var.",
   "codes.ARCHIVE_UNAVAILABLE": "Belge arşivi şu an kullanılamıyor. Biraz sonra tekrar deneyin.",
   "codes.RECORD_INCOMPLETE": "Kayıt eksik. Zorunlu alanları doldurup tekrar deneyin.",
