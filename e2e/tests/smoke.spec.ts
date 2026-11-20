@@ -246,7 +246,7 @@ test("yevmiye: mükellef değişince tablo yeni mükellefin, yeni fiş ona kaydo
   await expect(rows.nth(1).locator("input").nth(3)).toHaveValue("150,00");
   await expect(office.getByText("Dengeli", { exact: true })).toBeVisible();
   // Kaydetmeyi durduran satır sorunu varsa hata iletisinde görünsün.
-  const problem = office.getByText(/satırdaki tutar okunamadı|satırda hesap kodu ve yalnızca|En az bir satıra hesap/);
+  const problem = office.getByText(/^\d+\. satırdaki tutar okunamadı|^\d+\. satırda hesap kodu ve yalnızca|^En az bir satıra hesap/);
   if (await problem.count()) {
     const values = await rows.evaluateAll((trs) =>
       trs.map((tr) => [...tr.querySelectorAll("input")].map((i) => (i as HTMLInputElement).value).join(" | ")),
