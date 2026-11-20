@@ -32,6 +32,7 @@ const ENGAGEMENT = [
   "/warnings",
   "/journals",
   "/reconciliation",
+  "/trial-balance",
   "/connections",
   "/expenses",
   "/z-reports",

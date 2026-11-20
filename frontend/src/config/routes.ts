@@ -213,6 +213,9 @@ export const routes = {
     /** Mutabakat panosu: mizan – kaynak ve cari mutabakat (#389). */
     engagementReconciliation: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/reconciliation`,
+    /** Mükellef mizanı: yüklenen Luca mizanı, Excel / PDF (#669 E). */
+    engagementTrialBalance: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/trial-balance`,
     /** Z reports (ÖKC gün sonu) of one engagement (#384). */
     engagementZReports: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/z-reports`,

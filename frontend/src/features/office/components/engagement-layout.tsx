@@ -114,6 +114,12 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       label: t("office.engagement.tab_reconciliation"),
       permission: Permission.TenantReconciliationRead,
     },
+    // Mükellef mizanı (#669 E).
+    {
+      href: routes.tenant.engagementTrialBalance(slug, engagement),
+      label: t("office.engagement.tab_trial_balance"),
+      permission: Permission.TenantAccountPlanRead,
+    },
     {
       href: routes.tenant.engagementJournals(slug, engagement),
       label: t("office.engagement.tab_journals"),

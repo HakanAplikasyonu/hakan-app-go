@@ -30,4 +30,5 @@ export { EngagementEasytradePage } from "./components/engagement-easytrade-page"
 export { WhatsAppPage } from "./components/whatsapp-page";
 export { EngagementExpensesPage } from "./components/engagement-expenses-page";
 export { EngagementZReportsPage } from "./components/engagement-zreports-page";
+export { EngagementTrialBalancePage } from "./components/engagement-trial-balance-page";
 export { EngagementReconciliationPage } from "./components/engagement-reconciliation-page";
