@@ -13471,6 +13471,13 @@ paths:
         balance, lookalike) and are classified. A balance that does not add
         up raises `BNK_GAP`; a text PDF whose balance does not add up is
         refused. `?preview=true` reports the same counts without writing.
+        For .xlsx, CSV and text PDF, `overrides` (JSON) carries the
+        accountant's decisions from the table preview (`analyze`): the column
+        mapping (`columns`, header → field, as a template's columns), rows left
+        out (`skip_rows`, 1-based file rows below the header) and corrected
+        cells (`edits`: row, file column, value). The file is read with exactly
+        this mapping; an invalid mapping or an edit outside the movement rows
+        is `INVALID_OVERRIDES` (400). MT940 ignores it.
       security:
         - bearerAuth: []
       parameters:
@@ -13485,6 +13492,9 @@ paths:
               properties:
                 file: { type: string, format: binary }
                 cash_box_uuid: { type: string, format: uuid }
+                overrides:
+                  type: string
+                  description: 'JSON {"columns":[{"header","field"}],"skip_rows":[int],"edits":[{"row","column","value"}]}'
       responses:
         "200":
           description: Preview report (nothing written)
@@ -21758,7 +21768,7 @@ components:
 
     BankStatementAnalysis:
       type: object
-      required: [format, header_row, headers, fingerprint, columns, sample, lines, row_errors, warnings]
+      required: [format, header_row, headers, fingerprint, columns, sample, lines, row_errors, warnings, rows]
       properties:
         format: { type: string, enum: [excel, csv, pdf] }
         bank_id: { type: string }
@@ -21776,6 +21786,24 @@ components:
         lines: { type: integer }
         row_errors: { type: integer }
         warnings: { type: array, items: { type: string } }
+        rows:
+          type: array
+          description: |
+            The table below the header (at most 2000 non-empty rows) as the
+            import reads it with the proposed columns, for the Excel-like
+            preview. kind is movement, error (not readable: fix a cell or
+            leave the row out), skip (totals line and after) or empty when the
+            proposal has no date and amount columns yet.
+          items: { $ref: "#/components/schemas/BankStatementPreviewRow" }
+
+    BankStatementPreviewRow:
+      type: object
+      required: [row, cells, kind]
+      properties:
+        row: { type: integer, description: 1-based row of the file table }
+        cells: { type: array, items: { type: string }, description: "One per analysis column, in that order" }
+        kind: { type: string, enum: [movement, error, skip, ""] }
+        reason: { type: string }
 
     EnvelopeBankStatementTemplate:
       type: object

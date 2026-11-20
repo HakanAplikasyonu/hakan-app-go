@@ -6,31 +6,6 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useLocale } from "@/providers/locale-provider";
@@ -38,35 +13,13 @@ import { useLocale } from "@/providers/locale-provider";
 import {
   bankPostingService,
   type BankStatementAnalysis,
-  type BankStatementField,
+  type BankStatementOverrides,
+  type BankStatementReport,
 } from "../services/bank-posting.service";
-
-const FIELDS: BankStatementField[] = [
-  "date",
-  "time",
-  "value_date",
-  "description",
-  "amount",
-  "debit",
-  "credit",
-  "balance",
-  "receipt",
-  "reference",
-  "channel",
-  "counterparty",
-  "counterparty_iban",
-  "counterparty_tax_id",
-];
-const NONE = "__none";
-
-/**
- * Ekstre yükleme (#383). Bilinen banka biçimi (başlangıç ya da ofis
- * şablonu) doğrudan okunur; bilinmeyen biçimde dosya analiz edilir, kolon
- * önerileri (AI ya da başlık adlarından) müşavire gösterilir, onaylanınca
- * şablon kaydedilir ve dosya yeniden yüklenir.
- */
-/** Sütun eşleme tablosunun başlık hücresi (önceki görünümle aynı). */
-const HEAD = "text-foreground h-auto px-2 py-1.5 text-start font-bold";
+import {
+  BankStatementPreview,
+  type PreviewDecision,
+} from "./bank-statement-preview";
 
 /** Backend hata kodları: Türkçe ileti (ham İngilizce ileti gösterilmez). */
 const UPLOAD_ERRORS = [
@@ -75,8 +28,17 @@ const UPLOAD_ERRORS = [
   "UNSUPPORTED_FILE",
   "SCANNED_PDF",
   "STATEMENT_BALANCE_MISMATCH",
+  "INVALID_OVERRIDES",
 ] as const;
 
+/**
+ * Ekstre yükleme (#383, #669 ekstre). MT940 doğrudan okunur. Excel, CSV ve
+ * metin PDF önce deneme okumasından geçer, sonra Excel benzeri önizlemede
+ * gösterilir: kolonların anlamı, dışarıda bırakılacak satırlar, okunamayan
+ * hücreler. Biçim tanınmadıysa kolonlar başlık adlarından (ve AI'dan)
+ * önerilir. Onaylanan eşleme ofis şablonu olarak kaydedilir; aynı düzendeki
+ * bir sonraki ekstrede kendiliğinden gelir.
+ */
 export function BankStatementUpload({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
@@ -85,8 +47,6 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
   const [busy, setBusy] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [analysis, setAnalysis] = useState<BankStatementAnalysis | null>(null);
-  const [fields, setFields] = useState<BankStatementField[]>([]);
-  const [name, setName] = useState("");
 
   const uploadError = (e: unknown) => {
     const code = isApiError(e) ? e.code : "";
@@ -106,63 +66,68 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
       });
   };
 
-  const send = async (f: File) => {
+  const done = (rep: BankStatementReport) => {
+    const inserted = rep.accounts.reduce((n, a) => n + a.inserted, 0);
+    toast.success(
+      t("office.bank.upload.done", {
+        count: inserted,
+        bank: rep.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
+      }),
+    );
+    setAnalysis(null);
+    refresh();
+  };
+
+  const importFile = async (f: File, o?: BankStatementOverrides) => {
+    done(await bankPostingService.importStatement(slug, engagement, f, o));
+  };
+
+  const open = async (f: File) => {
     setBusy(true);
     try {
-      const rep = await bankPostingService.importStatement(slug, engagement, f);
-      const inserted = rep.accounts.reduce((n, a) => n + a.inserted, 0);
-      toast.success(
-        t("office.bank.upload.done", {
-          count: inserted,
-          bank: rep.bank_id ? t(`office.bank.banks.${rep.bank_id}`) : "—",
-        }),
-      );
-      setAnalysis(null);
-      refresh();
-    } catch (e) {
-      if (isApiError(e) && e.code === "STATEMENT_LAYOUT_UNKNOWN") {
-        try {
-          const a = await bankPostingService.analyzeStatement(slug, f);
-          setAnalysis(a);
-          setFields(a.columns.map((c) => c.field));
-          setName("");
-        } catch (e2) {
-          toast.error(uploadError(e2));
+      // Deneme okuması: hesap ve biçim hataları hemen söylenir.
+      try {
+        const dry = await bankPostingService.importStatement(
+          slug,
+          engagement,
+          f,
+          undefined,
+          true,
+        );
+        if (dry.format === "mt940") {
+          await importFile(f);
+          return;
         }
-      } else {
-        toast.error(uploadError(e));
+      } catch (e) {
+        // Bilinmeyen düzen: kolonlar önizlemede seçilir.
+        if (!isApiError(e) || e.code !== "STATEMENT_LAYOUT_UNKNOWN") throw e;
       }
+      setAnalysis(await bankPostingService.analyzeStatement(slug, f));
+    } catch (e) {
+      toast.error(uploadError(e));
     } finally {
       setBusy(false);
     }
   };
 
-  const used = (f: BankStatementField) => fields.filter((x) => x === f).length;
-  const valid =
-    used("date") === 1 &&
-    (used("amount") === 1 || (used("debit") === 1 && used("credit") === 1)) &&
-    FIELDS.every((f) => used(f) <= 1);
-
-  const saveTemplate = async () => {
+  const confirm = async (d: PreviewDecision) => {
     if (!analysis || !file) return;
     setBusy(true);
     try {
-      await bankPostingService.saveTemplate(slug, {
-        format: analysis.format,
-        bank_id: analysis.bank_id || undefined,
-        name: name.trim() || undefined,
-        columns: analysis.columns.map((c, i) => ({
-          header: c.header,
-          field: fields[i] ?? "",
-        })),
-      });
-      toast.success(t("office.bank.upload.template_saved"));
+      if (d.saveTemplate) {
+        await bankPostingService.saveTemplate(slug, {
+          format: analysis.format,
+          bank_id: analysis.bank_id || undefined,
+          name: d.templateName || undefined,
+          columns: d.overrides.columns,
+        });
+      }
+      await importFile(file, d.overrides);
     } catch (e) {
       toast.error(uploadError(e));
+    } finally {
       setBusy(false);
-      return;
     }
-    await send(file);
   };
 
   return (
@@ -178,7 +143,7 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
           e.target.value = "";
           if (!f) return;
           setFile(f);
-          void send(f);
+          void open(f);
         }}
       />
       <Button
@@ -190,120 +155,19 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
         {t("office.bank.upload.button")}
       </Button>
 
-      <Dialog
-        open={analysis !== null}
-        onOpenChange={(o) => (o ? null : setAnalysis(null))}
-      >
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{t("office.bank.upload.template_title")}</DialogTitle>
-            <DialogDescription>
-              {t("office.bank.upload.template_description")}
-            </DialogDescription>
-          </DialogHeader>
-          {analysis ? (
-            <div className="space-y-3">
-              {analysis.warnings.map((w) => (
-                <p key={w} className="text-warn text-sm">
-                  {w}
-                </p>
-              ))}
-              <div className="max-h-80 overflow-auto rounded-lg border">
-                <Table containerClassName="overflow-visible">
-                  <TableHeader className="bg-surface-2">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className={HEAD}>
-                        {t("office.bank.upload.col_header")}
-                      </TableHead>
-                      <TableHead className={HEAD}>
-                        {t("office.bank.upload.col_field")}
-                      </TableHead>
-                      <TableHead className={HEAD}>
-                        {t("office.bank.upload.col_sample")}
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {analysis.columns.map((c, i) => (
-                      <TableRow
-                        key={`${c.index}-${c.header}`}
-                        className="hover:bg-transparent"
-                      >
-                        <TableCell className="px-2 py-1.5 font-medium">
-                          {c.header}
-                        </TableCell>
-                        <TableCell className="px-2 py-1.5">
-                          <Select
-                            value={fields[i] || NONE}
-                            onValueChange={(v) => {
-                              const next = [...fields];
-                              next[i] = (
-                                v === NONE ? "" : v
-                              ) as BankStatementField;
-                              setFields(next);
-                            }}
-                          >
-                            <SelectTrigger
-                              aria-label={c.header}
-                              className="min-w-44"
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NONE}>
-                                {t("office.bank.upload.field_none")}
-                              </SelectItem>
-                              {FIELDS.map((f) => (
-                                <SelectItem key={f} value={f}>
-                                  {t(`office.bank.upload.field_${f}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell className="text-text-2 max-w-48 truncate px-2 py-1.5">
-                          {analysis.sample[0]?.[i] ?? ""}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="template-name">
-                  {t("office.bank.upload.template_name")}
-                </Label>
-                <Input
-                  id="template-name"
-                  value={name}
-                  placeholder={
-                    analysis.bank_id
-                      ? t(`office.bank.banks.${analysis.bank_id}`)
-                      : undefined
-                  }
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              {!valid ? (
-                <p className="text-warn text-sm">
-                  {t("office.bank.upload.need_fields")}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAnalysis(null)}>
-              {t("common.cancel")}
-            </Button>
-            <Button
-              disabled={!valid || busy}
-              onClick={() => void saveTemplate()}
-            >
-              {t("office.bank.upload.save_and_import")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {analysis && file ? (
+        <BankStatementPreview
+          key={`${file.name}-${file.lastModified}`}
+          fileName={file.name}
+          analysis={analysis}
+          busy={busy}
+          tryRead={(o) =>
+            bankPostingService.importStatement(slug, engagement, file, o, true)
+          }
+          onCancel={() => setAnalysis(null)}
+          onConfirm={(d) => void confirm(d)}
+        />
+      ) : null}
     </>
   );
 }
