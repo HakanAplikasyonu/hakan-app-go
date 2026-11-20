@@ -78,6 +78,9 @@ type Subject struct {
 	OrganizationID int64
 	EngagementID   int64
 	TaxpayerID     int64
+	// EngagementUUID scopes the audit history (#565): the events name the
+	// engagement in their payload.
+	EngagementUUID uuid.UUID
 }
 
 // Result counts a run.

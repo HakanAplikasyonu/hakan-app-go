@@ -8802,6 +8802,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/history": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Audit history of one bank movement
+         * @description Requires `tenant.bank.read` (#565). Who matched the movement to
+         *     invoices, undid the match or booked it to an account, and when;
+         *     newest first, at most 50. Only the events written under this
+         *     engagement are listed.
+         */
+        get: operations["getTenantBankTransactionHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search": {
         parameters: {
             query?: never;
@@ -16643,6 +16675,21 @@ export interface components {
             success: true;
             data: components["schemas"]["BankTransactionMatching"];
             meta: components["schemas"]["ResponseMeta"];
+        };
+        BankTransactionHistoryEntry: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            action: "matched" | "unmatched" | "booked";
+            /** Format: date-time */
+            at: string;
+            /** @description Who did it; null when the user is gone */
+            actor_name: string | null;
+            /** @description Invoice numbers matched or unmatched (empty for booked) */
+            invoices: string[];
+            /** @description The account booked to (booked only) */
+            account_code: string | null;
+            account_name: string | null;
         };
         BankTransactionMatching: {
             /** @description The bank sent no name; `counterparty_name` is read from the description (#565) */
@@ -34431,6 +34478,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTenantBankTransactionHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The movement's history */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            items: components["schemas"]["BankTransactionHistoryEntry"][];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
                 };
             };
             401: components["responses"]["Unauthenticated"];

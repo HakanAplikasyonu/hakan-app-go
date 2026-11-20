@@ -11715,6 +11715,45 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/history:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Bank]
+      operationId: getTenantBankTransactionHistory
+      summary: Audit history of one bank movement
+      description: |
+        Requires `tenant.bank.read` (#565). Who matched the movement to
+        invoices, undid the match or booked it to an account, and when;
+        newest first, at most 50. Only the events written under this
+        engagement are listed.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The movement's history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data:
+                    type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/BankTransactionHistoryEntry" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -21410,6 +21449,20 @@ components:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/BankTransactionMatching" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
+    BankTransactionHistoryEntry:
+      type: object
+      required: [uuid, action, at, actor_name, invoices, account_code, account_name]
+      properties:
+        uuid: { type: string, format: uuid }
+        action: { type: string, enum: [matched, unmatched, booked] }
+        at: { type: string, format: date-time }
+        actor_name: { type: [string, "null"], description: "Who did it; null when the user is gone" }
+        invoices:
+          type: array
+          description: Invoice numbers matched or unmatched (empty for booked)
+          items: { type: string }
+        account_code: { type: [string, "null"], description: "The account booked to (booked only)" }
+        account_name: { type: [string, "null"] }
     BankTransactionMatching:
       type: object
       required: [uuid, transaction_date, debit_credit, amount, currency, description, counterparty_name, counterparty_from_description, counterparty_iban, kind_detail, period, match_status, matchable, matches, candidates, posting]
