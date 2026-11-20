@@ -92,6 +92,9 @@ type FieldReview struct {
 	Value          extract.Value
 	Model          string
 	AttachmentID   int64
+	// ReceiptUUID is the capture the field was read from: the review
+	// queue shows its photo next to the value (#569).
+	ReceiptUUID uuid.UUID
 	// ProposedBy is the user who typed the value (taxpayer correction,
 	// #199); 0 = read by the model.
 	ProposedBy int64
@@ -323,7 +326,7 @@ func (s *Service) capture(ctx context.Context, sc engagementctx.Scope, userID in
 	if draft.Type == "retail_sale" {
 		s.CheckZContinuity(ctx, sc, res.Get(extract.FieldOKCSerial))
 	}
-	v.InReview = s.sendLowConfidence(ctx, sc, draft, res, period.String, att.ID)
+	v.InReview = s.sendLowConfidence(ctx, sc, draft, res, period.String, att.ID, capture.Uuid)
 	return v, nil
 }
 
@@ -367,7 +370,7 @@ func (s *Service) checkPlate(ctx context.Context, sc engagementctx.Scope, expens
 
 // sendLowConfidence submits every present field under ReviewBelow (or
 // one we could not normalize) to the review queue.
-func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope, d Draft, res extract.Result, period string, attachmentID int64) []string {
+func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope, d Draft, res extract.Result, period string, attachmentID int64, receipt uuid.UUID) []string {
 	var out []string
 	for _, f := range extract.Fields {
 		v, ok := res.Fields[f]
@@ -384,6 +387,7 @@ func (s *Service) sendLowConfidence(ctx context.Context, sc engagementctx.Scope,
 			return s.reviewer.SubmitField(ctx, FieldReview{
 				OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID,
 				TargetType: d.Type, TargetID: d.ID, Period: period, Field: f, Value: v, Model: res.Model, AttachmentID: attachmentID,
+				ReceiptUUID: receipt,
 			})
 		})
 	}

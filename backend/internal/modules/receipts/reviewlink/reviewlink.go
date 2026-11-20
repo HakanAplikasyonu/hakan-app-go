@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -65,6 +66,9 @@ func (r *Reviewer) SubmitField(ctx context.Context, f receipts.FieldReview) erro
 		prov = review.Provenance{Origin: review.OriginInput, Inputs: map[string]any{
 			"raw": f.Value.Raw, "attachment_id": f.AttachmentID, "proposed_by": "taxpayer", "user_id": f.ProposedBy,
 		}}
+	}
+	if f.ReceiptUUID != uuid.Nil {
+		prov.Inputs["receipt_uuid"] = f.ReceiptUUID.String()
 	}
 	_, err := r.svc.Submit(ctx, review.Subject{OrganizationID: f.OrganizationID, EngagementID: f.EngagementID, TaxpayerID: f.TaxpayerID}, review.Input{
 		Kind: Kind, TargetType: f.TargetType, TargetID: &targetID, TargetField: f.Field, Period: f.Period,

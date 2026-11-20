@@ -89,6 +89,7 @@ import { useEngagementScope, useInvoiceHref } from "../engagement-scope";
 import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { FilterSelect, Figure } from "./office-ui";
 import { ReviewGrid, ReviewHeading } from "./review-grid";
+import { ReviewReceiptImage } from "./review-receipt-image";
 import {
   humanRationale,
   kindTitle,
@@ -1256,6 +1257,19 @@ function ReviewWorkspaceInner() {
                   {valueButton}
                 </CodePicker>
               )}
+              {canCorrectValue &&
+              current.engagement_uuid &&
+              suggestionContext(current).receiptUuid ? (
+                <div className="mt-4 space-y-1.5">
+                  <h3 className="text-sm font-semibold">
+                    {t("office.review.receipt_image_title")}
+                  </h3>
+                  <ReviewReceiptImage
+                    engagement={current.engagement_uuid}
+                    receipt={suggestionContext(current).receiptUuid ?? ""}
+                  />
+                </div>
+              ) : null}
               <div className="mt-4">
                 <EvidenceChain s={current} threshold={threshold} />
               </div>

@@ -171,6 +171,8 @@ export function suggestionContext(s: ReviewSuggestion) {
     issueDate: str("issue_date"),
     invoiceTotal: str("invoice_total"),
     lineAmount: str("line_amount"),
+    // Fişten okunan alan (#569): fotoğrafı gösterilecek fiş kaydı.
+    receiptUuid: str("receipt_uuid"),
   };
 }
 
