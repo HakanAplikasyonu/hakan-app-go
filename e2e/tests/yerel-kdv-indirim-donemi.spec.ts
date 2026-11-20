@@ -6,7 +6,7 @@ import { addConsentedTaxpayer, Api, DEMO, deriveUbl, officePath, uiLogin, unique
  * KDV indirim dönemi (#640): alış faturasının KDV'si, belge tarihi
  * değişmeden sonraki bir ayın beyanına alınır. Fatura çekmecesinde
  * "İndirim dönemini değiştir" ile ay seçilir, "şu aya alındı" notu düşer;
- * bildirimdeki "Geri al" belge ayına döndürür.
+ * kutudaki "Geri al" belge ayına döndürür.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef; Atlas'ın gelen faturası
  * (atlas-05, Ekim 2026) bu mükellefe türetilir. Başka dosyanın kaydına
@@ -65,8 +65,8 @@ test.describe("KDV indirim dönemi (#640)", () => {
     expect(d.vat_deduction_period).toBe("2026-12");
     expect(d.period).toBe("2026-10");
 
-    // Bildirimdeki "Geri al": belge ayına döner.
-    await page.locator("[data-sonner-toast]").getByRole("button", { name: "Geri al" }).click();
+    // Kutudaki "Geri al": önceki hâline (belge ayına) döner.
+    await box.getByRole("button", { name: "Geri al" }).click();
     await expect(box.getByTestId("vat-deduction-note")).toHaveCount(0);
     await expect.poll(async () => (await detail()).vat_deduction_period).toBeNull();
     d = await detail();

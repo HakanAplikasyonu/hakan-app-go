@@ -67,15 +67,19 @@ export function VatDeductionPeriod({
   const current = d.vat_deduction_period ?? null;
   const [value, setValue] = useState(current ?? range.min);
 
+  // Son değişikliğin geri alınması kutunun içinde (#640): çekmece açıkken
+  // bildirimdeki düğmeye tıklanamıyor, çekmece önünü kapatıyor.
+  const [undo, setUndo] = useState<{ previous: string | null } | null>(null);
+
   const save = useMutation({
-    mutationFn: (period: string | null) =>
+    mutationFn: (v: { period: string | null; undoing?: boolean }) =>
       officeInvoiceService.setVatDeductionPeriod(
         slug,
         engagement,
         d.uuid,
-        period,
+        v.period,
       ),
-    onSuccess: (next, period) => {
+    onSuccess: (next, v) => {
       qc.setQueryData(
         officeInvoiceKeys.invoice(slug, engagement, d.uuid),
         next,
@@ -90,19 +94,13 @@ export function VatDeductionPeriod({
         ],
       });
       setEditing(false);
-      const previous = current;
+      setUndo(v.undoing ? null : { previous: current });
       toast.success(
-        period
+        v.period
           ? t("office.vat_deduction.saved", {
-              month: monthText(period, locale),
+              month: monthText(v.period, locale),
             })
           : t("office.vat_deduction.cleared"),
-        {
-          action: {
-            label: t("office.vat_deduction.undo"),
-            onClick: () => save.mutate(previous),
-          },
-        },
       );
     },
     onError: (err) =>
@@ -155,7 +153,7 @@ export function VatDeductionPeriod({
             className="flex flex-wrap items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault();
-              if (value) save.mutate(value);
+              if (value) save.mutate({ period: value });
             }}
           >
             <Input
@@ -200,12 +198,24 @@ export function VatDeductionPeriod({
             >
               {t("office.vat_deduction.change")}
             </Button>
+            {undo ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={save.isPending}
+                onClick={() =>
+                  save.mutate({ period: undo.previous, undoing: true })
+                }
+              >
+                {t("office.vat_deduction.undo")}
+              </Button>
+            ) : null}
             {current ? (
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={save.isPending}
-                onClick={() => save.mutate(null)}
+                onClick={() => save.mutate({ period: null })}
               >
                 {t("office.vat_deduction.reset")}
               </Button>
