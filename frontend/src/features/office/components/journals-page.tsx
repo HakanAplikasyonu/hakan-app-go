@@ -9,8 +9,6 @@ import {
   FileSpreadsheet,
   Loader2,
   MonitorUp,
-  Plus,
-  Trash2,
   Undo2,
 } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
@@ -31,8 +29,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Hint } from "@/components/ui/hint";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthPicker } from "@/components/ui/month-picker";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,8 +46,9 @@ import {
   useJournalExports,
   useJournalTransfers,
 } from "../hooks/use-journals";
-import { formatMoney, sub, sum, toMinor } from "../lib/decimal";
+import { formatMoney } from "../lib/decimal";
 import { exportIssueText } from "../lib/export-issue";
+import { journalErrorText } from "../lib/journal-error";
 import {
   journalService,
   TRANSFER_DRIVERS,
@@ -72,7 +69,8 @@ import {
   JournalTransfersPanel,
   TRANSFER_STATUS,
 } from "./journal-transfers-panel";
-import { FilterSelect, Figure, Money, Panel } from "./office-ui";
+import { FilterSelect, Figure, Panel } from "./office-ui";
+import { NewDraft } from "./journal-new-draft";
 import { useRelatedColumn } from "./related-column";
 import {
   ALL_PERIODS,
@@ -81,18 +79,6 @@ import {
   usePeriodText,
 } from "../period";
 
-type LineRow = {
-  account: string;
-  description: string;
-  debit: string;
-  credit: string;
-};
-const emptyLine = (): LineRow => ({
-  account: "",
-  description: "",
-  debit: "",
-  credit: "",
-});
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 
 const statusClass: Record<JournalDraft["status"], string> = {
@@ -119,230 +105,11 @@ const embeddedTable: DataTableFeatures = {
   density: false,
 };
 
-// Fiş kalemi formu: sıralama da kapalı (kalem sırası fişin sırasıdır).
-// Mobilde kartlar bilinçli açık; kart içindeki girdiler çalışır.
-const lineEditorTable: DataTableFeatures = {
-  ...embeddedTable,
-  sorting: false,
-};
-
-/** API error in Turkish when the code is known, else the server message (#161). */
-function errorText(t: Translate, err: unknown, fallback: string) {
-  if (isApiError(err)) {
-    const key = `office.journals.error_${err.code}`;
-    const msg = err.code ? t(key) : key;
-    return msg !== key ? msg : err.message || fallback;
-  }
-  return err instanceof Error ? err.message : fallback;
-}
-
 /** Program label for an export driver id; the id itself when unknown. */
 function driverLabel(t: Translate, name: string) {
   const key = `office.journals.driver_${name}`;
   const msg = t(key);
   return msg === key ? name : msg;
-}
-
-function NewDraft({ engagement }: { engagement: string }) {
-  const { t } = useLocale();
-  const { slug } = useTenant();
-  const { create } = useJournalActions(slug, engagement);
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [description, setDescription] = useState("");
-  const [lines, setLines] = useState<LineRow[]>([emptyLine(), emptyLine()]);
-  const debit = sum(lines.map((l) => l.debit || "0"));
-  const credit = sum(lines.map((l) => l.credit || "0"));
-  const balanced = toMinor(debit) === toMinor(credit) && toMinor(debit) > 0;
-  const set = useCallback(
-    (i: number, k: keyof LineRow, v: string) =>
-      setLines((ls) => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l))),
-    [],
-  );
-  // Kolonlar yalnızca t ve set'e bağlı: her tuşta yeniden oluşursa hücreler
-  // yeniden bağlanır ve girdi odağı kaybolur.
-  const lineColumns = useMemo<ColumnDef<LineRow, unknown>[]>(
-    () => [
-      createColumn<LineRow>({
-        id: "account",
-        labelKey: "office.col_account",
-        gridPrimary: true,
-        cell: ({ row }) => (
-          <Input
-            className="h-8 w-36 font-mono"
-            placeholder="770.01"
-            aria-label={`${t("office.col_account")} ${row.index + 1}`}
-            value={row.original.account}
-            onChange={(e) => set(row.index, "account", e.target.value)}
-          />
-        ),
-      }),
-      createColumn<LineRow>({
-        id: "description",
-        labelKey: "office.journals.line_description",
-        cell: ({ row }) => (
-          <Input
-            className="h-8"
-            aria-label={`${t("office.journals.line_description")} ${row.index + 1}`}
-            value={row.original.description}
-            onChange={(e) => set(row.index, "description", e.target.value)}
-          />
-        ),
-      }),
-      createColumn<LineRow>({
-        id: "debit",
-        labelKey: "office.journals.debit",
-        meta: { align: "end" },
-        cell: ({ row }) => (
-          <Input
-            className="ms-auto h-8 w-32 text-right font-mono"
-            inputMode="decimal"
-            aria-label={`${t("office.journals.debit")} ${row.index + 1}`}
-            value={row.original.debit}
-            onChange={(e) => set(row.index, "debit", e.target.value)}
-          />
-        ),
-      }),
-      createColumn<LineRow>({
-        id: "credit",
-        labelKey: "office.journals.credit",
-        meta: { align: "end" },
-        cell: ({ row }) => (
-          <Input
-            className="ms-auto h-8 w-32 text-right font-mono"
-            inputMode="decimal"
-            aria-label={`${t("office.journals.credit")} ${row.index + 1}`}
-            value={row.original.credit}
-            onChange={(e) => set(row.index, "credit", e.target.value)}
-          />
-        ),
-      }),
-      // Silme düğmesi satır sırasına ve kalem sayısına bakar; bunları hücre
-      // bağlamından okumak için yardımcının cell'i geçersiz kılınır.
-      {
-        ...createActionsColumn<LineRow>({
-          labelKey: "office.journals.remove_line",
-          cell: () => null,
-        }),
-        cell: ({ row, table }) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="max-md:min-w-11"
-            aria-label={t("office.journals.remove_line")}
-            disabled={table.options.data.length <= 2}
-            onClick={() =>
-              setLines((ls) => ls.filter((_, j) => j !== row.index))
-            }
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        ),
-      },
-    ],
-    [set, t],
-  );
-
-  const submit = () => {
-    create.mutate(
-      {
-        entry_type: "mahsup",
-        entry_date: `${date}T00:00:00Z`,
-        description,
-        lines: lines
-          .filter((l) => l.account.trim())
-          .map((l) => ({
-            account: l.account.trim(),
-            description: l.description,
-            debit: l.debit || "0",
-            credit: l.credit || "0",
-          })),
-      },
-      {
-        onSuccess: () => {
-          setDescription("");
-          setLines([emptyLine(), emptyLine()]);
-        },
-      },
-    );
-  };
-
-  return (
-    <Panel title={t("office.journals.new_title")}>
-      <div className="space-y-3 p-4">
-        <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2 text-xs">
-            <Label
-              htmlFor="journal-new-date"
-              className="text-muted-foreground text-xs font-normal"
-            >
-              {t("office.col_date")}
-            </Label>
-            <DatePicker
-              id="journal-new-date"
-              className="h-8 w-40"
-              value={date}
-              onChange={(v) => setDate(v)}
-            />
-          </div>
-          <Input
-            className="h-8 max-w-md flex-1"
-            placeholder={t("office.journals.description")}
-            aria-label={t("office.journals.description")}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </div>
-        <DataTable<LineRow>
-          columns={lineColumns}
-          data={lines}
-          getRowId={(_, i) => String(i)}
-          features={lineEditorTable}
-        />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setLines((ls) => [...ls, emptyLine()])}
-          >
-            <Plus className="size-4" />
-            {t("office.journals.add_line")}
-          </Button>
-          <div className="flex items-center gap-3 text-xs">
-            <span
-              className={cn(
-                balanced ? "text-status-approved" : "text-status-warning",
-              )}
-            >
-              {balanced
-                ? t("office.journals.balanced")
-                : t("office.journals.difference", {
-                    amount: formatMoney(sub(debit, credit), "TRY"),
-                  })}
-            </span>
-            <Figure>
-              <Money value={debit} /> / <Money value={credit} />
-            </Figure>
-            <Button size="sm" onClick={submit} disabled={create.isPending}>
-              {create.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Plus className="size-4" />
-              )}
-              {t("office.journals.create")}
-            </Button>
-          </div>
-        </div>
-        {create.isError ? (
-          <p className="text-status-blocking text-sm">
-            {errorText(t, create.error, t("office.api.load_error"))}
-          </p>
-        ) : null}
-        <p className="text-muted-foreground text-xs">
-          {t("office.journals.new_hint")}
-        </p>
-      </div>
-    </Panel>
-  );
 }
 
 /** Onayı durduran engel var mı (#566); hesap kodu sorunları uyarıdır. */
@@ -406,7 +173,7 @@ function DraftCheck({
             }),
           ),
         onError: (err) =>
-          toast.error(errorText(t, err, t("office.api.load_error"))),
+          toast.error(journalErrorText(t, err, t("office.api.load_error"))),
       },
     );
   };
@@ -480,7 +247,7 @@ function ApproveClean({
         done += 1;
       } catch (err) {
         failed += 1;
-        reason = errorText(t, err, t("office.api.load_error"));
+        reason = journalErrorText(t, err, t("office.api.load_error"));
       }
     }
     setBusy(false);
@@ -732,11 +499,11 @@ function ExportPanel({
         ) : run.isError &&
           !(isApiError(run.error) && run.error.code === "EXPORT_BLOCKED") ? (
           <p className="text-status-blocking text-sm">
-            {errorText(t, run.error, t("office.api.load_error"))}
+            {journalErrorText(t, run.error, t("office.api.load_error"))}
           </p>
         ) : check.isError ? (
           <p className="text-status-blocking text-sm">
-            {errorText(t, check.error, t("office.api.load_error"))}
+            {journalErrorText(t, check.error, t("office.api.load_error"))}
           </p>
         ) : null}
         {run.data ? (
@@ -822,7 +589,11 @@ function SendToAgent({
       </Button>
       {requestTransfer.isError ? (
         <span className="text-status-blocking text-xs">
-          {errorText(t, requestTransfer.error, t("office.api.load_error"))}
+          {journalErrorText(
+            t,
+            requestTransfer.error,
+            t("office.api.load_error"),
+          )}
         </span>
       ) : null}
     </span>
@@ -1119,7 +890,7 @@ function JournalsInner() {
       >
         {actionError ? (
           <p className="text-status-blocking px-4 pt-3 text-sm">
-            {errorText(t, actionError, t("office.api.load_error"))}
+            {journalErrorText(t, actionError, t("office.api.load_error"))}
           </p>
         ) : null}
         {drafts.isLoading ? (

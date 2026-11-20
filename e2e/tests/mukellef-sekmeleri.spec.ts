@@ -106,14 +106,15 @@ test.describe("mükellef sekmeleri", () => {
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/warnings`));
     await expectShell(page, taxpayer.title);
     await expect(tabs(page).getByRole("link", { name: "Uyarılar" })).toHaveAttribute("aria-current", "page");
-    // Mükellef sabit: mükellef seçicisi yok.
-    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+    // Mükellef sabit: sayfanın mükellef seçicisi yok (üst çubuktaki
+    // "Mükellef değiştir" başka mükellefin aynı sekmesine götürür).
+    await expect(page.getByRole("combobox", { name: /^Mükellef:/ })).toHaveCount(0);
 
     // Yüklemeler: bu mükellefin işleri; "Faturalar" bağlantısı sekmede kalır.
     await tabs(page).getByRole("link", { name: "Yüklemeler" }).click();
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/upload`));
     await expectShell(page, taxpayer.title);
-    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: /^Mükellef:/ })).toHaveCount(0);
     await page.locator("main p a", { hasText: "Faturalar" }).click();
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/invoices`));
     await expectShell(page, taxpayer.title);
@@ -123,7 +124,7 @@ test.describe("mükellef sekmeleri", () => {
     await page.waitForURL((u) => u.pathname.endsWith(`${base}/review`));
     await expectShell(page, taxpayer.title);
     await expect(page.getByRole("heading", { level: 2, name: "İnceleme kuyruğu" })).toBeVisible();
-    await expect(page.getByRole("combobox", { name: "Mükellef" })).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: /^Mükellef:/ })).toHaveCount(0);
 
     // Fişler: yevmiye taslakları bu mükellefin.
     await tabs(page).getByRole("link", { name: "Fişler" }).click();

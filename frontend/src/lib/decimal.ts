@@ -86,3 +86,33 @@ export function add(...values: string[]): string {
 export function sub(a: string, b: string): string {
   return fromMinor(toMinor(a) - toMinor(b));
 }
+
+/**
+ * Elle yazılan tutarı API biçimine çevirir ("1.234,56" → "1234.56").
+ * Türkçe yazım esas: virgül ondalık, nokta binlik ayırıcıdır. Yalnız nokta
+ * varsa ve sonrasında tam üç hane kalıyorsa ("1.234") binlik sayılır; diğer
+ * tek nokta ("12.5") ondalıktır. ₺ ve boşluk atılır. Boş girdi "", sayı
+ * olmayan girdi null döner.
+ */
+export function parseAmountInput(input: string): string | null {
+  const s = input.replace(/[\s₺]/g, "");
+  if (!s) return "";
+  if (!/^[0-9.,]+$/.test(s)) return null;
+  let norm: string;
+  if (s.includes(",")) {
+    if (s.indexOf(",") !== s.lastIndexOf(",")) return null;
+    const [int, frac] = s.split(",");
+    if (int.includes(".") && !/^\d{1,3}(\.\d{3})+$/.test(int)) return null;
+    norm = `${int.replace(/\./g, "")}.${frac}`;
+  } else {
+    const dots = s.split(".").length - 1;
+    if (dots > 1 || /^\d{1,3}\.\d{3}$/.test(s)) {
+      if (!/^\d{1,3}(\.\d{3})+$/.test(s)) return null;
+      norm = s.replace(/\./g, "");
+    } else {
+      norm = s;
+    }
+  }
+  if (!/^\d*(\.\d{0,2})?$/.test(norm) || norm === ".") return null;
+  return fromMinor(toMinor(norm.startsWith(".") ? `0${norm}` : norm));
+}

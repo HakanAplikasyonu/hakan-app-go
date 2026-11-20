@@ -10,10 +10,11 @@ import { expect, test, type Page } from "@playwright/test";
 export async function newApprovedEntry(page: Page, description: string, receivable = "120.01") {
   await page.getByPlaceholder(/açıklama/i).first().fill(description);
   const rows = page.locator('tbody tr:has(input[placeholder="770.01"])');
+  // Tutarlar Türkçe yazılır; KDV satırının tutarını "Farkı kapat" yazar (#573).
   const lines: [string, string, string, string][] = [
-    [receivable, "Yıldız Market", "1200", ""],
+    [receivable, "Yıldız Market", "1.200,00", ""],
     ["600.01", "Satış", "", "1000"],
-    ["391.01", "Hesaplanan KDV", "", "200"],
+    ["391.01", "Hesaplanan KDV", "", ""],
   ];
   while ((await rows.count()) < lines.length) {
     await page.getByRole("button", { name: "Satır ekle" }).click();
@@ -22,6 +23,10 @@ export async function newApprovedEntry(page: Page, description: string, receivab
     const inputs = rows.nth(i).locator("input");
     for (let j = 0; j < 4; j++) if (lines[i][j]) await inputs.nth(j).fill(lines[i][j]);
   }
+  await expect(page.getByText("Fark: ₺ 200,00")).toBeVisible();
+  await page.getByRole("button", { name: "Farkı kapat" }).click();
+  await expect(rows.nth(2).locator("input").nth(3)).toHaveValue("200,00");
+  await expect(page.getByText("Dengeli", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Taslağı kaydet" }).click();
   const row = page.locator("tr", { hasText: "Taslak" }).first();
   await expect(row).toBeVisible();

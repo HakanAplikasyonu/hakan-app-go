@@ -2139,5 +2139,13 @@
   "journals.transfer_check_stale": "Mizan aktarımdan önce karşılaştırılmış",
   "journals.transfer_check_none": "Mizanla karşılaştırılmadı",
   "journals.transfer_check_open": "Farkları gör",
-  "journals.transfer_check_run": "Mizanla karşılaştır"
+  "journals.transfer_check_run": "Mizanla karşılaştır",
+  "journals.entry.account_malformed": "Hesap kodu biçimi hatalı (ör. 770.01)",
+  "journals.entry.account_not_in_plan": "Hesap planında yok",
+  "journals.entry.account_parent": "Ana hesap: {{name}} · alt hesap seçin",
+  "journals.entry.amount_invalid": "{{line}}. satırdaki tutar okunamadı (ör. 1.250,50).",
+  "journals.entry.line_incomplete": "{{line}}. satırda hesap kodu ve yalnızca borç ya da alacak tutarı olmalı.",
+  "journals.entry.no_lines": "En az bir satıra hesap kodu ve tutar yazın.",
+  "journals.entry.close_difference": "Farkı kapat",
+  "journals.entry.keyboard_hint": "Hesap kodu ya da adıyla aranır. Enter sonraki alana geçer, son satırda yeni satır açar; Ctrl+Enter taslağı kaydeder."
 }

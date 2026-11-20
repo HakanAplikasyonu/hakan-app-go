@@ -154,6 +154,9 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("bank_transaction:") === true);
     expect(new URL(page.url()).searchParams.get("match")).toBe("matched");
     await expect(focused(page).getByRole("link", { name: /^Fatura: ATL2026000000102/ })).toBeVisible();
+    // Kayıt paneli kapanınca sekmelere dönülür.
+    await page.keyboard.press("Escape");
+    await expect(focused(page)).toBeHidden();
 
     // Fişler sekmesi: fişin satırı → kaynağı olan hareket.
     await tabs(page).getByRole("link", { name: "Fişler", exact: true }).click();
@@ -164,6 +167,8 @@ test.describe("kayıtlar arası bağlantılar", () => {
     await page.waitForURL((u) => u.searchParams.get("kayit")?.startsWith("journal_draft:") === true);
     await expectShell(page, "Fişler");
     await expect(focused(page).getByRole("link", { name: /^Banka hareketi: EFT GELEN/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(focused(page)).toBeHidden();
 
     // Uyarılar sekmesi: uyarı kartından → andığı hareket ve kural.
     await tabs(page).getByRole("link", { name: "Uyarılar", exact: true }).click();

@@ -46,7 +46,10 @@ test.describe("programa aktarım", () => {
 
     await uiLogin(page, DEMO.owner);
     await page.goto(officePath(`/journals?taxpayer=${atlas}`));
-    await page.getByRole("textbox", { name: "Dönem" }).fill("2026-10");
+    // Dönem ay seçiciyle (takvim düğmesi → ay).
+    await page.getByRole("button", { name: "Dönem", exact: true }).click();
+    await expect(page.getByText("2026", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Eki", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Programa aktarım" })).toBeVisible();
 
     const history = page.getByRole("row");
