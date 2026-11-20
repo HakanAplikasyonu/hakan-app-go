@@ -82,8 +82,8 @@ import { useRelatedColumn } from "./related-column";
 import {
   ALL_PERIODS,
   isPeriod,
-  useOfficePeriod,
   usePeriodText,
+  useUrlOfficePeriod,
 } from "../period";
 
 const thisMonth = () => new Date().toISOString().slice(0, 7);
@@ -677,8 +677,9 @@ function JournalsInner() {
     useSelectedEngagement(slug, scope);
   const engagement = scope ?? selected?.engagement ?? "";
   // Global dönem seçici (#326); "Tüm dönemler"de bu ay (yeni fişin dönemi).
+  // Seçili dönem adreste de durur (?period=, #669 D): geri tuşu aynı yeri açar.
   const { period: selectedPeriod, setPeriod: setGlobalPeriod } =
-    useOfficePeriod();
+    useUrlOfficePeriod();
   const period = selectedPeriod ?? thisMonth();
   const setPeriod = (value: string) =>
     setGlobalPeriod(isPeriod(value) ? value : ALL_PERIODS);

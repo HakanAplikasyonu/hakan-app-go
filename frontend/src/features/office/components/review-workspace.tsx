@@ -58,6 +58,7 @@ import { permissions } from "@/config/permissions";
 import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useUrlParam } from "@/hooks/use-url-param";
 import { formatMoney } from "@/lib/decimal";
 import { cn } from "@/lib/utils";
 import { date as formatDate } from "@/lib/utils/format";
@@ -525,6 +526,7 @@ function PresentArticle(props: React.ComponentProps<typeof motion.article>) {
 
 /** Kuyruk süzgeci: güven kademesi (README: düşük < %60, orta %60–90). */
 type Tier = "all" | "low" | "mid";
+const TIERS: readonly Tier[] = ["all", "low", "mid"];
 
 function tierOf(c: number): Exclude<Tier, "all"> | "high" {
   return c < 0.6 ? "low" : c < 0.9 ? "mid" : "high";
@@ -592,11 +594,11 @@ function ReviewWorkspaceInner() {
   // ?taxpayer=<engagement> (co-pilot, #392) opens the queue on one taxpayer;
   // mükellef detayının İnceleme sekmesinde mükellef sabit (#468).
   const scope = useEngagementScope();
-  const [engagement, setEngagement] = useState(
-    () => scope ?? params.get(ENGAGEMENT_PARAM) ?? "all",
-  );
-  const [kind, setKind] = useState("all");
-  const [tier, setTier] = useState<Tier>("all");
+  // Süzgeçler adreste (#669 D): geri tuşuyla dönünce aynı kuyruk açılır.
+  const [urlEngagement, setEngagement] = useUrlParam(ENGAGEMENT_PARAM, "all");
+  const engagement = scope ?? urlEngagement;
+  const [kind, setKind] = useUrlParam("kind", "all");
+  const [tier, setTier] = useUrlParam<Tier>("tier", "all", TIERS);
   const query = useReviewSuggestions({
     status: "pending",
     engagement: engagement === "all" ? undefined : engagement,
