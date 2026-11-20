@@ -4937,7 +4937,7 @@ export interface paths {
         /**
          * Upload an Excel / CSV export
          * @description Requires `tenant.excel_imports.write`, `tenant.engagements.read` and engagement access. xlsx or csv (; or , separated, UTF-8 or Windows-1254), max 20 MB / 100000 rows. Analysis runs at once: a matching template (company > tenant > global) maps the columns without AI; otherwise the AI maps a masked sample (columns under 0.80 confidence go to mapping_review); without AI the mapping is manual.
-         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports) and `bank_transactions` are accepted (#395); for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
+         *     Besides invoices, `payroll`, `expenses`, `retail_sales` (Z reports), `bank_transactions` (#395) and `customers` (cari cards, #669) are accepted; for these the owning module's header names are tried before AI, and the module writes the rows on commit (see `GET /v1/tenant/excel-import-data-types` for the fields). For `payroll`, `period` names the payroll month when the file does not.
          */
         post: operations["uploadExcelImport"];
         delete?: never;
@@ -14839,7 +14839,7 @@ export interface components {
         };
         ExcelImportMappingInput: {
             /** @enum {string} */
-            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             source_system?: string;
             columns?: {
                 column: string;
@@ -14866,7 +14866,7 @@ export interface components {
         };
         ExcelImportDataType: {
             /** @enum {string} */
-            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+            data_type: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
             /** @example Banka hareketleri */
             label: string;
             fields: {
@@ -29545,7 +29545,7 @@ export interface operations {
                     /** Format: binary */
                     file: string;
                     /** @enum {string} */
-                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions";
+                    data_type?: "outgoing_invoices" | "incoming_invoices" | "payroll" | "expenses" | "retail_sales" | "bank_transactions" | "customers";
                     /** @example bizimhesap */
                     source_system?: string;
                     /** @example 2026-10 */
