@@ -84,7 +84,16 @@ export function OfficeTabbar({ counts }: { counts: ShellCounts }) {
                   ) : null}
                 </span>
                 {label}
-                {count ? <span className="sr-only">, {count}</span> : null}
+                {count ? (
+                  <span className="sr-only">
+                    ,{" "}
+                    {id === "warnings"
+                      ? t("office.shell.count_blockers", {
+                          count: String(count),
+                        })
+                      : count}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

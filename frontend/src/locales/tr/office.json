@@ -644,6 +644,7 @@
   "review.undo_hint": "son kararı geri al",
   "shell.agents_offline": "{{count}} kapalı",
   "shell.agents_online": "{{count}} ajan çevrimiçi",
+  "shell.count_blockers": "{{count}} engel",
   "shell.group_office": "Ofis",
   "shell.group_records": "Kayıtlar",
   "shell.group_today": "Bugün",
