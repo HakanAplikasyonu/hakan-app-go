@@ -7,7 +7,8 @@ import { addConsentedTaxpayer, Api, DEMO, officePath, uiLogin, uniqueVkn } from 
  * panelinde "Bordroya bağla" bölümünde, hareketin ayı ve önceki iki ayın
  * ödenmemiş bordrolarıyla (personel sayısı, açık net) listelenir. Seçilen
  * bordroya bağlanır; bordro bağlantısı bordro sayfasında o dönemi ve
- * personel dökümünü açar; bordro "ödendi" olur. Gelen para (tahsilat)
+ * personel dökümünü açar; bordro "ödendi" olur. Personel satırına basınca
+ * detay açılır: brütten nete, işveren payları, bağlı banka ödemesi. Gelen para (tahsilat)
  * bordroya bağlanamaz.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef; Ekim 2026 bordrosu (iki
@@ -121,5 +122,21 @@ test("maaş ödemesi bordroya elle bağlanır; bordro bağlantısı dönemi aça
   await page.waitForURL(/\/payroll\?/);
   const region = page.getByRole("region", { name: /Ekim 2026/ }).first();
   for (const p of PEOPLE) await expect(region.getByRole("row").filter({ hasText: p })).toBeVisible();
+
+  // Personel satırı → detay: brütten nete, işveren payları, bağlı ödeme.
+  await region.getByRole("row").filter({ hasText: PEOPLE[0] }).first().click();
+  const sheet = page.getByTestId("payroll-line-sheet");
+  await expect(sheet.getByRole("heading", { name: PEOPLE[0] })).toBeVisible();
+  await expect(sheet).toContainText("Ekim 2026 bordrosu");
+  const calc = sheet.getByTestId("payroll-line-calc");
+  await expect(calc).toContainText("30.000,00");
+  await expect(calc).toContainText("4.200,00");
+  await expect(calc).toContainText("30,32");
+  await expect(calc.getByRole("definition").last()).toContainText("25.469,68");
+  await expect(sheet.getByTestId("payroll-line-employer")).toContainText("6.150,00");
+  const pay = sheet.getByTestId("payroll-line-payment");
+  await expect(pay).toContainText("Ödendi");
+  await expect(pay.getByRole("link", { name: /Banka ödemesi/ })).toBeVisible();
+  await expect(pay).toContainText("50.939,36");
   await api.dispose();
 });

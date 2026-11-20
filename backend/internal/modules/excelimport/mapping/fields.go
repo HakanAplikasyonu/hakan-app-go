@@ -15,7 +15,7 @@ const (
 )
 
 // SupportedDataTypes can be committed.
-var SupportedDataTypes = []string{OutgoingInvoices, IncomingInvoices, Payroll, Expenses, RetailSales, BankTransactions}
+var SupportedDataTypes = []string{OutgoingInvoices, IncomingInvoices, Payroll, Expenses, RetailSales, BankTransactions, Customers}
 
 // Supported reports whether dt can be imported.
 func Supported(dt string) bool {
