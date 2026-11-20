@@ -37,6 +37,9 @@ import { useApiWarningText, useEntityLabel } from "./warnings-page";
 /** Açık uyarının adres parametresi: dönünce kalınan yer korunur (#529). */
 export const WARNING_PARAM = "uyari";
 
+/** Kapanan uyarıdan sıradakine kendiliğinden geçmeden önceki bekleme. */
+const AUTO_NEXT_MS = 1500;
+
 /**
  * Uyarı yan panelinin durumu (#529): hangi uyarının açık olduğu adreste
  * (`?uyari=<uuid>`), süzgeç ve sayfa parametreleri korunur. Açılan uyarı
@@ -97,7 +100,7 @@ export function WarningSheet({
   // Sayfada birden çok liste (grup kartları) olabilir: panel yalnızca açık
   // uyarı bu listedeyse ya da buradan açıldıysa görünür.
 
-  const { current, gone, index, prev, next } = sheetPosition(
+  const { current, gone, index, prev, next, successor } = sheetPosition(
     items,
     openUuid,
     last,
@@ -129,6 +132,18 @@ export function WarningSheet({
     if (after && after.uuid !== current.uuid) open(after, Math.max(index, 0));
     else close();
   };
+
+  // Uyarı kaydın kendisinde çözüldüyse (ör. hareket panelde eşleşti, #570)
+  // "kapandı" kısa süre görünür, sonra panel sıradakine kendiliğinden geçer.
+  // Elle başka uyarıya geçilirse bekleyen geçiş iptal olur.
+  useEffect(() => {
+    if (!successor) return;
+    const id = setTimeout(
+      () => open(successor, items.indexOf(successor)),
+      AUTO_NEXT_MS,
+    );
+    return () => clearTimeout(id);
+  }, [successor, items, open]);
 
   const goPrev = () => prev && open(prev, items.indexOf(prev));
   const goNext = () => next && open(next, items.indexOf(next));
@@ -285,6 +300,11 @@ export function WarningSheet({
               {gone ? (
                 <p className="text-ok text-sm font-medium">
                   {t("office.warning_sheet.closed")}
+                  {successor ? (
+                    <span className="text-text-3 ms-1 font-normal">
+                      {t("office.warning_sheet.opening_next")}
+                    </span>
+                  ) : null}
                 </p>
               ) : (
                 <ApiWarningActions

@@ -2034,6 +2034,7 @@
   "warning_sheet.position": "{{index}} / {{total}}",
   "warning_sheet.hint": "Kaydı burada düzelt, sonra gerekçeyle kapat. ← → ile uyarılar arasında geçilir.",
   "warning_sheet.closed": "Bu uyarı kapandı.",
+  "warning_sheet.opening_next": "Sıradaki uyarı açılıyor…",
   "warning_sheet.duplicate_candidates": "Aynı görünen fatura:",
   "warning_sheet.duplicate_open": "{{index}}. faturayı aç",
   "warning_decision.presets_label": "Hazır gerekçeler",

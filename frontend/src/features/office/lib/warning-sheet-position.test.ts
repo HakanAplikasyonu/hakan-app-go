@@ -41,4 +41,21 @@ describe("sheetPosition", () => {
     expect(p.next).toBeUndefined();
     expect(p.prev?.uuid).toBe("a");
   });
+
+  it("opens the replacement, or the previous one, after a resolved warning", () => {
+    const last = { warning: { uuid: "b" }, index: 1 };
+    expect(
+      sheetPosition([{ uuid: "a" }, { uuid: "c" }], "b", last).successor?.uuid,
+    ).toBe("c");
+    // "c" was last: the one before takes over.
+    expect(
+      sheetPosition([{ uuid: "a" }, { uuid: "b" }], "c", {
+        warning: { uuid: "c" },
+        index: 2,
+      }).successor?.uuid,
+    ).toBe("b");
+    expect(sheetPosition([], "b", last).successor).toBeUndefined();
+    // An open (not resolved) warning has no successor: nothing jumps.
+    expect(sheetPosition(items, "b", null).successor).toBeUndefined();
+  });
 });

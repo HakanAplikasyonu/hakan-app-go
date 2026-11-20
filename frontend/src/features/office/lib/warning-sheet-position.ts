@@ -18,5 +18,8 @@ export function sheetPosition<T extends { uuid: string }>(
   const index = found >= 0 ? found : Math.min(last?.index ?? 0, items.length);
   const prev = index > 0 ? items[index - 1] : undefined;
   const next = gone ? items[index] : items[index + 1];
-  return { current, gone, index, prev, next };
+  // Çözülüp düşen uyarının yerine panelin kendiliğinden açacağı kayıt (#570):
+  // yerine geçen, o yoksa (sondaydı) bir önceki; liste boşsa yok.
+  const successor = gone ? (items[index] ?? items[index - 1]) : undefined;
+  return { current, gone, index, prev, next, successor };
 }
