@@ -1158,6 +1158,9 @@ type Invoice struct {
 	UpdatedAt                  pgtype.Timestamptz `json:"updated_at"`
 	ExchangeRateSetBy          pgtype.Int8        `json:"exchange_rate_set_by"`
 	ExchangeRateSetAt          pgtype.Timestamptz `json:"exchange_rate_set_at"`
+	VatDeductionPeriod         pgtype.Text        `json:"vat_deduction_period"`
+	VatDeductionSetBy          pgtype.Int8        `json:"vat_deduction_set_by"`
+	VatDeductionSetAt          pgtype.Timestamptz `json:"vat_deduction_set_at"`
 }
 
 type InvoiceItem struct {
