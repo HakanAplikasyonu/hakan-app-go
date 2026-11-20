@@ -18523,7 +18523,7 @@ export interface components {
              *     parent_account: the line posts to an account that has sub-accounts;
              *     period_locked: the period is closed;
              *     missing_document: a bank entry without an invoice / receipt or document number (approve with confirm_warnings);
-             *     possible_duplicate: a source document of the entry is in another entry too (approve with confirm_warnings).
+             *     possible_duplicate: a source document of the entry is in another entry too (blocked; send_duplicate with a reason passes it, #710).
              * @enum {string}
              */
             code: "unbalanced" | "unknown_account" | "parent_account" | "period_locked" | "missing_document" | "possible_duplicate";
@@ -32872,10 +32872,14 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** @description Approve although the draft has warnings (missing document / possible duplicate) */
+                    /** @description Approve although the draft has a missing document warning */
                     confirm_warnings?: boolean;
                     /** @description Optional reason kept on the entry */
                     note?: string;
+                    /** @description Send a possible duplicate anyway (#710); needs reason */
+                    send_duplicate?: boolean;
+                    /** @description Required with send_duplicate; kept on the entry */
+                    reason?: string;
                 };
             };
         };
@@ -32893,7 +32897,7 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
-            /** @description The draft has warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
+            /** @description A possible duplicate to send anyway (`JOURNAL_DUPLICATE`) or warnings to confirm (`JOURNAL_NEEDS_CONFIRMATION`) */
             409: {
                 headers: {
                     [name: string]: unknown;
