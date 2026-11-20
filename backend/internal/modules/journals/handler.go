@@ -79,6 +79,9 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/unapprove", engaged(approve, h.unapprove))
 	mux.Handle("PATCH "+base+"/journal-drafts/{draftUuid}/lines/{lineNo}", engaged(write, h.setLineAccount))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
+	// Aktarılmış fişin tamamen iptali (#710): aktarımdan çıkar, taslağa döner.
+	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/cancel-export", engaged(export, h.cancelExport))
+
 	// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi.
 	links := base + "/journal-drafts/{draftUuid}/links"
 	mux.Handle("PUT "+links+"/invoices/{invoiceUuid}", engaged(write, h.manualLink(LinkInvoice, "invoiceUuid", true)))
@@ -329,6 +332,39 @@ func (h *Handler) reverse(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, r, http.StatusOK, d)
 }
 
+// cancelExport cancels an exported entry completely (#710). It takes the
+// entry out of its export (export permission, the route) and back to draft
+// (approve permission, checked here).
+func (h *Handler) cancelExport(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathUUID(w, r, "draftUuid")
+	if !ok {
+		return
+	}
+	if org, ok := orgctx.From(r.Context()); !ok || !org.Has(rbac.PermTenantJournalsApprove) {
+		response.Forbidden(w, r, "Missing permission: "+rbac.PermTenantJournalsApprove)
+		return
+	}
+	var in struct {
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&in); err != nil {
+		response.BadRequest(w, r, "INVALID_BODY", "body must be {\"reason\": \"...\"}")
+		return
+	}
+	s := engagementctx.Must(r.Context())
+	p, _ := authctx.PrincipalFrom(r.Context())
+	if err := h.svc.CancelExport(r.Context(), s, p.UserInternal, id, in.Reason); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	d, err := h.svc.GetDraft(r.Context(), s, id)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, d)
+}
+
 func (h *Handler) listBatches(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	limit, offset := paging(q.Get("limit"), q.Get("offset"))
@@ -549,6 +585,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Conflict(w, r, "LINE_FROM_SOURCE", err.Error())
 	case errors.Is(err, ErrInvalid):
 		response.BadRequest(w, r, "INVALID_DRAFT", err.Error())
+	case errors.Is(err, ErrNotExported):
+		response.Conflict(w, r, "NOT_EXPORTED", "entry is not in a live export")
 	case errors.Is(err, ErrNotApproved):
 		response.Conflict(w, r, "NOT_APPROVED", "entry is not approved")
 	case errors.Is(err, ErrAlreadyExported):

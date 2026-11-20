@@ -1062,6 +1062,81 @@ func (q *Queries) TaxReturnRetailVATLines(ctx context.Context, arg TaxReturnReta
 	return items, nil
 }
 
+const taxReturnSectionStats = `-- name: TaxReturnSectionStats :one
+SELECT
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text)::bigint AS retail_total,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text
+        AND r.approval_status = 'approved')::bigint AS retail_processed,
+    (SELECT COUNT(*) FROM retail_sales r WHERE r.taxpayer_id = $1 AND r.period = $2::text
+        AND r.approval_status = 'rejected')::bigint AS retail_ignored,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL)::bigint AS invoice_total,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'active' AND (i.currency = 'TRY' OR i.exchange_rate IS NOT NULL))::bigint AS invoice_processed,
+    (SELECT COUNT(*) FROM invoices i WHERE i.taxpayer_id = $1
+        AND COALESCE(i.vat_deduction_period, i.period) = $2::text AND i.deleted_at_source IS NULL
+        AND i.status_normalized = 'cancelled')::bigint AS invoice_ignored,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled)::bigint AS bank_total,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled AND b.match_status = 'matched')::bigint AS bank_processed,
+    (SELECT COUNT(*) FROM bank_transactions b WHERE b.taxpayer_id = $1 AND b.period = $2::text
+        AND NOT b.is_cancelled AND b.match_status = 'ignored')::bigint AS bank_ignored,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0)::bigint AS expense_total,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'approved')::bigint AS expense_processed,
+    (SELECT COUNT(*) FROM expenses e WHERE e.taxpayer_id = $1 AND e.period = $2::text
+        AND COALESCE(e.tax_amount, 0) > 0 AND e.approval_status = 'rejected')::bigint AS expense_ignored
+`
+
+type TaxReturnSectionStatsParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Period     string `json:"period"`
+}
+
+type TaxReturnSectionStatsRow struct {
+	RetailTotal      int64 `json:"retail_total"`
+	RetailProcessed  int64 `json:"retail_processed"`
+	RetailIgnored    int64 `json:"retail_ignored"`
+	InvoiceTotal     int64 `json:"invoice_total"`
+	InvoiceProcessed int64 `json:"invoice_processed"`
+	InvoiceIgnored   int64 `json:"invoice_ignored"`
+	BankTotal        int64 `json:"bank_total"`
+	BankProcessed    int64 `json:"bank_processed"`
+	BankIgnored      int64 `json:"bank_ignored"`
+	ExpenseTotal     int64 `json:"expense_total"`
+	ExpenseProcessed int64 `json:"expense_processed"`
+	ExpenseIgnored   int64 `json:"expense_ignored"`
+}
+
+// Beyan sayfasının bölüm özeti (#710): dönemin Z raporları, faturaları
+// (KDV dönemine göre, #640), banka hareketleri ve KDV'li masraf fişleri;
+// her biri için toplam, işlenen ve yok sayılan sayısı. İşlenen: Z raporu ve
+// fiş onaylı, fatura beyana giren (etkin, TL ya da kurlu), banka hareketi
+// eşleşmiş. Yok sayılan: reddedilen Z raporu / fiş, iptal fatura, yok
+// sayılan banka hareketi.
+func (q *Queries) TaxReturnSectionStats(ctx context.Context, arg TaxReturnSectionStatsParams) (TaxReturnSectionStatsRow, error) {
+	row := q.db.QueryRow(ctx, taxReturnSectionStats, arg.TaxpayerID, arg.Period)
+	var i TaxReturnSectionStatsRow
+	err := row.Scan(
+		&i.RetailTotal,
+		&i.RetailProcessed,
+		&i.RetailIgnored,
+		&i.InvoiceTotal,
+		&i.InvoiceProcessed,
+		&i.InvoiceIgnored,
+		&i.BankTotal,
+		&i.BankProcessed,
+		&i.BankIgnored,
+		&i.ExpenseTotal,
+		&i.ExpenseProcessed,
+		&i.ExpenseIgnored,
+	)
+	return i, err
+}
+
 const taxReturnUserName = `-- name: TaxReturnUserName :one
 SELECT TRIM(u.name || ' ' || u.surname)::text AS full_name
 FROM users u
