@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Download,
   FileCheck2,
+  FileText,
   FileUp,
   Info,
   Landmark,
@@ -248,20 +249,38 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             {t("office.tax_returns.description")}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="max-md:min-h-11"
-          disabled={!p}
-          onClick={() =>
-            void taxReturnsService
-              .exportFile(slug, engagement, kind, period)
-              .catch(() => toast.error(t("office.tax_returns.export_failed")))
-          }
-        >
-          <Download className="size-4" aria-hidden />
-          {t("office.tax_returns.export")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-md:min-h-11"
+            disabled={!p}
+            onClick={() =>
+              void taxReturnsService
+                .exportFile(slug, engagement, kind, period)
+                .catch(() => toast.error(t("office.tax_returns.export_failed")))
+            }
+          >
+            <Download className="size-4" aria-hidden />
+            {t("office.tax_returns.export")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="max-md:min-h-11"
+            disabled={!p}
+            onClick={() =>
+              void taxReturnsService
+                .exportFile(slug, engagement, kind, period, "pdf")
+                .catch(() =>
+                  toast.error(t("office.tax_returns.export_pdf_failed")),
+                )
+            }
+          >
+            <FileText className="size-4" aria-hidden />
+            {t("office.tax_returns.export_pdf")}
+          </Button>
+        </div>
       </div>
 
       <div

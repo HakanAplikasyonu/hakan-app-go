@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { FileCheck2 } from "lucide-react";
+import { Download, FileCheck2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -66,6 +66,77 @@ function waitsForDocuments(c: PeriodMatrixCell) {
     c.submitted_documents ||
     c.missing_bank_statements.length
   );
+}
+
+/**
+ * Ofis beyan tablosu Excel'i (#669 H): ekrandaki (süzülmüş, sıralı)
+ * satırlar; her beyan için durum ve ödenecek tutar (sayı), belgeler ve
+ * engeller. İlk satır başlıklar.
+ */
+export function taxReturnsSheet(
+  rows: Row[],
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  late: Kind[],
+): (string | number)[][] {
+  const head: string[] = [
+    t("office.col_taxpayer"),
+    t("office.tax_returns.office.col_tax_id"),
+  ];
+  for (const k of KINDS) {
+    const kind = t(`office.tax_returns.kind_${k}`);
+    head.push(kind, `${kind} · ${t("office.tax_returns.office.col_payable")}`);
+  }
+  head.push(
+    t("office.tax_returns.office.col_documents"),
+    t("office.tax_returns.office.col_blockers"),
+  );
+  const out: (string | number)[][] = [head];
+  for (const r of rows) {
+    const c = r.cell;
+    const line: (string | number)[] = [r.taxpayer_title, r.taxpayer_tax_id];
+    for (const k of KINDS) {
+      const ret = returnOf(c, k);
+      let status = ret
+        ? t(`office.tax_returns.status_${ret.status}`)
+        : t("office.tax_returns.office.not_started");
+      if (late.includes(k) && ret?.status !== "filed")
+        status = `${status} (${t("office.tax_returns.office.late")})`;
+      const payable =
+        ret?.payable_amount && ret.status !== "draft"
+          ? Number(ret.payable_amount)
+          : "";
+      line.push(status, payable);
+    }
+    const docs: string[] = [];
+    if (c) {
+      for (const name of c.missing_bank_statements)
+        docs.push(t("office.tax_returns.office.statement_missing", { name }));
+      if (c.open_document_tasks)
+        docs.push(
+          t("office.tax_returns.office.documents_open", {
+            count: c.open_document_tasks,
+          }),
+        );
+      if (c.submitted_documents)
+        docs.push(
+          t("office.tax_returns.office.documents_submitted", {
+            count: c.submitted_documents,
+          }),
+        );
+    }
+    line.push(docs.join("; "), c?.open_blockers ?? 0);
+    out.push(line);
+  }
+  return out;
+}
+
+async function downloadSheet(data: (string | number)[][], fileName: string) {
+  const XLSX = await import("xlsx");
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws["!cols"] = data[0].map((_, i) => ({ wch: i === 0 ? 36 : 16 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Beyannameler");
+  XLSX.writeFile(wb, fileName);
 }
 
 /** Verilmemiş beyanı, belge bekleyeni ve engeli olanı öne alır. */
@@ -421,6 +492,24 @@ export function OfficeTaxReturnsPage() {
             },
           ]}
         />
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!matrix.data || rows.length === 0}
+          onClick={() =>
+            void downloadSheet(
+              taxReturnsSheet(
+                rows,
+                t,
+                KINDS.filter((k) => lateKey.split(",").includes(k)),
+              ),
+              `beyannameler_${period}.xlsx`,
+            ).catch(() => toast.error(t("office.tax_returns.export_failed")))
+          }
+        >
+          <Download className="size-4" aria-hidden />
+          {t("office.tax_returns.export")}
+        </Button>
         {matrix.data ? (
           <span className="text-muted-foreground text-xs">
             {t("office.tax_returns.office.summary", {

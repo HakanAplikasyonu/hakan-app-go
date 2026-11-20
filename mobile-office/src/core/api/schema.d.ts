@@ -12748,7 +12748,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Download the return as an Excel workbook
+         * Download the return as an Excel workbook or a PDF summary
          * @description Requires `tenant.tax_returns.read`. `.xlsx` in the form's order,
          *     field names as on the GİB form and amounts as numbers, for
          *     re-keying or importing into the accounting program (Luca / Zirve):
@@ -12763,6 +12763,9 @@ export interface paths {
          *     Every workbook ends with `Kontrol listesi`. A prepared or filed
          *     return exports its snapshot; a draft the live preview (the title row
          *     says "Taslak"). GİB e-beyanname XML is not produced.
+         *
+         *     `format=pdf` (#669 H): the same form as a PDF beyan özeti, one page
+         *     (or more) per workbook sheet; wide sheets are landscape.
          */
         get: operations["exportEngagementTaxReturn"];
         put?: never;
@@ -40925,7 +40928,9 @@ export interface operations {
     };
     exportEngagementTaxReturn: {
         parameters: {
-            query?: never;
+            query?: {
+                format?: "xlsx" | "pdf";
+            };
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -40943,13 +40948,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Workbook */
+            /** @description Workbook or PDF */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                    "application/pdf": string;
                 };
             };
             400: components["responses"]["BadRequest"];
