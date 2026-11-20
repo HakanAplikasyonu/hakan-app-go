@@ -6,6 +6,8 @@ import { ORGANIZATION_HEADER, tenantRequest } from "@/lib/api/tenant-request";
 export type TrialBalance = components["schemas"]["TrialBalance"];
 export type TrialBalanceLine = components["schemas"]["TrialBalanceLine"];
 export type TrialBalanceReport = components["schemas"]["TrialBalanceReport"];
+export type LiveTrialBalanceReport =
+  components["schemas"]["LiveTrialBalanceReport"];
 export type AccountPlanImportResult =
   components["schemas"]["EnvelopeAccountPlanImportResult"]["data"];
 
@@ -14,6 +16,15 @@ export type TrialBalanceQuery = {
   which: string;
   compare: "previous" | "none";
   /** 0: all levels, 1: main accounts. */
+  level: number;
+};
+
+/** Canlı mizan (#669 E): ofisin kendi fişlerinden. */
+export type LiveTrialBalanceQuery = {
+  /** `yyyy-MM`; Ocak'tan bu aya birikimli. */
+  period: string;
+  includeDrafts: boolean;
+  compare: "none" | "luca";
   level: number;
 };
 
@@ -31,6 +42,8 @@ export const trialBalanceKeys = {
     ] as const,
   report: (slug: string, engagement: string, q: TrialBalanceQuery) =>
     [...trialBalanceKeys.all(slug, engagement), "report", q] as const,
+  live: (slug: string, engagement: string, q: LiveTrialBalanceQuery) =>
+    [...trialBalanceKeys.all(slug, engagement), "live", q] as const,
 };
 
 function reportQuery(q: TrialBalanceQuery) {
@@ -38,6 +51,40 @@ function reportQuery(q: TrialBalanceQuery) {
     compare: q.compare,
     ...(q.level > 0 ? { level: String(q.level) } : {}),
   };
+}
+
+function liveQuery(q: LiveTrialBalanceQuery) {
+  return {
+    period: q.period,
+    compare: q.compare,
+    ...(q.includeDrafts ? { include_drafts: "true" } : {}),
+    ...(q.level > 0 ? { level: String(q.level) } : {}),
+  };
+}
+
+/** Dosyayı indirir; adı Content-Disposition'dan. */
+async function downloadFile(url: string, slug: string, fallback: string) {
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: { [ORGANIZATION_HEADER]: slug },
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => undefined);
+    return unwrap<never>({ data: payload, response });
+  }
+  const name =
+    /filename="([^"]+)"/.exec(
+      response.headers.get("Content-Disposition") ?? "",
+    )?.[1] ?? fallback;
+  const blob = await response.blob();
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
 }
 
 /**
@@ -80,7 +127,7 @@ export const trialBalanceService = {
     return unwrap<AccountPlanImportResult>({ data: payload, response });
   },
   /** Excel / PDF dosyasını indirir. */
-  async download(
+  download(
     slug: string,
     engagement: string,
     q: TrialBalanceQuery,
@@ -93,29 +140,35 @@ export const trialBalanceService = {
       locale,
       ...reportQuery(q),
     });
-    const response = await fetch(
+    return downloadFile(
       `${root}${eng(engagement)}/account-plan/trial-balances/${encodeURIComponent(q.which)}/export?${params}`,
-      {
-        credentials: "include",
-        headers: { [ORGANIZATION_HEADER]: slug },
-      },
+      slug,
+      `mizan.${format}`,
     );
-    if (!response.ok) {
-      const payload = await response.json().catch(() => undefined);
-      return unwrap<never>({ data: payload, response });
-    }
-    const name =
-      /filename="([^"]+)"/.exec(
-        response.headers.get("Content-Disposition") ?? "",
-      )?.[1] ?? `mizan.${format}`;
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  },
+  /** Canlı mizan: kendi fişlerimizden (onaylı ve aktarılmış). */
+  live(slug: string, engagement: string, q: LiveTrialBalanceQuery) {
+    return tenantRequest<LiveTrialBalanceReport>(
+      slug,
+      "GET",
+      `${eng(engagement)}/account-plan/live-trial-balance`,
+      { query: liveQuery(q), silent: true },
+    );
+  },
+  /** Canlı mizanın Excel / PDF dosyası. */
+  downloadLive(
+    slug: string,
+    engagement: string,
+    q: LiveTrialBalanceQuery,
+    format: "xlsx" | "pdf",
+    locale: string,
+  ) {
+    const root = apiConfig.baseUrl.replace(/\/$/, "");
+    const params = new URLSearchParams({ format, locale, ...liveQuery(q) });
+    return downloadFile(
+      `${root}${eng(engagement)}/account-plan/live-trial-balance/export?${params}`,
+      slug,
+      `canli_mizan.${format}`,
+    );
   },
 };

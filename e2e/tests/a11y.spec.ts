@@ -66,6 +66,7 @@ test.describe("@a11y ofis paneli", () => {
       `/engagements/${atlas}/reconciliation?view=babs`,
       `/engagements/${atlas}/reconciliation?view=letters`,
       `/engagements/${atlas}/trial-balance`,
+      `/engagements/${atlas}/trial-balance?kaynak=canli`,
       // Beyannameler: KDV1 (taslak, kontrol listesi), MUHSGK ve Ba/Bs (#390).
       `/engagements/${atlas}/tax-returns`,
       `/engagements/${atlas}/tax-returns?kind=muhsgk`,

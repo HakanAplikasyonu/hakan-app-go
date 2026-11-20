@@ -46,6 +46,9 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/trial-balances", read, h.ListTrialBalances, eng...)
 	r.Tenant("GET "+base+"/trial-balances/{trialBalance}", read, h.TrialBalance, eng...)
 	r.Tenant("GET "+base+"/trial-balances/{trialBalance}/export", read, h.TrialBalanceExport, eng...)
+	// Canlı mizan: ofisin kendi fişlerinden (#669 E).
+	r.Tenant("GET "+base+"/live-trial-balance", read, h.LiveTrialBalance, eng...)
+	r.Tenant("GET "+base+"/live-trial-balance/export", read, h.LiveTrialBalanceExport, eng...)
 	r.Tenant("POST "+base+"/check", read, h.Check, eng...)
 	r.Tenant("GET "+base+"/missing", read, h.Missing, eng...)
 	r.Tenant("POST "+base+"/missing-template", read, h.MissingTemplate, eng...)

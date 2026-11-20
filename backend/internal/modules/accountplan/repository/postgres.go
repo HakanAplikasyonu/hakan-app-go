@@ -279,3 +279,36 @@ func (p *Postgres) MissingAssigned(ctx context.Context, s usecase.Subject, targe
 	}
 	return out, nil
 }
+
+// LiveTotals implements usecase.Store (#669 E).
+func (p *Postgres) LiveTotals(ctx context.Context, s usecase.Subject, from, to string, includeDrafts bool) ([]usecase.LiveTotal, error) {
+	rows, err := p.q.LiveTrialBalanceTotals(ctx, db.LiveTrialBalanceTotalsParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, FromPeriod: from, ToPeriod: to, IncludeDrafts: includeDrafts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("live trial balance: %w", err)
+	}
+	out := make([]usecase.LiveTotal, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, usecase.LiveTotal{Code: r.AccountCode, Debit: dec(r.Debit), Credit: dec(r.Credit)})
+	}
+	return out, nil
+}
+
+// AccountNames implements usecase.Store (#669 E).
+func (p *Postgres) AccountNames(ctx context.Context, s usecase.Subject, target string, codes []string) (map[string]string, error) {
+	out := map[string]string{}
+	if len(codes) == 0 {
+		return out, nil
+	}
+	rows, err := p.q.AccountPlanNames(ctx, db.AccountPlanNamesParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Target: target, Codes: codes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("account names: %w", err)
+	}
+	for _, r := range rows {
+		out[r.Code] = r.Name
+	}
+	return out, nil
+}
