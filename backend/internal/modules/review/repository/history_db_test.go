@@ -48,7 +48,7 @@ func TestCounterpartyHistory(t *testing.T) {
 		s, err := svc.Submit(ctx, sub, usecase.Input{
 			Kind: "account_code", TargetType: "invoice_item", TargetID: &id, TargetField: field,
 			Period: "2026-10", Value: json.RawMessage(`{"account_code":"` + code + `"}`), Confidence: decimal.RequireFromString("0.5"),
-			Rationale: "kural", Provenance: usecase.Provenance{Origin: usecase.OriginRule, Inputs: map[string]any{"counterparty_key": key}},
+			Rationale: "kural", Provenance: usecase.Provenance{Origin: usecase.OriginRule, RuleRef: "test:kural", Inputs: map[string]any{"counterparty_key": key}},
 		})
 		must(err)
 		return s
