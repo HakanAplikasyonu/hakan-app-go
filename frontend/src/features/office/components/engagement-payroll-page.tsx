@@ -58,6 +58,7 @@ import {
 } from "../services/payroll.service";
 import { Money } from "./office-ui";
 import { PayrollEmployeeDialog } from "./payroll-employee-dialog";
+import { PayrollLineSheet } from "./payroll-line-sheet";
 import { useRelatedColumn } from "./related-column";
 
 /** Form alanı etiketi: normal kalınlıkta (önceki görünümle aynı). */
@@ -185,6 +186,7 @@ function RunsView({ engagement }: { engagement: string }) {
     items.find((r) => r.uuid === focusRun) ??
     items.find((r) => r.period === focus) ??
     items[0];
+  const [line, setLine] = useState<PayrollLine | null>(null);
   const detail = useQuery({
     queryKey: [...keyBase, "run", selected?.uuid],
     queryFn: () => payrollService.run(slug, engagement, selected!.uuid),
@@ -382,6 +384,15 @@ function RunsView({ engagement }: { engagement: string }) {
           <LinesTable
             lines={detail.data?.lines ?? []}
             loading={detail.isLoading}
+            onPick={setLine}
+          />
+          {/* Personel satırının detayı (#710): brütten nete, işveren
+              maliyeti, bağlı banka ödemesi. */}
+          <PayrollLineSheet
+            engagement={engagement}
+            run={selected}
+            line={line}
+            onClose={() => setLine(null)}
           />
         </section>
       ) : null}
@@ -462,9 +473,11 @@ function Stat({
 function LinesTable({
   lines,
   loading,
+  onPick,
 }: {
   lines: PayrollLine[];
   loading: boolean;
+  onPick: (line: PayrollLine) => void;
 }) {
   const { t } = useLocale();
   const columns = useMemo<ColumnDef<PayrollLine, unknown>[]>(
@@ -531,6 +544,7 @@ function LinesTable({
       getRowId={(l) => String(l.row)}
       isLoading={loading}
       emptyTitle={t("office.payroll.lines_empty")}
+      onRowClick={onPick}
       features={{ ...tableFeatures, persistKey: "office.payroll.lines" }}
     />
   );
