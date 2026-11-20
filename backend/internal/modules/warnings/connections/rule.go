@@ -42,6 +42,16 @@ const (
 	DefaultNeverSyncedDays = 1.0
 )
 
+// FailingGrace: a set-up (active) connection whose last attempt failed for
+// a transient reason (rate_limited, or a last_error such as a bank timeout)
+// warns only when it has not fetched successfully for this long (or, never
+// having succeeded, was created this long ago). The sweep runs every 15
+// minutes and the next successful fetch clears last_error: without the
+// grace an occasional timeout would open and close a warning many times a
+// day. auth_failed, and a failure during setup, warn at once: they do not
+// heal by themselves.
+const FailingGrace = 6 * time.Hour
+
 // waitingSetup are setup states that wait on a person (the taxpayer's
 // authorisation, the bank instruction), not on a sync: such a connection is
 // never stale. A failure there is still INT_CONNECTION_FAILED.
@@ -115,7 +125,7 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 		return engine.Finding{}, false
 	}
 	params := map[string]any{"source": SourceName(c.SourceSystem), "source_system": c.SourceSystem}
-	if Failing(c) {
+	if Failing(c) && !transientWithinGrace(c, now) {
 		params["status"] = c.Status
 		if r := errorReason(c.LastError); r != "" {
 			params["reason"] = r
@@ -124,6 +134,9 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 			params["last_success_at"] = day(*c.LastSuccessAt)
 		}
 		return engine.Finding{Code: CodeFailed, Params: params}, true
+	}
+	if Failing(c) {
+		return engine.Finding{}, false // transient, within the grace period
 	}
 	if waitingSetup[c.SetupState] {
 		return engine.Finding{}, false
@@ -141,6 +154,19 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 		return engine.Finding{Code: CodeStale, Params: params}, true
 	}
 	return engine.Finding{}, false
+}
+
+// transientWithinGrace: a set-up connection's transient failure (anything
+// but auth_failed) that is still within FailingGrace of its last success.
+func transientWithinGrace(c Connection, now time.Time) bool {
+	if c.Status == "auth_failed" || c.SetupState != "active" {
+		return false
+	}
+	since := c.CreatedAt
+	if c.LastSuccessAt != nil {
+		since = *c.LastSuccessAt
+	}
+	return now.Sub(since) <= FailingGrace
 }
 
 // Failing: the connection's last attempt failed. auth_failed and
