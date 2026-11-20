@@ -175,7 +175,10 @@ function useBehindColumns(focus: string) {
           if (crown !== "sorun") return badge;
           return (
             <Link
-              href={`${routes.tenant.engagementWarnings(slug, row.original.engagement_uuid)}?severity=blocker`}
+              href={routes.tenant.engagementBlockers(
+                slug,
+                row.original.engagement_uuid,
+              )}
               className="inline-flex rounded-md hover:underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -381,9 +384,7 @@ export function OfficeHome() {
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-11">
-                <Link href={blockersHref}>
-                  {t("office.home.see_blockers")}
-                </Link>
+                <Link href={blockersHref}>{t("office.home.see_blockers")}</Link>
               </Button>
             </>
           }

@@ -35,6 +35,26 @@ export function statusOf(
   return "collected";
 }
 
+/**
+ * Hücreye tıklayınca açılacak ekran (#567): problemden çözüm ekranına.
+ * Engelleyici uyarı varsa o uyarılar; açık değişiklik talebi mükellef
+ * özetinde çözülür; yalnız engellemeyen uyarı varsa uyarı listesi; iş yoksa
+ * mükellef özeti.
+ */
+export type CellTarget = "blockers" | "warnings" | "overview";
+
+export function cellTarget(
+  cell: Pick<
+    PeriodMatrixCell,
+    "open_blockers" | "open_warnings" | "open_change_requests"
+  >,
+): CellTarget {
+  if (cell.open_blockers > 0) return "blockers";
+  if (cell.open_change_requests > 0) return "overview";
+  if (cell.open_warnings > 0) return "warnings";
+  return "overview";
+}
+
 const rank: Record<CellStatus, number> = {
   open: 0,
   collected: 0,

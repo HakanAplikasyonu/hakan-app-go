@@ -170,6 +170,9 @@ export const routes = {
     /** Uyarılar sekmesi: mükellefin uyarıları (#468). */
     engagementWarnings: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/warnings`,
+    /** Mükellefin açık engelleyici uyarıları (#562, #567). */
+    engagementBlockers: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/warnings?severity=blocker`,
     /** Fişler sekmesi: mükellefin yevmiye taslakları ve çıktısı (#468). */
     engagementJournals: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/journals`,
