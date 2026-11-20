@@ -275,3 +275,62 @@ func TestCounterpartyAccountFromPlan(t *testing.T) {
 		t.Fatalf("new cari = %+v", c)
 	}
 }
+
+// TestMemoryIsPerEngagement is the #572 acceptance: what the accountant
+// teaches for taxpayer A (a rule, a rule change, the codes it produces) is
+// not seen at taxpayer B of the same office, and B's own rule does not
+// reach A or the office template.
+func TestMemoryIsPerEngagement(t *testing.T) {
+	f := setup(t)
+	ctx := context.Background()
+
+	f.newEngagement(t, "1111111111")
+	a := f
+	f.newEngagement(t, "3333333333")
+	b := f
+
+	ruleA, err := a.rules.CreateRule(ctx, a.org, a.eng, usecase.RuleInput{
+		Name: "Kira (A)", Conditions: engine.Conditions{Direction: "incoming", ItemNameContains: []string{"kira"}}, AccountCode: "770.01",
+	}, a.user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rules, err := b.rules.Rules(ctx, b.org, b.eng, true); err != nil || len(rules) != 0 {
+		t.Fatalf("A's rule leaked to B: %+v %v", rules, err)
+	}
+	if office, err := a.rules.Rules(ctx, a.org, 0, true); err != nil || len(office) != 0 {
+		t.Fatalf("A's rule leaked to the office template: %+v %v", office, err)
+	}
+
+	// The same rent line: A's rule codes it, B falls back to the global rule.
+	outA, err := a.rules.SuggestInvoice(ctx, a.sub(), a.invoice(t, "2026-10", "2222222222", "Mülk Sahibi", "Ofis kirası Ekim"))
+	if err != nil || outA[0].AccountCode != "770.01" || outA[0].RuleRef != fmt.Sprintf("account_rule:%d@v1", ruleA.ID) {
+		t.Fatalf("A rent = %+v %v", outA, err)
+	}
+	outB, err := b.rules.SuggestInvoice(ctx, b.sub(), b.invoice(t, "2026-10", "2222222222", "Mülk Sahibi", "Ofis kirası Ekim"))
+	if err != nil || outB[0].RuleRef == outA[0].RuleRef || outB[0].AccountCode == "770.01" {
+		t.Fatalf("B used A's rule: %+v %v", outB, err)
+	}
+
+	// B's own rule and A's rule live side by side; changing one leaves the other.
+	if _, err := b.rules.CreateRule(ctx, b.org, b.eng, usecase.RuleInput{
+		Name: "Kira (B)", Conditions: engine.Conditions{Direction: "incoming", ItemNameContains: []string{"kira"}}, AccountCode: "760.05",
+	}, b.user); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.rules.UpdateRule(ctx, a.org, a.eng, ruleA.Key, usecase.RuleInput{
+		Name: "Kira (A)", Conditions: engine.Conditions{Direction: "incoming", ItemNameContains: []string{"kira"}}, AccountCode: "770.02",
+	}, a.user); err != nil {
+		t.Fatal(err)
+	}
+	rulesA, _ := a.rules.Rules(ctx, a.org, a.eng, false)
+	rulesB, _ := b.rules.Rules(ctx, b.org, b.eng, false)
+	if len(rulesA) != 1 || rulesA[0].AccountCode != "770.02" || len(rulesB) != 1 || rulesB[0].AccountCode != "760.05" {
+		t.Fatalf("after changes A = %+v, B = %+v", rulesA, rulesB)
+	}
+	// The assignments (what was coded) are per engagement too.
+	var n int
+	if err := f.d.Pool.QueryRow(ctx, `SELECT count(*) FROM account_assignments WHERE engagement_id = $1 AND rule_id = $2`, b.eng, ruleA.ID).Scan(&n); err != nil || n != 0 {
+		t.Fatalf("B holds %d assignments of A's rule (%v)", n, err)
+	}
+}

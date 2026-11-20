@@ -586,6 +586,8 @@
   "memory.missing_title": "Accounts to open in Luca",
   "memory.missing_description": "Applied codes the account plan does not have (mostly new counterparties). The Luca export stops until they are opened in Luca and the trial balance is imported again.",
   "memory.missing_empty": "No account is missing from the plan.",
+  "memory.missing_no_plan": "This taxpayer's chart of accounts is not uploaded yet, so missing accounts cannot be checked. Upload the chart (trial balance) above first.",
+  "memory.scope_note": "The rules, memory and chart of accounts below belong to this taxpayer only; changes here do not affect any other taxpayer. Rules of origin \"Office template\" are starting rules copied from the office template when the taxpayer was added; the copy belongs to this taxpayer too.",
   "memory.missing_download": "Download the missing-account template",
   "memory.col_account_name": "Account name",
   "memory.col_uses": "Uses",
