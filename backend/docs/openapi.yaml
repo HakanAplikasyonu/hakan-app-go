@@ -9205,6 +9205,84 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Invoices]
+      operationId: setEngagementInvoiceVatDeductionPeriod
+      summary: Move a purchase invoice's KDV deduction to a later month (#640)
+      description: |
+        Requires `tenant.invoices.write` and engagement access. The document
+        date and period stay; only the month whose KDV return deducts the
+        invoice's KDV (KDV indirim dönemi) changes. Purchase invoices only;
+        the month must be after the document month and no later than
+        December of the year after the document year (KDVK 29/3). Both the
+        current deduction month and the new one must be open. Recorded in
+        the activity log.
+        409 `PERIOD_LOCKED`; 422 `NOT_PURCHASE_INVOICE`,
+        `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW`.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [period]
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$", example: "2026-04" }
+      responses:
+        "200":
+          description: The invoice after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`NOT_PURCHASE_INVOICE`, `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Invoices]
+      operationId: clearEngagementInvoiceVatDeductionPeriod
+      summary: Return a purchase invoice's KDV deduction to the document month (#640)
+      description: |
+        Requires `tenant.invoices.write` and engagement access. Undoes a
+        moved KDV indirim dönemi; both the current deduction month and the
+        document month must be open. Recorded in the activity log.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The invoice after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`NOT_PURCHASE_INVOICE`, `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/export-drivers:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22627,9 +22705,12 @@ components:
       allOf:
         - $ref: "#/components/schemas/TaxpayerInvoice"
         - type: object
-          required: [open_warnings]
+          required: [open_warnings, vat_deduction_period]
           properties:
             open_warnings: { type: integer, format: int64, description: Open data warnings on the invoice in this engagement }
+            vat_deduction_period:
+              type: [string, "null"]
+              description: The month whose KDV return deducts the invoice's KDV when moved forward from the document month (#640); null = the document month.
 
     OfficeInvoicePage:
       type: object
@@ -22661,7 +22742,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/TaxpayerInvoiceDetail"
         - type: object
-          required: [has_ubl, warnings, exchange_rate_entry]
+          required: [has_ubl, warnings, exchange_rate_entry, vat_deduction_period, vat_deduction_entry]
           properties:
             has_ubl: { type: boolean, description: "A UBL-TR XML is stored (GET .../ubl)" }
             warnings:
@@ -22669,6 +22750,18 @@ components:
               items: { $ref: "#/components/schemas/OfficeInvoiceWarning" }
             exchange_rate_entry:
               description: Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source.
+              oneOf:
+                - type: "null"
+                - type: object
+                  required: [set_by_name, set_at]
+                  properties:
+                    set_by_name: { type: string, description: "Empty when the user was deleted" }
+                    set_at: { type: string, format: date-time }
+            vat_deduction_period:
+              type: [string, "null"]
+              description: KDV indirim dönemi when moved forward from the document month (#640); null = the document month.
+            vat_deduction_entry:
+              description: Who moved the KDV deduction, and when (#640); null when it is in the document month.
               oneOf:
                 - type: "null"
                 - type: object

@@ -683,6 +683,8 @@ type Querier interface {
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
 	// Elle girilen kurun kim tarafından ne zaman girildiği (#571).
 	InvoiceExchangeRateEntry(ctx context.Context, arg InvoiceExchangeRateEntryParams) (InvoiceExchangeRateEntryRow, error)
+	// KDV indirim dönemini kimin ne zaman değiştirdiği (#640).
+	InvoiceVATDeductionEntry(ctx context.Context, arg InvoiceVATDeductionEntryParams) (InvoiceVATDeductionEntryRow, error)
 	IsBankTransactionCancelled(ctx context.Context, arg IsBankTransactionCancelledParams) (bool, error)
 	// Mükellefin dönemden önceki 12 aydaki aynı yönlü kalem adları ve satır sayıları.
 	ItemNamesHistory(ctx context.Context, arg ItemNamesHistoryParams) ([]ItemNamesHistoryRow, error)
@@ -1371,6 +1373,9 @@ type Querier interface {
 	SetExpenseApprovalByID(ctx context.Context, arg SetExpenseApprovalByIDParams) (Expense, error)
 	// Entegratör durumu (30 §8) faturaya işlenir.
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
+	// KDV indirim dönemi (#640): alış faturasının KDV'si bu aya alınır; NULL
+	// belge ayına döndürür. Sınırları tablo kısıtı da denetler.
+	SetInvoiceVATDeductionPeriod(ctx context.Context, arg SetInvoiceVATDeductionPeriodParams) (int64, error)
 	// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
 	SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error)
 	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da

@@ -6856,6 +6856,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/vat-deduction-period": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Move a purchase invoice's KDV deduction to a later month (#640)
+         * @description Requires `tenant.invoices.write` and engagement access. The document
+         *     date and period stay; only the month whose KDV return deducts the
+         *     invoice's KDV (KDV indirim dönemi) changes. Purchase invoices only;
+         *     the month must be after the document month and no later than
+         *     December of the year after the document year (KDVK 29/3). Both the
+         *     current deduction month and the new one must be open. Recorded in
+         *     the activity log.
+         *     409 `PERIOD_LOCKED`; 422 `NOT_PURCHASE_INVOICE`,
+         *     `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW`.
+         */
+        put: operations["setEngagementInvoiceVatDeductionPeriod"];
+        post?: never;
+        /**
+         * Return a purchase invoice's KDV deduction to the document month (#640)
+         * @description Requires `tenant.invoices.write` and engagement access. Undoes a
+         *     moved KDV indirim dönemi; both the current deduction month and the
+         *     document month must be open. Recorded in the activity log.
+         */
+        delete: operations["clearEngagementInvoiceVatDeductionPeriod"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/export-drivers": {
         parameters: {
             query?: never;
@@ -17756,6 +17799,8 @@ export interface components {
              * @description Open data warnings on the invoice in this engagement
              */
             open_warnings: number;
+            /** @description The month whose KDV return deducts the invoice's KDV when moved forward from the document month (#640); null = the document month. */
+            vat_deduction_period: string | null;
         };
         OfficeInvoicePage: {
             items: components["schemas"]["OfficeInvoice"][];
@@ -17790,6 +17835,15 @@ export interface components {
             warnings: components["schemas"]["OfficeInvoiceWarning"][];
             /** @description Who entered the missing exchange rate in the office, and when (#571); null when the rate came with the source. */
             exchange_rate_entry: null | {
+                /** @description Empty when the user was deleted */
+                set_by_name: string;
+                /** Format: date-time */
+                set_at: string;
+            };
+            /** @description KDV indirim dönemi when moved forward from the document month (#640); null = the document month. */
+            vat_deduction_period: string | null;
+            /** @description Who moved the KDV deduction, and when (#640); null when it is in the document month. */
+            vat_deduction_entry: null | {
                 /** @description Empty when the user was deleted */
                 set_by_name: string;
                 /** Format: date-time */
@@ -31495,6 +31549,101 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementInvoiceVatDeductionPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 2026-04 */
+                    period: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The invoice after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `NOT_PURCHASE_INVOICE`, `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    clearEngagementInvoiceVatDeductionPeriod: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `NOT_PURCHASE_INVOICE`, `VAT_PERIOD_NOT_FORWARD`, `VAT_PERIOD_OUT_OF_WINDOW` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

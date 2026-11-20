@@ -427,7 +427,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 			return deps.Storage.Download(r.Context(), path)
 		}
 	}
-	invoiceoffice.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceoffice.NewHandler(deps.Queries, ublDownload))
+	invoiceoffice.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver, invoiceoffice.NewHandler(deps.Queries, ublDownload).WithActivity(activityRec))
 	// Satır güvenliği zorlanmış tabloların uçları istek başına tek kapsamlı
 	// işlemde çalışır (issue #166, rls.Middleware).
 	var rlsScope func(http.Handler) http.Handler

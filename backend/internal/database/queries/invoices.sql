@@ -162,3 +162,19 @@ SELECT i.exchange_rate_set_at, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.name, u.sur
 FROM invoices i
 LEFT JOIN users u ON u.id = i.exchange_rate_set_by
 WHERE i.taxpayer_id = @taxpayer_id AND i.id = @id AND i.exchange_rate_set_at IS NOT NULL;
+
+-- name: SetInvoiceVATDeductionPeriod :execrows
+-- KDV indirim dönemi (#640): alış faturasının KDV'si bu aya alınır; NULL
+-- belge ayına döndürür. Sınırları tablo kısıtı da denetler.
+UPDATE invoices SET
+    vat_deduction_period = sqlc.narg(vat_period)::text,
+    vat_deduction_set_by = sqlc.narg(set_by)::bigint,
+    vat_deduction_set_at = CASE WHEN sqlc.narg(vat_period)::text IS NULL THEN NULL ELSE NOW() END
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND direction = 'incoming';
+
+-- name: InvoiceVATDeductionEntry :one
+-- KDV indirim dönemini kimin ne zaman değiştirdiği (#640).
+SELECT i.vat_deduction_set_at, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.name, u.surname)), ''), u.email::text, '')::text AS set_by_name
+FROM invoices i
+LEFT JOIN users u ON u.id = i.vat_deduction_set_by
+WHERE i.taxpayer_id = @taxpayer_id AND i.id = @id AND i.vat_deduction_set_at IS NOT NULL;

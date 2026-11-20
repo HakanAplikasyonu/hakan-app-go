@@ -22,6 +22,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/view"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/activity"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/jwt"
@@ -38,6 +39,14 @@ type Downloader func(r *http.Request, path string) (io.ReadCloser, int64, error)
 type Handler struct {
 	q        *db.Queries
 	download Downloader
+	activity *activity.Recorder
+}
+
+// WithActivity records KDV indirim dönemi changes in the activity log (#640);
+// rec may be nil.
+func (h *Handler) WithActivity(rec *activity.Recorder) *Handler {
+	h.activity = rec
+	return h
 }
 
 // NewHandler builds the handler. download may be nil (no UBL preview).
@@ -67,12 +76,18 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base+"/{invoiceUuid}/ubl", chain(h.ubl))
 	mux.Handle("GET "+base+"/{invoiceUuid}/pdf", chain(h.pdf))
 	// Eksik kuru tamamlama (#571): fatura yazma yetkisi ister.
-	mux.Handle("PUT "+base+"/{invoiceUuid}/exchange-rate", middleware.Chain(http.HandlerFunc(h.setExchangeRate),
-		middleware.Authenticate(tokens, loader),
-		middleware.RequireOrganization(orgResolver),
-		middleware.RequireTenantPermission(rbac.PermTenantInvoicesWrite),
-		middleware.RequireEngagement(engResolver),
-	))
+	write := func(fn http.HandlerFunc) http.Handler {
+		return middleware.Chain(fn,
+			middleware.Authenticate(tokens, loader),
+			middleware.RequireOrganization(orgResolver),
+			middleware.RequireTenantPermission(rbac.PermTenantInvoicesWrite),
+			middleware.RequireEngagement(engResolver),
+		)
+	}
+	mux.Handle("PUT "+base+"/{invoiceUuid}/exchange-rate", write(h.setExchangeRate))
+	// KDV indirim dönemi (#640): alış faturasının KDV'si sonraki bir aya alınır.
+	mux.Handle("PUT "+base+"/{invoiceUuid}/vat-deduction-period", write(h.setVATDeductionPeriod))
+	mux.Handle("DELETE "+base+"/{invoiceUuid}/vat-deduction-period", write(h.clearVATDeductionPeriod))
 }
 
 // maxExchangeRate bounds an office-entered rate (TL per unit).
@@ -132,10 +147,144 @@ func (h *Handler) setExchangeRate(w http.ResponseWriter, r *http.Request) {
 	h.get(w, r)
 }
 
+// setVATDeductionPeriod moves a purchase invoice's KDV deduction to a later
+// month (#640). The document date and period stay; only the KDV indirim
+// dönemi changes. KDVK 29/3: at the latest by the end of the calendar year
+// following the invoice's year. Both the current and the new deduction month
+// must be open.
+func (h *Handler) setVATDeductionPeriod(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Period string `json:"period"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		response.Error(w, r, http.StatusBadRequest, "INVALID_BODY", "body must be {\"period\": \"YYYY-MM\"}")
+		return
+	}
+	target := strings.TrimSpace(body.Period)
+	if _, err := time.Parse("2006-01", target); err != nil {
+		response.Error(w, r, http.StatusBadRequest, "INVALID_PERIOD", "period must be YYYY-MM")
+		return
+	}
+	inv, ok := h.load(w, r)
+	if !ok {
+		return
+	}
+	if err := VATDeductionAllowed(inv.Direction, inv.Period, target); err != "" {
+		response.Error(w, r, http.StatusUnprocessableEntity, err, vatDeductionMessages[err])
+		return
+	}
+	if target == DeductionPeriod(inv) {
+		h.get(w, r)
+		return
+	}
+	h.applyVATDeduction(w, r, inv, target)
+}
+
+// clearVATDeductionPeriod returns the KDV deduction to the document month.
+func (h *Handler) clearVATDeductionPeriod(w http.ResponseWriter, r *http.Request) {
+	inv, ok := h.load(w, r)
+	if !ok {
+		return
+	}
+	if inv.Direction != "incoming" {
+		response.Error(w, r, http.StatusUnprocessableEntity, "NOT_PURCHASE_INVOICE", vatDeductionMessages["NOT_PURCHASE_INVOICE"])
+		return
+	}
+	if !inv.VatDeductionPeriod.Valid {
+		h.get(w, r)
+		return
+	}
+	h.applyVATDeduction(w, r, inv, "")
+}
+
+func (h *Handler) applyVATDeduction(w http.ResponseWriter, r *http.Request, inv db.Invoice, target string) {
+	s := engagementctx.Must(r.Context())
+	from := DeductionPeriod(inv)
+	to := target
+	if to == "" {
+		to = inv.Period
+	}
+	for _, p := range []string{from, to} {
+		if _, err := h.q.GetPeriodLock(r.Context(), db.GetPeriodLockParams{
+			OrganizationID: s.OrganizationID, EngagementID: s.ID, Period: p,
+		}); err == nil {
+			response.Error(w, r, http.StatusConflict, "PERIOD_LOCKED", "the period "+p+" is locked")
+			return
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			response.InternalErr(w, r, err, "could not check the period lock")
+			return
+		}
+	}
+	set := db.SetInvoiceVATDeductionPeriodParams{TaxpayerID: s.TaxpayerID, ID: inv.ID}
+	if target != "" {
+		set.VatPeriod = pgtype.Text{String: target, Valid: true}
+		set.SetBy = actorOf(r)
+	}
+	n, err := h.q.SetInvoiceVATDeductionPeriod(r.Context(), set)
+	if err != nil {
+		response.InternalErr(w, r, err, "could not set the KDV deduction period")
+		return
+	}
+	if n == 0 {
+		response.NotFound(w, r, "invoice not found")
+		return
+	}
+	if p, ok := authctx.PrincipalFrom(r.Context()); ok && p.UserInternal > 0 {
+		action := "invoice.vat_deduction_period.set"
+		if target == "" {
+			action = "invoice.vat_deduction_period.clear"
+		}
+		uid, invUUID := p.UserInternal, inv.Uuid
+		h.activity.Record(r.Context(), &uid, action, "invoice", &invUUID, map[string]any{
+			"engagement_uuid": s.UUID.String(), "document_period": inv.Period, "from": from, "to": to,
+		}, r)
+	}
+	h.get(w, r)
+}
+
+// DeductionPeriod is the month whose KDV return deducts the invoice's KDV:
+// the KDV indirim dönemi when set (#640), otherwise the document month.
+func DeductionPeriod(inv db.Invoice) string {
+	if inv.VatDeductionPeriod.Valid && inv.VatDeductionPeriod.String != "" {
+		return inv.VatDeductionPeriod.String
+	}
+	return inv.Period
+}
+
+var vatDeductionMessages = map[string]string{
+	"NOT_PURCHASE_INVOICE":     "only a purchase invoice has a KDV deduction period",
+	"VAT_PERIOD_NOT_FORWARD":   "the KDV deduction period must be after the document month",
+	"VAT_PERIOD_OUT_OF_WINDOW": "the KDV deduction period must be by the end of the year after the invoice year",
+}
+
+// VATDeductionAllowed checks a KDV indirim dönemi against the rules (#640):
+// purchase invoices only, a later month than the document, and no later than
+// December of the year after the document year (KDVK 29/3). It returns the
+// error code, or "" when allowed. Both periods are YYYY-MM.
+func VATDeductionAllowed(direction, docPeriod, target string) string {
+	if direction != "incoming" {
+		return "NOT_PURCHASE_INVOICE"
+	}
+	if target <= docPeriod {
+		return "VAT_PERIOD_NOT_FORWARD"
+	}
+	docYear, err1 := strconv.Atoi(docPeriod[:4])
+	targetYear, err2 := strconv.Atoi(target[:4])
+	if err1 != nil || err2 != nil || targetYear > docYear+1 {
+		return "VAT_PERIOD_OUT_OF_WINDOW"
+	}
+	return ""
+}
+
 // Row is a list row: the invoice plus its open warning count.
 type Row struct {
 	view.Invoice
 	OpenWarnings int64 `json:"open_warnings"`
+	// VATDeductionPeriod: the month the KDV is deducted in when moved
+	// forward from the document month (#640); null = the document month.
+	VATDeductionPeriod *string `json:"vat_deduction_period"`
 }
 
 type page struct {
@@ -199,7 +348,10 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	}
 	out := page{Items: make([]Row, 0, len(rows)), Total: total, Limit: limit, Offset: offset}
 	for _, row := range rows {
-		out.Items = append(out.Items, Row{Invoice: view.FromInvoice(row.Invoice), OpenWarnings: row.OpenWarnings})
+		out.Items = append(out.Items, Row{
+			Invoice: view.FromInvoice(row.Invoice), OpenWarnings: row.OpenWarnings,
+			VATDeductionPeriod: textPtr(row.Invoice.VatDeductionPeriod),
+		})
 	}
 	if n := len(rows); n > 0 && n == int(limit) {
 		next := pagecursor.Encode(rows[n-1].Invoice.IssueDate.Time, rows[n-1].Invoice.ID)
@@ -227,6 +379,19 @@ type Detail struct {
 	// ExchangeRateEntry: who entered the missing rate in the office, and
 	// when (#571); null when the rate came with the source.
 	ExchangeRateEntry *RateEntry `json:"exchange_rate_entry"`
+	// VATDeductionPeriod: the KDV indirim dönemi when moved forward from the
+	// document month (#640); null = the document month.
+	VATDeductionPeriod *string `json:"vat_deduction_period"`
+	// VATDeductionEntry: who moved the KDV deduction, and when (#640).
+	VATDeductionEntry *RateEntry `json:"vat_deduction_entry"`
+}
+
+func textPtr(t pgtype.Text) *string {
+	if !t.Valid || t.String == "" {
+		return nil
+	}
+	v := t.String
+	return &v
 }
 
 // RateEntry is an office-entered exchange rate's author.
@@ -284,6 +449,13 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) {
 		out.ExchangeRateEntry = &RateEntry{SetByName: e.SetByName, SetAt: e.ExchangeRateSetAt.Time}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		response.InternalErr(w, r, err, "could not load the exchange rate entry")
+		return
+	}
+	out.VATDeductionPeriod = textPtr(inv.VatDeductionPeriod)
+	if e, err := h.q.InvoiceVATDeductionEntry(r.Context(), db.InvoiceVATDeductionEntryParams{TaxpayerID: s.TaxpayerID, ID: inv.ID}); err == nil {
+		out.VATDeductionEntry = &RateEntry{SetByName: e.SetByName, SetAt: e.VatDeductionSetAt.Time}
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		response.InternalErr(w, r, err, "could not load the KDV deduction entry")
 		return
 	}
 	for _, x := range ws {
