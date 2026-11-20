@@ -68,7 +68,7 @@
   "source_agent_action": "See agents",
   "source_upload": "Manual UBL / ZIP upload",
   "source_upload_body": "Always available: drag and drop the files.",
-  "source_upload_action": "Upload UBL",
+  "source_upload_action": "Upload e-invoices",
   "taxpayers_col_status": "Status",
   "taxpayers_col_tax_office": "Tax office",
   "taxpayers_fix_apply": "Apply fixes ({{count}})",
