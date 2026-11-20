@@ -1373,7 +1373,8 @@ type Querier interface {
 	RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error)
 	// Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 	// dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
-	// faturalar.
+	// faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
+	// fatura tutarı aralığı (hareketin para biriminde); boş olan uygulanmaz.
 	SearchInvoicesForBankMatch(ctx context.Context, arg SearchInvoicesForBankMatchParams) ([]SearchInvoicesForBankMatchRow, error)
 	// Aday fiş satırları: hareketin yönündeki taraf (gelen para → alacak,
 	// giden para → borç), banka hareketinden üretilmemiş satırlar. Arama terimi

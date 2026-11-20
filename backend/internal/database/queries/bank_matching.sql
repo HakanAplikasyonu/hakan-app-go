@@ -104,7 +104,8 @@ ORDER BY i.issue_date, i.id;
 -- name: SearchInvoicesForBankMatch :many
 -- Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 -- dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
--- faturalar.
+-- faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
+-- fatura tutarı aralığı (hareketin para biriminde); boş olan uygulanmaz.
 SELECT i.id, i.uuid, i.invoice_number, i.issue_date, i.customer_name,
        (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END)::numeric AS comparable_amount,
        COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
@@ -114,10 +115,17 @@ WHERE i.taxpayer_id = @taxpayer_id
   AND i.direction = @direction
   AND i.status_normalized = 'active'
   AND (i.currency = @currency::text OR (@currency::text = 'TRY' AND i.payable_amount_try IS NOT NULL))
-  AND (i.invoice_number ILIKE '%' || @term::text || '%'
-       OR i.customer_name ILIKE '%' || @term::text || '%'
-       OR i.customer_tax_number = @term::text
-       OR i.customer_identity_number = @term::text)
+  AND (sqlc.narg(term)::text IS NULL
+       OR i.invoice_number ILIKE '%' || sqlc.narg(term)::text || '%'
+       OR i.customer_name ILIKE '%' || sqlc.narg(term)::text || '%'
+       OR i.customer_tax_number = sqlc.narg(term)::text
+       OR i.customer_identity_number = sqlc.narg(term)::text)
+  AND (sqlc.narg(date_from)::date IS NULL OR i.issue_date >= sqlc.narg(date_from)::date)
+  AND (sqlc.narg(date_to)::date IS NULL OR i.issue_date <= sqlc.narg(date_to)::date)
+  AND (sqlc.narg(amount_min)::numeric IS NULL
+       OR (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END) >= sqlc.narg(amount_min)::numeric)
+  AND (sqlc.narg(amount_max)::numeric IS NULL
+       OR (CASE WHEN i.currency = @currency::text THEN i.payable_amount ELSE i.payable_amount_try END) <= sqlc.narg(amount_max)::numeric)
 ORDER BY i.issue_date DESC, i.id
 LIMIT 50;
 
