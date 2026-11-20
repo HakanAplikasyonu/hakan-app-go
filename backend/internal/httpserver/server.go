@@ -642,7 +642,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	// hareketi hesaba da işler (#565).
 	bankmatching.RegisterRoutes(mux, tokens, loader, tenantResolver, engagementResolver,
 		bankmatching.NewHandler(bankmatching.NewService(deps.DB, reviewSvc, warningEngine,
-			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)))
+			bankmatching.Options{FeeTolerance: decimal.RequireFromString("25")}).WithAccounts(bankFlow)).WithActivity(activityRec))
 	receiptsSvc := receiptsusecase.New(deps.DB, deps.Storage, receiptsextract.New(aiSvc),
 		receiptsreviewlink.NewReviewer(reviewSvc), warningEngine, log)
 	if deps.Storage != nil {
