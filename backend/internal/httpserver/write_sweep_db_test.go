@@ -289,6 +289,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/account-rules/{ruleKey}":                  {},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rule-candidates/promote":            {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/account-suggestions": {body: `{}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/exchange-rate":        {body: `{"rate":"38.5"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/evaluate":                      {body: `{}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":              {body: `{"amount":"100.00"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings/{period}":           {},

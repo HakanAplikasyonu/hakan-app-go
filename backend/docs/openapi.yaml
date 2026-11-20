@@ -9161,6 +9161,50 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/exchange-rate:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: invoiceUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Invoices]
+      operationId: setEngagementInvoiceExchangeRate
+      summary: Complete the missing exchange rate of a foreign-currency invoice (#571)
+      description: |
+        Requires `tenant.invoices.write` and engagement access. Only for an
+        invoice whose currency is not TRY and whose source gave no rate; the
+        TL amount is computed from it when missing, and KDV uses it. The rate
+        is TL per unit (VUK 280: TCMB döviz alış kuru of the invoice date),
+        positive, at most 6 decimals; a comma is read as the decimal mark.
+        A later source that brings its own rate replaces it.
+        409 `NOT_FOREIGN_CURRENCY` (TL invoice), `EXCHANGE_RATE_SET` (already
+        has a rate), `PERIOD_LOCKED` (the invoice's period is locked).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [rate]
+              properties:
+                rate: { type: string, example: "38.4521" }
+      responses:
+        "200":
+          description: The invoice after the change
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeInvoiceDetail"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/export-drivers:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22998,6 +23042,7 @@ components:
         counterparty_name: { type: string }
         counterparty_tax_id: { type: string }
         currency: { type: string }
+        exchange_rate: { type: string, description: "TL per unit of a foreign-currency invoice; absent when the source gave none (#571)" }
         tax_exclusive_amount: { type: string, description: Decimal string }
         tax_amount: { type: string }
         withholding_amount: { type: string }

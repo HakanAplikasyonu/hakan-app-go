@@ -120,6 +120,20 @@ export const officeInvoiceService = {
       `${eng(engagement)}/invoices/${encodeURIComponent(invoice)}`,
     );
   },
+  /** Eksik kuru tamamlar (#571); faturanın yeni hâli döner. */
+  setExchangeRate(
+    slug: string,
+    engagement: string,
+    invoice: string,
+    rate: string,
+  ) {
+    return tenantRequest<OfficeInvoiceDetail>(
+      slug,
+      "PUT",
+      `${eng(engagement)}/invoices/${encodeURIComponent(invoice)}/exchange-rate`,
+      { body: { rate }, silent: true },
+    );
+  },
   /** The stored UBL-TR XML as text (not JSON, so not through tenantRequest). */
   async ubl(slug: string, engagement: string, invoice: string) {
     const base = apiConfig.baseUrl.replace(/\/$/, "");

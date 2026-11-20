@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
@@ -232,5 +233,64 @@ func TestOfficeInvoiceCursorPagination(t *testing.T) {
 	}
 	if w := e.call(t, e.h.list, "/x?cursor=bozuk", nil); w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "INVALID_CURSOR") {
 		t.Fatalf("bad cursor = %d %s", w.Code, w.Body)
+	}
+}
+
+// Eksik kur (#571): dövizli faturada kaynakta kur yoksa ofis girer; KDV ve
+// TL karşılığı onu kullanır. Kuru olan, TL ya da kilitli döneme ait fatura
+// reddedilir.
+func TestOfficeSetsMissingExchangeRate(t *testing.T) {
+	e := setup(t)
+	ctx := context.Background()
+	put := func(body string) *httptest.ResponseRecorder {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodPut, "/x", strings.NewReader(body))
+		r.SetPathValue("invoiceUuid", e.inv)
+		r = r.WithContext(engagementctx.WithScope(r.Context(), e.scope))
+		w := httptest.NewRecorder()
+		e.h.setExchangeRate(w, r)
+		return w
+	}
+	if w := put(`{"rate":"38,5"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "NOT_FOREIGN_CURRENCY") {
+		t.Fatalf("TL invoice: %d %s", w.Code, w.Body)
+	}
+	var period string
+	if err := e.d.Pool.QueryRow(ctx, `
+		UPDATE invoices SET currency = 'USD', exchange_rate = NULL, payable_amount_try = NULL
+		WHERE uuid = $1 RETURNING period`, e.inv).Scan(&period); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{`{"rate":"0"}`, `{"rate":"-1"}`, `{"rate":"abc"}`, `{"rate":"1.1234567"}`, `{"kur":"38"}`} {
+		if w := put(bad); w.Code != http.StatusBadRequest {
+			t.Fatalf("%s: %d %s", bad, w.Code, w.Body)
+		}
+	}
+
+	if _, err := e.d.Pool.Exec(ctx, `INSERT INTO period_locks (organization_id, engagement_id, taxpayer_id, period)
+		VALUES ($1, $2, $3, $4)`, e.scope.OrganizationID, e.scope.ID, e.scope.TaxpayerID, period); err != nil {
+		t.Fatal(err)
+	}
+	if w := put(`{"rate":"38,5"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "PERIOD_LOCKED") {
+		t.Fatalf("locked period: %d %s", w.Code, w.Body)
+	}
+	if _, err := e.d.Pool.Exec(ctx, `DELETE FROM period_locks WHERE engagement_id = $1`, e.scope.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	w := put(`{"rate":"38,5"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("set: %d %s", w.Code, w.Body)
+	}
+	var rate, payable, payableTRY string
+	if err := e.d.Pool.QueryRow(ctx, `SELECT exchange_rate::text, payable_amount::text, payable_amount_try::text
+		FROM invoices WHERE uuid = $1`, e.inv).Scan(&rate, &payable, &payableTRY); err != nil {
+		t.Fatal(err)
+	}
+	want := decimal.RequireFromString(payable).Mul(decimal.RequireFromString("38.5")).Round(2)
+	if !decimal.RequireFromString(rate).Equal(decimal.RequireFromString("38.5")) || !decimal.RequireFromString(payableTRY).Equal(want) {
+		t.Fatalf("stored rate %s payable_try %s (payable %s)", rate, payableTRY, payable)
+	}
+	if w := put(`{"rate":"40"}`); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "EXCHANGE_RATE_SET") {
+		t.Fatalf("second set: %d %s", w.Code, w.Body)
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
@@ -64,6 +65,70 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("GET "+base+"/{invoiceUuid}", chain(h.get))
 	mux.Handle("GET "+base+"/{invoiceUuid}/ubl", chain(h.ubl))
 	mux.Handle("GET "+base+"/{invoiceUuid}/pdf", chain(h.pdf))
+	// Eksik kuru tamamlama (#571): fatura yazma yetkisi ister.
+	mux.Handle("PUT "+base+"/{invoiceUuid}/exchange-rate", middleware.Chain(http.HandlerFunc(h.setExchangeRate),
+		middleware.Authenticate(tokens, loader),
+		middleware.RequireOrganization(orgResolver),
+		middleware.RequireTenantPermission(rbac.PermTenantInvoicesWrite),
+		middleware.RequireEngagement(engResolver),
+	))
+}
+
+// maxExchangeRate bounds an office-entered rate (TL per unit).
+var maxExchangeRate = decimal.NewFromInt(100000)
+
+// setExchangeRate completes the missing exchange rate of a foreign-currency
+// invoice (#571): KDV and the TL amount use it. An invoice that already has
+// a rate, a TL invoice and a locked period are refused.
+func (h *Handler) setExchangeRate(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	var body struct {
+		Rate string `json:"rate"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<12))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&body); err != nil {
+		response.Error(w, r, http.StatusBadRequest, "INVALID_BODY", "body must be {\"rate\": \"…\"}")
+		return
+	}
+	rate, err := decimal.NewFromString(strings.ReplaceAll(strings.TrimSpace(body.Rate), ",", "."))
+	if err != nil || !rate.IsPositive() || rate.GreaterThan(maxExchangeRate) || rate.Exponent() < -6 {
+		response.Error(w, r, http.StatusBadRequest, "INVALID_RATE", "rate must be a positive number with at most 6 decimals")
+		return
+	}
+	inv, ok := h.load(w, r)
+	if !ok {
+		return
+	}
+	if inv.Currency == "TRY" {
+		response.Error(w, r, http.StatusConflict, "NOT_FOREIGN_CURRENCY", "the invoice is in TL")
+		return
+	}
+	if inv.ExchangeRate.Valid && !repository.Dec(inv.ExchangeRate).IsZero() {
+		response.Error(w, r, http.StatusConflict, "EXCHANGE_RATE_SET", "the invoice already has an exchange rate")
+		return
+	}
+	if _, err := h.q.GetPeriodLock(r.Context(), db.GetPeriodLockParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.ID, Period: inv.Period,
+	}); err == nil {
+		response.Error(w, r, http.StatusConflict, "PERIOD_LOCKED", "the period is locked")
+		return
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		response.InternalErr(w, r, err, "could not check the period lock")
+		return
+	}
+	n, err := h.q.SetMissingInvoiceExchangeRate(r.Context(), db.SetMissingInvoiceExchangeRateParams{
+		Rate: repository.Num(rate), TaxpayerID: s.TaxpayerID, ID: inv.ID,
+	})
+	if err != nil {
+		response.InternalErr(w, r, err, "could not set the exchange rate")
+		return
+	}
+	if n == 0 {
+		response.Error(w, r, http.StatusConflict, "EXCHANGE_RATE_SET", "the invoice already has an exchange rate")
+		return
+	}
+	h.get(w, r)
 }
 
 // Row is a list row: the invoice plus its open warning count.
