@@ -123,7 +123,7 @@ yoktur, dosyalar programa girmez. Zirve şablonu doğrulanmamıştır
 
 1. Ofis bilgisayarına masaüstü ajanını kurun (`docs/kullanim/masaustu.md`).
 2. Luca / Zirve'nin içe aktarım klasörünü ajana bağlayın.
-3. **Yevmiye ve çıktı → Programa aktarım → Masaüstü ajanına gönder**.
+3. **Fişler ve aktarım → Programa aktarım → Masaüstü ajanına gönder**.
    Ajan dosyayı klasöre bırakır.
 4. Ofis içe aktarımı programda yapar ve sonucu **Aktarıldı** ya da
    **Hata verdi** ile işaretler.
