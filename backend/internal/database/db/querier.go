@@ -37,6 +37,10 @@ type Querier interface {
 	// hedefi; plan yoksa 'luca'.
 	ActiveAccountPlanTarget(ctx context.Context, arg ActiveAccountPlanTargetParams) (string, error)
 	AddEngagementAssignment(ctx context.Context, arg AddEngagementAssignmentParams) error
+	// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi, fişin
+	// origin.manual_links dizisinde {kind, id}. Satırlara, tutarlara ve aktarıma
+	// dokunmaz; yalnız ilişkili kayıtlarda görünür. Aynı bağ ikinci kez eklenmez.
+	AddJournalDraftManualLink(ctx context.Context, arg AddJournalDraftManualLinkParams) (int64, error)
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
@@ -1302,6 +1306,8 @@ type Querier interface {
 	// Üretilen kod cari hafızasına da yazılır; incelemede verilmiş bir karar
 	// varsa ona dokunulmaz.
 	RememberGeneratedCounterpartyAccount(ctx context.Context, arg RememberGeneratedCounterpartyAccountParams) error
+	// Elle bağlanan kaydın bağı kaldırılır; bağ yoksa satır etkilenmez.
+	RemoveJournalDraftManualLink(ctx context.Context, arg RemoveJournalDraftManualLinkParams) (int64, error)
 	RemoveUserRoleBySlug(ctx context.Context, arg RemoveUserRoleBySlugParams) error
 	RenameCashBox(ctx context.Context, arg RenameCashBoxParams) (CashBox, error)
 	ReopenTaxReturn(ctx context.Context, arg ReopenTaxReturnParams) (TaxReturn, error)

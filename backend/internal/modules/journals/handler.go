@@ -79,6 +79,12 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/unapprove", engaged(approve, h.unapprove))
 	mux.Handle("PATCH "+base+"/journal-drafts/{draftUuid}/lines/{lineNo}", engaged(write, h.setLineAccount))
 	mux.Handle("POST "+base+"/journal-drafts/{draftUuid}/reverse", engaged(export, h.reverse))
+	// Fişe elle bağlanan kayıt (#710): fatura ya da banka hareketi.
+	links := base + "/journal-drafts/{draftUuid}/links"
+	mux.Handle("PUT "+links+"/invoices/{invoiceUuid}", engaged(write, h.manualLink(LinkInvoice, "invoiceUuid", true)))
+	mux.Handle("DELETE "+links+"/invoices/{invoiceUuid}", engaged(write, h.manualLink(LinkInvoice, "invoiceUuid", false)))
+	mux.Handle("PUT "+links+"/bank-transactions/{transactionUuid}", engaged(write, h.manualLink(LinkBankTransaction, "transactionUuid", true)))
+	mux.Handle("DELETE "+links+"/bank-transactions/{transactionUuid}", engaged(write, h.manualLink(LinkBankTransaction, "transactionUuid", false)))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
 	mux.Handle("POST "+base+"/journal-exports", scoped(export, h.export))
 	// Pre-export check and the document → file trail (#466).
@@ -220,6 +226,26 @@ func (h *Handler) unapprove(w http.ResponseWriter, r *http.Request) {
 
 // setLineAccount: kontrol ekranında satırın hesap kodu ve / veya tutarı
 // düzeltilir (#566). Gövde: {"account"?, "debit"?, "credit"?}; en az biri.
+// manualLink links or unlinks the path record to the draft by hand (#710).
+func (h *Handler) manualLink(kind, param string, on bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathUUID(w, r, "draftUuid")
+		if !ok {
+			return
+		}
+		target, ok := pathUUID(w, r, param)
+		if !ok {
+			return
+		}
+		linked, err := h.svc.SetManualLink(r.Context(), engagementctx.Must(r.Context()), id, kind, target, on)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		response.JSON(w, r, http.StatusOK, map[string]any{"kind": kind, "uuid": target, "linked": linked})
+	}
+}
+
 func (h *Handler) setLineAccount(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathUUID(w, r, "draftUuid")
 	if !ok {
