@@ -4501,6 +4501,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/review/taxpayers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Review queue per taxpayer
+         * @description Requires `tenant.review.read` (#710). How many suggestions each visible taxpayer has under the queue's filter (status, kind, period), largest first: the office picks a taxpayer and works through its queue. `total` is their sum and equals the queue's total. Without `tenant.engagements.read_all` only assigned engagements. Titles come from the engagement directory.
+         */
+        get: operations["listOfficeReviewTaxpayers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/review/settings": {
         parameters: {
             query?: never;
@@ -28656,6 +28682,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnvelopeSuggestionPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeReviewTaxpayers: {
+        parameters: {
+            query?: {
+                /**
+                 * @description The panel's period selector (#333): one accounting month, YYYY-MM.
+                 *     A record's period is its own (invoice, expense, suggestion, task);
+                 *     without one, the month it was created in (Europe/Istanbul). A
+                 *     malformed value answers `400 INVALID_PERIOD`.
+                 */
+                period?: components["parameters"]["PeriodFilter"];
+                /** @description Default pending; all = any status */
+                status?: "pending" | "auto_accepted" | "accepted" | "corrected" | "rejected" | "reverted" | "superseded" | "all";
+                kind?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts per taxpayer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {boolean} */
+                        success: true;
+                        data: {
+                            total: number;
+                            items: {
+                                /** Format: uuid */
+                                engagement_uuid: string;
+                                total: number;
+                                /** Format: date-time */
+                                oldest_created_at: string;
+                            }[];
+                        };
+                        meta: components["schemas"]["ResponseMeta"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];

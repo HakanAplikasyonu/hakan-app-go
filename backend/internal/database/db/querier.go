@@ -176,6 +176,9 @@ type Querier interface {
 	CountTenantDataWarnings(ctx context.Context, arg CountTenantDataWarningsParams) (int64, error)
 	// tenant-lint: org-wide ofis inceleme kuyruğu sayımı; ListTenantSuggestions ile aynı süzgeç
 	CountTenantSuggestions(ctx context.Context, arg CountTenantSuggestionsParams) (int64, error)
+	// Kuyruk mükellef bazında (#710): süzgeçteki öneri sayısı ve en eskisi,
+	// kullanıcının görebildiği mükellefler; çok olan önce.
+	CountTenantSuggestionsByEngagement(ctx context.Context, arg CountTenantSuggestionsByEngagementParams) ([]CountTenantSuggestionsByEngagementRow, error)
 	CountUnreadInappForUser(ctx context.Context, userID pgtype.Int8) (int64, error)
 	CountUsers(ctx context.Context, arg CountUsersParams) (int64, error)
 	CountUsersWithRole(ctx context.Context, roleSlug string) (int64, error)
