@@ -128,7 +128,8 @@ UPDATE invoices SET
     payment_due_date = sqlc.narg(payment_due_date), period = @period,
     customer_id = sqlc.narg(customer_id), customer_tax_number = sqlc.narg(customer_tax_number),
     customer_identity_number = sqlc.narg(customer_identity_number), customer_name = sqlc.narg(customer_name),
-    currency = @currency, exchange_rate = sqlc.narg(exchange_rate),
+    -- Kaynak kur vermezse ofisin girdiği kur korunur (#571).
+    currency = @currency, exchange_rate = COALESCE(sqlc.narg(exchange_rate), exchange_rate),
     line_extension_amount = @line_extension_amount, allowance_total_amount = @allowance_total_amount,
     tax_exclusive_amount = @tax_exclusive_amount, tax_amount = @tax_amount, tax_inclusive_amount = @tax_inclusive_amount,
     withholding_amount = @withholding_amount, excise_amount = @excise_amount, communications_tax_amount = @communications_tax_amount,
@@ -144,3 +145,12 @@ WHERE taxpayer_id = @taxpayer_id AND id = @id;
 -- name: GetInvoiceByID :one
 SELECT * FROM invoices
 WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- name: SetMissingInvoiceExchangeRate :execrows
+-- Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
+-- boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
+UPDATE invoices SET
+    exchange_rate = @rate::numeric,
+    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * @rate::numeric, 2))
+WHERE taxpayer_id = @taxpayer_id AND id = @id
+  AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0);

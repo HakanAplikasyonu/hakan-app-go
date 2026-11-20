@@ -1,11 +1,11 @@
 "use client";
 
 import { quantity } from "@/lib/utils/format";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import {
@@ -15,6 +15,7 @@ import {
   type DataTableFeatures,
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +35,10 @@ import { useInvoiceHref } from "../engagement-scope";
 import { toPanelInvoice } from "../lib/from-api";
 import { invoiceKindText } from "../lib/ubl-codes";
 import { createDocumentRequest } from "../services/engagement-documents.service";
+import {
+  officeInvoiceKeys,
+  officeInvoiceService,
+} from "../services/office-invoices.service";
 import type { InvoiceLine } from "../types";
 import { AmountWaterfall } from "./amount-waterfall";
 import { InvoiceStateBadge } from "./invoices-page";
@@ -41,6 +46,88 @@ import { InvoicePdfButton } from "./invoice-quick-view";
 import { Figure, useWarningText } from "./office-ui";
 
 const DOC_TASKS_WRITE = "tenant.doc_tasks.write";
+const INVOICES_WRITE = "tenant.invoices.write";
+
+/**
+ * Dövizli faturada kaynakta kur yoksa (#571) KDV ve TL tutarı hesaplanamaz;
+ * ofis faturanın tarihindeki TCMB döviz alış kurunu girer. Kilitli dönemde
+ * ya da kuru olan faturada sunucu reddeder.
+ */
+function MissingExchangeRate({
+  engagement,
+  invoice,
+  currency,
+  date,
+}: {
+  engagement: string;
+  invoice: string;
+  currency: string;
+  date: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const qc = useQueryClient();
+  const [rate, setRate] = useState("");
+  const save = useMutation({
+    mutationFn: () =>
+      officeInvoiceService.setExchangeRate(
+        slug,
+        engagement,
+        invoice,
+        rate.trim(),
+      ),
+    onSuccess: (d) => {
+      qc.setQueryData(officeInvoiceKeys.invoice(slug, engagement, invoice), d);
+      // Liste, KDV ve beyan özetleri bu mükellefin anahtarları altında.
+      void qc.invalidateQueries({
+        queryKey: [
+          "tenant",
+          slug.toLowerCase(),
+          "engagements",
+          engagement.toLowerCase(),
+        ],
+      });
+      toast.success(t("office.drawer.fx_saved"));
+    },
+    onError: (err) => toast.error(err.message || t("office.drawer.fx_error")),
+  });
+  return (
+    <section
+      aria-labelledby="drawer-fx"
+      className="border-warn bg-warn-tint space-y-2 rounded-lg border p-3 text-sm"
+    >
+      <h3 id="drawer-fx" className="font-semibold">
+        {t("office.drawer.fx_title", { currency })}
+      </h3>
+      <p className="text-text-2 text-xs">
+        {t("office.drawer.fx_hint", { date })}
+      </p>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (rate.trim()) save.mutate();
+        }}
+      >
+        <Input
+          className="h-9 w-36"
+          inputMode="decimal"
+          placeholder="38,4521"
+          aria-label={t("office.drawer.fx_label", { currency })}
+          value={rate}
+          onChange={(e) => setRate(e.target.value)}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          disabled={!rate.trim() || save.isPending}
+        >
+          {t("office.drawer.fx_save")}
+        </Button>
+      </form>
+    </section>
+  );
+}
 
 /**
  * Gömülü kalem tablosu (#381): araç çubuğu, sayfalama, seçim ve kolon
@@ -264,6 +351,17 @@ export function InvoiceDrawer({
                     <span className="text-foreground">{worstText}</span>
                   </p>
                 </div>
+              ) : null}
+
+              {d.currency !== "TRY" &&
+              !Number(d.exchange_rate ?? 0) &&
+              can(INVOICES_WRITE) ? (
+                <MissingExchangeRate
+                  engagement={engagement}
+                  invoice={d.uuid}
+                  currency={d.currency}
+                  date={dateText}
+                />
               ) : null}
 
               <section aria-labelledby="drawer-waterfall">

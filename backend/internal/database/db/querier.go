@@ -1340,6 +1340,9 @@ type Querier interface {
 	SetInvoiceStatusNormalized(ctx context.Context, arg SetInvoiceStatusNormalizedParams) (int64, error)
 	// Kontrol ekranında hatalı hesap kodu düzeltilir (#566); yalnız taslakta.
 	SetJournalDraftLineAccount(ctx context.Context, arg SetJournalDraftLineAccountParams) (int64, error)
+	// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
+	// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
+	SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error)
 	SetOrganizationAccessWindow(ctx context.Context, arg SetOrganizationAccessWindowParams) (Organization, error)
 	SetOrganizationSetup(ctx context.Context, arg SetOrganizationSetupParams) ([]byte, error)
 	SetOrganizationStatus(ctx context.Context, arg SetOrganizationStatusParams) (Organization, error)

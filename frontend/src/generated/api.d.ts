@@ -6820,6 +6820,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/invoices/{invoiceUuid}/exchange-rate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Complete the missing exchange rate of a foreign-currency invoice (#571)
+         * @description Requires `tenant.invoices.write` and engagement access. Only for an
+         *     invoice whose currency is not TRY and whose source gave no rate; the
+         *     TL amount is computed from it when missing, and KDV uses it. The rate
+         *     is TL per unit (VUK 280: TCMB döviz alış kuru of the invoice date),
+         *     positive, at most 6 decimals; a comma is read as the decimal mark.
+         *     A later source that brings its own rate replaces it.
+         *     409 `NOT_FOREIGN_CURRENCY` (TL invoice), `EXCHANGE_RATE_SET` (already
+         *     has a rate), `PERIOD_LOCKED` (the invoice's period is locked).
+         */
+        put: operations["setEngagementInvoiceExchangeRate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/export-drivers": {
         parameters: {
             query?: never;
@@ -18158,6 +18194,8 @@ export interface components {
             counterparty_name?: string;
             counterparty_tax_id?: string;
             currency: string;
+            /** @description TL per unit of a foreign-currency invoice; absent when the source gave none (#571) */
+            exchange_rate?: string;
             /** @description Decimal string */
             tax_exclusive_amount: string;
             tax_amount: string;
@@ -30988,6 +31026,48 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setEngagementInvoiceExchangeRate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                invoiceUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 38.4521 */
+                    rate: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The invoice after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeInvoiceDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };

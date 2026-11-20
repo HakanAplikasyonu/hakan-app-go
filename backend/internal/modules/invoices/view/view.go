@@ -28,13 +28,16 @@ type Invoice struct {
 	CounterpartyName string    `json:"counterparty_name,omitempty"`
 	CounterpartyID   string    `json:"counterparty_tax_id,omitempty"`
 	Currency         string    `json:"currency"`
-	TaxExclusive     string    `json:"tax_exclusive_amount"`
-	TaxAmount        string    `json:"tax_amount"`
-	Withholding      string    `json:"withholding_amount"`
-	Payable          string    `json:"payable_amount"`
-	Status           string    `json:"status"`
-	SourceSystem     string    `json:"source_system"`
-	CaptureMethod    string    `json:"capture_method"`
+	// ExchangeRate: TL per unit of a foreign-currency invoice; "" when
+	// the source gave none (#571).
+	ExchangeRate  string `json:"exchange_rate,omitempty"`
+	TaxExclusive  string `json:"tax_exclusive_amount"`
+	TaxAmount     string `json:"tax_amount"`
+	Withholding   string `json:"withholding_amount"`
+	Payable       string `json:"payable_amount"`
+	Status        string `json:"status"`
+	SourceSystem  string `json:"source_system"`
+	CaptureMethod string `json:"capture_method"`
 }
 
 // Detail is one invoice with lines, KDV summary and sources.
@@ -85,7 +88,20 @@ func FromInvoice(inv db.Invoice) Invoice {
 		Currency: inv.Currency, TaxExclusive: Money(inv.TaxExclusiveAmount), TaxAmount: Money(inv.TaxAmount),
 		Withholding: Money(inv.WithholdingAmount), Payable: Money(inv.PayableAmount),
 		Status: inv.StatusNormalized, SourceSystem: inv.SourceSystem, CaptureMethod: inv.CaptureMethod,
+		ExchangeRate: rate(inv.ExchangeRate),
 	}
+}
+
+// rate is a stored exchange rate as text, "" when missing or zero.
+func rate(n pgtype.Numeric) string {
+	if !n.Valid {
+		return ""
+	}
+	d := repository.Dec(n)
+	if d.IsZero() {
+		return ""
+	}
+	return d.String()
 }
 
 // LoadDetail reads lines, KDV summary and sources of inv.

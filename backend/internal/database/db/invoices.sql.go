@@ -1096,7 +1096,8 @@ UPDATE invoices SET
     payment_due_date = $14, period = $15,
     customer_id = $16, customer_tax_number = $17,
     customer_identity_number = $18, customer_name = $19,
-    currency = $20, exchange_rate = $21,
+    -- Kaynak kur vermezse ofisin girdiği kur korunur (#571).
+    currency = $20, exchange_rate = COALESCE($21, exchange_rate),
     line_extension_amount = $22, allowance_total_amount = $23,
     tax_exclusive_amount = $24, tax_amount = $25, tax_inclusive_amount = $26,
     withholding_amount = $27, excise_amount = $28, communications_tax_amount = $29,
@@ -1208,6 +1209,30 @@ func (q *Queries) ReplaceInvoiceContent(ctx context.Context, arg ReplaceInvoiceC
 		arg.TaxpayerID,
 		arg.ID,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setMissingInvoiceExchangeRate = `-- name: SetMissingInvoiceExchangeRate :execrows
+UPDATE invoices SET
+    exchange_rate = $1::numeric,
+    payable_amount_try = COALESCE(payable_amount_try, ROUND(payable_amount * $1::numeric, 2))
+WHERE taxpayer_id = $2 AND id = $3
+  AND currency <> 'TRY' AND (exchange_rate IS NULL OR exchange_rate = 0)
+`
+
+type SetMissingInvoiceExchangeRateParams struct {
+	Rate       pgtype.Numeric `json:"rate"`
+	TaxpayerID int64          `json:"taxpayer_id"`
+	ID         int64          `json:"id"`
+}
+
+// Dövizli faturada kaynakta kur yoksa ofis girer (#571); TL karşılığı da
+// boşsa kurdan hesaplanır. Kuru olan ya da TL faturaya dokunulmaz.
+func (q *Queries) SetMissingInvoiceExchangeRate(ctx context.Context, arg SetMissingInvoiceExchangeRateParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setMissingInvoiceExchangeRate, arg.Rate, arg.TaxpayerID, arg.ID)
 	if err != nil {
 		return 0, err
 	}
