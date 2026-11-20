@@ -109,6 +109,19 @@ func TestSweepDB(t *testing.T) {
 			WHERE (taxpayer_id, id) IN (($1, $2), ($3, $4))`, tp, conn, tpB, connB)
 		return err
 	})
+	// RecoverHold: the first healthy sweep keeps the warning (recovered_at
+	// recorded); once the hold is over it closes.
+	sweep()
+	if got := openByEngagement(); len(got[engA]) != 1 || len(got[engB]) != 1 {
+		t.Fatalf("recovered connection closed at once: %v", got)
+	}
+	sys(func(ctx context.Context, tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `
+			UPDATE data_warnings SET params = jsonb_set(params, '{recovered_at}', to_jsonb($3::text))
+			WHERE taxpayer_id = ANY($1::bigint[]) AND producer = $2 AND status = 'open' AND params ? 'recovered_at'`,
+			[]int64{tp, tpB}, Producer, time.Now().Add(-RecoverHold-time.Minute).UTC().Format(time.RFC3339))
+		return err
+	})
 	sweep()
 	if got := openByEngagement(); len(got) != 0 {
 		t.Fatalf("recovered connection still warns: %v", got)

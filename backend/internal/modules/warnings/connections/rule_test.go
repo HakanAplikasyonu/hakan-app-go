@@ -163,6 +163,23 @@ type fakeQueries struct {
 	conns    []db.SourceConnection
 	resolved []db.AutoResolveOtherConnectionWarningsParams
 	subjects []db.ListConnectionWarningSubjectsRow
+	// store serves the open warnings (ListOpenConnectionFailedWarnings).
+	store *engine.MemoryStore
+}
+
+func (f *fakeQueries) ListOpenConnectionFailedWarnings(_ context.Context, arg db.ListOpenConnectionFailedWarningsParams) ([]db.ListOpenConnectionFailedWarningsRow, error) {
+	var out []db.ListOpenConnectionFailedWarningsRow
+	if f.store == nil {
+		return out, nil
+	}
+	for _, w := range f.store.All() {
+		if w.Status != catalog.StatusOpen || w.Code != CodeFailed || w.EngagementID != arg.EngagementID ||
+			w.Period != arg.Period || w.EntityID == nil {
+			continue
+		}
+		out = append(out, db.ListOpenConnectionFailedWarningsRow{EntityID: pgtype.Int8{Int64: *w.EntityID, Valid: true}, Params: w.Params})
+	}
+	return out, nil
 }
 
 func (f *fakeQueries) ListSourceConnections(_ context.Context, taxpayerID int64) ([]db.SourceConnection, error) {
@@ -220,8 +237,11 @@ func TestCheckRaisesAndAutoResolves(t *testing.T) {
 			LastError: []byte(`{"reason":"bad_credentials"}`), CreatedAt: ts(now.Add(-time.Hour)),
 		}},
 		subjects: []db.ListConnectionWarningSubjectsRow{{OrganizationID: 1, EngagementID: 10, TaxpayerID: 100}},
+		store:    store,
 	}
-	c := New(q, eng).WithClock(func() time.Time { return now })
+	clock := now
+	eng.WithClock(func() time.Time { return clock })
+	c := New(q, eng).WithClock(func() time.Time { return clock })
 	created, err := c.Sweep(context.Background())
 	if err != nil || created != 1 {
 		t.Fatalf("sweep: created=%d err=%v", created, err)
@@ -244,11 +264,69 @@ func TestCheckRaisesAndAutoResolves(t *testing.T) {
 	// The bank accepts the new credentials: active, last_error cleared.
 	q.conns[0].Status, q.conns[0].SetupState, q.conns[0].LastError = "active", "active", nil
 	q.conns[0].LastSuccessAt = ts(now)
+	// RecoverHold: the first healthy sweeps keep the warning open.
+	for _, after := range []time.Duration{0, 15 * time.Minute, 45 * time.Minute} {
+		clock = now.Add(after)
+		q.conns[0].LastSuccessAt = ts(clock)
+		rep, err := c.Check(context.Background(), s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rep.AutoResolved != 0 || openCodes(store)[CodeFailed] != 1 {
+			t.Fatalf("held at +%s: report=%+v open=%v", after, rep, openCodes(store))
+		}
+	}
+	clock = now.Add(RecoverHold)
+	q.conns[0].LastSuccessAt = ts(clock)
 	rep, err := c.Check(context.Background(), s)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if rep.AutoResolved != 1 || len(openCodes(store)) != 0 {
 		t.Fatalf("recovery: report=%+v open=%v", rep, openCodes(store))
+	}
+}
+
+// A flaky connection: a transient failure during the hold keeps the warning
+// open and restarts the hold; no new warning row is written.
+func TestRecoverHoldRestartsOnFailure(t *testing.T) {
+	open := map[string]any{"source": "Vakıfbank", "status": "active", "reason": "timeout"}
+	healthy := Connection{ID: 7, SourceSystem: "bank_vakifbank", SetupState: "active", Status: "active",
+		LastSuccessAt: ago(time.Minute), CreatedAt: now.Add(-48 * time.Hour), OpenFailed: open}
+
+	code, p := verdict(t, healthy, defaults())
+	if code != CodeFailed || p[recoveredAt] != now.UTC().Format(time.RFC3339) || p["reason"] != "timeout" {
+		t.Fatalf("first healthy sweep: %s %v", code, p)
+	}
+
+	// Held, recovered_at unchanged (params stable).
+	held := healthy
+	held.OpenFailed = map[string]any{"source": "Vakıfbank", "reason": "timeout", recoveredAt: now.Add(-30 * time.Minute).UTC().Format(time.RFC3339)}
+	if code, p := verdict(t, held, defaults()); code != CodeFailed || p[recoveredAt] != held.OpenFailed[recoveredAt] {
+		t.Fatalf("within hold: %s %v", code, p)
+	}
+
+	// Hold over: closes.
+	held.OpenFailed[recoveredAt] = now.Add(-RecoverHold).UTC().Format(time.RFC3339)
+	if code, _ := verdict(t, held, defaults()); code != "" {
+		t.Fatalf("after hold: %s", code)
+	}
+
+	// Times out again within FailingGrace: still open, hold restarts.
+	flaky := held
+	flaky.LastError = json.RawMessage(`{"reason":"timeout"}`)
+	flaky.OpenFailed = map[string]any{"source": "Vakıfbank", "reason": "timeout", recoveredAt: now.Add(-20 * time.Minute).UTC().Format(time.RFC3339)}
+	code, p = verdict(t, flaky, defaults())
+	if code != CodeFailed {
+		t.Fatalf("flaky: want open, got %q", code)
+	}
+	if _, ok := p[recoveredAt]; ok {
+		t.Fatalf("flaky: recovered_at kept: %v", p)
+	}
+
+	// Without an open warning a transient failure within the grace stays quiet.
+	flaky.OpenFailed = nil
+	if code, _ := verdict(t, flaky, defaults()); code != "" {
+		t.Fatalf("no open warning: %s", code)
 	}
 }

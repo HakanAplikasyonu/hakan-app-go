@@ -52,6 +52,18 @@ const (
 // heal by themselves.
 const FailingGrace = 6 * time.Hour
 
+// RecoverHold: an open INT_CONNECTION_FAILED warning does not close on the
+// first successful fetch but once the connection has stayed healthy this
+// long (four sweeps). A connection that fails again in the meantime keeps
+// its warning open and the hold starts over. Together with FailingGrace a
+// flaky bank does not open and close the warning many times a day (#688).
+const RecoverHold = time.Hour
+
+// recoveredAt is the param holding when the connection was first seen
+// healthy again while its warning was open (RFC 3339, UTC). It is set once,
+// so the params stay stable during the hold.
+const recoveredAt = "recovered_at"
+
 // waitingSetup are setup states that wait on a person (the taxpayer's
 // authorisation, the bank instruction), not on a sync: such a connection is
 // never stale. A failure there is still INT_CONNECTION_FAILED.
@@ -68,6 +80,9 @@ type Connection struct {
 	LastError     json.RawMessage
 	LastSuccessAt *time.Time
 	CreatedAt     time.Time
+	// OpenFailed: the params of the connection's open INT_CONNECTION_FAILED
+	// warning in this period, nil when there is none (RecoverHold).
+	OpenFailed map[string]any
 }
 
 // Input is one taxpayer's connections at one moment.
@@ -125,7 +140,8 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 		return engine.Finding{}, false
 	}
 	params := map[string]any{"source": SourceName(c.SourceSystem), "source_system": c.SourceSystem}
-	if Failing(c) && !transientWithinGrace(c, now) {
+	failing := Failing(c)
+	if failing && !transientWithinGrace(c, now) {
 		params["status"] = c.Status
 		if r := errorReason(c.LastError); r != "" {
 			params["reason"] = r
@@ -135,7 +151,12 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 		}
 		return engine.Finding{Code: CodeFailed, Params: params}, true
 	}
-	if Failing(c) {
+	if c.OpenFailed != nil {
+		if f, ok := hold(c.OpenFailed, failing, now); ok {
+			return f, true
+		}
+	}
+	if failing {
 		return engine.Finding{}, false // transient, within the grace period
 	}
 	if waitingSetup[c.SetupState] {
@@ -154,6 +175,33 @@ func check(c Connection, now time.Time, stale float64, staleOn bool, never float
 		return engine.Finding{Code: CodeStale, Params: params}, true
 	}
 	return engine.Finding{}, false
+}
+
+// hold keeps an open failure warning during RecoverHold: the stored params
+// are re-raised unchanged (an acknowledged warning stays acknowledged), with
+// recovered_at added on the first healthy sweep. A transient failure within
+// FailingGrace keeps it open and drops recovered_at, so the hold restarts.
+func hold(open map[string]any, failing bool, now time.Time) (engine.Finding, bool) {
+	p := make(map[string]any, len(open)+1)
+	for k, v := range open {
+		p[k] = v
+	}
+	if failing {
+		delete(p, recoveredAt)
+		return engine.Finding{Code: CodeFailed, Params: p}, true
+	}
+	since := now
+	if s, ok := p[recoveredAt].(string); ok {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			since = t
+		}
+	} else {
+		p[recoveredAt] = now.UTC().Format(time.RFC3339)
+	}
+	if now.Sub(since) >= RecoverHold {
+		return engine.Finding{}, false
+	}
+	return engine.Finding{Code: CodeFailed, Params: p}, true
 }
 
 // transientWithinGrace: a set-up connection's transient failure (anything

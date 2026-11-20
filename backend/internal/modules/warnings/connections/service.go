@@ -2,6 +2,7 @@ package connections
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ type Queries interface {
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]db.SourceConnection, error)
 	AutoResolveOtherConnectionWarnings(ctx context.Context, arg db.AutoResolveOtherConnectionWarningsParams) (int64, error)
 	ListConnectionWarningSubjects(ctx context.Context) ([]db.ListConnectionWarningSubjectsRow, error)
+	ListOpenConnectionFailedWarnings(ctx context.Context, arg db.ListOpenConnectionFailedWarningsParams) ([]db.ListOpenConnectionFailedWarningsRow, error)
 }
 
 // Checker applies the rule to a taxpayer's connections.
@@ -54,9 +56,30 @@ func (c *Checker) Check(ctx context.Context, s engine.Subject) (engine.Report, e
 	}
 	now := c.now()
 	in := Input{Period: Period(now), Now: now, Connections: make([]Connection, 0, len(rows))}
+	open, err := c.q.ListOpenConnectionFailedWarnings(ctx, db.ListOpenConnectionFailedWarningsParams{
+		OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Period: in.Period,
+	})
+	if err != nil {
+		return engine.Report{}, fmt.Errorf("connections: open warnings: %w", err)
+	}
+	openParams := make(map[int64]map[string]any, len(open))
+	for _, w := range open {
+		if !w.EntityID.Valid {
+			continue
+		}
+		p := map[string]any{}
+		if len(w.Params) > 0 {
+			if err := json.Unmarshal(w.Params, &p); err != nil {
+				return engine.Report{}, fmt.Errorf("connections: warning params: %w", err)
+			}
+		}
+		openParams[w.EntityID.Int64] = p
+	}
 	ids := make([]int64, 0, len(rows))
 	for _, r := range rows {
-		in.Connections = append(in.Connections, FromRow(r))
+		conn := FromRow(r)
+		conn.OpenFailed = openParams[r.ID]
+		in.Connections = append(in.Connections, conn)
 		ids = append(ids, r.ID)
 	}
 	rep, err := engine.Run(ctx, c.engine, s, Rule{}, in)

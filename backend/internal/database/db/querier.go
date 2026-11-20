@@ -956,6 +956,10 @@ type Querier interface {
 	ListOfficeReportDeliveries(ctx context.Context, arg ListOfficeReportDeliveriesParams) ([]ListOfficeReportDeliveriesRow, error)
 	ListOnboardingRequestsByOrg(ctx context.Context, arg ListOnboardingRequestsByOrgParams) ([]ListOnboardingRequestsByOrgRow, error)
 	ListOpenChangeRequests(ctx context.Context, arg ListOpenChangeRequestsParams) ([]ChangeRequest, error)
+	// Açık bağlantı hatası uyarıları ve parametreleri (#688): bağlantı düzelince
+	// uyarı hemen değil, RecoverHold sonra kapanır; bekleme başlangıcı
+	// parametrelerde (recovered_at) durur.
+	ListOpenConnectionFailedWarnings(ctx context.Context, arg ListOpenConnectionFailedWarningsParams) ([]ListOpenConnectionFailedWarningsRow, error)
 	ListOpenSgkPremiums(ctx context.Context, taxpayerID int64) ([]SgkPremium, error)
 	// Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
 	// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar. Üst

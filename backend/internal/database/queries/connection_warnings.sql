@@ -21,3 +21,13 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id
   AND producer = 'control:source_connection' AND entity_type = 'source_connection'
   AND status = 'open'
   AND NOT (entity_id = ANY(@connection_ids::bigint[]) AND COALESCE(period, '') = @period::text);
+
+-- name: ListOpenConnectionFailedWarnings :many
+-- Açık bağlantı hatası uyarıları ve parametreleri (#688): bağlantı düzelince
+-- uyarı hemen değil, RecoverHold sonra kapanır; bekleme başlangıcı
+-- parametrelerde (recovered_at) durur.
+SELECT entity_id, params FROM data_warnings
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id
+  AND producer = 'control:source_connection' AND entity_type = 'source_connection'
+  AND code = 'INT_CONNECTION_FAILED' AND status = 'open'
+  AND COALESCE(period, '') = @period::text;

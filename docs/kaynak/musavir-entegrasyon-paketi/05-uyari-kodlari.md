@@ -101,7 +101,7 @@ Bağlantının kendi durumu §4'teki olaylarla `source_connection` üzerinde yü
 
 | Kod | Seviye | Varlık | Ne zaman | Kaynak |
 |---|---|---|---|---|
-| `INT_CONNECTION_FAILED` | `warning` | source_connection | `status` `auth_failed` ya da kurulum sırasında hata: hemen. Kurulmuş bağlantıda `rate_limited` ya da `last_error` (geçici hata): son başarılı çekim 6 saatten eskiyse (hiç yoksa kurulumdan 6 saat sonra) | §4 |
+| `INT_CONNECTION_FAILED` | `warning` | source_connection | `status` `auth_failed` ya da kurulum sırasında hata: hemen. Kurulmuş bağlantıda `rate_limited` ya da `last_error` (geçici hata): son başarılı çekim 6 saatten eskiyse (hiç yoksa kurulumdan 6 saat sonra). Kapanış: bağlantı 1 saat sağlıklı kalınca (bu arada geçici hata olursa uyarı açık kalır, süre yeniden başlar) | §4 |
 | `INT_SYNC_STALE` | `warning` | source_connection | Kurulmuş bağlantı `stale_days` (varsayılan 3) gündür başarılı çekim yapmadı; hiç yapmadıysa kurulumdan `never_synced_days` (varsayılan 1) gün sonra | §4 |
 
 ## 4. Bağlantı olayları

@@ -7,6 +7,8 @@ package db
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const autoResolveOtherConnectionWarnings = `-- name: AutoResolveOtherConnectionWarnings :execrows
@@ -71,6 +73,48 @@ func (q *Queries) ListConnectionWarningSubjects(ctx context.Context) ([]ListConn
 	for rows.Next() {
 		var i ListConnectionWarningSubjectsRow
 		if err := rows.Scan(&i.OrganizationID, &i.EngagementID, &i.TaxpayerID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenConnectionFailedWarnings = `-- name: ListOpenConnectionFailedWarnings :many
+SELECT entity_id, params FROM data_warnings
+WHERE organization_id = $1 AND engagement_id = $2
+  AND producer = 'control:source_connection' AND entity_type = 'source_connection'
+  AND code = 'INT_CONNECTION_FAILED' AND status = 'open'
+  AND COALESCE(period, '') = $3::text
+`
+
+type ListOpenConnectionFailedWarningsParams struct {
+	OrganizationID int64  `json:"organization_id"`
+	EngagementID   int64  `json:"engagement_id"`
+	Period         string `json:"period"`
+}
+
+type ListOpenConnectionFailedWarningsRow struct {
+	EntityID pgtype.Int8 `json:"entity_id"`
+	Params   []byte      `json:"params"`
+}
+
+// Açık bağlantı hatası uyarıları ve parametreleri (#688): bağlantı düzelince
+// uyarı hemen değil, RecoverHold sonra kapanır; bekleme başlangıcı
+// parametrelerde (recovered_at) durur.
+func (q *Queries) ListOpenConnectionFailedWarnings(ctx context.Context, arg ListOpenConnectionFailedWarningsParams) ([]ListOpenConnectionFailedWarningsRow, error) {
+	rows, err := q.db.Query(ctx, listOpenConnectionFailedWarnings, arg.OrganizationID, arg.EngagementID, arg.Period)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListOpenConnectionFailedWarningsRow{}
+	for rows.Next() {
+		var i ListOpenConnectionFailedWarningsRow
+		if err := rows.Scan(&i.EntityID, &i.Params); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
