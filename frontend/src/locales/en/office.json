@@ -2389,5 +2389,19 @@
   "tax_returns.export_pdf": "PDF summary",
   "tax_returns.export_pdf_failed": "Could not download the PDF.",
   "tax_returns.office.col_tax_id": "Tax ID",
-  "tax_returns.office.col_payable": "Payable"
+  "tax_returns.office.col_payable": "Payable",
+  "trial_balance.source": "Source",
+  "trial_balance.source_luca": "Uploaded Luca trial balance",
+  "trial_balance.source_live": "Our own entries",
+  "trial_balance.live_title": "Live trial balance",
+  "trial_balance.live_description": "From our own entries (approved and exported), cumulative {{from}} – {{to}}.",
+  "trial_balance.live_compared_to": "Compared with Luca: {{label}}",
+  "trial_balance.live_no_luca": "No Luca trial balance uploaded for this period.",
+  "trial_balance.live_period": "Period",
+  "trial_balance.include_drafts": "Include drafts",
+  "trial_balance.compare_luca": "Compare with Luca",
+  "trial_balance.live_empty_title": "No entries in this period",
+  "trial_balance.live_empty_body": "The live trial balance appears once entries are approved.",
+  "trial_balance.col_luca": "Luca balance",
+  "trial_balance.col_difference": "Difference"
 }

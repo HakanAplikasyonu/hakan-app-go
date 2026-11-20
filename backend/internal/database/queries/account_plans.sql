@@ -101,3 +101,24 @@ FROM trial_balance_lines
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND import_id = @import_id
   AND (sqlc.narg(max_level)::smallint IS NULL OR level <= sqlc.narg(max_level))
 ORDER BY code;
+
+-- name: LiveTrialBalanceTotals :many
+-- Canlı mizan (#669 E): ofisin kendi fişlerinden hesap bazında borç /
+-- alacak toplamı, [from_period, to_period] aralığında. Varsayılan onaylı ve
+-- aktarılmış fişler; include_drafts taslakları da katar.
+SELECT l.account_code::text AS account_code,
+       SUM(l.debit)::numeric AS debit,
+       SUM(l.credit)::numeric AS credit
+FROM journal_draft_lines l
+JOIN journal_drafts d ON d.id = l.journal_draft_id AND d.engagement_id = l.engagement_id
+WHERE d.organization_id = @organization_id AND d.engagement_id = @engagement_id
+  AND d.period >= @from_period::text AND d.period <= @to_period::text
+  AND (d.status IN ('approved', 'exported') OR @include_drafts::bool)
+GROUP BY l.account_code
+ORDER BY l.account_code;
+
+-- name: AccountPlanNames :many
+-- Etkin plandaki hesap adları (canlı mizanın adları, #669 E).
+SELECT code::text AS code, name FROM account_plan_accounts
+WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND target = @target
+  AND code = ANY(@codes::text[]);

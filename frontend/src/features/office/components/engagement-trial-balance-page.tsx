@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { MonthPicker } from "@/components/ui/month-picker";
 import {
   NativeSelect,
   NativeSelectOption,
@@ -32,6 +33,7 @@ import { usePermission } from "@/providers/permission-provider";
 import {
   trialBalanceKeys,
   trialBalanceService,
+  type LiveTrialBalanceQuery,
   type TrialBalance,
   type TrialBalanceLine,
   type TrialBalanceQuery,
@@ -75,13 +77,67 @@ export function EngagementTrialBalancePage({
   );
 }
 
+/** URL'deki seçimleri okur / yazar (`?kaynak=`, `?mizan=` …). */
+function useParams() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const setParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(search.toString());
+    if (value === null) next.delete(key);
+    else next.set(key, value);
+    router.replace(`?${next.toString()}`, { scroll: false });
+  };
+  return { search, setParam };
+}
+
+function currentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function TrialBalanceInner({ engagement }: { engagement: string }) {
+  const { t } = useLocale();
+  const { search, setParam } = useParams();
+  const live = search.get("kaynak") === "canli";
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="trial-balance-source">
+            {t("office.trial_balance.source")}
+          </Label>
+          <NativeSelect
+            id="trial-balance-source"
+            value={live ? "canli" : "luca"}
+            onChange={(e) =>
+              setParam("kaynak", e.target.value === "canli" ? "canli" : null)
+            }
+          >
+            <NativeSelectOption value="luca">
+              {t("office.trial_balance.source_luca")}
+            </NativeSelectOption>
+            <NativeSelectOption value="canli">
+              {t("office.trial_balance.source_live")}
+            </NativeSelectOption>
+          </NativeSelect>
+        </div>
+      </div>
+      {live ? (
+        <LiveTrialBalance engagement={engagement} />
+      ) : (
+        <UploadedTrialBalance engagement={engagement} />
+      )}
+    </div>
+  );
+}
+
+/** Yüklenen Luca mizanları. */
+function UploadedTrialBalance({ engagement }: { engagement: string }) {
   const { t, locale } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
   const qc = useQueryClient();
-  const router = useRouter();
-  const search = useSearchParams();
+  const { search, setParam } = useParams();
   const fileRef = useRef<HTMLInputElement>(null);
   const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
 
@@ -89,12 +145,6 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
   const level = search.get("level") === "1" ? 1 : 0;
   const compare = search.get("compare") === "none" ? "none" : "previous";
   const query: TrialBalanceQuery = { which, level, compare };
-  const setParam = (key: string, value: string | null) => {
-    const next = new URLSearchParams(search.toString());
-    if (value === null) next.delete(key);
-    else next.set(key, value);
-    router.replace(`?${next.toString()}`, { scroll: false });
-  };
 
   const list = useQuery({
     queryKey: trialBalanceKeys.all(slug, engagement),
@@ -181,22 +231,6 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
     );
 
   const rep = report.data;
-  const lines = rep?.lines ?? [];
-  const compared = !!rep?.compared_to;
-  const totals = lines
-    .filter((l) => (level === 1 ? l.level === 1 : l.is_leaf))
-    .reduce(
-      (acc, l) => {
-        const b = splitBalance(l.balance);
-        return {
-          debit: acc.debit + Number(l.debit),
-          credit: acc.credit + Number(l.credit),
-          debitBalance: acc.debitBalance + Number(b.debit || 0),
-          creditBalance: acc.creditBalance + Number(b.credit || 0),
-        };
-      },
-      { debit: 0, credit: 0, debitBalance: 0, creditBalance: 0 },
-    );
   const selected = rep?.trial_balance.uuid ?? "";
 
   return (
@@ -287,73 +321,273 @@ function TrialBalanceInner({ engagement }: { engagement: string }) {
       ) : report.isError || !rep ? (
         <p className="text-danger text-sm">{t("office.api.load_error")}</p>
       ) : (
-        // Kaydırılan bölge klavyeyle odaklanabilir olmalı (axe scrollable-region-focusable).
-        <div
-          className="bg-card overflow-x-auto rounded-xl border"
-          role="region"
-          tabIndex={0}
-          aria-label={t("office.trial_balance.table")}
-        >
-          <Table
-            aria-label={t("office.trial_balance.table")}
-            containerClassName="overflow-x-visible"
-          >
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("office.trial_balance.col_code")}</TableHead>
-                <TableHead>{t("office.trial_balance.col_name")}</TableHead>
-                <TableHead className="text-end">
-                  {t("office.trial_balance.col_debit")}
-                </TableHead>
-                <TableHead className="text-end">
-                  {t("office.trial_balance.col_credit")}
-                </TableHead>
-                <TableHead className="text-end">
-                  {t("office.trial_balance.col_debit_balance")}
-                </TableHead>
-                <TableHead className="text-end">
-                  {t("office.trial_balance.col_credit_balance")}
-                </TableHead>
-                {compared ? (
-                  <>
-                    <TableHead className="text-end">
-                      {t("office.trial_balance.col_previous")}
-                    </TableHead>
-                    <TableHead className="text-end">
-                      {t("office.trial_balance.col_change")}
-                    </TableHead>
-                  </>
-                ) : null}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((l) => (
-                <TrialBalanceRow key={l.code} line={l} compared={compared} />
-              ))}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell className="px-3 py-2" colSpan={2}>
-                  {t("office.trial_balance.total")}
-                </TableCell>
-                <TableCell className="px-3 py-2 text-end">
-                  <Money value={totals.debit.toFixed(2)} />
-                </TableCell>
-                <TableCell className="px-3 py-2 text-end">
-                  <Money value={totals.credit.toFixed(2)} />
-                </TableCell>
-                <TableCell className="px-3 py-2 text-end">
-                  <Money value={totals.debitBalance.toFixed(2)} />
-                </TableCell>
-                <TableCell className="px-3 py-2 text-end">
-                  <Money value={totals.creditBalance.toFixed(2)} />
-                </TableCell>
-                {compared ? <TableCell colSpan={2} /> : null}
-              </TableRow>
-            </TableFooter>
-          </Table>
-        </div>
+        <TrialBalanceTable
+          lines={rep.lines}
+          level={level}
+          compared={!!rep.compared_to}
+          previousLabel={t("office.trial_balance.col_previous")}
+          changeLabel={t("office.trial_balance.col_change")}
+        />
       )}
+    </div>
+  );
+}
+
+/**
+ * Canlı mizan (#669 E): ofisin kendi fişlerinden, dönemin yılının
+ * Ocak'ından seçilen aya birikimli. Varsayılan onaylı ve aktarılmış
+ * fişler; taslaklar istenirse katılır. Aynı dönemin yüklenen Luca
+ * mizanıyla karşılaştırılabilir.
+ */
+function LiveTrialBalance({ engagement }: { engagement: string }) {
+  const { t, locale } = useLocale();
+  const { slug } = useTenant();
+  const { search, setParam } = useParams();
+  const [exporting, setExporting] = useState<"xlsx" | "pdf" | null>(null);
+
+  const raw = search.get("donem") ?? "";
+  const period = /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : currentMonth();
+  const query: LiveTrialBalanceQuery = {
+    period,
+    includeDrafts: search.get("taslak") === "1",
+    compare: search.get("luca") === "1" ? "luca" : "none",
+    level: search.get("level") === "1" ? 1 : 0,
+  };
+  const report = useQuery({
+    queryKey: trialBalanceKeys.live(slug, engagement, query),
+    queryFn: () => trialBalanceService.live(slug, engagement, query),
+  });
+  const rep = report.data;
+
+  const download = async (format: "xlsx" | "pdf") => {
+    setExporting(format);
+    try {
+      await trialBalanceService.downloadLive(
+        slug,
+        engagement,
+        query,
+        format,
+        locale,
+      );
+    } catch (err) {
+      toast.error(
+        (err as Error)?.message || t("office.trial_balance.export_error"),
+      );
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  let description = t("office.trial_balance.live_description", {
+    from: rep?.from_period ?? `${period.slice(0, 4)}-01`,
+    to: period,
+  });
+  if (query.compare === "luca") {
+    description = rep?.compared_to
+      ? t("office.trial_balance.live_compared_to", {
+          label: trialBalanceLabel(rep.compared_to, locale),
+        })
+      : t("office.trial_balance.live_no_luca");
+  }
+
+  return (
+    <div className="space-y-4">
+      <Panel
+        title={t("office.trial_balance.live_title")}
+        description={description}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!rep || exporting !== null}
+              onClick={() => void download("xlsx")}
+            >
+              <FileDown className="size-4" aria-hidden />
+              {t("office.trial_balance.export_xlsx")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!rep || exporting !== null}
+              onClick={() => void download("pdf")}
+            >
+              <FileDown className="size-4" aria-hidden />
+              {t("office.trial_balance.export_pdf")}
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex flex-wrap items-end gap-4 p-4">
+          <div className="space-y-1">
+            <Label htmlFor="trial-balance-live-period">
+              {t("office.trial_balance.live_period")}
+            </Label>
+            <MonthPicker
+              id="trial-balance-live-period"
+              value={period}
+              onChange={(v) => setParam("donem", v)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="trial-balance-level">
+              {t("office.trial_balance.level")}
+            </Label>
+            <NativeSelect
+              id="trial-balance-level"
+              value={String(query.level)}
+              onChange={(e) =>
+                setParam("level", e.target.value === "1" ? "1" : null)
+              }
+            >
+              <NativeSelectOption value="0">
+                {t("office.trial_balance.level_all")}
+              </NativeSelectOption>
+              <NativeSelectOption value="1">
+                {t("office.trial_balance.level_main")}
+              </NativeSelectOption>
+            </NativeSelect>
+          </div>
+          <Label className="flex h-9 w-fit items-center gap-2 text-sm leading-normal font-normal">
+            <Checkbox
+              checked={query.includeDrafts}
+              onCheckedChange={(v) =>
+                setParam("taslak", v === true ? "1" : null)
+              }
+            />
+            {t("office.trial_balance.include_drafts")}
+          </Label>
+          <Label className="flex h-9 w-fit items-center gap-2 text-sm leading-normal font-normal">
+            <Checkbox
+              checked={query.compare === "luca"}
+              onCheckedChange={(v) => setParam("luca", v === true ? "1" : null)}
+            />
+            {t("office.trial_balance.compare_luca")}
+          </Label>
+        </div>
+      </Panel>
+
+      {report.isLoading ? (
+        <Skeleton className="h-64 w-full" />
+      ) : report.isError || !rep ? (
+        <p className="text-danger text-sm">{t("office.api.load_error")}</p>
+      ) : rep.lines.length === 0 ? (
+        <EmptyState
+          title={t("office.trial_balance.live_empty_title")}
+          description={t("office.trial_balance.live_empty_body")}
+        />
+      ) : (
+        <TrialBalanceTable
+          lines={rep.lines}
+          level={query.level}
+          compared={!!rep.compared_to}
+          previousLabel={t("office.trial_balance.col_luca")}
+          changeLabel={t("office.trial_balance.col_difference")}
+          totals={rep.totals}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Mizan tablosu: kod, ad, borç, alacak, borç / alacak bakiyesi ve
+ * karşılaştırmada önceki (ya da Luca) bakiye ile fark. `totals` verilmezse
+ * borç / alacak toplamı yaprak (ana hesap düzeyinde ana) hesaplardan.
+ */
+function TrialBalanceTable({
+  lines,
+  level,
+  compared,
+  previousLabel,
+  changeLabel,
+  totals: given,
+}: {
+  lines: TrialBalanceLine[];
+  level: number;
+  compared: boolean;
+  previousLabel: string;
+  changeLabel: string;
+  totals?: { debit: string; credit: string };
+}) {
+  const { t } = useLocale();
+  const counted = lines.filter((l) =>
+    level === 1 ? l.level === 1 : l.is_leaf,
+  );
+  const totals = counted.reduce(
+    (acc, l) => {
+      const b = splitBalance(l.balance);
+      return {
+        debit: acc.debit + Number(l.debit),
+        credit: acc.credit + Number(l.credit),
+        debitBalance: acc.debitBalance + Number(b.debit || 0),
+        creditBalance: acc.creditBalance + Number(b.credit || 0),
+      };
+    },
+    { debit: 0, credit: 0, debitBalance: 0, creditBalance: 0 },
+  );
+  return (
+    // Kaydırılan bölge klavyeyle odaklanabilir olmalı (axe scrollable-region-focusable).
+    <div
+      className="bg-card overflow-x-auto rounded-xl border"
+      role="region"
+      tabIndex={0}
+      aria-label={t("office.trial_balance.table")}
+    >
+      <Table
+        aria-label={t("office.trial_balance.table")}
+        containerClassName="overflow-x-visible"
+      >
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("office.trial_balance.col_code")}</TableHead>
+            <TableHead>{t("office.trial_balance.col_name")}</TableHead>
+            <TableHead className="text-end">
+              {t("office.trial_balance.col_debit")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.trial_balance.col_credit")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.trial_balance.col_debit_balance")}
+            </TableHead>
+            <TableHead className="text-end">
+              {t("office.trial_balance.col_credit_balance")}
+            </TableHead>
+            {compared ? (
+              <>
+                <TableHead className="text-end">{previousLabel}</TableHead>
+                <TableHead className="text-end">{changeLabel}</TableHead>
+              </>
+            ) : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lines.map((l) => (
+            <TrialBalanceRow key={l.code} line={l} compared={compared} />
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell className="px-3 py-2" colSpan={2}>
+              {t("office.trial_balance.total")}
+            </TableCell>
+            <TableCell className="px-3 py-2 text-end">
+              <Money value={given?.debit ?? totals.debit.toFixed(2)} />
+            </TableCell>
+            <TableCell className="px-3 py-2 text-end">
+              <Money value={given?.credit ?? totals.credit.toFixed(2)} />
+            </TableCell>
+            <TableCell className="px-3 py-2 text-end">
+              <Money value={totals.debitBalance.toFixed(2)} />
+            </TableCell>
+            <TableCell className="px-3 py-2 text-end">
+              <Money value={totals.creditBalance.toFixed(2)} />
+            </TableCell>
+            {compared ? <TableCell colSpan={2} /> : null}
+          </TableRow>
+        </TableFooter>
+      </Table>
     </div>
   );
 }
