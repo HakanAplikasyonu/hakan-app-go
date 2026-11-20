@@ -404,3 +404,12 @@ export async function settledPopover(page: Page) {
     .toBe(true);
   return pop;
 }
+
+/**
+ * Fişler ekranında yeni fiş formunu açar (#710): form açılır pencerede
+ * gelir; kaydedilince pencere kapanır.
+ */
+export async function openNewEntry(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Yeni fiş", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Yeni fiş" })).toBeVisible();
+}

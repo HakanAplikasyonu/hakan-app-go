@@ -12,7 +12,14 @@ import {
   MonitorUp,
   Undo2,
 } from "lucide-react";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -951,8 +958,12 @@ function JournalsInner() {
   // bölüme götürür (#566): liste
   // yüklendikten sonra kaydırılır, yoksa tarayıcı boş sayfada kalır.
   const loaded = drafts.isSuccess;
+  // Yalnız ilk yüklemede (#710): kayıt / aktarım sonrası liste yeniden
+  // yüklenince sayfa bölüme ya da en alta atılmaz, kaydırma konumu kalır.
+  const scrolled = useRef(false);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || scrolled.current) return;
+    scrolled.current = true;
     const id = window.location.hash.slice(1);
     if (![DRAFTS_ANCHOR, EXPORT_ANCHOR, TRANSFERS_ANCHOR].includes(id)) return;
     const el = document.getElementById(id);
