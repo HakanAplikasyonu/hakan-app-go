@@ -17503,6 +17503,8 @@ export interface components {
             entry_type: string;
             /** Format: date-time */
             entry_date: string;
+            /** @description Fişin açıklaması (#573). */
+            description: string;
             /** @enum {string} */
             status: "draft" | "approved" | "exported";
             debit: string;
@@ -17582,7 +17584,6 @@ export interface components {
             source_id?: string;
         };
         JournalDraftDetail: components["schemas"]["JournalDraft"] & {
-            description: string;
             document_type?: string;
             origin: {
                 [key: string]: unknown;

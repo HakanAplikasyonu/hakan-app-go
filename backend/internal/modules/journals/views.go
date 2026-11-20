@@ -76,7 +76,7 @@ func (s *Service) ListDrafts(ctx context.Context, scope engagementctx.Scope, f D
 	out := DraftPage{Items: make([]Draft, 0, len(rows)), Total: total, Limit: f.Limit, Offset: f.Offset}
 	for _, r := range rows {
 		out.Items = append(out.Items, Draft{
-			UUID: r.Uuid, Period: r.Period, EntryNo: r.EntryNo, Type: r.EntryType, Date: r.EntryDate.Time, Status: r.Status,
+			UUID: r.Uuid, Period: r.Period, EntryNo: r.EntryNo, Type: r.EntryType, Date: r.EntryDate.Time, Description: r.Description, Status: r.Status,
 			Debit: repository.Dec(r.TotalDebit), Credit: repository.Dec(r.TotalCredit), Lines: r.LineCount,
 			Issues: issues[r.ID], Export: exports[r.ID],
 		})
@@ -123,7 +123,6 @@ type DraftLine struct {
 // DraftDetail is a draft with its lines.
 type DraftDetail struct {
 	Draft
-	Description  string         `json:"description"`
 	DocumentType string         `json:"document_type,omitempty"`
 	Origin       map[string]any `json:"origin"`
 	ApprovedAt   *time.Time     `json:"approved_at,omitempty"`
@@ -145,8 +144,8 @@ func (s *Service) GetDraft(ctx context.Context, scope engagementctx.Scope, id uu
 		return DraftDetail{}, err
 	}
 	out := DraftDetail{
-		Draft:       Draft{UUID: row.Uuid, Period: row.Period, EntryNo: row.EntryNo, Type: row.EntryType, Date: row.EntryDate.Time, Status: row.Status, Lines: int32(len(lines))}, //nolint:gosec // small
-		Description: row.Description, DocumentType: row.DocumentType.String, Origin: map[string]any{},
+		Draft:        Draft{UUID: row.Uuid, Period: row.Period, EntryNo: row.EntryNo, Type: row.EntryType, Date: row.EntryDate.Time, Description: row.Description, Status: row.Status, Lines: int32(len(lines))}, //nolint:gosec // small
+		DocumentType: row.DocumentType.String, Origin: map[string]any{},
 		CreatedAt: row.CreatedAt.Time, Items: make([]DraftLine, 0, len(lines)),
 	}
 	_ = json.Unmarshal(row.Origin, &out.Origin)

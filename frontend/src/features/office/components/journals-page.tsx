@@ -694,6 +694,17 @@ function JournalsInner() {
         gridSecondary: true,
       }),
       createColumn<JournalDraft>({
+        id: "description",
+        labelKey: "office.journals.description",
+        accessorKey: "description",
+        meta: { cellClassName: "max-w-72 truncate" },
+        cell: ({ row }) => (
+          <span title={row.original.description}>
+            {row.original.description || "—"}
+          </span>
+        ),
+      }),
+      createColumn<JournalDraft>({
         id: "entry_type",
         labelKey: "office.col_type",
         accessorKey: "entry_type",

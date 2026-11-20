@@ -22282,13 +22282,14 @@ components:
 
     JournalDraft:
       type: object
-      required: [uuid, period, entry_no, entry_type, entry_date, status, debit, credit, lines]
+      required: [uuid, period, entry_no, entry_type, entry_date, description, status, debit, credit, lines]
       properties:
         uuid: { type: string, format: uuid }
         period: { type: string, example: "2026-10" }
         entry_no: { type: integer, format: int32 }
         entry_type: { type: string }
         entry_date: { type: string, format: date-time }
+        description: { type: string, description: "Fişin açıklaması (#573)." }
         status: { type: string, enum: [draft, approved, exported] }
         debit: { type: string }
         credit: { type: string }
@@ -22374,9 +22375,8 @@ components:
       allOf:
         - $ref: "#/components/schemas/JournalDraft"
         - type: object
-          required: [description, origin, created_at, items]
+          required: [origin, created_at, items]
           properties:
-            description: { type: string }
             document_type: { type: string }
             origin: { type: object, additionalProperties: true }
             approved_at: { type: string, format: date-time }
