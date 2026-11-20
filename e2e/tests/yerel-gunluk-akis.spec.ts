@@ -87,7 +87,9 @@ test("bankadan beyana günlük akış: ekstre → eşleştir → fiş → dönem
     const made = await api.json<{ drafts: unknown[] }>(await api.post(`${base}/bank-postings/drafts`, { period: PERIOD }));
     expect(made.drafts.length).toBe(1);
     const [draft] = await drafts();
-    expect(draft).toMatchObject({ status: "draft", debit: "5400.00" });
+    // Fiş uçları tutarı sade ondalık verir ("5400"); sayı olarak karşılaştırılır.
+    expect(draft.status).toBe("draft");
+    expect(Number(draft.debit)).toBe(5400);
     // Dönem kapatılır (müşavirin ay kapanışı); taslak onaylanamaz hâle gelir.
     const locked = await api.post(`${base}/periods/${PERIOD}/lock`);
     expect(locked.status(), await locked.text()).toBe(200);
