@@ -265,14 +265,19 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
   const actionError =
     completeTransfer.error ?? cancelTransfer.error ?? retryTransfer.error;
 
-  // Hata ekranı: her çıktının son görevi hatalıysa ve yerine yenisi
-  // açılmadıysa listelenir.
-  const openFailures = useMemo(() => {
-    const latest = new Map<string, JournalTransfer>();
+  // Her çıktının son görevi (liste yeniden eskiye). Hata ekranı: son görevi
+  // hatalıysa ve yerine yenisi açılmadıysa listelenir. "Yeniden dene" de
+  // yalnız son görevde: eskisinin yerine yenisi açıldıysa tekrar denenemez.
+  const latest = useMemo(() => {
+    const byBatch = new Map<string, JournalTransfer>();
     for (const tr of items)
-      if (!latest.has(tr.batch_uuid)) latest.set(tr.batch_uuid, tr);
-    return [...latest.values()].filter((tr) => tr.status === "failed");
+      if (!byBatch.has(tr.batch_uuid)) byBatch.set(tr.batch_uuid, tr);
+    return byBatch;
   }, [items]);
+  const openFailures = useMemo(
+    () => [...latest.values()].filter((tr) => tr.status === "failed"),
+    [latest],
+  );
 
   const columns = useMemo<ColumnDef<JournalTransfer, unknown>[]>(() => {
     const markImported = async (tr: JournalTransfer) => {
@@ -378,7 +383,8 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
                 {t("office.journals.transfer_cancel")}
               </Button>
             ) : null}
-            {tr.status === "failed" || tr.status === "cancelled" ? (
+            {(tr.status === "failed" || tr.status === "cancelled") &&
+            latest.get(tr.batch_uuid)?.uuid === tr.uuid ? (
               <Button
                 size="sm"
                 variant="ghost"
@@ -399,6 +405,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
     completeTransfer,
     confirm,
     engagement,
+    latest,
     prompt,
     retryTransfer,
     runs,

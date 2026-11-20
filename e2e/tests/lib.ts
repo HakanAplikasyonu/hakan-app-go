@@ -84,6 +84,11 @@ export class Api {
     return this.ctx.put(path, { headers: this.headers(headers), data });
   }
 
+  /** Çok parçalı PUT, alan adı `file` (ör. beyanın tahakkuk PDF'i). */
+  async uploadPut(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
+    return this.ctx.put(path, { headers: this.headers(), multipart: { file } });
+  }
+
   async upload(path: string, file: { name: string; mimeType: string; buffer: Buffer }) {
     return this.ctx.post(path, { headers: this.headers(), multipart: { file } });
   }
