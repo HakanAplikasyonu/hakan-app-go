@@ -19,6 +19,7 @@ Playwright ile ofis paneli, mükellef paneli ve çıktı akışları.
 | `tests/copilot-izgara.spec.ts` | Co-pilot (#392): Sıradaki iş, ⌘K ile aç / kapat, paletten ekrana git, komuttan plan → onayla ve çalıştır. Düzenlenebilir ızgara (#394): ok tuşlarıyla gezinti, yazarak düzenle, geri al / yinele (düğme, Ctrl+Z / Ctrl+Y), Esc ile vazgeç, Ctrl+S ile kaydet | Selin Yılmaz: aylık rapor (yalnızca bu dosya gönderir), her koşuda yeni ETTN'li fatura ve hesap kodu önerisi |
 | `tests/whatsapp-aktarim.spec.ts` | WhatsApp uzantısı (#388): eşleştirme kodu, kayıt türü filtresi. Programa aktarım (#391): yevmiyede aktarım geçmişi ve klasör hatası ekranı | Demo ofisi, Atlas Gıda; yalnızca okur |
 | `tests/k2-akislar.spec.ts` | EPIC #560 akışları: Mükellefler satırı → detay ve Komuta Merkezi hücresi → hedef ekran (#567); mizan hafızası kimin olduğunu yazar (#572); inceleme kuyruğunda banka hesabı önerisinde "Kodu düzelt" (#569); dönem uyarısı İncele panelinden çözülür (#570); eşleşmeyi geri al → hesaba işle → yeniden eşleştir (#565). Her adımın sonucu API'den doğrulanır | Her koşuda yeni mükellef; türetilmiş fatura ve Ziraat ekstresi API ile |
+| `tests/k2-liste-detay.spec.ts` | Liste-detay deseni (#564): banka listesinde alttaki kayıt yan panelde açılır, satır yerinden oynamaz; panelden önceki / sonraki kayda geçilir (düğme ve j / k); Esc ile kapanınca konum aynı | Atlas Gıda banka hareketleri; yalnızca okur |
 
 `office-onboarding.spec.ts` ofis ana akışının adımları:
 

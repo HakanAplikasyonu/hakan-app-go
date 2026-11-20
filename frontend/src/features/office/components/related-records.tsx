@@ -1,8 +1,10 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +27,7 @@ import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { useLocale } from "@/providers/locale-provider";
 
 import { useRelatedRecords } from "../hooks/use-related";
+import { focusNeighbor } from "../lib/focus-step";
 import { FOCUS_PARAM, parseFocus, relatedHref } from "../lib/related-href";
 import type {
   RelatedRecord,
@@ -272,6 +275,42 @@ export function FocusedRecord({ engagement }: { engagement: string }) {
   rest.delete(FOCUS_PARAM);
   const qs = rest.toString();
   const closeHref = `${pathname}${qs ? `?${qs}` : ""}`;
+  const kind = focus?.kind;
+  const uuid = focus?.uuid;
+  // Listedeki önceki / sonraki kayda geç (#564): komşu, sayfadaki satır
+  // bağlantılarından okunur; liste yerinde kalır, panel o kayda geçer.
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      if (!kind || !uuid) return;
+      const panel = document.querySelector('[data-testid="focused-record"]');
+      const hrefs = Array.from(
+        document.querySelectorAll<HTMLAnchorElement>(
+          `a[href*="${FOCUS_PARAM}="]`,
+        ),
+      )
+        .filter((a) => !panel?.contains(a))
+        .map((a) => a.getAttribute("href") ?? "");
+      const next = focusNeighbor(hrefs, { kind, uuid }, dir);
+      if (next) router.replace(next, { scroll: false });
+      else toast.info(t("office.related.focus_edge"));
+    },
+    [kind, uuid, router, t],
+  );
+  useEffect(() => {
+    if (!kind) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, select, [contenteditable=true]"))
+        return;
+      if (e.key === "j") step(1);
+      else if (e.key === "k") step(-1);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [kind, step]);
   return (
     <Sheet
       open={focus !== null}
@@ -295,12 +334,32 @@ export function FocusedRecord({ engagement }: { engagement: string }) {
                     kind: t(`office.related.kind.${focus.kind}`),
                   })}
                 </SheetTitle>
-                <Button asChild size="sm" variant="ghost">
-                  <Link href={closeHref} scroll={false}>
-                    <X className="size-4" aria-hidden />
-                    {t("office.related.focus_close")}
-                  </Link>
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={t("office.related.focus_prev")}
+                    aria-keyshortcuts="k"
+                    onClick={() => step(-1)}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    aria-label={t("office.related.focus_next")}
+                    aria-keyshortcuts="j"
+                    onClick={() => step(1)}
+                  >
+                    <ChevronRight className="size-4" aria-hidden />
+                  </Button>
+                  <Button asChild size="sm" variant="ghost">
+                    <Link href={closeHref} scroll={false}>
+                      <X className="size-4" aria-hidden />
+                      {t("office.related.focus_close")}
+                    </Link>
+                  </Button>
+                </div>
               </div>
               <SheetDescription>
                 {t("office.related.description")}
