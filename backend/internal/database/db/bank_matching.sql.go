@@ -249,10 +249,10 @@ SELECT t.id, t.uuid, t.transaction_date, t.debit_credit, t.amount, t.currency, t
        t.counterparty_name, t.counterparty_iban, t.counterparty_tax_number, t.counterparty_identity_number,
        t.payment_purpose, t.description,
        EXISTS (SELECT 1 FROM bank_transaction_postings p
-               JOIN suggestions s ON s.organization_id = p.organization_id AND s.engagement_id = p.engagement_id AND s.id = p.suggestion_id
+               LEFT JOIN suggestions s ON s.organization_id = p.organization_id AND s.engagement_id = p.engagement_id AND s.id = p.suggestion_id
                WHERE p.organization_id = $1 AND p.engagement_id = $2
                  AND p.bank_transaction_id = t.id AND p.status = 'approved'
-                 AND s.status IN ('accepted', 'corrected'))::boolean AS booked_by_hand
+                 AND (p.source = 'manual' OR s.status IN ('accepted', 'corrected')))::boolean AS booked_by_hand
 FROM bank_transactions t
 WHERE t.taxpayer_id = $3 AND t.period = $4 AND NOT t.is_cancelled AND t.possible_duplicate_of IS NULL
 ORDER BY t.transaction_date, t.id
@@ -286,7 +286,8 @@ type ListBankTransactionsForControlsRow struct {
 
 // Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
 // booked_by_hand (#565): müşavir hareketi bu angajmanda kendi kararıyla bir
-// hesaba işledi (öneriyi onayladı ya da hesabı seçti; otomatik onay sayılmaz).
+// hesaba işledi: hesabı elle seçti (source manual) ya da öneriyi onayladı;
+// eşik üstü otomatik onay sayılmaz.
 func (q *Queries) ListBankTransactionsForControls(ctx context.Context, arg ListBankTransactionsForControlsParams) ([]ListBankTransactionsForControlsRow, error) {
 	rows, err := q.db.Query(ctx, listBankTransactionsForControls,
 		arg.OrganizationID,
