@@ -82,7 +82,8 @@ func trMoney(d decimal.Decimal) string {
 }
 
 // ExportPDF writes the return summary as PDF (#669 H): the same form as the
-// workbook (every part, then the checklist), one section per sheet.
+// workbook (every part, the checklist, then the section summary, #710),
+// one section per sheet.
 func (s *Service) ExportPDF(ctx context.Context, sc engagementctx.Scope, kind, period string) ([]byte, string, error) {
 	p, err := s.Preview(ctx, sc, kind, period)
 	if err != nil {
@@ -110,6 +111,7 @@ func SummaryPDF(p Preview) ([]byte, error) {
 		w.babs(p, *p.BABS)
 	}
 	w.checklist(p)
+	w.sections(p)
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.SetAutoPageBreak(false, 12)
