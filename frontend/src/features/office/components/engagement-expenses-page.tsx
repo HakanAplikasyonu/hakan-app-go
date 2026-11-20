@@ -49,6 +49,7 @@ import { FOCUS_PARAM } from "../lib/related-href";
 import { ExpenseCategoriesDialog } from "./expense-categories-dialog";
 import { Money } from "./office-ui";
 import { ImportResultNote, SummaryCards, useImportFile } from "./receipts-ui";
+import { UnreadableReceipts } from "./unreadable-receipts";
 import { useRelatedColumn } from "./related-column";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
@@ -483,6 +484,8 @@ function ExpensesInner({ engagement }: { engagement: string }) {
       />
 
       <ImportResultNote result={imp.result} onClose={imp.clear} />
+
+      <UnreadableReceipts engagement={engagement} />
 
       <div className="flex flex-wrap items-center gap-2">
         <div

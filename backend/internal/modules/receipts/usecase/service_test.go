@@ -147,9 +147,30 @@ func TestCaptureAgainstPostgres(t *testing.T) {
 	if _, err := svc.Capture(ctx, sc, user, "x.txt", []byte("hello"), ""); err == nil {
 		t.Fatal("text accepted as image")
 	}
+	// Okunamayan fotoğraf (#568): failed kalır, onaylanamaz; ofis kapatır.
+	reader.answer = "okunamadı"
+	f, err := svc.Capture(ctx, sc, user, "bulanik.png", png("f"), "")
+	must(err)
+	if f.Status != StatusFailed || f.Draft != nil {
+		t.Fatalf("unreadable capture %+v", f)
+	}
+	if failed, n, err := svc.List(ctx, sc, StatusFailed, "", 50, 0); err != nil || n != 1 || failed[0].UUID != f.UUID {
+		t.Fatalf("failed list %d %v", n, err)
+	}
+	if _, err := svc.Decide(ctx, sc, f.UUID, user, true); err != ErrState {
+		t.Fatalf("approve unreadable: %v", err)
+	}
+	closed, err := svc.Decide(ctx, sc, f.UUID, user, false)
+	must(err)
+	if closed.Status != StatusRejected {
+		t.Fatalf("closed %s", closed.Status)
+	}
+	if _, n, _ := svc.List(ctx, sc, StatusFailed, "", 50, 0); n != 0 {
+		t.Fatalf("failed after close %d", n)
+	}
 	_, total, err := svc.List(ctx, sc, "", "", 50, 0)
 	must(err)
-	if total != 5 {
+	if total != 6 {
 		t.Fatalf("captures = %d", total)
 	}
 }

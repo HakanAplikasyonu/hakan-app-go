@@ -5202,7 +5202,7 @@ export interface paths {
         put?: never;
         /**
          * Reject a receipt draft
-         * @description Requires `tenant.receipts.approve` (accountant). Only drafts; only approved expenses count for the declaration.
+         * @description Requires `tenant.receipts.approve` (accountant). Drafts (only approved expenses count for the declaration) and unreadable captures (`failed`, #568: closed after the taxpayer is asked for a new photo).
          */
         post: operations["rejectReceiptCapture"];
         delete?: never;

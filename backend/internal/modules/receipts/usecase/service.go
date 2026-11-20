@@ -401,6 +401,15 @@ func (s *Service) Decide(ctx context.Context, sc engagementctx.Scope, id uuid.UU
 	if err != nil {
 		return View{}, err
 	}
+	// Okunamayan fotoğraf (#568): taslağı yoktur; ofis kapatır (yerine
+	// mükelleften yenisini ister). Onaylanacak bir şey yoktur.
+	if c.Status == StatusFailed && !approve {
+		c, err = s.q.SetReceiptCaptureStatus(ctx, db.SetReceiptCaptureStatusParams{Status: StatusRejected, OrganizationID: c.OrganizationID, EngagementID: c.EngagementID, ID: c.ID})
+		if err != nil {
+			return View{}, err
+		}
+		return s.view(c, nil), nil
+	}
 	if c.Status != StatusDraft {
 		return View{}, ErrState
 	}
