@@ -76,6 +76,7 @@ import {
   useAccountPlanAccounts,
   useDecisionErrorText,
   useReviewDecision,
+  useCounterpartyCodeHistory,
   useReviewSuggestions,
   useReviewThreshold,
   valueLabel,
@@ -548,34 +549,26 @@ function counterpartyKeyOf(s: ReviewSuggestion) {
   return typeof v === "string" && v ? v : undefined;
 }
 
-const DECIDED = new Set(["accepted", "corrected", "auto_accepted"]);
-
 /**
- * "Bu karşı tarafla geçmiş": mükellefin son kararlarında aynı karşı taraf
- * için onaylanan kodlar (en çok kullanılan önce). Son 100 karar içinden.
+ * "Bu karşı tarafla geçmiş": mükellefin kararlarında aynı karşı taraf için
+ * uygulanan satır kodları (en çok kullanılan önce). Sunucu bütün kararlardan
+ * sayar; kuyruğun ilk sayfasıyla sınırlı değil (#669 L).
  */
 function useCounterpartyHistory(s: ReviewSuggestion | undefined) {
   const key = s ? counterpartyKeyOf(s) : undefined;
-  const query = useReviewSuggestions(
-    {
-      engagement: s?.engagement_uuid ?? undefined,
-      status: "all",
-      kind: ACCOUNT_KIND,
-      limit: REVIEW_PAGE_MAX,
-      offset: 0,
-    },
-    !!key && !!s?.engagement_uuid,
+  const query = useCounterpartyCodeHistory(
+    s?.engagement_uuid ?? undefined,
+    key,
   );
-  return useMemo(() => {
-    if (!key) return [];
-    const counts = new Map<string, number>();
-    for (const x of query.data?.items ?? []) {
-      if (!DECIDED.has(x.status) || counterpartyKeyOf(x) !== key) continue;
-      const code = accountValue(x.applied_value ?? x.proposed_value).code;
-      if (code) counts.set(code, (counts.get(code) ?? 0) + 1);
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-  }, [query.data, key]);
+  return useMemo(
+    () =>
+      key
+        ? (query.data?.items ?? []).map(
+            (x) => [x.account_code, x.uses] as const,
+          )
+        : [],
+    [query.data, key],
+  );
 }
 
 function ReviewWorkspaceInner() {

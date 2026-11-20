@@ -54,6 +54,64 @@ func (q *Queries) CountTenantSuggestions(ctx context.Context, arg CountTenantSug
 	return column_1, err
 }
 
+const counterpartyCodeHistory = `-- name: CounterpartyCodeHistory :many
+SELECT (COALESCE(s.applied_value, s.proposed_value)->>'account_code')::text AS account_code,
+       count(*)::bigint AS uses,
+       max(s.updated_at)::timestamptz AS last_used_at
+FROM suggestions s
+WHERE s.organization_id = $1
+  AND s.engagement_id = $2
+  AND s.kind = 'account_code'
+  AND s.target_type = 'invoice_item'
+  AND s.target_field = 'account_code'
+  AND s.status IN ('accepted', 'corrected', 'auto_accepted')
+  AND s.inputs->>'counterparty_key' = $3::text
+  AND COALESCE(s.applied_value, s.proposed_value)->>'account_code' IS NOT NULL
+GROUP BY 1
+ORDER BY uses DESC, last_used_at DESC
+LIMIT $4
+`
+
+type CounterpartyCodeHistoryParams struct {
+	OrganizationID  int64  `json:"organization_id"`
+	EngagementID    int64  `json:"engagement_id"`
+	CounterpartyKey string `json:"counterparty_key"`
+	Lim             int32  `json:"lim"`
+}
+
+type CounterpartyCodeHistoryRow struct {
+	AccountCode string             `json:"account_code"`
+	Uses        int64              `json:"uses"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+}
+
+// Karşı tarafın geçmiş satır hesabı kodları (#669 L): mükellefin kabul
+// edilen, düzeltilen ve otomatik uygulanan önerileri; en çok kullanılan önce.
+func (q *Queries) CounterpartyCodeHistory(ctx context.Context, arg CounterpartyCodeHistoryParams) ([]CounterpartyCodeHistoryRow, error) {
+	rows, err := q.db.Query(ctx, counterpartyCodeHistory,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.CounterpartyKey,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CounterpartyCodeHistoryRow{}
+	for rows.Next() {
+		var i CounterpartyCodeHistoryRow
+		if err := rows.Scan(&i.AccountCode, &i.Uses, &i.LastUsedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteEngagementReviewSetting = `-- name: DeleteEngagementReviewSetting :execrows
 DELETE FROM review_settings
 WHERE organization_id = $1 AND engagement_id = $2 AND kind = $3

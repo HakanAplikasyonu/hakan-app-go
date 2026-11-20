@@ -6461,6 +6461,32 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/suggestions/history:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Review]
+      operationId: getCounterpartyCodeHistory
+      summary: Counterparty's past line account codes
+      description: |
+        Requires `tenant.review.read`, `tenant.engagements.read` and engagement access. Line account codes (`invoice_item` / `account_code`) of the engagement's accepted, corrected and auto-accepted suggestions for one counterparty (provenance input `counterparty_key`), most used first, over all decisions (#669 L).
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: counterparty, in: query, required: true, description: "The suggestion's `provenance.inputs.counterparty_key`", schema: { type: string, minLength: 1 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 20, default: 5 } }
+      responses:
+        "200":
+          description: Codes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeCounterpartyCodeHistory" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/suggestions:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -25075,6 +25101,28 @@ components:
             items:
               type: array
               items: { $ref: "#/components/schemas/AccountRuleCandidate" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    CounterpartyCodeUse:
+      type: object
+      required: [account_code, uses, last_used_at]
+      properties:
+        account_code: { type: string }
+        uses: { type: integer, format: int64 }
+        last_used_at: { type: string, format: date-time }
+
+    EnvelopeCounterpartyCodeHistory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/CounterpartyCodeUse" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeAccountSuggestionList:

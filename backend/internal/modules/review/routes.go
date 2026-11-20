@@ -44,6 +44,7 @@ func (m Module) Routes(r *module.Router) {
 	}
 	base := "/v1/tenant/engagements/{engagementUuid}"
 	r.Tenant("GET "+base+"/suggestions", read, h.ListEngagement, eng...)
+	r.Tenant("GET "+base+"/suggestions/history", read, h.CounterpartyHistory, eng...)
 	r.Tenant("GET "+base+"/suggestions/{suggestionUuid}", read, h.Get, eng...)
 	r.Tenant("POST "+base+"/suggestions/{suggestionUuid}/accept", decide, h.Accept, eng...)
 	r.Tenant("POST "+base+"/suggestions/{suggestionUuid}/reject", decide, h.Reject, eng...)
