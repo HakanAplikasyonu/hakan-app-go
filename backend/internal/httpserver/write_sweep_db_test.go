@@ -208,6 +208,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":              {body: `{"invoice_uuids":["00000000-0000-0000-0000-000000000001"]}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":           {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account":              {body: `{"account_code":"120.01.001"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {body: `{"excluded":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                   {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":             {body: sweepRange},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":                 {body: `{"sync_interval_minutes":60}`},

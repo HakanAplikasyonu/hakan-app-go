@@ -765,6 +765,10 @@ type Querier interface {
 	ListAssignedCodesMissingFromPlan(ctx context.Context, arg ListAssignedCodesMissingFromPlanParams) ([]ListAssignedCodesMissingFromPlanRow, error)
 	ListAssignedEngagements(ctx context.Context, arg ListAssignedEngagementsParams) ([]ListAssignedEngagementsRow, error)
 	ListBabsDeclarations(ctx context.Context, arg ListBabsDeclarationsParams) ([]BabsDeclaration, error)
+	// Bakiye uyuşmazlığında bakılacak hareketler (#710): içe aktarmanın olası
+	// mükerrer dediği ya da aynı hesapta aynı gün, yön ve tutarda ikizi olan
+	// hareketler; ofisin hesaptan çıkardıkları da (geri alınabilsin diye).
+	ListBankBalanceSuspects(ctx context.Context, arg ListBankBalanceSuspectsParams) ([]ListBankBalanceSuspectsRow, error)
 	// Banka web servisi bağlantıları (#49): source_connections üzerinde
 	// (source_system = 'bank_<id>'), mükellef kapsamında.
 	ListBankConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -1413,6 +1417,9 @@ type Querier interface {
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
+	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
+	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
+	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error
