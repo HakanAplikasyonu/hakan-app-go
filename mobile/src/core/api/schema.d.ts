@@ -6916,6 +6916,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/journal-transfers": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide latest transfers to the accounting program
+         * @description Requires `tenant.journals.read` (#574). The latest transfer of every
+         *     export of the office (a retry hides the earlier failure), newest
+         *     first; without `tenant.engagements.read_all` only the caller's
+         *     assigned engagements. `status` filters on that latest state. An
+         *     imported transfer carries the trial balance (mizan) check of its
+         *     period when the caller has `tenant.reconciliation.read`.
+         */
+        get: operations["listOfficeJournalTransfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/journal-transfers/pending": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide taxpayer periods with entries not yet in the program
+         * @description Requires `tenant.journals.read` (#574). One row per taxpayer and
+         *     period, oldest period first: approved entries without an export,
+         *     exported entries whose latest transfer is under way, and those
+         *     whose latest transfer failed. Exports that were only downloaded or
+         *     whose transfer was cancelled are not counted. Without
+         *     `tenant.engagements.read_all` only the caller's assigned
+         *     engagements.
+         */
+        get: operations["listOfficePendingJournalTransfers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-drafts": {
         parameters: {
             query?: never;
@@ -18006,6 +18069,92 @@ export interface components {
             /** @enum {boolean} */
             success: true;
             data: components["schemas"]["JournalTransferPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        /**
+         * @description Trial balance (mizan) check of an imported transfer's period (#574):
+         *     the latest reconciliation run of the period. `stale`: compared
+         *     before the transfer was imported; `none`: never compared. `issues`
+         *     counts differing accounts plus accounts missing in the ledger or
+         *     in the sources.
+         */
+        JournalTransferCheck: {
+            /** @enum {string} */
+            status: "ok" | "differences" | "stale" | "none";
+            /** Format: int64 */
+            issues: number;
+            /** Format: date-time */
+            run_at?: string;
+        };
+        OfficeJournalTransfer: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: uuid */
+            batch_uuid: string;
+            /** @description The export's period; for an export taken without one, the earliest period of its entries. */
+            period?: string;
+            driver: string;
+            status: components["schemas"]["JournalTransferStatus"];
+            error_message?: string;
+            /** Format: date-time */
+            completed_at?: string;
+            /** Format: date-time */
+            created_at: string;
+            check?: components["schemas"]["JournalTransferCheck"];
+        };
+        OfficeJournalTransferPage: {
+            items: components["schemas"]["OfficeJournalTransfer"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EnvelopeOfficeJournalTransferPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["OfficeJournalTransferPage"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        PendingJournalTransfer: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** @example 2026-10 */
+            period: string;
+            /**
+             * Format: int64
+             * @description Approved entries without an export
+             */
+            approved: number;
+            /**
+             * Format: int64
+             * @description Exported entries whose latest transfer is under way
+             */
+            in_transfer: number;
+            /**
+             * Format: int64
+             * @description Exported entries whose latest transfer failed
+             */
+            failed: number;
+        };
+        PendingJournalTransferPage: {
+            items: components["schemas"]["PendingJournalTransfer"][];
+            /** Format: int64 */
+            total: number;
+            /** Format: int32 */
+            limit: number;
+            /** Format: int32 */
+            offset: number;
+        };
+        EnvelopePendingJournalTransferPage: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["PendingJournalTransferPage"];
             meta: components["schemas"]["ResponseMeta"];
         };
         PrivacyRequestInput: {
@@ -31266,6 +31415,72 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficeJournalTransfers: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["JournalTransferStatus"];
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Transfers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeOfficeJournalTransferPage"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listOfficePendingJournalTransfers: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending taxpayer periods */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopePendingJournalTransferPage"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];

@@ -9274,6 +9274,69 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/journal-transfers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Journals]
+      operationId: listOfficeJournalTransfers
+      summary: Office-wide latest transfers to the accounting program
+      description: |
+        Requires `tenant.journals.read` (#574). The latest transfer of every
+        export of the office (a retry hides the earlier failure), newest
+        first; without `tenant.engagements.read_all` only the caller's
+        assigned engagements. `status` filters on that latest state. An
+        imported transfer carries the trial balance (mizan) check of its
+        period when the caller has `tenant.reconciliation.read`.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { $ref: "#/components/schemas/JournalTransferStatus" } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Transfers
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeOfficeJournalTransferPage"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/journal-transfers/pending:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Journals]
+      operationId: listOfficePendingJournalTransfers
+      summary: Office-wide taxpayer periods with entries not yet in the program
+      description: |
+        Requires `tenant.journals.read` (#574). One row per taxpayer and
+        period, oldest period first: approved entries without an export,
+        exported entries whose latest transfer is under way, and those
+        whose latest transfer failed. Exports that were only downloaded or
+        whose transfer was cancelled are not counted. Without
+        `tenant.engagements.read_all` only the caller's assigned
+        engagements.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+      responses:
+        "200":
+          description: Pending taxpayer periods
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePendingJournalTransferPage"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-drafts:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22878,6 +22941,83 @@ components:
       properties:
         success: { type: boolean, enum: [true] }
         data: { $ref: "#/components/schemas/JournalTransferPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    JournalTransferCheck:
+      type: object
+      description: |
+        Trial balance (mizan) check of an imported transfer's period (#574):
+        the latest reconciliation run of the period. `stale`: compared
+        before the transfer was imported; `none`: never compared. `issues`
+        counts differing accounts plus accounts missing in the ledger or
+        in the sources.
+      required: [status, issues]
+      properties:
+        status: { type: string, enum: [ok, differences, stale, none] }
+        issues: { type: integer, format: int64 }
+        run_at: { type: string, format: date-time }
+
+    OfficeJournalTransfer:
+      type: object
+      required: [uuid, engagement_uuid, taxpayer_title, batch_uuid, driver, status, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        batch_uuid: { type: string, format: uuid }
+        period:
+          type: string
+          description: The export's period; for an export taken without one, the earliest period of its entries.
+        driver: { type: string }
+        status: { $ref: "#/components/schemas/JournalTransferStatus" }
+        error_message: { type: string }
+        completed_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        check: { $ref: "#/components/schemas/JournalTransferCheck" }
+
+    OfficeJournalTransferPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/OfficeJournalTransfer" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    EnvelopeOfficeJournalTransferPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/OfficeJournalTransferPage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    PendingJournalTransfer:
+      type: object
+      required: [engagement_uuid, taxpayer_title, period, approved, in_transfer, failed]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        period: { type: string, example: "2026-10" }
+        approved: { type: integer, format: int64, description: Approved entries without an export }
+        in_transfer: { type: integer, format: int64, description: Exported entries whose latest transfer is under way }
+        failed: { type: integer, format: int64, description: Exported entries whose latest transfer failed }
+
+    PendingJournalTransferPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/PendingJournalTransfer" } }
+        total: { type: integer, format: int64 }
+        limit: { type: integer, format: int32 }
+        offset: { type: integer, format: int32 }
+
+    EnvelopePendingJournalTransferPage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/PendingJournalTransferPage" }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     PrivacyRequestInput:

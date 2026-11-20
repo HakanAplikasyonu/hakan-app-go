@@ -64,6 +64,10 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	// Office-wide export settings (#466): integrators Luca fetches itself.
 	mux.Handle("GET /v1/tenant/journal-export-settings", tenant(read, h.getOfficeSettings))
 	mux.Handle("PUT /v1/tenant/journal-export-settings", tenant(export, h.putOfficeSettings))
+	// Office-wide transfer overview (#574): pending entries per taxpayer
+	// period and the latest transfers with their trial balance check.
+	mux.Handle("GET /v1/tenant/journal-transfers", tenant(read, h.listOfficeTransfers))
+	mux.Handle("GET /v1/tenant/journal-transfers/pending", tenant(read, h.listOfficePending))
 	base := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}"
 	mux.Handle("GET "+base+"/journal-drafts", engaged(read, h.listDrafts))
 	mux.Handle("POST "+base+"/journal-drafts", engaged(write, h.createDraft))

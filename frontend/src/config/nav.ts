@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowRightLeft,
   Bell,
   BookOpenCheck,
   BrainCircuit,
@@ -356,6 +357,13 @@ export function tenantNav(slug: string): NavCatalog {
             titleKey: "office.journals.nav",
             href: routes.tenant.journals(slug),
             icon: BookOpenCheck,
+            permission: permissions.tenant.journals.read,
+          },
+          {
+            id: "transfers",
+            titleKey: "office.transfers.nav",
+            href: routes.tenant.transfers(slug),
+            icon: ArrowRightLeft,
             permission: permissions.tenant.journals.read,
           },
           {

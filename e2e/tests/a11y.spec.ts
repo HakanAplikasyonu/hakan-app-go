@@ -49,6 +49,8 @@ test.describe("@a11y ofis paneli", () => {
       "/whatsapp",
       `/upload?taxpayer=${atlas}`,
       `/journals?taxpayer=${atlas}`,
+      // Ofis geneli programa aktarımlar (#574).
+      "/transfers",
       // Co-pilot çubuğu mükellef ekranlarında (#392).
       `/engagements/${atlas}`,
       `/engagements/${atlas}/payroll`,

@@ -24,7 +24,7 @@ import {
 } from "@/components/tables";
 import { Button } from "@/components/ui/button";
 import { permissions } from "@/config/permissions";
-import { routes } from "@/config/routes";
+import { routes, TRANSFERS_ANCHOR } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { useDialogs } from "@/providers/dialog-provider";
@@ -374,6 +374,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
   if (!transfers.isLoading && !transfers.isError && items.length === 0) {
     return (
       <Panel
+        id={TRANSFERS_ANCHOR}
         title={t("office.journals.transfers_title")}
         description={t("office.journals.transfers_description")}
       >
@@ -386,6 +387,7 @@ export function JournalTransfersPanel({ engagement }: { engagement: string }) {
 
   return (
     <Panel
+      id={TRANSFERS_ANCHOR}
       title={t("office.journals.transfers_title")}
       description={t("office.journals.transfers_description")}
     >

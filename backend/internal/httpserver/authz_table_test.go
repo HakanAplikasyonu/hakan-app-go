@@ -500,6 +500,8 @@ var authzTable = map[string]authzClass{
 	"GET /v1/tenant/export-drivers":                                                                             azTenantRead,
 	"GET /v1/tenant/journal-export-settings":                                                                    azTenantRead,
 	"PUT /v1/tenant/journal-export-settings":                                                                    azTenantWrite,
+	"GET /v1/tenant/journal-transfers":                                                                          azTenantRead,
+	"GET /v1/tenant/journal-transfers/pending":                                                                  azTenantRead,
 	"GET /v1/tenant/invitations":                                                                                azTenantRead,
 	"POST /v1/tenant/invitations":                                                                               azTenantWrite,
 	"DELETE /v1/tenant/invitations/{uuid}":                                                                      azTenantWrite,
