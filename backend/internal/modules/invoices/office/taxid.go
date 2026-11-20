@@ -59,13 +59,13 @@ func (h *Handler) setCounterpartyTaxID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if inv.CustomerTaxNumber.Valid || inv.CustomerIdentityNumber.Valid {
-		response.Error(w, r, http.StatusConflict, "TAX_ID_SET", "the invoice already has a counterparty tax id")
+		response.Error(w, r, http.StatusUnprocessableEntity, "TAX_ID_SET", "the invoice already has a counterparty tax id")
 		return
 	}
 	if _, err := h.q.GetPeriodLock(r.Context(), db.GetPeriodLockParams{
 		OrganizationID: s.OrganizationID, EngagementID: s.ID, Period: inv.Period,
 	}); err == nil {
-		response.Error(w, r, http.StatusConflict, "PERIOD_LOCKED", "the period is locked")
+		response.Error(w, r, http.StatusUnprocessableEntity, "PERIOD_LOCKED", "the period is locked")
 		return
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		response.InternalErr(w, r, err, "could not check the period lock")
@@ -85,7 +85,7 @@ func (h *Handler) setCounterpartyTaxID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if n == 0 {
-		response.Error(w, r, http.StatusConflict, "TAX_ID_SET", "the invoice already has a counterparty tax id")
+		response.Error(w, r, http.StatusUnprocessableEntity, "TAX_ID_SET", "the invoice already has a counterparty tax id")
 		return
 	}
 	if _, err := h.q.ResolveEntityDataWarnings(r.Context(), db.ResolveEntityDataWarningsParams{

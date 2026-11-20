@@ -6997,8 +6997,12 @@ export interface paths {
          *     created; the open INVALID_TAX_ID warning of the invoice is resolved;
          *     who and when are recorded. The invoice then counts in Ba/Bs and in
          *     bank matching by number.
-         *     400 `INVALID_TAX_ID`; 409 `TAX_ID_SET` (already has a number),
-         *     `PERIOD_LOCKED` (the invoice's period is locked).
+         *     The answer does not depend on whether the number is registered on
+         *     the platform (D1b): only this taxpayer's own counterparties are
+         *     looked up, and the response is the invoice.
+         *     400 `INVALID_TAX_ID`; 422 `TAX_ID_SET` (the invoice already has a
+         *     number), `PERIOD_LOCKED` (the invoice's period is locked). No 409:
+         *     a conflict answer would read as an existence answer.
          */
         put: operations["setEngagementInvoiceCounterpartyTaxId"];
         post?: never;
@@ -32174,7 +32178,15 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
-            409: components["responses"]["Conflict"];
+            /** @description `TAX_ID_SET`, `PERIOD_LOCKED` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };

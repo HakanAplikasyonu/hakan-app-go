@@ -16,7 +16,7 @@ import {
  * karşı tarafın numarası geçersizse fatura Ba/Bs'ye ve numarayla banka
  * eşleşmesine girmez. Müşavir belge yan panelinde "VKN'yi gir" ile doğru
  * numarayı yazar; sunucu denetler, cariyi bağlar, uyarıyı çözülmüş yapar,
- * kimin ne zaman girdiğini tutar. Geçersiz numara 400, ikinci giriş 409.
+ * kimin ne zaman girdiğini tutar. Geçersiz numara 400, ikinci giriş 422.
  *
  * Veri: her koşuda yeni bir mükellef; ona demo atlas-01'den türetilen bir
  * satış faturası yüklenir, alıcının TCKN'si geçersiz yapılır.
@@ -120,7 +120,7 @@ test("geçersiz VKN'li faturada numara panelden girilir, uyarı çözülür", as
   const again = await api.put(`${url}/counterparty-tax-id`, {
     tax_id: uniqueVkn(),
   });
-  expect(again.status()).toBe(409);
+  expect(again.status()).toBe(422);
   expect(await again.text()).toContain("TAX_ID_SET");
   await api.dispose();
 });
