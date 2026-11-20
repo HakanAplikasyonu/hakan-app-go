@@ -93,6 +93,20 @@ export const payrollService = {
       { body, silent: true },
     );
   },
+  /** Gönderilmeyen alan aynı kalır; boş metin alanı temizler. */
+  updateEmployee(
+    slug: string,
+    engagement: string,
+    employee: string,
+    body: PayrollEmployeeInput,
+  ) {
+    return tenantRequest<PayrollEmployee>(
+      slug,
+      "PATCH",
+      `${root(engagement)}/employees/${encodeURIComponent(employee)}`,
+      { body, silent: true },
+    );
+  },
   runs(slug: string, engagement: string, year?: string) {
     return tenantRequest<PayrollRunPage>(
       slug,

@@ -14,6 +14,8 @@ import {
   FileText,
   Landmark,
   Link2,
+  Pencil,
+  Plus,
   Upload,
   Users,
 } from "lucide-react";
@@ -22,6 +24,7 @@ import { toast } from "sonner";
 
 import { EntityTable } from "@/components/entity";
 import {
+  createActionsColumn,
   createColumn,
   createDateColumn,
   createMoneyColumn,
@@ -52,6 +55,7 @@ import {
   type SgkPremium,
 } from "../services/payroll.service";
 import { Money } from "./office-ui";
+import { PayrollEmployeeDialog } from "./payroll-employee-dialog";
 import { useRelatedColumn } from "./related-column";
 
 /** Form alanı etiketi: normal kalınlıkta (önceki görünümle aynı). */
@@ -683,6 +687,11 @@ function ImportPanel({
 function EmployeesView({ engagement }: { engagement: string }) {
   const { t } = useLocale();
   const { slug } = useTenant();
+  const { can } = usePermission();
+  const canWrite = can(Permission.TenantPayrollWrite);
+  const qc = useQueryClient();
+  // #669 J: elle ekleme / düzenleme penceresi; "new" yeni personel.
+  const [dialog, setDialog] = useState<PayrollEmployee | "new" | null>(null);
   const [status, setStatus] = useState<"active" | "exited" | "all">("active");
   const [offset, setOffset] = useState(0);
   const list = useQuery({
@@ -741,8 +750,30 @@ function EmployeesView({ engagement }: { engagement: string }) {
         variants: employeeVariants,
         fallback: employeeVariants.active,
       }),
+      ...(canWrite
+        ? [
+            createActionsColumn<PayrollEmployee>({
+              cell: (e) => (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="max-md:min-h-11"
+                  aria-label={t("office.payroll.employee_edit", {
+                    name: e.full_name,
+                  })}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    setDialog(e);
+                  }}
+                >
+                  <Pencil aria-hidden className="size-4" />
+                </Button>
+              ),
+            }),
+          ]
+        : []),
     ],
-    [],
+    [canWrite, t],
   );
   const data = list.data;
   return (
@@ -772,13 +803,37 @@ function EmployeesView({ engagement }: { engagement: string }) {
           </Button>
         ))}
       </div>
-      <ListExportButton
-        onExport={() =>
-          payrollService.exportEmployees(slug, engagement, {
-            status: status === "all" ? undefined : status,
-          })
-        }
-      />
+      <div className="flex flex-wrap justify-end gap-2">
+        {canWrite ? (
+          <Button
+            size="sm"
+            className="max-md:min-h-11"
+            onClick={() => setDialog("new")}
+          >
+            <Plus aria-hidden className="size-4" />
+            {t("office.payroll.employee_add")}
+          </Button>
+        ) : null}
+        <ListExportButton
+          onExport={() =>
+            payrollService.exportEmployees(slug, engagement, {
+              status: status === "all" ? undefined : status,
+            })
+          }
+        />
+      </div>
+      {dialog ? (
+        <PayrollEmployeeDialog
+          engagement={engagement}
+          employee={dialog === "new" ? null : dialog}
+          onClose={() => setDialog(null)}
+          onSaved={() =>
+            void qc.invalidateQueries({
+              queryKey: payrollKeys.all(slug, engagement),
+            })
+          }
+        />
+      ) : null}
       <EntityTable<PayrollEmployee>
         columns={columns}
         data={data?.items ?? []}
