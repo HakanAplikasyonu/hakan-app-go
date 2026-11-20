@@ -21,12 +21,14 @@ SELECT count(*)::bigint AS total,
        count(*) FILTER (WHERE category = 'isg' AND valid_until >= $1::date AND valid_until <= $2::date)::bigint AS isg_expiring
 FROM taxpayer_documents
 WHERE taxpayer_id = $3
+  AND (NOT $4::bool OR visible_to_taxpayer)
 `
 
 type CountTaxpayerDocumentsParams struct {
-	Today      pgtype.Date `json:"today"`
-	Soon       pgtype.Date `json:"soon"`
-	TaxpayerID int64       `json:"taxpayer_id"`
+	Today       pgtype.Date `json:"today"`
+	Soon        pgtype.Date `json:"soon"`
+	TaxpayerID  int64       `json:"taxpayer_id"`
+	OnlyVisible bool        `json:"only_visible"`
 }
 
 type CountTaxpayerDocumentsRow struct {
@@ -40,8 +42,14 @@ type CountTaxpayerDocumentsRow struct {
 
 // Sekme sayaçları ve bitiş uyarısı: kategori başına sayı, süresi dolan ve
 // soon tarihine kadar bitecek evrak (bütün arşiv ve yalnızca İSG).
+// only_visible: mükellef panelinde yalnızca "Mükellef de görsün" işaretliler.
 func (q *Queries) CountTaxpayerDocuments(ctx context.Context, arg CountTaxpayerDocumentsParams) (CountTaxpayerDocumentsRow, error) {
-	row := q.db.QueryRow(ctx, countTaxpayerDocuments, arg.Today, arg.Soon, arg.TaxpayerID)
+	row := q.db.QueryRow(ctx, countTaxpayerDocuments,
+		arg.Today,
+		arg.Soon,
+		arg.TaxpayerID,
+		arg.OnlyVisible,
+	)
 	var i CountTaxpayerDocumentsRow
 	err := row.Scan(
 		&i.Total,
@@ -176,20 +184,22 @@ const listTaxpayerDocuments = `-- name: ListTaxpayerDocuments :many
 SELECT d.id, d.uuid, d.taxpayer_id, d.category, d.isg_kind, d.title, d.note, d.document_date, d.valid_until, d.storage_key, d.sha256, d.size_bytes, d.content_type, d.file_name, d.visible_to_taxpayer, d.created_by, d.created_at, d.updated_at, count(*) OVER ()::bigint AS total_count
 FROM taxpayer_documents d
 WHERE d.taxpayer_id = $1
-  AND ($2::text IS NULL OR d.category = $2::text)
-  AND ($3::text IS NULL OR d.isg_kind = $3::text)
-  AND ($4::text IS NULL
-       OR d.title ILIKE '%' || $4::text || '%'
-       OR d.file_name ILIKE '%' || $4::text || '%'
-       OR d.note ILIKE '%' || $4::text || '%')
-  AND ($5::date IS NULL OR (d.valid_until IS NOT NULL AND d.valid_until <= $5::date))
-ORDER BY CASE WHEN $5::date IS NOT NULL THEN d.valid_until END ASC NULLS LAST,
+  AND (NOT $2::bool OR d.visible_to_taxpayer)
+  AND ($3::text IS NULL OR d.category = $3::text)
+  AND ($4::text IS NULL OR d.isg_kind = $4::text)
+  AND ($5::text IS NULL
+       OR d.title ILIKE '%' || $5::text || '%'
+       OR d.file_name ILIKE '%' || $5::text || '%'
+       OR d.note ILIKE '%' || $5::text || '%')
+  AND ($6::date IS NULL OR (d.valid_until IS NOT NULL AND d.valid_until <= $6::date))
+ORDER BY CASE WHEN $6::date IS NOT NULL THEN d.valid_until END ASC NULLS LAST,
          COALESCE(d.document_date, (d.created_at AT TIME ZONE 'Europe/Istanbul')::date) DESC, d.id DESC
-LIMIT $7 OFFSET $6
+LIMIT $8 OFFSET $7
 `
 
 type ListTaxpayerDocumentsParams struct {
 	TaxpayerID    int64       `json:"taxpayer_id"`
+	OnlyVisible   bool        `json:"only_visible"`
 	Category      pgtype.Text `json:"category"`
 	IsgKind       pgtype.Text `json:"isg_kind"`
 	Q             pgtype.Text `json:"q"`
@@ -225,6 +235,7 @@ type ListTaxpayerDocumentsRow struct {
 func (q *Queries) ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDocumentsParams) ([]ListTaxpayerDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, listTaxpayerDocuments,
 		arg.TaxpayerID,
+		arg.OnlyVisible,
 		arg.Category,
 		arg.IsgKind,
 		arg.Q,

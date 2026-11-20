@@ -61,6 +61,10 @@ export function TaxpayerNav({
             href: routes.taxpayer.payroll(taxpayer),
             label: t("taxpayer.nav_payroll"),
           },
+          {
+            href: routes.taxpayer.archive(taxpayer),
+            label: t("taxpayer.nav_archive"),
+          },
         ]
       : []),
     {
