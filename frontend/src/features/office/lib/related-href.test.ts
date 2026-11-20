@@ -4,6 +4,7 @@ import { routes } from "@/config/routes";
 
 import {
   checklistHref,
+  panelTarget,
   parseFocus,
   reconciliationItemHref,
   relatedHref,
@@ -121,5 +122,23 @@ describe("warningRecordHref", () => {
   it("kaydı olmayan ya da bilinmeyen türde bağlantı yok", () => {
     expect(warningRecordHref("demo", w("period", null))).toBeNull();
     expect(warningRecordHref("demo", w("unknown"))).toBeNull();
+  });
+});
+
+describe("panelTarget", () => {
+  it("panelin gösterebildiği türler panelde açılır (#564)", () => {
+    for (const kind of [
+      "bank_transaction",
+      "invoice",
+      "retail_sale",
+      "expense",
+    ] as const)
+      expect(panelTarget({ kind, uuid: U })).toEqual({ kind, uuid: U });
+  });
+  it("diğer türler ve kimliksiz kayıt bağlantı olarak kalır", () => {
+    expect(panelTarget({ kind: "journal_draft", uuid: U })).toBeNull();
+    expect(panelTarget({ kind: "warning", uuid: U })).toBeNull();
+    expect(panelTarget({ kind: "rule", uuid: null })).toBeNull();
+    expect(panelTarget({ kind: "invoice", uuid: null })).toBeNull();
   });
 });

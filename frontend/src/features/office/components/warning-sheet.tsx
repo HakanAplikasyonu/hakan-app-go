@@ -3,7 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +27,7 @@ import {
   BankBalanceCheckPanel,
 } from "./bank-balance-check";
 import { RecordDetail } from "./record-detail";
+import type { OpenRelated } from "./related-records";
 import { ApiWarningActions } from "./warning-actions";
 import { WarningTransactions } from "./warning-transactions";
 import { useApiWarningText, useEntityLabel } from "./warnings-page";
@@ -99,6 +100,26 @@ export function WarningSheet({
     openUuid,
     last,
   );
+  // İlişkili kayıtlar panelin içinde açılır (#564): açılanlar yığında,
+  // "Geri" bir öncekine, en sonunda uyarıya döner. Başka uyarıya geçince
+  // yığın kendiliğinden boşalır.
+  const [trail, setTrail] = useState<{
+    warning: string;
+    items: Parameters<OpenRelated>[0][];
+  }>({ warning: "", items: [] });
+  const stack = current && trail.warning === current.uuid ? trail.items : [];
+  const top = stack.at(-1) ?? null;
+  const openRelated: OpenRelated = (target) => {
+    if (!current) return;
+    setTrail({ warning: current.uuid, items: [...stack, target] });
+  };
+  const back = () => setTrail((s) => ({ ...s, items: s.items.slice(0, -1) }));
+  const backRef = useRef<HTMLButtonElement>(null);
+  const depth = stack.length;
+  useEffect(() => {
+    if (depth > 0) backRef.current?.focus();
+  }, [depth, top?.uuid]);
+
   const goPrev = () => prev && open(prev, items.indexOf(prev));
   const goNext = () => next && open(next, items.indexOf(next));
 
@@ -176,7 +197,39 @@ export function WarningSheet({
           <SheetDescription>{t("office.warning_sheet.hint")}</SheetDescription>
         </SheetHeader>
 
-        {!current ? null : (
+        {current && top ? (
+          <div className="mt-4 space-y-5" data-testid="warning-related-record">
+            <div className="space-y-1">
+              <Button
+                ref={backRef}
+                size="sm"
+                variant="ghost"
+                className="-ms-2"
+                onClick={back}
+                data-testid="warning-related-back"
+              >
+                <ChevronLeft className="size-4" aria-hidden />
+                {depth > 1
+                  ? t("office.warning_sheet.related_back_step")
+                  : t("office.warning_sheet.related_back")}
+              </Button>
+              <h3 className="text-sm font-semibold">
+                {t("office.warning_sheet.related_title", {
+                  kind: t(`office.related.kind.${top.kind}`),
+                  record: top.label || "—",
+                })}
+              </h3>
+            </div>
+            <RecordDetail
+              key={`${top.kind}:${top.uuid}`}
+              engagement={current.engagement_uuid}
+              entityType={top.kind}
+              kind={top.kind}
+              uuid={top.uuid}
+              onOpenRelated={openRelated}
+            />
+          </div>
+        ) : !current ? null : (
           <div className="mt-4 space-y-5">
             <section
               className="border-line space-y-2 rounded-xl border p-3"
@@ -264,6 +317,7 @@ export function WarningSheet({
               kind={kind}
               uuid={current.entity_uuid ?? null}
               warning={current.uuid}
+              onOpenRelated={openRelated}
             />
           </div>
         )}

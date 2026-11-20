@@ -210,3 +210,23 @@ export function warningRecordHref(
     label: "",
   });
 }
+
+/** Uyarı yan panelinin kendi içinde gösterebildiği kayıt türleri (#564). */
+const PANEL_KINDS: RelatedSourceKind[] = [
+  "bank_transaction",
+  "invoice",
+  "retail_sale",
+  "expense",
+];
+
+/**
+ * İlişkili kaydın uyarı panelinin içinde açılacak hali (#564): yalnızca
+ * panelin ayrıntısını gösterebildiği türler (banka hareketi, fatura, Z
+ * raporu, masraf); diğerleri için null, bağlantı kendi sekmesine gider.
+ */
+export function panelTarget(
+  item: Pick<RelatedRecord, "kind" | "uuid">,
+): { kind: RelatedSourceKind; uuid: string } | null {
+  const kind = PANEL_KINDS.find((k) => k === item.kind);
+  return kind && item.uuid ? { kind, uuid: item.uuid } : null;
+}
