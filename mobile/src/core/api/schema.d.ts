@@ -17980,6 +17980,11 @@ export interface components {
                 suggested: number;
                 /** Format: int64 */
                 matched: number;
+                /**
+                 * Format: int64
+                 * @description Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)
+                 */
+                unmatched_booked: number;
             };
         };
         /** @description An employee of the taxpayer (#382). The national id is never returned in clear. */

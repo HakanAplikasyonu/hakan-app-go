@@ -1673,7 +1673,12 @@ SELECT count(*)::bigint AS total,
        COALESCE(sum(bt.amount) FILTER (WHERE bt.debit_credit = 'B'), 0)::numeric(18,4) AS out_total,
        count(*) FILTER (WHERE bt.match_status = 'unmatched')::bigint AS unmatched,
        count(*) FILTER (WHERE bt.match_status = 'suggested')::bigint AS suggested,
-       count(*) FILTER (WHERE bt.match_status = 'matched')::bigint AS matched
+       count(*) FILTER (WHERE bt.match_status = 'matched')::bigint AS matched,
+       -- Faturayla eşleşmemiş ama karşı hesabı onaylanmış (vergi, SGK, maaş,
+       -- masraf …): iş bitmiştir, bekleyen sayılmaz (#710).
+       count(*) FILTER (WHERE bt.match_status = 'unmatched' AND EXISTS (
+           SELECT 1 FROM bank_transaction_postings p
+           WHERE p.taxpayer_id = bt.taxpayer_id AND p.bank_transaction_id = bt.id AND p.status = 'approved'))::bigint AS unmatched_booked
 FROM bank_transactions bt
 JOIN cash_boxes cb ON cb.id = bt.cash_box_id AND cb.taxpayer_id = bt.taxpayer_id
 WHERE bt.taxpayer_id = $1 AND NOT bt.is_cancelled
@@ -1688,12 +1693,13 @@ type SummarizeBankTransactionsParams struct {
 }
 
 type SummarizeBankTransactionsRow struct {
-	Total     int64          `json:"total"`
-	InTotal   pgtype.Numeric `json:"in_total"`
-	OutTotal  pgtype.Numeric `json:"out_total"`
-	Unmatched int64          `json:"unmatched"`
-	Suggested int64          `json:"suggested"`
-	Matched   int64          `json:"matched"`
+	Total           int64          `json:"total"`
+	InTotal         pgtype.Numeric `json:"in_total"`
+	OutTotal        pgtype.Numeric `json:"out_total"`
+	Unmatched       int64          `json:"unmatched"`
+	Suggested       int64          `json:"suggested"`
+	Matched         int64          `json:"matched"`
+	UnmatchedBooked int64          `json:"unmatched_booked"`
 }
 
 // Aynı süzgeçle sayı, giriş (A, alacak) / çıkış (B, borç) toplamı ve eşleşme
@@ -1708,6 +1714,7 @@ func (q *Queries) SummarizeBankTransactions(ctx context.Context, arg SummarizeBa
 		&i.Unmatched,
 		&i.Suggested,
 		&i.Matched,
+		&i.UnmatchedBooked,
 	)
 	return i, err
 }
