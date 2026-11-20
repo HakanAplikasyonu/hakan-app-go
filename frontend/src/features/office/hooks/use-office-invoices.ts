@@ -9,6 +9,8 @@ import {
 
 import { keepPreviousWithin } from "@/lib/query/keep-previous";
 
+import { useEngagementDirectory } from "./use-engagement-directory";
+
 import {
   officeInvoiceKeys,
   officeInvoiceService,
@@ -25,29 +27,49 @@ export type EngagementOption = {
 
 /**
  * Active engagements the caller may see, each with its taxpayer title and
- * VKN/TCKN (one request per engagement: the list carries no taxpayer name).
+ * VKN/TCKN. The engagement list gives the order (newest first, the picker's
+ * default); names come from the office engagement directory (one shared
+ * request) instead of one request per engagement (#639). Only an engagement
+ * the directory does not know is asked one by one.
  */
 export function useEngagementOptions(slug: string) {
   const list = useQuery({
     queryKey: officeInvoiceKeys.engagements(slug),
     queryFn: () => officeInvoiceService.activeEngagements(slug),
   });
+  const directory = useEngagementDirectory();
   const items = list.data?.items ?? [];
+  // Dizin gelmediyse (hata) eski yola düşülür: her mükellef tek tek.
+  const missing = directory.isSuccess
+    ? items.filter((e) => !directory.entries.has(e.uuid))
+    : directory.isError
+      ? items
+      : [];
   const taxpayers = useQueries({
-    queries: items.map((e) => ({
+    queries: missing.map((e) => ({
       queryKey: officeInvoiceKeys.taxpayer(slug, e.uuid),
       queryFn: () => officeInvoiceService.taxpayer(slug, e.uuid),
       staleTime: 5 * 60_000,
     })),
   });
-  const options: EngagementOption[] = items.map((e, i) => ({
-    engagement: e.uuid,
-    title: taxpayers[i]?.data?.title ?? "",
-    taxId: taxpayers[i]?.data?.tax_id ?? "",
-  }));
+  const fallback = new Map(
+    missing.map((e, i) => [e.uuid, taxpayers[i]?.data] as const),
+  );
+  const options: EngagementOption[] = items.map((e) => {
+    const known = directory.entries.get(e.uuid);
+    const extra = fallback.get(e.uuid);
+    return {
+      engagement: e.uuid,
+      title: known?.title ?? extra?.title ?? "",
+      taxId: known?.taxId ?? extra?.tax_id ?? "",
+    };
+  });
   return {
     options,
-    isLoading: list.isLoading || taxpayers.some((q) => q.isLoading),
+    isLoading:
+      list.isLoading ||
+      directory.isLoading ||
+      taxpayers.some((q) => q.isLoading),
     isError: list.isError,
   };
 }
