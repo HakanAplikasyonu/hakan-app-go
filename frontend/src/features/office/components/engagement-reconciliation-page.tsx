@@ -51,6 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { permissions } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -268,6 +269,65 @@ function ReconciliationExplainer() {
   );
 }
 
+/**
+ * Önerinin tek tık eylemi (#669 UX geçişi): öneri "taslakları onaylayıp
+ * dışa aktarın" ya da "portalda da fişleyin" diyorsa, işin yapıldığı
+ * ekrana götürür. Eylemi olmayan önerilerde bağlantı yok.
+ */
+const SUGGESTION_ACTIONS: Partial<
+  Record<
+    NonNullable<ReconciliationItem["suggestion_code"]>,
+    {
+      labelKey: string;
+      href: (slug: string, engagement: string, period: string) => string;
+    }
+  >
+> = {
+  draft_not_exported: {
+    labelKey: "office.reconciliation.go_drafts",
+    href: (slug, e, period) =>
+      `${routes.tenant.engagementJournals(slug, e)}?period=${encodeURIComponent(period)}`,
+  },
+  unposted_sources: {
+    labelKey: "office.reconciliation.go_unposted",
+    href: (slug, e) => routes.tenant.engagementReview(slug, e),
+  },
+  single_unposted: {
+    labelKey: "office.reconciliation.go_unposted",
+    href: (slug, e) => routes.tenant.engagementReview(slug, e),
+  },
+  opening_balance: {
+    labelKey: "office.reconciliation.go_trial_balance",
+    href: (slug, e) => routes.tenant.engagementTrialBalance(slug, e),
+  },
+};
+
+function SuggestionLink({
+  item,
+  engagement,
+  period,
+}: {
+  item: ReconciliationItem;
+  engagement: string;
+  period: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const action = item.suggestion_code
+    ? SUGGESTION_ACTIONS[item.suggestion_code]
+    : undefined;
+  if (!action) return null;
+  return (
+    <Link
+      href={action.href(slug, engagement, period)}
+      className="text-brand-text ms-1 font-medium whitespace-nowrap hover:underline"
+      aria-label={`${t(action.labelKey)}: ${item.main_code} ${item.account_name}`}
+    >
+      {t(action.labelKey)}
+    </Link>
+  );
+}
+
 function AccountsView({
   engagement,
   period,
@@ -426,6 +486,11 @@ function AccountsView({
                 {t("office.reconciliation.suggested")}
               </StatusPill>
               {x.suggestion}
+              <SuggestionLink
+                item={x}
+                engagement={engagement}
+                period={period}
+              />
             </p>
           ) : (
             <span className="text-text-3">—</span>
@@ -500,7 +565,7 @@ function AccountsView({
         ),
       }),
     ],
-    [t, canWrite, decideItem],
+    [t, canWrite, decideItem, engagement, period],
   );
 
   const unpostedAmount = Object.values(sum.unposted).reduce(
