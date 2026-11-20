@@ -165,6 +165,12 @@ export function suggestionContext(s: ReviewSuggestion) {
     lineType: str("line_type"),
     taxRate: str("tax_rate"),
     lineNo: str("line_no"),
+    // Belge bilgisi (#569): hangi fatura, hangi tarih, ne kadar.
+    counterpartyTaxId: str("counterparty_tax_id"),
+    invoiceNumber: str("invoice_number"),
+    issueDate: str("issue_date"),
+    invoiceTotal: str("invoice_total"),
+    lineAmount: str("line_amount"),
   };
 }
 

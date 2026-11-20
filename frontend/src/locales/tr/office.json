@@ -2083,5 +2083,19 @@
   "copilot.next.export_transfer": "Aktarımı kontrol et",
   "picker.choose": "Mükellef seçin",
   "picker.search": "Unvan ya da VKN ara",
-  "picker.empty": "Mükellef bulunamadı."
+  "picker.empty": "Mükellef bulunamadı.",
+  "review_grid.col_document": "Belge",
+  "review_grid.col_amount": "Tutar",
+  "review.correct_value": "Değeri düzelt",
+  "review.correct_unavailable": "Bu öneri türünde değer değiştirilmez; onaylayın ya da reddedin.",
+  "review.value_label": "Doğru değer",
+  "review.value_hint_date": "Tarih: 14.10.2026 gibi yazın.",
+  "review.value_hint_amount": "Tutar: 1.250,00 gibi yazın.",
+  "review.value_hint_text": "Belgede yazdığı gibi yazın.",
+  "review.value_save": "Kaydet ve onayla",
+  "review.value_cancel": "Vazgeç",
+  "review.value_required": "Bir değer yazın.",
+  "review.document": "Belge {{number}}",
+  "review.document_total": "Fatura toplamı {{amount}}",
+  "review.line_amount": "Satır tutarı {{amount}}"
 }

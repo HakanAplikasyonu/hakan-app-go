@@ -2083,5 +2083,19 @@
   "copilot.next.export_transfer": "Check the transfer",
   "picker.choose": "Choose a taxpayer",
   "picker.search": "Search by name or tax ID",
-  "picker.empty": "No taxpayer found."
+  "picker.empty": "No taxpayer found.",
+  "review_grid.col_document": "Document",
+  "review_grid.col_amount": "Amount",
+  "review.correct_value": "Fix value",
+  "review.correct_unavailable": "This suggestion type has no value to change; approve or reject it.",
+  "review.value_label": "Correct value",
+  "review.value_hint_date": "Date: write it like 14.10.2026.",
+  "review.value_hint_amount": "Amount: write it like 1,250.00.",
+  "review.value_hint_text": "Write it as it appears on the document.",
+  "review.value_save": "Save and approve",
+  "review.value_cancel": "Cancel",
+  "review.value_required": "Enter a value.",
+  "review.document": "Document {{number}}",
+  "review.document_total": "Invoice total {{amount}}",
+  "review.line_amount": "Line amount {{amount}}"
 }

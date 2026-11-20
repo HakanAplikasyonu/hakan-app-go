@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { ErrorState } from "@/components/common/error-state";
+import { formatMoney } from "@/lib/decimal";
+import { date as formatDate } from "@/lib/utils/format";
 import {
   EditableGrid,
   type EditableGridColumn,
@@ -90,7 +92,31 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
       {
         id: "counterparty",
         header: t("office.review_grid.col_counterparty"),
-        value: (s) => suggestionContext(s).counterparty ?? "—",
+        value: (s) => {
+          const ctx = suggestionContext(s);
+          return (
+            [ctx.counterparty, ctx.counterpartyTaxId]
+              .filter(Boolean)
+              .join(" · ") || "—"
+          );
+        },
+        width: 220,
+      },
+      {
+        // Belge no ve tarihi (#569): kayıt hangi faturadan.
+        id: "document",
+        header: t("office.review_grid.col_document"),
+        value: (s) => {
+          const ctx = suggestionContext(s);
+          return (
+            [
+              ctx.invoiceNumber,
+              ctx.issueDate ? formatDate(ctx.issueDate) : undefined,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "—"
+          );
+        },
         width: 200,
       },
       {
@@ -101,6 +127,17 @@ export function ReviewGrid({ viewSwitch }: { viewSwitch: ReactNode }) {
           const type = ctx.lineType ? lineTypeLabel(ctx.lineType, t) : "";
           return [ctx.itemName, type].filter(Boolean).join(" · ") || "—";
         },
+      },
+      {
+        id: "amount",
+        header: t("office.review_grid.col_amount"),
+        value: (s) => {
+          const ctx = suggestionContext(s);
+          const v = ctx.lineAmount ?? ctx.invoiceTotal;
+          return v ? formatMoney(v, "TRY") : "—";
+        },
+        align: "end",
+        width: 130,
       },
       {
         id: "proposed",

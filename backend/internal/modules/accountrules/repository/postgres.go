@@ -211,6 +211,10 @@ func (p *Postgres) Invoice(ctx context.Context, taxpayerID int64, id uuid.UUID) 
 	inv := usecase.Invoice{
 		ID: row.ID, UUID: row.Uuid, Direction: row.Direction, Type: row.Type, Period: row.Period,
 		TaxNumber: row.CustomerTaxNumber.String, IdentityNumber: row.CustomerIdentityNumber.String, CustomerName: row.CustomerName.String,
+		Number: row.InvoiceNumber, Total: fromNumeric(row.PayableAmount),
+	}
+	if row.IssueDate.Valid {
+		inv.IssueDate = row.IssueDate.Time.Format("2006-01-02")
 	}
 	if row.CustomerID.Valid {
 		c := row.CustomerID.Int64
@@ -221,7 +225,7 @@ func (p *Postgres) Invoice(ctx context.Context, taxpayerID int64, id uuid.UUID) 
 		return usecase.Invoice{}, fmt.Errorf("list items: %w", err)
 	}
 	for _, it := range items {
-		inv.Lines = append(inv.Lines, usecase.InvoiceLine{ID: it.ID, LineNo: int(it.LineNo), Name: it.Name, LineType: it.LineType, TaxRate: fromNumeric(it.TaxRate)})
+		inv.Lines = append(inv.Lines, usecase.InvoiceLine{ID: it.ID, LineNo: int(it.LineNo), Name: it.Name, LineType: it.LineType, TaxRate: fromNumeric(it.TaxRate), Amount: fromNumeric(it.LineExtensionAmount)})
 	}
 	return inv, nil
 }

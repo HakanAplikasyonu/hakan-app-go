@@ -104,7 +104,8 @@ ORDER BY decisions DESC, account_code;
 
 -- name: GetInvoiceForAccounting :one
 SELECT i.id, i.uuid, i.taxpayer_id, i.direction, i.type, i.period, i.customer_id,
-       i.customer_tax_number, i.customer_identity_number, i.customer_name
+       i.customer_tax_number, i.customer_identity_number, i.customer_name,
+       i.invoice_number, i.issue_date, i.payable_amount
 FROM invoices i
 WHERE i.taxpayer_id = @taxpayer_id AND i.uuid = @uuid;
 
