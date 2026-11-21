@@ -409,6 +409,7 @@ type Querier interface {
 	// Tek hareketin ekranı (#528): hareket, eşleşmeleri ve adayları.
 	GetBankTransactionByUUID(ctx context.Context, arg GetBankTransactionByUUIDParams) (BankTransaction, error)
 	GetBankTransactionForPosting(ctx context.Context, arg GetBankTransactionForPostingParams) (GetBankTransactionForPostingRow, error)
+	GetBankTransactionForTaxPayment(ctx context.Context, arg GetBankTransactionForTaxPaymentParams) (GetBankTransactionForTaxPaymentRow, error)
 	// Hareketin virman karşılığı (#710).
 	GetBankTransferMatch(ctx context.Context, arg GetBankTransferMatchParams) (GetBankTransferMatchRow, error)
 	GetBillingPlan(ctx context.Context, id int64) (BillingPlan, error)
@@ -560,6 +561,8 @@ type Querier interface {
 	// Müşavir mobil inceleme kuyruğu (issue #239).
 	GetSuggestionReviewContext(ctx context.Context, arg GetSuggestionReviewContextParams) (GetSuggestionReviewContextRow, error)
 	GetTaxReturn(ctx context.Context, arg GetTaxReturnParams) (TaxReturn, error)
+	// Tahakkuku kapatan banka hareketi (#575).
+	GetTaxReturnPaymentTransaction(ctx context.Context, arg GetTaxReturnPaymentTransactionParams) (GetTaxReturnPaymentTransactionRow, error)
 	// Beyan son kontrolü ofis ayarı (#710); satırı yoksa varsayılan (açık).
 	GetTaxReturnSettings(ctx context.Context, organizationID int64) (TaxReturnSetting, error)
 	GetTaxpayerByID(ctx context.Context, id int64) (Taxpayer, error)
@@ -1138,6 +1141,10 @@ type Querier interface {
 	ListSubaccountCandidates(ctx context.Context, taxpayerID int64) ([]ListSubaccountCandidatesRow, error)
 	ListSuggestionDecisions(ctx context.Context, arg ListSuggestionDecisionsParams) ([]ListSuggestionDecisionsRow, error)
 	ListSyncRuns(ctx context.Context, arg ListSyncRunsParams) ([]SyncRun, error)
+	// Tahakkuku ödeyebilecek banka çıkışları (#575): TL, iptal edilmemiş, verilme
+	// gününden 5 gün önce ile son günden 60 gün sonra arasında; tutarı tahakkuka
+	// eşit ya da açıklamasında vergi / GİB / tahakkuk geçen. Tutarı tutan önce.
+	ListTaxPaymentCandidates(ctx context.Context, arg ListTaxPaymentCandidatesParams) ([]ListTaxPaymentCandidatesRow, error)
 	ListTaxReturns(ctx context.Context, arg ListTaxReturnsParams) ([]TaxReturn, error)
 	// ---------------------------------------------------------------------------
 	// Mükellef tarafı (/v1/taxpayer/*). Kapsam X-Taxpayer üyeliğidir: görevler
@@ -1305,6 +1312,10 @@ type Querier interface {
 	// önceki üç ayda hareketi olan banka hesabı. Kapanmış hesap üç ay sonra
 	// düşer; açık ay (bugünün ayı) sayılmaz.
 	PeriodMatrixMissingStatements(ctx context.Context, arg PeriodMatrixMissingStatementsParams) ([]PeriodMatrixMissingStatementsRow, error)
+	// Beyandan önce işlenmesi gereken kayıtlar (#575): eşleşmemiş, yok
+	// sayılmamış ve bu angajmanda karşı hesabı onaylanmamış banka hareketleri;
+	// onay bekleyen KDV'li masraf fişleri ve Z raporları.
+	PeriodMatrixPendingWork(ctx context.Context, arg PeriodMatrixPendingWorkParams) ([]PeriodMatrixPendingWorkRow, error)
 	// Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
 	PeriodMatrixReturns(ctx context.Context, arg PeriodMatrixReturnsParams) ([]PeriodMatrixReturnsRow, error)
 	// KDV1 için dönem özeti (yalnızca aktif faturalar).
@@ -1539,6 +1550,8 @@ type Querier interface {
 	// Tahakkuk PDF'i (#575) yalnızca verilmiş beyana eklenir; yenisi eskisinin
 	// yerine geçer. Dönen satır eski anahtarı taşımaz; eskisini çağıran siler.
 	SetTaxReturnAccrualDocument(ctx context.Context, arg SetTaxReturnAccrualDocumentParams) (TaxReturn, error)
+	// Tahakkuk ödemesi (#575): yalnız verilmiş beyanda; paid_on boşsa kaldırır.
+	SetTaxReturnPayment(ctx context.Context, arg SetTaxReturnPaymentParams) (TaxReturn, error)
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
 	SetUserSMMMRegistryNo(ctx context.Context, arg SetUserSMMMRegistryNoParams) error
@@ -1571,6 +1584,13 @@ type Querier interface {
 	// Beyan öncesi kontrol (#575): dönemin mükelleften beklenen ve gelip
 	// işlenmeyen belgeleri; örnek olarak ilk bekleyen belgenin adı.
 	TaxReturnDocumentTaskStats(ctx context.Context, arg TaxReturnDocumentTaskStatsParams) (TaxReturnDocumentTaskStatsRow, error)
+	// Ba (#575): masraf olarak işlenen, fatura ya da fatura yerine geçen alış
+	// belgeleri (kâğıt fatura = other, serbest meslek makbuzu = smm), satıcı
+	// VKN / TCKN'sine göre. ÖKC / akaryakıt fişi, gider pusulası ve banka
+	// masrafı Ba'ya girmez.
+	TaxReturnExpenseCounterparties(ctx context.Context, arg TaxReturnExpenseCounterpartiesParams) ([]TaxReturnExpenseCounterpartiesRow, error)
+	// Ba (#575): satıcı VKN / TCKN'si olmayan onaylı alış belgeleri (masraf).
+	TaxReturnExpenseMissingVendor(ctx context.Context, arg TaxReturnExpenseMissingVendorParams) (TaxReturnExpenseMissingVendorRow, error)
 	TaxReturnExpenseStats(ctx context.Context, arg TaxReturnExpenseStatsParams) (TaxReturnExpenseStatsRow, error)
 	// Onaylı, KDV'si indirilebilir masraf fişlerinin (ÖKC, akaryakıt, SMM ...)
 	// oran kırılımı. Maaş, vergi ödemesi ve banka masrafı KDV taşımaz.
@@ -1594,6 +1614,9 @@ type Querier interface {
 	TaxReturnMissingCounterparty(ctx context.Context, arg TaxReturnMissingCounterpartyParams) ([]TaxReturnMissingCounterpartyRow, error)
 	// MUHSGK çalışan eki: dönem bordrosunun satırları (TCKN maskeli).
 	TaxReturnPayrollLines(ctx context.Context, arg TaxReturnPayrollLinesParams) ([]TaxReturnPayrollLinesRow, error)
+	// Beyandan önce işlenmesi gereken kayıtlar (#575); PeriodMatrixPendingWork
+	// ile aynı kurallar, tek angajman ve dönem.
+	TaxReturnPendingWork(ctx context.Context, arg TaxReturnPendingWorkParams) (TaxReturnPendingWorkRow, error)
 	// Z raporları: onaylı / bekleyen sayısı, oran kırılımı olmayan onaylılar ve
 	// kredi kartıyla tahsil edilen (KDV dahil) tutar.
 	TaxReturnRetailStats(ctx context.Context, arg TaxReturnRetailStatsParams) (TaxReturnRetailStatsRow, error)

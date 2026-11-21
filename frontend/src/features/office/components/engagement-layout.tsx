@@ -31,6 +31,12 @@ type Cell = PeriodMatrixRow["cells"][number];
 /** Dönem şeridindeki ay sayısı (genel bakışla aynı sorgu, önbellekten). */
 export const ENGAGEMENT_MONTHS = 6;
 
+/** Dönemde işlenmemiş kayıt sayısı (#575). */
+export function pendingTotal(cell: Cell): number {
+  const p = cell.pending;
+  return p ? p.bank_transactions + p.expenses + p.retail_sales : 0;
+}
+
 /** Dönem hücresi → taç ve etiket (veri · onay · aktarım). */
 export function periodCrown(cell: Cell): {
   durum: TacDurumu;
@@ -38,6 +44,8 @@ export function periodCrown(cell: Cell): {
 } {
   if (cell.locked) return { durum: "aktarildi", key: "locked" };
   if (cell.open_blockers > 0) return { durum: "sorun", key: "blocked" };
+  // İşlenmemiş banka hareketi, fiş ya da Z raporu varsa hazır değil (#575).
+  if (pendingTotal(cell) > 0) return { durum: "yuklendi", key: "pending" };
   if (cell.ready) return { durum: "onaylandi", key: "ready" };
   if (cell.open_change_requests > 0)
     return { durum: "yuklendi", key: "changes" };

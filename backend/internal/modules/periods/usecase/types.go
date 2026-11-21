@@ -157,7 +157,22 @@ type MatrixCounts struct {
 	DocTasks       map[MatrixKey][2]int64 // open, submitted
 	// MissingStatements: bank accounts without a statement for the period.
 	MissingStatements map[MatrixKey][]string
+	// Pending: records still to process before the return (#575): bank
+	// movements, VAT expense receipts, Z reports.
+	Pending map[MatrixKey]PendingWork
 }
+
+// PendingWork counts the period's records not processed yet (#575): bank
+// movements neither matched, ignored nor booked; VAT expense receipts and
+// Z reports waiting for approval.
+type PendingWork struct {
+	BankTransactions int64 `json:"bank_transactions"`
+	Expenses         int64 `json:"expenses"`
+	RetailSales      int64 `json:"retail_sales"`
+}
+
+// Total is every pending record.
+func (p PendingWork) Total() int64 { return p.BankTransactions + p.Expenses + p.RetailSales }
 
 // MatrixKey addresses one cell.
 type MatrixKey struct {
@@ -185,6 +200,9 @@ type Cell struct {
 	// three months before but none in this closed month: the statement has
 	// not been loaded (#568).
 	MissingBankStatements []string `json:"missing_bank_statements"`
+	// Pending: records still to process; a period with any is not ready
+	// for the return (#575).
+	Pending PendingWork `json:"pending"`
 }
 
 // CellReturn is one tax return record of a cell.
@@ -193,6 +211,8 @@ type CellReturn struct {
 	Status        string  `json:"status"`
 	PayableAmount *string `json:"payable_amount"`
 	FiledOn       *string `json:"filed_on"`
+	// PaidOn: the accrual was paid that day (#575).
+	PaidOn *string `json:"paid_on"`
 }
 
 // MatrixRow is one engagement of the matrix.
