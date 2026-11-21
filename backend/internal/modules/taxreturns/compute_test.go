@@ -259,7 +259,7 @@ func TestDueDate(t *testing.T) {
 			t.Errorf("DueDate(%s, %s) = %s, %v; want %s", c.kind, c.period, got.Format(time.DateOnly), err, c.want)
 		}
 	}
-	if _, _, err := DueDate("kdv2", "2026-10"); err == nil {
+	if _, _, err := DueDate("kdv3", "2026-10"); err == nil {
 		t.Error("unknown kind accepted")
 	}
 }
