@@ -46,6 +46,11 @@ type Querier interface {
 	// Elle bağlanan ödeme primi öder (#565).
 	AddSgkPremiumPaid(ctx context.Context, arg AddSgkPremiumPaidParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
+	// Düzeltme beyannamesi (#575): verilmiş beyanın bu sürümü arşivlenir ve
+	// satır düzeltme için taslağa döner (tek ifadede, atomik). Sürüm artar;
+	// onaylar, verildi / tahakkuk / ödeme bilgisi yeni sürüm için sıfırlanır
+	// (eskisi tax_return_versions'ta, tahakkuk PDF'i silinmez).
+	AmendTaxReturn(ctx context.Context, arg AmendTaxReturnParams) (TaxReturn, error)
 	// The row stays (foreign keys, audit trail); every personal field is replaced
 	// and the account can never sign in again.
 	AnonymizePrivacyUser(ctx context.Context, arg AnonymizePrivacyUserParams) error
@@ -1145,6 +1150,7 @@ type Querier interface {
 	// gününden 5 gün önce ile son günden 60 gün sonra arasında; tutarı tahakkuka
 	// eşit ya da açıklamasında vergi / GİB / tahakkuk geçen. Tutarı tutan önce.
 	ListTaxPaymentCandidates(ctx context.Context, arg ListTaxPaymentCandidatesParams) ([]ListTaxPaymentCandidatesRow, error)
+	ListTaxReturnVersions(ctx context.Context, arg ListTaxReturnVersionsParams) ([]ListTaxReturnVersionsRow, error)
 	ListTaxReturns(ctx context.Context, arg ListTaxReturnsParams) ([]TaxReturn, error)
 	// ---------------------------------------------------------------------------
 	// Mükellef tarafı (/v1/taxpayer/*). Kapsam X-Taxpayer üyeliğidir: görevler

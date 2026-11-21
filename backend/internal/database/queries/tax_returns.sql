@@ -328,3 +328,35 @@ WHERE b.taxpayer_id = @taxpayer_id AND b.debit_credit = 'B' AND b.currency = 'TR
        OR b.description ILIKE '%VERGİ%')
 ORDER BY (b.amount = @amount::numeric) DESC, b.transaction_date, b.id
 LIMIT 10;
+
+-- name: AmendTaxReturn :one
+-- Düzeltme beyannamesi (#575): verilmiş beyanın bu sürümü arşivlenir ve
+-- satır düzeltme için taslağa döner (tek ifadede, atomik). Sürüm artar;
+-- onaylar, verildi / tahakkuk / ödeme bilgisi yeni sürüm için sıfırlanır
+-- (eskisi tax_return_versions'ta, tahakkuk PDF'i silinmez).
+WITH archived AS (
+    INSERT INTO tax_return_versions (organization_id, engagement_id, tax_return_id, version, snapshot, payable_amount, carry_out,
+                                     filed_on, accrual_number, accrual_storage_key, accrual_file_name, paid_on, filed_by, amended_by)
+    SELECT t.organization_id, t.engagement_id, t.id, t.version, t.snapshot, t.payable_amount, t.carry_out,
+           t.filed_on, t.accrual_number, t.accrual_storage_key, t.accrual_file_name, t.paid_on, t.filed_by, sqlc.narg(amended_by)
+    FROM tax_returns t
+    WHERE t.organization_id = @organization_id AND t.engagement_id = @engagement_id AND t.kind = @kind AND t.period = @period
+      AND t.status = 'filed' AND t.snapshot IS NOT NULL
+    RETURNING tax_return_id
+)
+UPDATE tax_returns AS r
+SET status = 'draft', version = r.version + 1, snapshot = NULL, payable_amount = NULL, carry_out = NULL,
+    acknowledged = '[]'::jsonb, prepared_by = NULL, prepared_at = NULL, checked_by = NULL, checked_at = NULL,
+    filed_on = NULL, accrual_number = NULL, filed_by = NULL, filed_at = NULL,
+    accrual_storage_key = NULL, accrual_file_name = NULL, accrual_size_bytes = NULL, accrual_sha256 = NULL,
+    accrual_uploaded_by = NULL, accrual_uploaded_at = NULL,
+    paid_on = NULL, payment_bank_transaction_id = NULL, paid_by = NULL, paid_recorded_at = NULL
+WHERE r.organization_id = @organization_id AND r.engagement_id = @engagement_id
+  AND r.id IN (SELECT a.tax_return_id FROM archived a)
+RETURNING r.*;
+
+-- name: ListTaxReturnVersions :many
+SELECT v.version, v.snapshot, v.payable_amount, v.carry_out, v.filed_on, v.accrual_number, v.paid_on, v.amended_at
+FROM tax_return_versions v
+WHERE v.organization_id = @organization_id AND v.engagement_id = @engagement_id AND v.tax_return_id = @tax_return_id
+ORDER BY v.version DESC;

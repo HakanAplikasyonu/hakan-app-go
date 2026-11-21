@@ -17704,6 +17704,37 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+    post:
+      tags: [TaxReturns]
+      operationId: amendEngagementTaxReturn
+      summary: Start a correction (düzeltme beyannamesi) of a filed return
+      description: |
+        Requires `tenant.tax_returns.write` (#575). Only a filed return (`409 TAX_RETURN_NOT_FILED`). The filed version
+        (snapshot, payable / carry, filed on, accrual number and PDF, payment day) is archived; the return is a draft
+        again with `version + 1` and no acknowledgements, filing, accrual or payment. It is then prepared and filed as
+        usual; `amendment.differences` compares it with the previous version.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The correction draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -27053,6 +27084,11 @@ components:
           oneOf:
             - $ref: "#/components/schemas/TaxReturnPayment"
             - type: "null"
+        amendment:
+          description: Versions of a filed or corrected return (#575); null for a first version not filed yet
+          oneOf:
+            - $ref: "#/components/schemas/TaxReturnAmendment"
+            - type: "null"
 
     TaxReturnPaymentMovement:
       type: object
@@ -27080,6 +27116,45 @@ components:
           type: array
           description: Outgoing TRY movements around the due date that may pay it (same amount first); empty once paid
           items: { $ref: "#/components/schemas/TaxReturnPaymentMovement" }
+
+    TaxReturnAmendmentFigure:
+      type: object
+      required: [key, label, previous, current, difference]
+      properties:
+        key: { type: string, description: "base_total, payable, carry_out, income_tax, ba_amount, ..." }
+        label: { type: string }
+        previous: { type: string }
+        current: { type: string }
+        difference: { type: string, description: current − previous }
+
+    TaxReturnAmendmentVersion:
+      type: object
+      required: [version, filed_on, accrual_number, payable_amount, carry_out, paid_on, amended_at]
+      properties:
+        version: { type: integer }
+        filed_on: { type: string, format: date }
+        accrual_number: { type: [string, "null"] }
+        payable_amount: { type: [string, "null"] }
+        carry_out: { type: [string, "null"] }
+        paid_on: { type: [string, "null"], format: date }
+        amended_at: { type: string, format: date-time }
+
+    TaxReturnAmendment:
+      type: object
+      description: |
+        A filed return compares its live data with what was filed (needed: they differ, a correction may be due —
+        office rule: a changed sale after filing means a düzeltme beyannamesi). A correction (version > 1) compares
+        itself with the previous filed version.
+      required: [version, needed, previous, differences, versions]
+      properties:
+        version: { type: integer, description: 1 for the original return }
+        needed: { type: boolean }
+        previous:
+          oneOf:
+            - $ref: "#/components/schemas/TaxReturnAmendmentVersion"
+            - type: "null"
+        differences: { type: array, items: { $ref: "#/components/schemas/TaxReturnAmendmentFigure" } }
+        versions: { type: array, description: Archived versions, newest first, items: { $ref: "#/components/schemas/TaxReturnAmendmentVersion" } }
 
     TaxReturnSection:
       type: object
