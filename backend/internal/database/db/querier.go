@@ -142,6 +142,7 @@ type Querier interface {
 	CountExportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountImportJobsForActor(ctx context.Context, actorID int64) (int64, error)
 	CountJournalDrafts(ctx context.Context, arg CountJournalDraftsParams) (int64, error)
+	CountLateDocumentsByStatus(ctx context.Context, arg CountLateDocumentsByStatusParams) ([]CountLateDocumentsByStatusRow, error)
 	CountNotificationsForUser(ctx context.Context, arg CountNotificationsForUserParams) (int64, error)
 	// tenant-lint: org-wide ofis gönderim geçmişi sayımı; ListOfficeReportDeliveries ile aynı süzgeç
 	CountOfficeReportDeliveries(ctx context.Context, arg CountOfficeReportDeliveriesParams) (int64, error)
@@ -248,6 +249,8 @@ type Querier interface {
 	DeactivateUser(ctx context.Context, id int64) (User, error)
 	DecideChangeRequest(ctx context.Context, arg DecideChangeRequestParams) (int64, error)
 	DecideDataWarning(ctx context.Context, arg DecideDataWarningParams) (int64, error)
+	// Ofisin kararı; "pending" kararı geri alır.
+	DecideLateDocument(ctx context.Context, arg DecideLateDocumentParams) (LateDocument, error)
 	// tenant-lint: cross-org onay sonucu, token ile bulunan satırın id'siyle
 	DecideOnboardingRequest(ctx context.Context, arg DecideOnboardingRequestParams) error
 	// Only a pending request is decided, once.
@@ -494,6 +497,7 @@ type Querier interface {
 	GetJournalDraft(ctx context.Context, arg GetJournalDraftParams) (JournalDraft, error)
 	GetJournalDraftByID(ctx context.Context, arg GetJournalDraftByIDParams) (JournalDraft, error)
 	GetJournalDraftIDByUUID(ctx context.Context, arg GetJournalDraftIDByUUIDParams) (int64, error)
+	GetLateDocument(ctx context.Context, arg GetLateDocumentParams) (LateDocument, error)
 	GetLatestAppRelease(ctx context.Context) (AppRelease, error)
 	// Uyarı motoru (issue #13) sorguları. Tablo #9'da (data_warnings).
 	// Aynı anahtarın (05 §1: engagement, varlık, kod, dönem) en son kaydı.
@@ -1009,6 +1013,8 @@ type Querier interface {
 	// aramayla aynı; açık tutar bu hareketin eski eşleşmeleri hariç
 	// (yeniden eşleştirme).
 	ListJournalLinesForManualMatch(ctx context.Context, arg ListJournalLinesForManualMatchParams) ([]ListJournalLinesForManualMatchRow, error)
+	// Mükellefin geç gelen belgeleri; bekleyenler önce, yeni dönem önce.
+	ListLateDocuments(ctx context.Context, arg ListLateDocumentsParams) ([]ListLateDocumentsRow, error)
 	// Aynı programa canlı (geri alınmamış) bir çıktıda gitmiş belgeler.
 	ListLiveDocumentExports(ctx context.Context, arg ListLiveDocumentExportsParams) ([]ListLiveDocumentExportsRow, error)
 	ListLogPurgeRules(ctx context.Context) ([]LogPurgeRule, error)
@@ -1501,6 +1507,11 @@ type Querier interface {
 	// verilmezse ofisin bütün aktif engagement'ları (ofis şablon kuralı).
 	// tenant-lint: org-wide engagement verilmezse ofisin bütün aktif engagement'ları; organization_id ile sınırlı
 	RulePreviewLines(ctx context.Context, arg RulePreviewLinesParams) ([]RulePreviewLinesRow, error)
+	// Geç gelen belge ve geçmiş dönem takibi (#780 C).
+	// Kapanmış dönemlere (kilit ya da verilmiş beyan) kapanıştan sonra gelen
+	// belgeleri late_documents'a yazar; aynı belge ikinci kez yazılmaz.
+	// engagement_id boşsa ofisin (görünen) bütün mükellefleri taranır.
+	ScanLateDocuments(ctx context.Context, arg ScanLateDocumentsParams) (int64, error)
 	// Elle eşleştirme araması (#565): aday listesinin tarih ve tutar penceresi
 	// dışında da; fatura no, unvan ya da VKN/TCKN ile hareketin yönündeki açık
 	// faturalar. Süzgeçler isteğe bağlıdır: terim, düzenleme tarihi aralığı ve
@@ -1601,6 +1612,8 @@ type Querier interface {
 	SummarizeBankTransactions(ctx context.Context, arg SummarizeBankTransactionsParams) (SummarizeBankTransactionsRow, error)
 	SummarizeEngagementExpenses(ctx context.Context, arg SummarizeEngagementExpensesParams) (SummarizeEngagementExpensesRow, error)
 	SummarizeEngagementRetailSales(ctx context.Context, arg SummarizeEngagementRetailSalesParams) (SummarizeEngagementRetailSalesRow, error)
+	// tenant-lint: org-wide ofis geneli geçmiş dönem takibi sayacı; read_all yoksa atananlarla sınırlı
+	SummarizeLateDocuments(ctx context.Context, arg SummarizeLateDocumentsParams) ([]SummarizeLateDocumentsRow, error)
 	// Filtredeki Z raporlarının KDV oranı kırılımı.
 	SummarizeRetailSaleVatRates(ctx context.Context, arg SummarizeRetailSaleVatRatesParams) ([]SummarizeRetailSaleVatRatesRow, error)
 	SummarizeSourceFinancialByCustomer(ctx context.Context, arg SummarizeSourceFinancialByCustomerParams) ([]SummarizeSourceFinancialByCustomerRow, error)

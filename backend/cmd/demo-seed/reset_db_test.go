@@ -156,6 +156,11 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		`SELECT count(*) FROM tax_returns WHERE period = '2026-09' AND status = 'filed' AND accrual_number IS NOT NULL`: 2,
 		`SELECT count(*) FROM tax_returns WHERE period = '2026-09' AND kind = 'babs' AND status = 'prepared'`:           1,
 		`SELECT count(*) FROM tax_returns WHERE period = '2026-10' AND kind = 'kdv1' AND status = 'draft'`:              1,
+		// #780 C: Eylül beyanından sonra gelen iki masraf; biri cari döneme alındı.
+		`SELECT count(*) FROM late_documents l JOIN expenses x ON l.document_type = 'expense' AND x.id = l.document_id
+		 WHERE x.source_id LIKE 'demo-gec-belge-%' AND l.period = '2026-09' AND l.close_reason = 'filed'`: 2,
+		`SELECT count(*) FROM late_documents l JOIN expenses x ON l.document_type = 'expense' AND x.id = l.document_id
+		 WHERE x.source_id = 'demo-gec-belge-2' AND l.status = 'current_period' AND l.target_period = '2026-11'`: 1,
 	} {
 		if n := count(t, d, q); n != want {
 			t.Errorf("%s = %d, want %d", q, n, want)

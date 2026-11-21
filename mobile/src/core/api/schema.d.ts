@@ -3561,6 +3561,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/late-documents/summary": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide count of late documents per taxpayer
+         * @description Requires `tenant.periods.read` (#780 C). Documents that arrived after
+         *     their period was closed, per taxpayer: pending and total counts and
+         *     the oldest pending period. Refreshed on every read. Active
+         *     engagements only; without `tenant.engagements.read_all` only
+         *     engagements assigned to the caller.
+         */
+        get: operations["getLateDocumentSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/clients": {
         parameters: {
             query?: never;
@@ -12129,6 +12159,75 @@ export interface paths {
          *     other request is open for the record. 409 when already decided.
          */
         post: operations["rejectEngagementChangeRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Late documents of an engagement (geçmiş dönem takibi)
+         * @description Requires `tenant.periods.read` and engagement access (#780 C). A
+         *     document has two dates: its arrival (`arrived_at`, when it entered the
+         *     system) and its period (the month of the document date). A document
+         *     that arrived after its period was closed (the period was locked, or a
+         *     tax return of the period was filed; `closed_at`, `close_reason`) is
+         *     listed here with the office's decision. The list is refreshed on every
+         *     read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+         *     `document_uuid` (the warning on one document).
+         */
+        get: operations["listEngagementLateDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the office's decision on a late document
+         * @description Requires `tenant.change_requests.decide` and engagement access.
+         *     `correction`: taken into a correction return (düzeltme beyannamesi);
+         *     `current_period`: booked in a later month (`target_period`, default
+         *     the current month; must be after the document period); `ignored`;
+         *     `pending` undoes the decision. The KDV deduction month of a purchase
+         *     invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+         */
+        post: operations["decideEngagementLateDocument"];
         delete?: never;
         options?: never;
         head?: never;
@@ -20878,6 +20977,106 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        LateDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            document_type: "invoice" | "expense" | "retail_sale";
+            /** Format: uuid */
+            document_uuid: string;
+            /** @description Invoice number, receipt number or description, Z report number */
+            label: string;
+            counterparty: string | null;
+            /** Format: date */
+            document_date: string | null;
+            /** @description Total with two decimals */
+            amount: string;
+            currency: string;
+            period: components["schemas"]["Period"];
+            /**
+             * Format: date-time
+             * @description Geliş tarihi: when the document entered the system
+             */
+            arrived_at: string;
+            /**
+             * Format: date-time
+             * @description When the period was closed
+             */
+            closed_at: string;
+            /**
+             * @description lock: the period was locked; filed: a tax return of the period was filed
+             * @enum {string}
+             */
+            close_reason: "lock" | "filed";
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description The month it was booked in (current_period) */
+            target_period: string | null;
+            note: string | null;
+            decided_by_name: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            /** @enum {string|null} */
+            invoice_direction: "incoming" | "outgoing" | null;
+            /** @description A purchase invoice's KDV deduction month when moved forward (#640) */
+            vat_deduction_period: string | null;
+        };
+        LateDocumentCounts: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            correction: number;
+            /** Format: int64 */
+            current_period: number;
+            /** Format: int64 */
+            ignored: number;
+        };
+        LateDocumentList: {
+            items: components["schemas"]["LateDocument"][];
+            counts: components["schemas"]["LateDocumentCounts"];
+        };
+        LateDocumentDecision: {
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description YYYY-MM, only for current_period; default the current month */
+            target_period?: string;
+            note?: string;
+        };
+        LateDocumentSummaryRow: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            oldest_pending_period: string | null;
+        };
+        LateDocumentSummary: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            items: components["schemas"]["LateDocumentSummaryRow"][];
+        };
+        EnvelopeLateDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentSummary: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentSummary"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
             /** @description No open blocker, change request or unprocessed record (#575) */
@@ -22903,6 +23102,7 @@ export interface components {
         /** @description Dönem (YYYY-MM) */
         PeriodPath: string;
         ChangeRequestUuid: string;
+        LateDocumentUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -28460,6 +28660,35 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLateDocumentSummary: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late document counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
@@ -41996,6 +42225,81 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementLateDocuments: {
+        parameters: {
+            query?: {
+                status?: "pending" | "correction" | "current_period" | "ignored";
+                period?: components["schemas"]["Period"];
+                document_uuid?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late documents and counts by status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideEngagementLateDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LateDocumentDecision"];
+            };
+        };
+        responses: {
+            /** @description Updated late document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
