@@ -26,6 +26,8 @@ type Handler struct {
 	svc      *usecase.Service
 	activity *activity.Recorder
 	notices  *notice.Service
+	// portal: the mükellef panel route (#780), see WithPortal.
+	portal PortalQueries
 }
 
 // WithNotices enables the taxpayer VAT notices (#780); n may be nil.

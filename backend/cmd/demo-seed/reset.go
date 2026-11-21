@@ -53,6 +53,10 @@ func dropDemoTx(ctx context.Context, tx pgx.Tx) error {
 	for _, tp := range demo.Taxpayers {
 		demoIDs = append(demoIDs, tp.TaxID)
 	}
+	// İşletme defteri / serbest meslek demo mükellefleri (#780).
+	for _, tp := range demo.OperatingTaxpayers {
+		demoIDs = append(demoIDs, tp.TaxID)
+	}
 	// Büyük demonun mükellefleri sabit önekli aralıkta (internal/demo/big.go).
 	rows, err = tx.Query(ctx, `
 		SELECT DISTINCT t.id FROM taxpayers t

@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/providers/locale-provider";
 
 import { useEngagementScope } from "../engagement-scope";
+import { useLedgerType } from "./ledger-type";
 import { downloadFile } from "../services/download";
 import { useUrlOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
@@ -210,6 +211,7 @@ export function EngagementBankPage({ engagement }: { engagement: string }) {
 }
 
 function EngagementBankInner({ engagement }: { engagement: string }) {
+  const { singleEntry } = useLedgerType(engagement);
   const { t } = useLocale();
   const { slug } = useTenant();
   // Dönem adreste (`?period=`): uyarıdan gelen bağlantı o ayı açar (#710).
@@ -333,7 +335,10 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
       />
       <EngagementNextWork engagement={engagement} />
       <TabStrip aria-label={t("office.bank.view_label")}>
-        {VIEWS.map((v) => (
+        {VIEWS.filter(
+          // İşletme defteri / serbest meslek (#780): hesap kodu ve Luca yok.
+          (v) => !singleEntry || (v !== "posting" && v !== "luca"),
+        ).map((v) => (
           <TabStripItem
             key={v}
             selected={view === v}
@@ -352,7 +357,14 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
     return (
       <div className="space-y-5">
         {header}
-        {view === "posting" ? (
+        {singleEntry && (view === "posting" || view === "luca") ? (
+          <p
+            className="text-text-2 bg-surface border-line rounded-xl border p-4 text-sm"
+            data-testid="bank-single-entry-note"
+          >
+            {t("office.bookkeeping.bank_note")}
+          </p>
+        ) : view === "posting" ? (
           <BankPostingPanel engagement={engagement} period={period} />
         ) : view === "luca" ? (
           <LucaBankExportPanel engagement={engagement} period={period} />
