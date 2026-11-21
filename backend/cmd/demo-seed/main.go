@@ -285,6 +285,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedTaxReturns(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("tax returns → %s: %w", tp.Key, err)
 			}
+			// Eylül beyanı verildikten sonra gelen iki masraf: biri bekliyor,
+			// biri cari döneme alındı (#780 C).
+			if err := seedLateDocuments(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("late documents → %s: %w", tp.Key, err)
+			}
 			// Belge arşivi ve İSG evrakları (yaklaşan bitiş uyarısıyla) (#393).
 			if err := seedArchive(ctx, pool, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID, time.Now()); err != nil {
 				return fmt.Errorf("archive → %s: %w", tp.Key, err)

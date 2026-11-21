@@ -22,6 +22,7 @@ import (
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	excelimportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport"
 	excelimporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/excelimport/handler"
+	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
 	legalmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	logsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs"
@@ -87,6 +88,8 @@ type moduleHandlers struct {
 	whatsapp *whatsappmodule.Handler
 	// related: kayıtlar arası ilişkili kayıtlar (issue #469).
 	related *relatedmodule.Handler
+	// latedocs: geç gelen belge ve geçmiş dönem takibi (#780 C).
+	latedocs *latedocsmodule.Handler
 	// engagements resolves {engagementUuid} for engagement-scoped module routes.
 	engagements engagementctx.Resolver
 	// rlsScope is rls.Middleware for modules whose tables are enforced.
@@ -124,5 +127,6 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		officedashmodule.Module{H: h.officedash, Clients: h.officeClients, Review: h.officeReview, Engagements: h.engagements},
 		whatsappmodule.Module{H: h.whatsapp, Engagements: h.engagements, Scope: h.rlsScope},
 		relatedmodule.Module{H: h.related, Engagements: h.engagements, Scope: h.rlsScope},
+		latedocsmodule.Module{H: h.latedocs, Engagements: h.engagements, Scope: h.rlsScope},
 	}
 }

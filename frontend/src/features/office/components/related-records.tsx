@@ -42,6 +42,7 @@ import type {
 } from "../services/related.service";
 import { BankTransactionMatchingPanel } from "./bank-transaction-matching";
 import { ManualLinkForm, ManualUnlinkButton } from "./journal-manual-link";
+import { LateDocumentNote } from "./late-documents";
 import { Figure, Money, Panel, SeverityBadge } from "./office-ui";
 
 /** Çeviri yoksa ham değer (bilinmeyen durum ya da öneri türü). */
@@ -507,6 +508,14 @@ export function FocusedRecord({ engagement }: { engagement: string }) {
                 {t("office.related.description")}
               </SheetDescription>
             </SheetHeader>
+            {(focus.kind === "expense" ||
+              focus.kind === "retail_sale" ||
+              focus.kind === "invoice") && (
+              <LateDocumentNote
+                engagement={engagement}
+                documentUuid={focus.uuid}
+              />
+            )}
             {focus.kind === "bank_transaction" && (
               <BankTransactionMatchingPanel
                 engagement={engagement}

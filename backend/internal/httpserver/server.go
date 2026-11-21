@@ -77,6 +77,7 @@ import (
 	invoiceposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/posting"
 	invoiceupload "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/upload"
 	journalsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/journals"
+	latedocsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/latedocs"
 	legalhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/handler"
 	legalusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/legal/usecase"
 	logshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/logs/handler"
@@ -739,6 +740,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		), activityRec),
 		engagements: engagementResolver,
 		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
+		latedocs:    latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
 		rlsScope:    rlsScope,
 		taxpayers:   taxpayerResolver,
 	})...); err != nil {

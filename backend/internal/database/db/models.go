@@ -1295,6 +1295,27 @@ type JournalDraftLine struct {
 	Confidence     pgtype.Numeric `json:"confidence"`
 }
 
+type LateDocument struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	DocumentType   string             `json:"document_type"`
+	DocumentID     int64              `json:"document_id"`
+	DocumentUuid   uuid.UUID          `json:"document_uuid"`
+	Period         string             `json:"period"`
+	ArrivedAt      pgtype.Timestamptz `json:"arrived_at"`
+	ClosedAt       pgtype.Timestamptz `json:"closed_at"`
+	CloseReason    string             `json:"close_reason"`
+	Status         string             `json:"status"`
+	TargetPeriod   pgtype.Text        `json:"target_period"`
+	Note           pgtype.Text        `json:"note"`
+	DecidedBy      pgtype.Int8        `json:"decided_by"`
+	DecidedAt      pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LegalAcceptance struct {
 	ID             int64              `json:"id"`
 	Uuid           uuid.UUID          `json:"uuid"`

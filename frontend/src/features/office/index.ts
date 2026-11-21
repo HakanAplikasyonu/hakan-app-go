@@ -33,3 +33,7 @@ export { EngagementExpensesPage } from "./components/engagement-expenses-page";
 export { EngagementZReportsPage } from "./components/engagement-zreports-page";
 export { EngagementTrialBalancePage } from "./components/engagement-trial-balance-page";
 export { EngagementReconciliationPage } from "./components/engagement-reconciliation-page";
+export {
+  EngagementLateDocumentsPage,
+  OfficeLateDocumentsPage,
+} from "./components/late-documents";
