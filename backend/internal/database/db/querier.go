@@ -718,6 +718,8 @@ type Querier interface {
 	// Mizan satırları (#393). rows: [{"code","name","main_code","level","is_leaf","debit","credit","balance"}, ...]
 	InsertTrialBalanceLines(ctx context.Context, arg InsertTrialBalanceLinesParams) (int64, error)
 	InsertUserRole(ctx context.Context, arg InsertUserRoleParams) error
+	// Mükellefe giden KDV bildirimi ve gönderim kanıtı (#780).
+	InsertVATNotice(ctx context.Context, arg InsertVATNoticeParams) (VatNotice, error)
 	InsertWarningOfficeAlerts(ctx context.Context, arg InsertWarningOfficeAlertsParams) (int64, error)
 	InsertWhatsAppCapture(ctx context.Context, arg InsertWhatsAppCaptureParams) (uuid.UUID, error)
 	InvalidateActiveOTPs(ctx context.Context, arg InvalidateActiveOTPsParams) error
@@ -1202,6 +1204,12 @@ type Querier interface {
 	ListUserUUIDsForBulk(ctx context.Context, arg ListUserUUIDsForBulkParams) ([]uuid.UUID, error)
 	ListUsersFiltered(ctx context.Context, arg ListUsersFilteredParams) ([]User, error)
 	ListUsersForExport(ctx context.Context, arg ListUsersForExportParams) ([]User, error)
+	// Gönderim kanıtı: bildirimin her kanal / kullanıcı satırı ve zamanları.
+	ListVATNoticeDeliveries(ctx context.Context, arg ListVATNoticeDeliveriesParams) ([]ListVATNoticeDeliveriesRow, error)
+	// Bildirimi alacak mükellef kullanıcıları.
+	ListVATNoticeRecipients(ctx context.Context, taxpayerID int64) ([]int64, error)
+	// Bir mükellefin bildirimleri, yeniden eskiye; gönderen adıyla.
+	ListVATNotices(ctx context.Context, arg ListVATNoticesParams) ([]ListVATNoticesRow, error)
 	ListVATOpenings(ctx context.Context, arg ListVATOpeningsParams) ([]ListVATOpeningsRow, error)
 	ListWarningCodes(ctx context.Context, codes []string) ([]ListWarningCodesRow, error)
 	// Office rows (engagement_id IS NULL) plus, when engagement_id is given,
@@ -1555,6 +1563,7 @@ type Querier interface {
 	SetUserEmailVerified(ctx context.Context, id int64) (User, error)
 	// SMMM oda sicil no (issue #5, D16): profil alanı, doğrulanmaz. NULL siler.
 	SetUserSMMMRegistryNo(ctx context.Context, arg SetUserSMMMRegistryNoParams) error
+	SetVATNoticeNotifications(ctx context.Context, arg SetVATNoticeNotificationsParams) error
 	SlugExists(ctx context.Context, slug string) (bool, error)
 	SoftDeleteOrganization(ctx context.Context, argUuid uuid.UUID) (Organization, error)
 	StartSyncRun(ctx context.Context, arg StartSyncRunParams) (SyncRun, error)

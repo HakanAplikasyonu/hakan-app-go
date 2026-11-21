@@ -215,6 +215,12 @@ masraflardan ve onaylı Z raporlarından hesaplanır; KDV tutarı tahminidir.
   eklenir. Gönderimin durumu **Gönderim geçmişi**nde görünür.
 - **Otomatik aylık gönderim**: açarsanız ay kapanınca, seçtiğiniz günden
   itibaren önceki ayın raporu bir kez kendiliğinden gönderilir.
+- **Mükellefe KDV bildirimi**: **Mükellefe gönder** bu ayın güncel KDV
+  durumunu ("ödeme çıkacak" ya da "ödeme çıkmayacak", tutar ve son ödeme
+  günüyle) mükellefin paneline ve e-postasına ofis adınızla gönderir. İsterseniz
+  kısa bir not ekleyin. Kartın altında her bildirimin kanal bazında ne zaman
+  gönderildiği ve mükellefin ne zaman okuduğu görünür; bu kayıt gönderim
+  kanıtı olarak saklanır.
 
 Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.

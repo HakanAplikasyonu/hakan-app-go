@@ -13197,6 +13197,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/notices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * VAT notices sent to the taxpayer, with proof of sending (#780)
+         * @description Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+         *     freezes the forecast that was sent; `deliveries` are its channel rows
+         *     (in-app, e-mail) with queued / sent / delivered / read times.
+         */
+        get: operations["listVATNotices"];
+        put?: never;
+        /**
+         * Send the taxpayer the in-period VAT status (#780)
+         * @description Requires `tenant.vat.write`. Computes the forecast of `period`
+         *     (default this month), freezes it and notifies every panel user of the
+         *     taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+         *     `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+         */
+        post: operations["sendVATNotice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/vat-forecast/openings": {
         parameters: {
             query?: never;
@@ -21225,6 +21262,54 @@ export interface components {
                 total: number;
                 limit: number;
                 offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        VATNotice: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            outcome: "payment" | "no_payment";
+            output_vat: string;
+            input_vat: string;
+            carried_in: string;
+            payable: string;
+            carry_out: string;
+            /** Format: date */
+            due_date: string | null;
+            message: string | null;
+            sent_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+            deliveries: {
+                /** @enum {string} */
+                channel: "inapp" | "email" | "realtime" | "sms" | "push";
+                status: string;
+                user_name: string;
+                /** Format: date-time */
+                queued_at: string;
+                /** Format: date-time */
+                sent_at: string | null;
+                /** Format: date-time */
+                delivered_at: string | null;
+                /** Format: date-time */
+                read_at: string | null;
+                /** Format: date-time */
+                failed_at: string | null;
+            }[];
+        };
+        EnvelopeVATNotice: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATNotice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATNoticeList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["VATNotice"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -42892,6 +42977,86 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listVATNotices: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNoticeList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendVATNotice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    period?: string;
+                    /** @description Optional note from the office */
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNotice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_TAXPAYER_USER`: the taxpayer has no panel user */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             500: components["responses"]["InternalError"];
         };
     };
