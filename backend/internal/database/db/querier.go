@@ -71,6 +71,10 @@ type Querier interface {
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Cari mizanı (#780): cari alt hesapların adı ve VKN'si; etkin plan, üretilen
+	// cari alt hesaplar ve cari hafızası. Kod başına birden çok satır gelebilir,
+	// öncelik rank'ta (0 plan).
+	CariAccountInfo(ctx context.Context, arg CariAccountInfoParams) ([]CariAccountInfoRow, error)
 	// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
 	CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error)
 	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş

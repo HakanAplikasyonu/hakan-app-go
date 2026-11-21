@@ -122,3 +122,23 @@ ORDER BY l.account_code;
 SELECT code::text AS code, name FROM account_plan_accounts
 WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND target = @target
   AND code = ANY(@codes::text[]);
+
+-- name: CariAccountInfo :many
+-- Cari mizanı (#780): cari alt hesapların adı ve VKN'si; etkin plan, üretilen
+-- cari alt hesaplar ve cari hafızası. Kod başına birden çok satır gelebilir,
+-- öncelik rank'ta (0 plan).
+SELECT code::text AS code, name::text AS name, tax_id::text AS tax_id, rank::int AS rank FROM (
+    SELECT a.code, a.name, '' AS tax_id, 0 AS rank, a.id FROM account_plan_accounts a
+    WHERE a.organization_id = @organization_id AND a.engagement_id = @engagement_id
+      AND a.code = ANY(@codes::text[])
+    UNION ALL
+    SELECT g.code, g.name, CASE WHEN g.counterparty_key ~ '^[0-9]{10,11}$' THEN g.counterparty_key ELSE '' END, 1, g.id
+    FROM generated_subaccounts g
+    WHERE g.organization_id = @organization_id AND g.engagement_id = @engagement_id
+      AND g.code = ANY(@codes::text[])
+    UNION ALL
+    SELECT c.account_code, c.account_name, c.counterparty_tax_id, 2, c.id FROM counterparty_accounts c
+    WHERE c.organization_id = @organization_id AND c.engagement_id = @engagement_id
+      AND c.account_code = ANY(@codes::text[])
+) n
+ORDER BY code, rank, id DESC;
