@@ -51,6 +51,8 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <Comp
         data-slot="button"
+        // Düğme hiyerarşisi okunur (#710: sayfada tek birincil eylem).
+        data-variant={variant ?? "default"}
         type={asChild ? undefined : (type ?? "button")}
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}

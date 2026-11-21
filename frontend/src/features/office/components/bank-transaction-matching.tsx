@@ -100,6 +100,8 @@ export function BankTransactionMatchingPanel({
   const [pickedPayroll, setPickedPayroll] = useState<string[]>([]);
   // Seçilen SGK primleri (#565): aylık prim ödemesi.
   const [pickedSgk, setPickedSgk] = useState<string[]>([]);
+  // Seçilen çek / senetler (#565): entegrasyondan gelen finansal işlem.
+  const [pickedFinancial, setPickedFinancial] = useState<string[]>([]);
   const [term, setTerm] = useState("");
   const deferred = useDeferredValue(term.trim());
   // Elle arama süzgeçleri (#565): düzenleme tarihi ve tutar aralığı.
@@ -125,6 +127,7 @@ export function BankTransactionMatchingPanel({
     setPickedLines([]);
     setPickedPayroll([]);
     setPickedSgk([]);
+    setPickedFinancial([]);
     void qc.invalidateQueries({
       queryKey: [
         "tenant",
@@ -162,6 +165,7 @@ export function BankTransactionMatchingPanel({
       lines: BankMatchLineRef[];
       payroll: string[];
       sgk: string[];
+      financial: string[];
     }) =>
       bankMatchingService.match(
         slug,
@@ -171,6 +175,7 @@ export function BankTransactionMatchingPanel({
         m.lines,
         m.payroll,
         m.sgk,
+        m.financial,
       ),
     onSuccess: (v) =>
       settle(
@@ -182,7 +187,9 @@ export function BankTransactionMatchingPanel({
               ? "office.bank.matching.matched_payroll"
               : v.sgk_matches.length > 0
                 ? "office.bank.matching.matched_sgk"
-                : "office.bank.matching.matched_lines",
+                : v.financial_matches.length > 0
+                  ? "office.bank.matching.matched_financial"
+                  : "office.bank.matching.matched_lines",
         ),
       ),
     onError: (e) => toast.error(errText(e, t("office.bank.matching.failed"))),
@@ -249,21 +256,34 @@ export function BankTransactionMatchingPanel({
   const toggleSgk = (id: string, on: boolean) =>
     setPickedSgk((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
   const sgkHref = routes.tenant.engagementPayroll(slug, engagement);
+  const toggleFinancial = (id: string, on: boolean) =>
+    setPickedFinancial((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  const financialLabel = (f: {
+    payment_method_type: string;
+    document_no: string | null;
+    description: string;
+  }) =>
+    t(`office.bank.matching.financial_method_${f.payment_method_type}`) +
+    " · " +
+    (f.document_no || f.description);
   const hasMatches =
     v.matches.length +
       v.journal_matches.length +
       v.payroll_matches.length +
-      v.sgk_matches.length >
+      v.sgk_matches.length +
+      v.financial_matches.length >
     0;
   const pickedCount =
     picked.length +
     pickedLines.length +
     pickedPayroll.length +
-    pickedSgk.length;
+    pickedSgk.length +
+    pickedFinancial.length;
   const submit = () =>
     match.mutate({
       payroll: pickedPayroll,
       sgk: pickedSgk,
+      financial: pickedFinancial,
       invoices: picked,
       lines: pickedLines.map((k) => {
         const [uuid, no] = k.split(":");
@@ -335,7 +355,9 @@ export function BankTransactionMatchingPanel({
                   ? t("office.bank.matching.payroll_matches_title")
                   : v.sgk_matches.length > 0
                     ? t("office.bank.matching.sgk_matches_title")
-                    : t("office.bank.matching.line_matches_title")}
+                    : v.financial_matches.length > 0
+                      ? t("office.bank.matching.financial_matches_title")
+                      : t("office.bank.matching.line_matches_title")}
             </h3>
             {canWrite && (
               <Button
@@ -437,6 +459,29 @@ export function BankTransactionMatchingPanel({
                   <span className="text-muted-foreground">
                     {t("office.bank.matching.sgk_payable")}{" "}
                     <Money value={m.payable_amount} currency={v.currency} />
+                  </span>
+                  <Money value={m.amount} currency={v.currency} />
+                  <Badge variant="secondary">
+                    {t(`office.bank.matching.method_${m.method}`)}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {v.financial_matches.length > 0 ? (
+            <ul
+              className="divide-y rounded-md border text-sm"
+              data-testid="bank-transaction-financial-matches"
+            >
+              {v.financial_matches.map((m) => (
+                <li
+                  key={m.financial_transaction_uuid}
+                  className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                >
+                  <span className="font-medium">{financialLabel(m)}</span>
+                  <span className="text-muted-foreground">
+                    {m.counterparty_name ?? "—"} ·{" "}
+                    {trDate(m.due_date ?? m.transaction_date)}
                   </span>
                   <Money value={m.amount} currency={v.currency} />
                   <Badge variant="secondary">
@@ -673,6 +718,50 @@ export function BankTransactionMatchingPanel({
         </section>
       ) : null}
 
+      {canWrite && v.financial_candidates.length > 0 ? (
+        <section className="space-y-2" data-testid="bank-financial-candidates">
+          <h3 className="text-sm font-medium">
+            {t("office.bank.matching.financial_title")}
+          </h3>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.financial_hint")}
+          </p>
+          <ul className="divide-y rounded-md border text-sm">
+            {v.financial_candidates.map((c) => (
+              <li
+                key={c.financial_transaction_uuid}
+                className="flex flex-wrap items-center gap-3 px-3 py-2"
+              >
+                <Checkbox
+                  checked={pickedFinancial.includes(
+                    c.financial_transaction_uuid,
+                  )}
+                  onCheckedChange={(on) =>
+                    toggleFinancial(c.financial_transaction_uuid, on === true)
+                  }
+                  aria-label={t("office.bank.matching.pick_financial", {
+                    label: financialLabel(c),
+                  })}
+                />
+                <span className="font-medium">{financialLabel(c)}</span>
+                <span className="text-muted-foreground">
+                  {c.counterparty_name ?? "—"} ·{" "}
+                  {c.due_date
+                    ? t("office.bank.matching.financial_due", {
+                        date: trDate(c.due_date),
+                      })
+                    : trDate(c.transaction_date)}
+                </span>
+                <span className="ms-auto">
+                  {t("office.bank.matching.open")}{" "}
+                  <Money value={c.open_amount} currency={v.currency} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {v.line_matchable && canWrite ? (
         <LineSection
           engagement={engagement}
@@ -715,6 +804,17 @@ export function BankTransactionMatchingPanel({
         busy={busy}
         onBook={(code, name) => book.mutate({ code, name })}
       />
+
+      {v.fx ? (
+        <FxSection
+          engagement={engagement}
+          transaction={transaction}
+          currency={v.currency}
+          fx={v.fx}
+          canWrite={canWrite}
+          onSaved={(next) => qc.setQueryData(key, next)}
+        />
+      ) : null}
 
       {v.posting && v.debit_credit === "A" && v.currency === "TRY" ? (
         <CommissionSection
@@ -940,6 +1040,136 @@ function AccountSection({
           )}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Kur farkı (#565): döviz hareketi döviz faturasını kapatınca müşavir
+ * ödeme günü kurunu girer; kapanan tutar × (ödeme kuru − fatura kuru) TL
+ * farkı kâr ise 646 Kambiyo kârları, zarar ise 656 Kambiyo zararları olur.
+ */
+function FxSection({
+  engagement,
+  transaction,
+  currency,
+  fx,
+  canWrite,
+  onSaved,
+}: {
+  engagement: string;
+  transaction: string;
+  currency: string;
+  fx: NonNullable<BankTransactionMatching["fx"]>;
+  canWrite: boolean;
+  onSaved: (v: BankTransactionMatching) => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: (rate: string | null) =>
+      bankMatchingService.setFxRate(slug, engagement, transaction, rate),
+    onSuccess: (v, rate) => {
+      setValue("");
+      toast.success(
+        t(
+          rate === null
+            ? "office.bank.matching.fx_removed"
+            : "office.bank.matching.fx_saved",
+        ),
+      );
+      onSaved(v);
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.bank.matching.fx_failed"))),
+  });
+  // Kur "34,5678" ya da "34.5678" yazılır: virgül varsa nokta binlik ayırıcıdır.
+  const raw = value.trim();
+  const typed = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const valid = /^\d+(\.\d{1,6})?$/.test(typed) && Number(typed) > 0;
+  const diff = fx.diff_try;
+  const gain = diff !== null && !diff.startsWith("-");
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-fx">
+      <h3 className="text-sm font-medium">
+        {t("office.bank.matching.fx_title")}
+      </h3>
+      {fx.missing_invoice_rate ? (
+        <p className="text-warn text-sm">
+          {t("office.bank.matching.fx_missing_invoice_rate")}
+        </p>
+      ) : diff !== null ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span>
+            {t("office.bank.matching.fx_rate_label", { currency })}{" "}
+            <Figure>{fx.rate_payment}</Figure>
+          </span>
+          <span
+            className={cn("font-medium", gain ? "text-ok" : "text-warn")}
+            data-testid="bank-transaction-fx-diff"
+          >
+            {t(
+              gain
+                ? "office.bank.matching.fx_gain"
+                : "office.bank.matching.fx_loss",
+            )}{" "}
+            <Money value={diff.replace("-", "")} currency="TRY" /> (
+            <Figure>{fx.account_code}</Figure>)
+          </span>
+          {canWrite ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={save.isPending}
+              onClick={() => save.mutate(null)}
+            >
+              {t("office.bank.matching.fx_remove")}
+            </Button>
+          ) : null}
+        </div>
+      ) : canWrite ? (
+        <>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.fx_hint")}
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (valid) save.mutate(typed);
+            }}
+          >
+            <div className="space-y-1">
+              <Label htmlFor={`fx-${transaction}`}>
+                {t("office.bank.matching.fx_rate_label", { currency })}
+              </Label>
+              <Input
+                id={`fx-${transaction}`}
+                inputMode="decimal"
+                className="w-36"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,0000"
+              />
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!valid || save.isPending}
+              className="max-md:min-h-11"
+            >
+              {t("office.bank.matching.fx_save")}
+            </Button>
+          </form>
+        </>
+      ) : (
+        <p className="text-text-3 text-sm">
+          {t("office.bank.matching.fx_none")}
+        </p>
+      )}
     </section>
   );
 }

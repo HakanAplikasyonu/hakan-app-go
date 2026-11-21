@@ -15,6 +15,7 @@ import {
   MoneyCell,
   type StatusVariant,
 } from "@/components/tables";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { TabStrip, TabStripItem } from "@/components/ui/tab-strip";
@@ -56,6 +57,9 @@ const matchVariants: Record<string, StatusVariant> = {
   unmatched: { labelKey: "office.bank.match_unmatched", tone: "warn" },
   suggested: { labelKey: "office.bank.match_suggested", tone: "info" },
   matched: { labelKey: "office.bank.match_matched", tone: "ok" },
+  // Faturası olmayan ama hesabı onaylanmış hareket (vergi, SGK, maaş,
+  // masraf): iş bitmiştir, "Eşleşmedi" uyarısı gibi görünmez (#710).
+  booked: { labelKey: "office.bank.match_booked", tone: "ok" },
   ignored: { labelKey: "office.bank.match_ignored", tone: "neutral" },
 };
 
@@ -180,7 +184,10 @@ function useBankColumns() {
       createStatusColumn<BankRow>({
         id: "match_status",
         labelKey: "office.bank.col_match",
-        accessor: (x) => x.match_status,
+        accessor: (x) =>
+          x.match_status === "unmatched" && x.booked_account_code
+            ? "booked"
+            : x.match_status,
         variants: matchVariants,
         fallback: matchVariants.ignored,
       }),
@@ -292,37 +299,38 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
 
   const header = (
     <>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="font-display truncate text-xl font-bold">
-            {t("office.bank.title")}
-          </h2>
-          <p className="text-text-2 text-sm">{t("office.bank.description")}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* #395: süzgece (dönem, eşleşme) uyan hareketler .xlsx olarak. */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="max-md:min-h-11"
-            onClick={() =>
-              void downloadFile(
-                slug,
-                `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-transactions/export`,
-                {
-                  period,
-                  match_status: match === "all" ? undefined : match,
-                },
-                "banka-hareketleri.xlsx",
-              ).catch(() => toast.error(t("office.bank.export_failed")))
-            }
-          >
-            <Download className="size-4" aria-hidden />
-            {t("office.bank.export")}
-          </Button>
-          <BankStatementUpload engagement={engagement} />
-        </div>
-      </div>
+      {/* Ortak sekme başlığı (#710): başlık, kısa açıklama; eylemlerde tek
+          birincil (ekstre yükle), dışa aktarma ikincil. */}
+      <PageHeader
+        headingLevel={2}
+        title={t("office.bank.title")}
+        description={t("office.bank.description")}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* #395: süzgece (dönem, eşleşme) uyan hareketler .xlsx olarak. */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-md:min-h-11"
+              onClick={() =>
+                void downloadFile(
+                  slug,
+                  `/v1/tenant/engagements/${encodeURIComponent(engagement)}/bank-transactions/export`,
+                  {
+                    period,
+                    match_status: match === "all" ? undefined : match,
+                  },
+                  "banka-hareketleri.xlsx",
+                ).catch(() => toast.error(t("office.bank.export_failed")))
+              }
+            >
+              <Download className="size-4" aria-hidden />
+              {t("office.bank.export")}
+            </Button>
+            <BankStatementUpload engagement={engagement} variant="default" />
+          </div>
+        }
+      />
       <EngagementNextWork engagement={engagement} />
       <TabStrip aria-label={t("office.bank.view_label")}>
         {VIEWS.map((v) => (
@@ -375,7 +383,7 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
           },
           {
             label: t("office.bank.unmatched_count"),
-            value: sum ? sum.unmatched : "–",
+            value: sum ? sum.unmatched - sum.unmatched_booked : "–",
             icon: Link2Off,
             box: "bg-warn-tint text-warn",
           },

@@ -56,6 +56,9 @@ type TransactionView struct {
 	Matchable           bool             `json:"matchable"`
 	Matches             []MatchedInvoice `json:"matches"`
 	Candidates          []CandidateView  `json:"candidates"`
+	// Fx: the exchange difference of a foreign currency movement closing
+	// foreign currency invoices (#565); nil otherwise.
+	Fx *FxView `json:"fx"`
 	// LineMatchable: the movement can be tied to an existing journal line
 	// (any movement that is not cancelled, #669 G).
 	LineMatchable  bool                 `json:"line_matchable"`
@@ -74,6 +77,11 @@ type TransactionView struct {
 	// still unpaid (#565). Shown when PayrollMatchable.
 	SgkMatches    []MatchedSgk   `json:"sgk_matches"`
 	SgkCandidates []SgkCandidate `json:"sgk_candidates"`
+	// FinancialMatches / FinancialCandidates: source financial transactions
+	// (cheque, promissory note from Easytrade, KolayBi, Paraşüt) the movement
+	// settles, and those of the same direction around its date (#565).
+	FinancialMatches    []MatchedFinancial   `json:"financial_matches"`
+	FinancialCandidates []FinancialCandidate `json:"financial_candidates"`
 }
 
 // PostingView is the movement's counter account: suggested (waits for the
@@ -248,6 +256,10 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	if err := s.sgkView(ctx, q, sub, t, &v); err != nil {
 		return v, err
 	}
+	if err := s.financialView(ctx, q, sub, t, &v); err != nil {
+		return v, err
+	}
+	v.Fx = fxView(t, matches)
 	matched := map[uuid.UUID]bool{}
 	for _, r := range matches {
 		matched[r.InvoiceUuid] = true
@@ -386,6 +398,7 @@ type MatchInput struct {
 	Invoices    []uuid.UUID
 	PayrollRuns []uuid.UUID
 	SgkPremiums []uuid.UUID
+	Financial   []uuid.UUID
 	Lines       []LineRef
 }
 
@@ -399,7 +412,7 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 	if err != nil {
 		return TransactionView{}, err
 	}
-	if len(invoices)+len(lines)+len(in.PayrollRuns)+len(in.SgkPremiums) == 0 {
+	if len(invoices)+len(lines)+len(in.PayrollRuns)+len(in.SgkPremiums)+len(in.Financial) == 0 {
 		return TransactionView{}, fmt.Errorf("%w: pick an invoice or a journal line", ErrInvalidInvoices)
 	}
 	if (len(invoices) > 0 && !matchable(t)) || !lineMatchable(t) {
@@ -417,6 +430,10 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 		return TransactionView{}, err
 	}
 	sgk, remaining, err := s.pickSgk(ctx, q, sub, t, in.SgkPremiums, remaining)
+	if err != nil {
+		return TransactionView{}, err
+	}
+	financial, remaining, err := s.pickFinancial(ctx, q, sub, t, in.Financial, remaining)
 	if err != nil {
 		return TransactionView{}, err
 	}
@@ -444,6 +461,9 @@ func (s *Service) MatchAll(ctx context.Context, sub Subject, id uuid.UUID, in Ma
 			return err
 		}
 		if err := writeSgk(ctx, tq, sub, t, sgk, userID); err != nil {
+			return err
+		}
+		if err := writeFinancial(ctx, tq, sub, t.ID, financial, userID); err != nil {
 			return err
 		}
 		// writeValue marks the movement matched (with or without invoices).

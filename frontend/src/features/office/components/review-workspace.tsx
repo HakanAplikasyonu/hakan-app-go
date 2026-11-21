@@ -1645,10 +1645,13 @@ function ReviewWorkspaceInner() {
         <div className="bg-card flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3">
           <GuvenOlcegi deger={bulkAt / 100} />
           <p className="min-w-0 flex-1 text-sm">
-            {t("office.review.bulk_text", {
-              count: bulkPicked.length,
-              threshold: bulkAt,
-            })}
+            {/* Sıfırken "0 öneriyi toplu onayla" yerine ne yapılacağı (#710). */}
+            {bulkPicked.length
+              ? t("office.review.bulk_text", {
+                  count: bulkPicked.length,
+                  threshold: bulkAt,
+                })
+              : t("office.review.bulk_none", { threshold: bulkAt })}
           </p>
           <div className="flex items-center gap-2">
             <Slider
@@ -1670,7 +1673,9 @@ function ReviewWorkspaceInner() {
           >
             {bulkBusy
               ? t("office.review_api.bulk_running")
-              : t("office.review.bulk_action", { count: bulkPicked.length })}
+              : bulkPicked.length
+                ? t("office.review.bulk_action", { count: bulkPicked.length })
+                : t("office.review.bulk_action_none")}
           </Button>
         </div>
       ) : null}
