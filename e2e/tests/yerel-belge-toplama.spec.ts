@@ -67,17 +67,14 @@ test("Belge toplama: eksik ekstre, Z, masraf, fatura; tek tık ve toplu istek (#
   const engagement = await engagementOf(api, DEMO.selin.title);
   const missingUrl = `/v1/tenant/engagements/${engagement}/document-tasks/missing`;
 
-  // Varsayılan dönem geçen ay; dört tür de eksik.
+  // Varsayılan dönem geçen ay. Demo dört türü de eksik bırakır; başka
+  // testler Selin'e fatura ya da ekstre yükleyebildiği için yalnız Z raporu
+  // ve masraf (Selin'e başka yerde girilmez) zorunlu.
   const before = await api.json<Missing>(await api.get(missingUrl));
   const period = before.period;
   expect(period).toMatch(/^\d{4}-\d{2}$/);
   const kinds = before.items.map((i) => i.kind);
-  for (const k of [
-    "bank_statement",
-    "z_reports",
-    "expenses",
-    "purchase_invoices",
-  ] as const) {
+  for (const k of ["z_reports", "expenses"] as const) {
     expect(kinds, `${k} eksik görünmeli`).toContain(k);
   }
   const titles = before.items.map((i) => i.title);
