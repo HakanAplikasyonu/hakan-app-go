@@ -16744,6 +16744,58 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-tracking-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: getVATTrackingSettings
+      summary: The office's VAT tracking settings (#780)
+      description: |
+        Requires `tenant.vat.read`. `report_enabled` (default true): the
+        month-end VAT report of all taxpayers (alınan, satılan, devreden) is
+        shown. `report_day` (1-31, default 29): from this day of the month on
+        the report is ready; a shorter month uses its last day.
+        `report_ready_on` is this month's ready date.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [VAT]
+      operationId: putVATTrackingSettings
+      summary: Set the office's VAT tracking settings (#780)
+      description: Requires `tenant.settings.write` (office owner / admin).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [report_enabled, report_day]
+              additionalProperties: false
+              properties:
+                report_enabled: { type: boolean }
+                report_day: { type: integer, minimum: 1, maximum: 31 }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATTrackingSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/account-rule-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26317,6 +26369,21 @@ components:
           type: boolean
           description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
         updated_at: { type: string, format: date-time }
+    VATTrackingSettings:
+      type: object
+      required: [report_enabled, report_day, report_ready_on, updated_at]
+      properties:
+        report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
+        report_day: { type: integer, description: Day of month the report is ready (1-31, default 29) }
+        report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
+        updated_at: { type: [string, "null"], format: date-time }
+    EnvelopeVATTrackingSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATTrackingSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeTaxReturnSettings:
       type: object
       required: [success, data, meta]
@@ -26708,10 +26775,11 @@ components:
               type: array
               items:
                 type: object
-                required: [engagement_uuid, taxpayer_uuid, totals, calendar, checks, excluded]
+                required: [engagement_uuid, taxpayer_uuid, taxpayer_title, totals, calendar, checks, excluded]
                 properties:
                   engagement_uuid: { type: string, format: uuid }
                   taxpayer_uuid: { type: string, format: uuid }
+                  taxpayer_title: { type: string }
                   totals: { $ref: "#/components/schemas/VATTotals" }
                   calendar: { $ref: "#/components/schemas/VATCalendar" }
                   checks: { $ref: "#/components/schemas/VATChecks" }
