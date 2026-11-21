@@ -155,6 +155,7 @@ func TestLateDocuments(t *testing.T) {
 	if err != nil || len(mine.Items) != 0 {
 		t.Fatalf("unassigned summary = %+v, %v", mine, err)
 	}
+	d.Member(t, org, user, "member")
 	d.Assign(t, org, eng, user)
 	mine, err = svc.Summary(ctx, org, false, user)
 	if err != nil || mine.Pending != 2 {

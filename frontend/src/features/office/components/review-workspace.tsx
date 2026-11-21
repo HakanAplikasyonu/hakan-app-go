@@ -650,7 +650,9 @@ function ReviewWorkspaceInner() {
   const [editing, setEditing] = useState(false);
   const [ruleOnCorrect, setRuleOnCorrect] = useState(false);
   const [help, setHelp] = useState(false);
-  const [bulkAt, setBulkAt] = useState(95);
+  // Toplu onay eşiği açılışta %80 (#780): %95'te kuyruk doluyken "öneri
+  // yok" görünüyordu.
+  const [bulkAt, setBulkAt] = useState(80);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [undoBusy, setUndoBusy] = useState(false);
   const [ruleBusy, setRuleBusy] = useState(false);
@@ -1651,7 +1653,10 @@ function ReviewWorkspaceInner() {
                   count: bulkPicked.length,
                   threshold: bulkAt,
                 })
-              : t("office.review.bulk_none", { threshold: bulkAt })}
+              : t("office.review.bulk_none", {
+                  threshold: bulkAt,
+                  count: queue.length,
+                })}
           </p>
           <div className="flex items-center gap-2">
             <Slider
