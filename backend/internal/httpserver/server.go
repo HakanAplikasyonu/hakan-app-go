@@ -67,6 +67,7 @@ import (
 	exportmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports"
 	exporthandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/handler"
 	exportusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/exports/usecase"
+	foreigninvoicesmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/foreigninvoices"
 	importmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports"
 	importhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/handler"
 	importusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/imports/usecase"
@@ -765,11 +766,12 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 				Outbox: outbox.NewStore(deps.DB, deps.Queries), Notifier: notifSvc, FrontendURL: cfg.Auth.FrontendURL, Log: log,
 			}).
 			WithPortal(deps.Queries),
-		engagements: engagementResolver,
-		related:     relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
-		latedocs:    latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
-		rlsScope:    rlsScope,
-		taxpayers:   taxpayerResolver,
+		engagements:     engagementResolver,
+		related:         relatedmodule.NewHandler(relatedmodule.New(deps.Queries)),
+		latedocs:        latedocsmodule.NewHandler(latedocsmodule.New(deps.Queries)),
+		foreigninvoices: foreigninvoicesmodule.NewHandler(foreigninvoicesmodule.New(deps.Queries)),
+		rlsScope:        rlsScope,
+		taxpayers:       taxpayerResolver,
 	})...); err != nil {
 		return nil, fmt.Errorf("httpserver: %w", err)
 	}
