@@ -1932,6 +1932,7 @@
   "tax_returns.employees_empty_title": "Çalışan yok",
   "tax_returns.employees_empty": "Bu döneme bordro yüklenmedi. “Personel ve bordro” sekmesinden bordroyu içe aktarın.",
   "tax_returns.babs_hint": "Karşı taraf başına KDV hariç toplamı bildirim sınırına ulaşan belgeler bildirilir. Sınır:",
+  "tax_returns.babs_expense_docs": "({{count}} masraf belgesi)",
   "tax_returns.form_ba": "Form Ba (alışlar)",
   "tax_returns.form_bs": "Form Bs (satışlar)",
   "tax_returns.documents": "belge",

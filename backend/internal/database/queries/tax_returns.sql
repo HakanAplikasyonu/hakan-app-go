@@ -148,6 +148,37 @@ WHERE i.taxpayer_id = @taxpayer_id
 GROUP BY i.direction, 2
 ORDER BY i.direction, 5 DESC, 2;
 
+-- name: TaxReturnExpenseCounterparties :many
+-- Ba (#575): masraf olarak işlenen, fatura ya da fatura yerine geçen alış
+-- belgeleri (kâğıt fatura = other, serbest meslek makbuzu = smm), satıcı
+-- VKN / TCKN'sine göre. ÖKC / akaryakıt fişi, gider pusulası ve banka
+-- masrafı Ba'ya girmez.
+SELECT e.vendor_tax_number::text AS counterparty_id,
+       COALESCE(MAX(e.vendor_name), '')::text AS counterparty_name,
+       COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = @taxpayer_id
+  AND e.period = @period
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND e.vendor_tax_number ~ '^[0-9]{10,11}$'
+GROUP BY e.vendor_tax_number
+ORDER BY 4 DESC, 1;
+
+-- name: TaxReturnExpenseMissingVendor :one
+-- Ba (#575): satıcı VKN / TCKN'si olmayan onaylı alış belgeleri (masraf).
+SELECT COUNT(*)::bigint AS document_count,
+       COALESCE(SUM(ROUND(COALESCE(e.tax_exclusive_amount, e.amount - COALESCE(e.tax_amount, 0), 0), 2)), 0)::numeric AS amount
+FROM expenses e
+WHERE e.taxpayer_id = @taxpayer_id
+  AND e.period = @period
+  AND e.approval_status = 'approved'
+  AND e.currency = 'TRY'
+  AND e.receipt_type IN ('other', 'smm')
+  AND (e.vendor_tax_number IS NULL OR e.vendor_tax_number !~ '^[0-9]{10,11}$');
+
 -- name: TaxReturnMissingCounterparty :many
 -- Ba/Bs: karşı taraf kimliği olmayan (yabancı ya da eksik) faturalar.
 SELECT i.direction,
