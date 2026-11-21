@@ -22,6 +22,7 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
+import { VATTrackingSetting } from "@/features/tenant/components/vat-tracking-setting";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
 import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
@@ -32,6 +33,7 @@ import { usePermission } from "@/providers/permission-provider";
 type SectionId =
   | "office"
   | "tax-returns"
+  | "vat"
   | "taxpayer-panel"
   | "support"
   | "sms"
@@ -135,6 +137,7 @@ export function TenantSettingsPage() {
       id: "tax-returns",
       label: t("tenant.settings_section_tax_returns"),
     },
+    { id: "vat", label: t("tenant.settings_section_vat") },
     {
       id: "taxpayer-panel",
       label: t("tenant.settings_section_taxpayer_panel"),
@@ -236,6 +239,14 @@ export function TenantSettingsPage() {
               slug={tenant.slug}
               canWrite={canWrite}
             />
+          </Section>
+          {/* KDV takibi (#780): ay sonu KDV raporu; varsayılan açık. */}
+          <Section
+            id="vat"
+            title={t("tenant.settings_section_vat")}
+            description={t("tenant.settings_section_vat_description")}
+          >
+            <VATTrackingSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* Mükellef paneli (#780): anlık KDV ve satış raporu, varsayılan açık. */}
           <Section
