@@ -593,7 +593,7 @@ function NewDraftForm({
         ) : null}
         {create.isError ? (
           <p className="text-status-blocking text-sm">
-            {journalErrorText(t, create.error, t("office.api.load_error"))}
+            {journalErrorText(t, create.error, t("office.journals.save_error"))}
           </p>
         ) : null}
         <p className="text-muted-foreground text-xs">

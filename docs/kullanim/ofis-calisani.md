@@ -23,7 +23,7 @@ saklanır.
 1. **Sıradaki iş:** her mükellefin dönem kapanışında sıradaki adımını görün
    ve tek tıkla (onayınızla) çalıştırın.
 2. **Genel bakış / Komuta merkezi:** işi geride olan mükellefleri görün.
-3. **UBL yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
+3. **e-Fatura yükle:** gelen e-fatura / e-arşiv dosyalarını yükleyin.
 4. **İnceleme kuyruğu:** hesap kodu önerilerini karara bağlayın.
 5. **Uyarılar:** kontrollerin bulduğu sorunları kapatın.
 6. **Fişler ve aktarım:** fişi onaylayın, Luca / Zirve dosyasını indirin
@@ -31,7 +31,7 @@ saklanır.
 
 ## UBL yükleme
 
-![UBL yükle](../../frontend/public/yardim/img/ofis-ubl-yukle.jpg)
+![e-Fatura yükle](../../frontend/public/yardim/img/ofis-ubl-yukle.jpg)
 
 1. Üstten mükellefi seçin.
 2. XML dosyalarını ya da bunları içeren ZIP'i alana sürükleyin (ya da

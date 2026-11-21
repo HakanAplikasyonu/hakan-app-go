@@ -879,6 +879,9 @@ type Querier interface {
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	// Cari hafızası (#319): incelemede kararlaştırılmış cari hesaplar.
 	ListEngagementCounterpartyAccounts(ctx context.Context, arg ListEngagementCounterpartyAccountsParams) ([]ListEngagementCounterpartyAccountsRow, error)
+	// Fişe bağlanabilecek cari kartları (#710): mükellefin müşteri ve
+	// tedarikçileri, unvana göre; q unvanda aranır (VKN ile arama yok).
+	ListEngagementCustomers(ctx context.Context, arg ListEngagementCustomersParams) ([]ListEngagementCustomersRow, error)
 	// Ofis panelinde mükellefin masrafları; kategori ve hesap ofis tarafından.
 	ListEngagementExpenses(ctx context.Context, arg ListEngagementExpensesParams) ([]ListEngagementExpensesRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
@@ -1438,6 +1441,8 @@ type Querier interface {
 	SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	// POS komisyonu (#565): yalnız fişe girmemiş harekette; boş değer siler.
+	SetBankPostingCommission(ctx context.Context, arg SetBankPostingCommissionParams) (int64, error)
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error

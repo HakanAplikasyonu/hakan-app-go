@@ -61,6 +61,7 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("POST "+p+"/approve", middleware.Chain(http.HandlerFunc(h.approve), authn, org, write, eng))
 	mux.Handle("POST "+p+"/drafts", middleware.Chain(http.HandlerFunc(h.drafts), authn, org, write, journals, eng))
 	mux.Handle("PUT "+p+"/{transactionUuid}", middleware.Chain(http.HandlerFunc(h.setAccount), authn, org, write, eng))
+	mux.Handle("PUT "+p+"/{transactionUuid}/commission", middleware.Chain(http.HandlerFunc(h.setCommission), authn, org, write, eng))
 	l := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-ledger-accounts"
 	mux.Handle("GET "+l, middleware.Chain(http.HandlerFunc(h.ledgerAccounts), authn, org, read, eng))
 	mux.Handle("PUT "+l+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.setLedgerAccount), authn, org, write, eng))
@@ -92,6 +93,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error, what string) {
 		response.Error(w, r, http.StatusUnprocessableEntity, "VALIDATION_ERROR", err.Error())
 	case errors.Is(err, ErrNotFound):
 		response.NotFound(w, r, what+" not found")
+	case errors.Is(err, ErrNoPosting):
+		response.Error(w, r, http.StatusConflict, "BANK_POSTING_MISSING", "pick the movement's account first")
 	case errors.Is(err, ErrDrafted):
 		response.Error(w, r, http.StatusConflict, "BANK_POSTING_DRAFTED", "the movement is already in a journal draft; reverse the draft first")
 	case errors.Is(err, reviewusecase.ErrInvalid):
@@ -283,6 +286,25 @@ func (h *Handler) setAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.flow.SetAccount(r.Context(), subjectOf(r), userOf(r), id, in.AccountCode, in.AccountName); err != nil {
+		writeErr(w, r, err, "bank transaction")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// setCommission: PUT .../bank-postings/{transactionUuid}/commission
+// {amount, account_code} nets a POS collection (#565); amount null removes it.
+func (h *Handler) setCommission(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "bank transaction not found")
+		return
+	}
+	var in CommissionInput
+	if !decode(w, r, &in) {
+		return
+	}
+	if err := h.flow.SetCommission(r.Context(), subjectOf(r), id, in); err != nil {
 		writeErr(w, r, err, "bank transaction")
 		return
 	}

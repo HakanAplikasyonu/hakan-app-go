@@ -20,7 +20,7 @@ import {
 import { journalKeys, journalService } from "../services/journals.service";
 import { Money } from "./office-ui";
 
-const KINDS: ManualLinkKind[] = ["invoice", "bank_transaction"];
+const KINDS: ManualLinkKind[] = ["invoice", "bank_transaction", "customer"];
 const SHOWN = 8;
 
 function useLinkMutation(engagement: string, draft: string) {
@@ -118,7 +118,8 @@ export function ManualLinkForm({
     ],
     queryFn: () =>
       journalLinksService.candidates(slug, engagement, kind, period),
-    enabled: open && !!period,
+    // Cari kartlarının dönemi yok; fatura ve banka fişin ayından gelir.
+    enabled: open && (kind === "customer" || !!period),
   });
   const shown = useMemo(() => {
     const q = text.trim().toLocaleLowerCase("tr");
@@ -215,6 +216,12 @@ export function ManualLinkForm({
                 <span className="font-medium">{c.label || "—"}</span>
                 {c.detail ? (
                   <span className="text-text-2"> · {c.detail}</span>
+                ) : null}
+                {c.cardType ? (
+                  <span className="text-text-2">
+                    {" · "}
+                    {t(`office.related.status.${c.cardType}`)}
+                  </span>
                 ) : null}
                 {c.amount ? (
                   <>

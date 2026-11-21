@@ -17,7 +17,7 @@ UPDATE bank_transaction_postings
 SET status = 'approved', account_code = $1, account_name = $2,
     source = $3, suggestion_id = $4, approved_by = $5, approved_at = NOW()
 WHERE organization_id = $6 AND engagement_id = $7 AND bank_transaction_id = $8
-RETURNING id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at
+RETURNING id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at, commission_amount, commission_account_code
 `
 
 type ApproveBankPostingParams struct {
@@ -61,6 +61,8 @@ func (q *Queries) ApproveBankPosting(ctx context.Context, arg ApproveBankPosting
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CommissionAmount,
+		&i.CommissionAccountCode,
 	)
 	return i, err
 }
@@ -160,7 +162,7 @@ func (q *Queries) CountBankPostings(ctx context.Context, arg CountBankPostingsPa
 }
 
 const getBankPosting = `-- name: GetBankPosting :one
-SELECT id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at FROM bank_transaction_postings
+SELECT id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at, commission_amount, commission_account_code FROM bank_transaction_postings
 WHERE organization_id = $1 AND engagement_id = $2 AND bank_transaction_id = $3
 `
 
@@ -191,12 +193,14 @@ func (q *Queries) GetBankPosting(ctx context.Context, arg GetBankPostingParams) 
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CommissionAmount,
+		&i.CommissionAccountCode,
 	)
 	return i, err
 }
 
 const getBankPostingView = `-- name: GetBankPostingView :one
-SELECT p.id, p.organization_id, p.engagement_id, p.taxpayer_id, p.bank_transaction_id, p.account_code, p.account_name, p.status, p.confidence, p.source, p.reason, p.suggestion_id, p.journal_draft_uuid, p.approved_by, p.approved_at, p.created_at, p.updated_at, s.uuid AS suggestion_uuid, s.status AS suggestion_status
+SELECT p.id, p.organization_id, p.engagement_id, p.taxpayer_id, p.bank_transaction_id, p.account_code, p.account_name, p.status, p.confidence, p.source, p.reason, p.suggestion_id, p.journal_draft_uuid, p.approved_by, p.approved_at, p.created_at, p.updated_at, p.commission_amount, p.commission_account_code, s.uuid AS suggestion_uuid, s.status AS suggestion_status
 FROM bank_transaction_postings p
 LEFT JOIN suggestions s ON s.organization_id = p.organization_id AND s.engagement_id = p.engagement_id AND s.id = p.suggestion_id
 WHERE p.organization_id = $1 AND p.engagement_id = $2 AND p.bank_transaction_id = $3
@@ -209,25 +213,27 @@ type GetBankPostingViewParams struct {
 }
 
 type GetBankPostingViewRow struct {
-	ID                int64              `json:"id"`
-	OrganizationID    int64              `json:"organization_id"`
-	EngagementID      int64              `json:"engagement_id"`
-	TaxpayerID        int64              `json:"taxpayer_id"`
-	BankTransactionID int64              `json:"bank_transaction_id"`
-	AccountCode       string             `json:"account_code"`
-	AccountName       string             `json:"account_name"`
-	Status            string             `json:"status"`
-	Confidence        pgtype.Numeric     `json:"confidence"`
-	Source            string             `json:"source"`
-	Reason            string             `json:"reason"`
-	SuggestionID      pgtype.Int8        `json:"suggestion_id"`
-	JournalDraftUuid  pgtype.UUID        `json:"journal_draft_uuid"`
-	ApprovedBy        pgtype.Int8        `json:"approved_by"`
-	ApprovedAt        pgtype.Timestamptz `json:"approved_at"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
-	SuggestionUuid    pgtype.UUID        `json:"suggestion_uuid"`
-	SuggestionStatus  pgtype.Text        `json:"suggestion_status"`
+	ID                    int64              `json:"id"`
+	OrganizationID        int64              `json:"organization_id"`
+	EngagementID          int64              `json:"engagement_id"`
+	TaxpayerID            int64              `json:"taxpayer_id"`
+	BankTransactionID     int64              `json:"bank_transaction_id"`
+	AccountCode           string             `json:"account_code"`
+	AccountName           string             `json:"account_name"`
+	Status                string             `json:"status"`
+	Confidence            pgtype.Numeric     `json:"confidence"`
+	Source                string             `json:"source"`
+	Reason                string             `json:"reason"`
+	SuggestionID          pgtype.Int8        `json:"suggestion_id"`
+	JournalDraftUuid      pgtype.UUID        `json:"journal_draft_uuid"`
+	ApprovedBy            pgtype.Int8        `json:"approved_by"`
+	ApprovedAt            pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	CommissionAmount      pgtype.Numeric     `json:"commission_amount"`
+	CommissionAccountCode pgtype.Text        `json:"commission_account_code"`
+	SuggestionUuid        pgtype.UUID        `json:"suggestion_uuid"`
+	SuggestionStatus      pgtype.Text        `json:"suggestion_status"`
 }
 
 func (q *Queries) GetBankPostingView(ctx context.Context, arg GetBankPostingViewParams) (GetBankPostingViewRow, error) {
@@ -251,6 +257,8 @@ func (q *Queries) GetBankPostingView(ctx context.Context, arg GetBankPostingView
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CommissionAmount,
+		&i.CommissionAccountCode,
 		&i.SuggestionUuid,
 		&i.SuggestionStatus,
 	)
@@ -314,6 +322,7 @@ func (q *Queries) GetBankTransactionForPosting(ctx context.Context, arg GetBankT
 
 const listApprovedBankPostingsWithoutDraft = `-- name: ListApprovedBankPostingsWithoutDraft :many
 SELECT p.bank_transaction_id, p.account_code, p.account_name, p.confidence,
+       p.commission_amount, p.commission_account_code,
        t.uuid, t.cash_box_id, t.transaction_date, t.debit_credit, t.amount, t.currency, t.description,
        t.counterparty_name, cb.name AS cash_box_name,
        COALESCE(l.account_code, '102')::text AS bank_account_code
@@ -336,20 +345,22 @@ type ListApprovedBankPostingsWithoutDraftParams struct {
 }
 
 type ListApprovedBankPostingsWithoutDraftRow struct {
-	BankTransactionID int64          `json:"bank_transaction_id"`
-	AccountCode       string         `json:"account_code"`
-	AccountName       string         `json:"account_name"`
-	Confidence        pgtype.Numeric `json:"confidence"`
-	Uuid              uuid.UUID      `json:"uuid"`
-	CashBoxID         int64          `json:"cash_box_id"`
-	TransactionDate   pgtype.Date    `json:"transaction_date"`
-	DebitCredit       string         `json:"debit_credit"`
-	Amount            pgtype.Numeric `json:"amount"`
-	Currency          string         `json:"currency"`
-	Description       string         `json:"description"`
-	CounterpartyName  pgtype.Text    `json:"counterparty_name"`
-	CashBoxName       string         `json:"cash_box_name"`
-	BankAccountCode   string         `json:"bank_account_code"`
+	BankTransactionID     int64          `json:"bank_transaction_id"`
+	AccountCode           string         `json:"account_code"`
+	AccountName           string         `json:"account_name"`
+	Confidence            pgtype.Numeric `json:"confidence"`
+	CommissionAmount      pgtype.Numeric `json:"commission_amount"`
+	CommissionAccountCode pgtype.Text    `json:"commission_account_code"`
+	Uuid                  uuid.UUID      `json:"uuid"`
+	CashBoxID             int64          `json:"cash_box_id"`
+	TransactionDate       pgtype.Date    `json:"transaction_date"`
+	DebitCredit           string         `json:"debit_credit"`
+	Amount                pgtype.Numeric `json:"amount"`
+	Currency              string         `json:"currency"`
+	Description           string         `json:"description"`
+	CounterpartyName      pgtype.Text    `json:"counterparty_name"`
+	CashBoxName           string         `json:"cash_box_name"`
+	BankAccountCode       string         `json:"bank_account_code"`
 }
 
 func (q *Queries) ListApprovedBankPostingsWithoutDraft(ctx context.Context, arg ListApprovedBankPostingsWithoutDraftParams) ([]ListApprovedBankPostingsWithoutDraftRow, error) {
@@ -371,6 +382,8 @@ func (q *Queries) ListApprovedBankPostingsWithoutDraft(ctx context.Context, arg 
 			&i.AccountCode,
 			&i.AccountName,
 			&i.Confidence,
+			&i.CommissionAmount,
+			&i.CommissionAccountCode,
 			&i.Uuid,
 			&i.CashBoxID,
 			&i.TransactionDate,
@@ -669,6 +682,38 @@ func (q *Queries) ListBankTransactionsForPosting(ctx context.Context, arg ListBa
 	return items, nil
 }
 
+const setBankPostingCommission = `-- name: SetBankPostingCommission :execrows
+UPDATE bank_transaction_postings
+SET commission_amount = $1, commission_account_code = $2
+WHERE organization_id = $3 AND engagement_id = $4 AND taxpayer_id = $5
+  AND bank_transaction_id = $6 AND journal_draft_uuid IS NULL
+`
+
+type SetBankPostingCommissionParams struct {
+	CommissionAmount      pgtype.Numeric `json:"commission_amount"`
+	CommissionAccountCode pgtype.Text    `json:"commission_account_code"`
+	OrganizationID        int64          `json:"organization_id"`
+	EngagementID          int64          `json:"engagement_id"`
+	TaxpayerID            int64          `json:"taxpayer_id"`
+	BankTransactionID     int64          `json:"bank_transaction_id"`
+}
+
+// POS komisyonu (#565): yalnız fişe girmemiş harekette; boş değer siler.
+func (q *Queries) SetBankPostingCommission(ctx context.Context, arg SetBankPostingCommissionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setBankPostingCommission,
+		arg.CommissionAmount,
+		arg.CommissionAccountCode,
+		arg.OrganizationID,
+		arg.EngagementID,
+		arg.TaxpayerID,
+		arg.BankTransactionID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setBankPostingSuggestion = `-- name: SetBankPostingSuggestion :exec
 UPDATE bank_transaction_postings SET suggestion_id = $1
 WHERE organization_id = $2 AND engagement_id = $3 AND bank_transaction_id = $4
@@ -779,7 +824,7 @@ ON CONFLICT (engagement_id, bank_transaction_id) DO UPDATE
 SET account_code = EXCLUDED.account_code, account_name = EXCLUDED.account_name, confidence = EXCLUDED.confidence,
     source = EXCLUDED.source, reason = EXCLUDED.reason, suggestion_id = EXCLUDED.suggestion_id
 WHERE bank_transaction_postings.status = 'suggested'
-RETURNING id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at
+RETURNING id, organization_id, engagement_id, taxpayer_id, bank_transaction_id, account_code, account_name, status, confidence, source, reason, suggestion_id, journal_draft_uuid, approved_by, approved_at, created_at, updated_at, commission_amount, commission_account_code
 `
 
 type UpsertBankPostingParams struct {
@@ -828,6 +873,8 @@ func (q *Queries) UpsertBankPosting(ctx context.Context, arg UpsertBankPostingPa
 		&i.ApprovedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CommissionAmount,
+		&i.CommissionAccountCode,
 	)
 	return i, err
 }
