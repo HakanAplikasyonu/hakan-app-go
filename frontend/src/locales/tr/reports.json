@@ -93,7 +93,7 @@
   "vat.total": "Toplam",
   "vat.limit_reached": "Eşik aşıldı",
   "vat.opening": "Devri gir",
-  "vat.opening_for": "{{name}} için devreden KDV'yi gir",
+  "vat.opening_for": "Devri gir: {{name}}",
   "vat.opening_title": "{{name}}: devreden KDV",
   "vat.opening_hint": "Önceki aydan {{month}} dönemine devreden KDV. Sistemde önceki ayların faturası yoksa bu tutarla başlanır.",
   "vat.opening_amount": "Devreden KDV (TL)",
