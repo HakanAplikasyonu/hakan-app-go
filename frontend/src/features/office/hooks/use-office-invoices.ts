@@ -183,3 +183,35 @@ export function usePostInvoices(slug: string, engagement: string) {
     },
   });
 }
+
+/** Kaç mükellefe bakılır: ilk açılışta en çok bu kadar küçük istek. */
+const FIRST_WITH_INVOICES_PROBE = 12;
+
+/**
+ * İlk açılış boş ekran olmasın (#780): adreste mükellef yokken listedeki
+ * ilk mükellefler arasından seçili dönemde faturası olan ilki. Hiçbirinde
+ * yoksa null (ilk mükellef açılır).
+ */
+export function useFirstEngagementWithInvoices(
+  slug: string,
+  options: EngagementOption[],
+  period: string | undefined,
+  enabled: boolean,
+) {
+  const head = enabled ? options.slice(0, FIRST_WITH_INVOICES_PROBE) : [];
+  const filter: InvoiceFilter = { period, limit: 1, offset: 0 };
+  const probes = useQueries({
+    queries: head.map((o) => ({
+      queryKey: officeInvoiceKeys.invoices(slug, o.engagement, filter),
+      queryFn: () => officeInvoiceService.invoices(slug, o.engagement, filter),
+      staleTime: 60_000,
+    })),
+  });
+  const waiting =
+    enabled && (options.length === 0 || probes.some((q) => q.isLoading));
+  const idx = probes.findIndex((q) => (q.data?.items.length ?? 0) > 0);
+  return {
+    engagement: idx >= 0 ? (head[idx]?.engagement ?? null) : null,
+    waiting,
+  };
+}

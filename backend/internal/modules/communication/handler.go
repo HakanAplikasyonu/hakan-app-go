@@ -137,7 +137,7 @@ func (h *Handler) TestMessage(w http.ResponseWriter, r *http.Request) {
 
 // ListMessages: GET /v1/tenant/sms-messages?limit=50.
 func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
 	items, err := h.svc.Recent(r.Context(), orgctx.Must(r.Context()).ID, int32(limit))
 	if err != nil {
 		h.fail(w, r, err)

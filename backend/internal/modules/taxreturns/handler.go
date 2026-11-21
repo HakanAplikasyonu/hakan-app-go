@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
+
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/authctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
@@ -63,6 +65,9 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	route("GET", "/{returnKind}/{period}/accrual-document", read, h.accrualFile)
 	// Tahakkuk ödemesi (#575): ödendi günü, varsa vergi dairesine ödeyen banka hareketi.
 	route("PUT", "/{returnKind}/{period}/payment", write, h.setPayment)
+	// Faturasız kira stopajı (#575, rent.go).
+	route("PUT", "/{returnKind}/{period}/rent-withholdings/{transactionUuid}", write, h.setRent)
+	route("DELETE", "/{returnKind}/{period}/rent-withholdings/{transactionUuid}", write, h.deleteRent)
 }
 
 func userID(r *http.Request) int64 {
@@ -102,6 +107,8 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 		response.Error(w, r, http.StatusUnsupportedMediaType, "NOT_PDF", "the accrual slip must be a PDF file")
 	case errors.Is(err, ErrStorageMissing):
 		response.Error(w, r, http.StatusServiceUnavailable, "STORAGE_UNAVAILABLE", "file storage is not configured")
+	case errors.Is(err, ErrInvalidRent):
+		response.Error(w, r, http.StatusUnprocessableEntity, response.CodeValidationError, err.Error())
 	case errors.Is(err, ErrNotFound):
 		response.NotFound(w, r, "not found")
 	default:
@@ -349,6 +356,40 @@ func (h *Handler) accrualFile(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) amend(w http.ResponseWriter, r *http.Request) {
 	s := engagementctx.Must(r.Context())
 	p, err := h.svc.Amend(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) setRent(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	txn, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "not found")
+		return
+	}
+	var in RentInput
+	if !decode(w, r, &in) {
+		return
+	}
+	p, err := h.svc.SetRent(r.Context(), s, userID(r), r.PathValue("returnKind"), r.PathValue("period"), txn, in)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, p)
+}
+
+func (h *Handler) deleteRent(w http.ResponseWriter, r *http.Request) {
+	s := engagementctx.Must(r.Context())
+	txn, err := uuid.Parse(r.PathValue("transactionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "not found")
+		return
+	}
+	p, err := h.svc.DeleteRent(r.Context(), s, r.PathValue("returnKind"), r.PathValue("period"), txn)
 	if err != nil {
 		h.fail(w, r, err)
 		return

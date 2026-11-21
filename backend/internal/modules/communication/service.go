@@ -90,12 +90,12 @@ type Options struct {
 	PerMinute int
 }
 
-// OptionsFromEnv reads NETGSM_BASE_URL and NETGSM_SEND_ENABLED.
+// OptionsFromEnv reads NETGSM_SEND_ENABLED (the real NetGSM API is always
+// used; tests pass Options.BaseURL directly).
 func OptionsFromEnv(m mail.Sender) Options {
 	return Options{
-		BaseURL: strings.TrimSpace(os.Getenv("NETGSM_BASE_URL")),
-		Live:    strings.EqualFold(strings.TrimSpace(os.Getenv("NETGSM_SEND_ENABLED")), "true"),
-		Mailer:  m,
+		Live:   strings.EqualFold(strings.TrimSpace(os.Getenv("NETGSM_SEND_ENABLED")), "true"),
+		Mailer: m,
 	}
 }
 

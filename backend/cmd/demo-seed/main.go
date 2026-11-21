@@ -306,6 +306,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedPlanExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("plan export → %s: %w", tp.Key, err)
 			}
+			// Dilekçeler sekmesi boş durmasın (#780).
+			if err := seedPetitions(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("petitions → %s: %w", tp.Key, err)
+			}
 			// Luca banka ekstresi: Ekim hareketlerinin CSV'si bir kez (#465).
 			if err := seedBankStatementExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("bank statement export → %s: %w", tp.Key, err)

@@ -51,7 +51,7 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 		response.BadRequest(w, r, response.CodeValidationError, "Kanal sms ya da email olmalı.")
 		return
 	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, _ := strconv.ParseInt(r.URL.Query().Get("limit"), 10, 32)
 	eng := engagementctx.Must(r.Context())
 	items, err := h.svc.History(r.Context(), orgctx.Must(r.Context()).ID, eng.ID, channel, int32(limit))
 	if err != nil {

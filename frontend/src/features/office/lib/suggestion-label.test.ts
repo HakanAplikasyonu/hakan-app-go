@@ -82,7 +82,9 @@ describe("humanRationale (#576)", () => {
     );
   });
   it("diğer gerekçeler aynen", () => {
-    expect(humanRationale("Kural: 120 Alıcılar", t)).toBe("Kural: 120 Alıcılar");
+    expect(humanRationale("Kural: 120 Alıcılar", t)).toBe(
+      "Kural: 120 Alıcılar",
+    );
     expect(humanRationale(null, t)).toBe("");
   });
 });
