@@ -289,6 +289,7 @@ type Querier interface {
 	DeleteOAuthAccountByUserProvider(ctx context.Context, arg DeleteOAuthAccountByUserProviderParams) error
 	DeleteOfficeReviewSetting(ctx context.Context, arg DeleteOfficeReviewSettingParams) (int64, error)
 	DeleteOfficeWarningRule(ctx context.Context, arg DeleteOfficeWarningRuleParams) (int64, error)
+	DeleteOperatingAccountCategory(ctx context.Context, arg DeleteOperatingAccountCategoryParams) error
 	DeleteOrganizationMember(ctx context.Context, arg DeleteOrganizationMemberParams) (int64, error)
 	DeleteOrganizationRole(ctx context.Context, arg DeleteOrganizationRoleParams) (int64, error)
 	DeletePayrollDocument(ctx context.Context, arg DeletePayrollDocumentParams) error
@@ -457,6 +458,12 @@ type Querier interface {
 	GetEngagementAlertNames(ctx context.Context, arg GetEngagementAlertNamesParams) (GetEngagementAlertNamesRow, error)
 	GetEngagementByUUID(ctx context.Context, arg GetEngagementByUUIDParams) (GetEngagementByUUIDRow, error)
 	GetEngagementInvoice(ctx context.Context, arg GetEngagementInvoiceParams) (Invoice, error)
+	// Defter türü ve işletme hesabı (#780). İşletme defteri ve serbest meslek
+	// kazanç defteri tutan mükellefte hesap planı yoktur: alış faturası, masraf
+	// ve fiş gider; satış faturası ve Z raporu gelir satırıdır. Fatura kuralları
+	// KDV1 ile aynı (tax_returns.sql): aktif, kaynakta silinmemiş, dövizliyse
+	// kuru olan faturalar; masraf ve Z raporu onaylı ve TL.
+	GetEngagementLedgerType(ctx context.Context, arg GetEngagementLedgerTypeParams) (string, error)
 	GetEngagementReceiptImage(ctx context.Context, arg GetEngagementReceiptImageParams) (GetEngagementReceiptImageRow, error)
 	GetEngagementTaxpayerContact(ctx context.Context, arg GetEngagementTaxpayerContactParams) (GetEngagementTaxpayerContactRow, error)
 	GetEngagementUUIDByID(ctx context.Context, arg GetEngagementUUIDByIDParams) (uuid.UUID, error)
@@ -510,6 +517,7 @@ type Querier interface {
 	// member, so the lookup cannot be organization-scoped.
 	// tenant-lint: cross-org onay bağlantısı, yalnızca token özetiyle tek satır
 	GetOnboardingRequestByTokenHash(ctx context.Context, tokenHash string) (GetOnboardingRequestByTokenHashRow, error)
+	GetOperatingAccountInventory(ctx context.Context, arg GetOperatingAccountInventoryParams) (OperatingAccountInventory, error)
 	GetOrganizationBilling(ctx context.Context, organizationID int64) (OrganizationBilling, error)
 	GetOrganizationByID(ctx context.Context, id int64) (Organization, error)
 	GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error)
@@ -1037,6 +1045,7 @@ type Querier interface {
 	// parametrelerde (recovered_at) durur.
 	ListOpenConnectionFailedWarnings(ctx context.Context, arg ListOpenConnectionFailedWarningsParams) ([]ListOpenConnectionFailedWarningsRow, error)
 	ListOpenSgkPremiums(ctx context.Context, taxpayerID int64) ([]SgkPremium, error)
+	ListOperatingAccountRows(ctx context.Context, arg ListOperatingAccountRowsParams) ([]ListOperatingAccountRowsRow, error)
 	// Ofis genelindeki atamalar (#639): mükellefler listesi satır başına istek
 	// atmasın. read_all yoksa yalnız çağıranın atandığı engagement'lar. Üst
 	// sınır 5000 satır (birkaç yüz mükellef × birkaç atanan).
@@ -1311,6 +1320,11 @@ type Querier interface {
 	// Aynı mükellefe aynı başlıkla açık bir talep varsa ikincisi açılmaz (#568).
 	OpenDocumentRequestByTitle(ctx context.Context, arg OpenDocumentRequestByTitleParams) (uuid.UUID, error)
 	OpenWarningCodesForEntity(ctx context.Context, arg OpenWarningCodesForEntityParams) ([]string, error)
+	// Deftere henüz girmeyen kayıtlar: onay bekleyen masraf ve Z raporu, kuru
+	// eksik döviz faturası.
+	OperatingAccountPending(ctx context.Context, arg OperatingAccountPendingParams) (OperatingAccountPendingRow, error)
+	// Kategori yalnız mükellefin kendi belgesine yazılır.
+	OperatingAccountRecordExists(ctx context.Context, arg OperatingAccountRecordExistsParams) (bool, error)
 	OrganizationReadOnly(ctx context.Context, organizationID int64) (bool, error)
 	// Aynı karşı tarafın, faturadan önceki 12 aydaki tutarları.
 	PartyAmountsBefore(ctx context.Context, arg PartyAmountsBeforeParams) ([]pgtype.Numeric, error)
@@ -1515,6 +1529,7 @@ type Querier interface {
 	SetCustomerType(ctx context.Context, arg SetCustomerTypeParams) error
 	// matched: belge eşlendi; submitted: yüklendi, ofis bakacak. Hatırlatma durur.
 	SetDocumentTaskStatus(ctx context.Context, arg SetDocumentTaskStatusParams) error
+	SetEngagementLedgerType(ctx context.Context, arg SetEngagementLedgerTypeParams) (string, error)
 	SetEntegratorDocumentUBL(ctx context.Context, arg SetEntegratorDocumentUBLParams) (int64, error)
 	SetExcelImportRowOutcome(ctx context.Context, arg SetExcelImportRowOutcomeParams) error
 	SetExcelImportRowSkipped(ctx context.Context, arg SetExcelImportRowSkippedParams) (int64, error)
@@ -1736,6 +1751,8 @@ type Querier interface {
 	UpsertOfficeWarningRule(ctx context.Context, arg UpsertOfficeWarningRuleParams) error
 	// 05 §1: aynı (varlık, kod) için tek açık uyarı; tekrar üretilirse updated_at ve params güncellenir.
 	UpsertOpenDataWarning(ctx context.Context, arg UpsertOpenDataWarningParams) (DataWarning, error)
+	UpsertOperatingAccountCategory(ctx context.Context, arg UpsertOperatingAccountCategoryParams) error
+	UpsertOperatingAccountInventory(ctx context.Context, arg UpsertOperatingAccountInventoryParams) (OperatingAccountInventory, error)
 	UpsertOrganizationBilling(ctx context.Context, arg UpsertOrganizationBillingParams) (OrganizationBilling, error)
 	// Aynı dönemin yeniden içe aktarılması toplamları ve kaynağı değiştirir.
 	UpsertPayrollRun(ctx context.Context, arg UpsertPayrollRunParams) (PayrollRun, error)

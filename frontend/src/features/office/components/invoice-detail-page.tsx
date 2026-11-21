@@ -34,6 +34,8 @@ import { ENGAGEMENT_PARAM } from "./engagement-picker";
 import { sourceSystemLabel } from "@/lib/source-label";
 import { LINE_TABLE_FEATURES, useInvoiceLineColumns } from "./invoice-drawer";
 import { InvoiceAccountCodes } from "./invoice-account-codes";
+import { OperatingCategoryPanel } from "./engagement-operating-account-page";
+import { useLedgerType } from "./ledger-type";
 import { InvoicePreview } from "./invoice-preview";
 import { InvoicePdfButton } from "./invoice-quick-view";
 import { RelatedRecordsPanel } from "./related-records";
@@ -73,6 +75,7 @@ function InvoiceDetailInner({ id }: { id: string }) {
   // Mükellef detayında (#468) mükellef rotadan; genel sayfada ?taxpayer=.
   const scope = useEngagementScope();
   const engagement = scope ?? search.get(ENGAGEMENT_PARAM) ?? "";
+  const { singleEntry } = useLedgerType(engagement);
   const detail = useEngagementInvoice(slug, engagement, id);
   const ubl = useInvoiceUBL(slug, engagement, id, !!detail.data?.has_ubl);
   const { options } = useEngagementOptions(slug);
@@ -271,7 +274,17 @@ function InvoiceDetailInner({ id }: { id: string }) {
             />
           </Panel>
 
-          <InvoiceAccountCodes engagement={engagement} invoice={id} />
+          {/* İşletme defteri / serbest meslekte hesap kodu yok (#780). */}
+          {singleEntry ? (
+            <OperatingCategoryPanel
+              engagement={engagement}
+              period={d.period}
+              source="invoice"
+              record={id}
+            />
+          ) : (
+            <InvoiceAccountCodes engagement={engagement} invoice={id} />
+          )}
 
           <Panel
             title={t("office.waterfall.title")}
