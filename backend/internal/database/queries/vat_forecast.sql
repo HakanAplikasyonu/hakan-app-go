@@ -94,9 +94,9 @@ WHERE organization_id = @organization_id AND engagement_id = @engagement_id AND 
 SELECT * FROM vat_tracking_settings WHERE organization_id = @organization_id;
 
 -- name: UpsertVATTrackingSettings :one
-INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, watch_enabled, updated_by, updated_at)
-VALUES (@organization_id, @report_enabled, @report_day, @watch_enabled, sqlc.narg(updated_by), NOW())
+INSERT INTO vat_tracking_settings (organization_id, report_enabled, report_day, watch_enabled, watch_email, updated_by, updated_at)
+VALUES (@organization_id, @report_enabled, @report_day, @watch_enabled, @watch_email, sqlc.narg(updated_by), NOW())
 ON CONFLICT (organization_id) DO UPDATE
 SET report_enabled = EXCLUDED.report_enabled, report_day = EXCLUDED.report_day,
-    watch_enabled = EXCLUDED.watch_enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+    watch_enabled = EXCLUDED.watch_enabled, watch_email = EXCLUDED.watch_email, updated_by = EXCLUDED.updated_by, updated_at = NOW()
 RETURNING *;

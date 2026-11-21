@@ -181,6 +181,23 @@ func TestSeedLinksTaxpayerUser(t *testing.T) {
 		WHERE w.code IN ('Z_NUMBER_GAP', 'Z_DAY_GAP') AND w.status = 'open'`, demo.OrgSlug); n != 2 {
 		t.Fatalf("Z continuity warnings = %d, want 2", n)
 	}
+	// #780 B: ofis KDV eşiği 10.000 TL; Atlas, Selin ve Deniz Market bu ay
+	// eşiği geçer, nöbetçi olayı ve zil bildirimi oluşur.
+	if n := count(t, d, `
+		SELECT count(*) FROM warning_rule_configs c JOIN organizations o ON o.id = c.organization_id AND o.slug = $1
+		WHERE c.engagement_id IS NULL AND c.code = 'VAT_PAYABLE_THRESHOLD' AND c.params->>'limit' = '10000.00'`, demo.OrgSlug); n != 1 {
+		t.Fatalf("office VAT threshold rows = %d, want 1", n)
+	}
+	if n := count(t, d, `
+		SELECT count(*) FROM vat_watch_events w JOIN organizations o ON o.id = w.organization_id AND o.slug = $1
+		WHERE w.event = 'vat.threshold_exceeded'`, demo.OrgSlug); n < 3 {
+		t.Fatalf("VAT threshold events = %d, want at least 3", n)
+	}
+	if n := count(t, d, `
+		SELECT count(*) FROM notifications n JOIN organizations o ON o.id = n.organization_id AND o.slug = $1
+		WHERE n.channel = 'inapp' AND n.source_event = 'vat.threshold_exceeded'`, demo.OrgSlug); n < 3 {
+		t.Fatalf("VAT threshold notifications = %d, want at least 3", n)
+	}
 }
 
 // TestResetAfterUpload (#148): after UBL was uploaded to the demo office,

@@ -61,6 +61,8 @@ type Service struct {
 	config engine.ConfigResolver
 	engine *engine.Engine
 	now    func() time.Time
+	// thresholds writes the office VAT threshold (WithThresholds).
+	thresholds ThresholdStore
 }
 
 // New builds the service. eng may be nil (Evaluate then fails).

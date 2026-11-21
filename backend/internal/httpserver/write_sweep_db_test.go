@@ -292,6 +292,11 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/sms-settings":                                                                                          {body: `{"enabled":false,"test_mode":true,"usercode":"8501234567","msgheader":"OFISADI","encoding":"TR","appname":""}`},
 	"POST /v1/tenant/sms-settings/test":                                                                                    {},
 	"POST /v1/tenant/sms-messages/test":                                                                                    {body: `{"phone":"5321234567","text":"Deneme"}`},
+	"POST /v1/tenant/communication/groups":                                                                                 {body: `{"name":"Tarama grubu","description":"","engagement_uuids":["{engagementUuid}"]}`},
+	"PUT /v1/tenant/communication/groups/{groupUuid}":                                                                      {body: `{"name":"Tarama grubu 2","description":"","engagement_uuids":["{engagementUuid}"]}`, late: true},
+	"DELETE /v1/tenant/communication/groups/{groupUuid}":                                                                   {last: true},
+	"POST /v1/tenant/communication/bulk-sends/preview":                                                                     {body: `{"channel":"mail","subject":"Konu","body":"Sayın :mukellef","target":{"kind":"selection","engagement_uuids":["{engagementUuid}"]}}`},
+	"POST /v1/tenant/communication/bulk-sends":                                                                             {body: `{"channel":"mail","subject":"Konu","body":"Sayın :mukellef","target":{"kind":"selection","engagement_uuids":["{engagementUuid}"]}}`},
 	"POST /v1/tenant/automations":                                                                                          {body: `{"name":"Tarama kuralı","trigger_kind":"calendar","trigger":{"mode":"days","days":[15],"hour":9,"before_due_days":0,"tax":"","current_period":false,"event":"","delay_min_hours":0,"delay_max_hours":0,"resend_after_days":0,"payment_date":"","payment_amount":"","payment_days_before":0},"target_kind":"all","channels":["sms"],"body":"Sayın :mukellef, bilgi.","approval_mode":"auto","active":false}`},
 	"PUT /v1/tenant/automations/{automationUuid}":                                                                          {body: `{"name":"Tarama kuralı","trigger_kind":"calendar","trigger":{"mode":"days","days":[15],"hour":9,"before_due_days":0,"tax":"","current_period":false,"event":"","delay_min_hours":0,"delay_max_hours":0,"resend_after_days":0,"payment_date":"","payment_amount":"","payment_days_before":0},"target_kind":"all","channels":["sms"],"body":"Sayın :mukellef, bilgi.","approval_mode":"auto","active":false}`},
 	"DELETE /v1/tenant/automations/{automationUuid}":                                                                       {},
@@ -330,7 +335,7 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}":    {body: `{"rate":"20"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}": {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend":                                 {late: true},
-	"PUT /v1/tenant/vat-tracking-settings":                                                                                 {body: `{"report_enabled":true,"report_day":29}`},
+	"PUT /v1/tenant/vat-tracking-settings":                                                                                 {body: `{"report_enabled":true,"report_day":29,"watch_email":false,"payable_limit":"10000.00"}`},
 	// Defter türü ve işletme hesabı (#780): engagement işletme defterine
 	// geçer; kategori ve mal mevcudu ondan sonra yazılır.
 	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                  {body: `{"ledger_type":"isletme"}`, late: true},
@@ -740,6 +745,8 @@ var paramQueries = map[string]string{
 	"counterpartyUuid":    `SELECT uuid::text FROM counterparty_reconciliations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 AND result <> 'matched' ORDER BY id DESC LIMIT 1`,
 	"declarationUuid":     `SELECT uuid::text FROM babs_declarations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"letterUuid":          `SELECT uuid::text FROM reconciliation_letters WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"groupUuid":           `SELECT uuid::text FROM taxpayer_groups WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"bulkUuid":            `SELECT uuid::text FROM bulk_sends WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"customerUuid":        `SELECT uuid::text FROM customers WHERE taxpayer_id = $3 AND type <> 'employee' AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
