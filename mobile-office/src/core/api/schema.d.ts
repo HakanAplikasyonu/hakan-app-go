@@ -3561,6 +3561,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/late-documents/summary": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide count of late documents per taxpayer
+         * @description Requires `tenant.periods.read` (#780 C). Documents that arrived after
+         *     their period was closed, per taxpayer: pending and total counts and
+         *     the oldest pending period. Refreshed on every read. Active
+         *     engagements only; without `tenant.engagements.read_all` only
+         *     engagements assigned to the caller.
+         */
+        get: operations["getLateDocumentSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/clients": {
         parameters: {
             query?: never;
@@ -12135,6 +12165,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Late documents of an engagement (geçmiş dönem takibi)
+         * @description Requires `tenant.periods.read` and engagement access (#780 C). A
+         *     document has two dates: its arrival (`arrived_at`, when it entered the
+         *     system) and its period (the month of the document date). A document
+         *     that arrived after its period was closed (the period was locked, or a
+         *     tax return of the period was filed; `closed_at`, `close_reason`) is
+         *     listed here with the office's decision. The list is refreshed on every
+         *     read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+         *     `document_uuid` (the warning on one document).
+         */
+        get: operations["listEngagementLateDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the office's decision on a late document
+         * @description Requires `tenant.change_requests.decide` and engagement access.
+         *     `correction`: taken into a correction return (düzeltme beyannamesi);
+         *     `current_period`: booked in a later month (`target_period`, default
+         *     the current month; must be after the document period); `ignored`;
+         *     `pending` undoes the decision. The KDV deduction month of a purchase
+         *     invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+         */
+        post: operations["decideEngagementLateDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks": {
         parameters: {
             query?: never;
@@ -12807,43 +12906,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/automations": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The office's automation rules (#780)
-         * @description Requires `tenant.settings.read`. Installs the ready-made rules the
-         *     office does not have yet (all passive), then returns the master
-         *     switch, the counts (rules, active rules, sends, pending drafts), the
-         *     rules and the event catalog (events without a source are
-         *     `available: false`).
-         */
-        get: operations["listAutomations"];
-        put?: never;
-        /**
-         * Create an automation rule (#780)
-         * @description Requires `tenant.settings.write`. Campaign wording, WhatsApp, events
-         *     marked "yakında" and group targets (until taxpayer groups land) are
-         *     refused.
-         */
-        post: operations["createAutomation"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/automations/{automationUuid}": {
+    "/v1/tenant/engagements/{engagementUuid}/communications": {
         parameters: {
             query?: never;
             header: {
@@ -12854,75 +12917,19 @@ export interface paths {
                 "X-Organization": components["parameters"]["XOrganization"];
             };
             path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Replace an automation rule (#780)
-         * @description Requires `tenant.settings.write`. The edit is kept in the rule's history.
-         */
-        put: operations["updateAutomation"];
-        post?: never;
-        /**
-         * Delete an automation rule (#780)
-         * @description Requires `tenant.settings.write`. The rule is hidden; its runs and history stay.
-         */
-        delete: operations["deleteAutomation"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/automations/{automationUuid}/active": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Switch an automation rule on or off (#780)
-         * @description Requires `tenant.settings.write`. One click on the list; kept in the history.
-         */
-        put: operations["setAutomationActive"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/automations/{automationUuid}/history": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
+                engagementUuid: components["parameters"]["EngagementUuid"];
             };
             cookie?: never;
         };
         /**
-         * An automation rule's runs and edits (#780)
-         * @description Requires `tenant.settings.read`. The last 100 runs and the last 50 edits.
+         * Communication history of the taxpayer (#780)
+         * @description Requires `tenant.engagements.read`. Every SMS and e-mail the office
+         *     sent to this taxpayer, newest first: number or address, text, NetGSM
+         *     job id, send time, delivery time (NetGSM report) for SMS, open and
+         *     download time (tracking pixel / link) for e-mail. `channel` narrows
+         *     to one channel.
          */
-        get: operations["getAutomationHistory"];
+        get: operations["listEngagementCommunications"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12931,50 +12938,21 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/automation-settings": {
+    "/v1/public/mail/{token}/open": {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * The office-wide automation switch (#780)
-         * @description Requires `tenant.settings.write`. Off stops every rule of the office.
-         */
-        put: operations["putAutomationSettings"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/automation-runs": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
         /**
-         * Automation send history and pending drafts (#780)
-         * @description Requires `tenant.settings.read`. Newest first; `status=draft` lists the drafts waiting for approval.
+         * E-mail open tracking pixel (#780)
+         * @description The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+         *     the unguessable `track_token` of the record is the key. The first hit
+         *     writes `opened_at`; later hits change nothing. A bad or unknown token
+         *     gets the same image and writes nothing. Limited per client address.
          */
-        get: operations["listAutomationRuns"];
+        get: operations["getMailOpenPixel"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12983,28 +12961,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/automation-runs/decide": {
+    "/v1/public/mail/{token}/link": {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Approve or reject pending drafts (#780)
-         * @description Requires `tenant.settings.write`. Approve sends the drafts over their
-         *     rule's channels (test mode records only); reject closes them. Runs
-         *     that are no longer drafts are left alone.
+         * E-mail attachment / document link (#780)
+         * @description Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+         *     the first click, then redirects to `to`. Only the app's own frontend
+         *     and storage origins are redirect targets (a path is taken as a
+         *     frontend path); any other target answers 404, so the route is not an
+         *     open redirect. No session: `track_token` is the key.
          */
-        post: operations["decideAutomationDrafts"];
+        get: operations["getMailTrackedLink"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13544,6 +13518,44 @@ export interface paths {
          * @description Requires `tenant.vat.write`. Applies `VAT_PAYABLE_THRESHOLD` (payable ≥ `limit`; null limit = off) and `VAT_DEADLINE_NEAR` (0 ≤ days left ≤ `days_before`) on the period entity, producer `control:vat_forecast`. Conditions that no longer hold are auto-resolved. Without `period`: last month and this month.
          */
         post: operations["evaluateEngagementVATForecast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/notices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * VAT notices sent to the taxpayer (#780)
+         * @description Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+         *     freezes what the taxpayer was told and when. Per-channel proof of
+         *     sending belongs to the communication centre (#780 A); `message_ref`
+         *     will link its message record.
+         */
+        get: operations["listVATNotices"];
+        put?: never;
+        /**
+         * Send the taxpayer the in-period VAT status (#780)
+         * @description Requires `tenant.vat.write`. Computes the forecast of `period`
+         *     (default this month), freezes it and notifies every panel user of the
+         *     taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+         *     `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+         */
+        post: operations["sendVATNotice"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14467,6 +14479,210 @@ export interface paths {
          */
         put: operations["linkWhatsAppCaptureTask"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automations": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's automation rules (#780)
+         * @description Requires `tenant.settings.read`. Installs the ready-made rules the
+         *     office does not have yet (all passive), then returns the master
+         *     switch, the counts (rules, active rules, sends, pending drafts), the
+         *     rules and the event catalog (events without a source are
+         *     `available: false`).
+         */
+        get: operations["listAutomations"];
+        put?: never;
+        /**
+         * Create an automation rule (#780)
+         * @description Requires `tenant.settings.write`. Campaign wording, WhatsApp, events
+         *     marked "yakında" and group targets (until taxpayer groups land) are
+         *     refused.
+         */
+        post: operations["createAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automations/{automationUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace an automation rule (#780)
+         * @description Requires `tenant.settings.write`. The edit is kept in the rule's history.
+         */
+        put: operations["updateAutomation"];
+        post?: never;
+        /**
+         * Delete an automation rule (#780)
+         * @description Requires `tenant.settings.write`. The rule is hidden; its runs and history stay.
+         */
+        delete: operations["deleteAutomation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automations/{automationUuid}/active": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch an automation rule on or off (#780)
+         * @description Requires `tenant.settings.write`. One click on the list; kept in the history.
+         */
+        put: operations["setAutomationActive"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automations/{automationUuid}/history": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * An automation rule's runs and edits (#780)
+         * @description Requires `tenant.settings.read`. The last 100 runs and the last 50 edits.
+         */
+        get: operations["getAutomationHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automation-settings": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * The office-wide automation switch (#780)
+         * @description Requires `tenant.settings.write`. Off stops every rule of the office.
+         */
+        put: operations["putAutomationSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automation-runs": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Automation send history and pending drafts (#780)
+         * @description Requires `tenant.settings.read`. Newest first; `status=draft` lists the drafts waiting for approval.
+         */
+        get: operations["listAutomationRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/automation-runs/decide": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject pending drafts (#780)
+         * @description Requires `tenant.settings.write`. Approve sends the drafts over their
+         *     rule's channels (test mode records only); reject closes them. Runs
+         *     that are no longer drafts are left alone.
+         */
+        post: operations["decideAutomationDrafts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -21082,6 +21298,106 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        LateDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            document_type: "invoice" | "expense" | "retail_sale";
+            /** Format: uuid */
+            document_uuid: string;
+            /** @description Invoice number, receipt number or description, Z report number */
+            label: string;
+            counterparty: string | null;
+            /** Format: date */
+            document_date: string | null;
+            /** @description Total with two decimals */
+            amount: string;
+            currency: string;
+            period: components["schemas"]["Period"];
+            /**
+             * Format: date-time
+             * @description Geliş tarihi: when the document entered the system
+             */
+            arrived_at: string;
+            /**
+             * Format: date-time
+             * @description When the period was closed
+             */
+            closed_at: string;
+            /**
+             * @description lock: the period was locked; filed: a tax return of the period was filed
+             * @enum {string}
+             */
+            close_reason: "lock" | "filed";
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description The month it was booked in (current_period) */
+            target_period: string | null;
+            note: string | null;
+            decided_by_name: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            /** @enum {string|null} */
+            invoice_direction: "incoming" | "outgoing" | null;
+            /** @description A purchase invoice's KDV deduction month when moved forward (#640) */
+            vat_deduction_period: string | null;
+        };
+        LateDocumentCounts: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            correction: number;
+            /** Format: int64 */
+            current_period: number;
+            /** Format: int64 */
+            ignored: number;
+        };
+        LateDocumentList: {
+            items: components["schemas"]["LateDocument"][];
+            counts: components["schemas"]["LateDocumentCounts"];
+        };
+        LateDocumentDecision: {
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description YYYY-MM, only for current_period; default the current month */
+            target_period?: string;
+            note?: string;
+        };
+        LateDocumentSummaryRow: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            oldest_pending_period: string | null;
+        };
+        LateDocumentSummary: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            items: components["schemas"]["LateDocumentSummaryRow"][];
+        };
+        EnvelopeLateDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentSummary: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentSummary"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
             /** @description No open blocker, change request or unprocessed record (#575) */
@@ -21471,200 +21787,41 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
-        AutomationTrigger: {
-            /**
-             * @description Calendar: days of the month or N days before the due date
-             * @enum {string}
-             */
-            mode: "" | "days" | "before_due";
-            /** @description Days of the month; 31 means the last day */
-            days: number[];
-            hour: number;
-            before_due_days: number;
-            /** @enum {string} */
-            tax: "" | "kdv" | "muhtasar" | "gecici";
-            /** @description The period is the running month */
-            current_period: boolean;
-            event: string;
-            delay_min_hours: number;
-            delay_max_hours: number;
-            /** @description Resend when still unpaid after N days (0 = no) */
-            resend_after_days: number;
-            payment_date: string;
-            payment_amount: string;
-            payment_days_before: number;
-        };
-        AutomationRuleInput: {
-            name: string;
-            /** @enum {string} */
-            trigger_kind: "calendar" | "event" | "payment";
-            trigger: components["schemas"]["AutomationTrigger"];
-            /** @enum {string} */
-            target_kind: "all" | "group" | "selected";
-            /** Format: uuid */
-            target_group_uuid?: string | null;
-            target_engagements?: string[] | null;
-            only_due?: boolean;
-            channels: ("sms" | "email" | "inapp")[];
-            sms_if_unopened_hours?: number | null;
-            subject?: string;
-            body: string;
-            /** @enum {string} */
-            approval_mode?: "auto" | "draft";
-            active?: boolean;
-        };
-        AutomationRule: {
+        CommunicationHistoryItem: {
             /** Format: uuid */
             uuid: string;
-            /** @description Ready-made rule code; empty for the office's own rules */
-            template_code: string;
-            name: string;
             /** @enum {string} */
-            trigger_kind: "calendar" | "event" | "payment";
-            trigger: components["schemas"]["AutomationTrigger"];
-            /** @enum {string} */
-            target_kind: "all" | "group" | "selected";
-            /** Format: uuid */
-            target_group_uuid: string | null;
-            target_engagements: string[];
-            only_due: boolean;
-            channels: ("sms" | "email" | "inapp")[];
-            sms_if_unopened_hours: number | null;
+            channel: "sms" | "email";
+            /** @description Phone number (SMS) or e-mail address. */
+            to: string;
             subject: string;
             body: string;
             /** @enum {string} */
-            approval_mode: "auto" | "draft";
-            active: boolean;
-            send_count: number;
-            /** Format: date-time */
-            last_run_at: string | null;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-        };
-        AutomationEvent: {
-            code: string;
-            /** @description False: listed as coming soon */
-            available: boolean;
-            /** @description A payment event: resend when still unpaid applies */
-            payment: boolean;
-        };
-        AutomationOverview: {
-            enabled: boolean;
-            stats: {
-                total: number;
-                active: number;
-                sent: number;
-                drafts: number;
-            };
-            items: components["schemas"]["AutomationRule"][];
-            events: components["schemas"]["AutomationEvent"][];
-        };
-        AutomationRun: {
-            /** Format: uuid */
-            uuid: string;
-            /** Format: uuid */
-            rule_uuid: string;
-            rule_name: string;
-            taxpayer_title: string;
-            engagement_uuid: string;
-            period: string;
-            /** @enum {string} */
-            status: "scheduled" | "draft" | "sent" | "skipped" | "failed" | "rejected";
-            /** Format: date-time */
-            scheduled_for: string;
-            subject: string;
-            body: string;
-            channels: string[];
-            /** @description Outcome per channel (sms, email, inapp) */
-            result: {
-                [key: string]: components["schemas"]["AutomationChannelResult"];
-            };
-            note: string;
-            /** @enum {string} */
-            sms_followup_status: "" | "sent" | "skipped";
+            status: "pending" | "sent" | "failed" | "uncertain" | "dry_run";
+            msgheader: string;
+            provider_job_id: string;
+            error_code: string;
+            error_message: string;
+            source_rule: string;
+            source_ref: string;
+            sent_by_name: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
             sent_at: string | null;
             /** Format: date-time */
-            decided_at: string | null;
-        };
-        AutomationChannelResult: {
-            /** @description sent, dry_run, failed, uncertain, waiting or skipped */
-            status: string;
-            uuid?: string;
-            error?: string;
-            count?: number;
-            hours?: number;
-        };
-        AutomationEdit: {
-            /** @enum {string} */
-            action: "created" | "updated" | "enabled" | "disabled" | "deleted";
-            actor_name: string;
+            delivered_at: string | null;
             /** Format: date-time */
-            at: string;
-            snapshot: {
-                [key: string]: unknown;
-            };
+            opened_at: string | null;
+            /** Format: date-time */
+            downloaded_at: string | null;
         };
-        AutomationHistory: {
-            rule: components["schemas"]["AutomationRule"];
-            runs: components["schemas"]["AutomationRun"][];
-            edits: components["schemas"]["AutomationEdit"][];
-        };
-        AutomationSettings: {
-            enabled: boolean;
-        };
-        AutomationActiveInput: {
-            active: boolean;
-        };
-        AutomationDecideInput: {
-            uuids: string[];
-            approve: boolean;
-        };
-        AutomationDecideResult: {
-            sent: number;
-            failed: number;
-            rejected: number;
-        };
-        EnvelopeAutomationOverview: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["AutomationOverview"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeAutomationRule: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["AutomationRule"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeAutomationHistory: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["AutomationHistory"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeAutomationSettings: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["AutomationSettings"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeAutomationRunList: {
+        EnvelopeCommunicationHistory: {
             /** @enum {boolean} */
             success: true;
             data: {
-                items: components["schemas"]["AutomationRun"][];
+                items: components["schemas"]["CommunicationHistoryItem"][];
             };
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeAutomationDecideResult: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["AutomationDecideResult"];
             meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeSupportSettings: {
@@ -22097,6 +22254,40 @@ export interface components {
                 total: number;
                 limit: number;
                 offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        VATNotice: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            outcome: "payment" | "no_payment";
+            output_vat: string;
+            input_vat: string;
+            carried_in: string;
+            payable: string;
+            carry_out: string;
+            /** Format: date */
+            due_date: string | null;
+            message: string | null;
+            sent_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null. */
+            message_ref: string | null;
+        };
+        EnvelopeVATNotice: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATNotice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATNoticeList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["VATNotice"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -23148,6 +23339,202 @@ export interface components {
             /** Format: date-time */
             expires_at: string | null;
         };
+        AutomationTrigger: {
+            /**
+             * @description Calendar: days of the month or N days before the due date
+             * @enum {string}
+             */
+            mode: "" | "days" | "before_due";
+            /** @description Days of the month; 31 means the last day */
+            days: number[];
+            hour: number;
+            before_due_days: number;
+            /** @enum {string} */
+            tax: "" | "kdv" | "muhtasar" | "gecici";
+            /** @description The period is the running month */
+            current_period: boolean;
+            event: string;
+            delay_min_hours: number;
+            delay_max_hours: number;
+            /** @description Resend when still unpaid after N days (0 = no) */
+            resend_after_days: number;
+            payment_date: string;
+            payment_amount: string;
+            payment_days_before: number;
+        };
+        AutomationRuleInput: {
+            name: string;
+            /** @enum {string} */
+            trigger_kind: "calendar" | "event" | "payment";
+            trigger: components["schemas"]["AutomationTrigger"];
+            /** @enum {string} */
+            target_kind: "all" | "group" | "selected";
+            /** Format: uuid */
+            target_group_uuid?: string | null;
+            target_engagements?: string[] | null;
+            only_due?: boolean;
+            channels: ("sms" | "email" | "inapp")[];
+            sms_if_unopened_hours?: number | null;
+            subject?: string;
+            body: string;
+            /** @enum {string} */
+            approval_mode?: "auto" | "draft";
+            active?: boolean;
+        };
+        AutomationRule: {
+            /** Format: uuid */
+            uuid: string;
+            /** @description Ready-made rule code; empty for the office's own rules */
+            template_code: string;
+            name: string;
+            /** @enum {string} */
+            trigger_kind: "calendar" | "event" | "payment";
+            trigger: components["schemas"]["AutomationTrigger"];
+            /** @enum {string} */
+            target_kind: "all" | "group" | "selected";
+            /** Format: uuid */
+            target_group_uuid: string | null;
+            target_engagements: string[];
+            only_due: boolean;
+            channels: ("sms" | "email" | "inapp")[];
+            sms_if_unopened_hours: number | null;
+            subject: string;
+            body: string;
+            /** @enum {string} */
+            approval_mode: "auto" | "draft";
+            active: boolean;
+            send_count: number;
+            /** Format: date-time */
+            last_run_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        AutomationEvent: {
+            code: string;
+            /** @description False: listed as coming soon */
+            available: boolean;
+            /** @description A payment event: resend when still unpaid applies */
+            payment: boolean;
+        };
+        AutomationOverview: {
+            enabled: boolean;
+            stats: {
+                total: number;
+                active: number;
+                sent: number;
+                drafts: number;
+            };
+            items: components["schemas"]["AutomationRule"][];
+            events: components["schemas"]["AutomationEvent"][];
+        };
+        AutomationRun: {
+            /** Format: uuid */
+            uuid: string;
+            /** Format: uuid */
+            rule_uuid: string;
+            rule_name: string;
+            taxpayer_title: string;
+            engagement_uuid: string;
+            period: string;
+            /** @enum {string} */
+            status: "scheduled" | "draft" | "sent" | "skipped" | "failed" | "rejected";
+            /** Format: date-time */
+            scheduled_for: string;
+            subject: string;
+            body: string;
+            channels: string[];
+            /** @description Outcome per channel (sms, email, inapp) */
+            result: {
+                [key: string]: components["schemas"]["AutomationChannelResult"];
+            };
+            note: string;
+            /** @enum {string} */
+            sms_followup_status: "" | "sent" | "skipped";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+        };
+        AutomationChannelResult: {
+            /** @description sent, dry_run, failed, uncertain, waiting or skipped */
+            status: string;
+            uuid?: string;
+            error?: string;
+            count?: number;
+            hours?: number;
+        };
+        AutomationEdit: {
+            /** @enum {string} */
+            action: "created" | "updated" | "enabled" | "disabled" | "deleted";
+            actor_name: string;
+            /** Format: date-time */
+            at: string;
+            snapshot: {
+                [key: string]: unknown;
+            };
+        };
+        AutomationHistory: {
+            rule: components["schemas"]["AutomationRule"];
+            runs: components["schemas"]["AutomationRun"][];
+            edits: components["schemas"]["AutomationEdit"][];
+        };
+        AutomationSettings: {
+            enabled: boolean;
+        };
+        AutomationActiveInput: {
+            active: boolean;
+        };
+        AutomationDecideInput: {
+            uuids: string[];
+            approve: boolean;
+        };
+        AutomationDecideResult: {
+            sent: number;
+            failed: number;
+            rejected: number;
+        };
+        EnvelopeAutomationOverview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AutomationOverview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAutomationRule: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AutomationRule"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAutomationHistory: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AutomationHistory"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAutomationSettings: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AutomationSettings"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAutomationRunList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["AutomationRun"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeAutomationDecideResult: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["AutomationDecideResult"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
     };
     responses: {
         /**
@@ -23303,6 +23690,7 @@ export interface components {
         /** @description Dönem (YYYY-MM) */
         PeriodPath: string;
         ChangeRequestUuid: string;
+        LateDocumentUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -28860,6 +29248,35 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLateDocumentSummary: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late document counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
@@ -42399,6 +42816,81 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listEngagementLateDocuments: {
+        parameters: {
+            query?: {
+                status?: "pending" | "correction" | "current_period" | "ignored";
+                period?: components["schemas"]["Period"];
+                document_uuid?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late documents and counts by status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideEngagementLateDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LateDocumentDecision"];
+            };
+        };
+        responses: {
+            /** @description Updated late document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantDocumentTasks: {
         parameters: {
             query?: {
@@ -43381,243 +43873,10 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    listAutomations: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Rules */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationOverview"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    createAutomation: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutomationRuleInput"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    updateAutomation: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutomationRuleInput"];
-            };
-        };
-        responses: {
-            /** @description Saved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    deleteAutomation: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    setAutomationActive: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutomationActiveInput"];
-            };
-        };
-        responses: {
-            /** @description Saved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    getAutomationHistory: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                automationUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description History */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationHistory"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    putAutomationSettings: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutomationSettings"];
-            };
-        };
-        responses: {
-            /** @description Saved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationSettings"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    listAutomationRuns: {
+    listEngagementCommunications: {
         parameters: {
             query?: {
-                status?: "scheduled" | "draft" | "sent" | "skipped" | "failed" | "rejected";
+                channel?: "sms" | "email";
                 limit?: number;
             };
             header: {
@@ -43627,58 +43886,74 @@ export interface operations {
                  */
                 "X-Organization": components["parameters"]["XOrganization"];
             };
-            path?: never;
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Runs */
+            /** @description Records */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationRunList"];
+                    "application/json": components["schemas"]["EnvelopeCommunicationHistory"];
                 };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
-    decideAutomationDrafts: {
+    getMailOpenPixel: {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
+            header?: never;
+            path: {
+                token: string;
             };
-            path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AutomationDecideInput"];
-            };
-        };
+        requestBody?: never;
         responses: {
-            /** @description Outcome */
+            /** @description The pixel. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnvelopeAutomationDecideResult"];
+                    "image/gif": string;
                 };
             };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
+        };
+    };
+    getMailTrackedLink: {
+        parameters: {
+            query: {
+                /** @description Target URL or frontend path. */
+                to: string;
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the target. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getClickFixIdentity: {
@@ -44490,6 +44765,86 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listVATNotices: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNoticeList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendVATNotice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    period?: string;
+                    /** @description Optional note from the office */
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNotice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_TAXPAYER_USER`: the taxpayer has no panel user */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             500: components["responses"]["InternalError"];
         };
     };
@@ -45751,6 +46106,306 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAutomations: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rules */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationOverview"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createAutomation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateAutomation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteAutomation: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setAutomationActive: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationActiveInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationRule"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getAutomationHistory: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                automationUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description History */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationHistory"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    putAutomationSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationSettings"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listAutomationRuns: {
+        parameters: {
+            query?: {
+                status?: "scheduled" | "draft" | "sent" | "skipped" | "failed" | "rejected";
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationRunList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideAutomationDrafts: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AutomationDecideInput"];
+            };
+        };
+        responses: {
+            /** @description Outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeAutomationDecideResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
         };
     };

@@ -74,6 +74,8 @@ type Service struct {
 	live  bool
 	limit *limiter
 	now   func() time.Time
+	// tracking: e-mail pixel and tracked links (#780 D); zero = off.
+	tracking Tracking
 }
 
 // Options configure the service.
@@ -487,14 +489,18 @@ func (s *Service) SendMail(ctx context.Context, in MailInput) (db.MailMessage, e
 	}
 	fin := db.FinishMailMessageParams{OrganizationID: msg.OrganizationID, ID: msg.ID, Status: StatusSent,
 		SentAt: pgtype.Timestamptz{Time: s.now(), Valid: true}}
-	if err := s.mailer.Send(ctx, mail.Message{To: []string{msg.ToEmail}, Subject: msg.Subject, Body: msg.Body}); err != nil {
+	// The HTML part carries the open pixel (#780 D); the text part is the
+	// body as written.
+	out := mail.Message{To: []string{msg.ToEmail}, Subject: msg.Subject, Body: msg.Body,
+		HTML: s.mailHTML(msg.Subject, msg.Body, msg.TrackToken)}
+	if err := s.mailer.Send(ctx, out); err != nil {
 		fin.Status, fin.ErrorMessage, fin.SentAt = StatusFailed, "E-posta gönderilemedi.", pgtype.Timestamptz{}
 	}
-	out, err := s.q.FinishMailMessage(context.WithoutCancel(ctx), fin)
+	done, err := s.q.FinishMailMessage(context.WithoutCancel(ctx), fin)
 	if err != nil {
 		return msg, fmt.Errorf("finish mail: %w", err)
 	}
-	return out, nil
+	return done, nil
 }
 
 // MailToEngagement sends to the contact e-mail of the engagement's taxpayer.

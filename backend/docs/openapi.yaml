@@ -5212,6 +5212,31 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/late-documents/summary:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Periods]
+      operationId: getLateDocumentSummary
+      summary: Office-wide count of late documents per taxpayer
+      description: |
+        Requires `tenant.periods.read` (#780 C). Documents that arrived after
+        their period was closed, per taxpayer: pending and total counts and
+        the oldest pending period. Refreshed on every read. Active
+        engagements only; without `tenant.engagements.read_all` only
+        engagements assigned to the caller.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Late document counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocumentSummary"
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/clients:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16053,6 +16078,88 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/late-documents:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Periods]
+      operationId: listEngagementLateDocuments
+      summary: Late documents of an engagement (geçmiş dönem takibi)
+      description: |
+        Requires `tenant.periods.read` and engagement access (#780 C). A
+        document has two dates: its arrival (`arrived_at`, when it entered the
+        system) and its period (the month of the document date). A document
+        that arrived after its period was closed (the period was locked, or a
+        tax return of the period was filed; `closed_at`, `close_reason`) is
+        listed here with the office's decision. The list is refreshed on every
+        read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+        `document_uuid` (the warning on one document).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [pending, correction, current_period, ignored] }
+        - name: period
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/Period" }
+        - name: document_uuid
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Late documents and counts by status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocumentList"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/LateDocumentUuid"
+    post:
+      tags: [Periods]
+      operationId: decideEngagementLateDocument
+      summary: Record the office's decision on a late document
+      description: |
+        Requires `tenant.change_requests.decide` and engagement access.
+        `correction`: taken into a correction return (düzeltme beyannamesi);
+        `current_period`: booked in a later month (`target_period`, default
+        the current month; must be after the document period); `ignored`;
+        `pending` undoes the decision. The KDV deduction month of a purchase
+        invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LateDocumentDecision"
+      responses:
+        "200":
+          description: Updated late document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeLateDocument"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/document-tasks:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -16838,231 +16945,84 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
-  /v1/tenant/automations:
+  /v1/tenant/engagements/{engagementUuid}/communications:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
     get:
       tags: [Tenant]
-      operationId: listAutomations
-      summary: The office's automation rules (#780)
+      operationId: listEngagementCommunications
+      summary: Communication history of the taxpayer (#780)
       description: |
-        Requires `tenant.settings.read`. Installs the ready-made rules the
-        office does not have yet (all passive), then returns the master
-        switch, the counts (rules, active rules, sends, pending drafts), the
-        rules and the event catalog (events without a source are
-        `available: false`).
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Rules
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationOverview" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
-    post:
-      tags: [Tenant]
-      operationId: createAutomation
-      summary: Create an automation rule (#780)
-      description: |
-        Requires `tenant.settings.write`. Campaign wording, WhatsApp, events
-        marked "yakında" and group targets (until taxpayer groups land) are
-        refused.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
-  /v1/tenant/automations/{automationUuid}:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
-    put:
-      tags: [Tenant]
-      operationId: updateAutomation
-      summary: Replace an automation rule (#780)
-      description: Requires `tenant.settings.write`. The edit is kept in the rule's history.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
-      responses:
-        "200":
-          description: Saved
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "500": { $ref: "#/components/responses/InternalError" }
-    delete:
-      tags: [Tenant]
-      operationId: deleteAutomation
-      summary: Delete an automation rule (#780)
-      description: Requires `tenant.settings.write`. The rule is hidden; its runs and history stay.
-      security:
-        - bearerAuth: []
-      responses:
-        "204": { description: Deleted }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
-  /v1/tenant/automations/{automationUuid}/active:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
-    put:
-      tags: [Tenant]
-      operationId: setAutomationActive
-      summary: Switch an automation rule on or off (#780)
-      description: Requires `tenant.settings.write`. One click on the list; kept in the history.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AutomationActiveInput" }
-      responses:
-        "200":
-          description: Saved
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
-  /v1/tenant/automations/{automationUuid}/history:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
-    get:
-      tags: [Tenant]
-      operationId: getAutomationHistory
-      summary: An automation rule's runs and edits (#780)
-      description: Requires `tenant.settings.read`. The last 100 runs and the last 50 edits.
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: History
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationHistory" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "404": { $ref: "#/components/responses/NotFound" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
-  /v1/tenant/automation-settings:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-    put:
-      tags: [Tenant]
-      operationId: putAutomationSettings
-      summary: The office-wide automation switch (#780)
-      description: Requires `tenant.settings.write`. Off stops every rule of the office.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AutomationSettings" }
-      responses:
-        "200":
-          description: Saved
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationSettings" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
-
-  /v1/tenant/automation-runs:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-    get:
-      tags: [Tenant]
-      operationId: listAutomationRuns
-      summary: Automation send history and pending drafts (#780)
-      description: Requires `tenant.settings.read`. Newest first; `status=draft` lists the drafts waiting for approval.
+        Requires `tenant.engagements.read`. Every SMS and e-mail the office
+        sent to this taxpayer, newest first: number or address, text, NetGSM
+        job id, send time, delivery time (NetGSM report) for SMS, open and
+        download time (tracking pixel / link) for e-mail. `channel` narrows
+        to one channel.
       security:
         - bearerAuth: []
       parameters:
-        - name: status
+        - name: channel
           in: query
           required: false
-          schema: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
+          schema: { type: string, enum: [sms, email] }
         - name: limit
           in: query
           required: false
           schema: { type: integer, minimum: 1, maximum: 500 }
       responses:
         "200":
-          description: Runs
+          description: Records
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationRunList" }
+              schema: { $ref: "#/components/schemas/EnvelopeCommunicationHistory" }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/InternalError" }
 
-  /v1/tenant/automation-runs/decide:
-    parameters:
-      - $ref: "#/components/parameters/XOrganization"
-    post:
+  /v1/public/mail/{token}/open:
+    get:
       tags: [Tenant]
-      operationId: decideAutomationDrafts
-      summary: Approve or reject pending drafts (#780)
+      operationId: getMailOpenPixel
+      summary: E-mail open tracking pixel (#780)
       description: |
-        Requires `tenant.settings.write`. Approve sends the drafts over their
-        rule's channels (test mode records only); reject closes them. Runs
-        that are no longer drafts are left alone.
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/AutomationDecideInput" }
+        The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+        the unguessable `track_token` of the record is the key. The first hit
+        writes `opened_at`; later hits change nothing. A bad or unknown token
+        gets the same image and writes nothing. Limited per client address.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
       responses:
         "200":
-          description: Outcome
+          description: The pixel.
           content:
-            application/json:
-              schema: { $ref: "#/components/schemas/EnvelopeAutomationDecideResult" }
-        "400": { $ref: "#/components/responses/BadRequest" }
-        "401": { $ref: "#/components/responses/Unauthenticated" }
-        "403": { $ref: "#/components/responses/TenantForbidden" }
-        "500": { $ref: "#/components/responses/InternalError" }
+            image/gif:
+              schema: { type: string, format: binary }
+
+  /v1/public/mail/{token}/link:
+    get:
+      tags: [Tenant]
+      operationId: getMailTrackedLink
+      summary: E-mail attachment / document link (#780)
+      description: |
+        Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+        the first click, then redirects to `to`. Only the app's own frontend
+        and storage origins are redirect targets (a path is taken as a
+        frontend path); any other target answers 404, so the route is not an
+        open redirect. No session: `track_token` is the key.
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+        - { name: to, in: query, required: true, schema: { type: string }, description: Target URL or frontend path. }
+      responses:
+        "302":
+          description: Redirect to the target.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   /v1/tenant/support/clickfix-identity:
     parameters:
@@ -17669,6 +17629,64 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATNotices
+      summary: VAT notices sent to the taxpayer (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+        freezes what the taxpayer was told and when. Per-channel proof of
+        sending belongs to the communication centre (#780 A); `message_ref`
+        will link its message record.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Notices
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNoticeList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [VAT]
+      operationId: sendVATNotice
+      summary: Send the taxpayer the in-period VAT status (#780)
+      description: |
+        Requires `tenant.vat.write`. Computes the forecast of `period`
+        (default this month), freezes it and notifies every panel user of the
+        taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+        `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                period: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" }
+                message: { type: string, maxLength: 1000, description: Optional note from the office }
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATNotice" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { description: "`NO_TAXPAYER_USER`: the taxpayer has no panel user" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -18731,6 +18749,232 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/automations:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listAutomations
+      summary: The office's automation rules (#780)
+      description: |
+        Requires `tenant.settings.read`. Installs the ready-made rules the
+        office does not have yet (all passive), then returns the master
+        switch, the counts (rules, active rules, sends, pending drafts), the
+        rules and the event catalog (events without a source are
+        `available: false`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationOverview" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    post:
+      tags: [Tenant]
+      operationId: createAutomation
+      summary: Create an automation rule (#780)
+      description: |
+        Requires `tenant.settings.write`. Campaign wording, WhatsApp, events
+        marked "yakında" and group targets (until taxpayer groups land) are
+        refused.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Tenant]
+      operationId: updateAutomation
+      summary: Replace an automation rule (#780)
+      description: Requires `tenant.settings.write`. The edit is kept in the rule's history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationRuleInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Tenant]
+      operationId: deleteAutomation
+      summary: Delete an automation rule (#780)
+      description: Requires `tenant.settings.write`. The rule is hidden; its runs and history stay.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}/active:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Tenant]
+      operationId: setAutomationActive
+      summary: Switch an automation rule on or off (#780)
+      description: Requires `tenant.settings.write`. One click on the list; kept in the history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationActiveInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automations/{automationUuid}/history:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - { name: automationUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [Tenant]
+      operationId: getAutomationHistory
+      summary: An automation rule's runs and edits (#780)
+      description: Requires `tenant.settings.read`. The last 100 runs and the last 50 edits.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: History
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationHistory" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    put:
+      tags: [Tenant]
+      operationId: putAutomationSettings
+      summary: The office-wide automation switch (#780)
+      description: Requires `tenant.settings.write`. Off stops every rule of the office.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationSettings" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-runs:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listAutomationRuns
+      summary: Automation send history and pending drafts (#780)
+      description: Requires `tenant.settings.read`. Newest first; `status=draft` lists the drafts waiting for approval.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500 }
+      responses:
+        "200":
+          description: Runs
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationRunList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/automation-runs/decide:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: decideAutomationDrafts
+      summary: Approve or reject pending drafts (#780)
+      description: |
+        Requires `tenant.settings.write`. Approve sends the drafts over their
+        rule's channels (test mode records only); reject closes them. Runs
+        that are no longer drafts are left alone.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomationDecideInput" }
+      responses:
+        "200":
+          description: Outcome
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeAutomationDecideResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
 
 components:
   securitySchemes:
@@ -18848,6 +19092,12 @@ components:
 
     ChangeRequestUuid:
       name: changeRequestUuid
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+    LateDocumentUuid:
+      name: lateDocumentUuid
       in: path
       required: true
       schema: { type: string, format: uuid }
@@ -26591,6 +26841,101 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    LateDocument:
+      type: object
+      required: [uuid, document_type, document_uuid, label, counterparty, document_date, amount, currency, period, arrived_at, closed_at, close_reason, status, target_period, note, decided_by_name, decided_at, invoice_direction, vat_deduction_period]
+      properties:
+        uuid: { type: string, format: uuid }
+        document_type: { type: string, enum: [invoice, expense, retail_sale] }
+        document_uuid: { type: string, format: uuid }
+        label: { type: string, description: "Invoice number, receipt number or description, Z report number" }
+        counterparty: { type: [string, "null"] }
+        document_date: { type: [string, "null"], format: date }
+        amount: { type: string, description: Total with two decimals }
+        currency: { type: string }
+        period: { $ref: "#/components/schemas/Period" }
+        arrived_at: { type: string, format: date-time, description: "Geliş tarihi: when the document entered the system" }
+        closed_at: { type: string, format: date-time, description: When the period was closed }
+        close_reason: { type: string, enum: [lock, filed], description: "lock: the period was locked; filed: a tax return of the period was filed" }
+        status: { type: string, enum: [pending, correction, current_period, ignored] }
+        target_period: { type: [string, "null"], description: "The month it was booked in (current_period)" }
+        note: { type: [string, "null"] }
+        decided_by_name: { type: [string, "null"] }
+        decided_at: { type: [string, "null"], format: date-time }
+        invoice_direction: { type: [string, "null"], enum: [incoming, outgoing, null] }
+        vat_deduction_period: { type: [string, "null"], description: "A purchase invoice's KDV deduction month when moved forward (#640)" }
+
+    LateDocumentCounts:
+      type: object
+      required: [pending, correction, current_period, ignored]
+      properties:
+        pending: { type: integer, format: int64 }
+        correction: { type: integer, format: int64 }
+        current_period: { type: integer, format: int64 }
+        ignored: { type: integer, format: int64 }
+
+    LateDocumentList:
+      type: object
+      required: [items, counts]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LateDocument" }
+        counts: { $ref: "#/components/schemas/LateDocumentCounts" }
+
+    LateDocumentDecision:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [pending, correction, current_period, ignored] }
+        target_period: { type: string, description: "YYYY-MM, only for current_period; default the current month" }
+        note: { type: string, maxLength: 1000 }
+
+    LateDocumentSummaryRow:
+      type: object
+      required: [engagement_uuid, taxpayer_title, pending, total, oldest_pending_period]
+      properties:
+        engagement_uuid: { type: string, format: uuid }
+        taxpayer_title: { type: string }
+        pending: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+        oldest_pending_period: { type: [string, "null"] }
+
+    LateDocumentSummary:
+      type: object
+      required: [pending, total, items]
+      properties:
+        pending: { type: integer, format: int64 }
+        total: { type: integer, format: int64 }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/LateDocumentSummaryRow" }
+
+    EnvelopeLateDocument:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocument" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLateDocumentList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocumentList" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeLateDocumentSummary:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/LateDocumentSummary" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
     PeriodMatrixCell:
       type: object
       required: [period, ready, locked, locked_at, open_blockers, open_warnings, open_change_requests, returns, open_document_tasks, submitted_documents, missing_bank_statements, pending]
@@ -26980,190 +27325,29 @@ components:
           properties:
             items: { type: array, items: { $ref: "#/components/schemas/SmsMessage" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
-    AutomationTrigger:
+    CommunicationHistoryItem:
       type: object
-      required: [mode, days, hour, before_due_days, tax, current_period, event, delay_min_hours, delay_max_hours, resend_after_days, payment_date, payment_amount, payment_days_before]
-      additionalProperties: false
-      properties:
-        mode: { type: string, enum: ["", days, before_due], description: "Calendar: days of the month or N days before the due date" }
-        days: { type: array, items: { type: integer, minimum: 1, maximum: 31 }, description: "Days of the month; 31 means the last day" }
-        hour: { type: integer, minimum: 0, maximum: 23 }
-        before_due_days: { type: integer, minimum: 0, maximum: 20 }
-        tax: { type: string, enum: ["", kdv, muhtasar, gecici] }
-        current_period: { type: boolean, description: "The period is the running month" }
-        event: { type: string }
-        delay_min_hours: { type: integer, minimum: 0, maximum: 720 }
-        delay_max_hours: { type: integer, minimum: 0, maximum: 720 }
-        resend_after_days: { type: integer, minimum: 0, maximum: 60, description: "Resend when still unpaid after N days (0 = no)" }
-        payment_date: { type: string }
-        payment_amount: { type: string }
-        payment_days_before: { type: integer, minimum: 0, maximum: 30 }
-    AutomationRuleInput:
-      type: object
-      required: [name, trigger_kind, trigger, target_kind, channels, body]
-      additionalProperties: false
-      properties:
-        name: { type: string, maxLength: 120 }
-        trigger_kind: { type: string, enum: [calendar, event, payment] }
-        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
-        target_kind: { type: string, enum: [all, group, selected] }
-        target_group_uuid: { type: [string, "null"], format: uuid }
-        target_engagements: { type: [array, "null"], items: { type: string, format: uuid } }
-        only_due: { type: boolean }
-        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
-        sms_if_unopened_hours: { type: [integer, "null"], minimum: 1, maximum: 168 }
-        subject: { type: string, maxLength: 200 }
-        body: { type: string, maxLength: 2000 }
-        approval_mode: { type: string, enum: [auto, draft] }
-        active: { type: boolean }
-    AutomationRule:
-      type: object
-      required: [uuid, template_code, name, trigger_kind, trigger, target_kind, target_group_uuid, target_engagements, only_due, channels, sms_if_unopened_hours, subject, body, approval_mode, active, send_count, last_run_at, created_at, updated_at]
+      required: [uuid, channel, to, subject, body, status, msgheader, provider_job_id, error_code, error_message, source_rule, source_ref, sent_by_name, created_at, sent_at, delivered_at, opened_at, downloaded_at]
       properties:
         uuid: { type: string, format: uuid }
-        template_code: { type: string, description: "Ready-made rule code; empty for the office's own rules" }
-        name: { type: string }
-        trigger_kind: { type: string, enum: [calendar, event, payment] }
-        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
-        target_kind: { type: string, enum: [all, group, selected] }
-        target_group_uuid: { type: [string, "null"], format: uuid }
-        target_engagements: { type: array, items: { type: string } }
-        only_due: { type: boolean }
-        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
-        sms_if_unopened_hours: { type: [integer, "null"] }
+        channel: { type: string, enum: [sms, email] }
+        to: { type: string, description: Phone number (SMS) or e-mail address. }
         subject: { type: string }
         body: { type: string }
-        approval_mode: { type: string, enum: [auto, draft] }
-        active: { type: boolean }
-        send_count: { type: integer }
-        last_run_at: { type: [string, "null"], format: date-time }
-        created_at: { type: string, format: date-time }
-        updated_at: { type: string, format: date-time }
-    AutomationEvent:
-      type: object
-      required: [code, available, payment]
-      properties:
-        code: { type: string }
-        available: { type: boolean, description: "False: listed as coming soon" }
-        payment: { type: boolean, description: "A payment event: resend when still unpaid applies" }
-    AutomationOverview:
-      type: object
-      required: [enabled, stats, items, events]
-      properties:
-        enabled: { type: boolean }
-        stats:
-          type: object
-          required: [total, active, sent, drafts]
-          properties:
-            total: { type: integer }
-            active: { type: integer }
-            sent: { type: integer }
-            drafts: { type: integer }
-        items: { type: array, items: { $ref: "#/components/schemas/AutomationRule" } }
-        events: { type: array, items: { $ref: "#/components/schemas/AutomationEvent" } }
-    AutomationRun:
-      type: object
-      required: [uuid, rule_uuid, rule_name, taxpayer_title, engagement_uuid, period, status, scheduled_for, subject, body, channels, result, note, sms_followup_status, created_at, sent_at, decided_at]
-      properties:
-        uuid: { type: string, format: uuid }
-        rule_uuid: { type: string, format: uuid }
-        rule_name: { type: string }
-        taxpayer_title: { type: string }
-        engagement_uuid: { type: string }
-        period: { type: string }
-        status: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
-        scheduled_for: { type: string, format: date-time }
-        subject: { type: string }
-        body: { type: string }
-        channels: { type: array, items: { type: string } }
-        result:
-          type: object
-          description: Outcome per channel (sms, email, inapp)
-          additionalProperties: { $ref: "#/components/schemas/AutomationChannelResult" }
-        note: { type: string }
-        sms_followup_status: { type: string, enum: ["", sent, skipped] }
+        status: { type: string, enum: [pending, sent, failed, uncertain, dry_run] }
+        msgheader: { type: string }
+        provider_job_id: { type: string }
+        error_code: { type: string }
+        error_message: { type: string }
+        source_rule: { type: string }
+        source_ref: { type: string }
+        sent_by_name: { type: string }
         created_at: { type: string, format: date-time }
         sent_at: { type: [string, "null"], format: date-time }
-        decided_at: { type: [string, "null"], format: date-time }
-    AutomationChannelResult:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, description: "sent, dry_run, failed, uncertain, waiting or skipped" }
-        uuid: { type: string }
-        error: { type: string }
-        count: { type: integer }
-        hours: { type: integer }
-    AutomationEdit:
-      type: object
-      required: [action, actor_name, at, snapshot]
-      properties:
-        action: { type: string, enum: [created, updated, enabled, disabled, deleted] }
-        actor_name: { type: string }
-        at: { type: string, format: date-time }
-        snapshot: { type: object, additionalProperties: true }
-    AutomationHistory:
-      type: object
-      required: [rule, runs, edits]
-      properties:
-        rule: { $ref: "#/components/schemas/AutomationRule" }
-        runs: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
-        edits: { type: array, items: { $ref: "#/components/schemas/AutomationEdit" } }
-    AutomationSettings:
-      type: object
-      required: [enabled]
-      additionalProperties: false
-      properties:
-        enabled: { type: boolean }
-    AutomationActiveInput:
-      type: object
-      required: [active]
-      additionalProperties: false
-      properties:
-        active: { type: boolean }
-    AutomationDecideInput:
-      type: object
-      required: [uuids, approve]
-      additionalProperties: false
-      properties:
-        uuids: { type: array, items: { type: string, format: uuid }, maxItems: 500 }
-        approve: { type: boolean }
-    AutomationDecideResult:
-      type: object
-      required: [sent, failed, rejected]
-      properties:
-        sent: { type: integer }
-        failed: { type: integer }
-        rejected: { type: integer }
-    EnvelopeAutomationOverview:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success: { type: boolean, enum: [true] }
-        data: { $ref: "#/components/schemas/AutomationOverview" }
-        meta: { $ref: "#/components/schemas/ResponseMeta" }
-    EnvelopeAutomationRule:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success: { type: boolean, enum: [true] }
-        data: { $ref: "#/components/schemas/AutomationRule" }
-        meta: { $ref: "#/components/schemas/ResponseMeta" }
-    EnvelopeAutomationHistory:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success: { type: boolean, enum: [true] }
-        data: { $ref: "#/components/schemas/AutomationHistory" }
-        meta: { $ref: "#/components/schemas/ResponseMeta" }
-    EnvelopeAutomationSettings:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success: { type: boolean, enum: [true] }
-        data: { $ref: "#/components/schemas/AutomationSettings" }
-        meta: { $ref: "#/components/schemas/ResponseMeta" }
-    EnvelopeAutomationRunList:
+        delivered_at: { type: [string, "null"], format: date-time }
+        opened_at: { type: [string, "null"], format: date-time }
+        downloaded_at: { type: [string, "null"], format: date-time }
+    EnvelopeCommunicationHistory:
       type: object
       required: [success, data, meta]
       properties:
@@ -27172,14 +27356,7 @@ components:
           type: object
           required: [items]
           properties:
-            items: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
-        meta: { $ref: "#/components/schemas/ResponseMeta" }
-    EnvelopeAutomationDecideResult:
-      type: object
-      required: [success, data, meta]
-      properties:
-        success: { type: boolean, enum: [true] }
-        data: { $ref: "#/components/schemas/AutomationDecideResult" }
+            items: { type: array, items: { $ref: "#/components/schemas/CommunicationHistoryItem" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeSupportSettings:
       type: object
@@ -27688,6 +27865,44 @@ components:
             total: { type: integer, format: int64 }
             limit: { type: integer }
             offset: { type: integer }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    VATNotice:
+      type: object
+      required: [uuid, period, outcome, output_vat, input_vat, carried_in, payable, carry_out, due_date, message, sent_by_name, created_at, message_ref]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        outcome: { type: string, enum: [payment, no_payment] }
+        output_vat: { type: string }
+        input_vat: { type: string }
+        carried_in: { type: string }
+        payable: { type: string }
+        carry_out: { type: string }
+        due_date: { type: [string, "null"], format: date }
+        message: { type: [string, "null"] }
+        sent_by_name: { type: string }
+        created_at: { type: string, format: date-time }
+        message_ref:
+          type: [string, "null"]
+          description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
+    EnvelopeVATNotice:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/VATNotice" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATNoticeList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/VATNotice" } }
         meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeVATEvaluation:
@@ -28897,3 +29112,204 @@ components:
         response_balance: { type: [string, "null"] }
         responded_at: { type: [string, "null"], format: date-time }
         expires_at: { type: [string, "null"], format: date-time }
+    AutomationTrigger:
+      type: object
+      required: [mode, days, hour, before_due_days, tax, current_period, event, delay_min_hours, delay_max_hours, resend_after_days, payment_date, payment_amount, payment_days_before]
+      additionalProperties: false
+      properties:
+        mode: { type: string, enum: ["", days, before_due], description: "Calendar: days of the month or N days before the due date" }
+        days: { type: array, items: { type: integer, minimum: 1, maximum: 31 }, description: "Days of the month; 31 means the last day" }
+        hour: { type: integer, minimum: 0, maximum: 23 }
+        before_due_days: { type: integer, minimum: 0, maximum: 20 }
+        tax: { type: string, enum: ["", kdv, muhtasar, gecici] }
+        current_period: { type: boolean, description: "The period is the running month" }
+        event: { type: string }
+        delay_min_hours: { type: integer, minimum: 0, maximum: 720 }
+        delay_max_hours: { type: integer, minimum: 0, maximum: 720 }
+        resend_after_days: { type: integer, minimum: 0, maximum: 60, description: "Resend when still unpaid after N days (0 = no)" }
+        payment_date: { type: string }
+        payment_amount: { type: string }
+        payment_days_before: { type: integer, minimum: 0, maximum: 30 }
+    AutomationRuleInput:
+      type: object
+      required: [name, trigger_kind, trigger, target_kind, channels, body]
+      additionalProperties: false
+      properties:
+        name: { type: string, maxLength: 120 }
+        trigger_kind: { type: string, enum: [calendar, event, payment] }
+        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
+        target_kind: { type: string, enum: [all, group, selected] }
+        target_group_uuid: { type: [string, "null"], format: uuid }
+        target_engagements: { type: [array, "null"], items: { type: string, format: uuid } }
+        only_due: { type: boolean }
+        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
+        sms_if_unopened_hours: { type: [integer, "null"], minimum: 1, maximum: 168 }
+        subject: { type: string, maxLength: 200 }
+        body: { type: string, maxLength: 2000 }
+        approval_mode: { type: string, enum: [auto, draft] }
+        active: { type: boolean }
+    AutomationRule:
+      type: object
+      required: [uuid, template_code, name, trigger_kind, trigger, target_kind, target_group_uuid, target_engagements, only_due, channels, sms_if_unopened_hours, subject, body, approval_mode, active, send_count, last_run_at, created_at, updated_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        template_code: { type: string, description: "Ready-made rule code; empty for the office's own rules" }
+        name: { type: string }
+        trigger_kind: { type: string, enum: [calendar, event, payment] }
+        trigger: { $ref: "#/components/schemas/AutomationTrigger" }
+        target_kind: { type: string, enum: [all, group, selected] }
+        target_group_uuid: { type: [string, "null"], format: uuid }
+        target_engagements: { type: array, items: { type: string } }
+        only_due: { type: boolean }
+        channels: { type: array, items: { type: string, enum: [sms, email, inapp] } }
+        sms_if_unopened_hours: { type: [integer, "null"] }
+        subject: { type: string }
+        body: { type: string }
+        approval_mode: { type: string, enum: [auto, draft] }
+        active: { type: boolean }
+        send_count: { type: integer }
+        last_run_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AutomationEvent:
+      type: object
+      required: [code, available, payment]
+      properties:
+        code: { type: string }
+        available: { type: boolean, description: "False: listed as coming soon" }
+        payment: { type: boolean, description: "A payment event: resend when still unpaid applies" }
+    AutomationOverview:
+      type: object
+      required: [enabled, stats, items, events]
+      properties:
+        enabled: { type: boolean }
+        stats:
+          type: object
+          required: [total, active, sent, drafts]
+          properties:
+            total: { type: integer }
+            active: { type: integer }
+            sent: { type: integer }
+            drafts: { type: integer }
+        items: { type: array, items: { $ref: "#/components/schemas/AutomationRule" } }
+        events: { type: array, items: { $ref: "#/components/schemas/AutomationEvent" } }
+    AutomationRun:
+      type: object
+      required: [uuid, rule_uuid, rule_name, taxpayer_title, engagement_uuid, period, status, scheduled_for, subject, body, channels, result, note, sms_followup_status, created_at, sent_at, decided_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        rule_uuid: { type: string, format: uuid }
+        rule_name: { type: string }
+        taxpayer_title: { type: string }
+        engagement_uuid: { type: string }
+        period: { type: string }
+        status: { type: string, enum: [scheduled, draft, sent, skipped, failed, rejected] }
+        scheduled_for: { type: string, format: date-time }
+        subject: { type: string }
+        body: { type: string }
+        channels: { type: array, items: { type: string } }
+        result:
+          type: object
+          description: Outcome per channel (sms, email, inapp)
+          additionalProperties: { $ref: "#/components/schemas/AutomationChannelResult" }
+        note: { type: string }
+        sms_followup_status: { type: string, enum: ["", sent, skipped] }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        decided_at: { type: [string, "null"], format: date-time }
+    AutomationChannelResult:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, description: "sent, dry_run, failed, uncertain, waiting or skipped" }
+        uuid: { type: string }
+        error: { type: string }
+        count: { type: integer }
+        hours: { type: integer }
+    AutomationEdit:
+      type: object
+      required: [action, actor_name, at, snapshot]
+      properties:
+        action: { type: string, enum: [created, updated, enabled, disabled, deleted] }
+        actor_name: { type: string }
+        at: { type: string, format: date-time }
+        snapshot: { type: object, additionalProperties: true }
+    AutomationHistory:
+      type: object
+      required: [rule, runs, edits]
+      properties:
+        rule: { $ref: "#/components/schemas/AutomationRule" }
+        runs: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
+        edits: { type: array, items: { $ref: "#/components/schemas/AutomationEdit" } }
+    AutomationSettings:
+      type: object
+      required: [enabled]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+    AutomationActiveInput:
+      type: object
+      required: [active]
+      additionalProperties: false
+      properties:
+        active: { type: boolean }
+    AutomationDecideInput:
+      type: object
+      required: [uuids, approve]
+      additionalProperties: false
+      properties:
+        uuids: { type: array, items: { type: string, format: uuid }, maxItems: 500 }
+        approve: { type: boolean }
+    AutomationDecideResult:
+      type: object
+      required: [sent, failed, rejected]
+      properties:
+        sent: { type: integer }
+        failed: { type: integer }
+        rejected: { type: integer }
+    EnvelopeAutomationOverview:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationOverview" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationRule:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationRule" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationHistory:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationHistory" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationRunList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/AutomationRun" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeAutomationDecideResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/AutomationDecideResult" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }

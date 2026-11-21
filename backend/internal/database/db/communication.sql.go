@@ -310,6 +310,162 @@ func (q *Queries) InsertSmsMessage(ctx context.Context, arg InsertSmsMessagePara
 	return i, err
 }
 
+const listEngagementMailMessages = `-- name: ListEngagementMailMessages :many
+SELECT m.id, m.uuid, m.organization_id, m.engagement_id, m.to_email, m.subject, m.body, m.status, m.error_message, m.source_rule, m.source_ref, m.sent_by, m.bulk_id, m.track_token, m.created_at, m.sent_at, m.opened_at, m.downloaded_at, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM mail_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = $1 AND m.engagement_id = $2
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3
+`
+
+type ListEngagementMailMessagesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListEngagementMailMessagesRow struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	ToEmail        string             `json:"to_email"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	Status         string             `json:"status"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	BulkID         pgtype.UUID        `json:"bulk_id"`
+	TrackToken     uuid.UUID          `json:"track_token"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	OpenedAt       pgtype.Timestamptz `json:"opened_at"`
+	DownloadedAt   pgtype.Timestamptz `json:"downloaded_at"`
+	SentByName     string             `json:"sent_by_name"`
+}
+
+func (q *Queries) ListEngagementMailMessages(ctx context.Context, arg ListEngagementMailMessagesParams) ([]ListEngagementMailMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listEngagementMailMessages, arg.OrganizationID, arg.EngagementID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEngagementMailMessagesRow{}
+	for rows.Next() {
+		var i ListEngagementMailMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.ToEmail,
+			&i.Subject,
+			&i.Body,
+			&i.Status,
+			&i.ErrorMessage,
+			&i.SourceRule,
+			&i.SourceRef,
+			&i.SentBy,
+			&i.BulkID,
+			&i.TrackToken,
+			&i.CreatedAt,
+			&i.SentAt,
+			&i.OpenedAt,
+			&i.DownloadedAt,
+			&i.SentByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listEngagementSmsMessages = `-- name: ListEngagementSmsMessages :many
+
+SELECT m.id, m.uuid, m.organization_id, m.engagement_id, m.phone, m.body, m.msgheader, m.status, m.provider_job_id, m.error_code, m.error_message, m.source_rule, m.source_ref, m.sent_by, m.bulk_id, m.created_at, m.sent_at, m.delivered_at, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM sms_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = $1 AND m.engagement_id = $2
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT $3
+`
+
+type ListEngagementSmsMessagesParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	EngagementID   pgtype.Int8 `json:"engagement_id"`
+	Lim            int32       `json:"lim"`
+}
+
+type ListEngagementSmsMessagesRow struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Phone          string             `json:"phone"`
+	Body           string             `json:"body"`
+	Msgheader      string             `json:"msgheader"`
+	Status         string             `json:"status"`
+	ProviderJobID  string             `json:"provider_job_id"`
+	ErrorCode      string             `json:"error_code"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	BulkID         pgtype.UUID        `json:"bulk_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
+	SentByName     string             `json:"sent_by_name"`
+}
+
+// İletişim geçmişi (#780 D): mükellefe giden SMS ve e-postalar, yeniden eskiye.
+func (q *Queries) ListEngagementSmsMessages(ctx context.Context, arg ListEngagementSmsMessagesParams) ([]ListEngagementSmsMessagesRow, error) {
+	rows, err := q.db.Query(ctx, listEngagementSmsMessages, arg.OrganizationID, arg.EngagementID, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEngagementSmsMessagesRow{}
+	for rows.Next() {
+		var i ListEngagementSmsMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Uuid,
+			&i.OrganizationID,
+			&i.EngagementID,
+			&i.Phone,
+			&i.Body,
+			&i.Msgheader,
+			&i.Status,
+			&i.ProviderJobID,
+			&i.ErrorCode,
+			&i.ErrorMessage,
+			&i.SourceRule,
+			&i.SourceRef,
+			&i.SentBy,
+			&i.BulkID,
+			&i.CreatedAt,
+			&i.SentAt,
+			&i.DeliveredAt,
+			&i.SentByName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOfficeSmsMessages = `-- name: ListOfficeSmsMessages :many
 SELECT m.id, m.uuid, m.organization_id, m.engagement_id, m.phone, m.body, m.msgheader, m.status, m.provider_job_id, m.error_code, m.error_message, m.source_rule, m.source_ref, m.sent_by, m.bulk_id, m.created_at, m.sent_at, m.delivered_at, COALESCE(t.title, '')::text AS taxpayer_title, COALESCE(e.uuid::text, '')::text AS engagement_uuid
 FROM sms_messages m
@@ -387,6 +543,129 @@ func (q *Queries) ListOfficeSmsMessages(ctx context.Context, arg ListOfficeSmsMe
 		return nil, err
 	}
 	return items, nil
+}
+
+const listSmsAwaitingDelivery = `-- name: ListSmsAwaitingDelivery :many
+SELECT id, organization_id, provider_job_id, phone
+FROM sms_messages
+WHERE status = 'sent' AND delivered_at IS NULL AND provider_job_id <> '' AND sent_at >= $1
+ORDER BY organization_id, sent_at, id
+LIMIT $2
+`
+
+type ListSmsAwaitingDeliveryParams struct {
+	Since pgtype.Timestamptz `json:"since"`
+	Lim   int32              `json:"lim"`
+}
+
+type ListSmsAwaitingDeliveryRow struct {
+	ID             int64  `json:"id"`
+	OrganizationID int64  `json:"organization_id"`
+	ProviderJobID  string `json:"provider_job_id"`
+	Phone          string `json:"phone"`
+}
+
+// İletim raporu taraması (#780 D): NetGSM'in kabul ettiği, henüz iletim
+// bilgisi gelmemiş son günlerin SMS'leri. Bütün ofisler (rls.System içinde).
+// tenant-lint: cross-org NetGSM iletim raporu taraması, bütün ofisler
+func (q *Queries) ListSmsAwaitingDelivery(ctx context.Context, arg ListSmsAwaitingDeliveryParams) ([]ListSmsAwaitingDeliveryRow, error) {
+	rows, err := q.db.Query(ctx, listSmsAwaitingDelivery, arg.Since, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListSmsAwaitingDeliveryRow{}
+	for rows.Next() {
+		var i ListSmsAwaitingDeliveryRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.ProviderJobID,
+			&i.Phone,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markMailDownloadedByToken = `-- name: MarkMailDownloadedByToken :execrows
+UPDATE mail_messages
+SET downloaded_at = COALESCE(downloaded_at, NOW()), opened_at = COALESCE(opened_at, NOW())
+WHERE track_token = $1 AND (downloaded_at IS NULL OR opened_at IS NULL)
+`
+
+// tenant-lint: cross-org ek bağlantısı, oturumsuz, track_token benzersiz
+func (q *Queries) MarkMailDownloadedByToken(ctx context.Context, trackToken uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markMailDownloadedByToken, trackToken)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markMailOpenedByToken = `-- name: MarkMailOpenedByToken :execrows
+UPDATE mail_messages SET opened_at = NOW()
+WHERE track_token = $1 AND opened_at IS NULL
+`
+
+// E-posta izleme (#780 D): piksel ve bağlantı oturum açmadan gelir; anahtar
+// tahmin edilemez track_token'dır. Zaman yalnız ilk seferde yazılır.
+// tenant-lint: cross-org izleme pikseli, oturumsuz, track_token benzersiz
+func (q *Queries) MarkMailOpenedByToken(ctx context.Context, trackToken uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, markMailOpenedByToken, trackToken)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markSmsDelivered = `-- name: MarkSmsDelivered :execrows
+UPDATE sms_messages SET delivered_at = $1
+WHERE organization_id = $2 AND id = $3 AND delivered_at IS NULL
+`
+
+type MarkSmsDeliveredParams struct {
+	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
+	OrganizationID int64              `json:"organization_id"`
+	ID             int64              `json:"id"`
+}
+
+func (q *Queries) MarkSmsDelivered(ctx context.Context, arg MarkSmsDeliveredParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markSmsDelivered, arg.DeliveredAt, arg.OrganizationID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const markSmsDeliveryFailed = `-- name: MarkSmsDeliveryFailed :execrows
+UPDATE sms_messages SET status = 'failed', error_code = $1, error_message = $2
+WHERE organization_id = $3 AND id = $4 AND status = 'sent' AND delivered_at IS NULL
+`
+
+type MarkSmsDeliveryFailedParams struct {
+	ErrorCode      string `json:"error_code"`
+	ErrorMessage   string `json:"error_message"`
+	OrganizationID int64  `json:"organization_id"`
+	ID             int64  `json:"id"`
+}
+
+func (q *Queries) MarkSmsDeliveryFailed(ctx context.Context, arg MarkSmsDeliveryFailedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markSmsDeliveryFailed,
+		arg.ErrorCode,
+		arg.ErrorMessage,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setOfficeSmsTestResult = `-- name: SetOfficeSmsTestResult :one

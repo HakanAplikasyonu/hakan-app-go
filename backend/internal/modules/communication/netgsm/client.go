@@ -110,6 +110,8 @@ type answer struct {
 	Description string          `json:"description"`
 	JobID       string          `json:"jobid"`
 	Headers     json.RawMessage `json:"msgheaders"`
+	// Raw is the whole answer body (the report call reads its job list).
+	Raw []byte `json:"-"`
 }
 
 // do sends one request with the retry rule of the package doc.
@@ -190,10 +192,16 @@ func (c *Client) once(ctx context.Context, cred Credentials, method, path string
 		if resp.StatusCode == http.StatusUnauthorized && a.Code == "" {
 			a.Code = "30"
 		}
+		if a.Code == "" && resp.StatusCode == http.StatusOK && json.Valid(raw) {
+			// A JSON answer without a code (a bare report list): the
+			// caller decides; Headers and Send treat it as an error.
+			return answer{Raw: raw}, true, nil
+		}
 		if a.Code == "" {
 			return answer{}, true, &APIError{Code: "", Description: fmt.Sprintf("HTTP %d", resp.StatusCode)}
 		}
 	}
+	a.Raw = raw
 	return a, true, nil
 }
 

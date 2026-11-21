@@ -140,7 +140,10 @@ func main() {
 
 	queries := database.NewQueries(pool)
 	mailer := mail.NewSMTPSender(cfg.SMTP)
-	commSvc := communication.NewFromConfig(pool, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)
+	// İletişim merkezi (#780): SMS bildirimleri ve NetGSM iletim raporu
+	// taraması aynı servisten (dakikada 40 istek sınırı ortak).
+	commSvc := communication.NewFromConfig(pool, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log).
+		WithTracking(communication.TrackingFromConfig(cfg))
 	provs := []providers.Provider{
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
@@ -289,6 +292,9 @@ func main() {
 		// Otomasyon kuralları (#780 C): bütün ofisler, her çalışma kendi
 		// sistem işleminde (gerekçeli satır güvenliği atlaması).
 		WithAutomationTick(func(ctx context.Context) (int, error) { return automationSvc.Tick(ctx, pool) }).
+		// NetGSM iletim raporu (#780 D): gerçek gönderim kapalıysa ya da ofis
+		// deneme modundaysa NetGSM'e istek gitmez.
+		WithSmsDeliveryReports(func(ctx context.Context) (int, error) { return commSvc.SweepDeliveryReports(ctx, log) }).
 		WithEgressCheck(egressChecker.Run).
 		WithLogPurge(logsSvc.ApplyDueRules).
 		WithMobilePush(notifSvc.SendMobilePush, notifSvc.ProcessPushReceipts).
@@ -340,6 +346,10 @@ func main() {
 		}
 		if err := queue.RegisterAutomationSchedule(scheduler); err != nil {
 			log.Error("automation_scheduler_failed", "error", err)
+			exit(1)
+		}
+		if err := queue.RegisterSmsDeliveryReportsSchedule(scheduler); err != nil {
+			log.Error("sms_delivery_reports_scheduler_failed", "error", err)
 			exit(1)
 		}
 		if err := queue.RegisterEgressCheckSchedule(scheduler, egressCfg.Normalize().CheckInterval); err != nil {
