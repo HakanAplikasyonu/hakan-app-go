@@ -52,6 +52,9 @@ func TestSideEffectFailuresKeepRequest(t *testing.T) {
 		}
 		return n
 	}
+	// The demo seed already wrote some rows (e.g. the VAT watch's bell
+	// notifications, #780 B); none may be added from here on.
+	rowsBefore := count(`SELECT count(*) FROM notifications`) + count(`SELECT count(*) FROM activity_events`)
 	notifBefore := testutil.ToFloat64(metrics.Default.SideEffectFailures("notification"))
 	activityBefore := testutil.ToFloat64(metrics.Default.SideEffectFailures("activity"))
 
@@ -110,7 +113,7 @@ func TestSideEffectFailuresKeepRequest(t *testing.T) {
 	if got := testutil.ToFloat64(metrics.Default.SideEffectFailures("activity")); got <= activityBefore {
 		t.Errorf("side_effect_failures_total{name=activity} = %v, want > %v", got, activityBefore)
 	}
-	if n := count(`SELECT count(*) FROM notifications`) + count(`SELECT count(*) FROM activity_events`); n != 0 {
-		t.Fatalf("side-effect rows written despite the trigger: %d", n)
+	if n := count(`SELECT count(*) FROM notifications`) + count(`SELECT count(*) FROM activity_events`); n != rowsBefore {
+		t.Fatalf("side-effect rows written despite the trigger: %d (before %d)", n, rowsBefore)
 	}
 }

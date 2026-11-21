@@ -23,13 +23,7 @@ const salesDemoFrom = "2026-11"
 // salesDemoInvoices are the current-month invoices of the demo taxpayer
 // (#780): sales to a few buyers and two purchases, so the mükellef panel's
 // VAT card and sales report have figures in the month they open on.
-var salesDemoInvoices = []struct {
-	day       int
-	direction string
-	name, vkn string
-	base      int // TL, excluding VAT
-	rate      int // percent
-}{
+var salesDemoInvoices = []monthInvoice{
 	{2, "outgoing", "Marmara Market Zinciri A.Ş.", "6130412887", 84000, 20},
 	{4, "outgoing", "Ege Toptan Gıda Ltd. Şti.", "3270558341", 46500, 10},
 	{6, "outgoing", "Marmara Market Zinciri A.Ş.", "6130412887", 52000, 20},
@@ -43,17 +37,34 @@ var salesDemoInvoices = []struct {
 // taxpayer. Keyed by month and row (source_id), so a rerun in the same
 // month adds nothing; days after today move to today.
 func seedCurrentSales(ctx context.Context, pool *pgxpool.Pool, tpID int64, now time.Time) error {
+	return seedMonthInvoices(ctx, pool, tpID, now, salesDemoSource, "ATS", salesDemoInvoices)
+}
+
+// monthInvoice is one current-month demo invoice.
+type monthInvoice struct {
+	day       int
+	direction string
+	name, vkn string
+	base      int // TL, excluding VAT
+	rate      int // percent
+}
+
+// seedMonthInvoices adds invoices to the month of now for the taxpayer,
+// keyed by source, month and row (source_id): a rerun in the same month
+// adds nothing; days after today move to today. prefix starts the
+// invoice numbers.
+func seedMonthInvoices(ctx context.Context, pool *pgxpool.Pool, tpID int64, now time.Time, source, prefix string, invoices []monthInvoice) error {
 	now = now.In(time.FixedZone("TRT", 3*60*60))
 	period := now.Format("2006-01")
 	if period < salesDemoFrom {
 		return nil
 	}
-	return rls.System(ctx, pool, "demo-seed: current-month sales (#780)", func(ctx context.Context, tx pgx.Tx) error {
-		for i, inv := range salesDemoInvoices {
+	return rls.System(ctx, pool, "demo-seed: current-month invoices (#780)", func(ctx context.Context, tx pgx.Tx) error {
+		for i, inv := range invoices {
 			day := min(inv.day, now.Day())
 			date := time.Date(now.Year(), now.Month(), day, 0, 0, 0, 0, time.UTC)
 			vat := inv.base * inv.rate / 100
-			number := fmt.Sprintf("ATS%s%09d", now.Format("2006"), now.Year()%100*1000000+int(now.Month())*1000+i+1)
+			number := fmt.Sprintf("%s%s%09d", prefix, now.Format("2006"), now.Year()%100*1000000+int(now.Month())*1000+i+1)
 			var id int64
 			err := tx.QueryRow(ctx, `
 				INSERT INTO invoices (taxpayer_id, source_system, source_id, capture_method, invoice_number,
@@ -64,7 +75,7 @@ func seedCurrentSales(ctx context.Context, pool *pgxpool.Pool, tpID int64, now t
 					$11::numeric, $11::numeric, 'source_summary', $12, $13)
 				ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
 				RETURNING id`,
-				tpID, salesDemoSource, fmt.Sprintf("%s-%02d", period, i+1), number, inv.direction, "SATIS",
+				tpID, source, fmt.Sprintf("%s-%02d", period, i+1), number, inv.direction, "SATIS",
 				date, period, inv.base, vat, inv.base+vat, inv.name, inv.vkn).Scan(&id)
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue // already seeded this month

@@ -46,6 +46,7 @@ func (m Module) Routes(r *module.Router) {
 		office = append(office, m.Scope)
 	}
 	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office, office...)
+	r.Tenant("GET /v1/tenant/vat-forecast/watch-events", read, h.OfficeWatchEvents, office...)
 	r.Tenant("GET /v1/tenant/vat-tracking-settings", read, h.Tracking, office...)
 	r.Tenant("PUT /v1/tenant/vat-tracking-settings", rbac.PermTenantSettingsWrite, h.PutTracking, office...)
 	r.Tenant("GET /v1/tenant/vat-report-rules", read, h.ReportRules, office...)

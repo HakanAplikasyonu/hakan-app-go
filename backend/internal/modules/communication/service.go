@@ -74,6 +74,11 @@ type Service struct {
 	live  bool
 	limit *limiter
 	now   func() time.Time
+	// linkBase: the web address :link points to (bulk sends, #780 B).
+	linkBase string
+	log      *slog.Logger
+	// bulkWG tracks background bulk sends (tests wait on it).
+	bulkWG sync.WaitGroup
 	// tracking: e-mail pixel and tracked links (#780 D); zero = off.
 	tracking Tracking
 }

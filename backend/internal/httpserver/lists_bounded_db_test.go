@@ -21,6 +21,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/foreign-invoices":            "foreign service invoices of one taxpayer and month (#780 A1), capped in SQL (LIMIT 500)",
 	"GET /v1/tenant/foreign-service-kinds":                                    "foreign service kind catalog (5 ready-made kinds)",
 	"GET /v1/tenant/vat-report-rules":                                         "office VAT report rules (at most 10)",
+	"GET /v1/tenant/vat-forecast/watch-events":                                "latest office VAT watch events (#780 B), honours limit, capped at 50 in code",
 	"GET /v1/tenant/roles":                                                    "office roles (system + custom, a handful)",
 	"GET /v1/tenant/role-permissions":                                         "permission catalog",
 	"GET /v1/tenant/einvoice-integrators":                                     "e-invoice integrator catalog (go-ubltr registry)",
@@ -43,6 +44,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns":                 "three returns a month, filtered by year",
 	"GET /v1/taxpayer/important-documents":                                    "server-side cap (LIMIT 200): a company's important documents (#780 B)",
 	"GET /v1/tenant/engagement-assignments":                                   "server-side cap (LIMIT): assignees of the office's engagements, one request instead of one per row (#639)",
+	"GET /v1/tenant/communication/groups":                                     "office taxpayer groups (a handful per office, unique by name) (#780)",
 }
 
 var fileListRe = regexp.MustCompile(`/(export|pdf|file)$`)

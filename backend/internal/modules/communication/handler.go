@@ -3,6 +3,7 @@ package communication
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,8 +64,26 @@ func UserMessage(err error) string {
 		return "Bu ofiste SMS gönderimi açık değil. Ayarlar > SMS bölümünden NetGSM hesabını bağlayın."
 	case errors.Is(err, ErrNoContact):
 		return "Mükellefin kayıtlı iletişim bilgisi yok."
+	case errors.Is(err, ErrInvalidInput):
+		return detail(err, ErrInvalidInput, "İstek geçersiz.")
+	case errors.Is(err, ErrBulkBlocked):
+		return detail(err, ErrBulkBlocked, "Gönderim yapılamaz.")
+	case errors.Is(err, ErrTooManyRecipients):
+		return fmt.Sprintf("Toplu gönderim en fazla %d mükellefe yapılabilir. Seçimi daraltın.", MaxBulkRecipients)
+	case errors.Is(err, ErrNoRecipients):
+		return "Gönderilecek mükellef yok: hedefteki mükelleflerin iletişim bilgisi yok."
 	}
 	return ""
+}
+
+// detail is the screen text a sentinel error was wrapped with
+// ("<sentinel>: <text>"); fallback when there is none.
+func detail(err, sentinel error, fallback string) string {
+	msg, prefix := err.Error(), sentinel.Error()+": "
+	if i := strings.Index(msg, prefix); i >= 0 {
+		return msg[i+len(prefix):]
+	}
+	return fallback
 }
 
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
