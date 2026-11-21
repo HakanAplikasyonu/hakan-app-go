@@ -59,6 +59,13 @@ trendinizi grafiklerle gösterir. Rakamlar portala kayıtlı faturalarınızdan,
 onaylı masraflarınızdan ve Z raporlarınızdan hesaplanır. Müşavirinizin
 yorumu, size e-postayla gönderdiği rapor PDF'inde yer alır.
 
+### Belgeler
+
+Müşavirinizin sizinle paylaştığı belgeler. En üstteki **Önemli belgeler**
+bölümünde vergi levhası, imza sirküleri, ticaret sicil gazetesi gibi
+belgeler durur; **İndir** ile alırsınız. Süresi 30 gün içinde bitecek belge
+renkli görünür: yenisini müşavirinize iletin.
+
 ## Mobil uygulama
 
 Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.

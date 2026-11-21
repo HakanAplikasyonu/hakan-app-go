@@ -220,6 +220,17 @@ Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.
 E-posta adresi olmayan mükellefler atlanır ve size bildirilir.
 
+## Önemli belgeler
+
+Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi
+levhası, imza sirküleri, ticaret sicil gazetesi, kira sözleşmesi, ruhsat ve
+vekâletname gibi sık istenen belgeler durur. **Önemli belge ekle** ile tür,
+ad, geçerlilik bitişi ve notla yükleyin ya da **Arşiv** sekmesinde bir
+belgenin yıldızına basıp "önemli" işaretleyin. Bitişi 30 gün içinde olan ya
+da geçmiş belge renkli satırda görünür; yenisini zamanında isteyin.
+**Mükellef görebilir** açık olan belgeyi mükellef kendi panelinde görür ve
+indirir; belge bazında kapatabilirsiniz.
+
 ## Sık sorulanlar
 
 - **"Çok fazla deneme" uyarısı:** kısa sürede çok sayıda istek gönderdiniz

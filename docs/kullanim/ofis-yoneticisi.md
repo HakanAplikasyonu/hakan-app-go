@@ -59,6 +59,9 @@ Ayarlar dört bölümdür (geniş ekranda soldaki menüden, telefonda üstten):
   - **Kural adayı eşiği:** kaç tutarlı karardan sonra kural adayı
     çıkacağı (2–10) ve hangi kararların sayılacağı. Bu ayarı ofis sahibi ve
     yöneticisi değiştirir.
+- **Belgeler:** mükellef sayfasındaki ve mükellef panelindeki **Önemli
+  belgeler** bölümü (varsayılan açık). Kapatınca bölüm gizlenir; belgeler
+  arşivde kalır.
 - **Masaüstü ajanları:** ofise bağlı ajanlar ve durumları.
 - **Görünüm:** tema (kristal mavi ya da yeşil; açık, koyu ya da sistemi izle).
   Yalnızca sizin hesabınız için geçerlidir.
