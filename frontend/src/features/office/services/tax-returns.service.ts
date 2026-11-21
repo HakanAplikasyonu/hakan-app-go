@@ -23,6 +23,7 @@ export type TaxReturnStampLine = NonNullable<
 >[number];
 export type TaxReturnDraftInput = components["schemas"]["TaxReturnDraftInput"];
 export type TaxReturnFileInput = components["schemas"]["TaxReturnFileInput"];
+export type TaxReturnAmendment = components["schemas"]["TaxReturnAmendment"];
 export type TaxReturnPayment = components["schemas"]["TaxReturnPayment"];
 export type TaxReturnPaymentMovement =
   components["schemas"]["TaxReturnPaymentMovement"];
@@ -150,6 +151,18 @@ export const taxReturnsService = {
       "PUT",
       `${one(engagement, kind, period)}/payment`,
       { body, silent: true },
+    );
+  },
+  /**
+   * Düzeltme beyannamesi (#575): verilmiş beyan sürüm olarak arşivlenir,
+   * beyan taslağa döner (sürüm + 1).
+   */
+  amend(slug: string, engagement: string, kind: TaxReturnKind, period: string) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "POST",
+      `${one(engagement, kind, period)}/amend`,
+      { silent: true },
     );
   },
   /** Tahakkuk PDF'i (#575): verilmiş beyana eklenir; yenisi eskisinin yerine geçer. */

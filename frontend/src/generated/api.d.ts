@@ -13560,6 +13560,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a correction (düzeltme beyannamesi) of a filed return
+         * @description Requires `tenant.tax_returns.write` (#575). Only a filed return (`409 TAX_RETURN_NOT_FILED`). The filed version
+         *     (snapshot, payable / carry, filed on, accrual number and PDF, payment day) is archived; the return is a draft
+         *     again with `version + 1` and no acknowledgements, filing, accrual or payment. It is then prepared and filed as
+         *     usual; `amendment.differences` compares it with the previous version.
+         */
+        post: operations["amendEngagementTaxReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export": {
         parameters: {
             query?: never;
@@ -21583,6 +21617,8 @@ export interface components {
             babs?: components["schemas"]["TaxReturnBABS"];
             /** @description Accrual payment (#575); null unless filed KDV1 / MUHSGK with an amount to pay */
             payment?: components["schemas"]["TaxReturnPayment"] | null;
+            /** @description Versions of a filed or corrected return (#575); null for a first version not filed yet */
+            amendment?: components["schemas"]["TaxReturnAmendment"] | null;
         };
         TaxReturnPaymentMovement: {
             /** Format: uuid */
@@ -21608,6 +21644,41 @@ export interface components {
             bank_transaction: components["schemas"]["TaxReturnPaymentMovement"] | null;
             /** @description Outgoing TRY movements around the due date that may pay it (same amount first); empty once paid */
             candidates: components["schemas"]["TaxReturnPaymentMovement"][];
+        };
+        TaxReturnAmendmentFigure: {
+            /** @description base_total, payable, carry_out, income_tax, ba_amount, ... */
+            key: string;
+            label: string;
+            previous: string;
+            current: string;
+            /** @description current − previous */
+            difference: string;
+        };
+        TaxReturnAmendmentVersion: {
+            version: number;
+            /** Format: date */
+            filed_on: string;
+            accrual_number: string | null;
+            payable_amount: string | null;
+            carry_out: string | null;
+            /** Format: date */
+            paid_on: string | null;
+            /** Format: date-time */
+            amended_at: string;
+        };
+        /**
+         * @description A filed return compares its live data with what was filed (needed: they differ, a correction may be due —
+         *     office rule: a changed sale after filing means a düzeltme beyannamesi). A correction (version > 1) compares
+         *     itself with the previous filed version.
+         */
+        TaxReturnAmendment: {
+            /** @description 1 for the original return */
+            version: number;
+            needed: boolean;
+            previous: components["schemas"]["TaxReturnAmendmentVersion"] | null;
+            differences: components["schemas"]["TaxReturnAmendmentFigure"][];
+            /** @description Archived versions, newest first */
+            versions: components["schemas"]["TaxReturnAmendmentVersion"][];
         };
         /**
          * @description One source of the period. processed counts for the return (approved Z report / receipt, active invoice with a TL
@@ -43493,6 +43564,43 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    amendEngagementTaxReturn: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                /** @description kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs) */
+                returnKind: components["parameters"]["TaxReturnKind"];
+                period: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The correction draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxReturn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             500: components["responses"]["InternalError"];
         };
     };
