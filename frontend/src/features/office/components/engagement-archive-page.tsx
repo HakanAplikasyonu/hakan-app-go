@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Eye, Trash2, Upload } from "lucide-react";
+import { Download, Eye, Star, Trash2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { toast } from "sonner";
@@ -54,11 +54,13 @@ import { usePermission } from "@/providers/permission-provider";
 
 import {
   ARCHIVE_CATEGORIES,
+  ARCHIVE_IMPORTANT_KINDS,
   ARCHIVE_ISG_KINDS,
   archiveKeys,
   archiveService,
   type ArchiveCategory,
   type ArchiveDocument,
+  type ArchiveImportantKind,
   type ArchiveIsgKind,
   type ArchiveQuery,
 } from "../services/archive-documents.service";
@@ -118,6 +120,7 @@ function ArchiveInner({ engagement }: { engagement: string }) {
   const search = useSearchParams();
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState<ArchiveDocument | null>(null);
+  const [marking, setMarking] = useState<ArchiveDocument | null>(null);
   const [q, setQ] = useState(search.get("q") ?? "");
 
   const rawCategory = search.get("kategori");
@@ -162,6 +165,19 @@ function ArchiveInner({ engagement }: { engagement: string }) {
     },
     onError: (err) => toast.error(err.message || t("office.archive.error")),
     onSettled: () => setRemoving(null),
+  });
+
+  // Önemli işaretini kaldırma (#780 B); işaretleme tür seçtiren pencerede.
+  const unmark = useMutation({
+    mutationFn: (d: ArchiveDocument) =>
+      archiveService.update(slug, engagement, d.uuid, { important_kind: "" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: archiveKeys.all(slug, engagement),
+      });
+      toast.success(t("office.important.unmarked"));
+    },
+    onError: (err) => toast.error(err.message || t("office.archive.error")),
   });
 
   const act = (fn: () => Promise<unknown>) =>
@@ -293,6 +309,13 @@ function ArchiveInner({ engagement }: { engagement: string }) {
                 <TableRow key={d.uuid} className="border-t">
                   <TableCell className="px-3 py-2">
                     <span className="font-medium">{d.title}</span>
+                    {d.important_kind ? (
+                      <span className="text-brand-text block text-xs font-semibold">
+                        {t("office.important.badge", {
+                          kind: t(`office.important.kind_${d.important_kind}`),
+                        })}
+                      </span>
+                    ) : null}
                     {d.note ? (
                       <span className="text-muted-foreground block text-xs">
                         {d.note}
@@ -374,6 +397,45 @@ function ArchiveInner({ engagement }: { engagement: string }) {
                         </Button>
                       </Hint>
                       {canWrite ? (
+                        <Hint
+                          label={
+                            d.important_kind
+                              ? t("office.important.unmark_short")
+                              : t("office.important.mark_short")
+                          }
+                        >
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            aria-label={
+                              d.important_kind
+                                ? t("office.important.unmark", {
+                                    title: d.title,
+                                  })
+                                : t("office.important.mark", {
+                                    title: d.title,
+                                  })
+                            }
+                            aria-pressed={!!d.important_kind}
+                            disabled={unmark.isPending}
+                            onClick={() =>
+                              d.important_kind
+                                ? unmark.mutate(d)
+                                : setMarking(d)
+                            }
+                          >
+                            <Star
+                              className={
+                                d.important_kind
+                                  ? "fill-warn text-warn size-4"
+                                  : "size-4"
+                              }
+                              aria-hidden
+                            />
+                          </Button>
+                        </Hint>
+                      ) : null}
+                      {canWrite ? (
                         <Hint label={t("office.archive.delete_short")}>
                           <Button
                             size="icon"
@@ -433,6 +495,14 @@ function ArchiveInner({ engagement }: { engagement: string }) {
         />
       ) : null}
 
+      {marking ? (
+        <MarkImportantDialog
+          engagement={engagement}
+          doc={marking}
+          onClose={() => setMarking(null)}
+        />
+      ) : null}
+
       <AlertDialog
         open={!!removing}
         onOpenChange={(open) => {
@@ -470,13 +540,113 @@ function ArchiveInner({ engagement }: { engagement: string }) {
   );
 }
 
-function UploadDialog({
+/**
+ * Arşivdeki belgeyi "önemli" işaretler (#780 B): tür seçilir; mükellef
+ * sayfasındaki "Önemli belgeler" bölümüne düşer. "Mükellef de görsün"
+ * buradan açılabilir.
+ */
+function MarkImportantDialog({
+  engagement,
+  doc,
+  onClose,
+}: {
+  engagement: string;
+  doc: ArchiveDocument;
+  onClose: () => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const qc = useQueryClient();
+  const [kind, setKind] = useState<ArchiveImportantKind>("other");
+  const [visible, setVisible] = useState(doc.visible_to_taxpayer);
+  const save = useMutation({
+    mutationFn: () =>
+      archiveService.update(slug, engagement, doc.uuid, {
+        important_kind: kind,
+        visible_to_taxpayer: visible,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: archiveKeys.all(slug, engagement),
+      });
+      toast.success(t("office.important.marked"));
+      onClose();
+    },
+    onError: (err) => toast.error(err.message || t("office.archive.error")),
+  });
+  return (
+    <Dialog open onOpenChange={(open) => !open && !save.isPending && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("office.important.mark_title")}</DialogTitle>
+          <DialogDescription>
+            {t("office.important.mark_hint", { title: doc.title })}
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
+        >
+          <div className="space-y-1">
+            <Label htmlFor="important-mark-kind">
+              {t("office.important.kind")}
+            </Label>
+            <NativeSelect
+              id="important-mark-kind"
+              value={kind}
+              onChange={(e) =>
+                setKind(e.target.value as ArchiveImportantKind)
+              }
+            >
+              {ARCHIVE_IMPORTANT_KINDS.map((k) => (
+                <NativeSelectOption key={k} value={k}>
+                  {t(`office.important.kind_${k}`)}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
+          <Label className="flex w-fit items-center gap-2 text-sm leading-normal font-normal">
+            <Checkbox
+              checked={visible}
+              onCheckedChange={(v) => setVisible(v === true)}
+            />
+            {t("office.archive.visible_to_taxpayer")}
+          </Label>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={save.isPending}
+              onClick={onClose}
+            >
+              {t("office.archive.cancel")}
+            </Button>
+            <Button type="submit" disabled={save.isPending}>
+              {t("office.important.mark_confirm")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * Arşive belge yükleme penceresi. defaultImportant (#780 B): "Önemli
+ * belgeler" bölümünden açılınca tür seçili ve "Mükellef de görsün" açık gelir.
+ */
+export function UploadDialog({
   engagement,
   defaultCategory,
+  defaultImportant,
   onClose,
 }: {
   engagement: string;
   defaultCategory: ArchiveCategory;
+  defaultImportant?: ArchiveImportantKind;
   onClose: () => void;
 }) {
   const { t } = useLocale();
@@ -489,7 +659,10 @@ function UploadDialog({
   const [note, setNote] = useState("");
   const [documentDate, setDocumentDate] = useState("");
   const [validUntil, setValidUntil] = useState("");
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(!!defaultImportant);
+  const [important, setImportant] = useState<ArchiveImportantKind | "">(
+    defaultImportant ?? "",
+  );
 
   const upload = useMutation({
     mutationFn: () =>
@@ -502,6 +675,7 @@ function UploadDialog({
         documentDate,
         validUntil,
         visibleToTaxpayer: visible,
+        importantKind: important || undefined,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({
@@ -576,6 +750,27 @@ function UploadDialog({
                 </NativeSelect>
               </div>
             ) : null}
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="archive-important">
+              {t("office.important.kind_field")}
+            </Label>
+            <NativeSelect
+              id="archive-important"
+              value={important}
+              onChange={(e) =>
+                setImportant(e.target.value as ArchiveImportantKind | "")
+              }
+            >
+              <NativeSelectOption value="">
+                {t("office.important.kind_none")}
+              </NativeSelectOption>
+              {ARCHIVE_IMPORTANT_KINDS.map((k) => (
+                <NativeSelectOption key={k} value={k}>
+                  {t(`office.important.kind_${k}`)}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
           </div>
           <div className="space-y-1">
             <Label htmlFor="archive-title">

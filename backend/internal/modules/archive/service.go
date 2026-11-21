@@ -48,6 +48,11 @@ const ExpiringDays = 30
 var (
 	Categories = []string{"general", "contract", "tax", "sgk", "trade_registry", "isg", "other"}
 	ISGKinds   = []string{"isg_training", "risk_assessment", "health_report", "other"}
+	// ImportantKinds are the kinds of a mükellef's important documents
+	// (#780 B): vergi levhası, imza sirküleri, ticaret sicil gazetesi, kira
+	// sözleşmesi, ruhsat, vekâletname, diğer.
+	ImportantKinds = []string{"tax_certificate", "signature_circular", "trade_registry_gazette",
+		"lease_contract", "license", "power_of_attorney", "other"}
 )
 
 func oneOf(v string, set []string) bool {
@@ -94,7 +99,9 @@ type Document struct {
 	SizeBytes         int64     `json:"size_bytes"`
 	ContentType       string    `json:"content_type"`
 	VisibleToTaxpayer bool      `json:"visible_to_taxpayer"`
-	CreatedAt         time.Time `json:"created_at"`
+	// ImportantKind marks an important document (#780 B); nil: not important.
+	ImportantKind *string   `json:"important_kind"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // Counts are the tab counters and the expiry warning over the whole archive.
@@ -105,6 +112,10 @@ type Counts struct {
 	Expiring    int64 `json:"expiring"`
 	ISGExpired  int64 `json:"isg_expired"`
 	ISGExpiring int64 `json:"isg_expiring"`
+	// Important documents (#780 B) and those expired or ending within
+	// ExpiringDays.
+	Important         int64 `json:"important"`
+	ImportantExpiring int64 `json:"important_expiring"`
 }
 
 // Page is a page of documents with the archive counters.
@@ -127,7 +138,10 @@ type Filter struct {
 	ExpiringOnly bool
 	// OnlyVisible: the mükellef panel sees only documents the office marked
 	// "Mükellef de görsün"; the counters follow.
-	OnlyVisible   bool
+	OnlyVisible bool
+	// OnlyImportant lists the important documents (#780 B), the soonest
+	// validity end first.
+	OnlyImportant bool
 	Limit, Offset int32
 }
 
@@ -186,7 +200,7 @@ func (s *Service) view(r db.TaxpayerDocument, today time.Time) Document {
 		UUID: r.Uuid, Category: r.Category, ISGKind: textPtr(r.IsgKind), Title: r.Title, Note: r.Note,
 		DocumentDate: dateStr(r.DocumentDate), ValidUntil: dateStr(r.ValidUntil), ExpiryStatus: st, DaysLeft: days,
 		FileName: r.FileName, SizeBytes: r.SizeBytes, ContentType: r.ContentType,
-		VisibleToTaxpayer: r.VisibleToTaxpayer, CreatedAt: r.CreatedAt.Time,
+		VisibleToTaxpayer: r.VisibleToTaxpayer, ImportantKind: textPtr(r.ImportantKind), CreatedAt: r.CreatedAt.Time,
 	}
 }
 
@@ -199,7 +213,7 @@ func (s *Service) List(ctx context.Context, taxpayerID int64, f Filter) (Page, e
 	}
 	today := s.today()
 	soon := today.AddDate(0, 0, ExpiringDays)
-	p := db.ListTaxpayerDocumentsParams{TaxpayerID: taxpayerID, OnlyVisible: f.OnlyVisible, Lim: f.Limit, Off: f.Offset}
+	p := db.ListTaxpayerDocumentsParams{TaxpayerID: taxpayerID, OnlyVisible: f.OnlyVisible, OnlyImportant: f.OnlyImportant, Lim: f.Limit, Off: f.Offset}
 	if f.Category != "" {
 		p.Category = pgtype.Text{String: f.Category, Valid: true}
 	}
@@ -224,12 +238,13 @@ func (s *Service) List(ctx context.Context, taxpayerID int64, f Filter) (Page, e
 		return Page{}, fmt.Errorf("archive: counts: %w", err)
 	}
 	out := Page{Items: make([]Document, len(rows)), Limit: f.Limit, Offset: f.Offset, ExpiringDays: ExpiringDays,
-		Counts: Counts{Total: c.Total, ISG: c.Isg, Expired: c.Expired, Expiring: c.Expiring, ISGExpired: c.IsgExpired, ISGExpiring: c.IsgExpiring}}
+		Counts: Counts{Total: c.Total, ISG: c.Isg, Expired: c.Expired, Expiring: c.Expiring, ISGExpired: c.IsgExpired, ISGExpiring: c.IsgExpiring,
+			Important: c.Important, ImportantExpiring: c.ImportantExpiring}}
 	for i, r := range rows {
 		out.Items[i] = s.view(db.TaxpayerDocument{
 			ID: r.ID, Uuid: r.Uuid, TaxpayerID: r.TaxpayerID, Category: r.Category, IsgKind: r.IsgKind, Title: r.Title,
 			Note: r.Note, DocumentDate: r.DocumentDate, ValidUntil: r.ValidUntil, FileName: r.FileName, SizeBytes: r.SizeBytes,
-			ContentType: r.ContentType, VisibleToTaxpayer: r.VisibleToTaxpayer, CreatedAt: r.CreatedAt,
+			ContentType: r.ContentType, VisibleToTaxpayer: r.VisibleToTaxpayer, ImportantKind: r.ImportantKind, CreatedAt: r.CreatedAt,
 		}, today)
 		out.Total = r.TotalCount
 	}
@@ -245,6 +260,17 @@ type Input struct {
 	DocumentDate      string // YYYY-MM-DD, optional
 	ValidUntil        string // YYYY-MM-DD, optional
 	VisibleToTaxpayer bool
+	ImportantKind     string // optional: marks the document important (#780 B)
+}
+
+func importantKind(v string) (pgtype.Text, error) {
+	if v == "" {
+		return pgtype.Text{}, nil
+	}
+	if !oneOf(v, ImportantKinds) {
+		return pgtype.Text{}, fmt.Errorf("%w: unknown important_kind", ErrInvalid)
+	}
+	return pgtype.Text{String: v, Valid: true}, nil
 }
 
 func parseDate(field, v string) (pgtype.Date, error) {
@@ -320,6 +346,10 @@ func (s *Service) Upload(ctx context.Context, taxpayerID, actorID int64, fileNam
 	if len([]rune(in.Note)) > 1000 {
 		return Document{}, fmt.Errorf("%w: note is longer than 1000 characters", ErrInvalid)
 	}
+	important, err := importantKind(in.ImportantKind)
+	if err != nil {
+		return Document{}, err
+	}
 	if len(data) == 0 || len(data) > MaxFileBytes {
 		return Document{}, fmt.Errorf("%w: the file is empty or larger than 20 MB", ErrInvalid)
 	}
@@ -348,7 +378,7 @@ func (s *Service) Upload(ctx context.Context, taxpayerID, actorID int64, fileNam
 	row, err := s.q.InsertTaxpayerDocument(ctx, db.InsertTaxpayerDocumentParams{
 		TaxpayerID: taxpayerID, Category: in.Category, IsgKind: isg, Title: title, Note: strings.TrimSpace(in.Note),
 		DocumentDate: docDate, ValidUntil: validUntil, StorageKey: key, Sha256: digest, SizeBytes: int64(len(data)),
-		ContentType: ct, FileName: name, VisibleToTaxpayer: in.VisibleToTaxpayer, CreatedBy: by,
+		ContentType: ct, FileName: name, VisibleToTaxpayer: in.VisibleToTaxpayer, CreatedBy: by, ImportantKind: important,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Document{}, ErrExists

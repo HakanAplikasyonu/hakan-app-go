@@ -2,10 +2,16 @@ import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
 export type VATNotice = components["schemas"]["VATNotice"];
+export type VATWatchEvent = components["schemas"]["VATWatchEvent"];
+export type VATWatchResult = components["schemas"]["EnvelopeVATWatch"]["data"];
 export type VATNoticeInput = { period?: string; message?: string };
 
+function vatBase(engagement: string) {
+  return `/v1/tenant/engagements/${encodeURIComponent(engagement)}/vat-forecast`;
+}
+
 function base(engagement: string) {
-  return `/v1/tenant/engagements/${encodeURIComponent(engagement)}/vat-forecast/notices`;
+  return `${vatBase(engagement)}/notices`;
 }
 
 export const vatNoticeKeys = {
@@ -16,6 +22,14 @@ export const vatNoticeKeys = {
       "engagements",
       engagement.toLowerCase(),
       "vat-notices",
+    ] as const,
+  watch: (slug: string, engagement: string) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "engagements",
+      engagement.toLowerCase(),
+      "vat-watch",
     ] as const,
 };
 
@@ -32,5 +46,22 @@ export const vatNoticeService = {
       body,
       silent: true,
     });
+  },
+  /** KDV nöbetçisinin bu mükellef için ürettiği olaylar. */
+  watchEvents(slug: string, engagement: string) {
+    return tenantRequest<VATWatchResult>(
+      slug,
+      "GET",
+      `${vatBase(engagement)}/watch-events`,
+    );
+  },
+  /** Nöbetçiyi bu mükellef için şimdi çalıştırır ("Şimdi kontrol et"). */
+  runWatch(slug: string, engagement: string) {
+    return tenantRequest<VATWatchResult>(
+      slug,
+      "POST",
+      `${vatBase(engagement)}/watch`,
+      { body: {}, silent: true },
+    );
   },
 };

@@ -48,6 +48,9 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office, office...)
 	r.Tenant("GET /v1/tenant/vat-tracking-settings", read, h.Tracking, office...)
 	r.Tenant("PUT /v1/tenant/vat-tracking-settings", rbac.PermTenantSettingsWrite, h.PutTracking, office...)
+	r.Tenant("GET /v1/tenant/vat-report-rules", read, h.ReportRules, office...)
+	r.Tenant("PUT /v1/tenant/vat-report-rules", rbac.PermTenantSettingsWrite, h.PutReportRules, office...)
+	r.Tenant("POST /v1/tenant/vat-report-rules/{rule}/run", rbac.PermTenantSettingsWrite, h.RunReportRule, office...)
 	// Mükellef paneli (#780): anlık KDV ve satış raporu, salt okunur.
 	tp := func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { response.NotFound(w, req, "") })
@@ -72,6 +75,8 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("GET "+base+"/openings", read, h.ListOpenings, eng...)
 	r.Tenant("GET "+base+"/notices", read, h.ListNotices, eng...)
 	r.Tenant("POST "+base+"/notices", write, h.SendNotice, eng...)
+	r.Tenant("GET "+base+"/watch-events", read, h.ListWatchEvents, eng...)
+	r.Tenant("POST "+base+"/watch", write, h.RunWatch, eng...)
 	r.Tenant("PUT "+base+"/openings/{period}", write, h.PutOpening, eng...)
 	r.Tenant("DELETE "+base+"/openings/{period}", write, h.DeleteOpening, eng...)
 }

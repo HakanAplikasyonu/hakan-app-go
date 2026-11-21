@@ -135,5 +135,15 @@
   "vat_notice.empty": "Henüz KDV bildirimi gönderilmedi.",
   "vat_notice.outcome_payment": "Ödeme çıkacak: {{amount}}",
   "vat_notice.outcome_no_payment": "Ödeme çıkmayacak",
-  "vat_notice.sent_by": "{{name}} · {{time}}"
+  "vat_notice.sent_by": "{{name}} · {{time}}",
+  "vat_watch.run": "Şimdi kontrol et",
+  "vat_watch.raised": "{{count}} yeni KDV uyarısı oluştu.",
+  "vat_watch.nothing": "KDV durumunda değişiklik yok.",
+  "vat_watch.error": "KDV kontrolü yapılamadı.",
+  "vat_watch.changed_title": "KDV durumu değişti",
+  "vat_watch.changed_was_no_payment": "{{month}} için mükellefe \"ödeme çıkmayacak\" denmişti.",
+  "vat_watch.changed_was_payment": "{{month}} için mükellefe \"ödeme çıkacak\" denmişti.",
+  "vat_watch.changed_now_payment": "Yeni faturalarla şu an {{amount}} KDV ödemesi çıkıyor.",
+  "vat_watch.changed_now_no_payment": "Yeni faturalarla şu an KDV ödemesi çıkmıyor.",
+  "vat_watch.resend": "Mükellefe yeni bilgi gönder"
 }

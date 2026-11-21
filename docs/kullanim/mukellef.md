@@ -72,6 +72,13 @@ Müşavirinizin gönderdiği **KDV bildirimi** (bu ay ödeme çıkacak mı,
 çıkmayacak mı) bildirimlerinizde ve e-postanızda görünür. Ay içinde yeni
 fatura gelirse durum değişebilir.
 
+### Belgeler
+
+Müşavirinizin sizinle paylaştığı belgeler. En üstteki **Önemli belgeler**
+bölümünde vergi levhası, imza sirküleri, ticaret sicil gazetesi gibi
+belgeler durur; **İndir** ile alırsınız. Süresi 30 gün içinde bitecek belge
+renkli görünür: yenisini müşavirinize iletin.
+
 ## Mobil uygulama
 
 Mobil uygulama fiş ve belge göndermenin en hızlı yoludur.

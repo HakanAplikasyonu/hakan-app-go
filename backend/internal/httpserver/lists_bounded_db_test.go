@@ -18,6 +18,7 @@ import (
 var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/late-documents":              "late documents of one taxpayer (#780 C), capped in SQL",
 	"GET /v1/tenant/late-documents/summary":                                   "one row per taxpayer with late documents (#780 C), capped in SQL",
+	"GET /v1/tenant/vat-report-rules":                                         "office VAT report rules (at most 10)",
 	"GET /v1/tenant/roles":                                                    "office roles (system + custom, a handful)",
 	"GET /v1/tenant/role-permissions":                                         "permission catalog",
 	"GET /v1/tenant/einvoice-integrators":                                     "e-invoice integrator catalog (go-ubltr registry)",
@@ -29,12 +30,14 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/excel-import-data-types":                                  "data type catalog",
 	"GET /v1/tenant/expense-categories":                                       "expense category catalog (system + office)",
 	"GET /v1/tenant/engagements/{engagementUuid}/expense-categories":          "expense category catalog (system + office)",
+	"GET /v1/tenant/automations":                                              "office automation rules (7 ready-made + a handful the office adds)",
 	"GET /v1/tenant/export-drivers":                                           "accounting export driver catalog",
 	"GET /v1/tenant/bank-statement-templates":                                 "bank statement template catalog",
 	"GET /v1/tenant/engagements/{engagementUuid}/reconciliation/letters":      "server-side cap (LIMIT)",
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/imports":        "server-side cap (LIMIT)",
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances": "server-side cap (LIMIT)",
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns":                 "three returns a month, filtered by year",
+	"GET /v1/taxpayer/important-documents":                                    "server-side cap (LIMIT 200): a company's important documents (#780 B)",
 	"GET /v1/tenant/engagement-assignments":                                   "server-side cap (LIMIT): assignees of the office's engagements, one request instead of one per row (#639)",
 	"GET /v1/tenant/communication/groups":                                     "office taxpayer groups (a handful per office, unique by name) (#780)",
 }

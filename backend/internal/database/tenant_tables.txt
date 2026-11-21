@@ -63,12 +63,17 @@ taxpayer_import_batches
 account_rule_settings
 office_support_settings
 tax_return_settings
+important_document_settings
 office_sms_settings
 sms_messages
 mail_messages
 taxpayer_groups
 taxpayer_group_members
 bulk_sends
+office_automation_settings
+automation_rules
+automation_runs
+automation_rule_history
 report_deliveries engagement
 whatsapp_chat_links engagement
 whatsapp_captures engagement
@@ -90,6 +95,9 @@ bank_statement_export_items engagement
 tax_return_versions engagement
 bank_rent_withholdings engagement
 vat_notices engagement
+vat_tracking_settings
+vat_watch_events engagement
+vat_report_rules
 operating_account_inventories engagement
 operating_account_categories engagement
 late_documents engagement

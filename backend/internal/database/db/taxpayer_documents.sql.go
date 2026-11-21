@@ -18,7 +18,9 @@ SELECT count(*)::bigint AS total,
        count(*) FILTER (WHERE valid_until < $1::date)::bigint AS expired,
        count(*) FILTER (WHERE valid_until >= $1::date AND valid_until <= $2::date)::bigint AS expiring,
        count(*) FILTER (WHERE category = 'isg' AND valid_until < $1::date)::bigint AS isg_expired,
-       count(*) FILTER (WHERE category = 'isg' AND valid_until >= $1::date AND valid_until <= $2::date)::bigint AS isg_expiring
+       count(*) FILTER (WHERE category = 'isg' AND valid_until >= $1::date AND valid_until <= $2::date)::bigint AS isg_expiring,
+       count(*) FILTER (WHERE important_kind IS NOT NULL)::bigint AS important,
+       count(*) FILTER (WHERE important_kind IS NOT NULL AND valid_until <= $2::date)::bigint AS important_expiring
 FROM taxpayer_documents
 WHERE taxpayer_id = $3
   AND (NOT $4::bool OR visible_to_taxpayer)
@@ -32,12 +34,14 @@ type CountTaxpayerDocumentsParams struct {
 }
 
 type CountTaxpayerDocumentsRow struct {
-	Total       int64 `json:"total"`
-	Isg         int64 `json:"isg"`
-	Expired     int64 `json:"expired"`
-	Expiring    int64 `json:"expiring"`
-	IsgExpired  int64 `json:"isg_expired"`
-	IsgExpiring int64 `json:"isg_expiring"`
+	Total             int64 `json:"total"`
+	Isg               int64 `json:"isg"`
+	Expired           int64 `json:"expired"`
+	Expiring          int64 `json:"expiring"`
+	IsgExpired        int64 `json:"isg_expired"`
+	IsgExpiring       int64 `json:"isg_expiring"`
+	Important         int64 `json:"important"`
+	ImportantExpiring int64 `json:"important_expiring"`
 }
 
 // Sekme sayaçları ve bitiş uyarısı: kategori başına sayı, süresi dolan ve
@@ -58,6 +62,8 @@ func (q *Queries) CountTaxpayerDocuments(ctx context.Context, arg CountTaxpayerD
 		&i.Expiring,
 		&i.IsgExpired,
 		&i.IsgExpiring,
+		&i.Important,
+		&i.ImportantExpiring,
 	)
 	return i, err
 }
@@ -76,8 +82,25 @@ func (q *Queries) DeleteTaxpayerDocument(ctx context.Context, arg DeleteTaxpayer
 	return err
 }
 
+const getImportantDocumentSettings = `-- name: GetImportantDocumentSettings :one
+SELECT organization_id, enabled, updated_by, updated_at FROM important_document_settings WHERE organization_id = $1
+`
+
+// "Önemli belgeler" bölümü ofis ayarı (#780 B); satırı yoksa açık.
+func (q *Queries) GetImportantDocumentSettings(ctx context.Context, organizationID int64) (ImportantDocumentSetting, error) {
+	row := q.db.QueryRow(ctx, getImportantDocumentSettings, organizationID)
+	var i ImportantDocumentSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.Enabled,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getTaxpayerDocument = `-- name: GetTaxpayerDocument :one
-SELECT id, uuid, taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key, sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, created_at, updated_at FROM taxpayer_documents WHERE taxpayer_id = $1 AND uuid = $2
+SELECT id, uuid, taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key, sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, created_at, updated_at, important_kind FROM taxpayer_documents WHERE taxpayer_id = $1 AND uuid = $2
 `
 
 type GetTaxpayerDocumentParams struct {
@@ -107,6 +130,7 @@ func (q *Queries) GetTaxpayerDocument(ctx context.Context, arg GetTaxpayerDocume
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImportantKind,
 	)
 	return i, err
 }
@@ -114,11 +138,11 @@ func (q *Queries) GetTaxpayerDocument(ctx context.Context, arg GetTaxpayerDocume
 const insertTaxpayerDocument = `-- name: InsertTaxpayerDocument :one
 
 INSERT INTO taxpayer_documents (taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key,
-                                sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by)
+                                sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, important_kind)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14)
+        $9, $10, $11, $12, $13, $14, $15)
 ON CONFLICT (taxpayer_id, sha256) DO NOTHING
-RETURNING id, uuid, taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key, sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, created_at, updated_at
+RETURNING id, uuid, taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key, sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, created_at, updated_at, important_kind
 `
 
 type InsertTaxpayerDocumentParams struct {
@@ -136,6 +160,7 @@ type InsertTaxpayerDocumentParams struct {
 	FileName          string      `json:"file_name"`
 	VisibleToTaxpayer bool        `json:"visible_to_taxpayer"`
 	CreatedBy         pgtype.Int8 `json:"created_by"`
+	ImportantKind     pgtype.Text `json:"important_kind"`
 }
 
 // Belge arşivi ve İSG evrakları (#393). taxpayer_id kapsamlı.
@@ -155,6 +180,7 @@ func (q *Queries) InsertTaxpayerDocument(ctx context.Context, arg InsertTaxpayer
 		arg.FileName,
 		arg.VisibleToTaxpayer,
 		arg.CreatedBy,
+		arg.ImportantKind,
 	)
 	var i TaxpayerDocument
 	err := row.Scan(
@@ -176,30 +202,33 @@ func (q *Queries) InsertTaxpayerDocument(ctx context.Context, arg InsertTaxpayer
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ImportantKind,
 	)
 	return i, err
 }
 
 const listTaxpayerDocuments = `-- name: ListTaxpayerDocuments :many
-SELECT d.id, d.uuid, d.taxpayer_id, d.category, d.isg_kind, d.title, d.note, d.document_date, d.valid_until, d.storage_key, d.sha256, d.size_bytes, d.content_type, d.file_name, d.visible_to_taxpayer, d.created_by, d.created_at, d.updated_at, count(*) OVER ()::bigint AS total_count
+SELECT d.id, d.uuid, d.taxpayer_id, d.category, d.isg_kind, d.title, d.note, d.document_date, d.valid_until, d.storage_key, d.sha256, d.size_bytes, d.content_type, d.file_name, d.visible_to_taxpayer, d.created_by, d.created_at, d.updated_at, d.important_kind, count(*) OVER ()::bigint AS total_count
 FROM taxpayer_documents d
 WHERE d.taxpayer_id = $1
   AND (NOT $2::bool OR d.visible_to_taxpayer)
-  AND ($3::text IS NULL OR d.category = $3::text)
-  AND ($4::text IS NULL OR d.isg_kind = $4::text)
-  AND ($5::text IS NULL
-       OR d.title ILIKE '%' || $5::text || '%'
-       OR d.file_name ILIKE '%' || $5::text || '%'
-       OR d.note ILIKE '%' || $5::text || '%')
-  AND ($6::date IS NULL OR (d.valid_until IS NOT NULL AND d.valid_until <= $6::date))
-ORDER BY CASE WHEN $6::date IS NOT NULL THEN d.valid_until END ASC NULLS LAST,
+  AND (NOT $3::bool OR d.important_kind IS NOT NULL)
+  AND ($4::text IS NULL OR d.category = $4::text)
+  AND ($5::text IS NULL OR d.isg_kind = $5::text)
+  AND ($6::text IS NULL
+       OR d.title ILIKE '%' || $6::text || '%'
+       OR d.file_name ILIKE '%' || $6::text || '%'
+       OR d.note ILIKE '%' || $6::text || '%')
+  AND ($7::date IS NULL OR (d.valid_until IS NOT NULL AND d.valid_until <= $7::date))
+ORDER BY CASE WHEN $7::date IS NOT NULL OR $3::bool THEN d.valid_until END ASC NULLS LAST,
          COALESCE(d.document_date, (d.created_at AT TIME ZONE 'Europe/Istanbul')::date) DESC, d.id DESC
-LIMIT $8 OFFSET $7
+LIMIT $9 OFFSET $8
 `
 
 type ListTaxpayerDocumentsParams struct {
 	TaxpayerID    int64       `json:"taxpayer_id"`
 	OnlyVisible   bool        `json:"only_visible"`
+	OnlyImportant bool        `json:"only_important"`
 	Category      pgtype.Text `json:"category"`
 	IsgKind       pgtype.Text `json:"isg_kind"`
 	Q             pgtype.Text `json:"q"`
@@ -227,15 +256,18 @@ type ListTaxpayerDocumentsRow struct {
 	CreatedBy         pgtype.Int8        `json:"created_by"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ImportantKind     pgtype.Text        `json:"important_kind"`
 	TotalCount        int64              `json:"total_count"`
 }
 
+// only_important: yalnız önemli belgeler (#780 B), bitişi yakın olan önce.
 // Arama başlık, dosya adı ve notta; expires_before verilirse yalnızca o
 // tarihte ya da önce biten evraklar, bitişi yakın olan önce.
 func (q *Queries) ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDocumentsParams) ([]ListTaxpayerDocumentsRow, error) {
 	rows, err := q.db.Query(ctx, listTaxpayerDocuments,
 		arg.TaxpayerID,
 		arg.OnlyVisible,
+		arg.OnlyImportant,
 		arg.Category,
 		arg.IsgKind,
 		arg.Q,
@@ -269,6 +301,7 @@ func (q *Queries) ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDoc
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ImportantKind,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -279,4 +312,88 @@ func (q *Queries) ListTaxpayerDocuments(ctx context.Context, arg ListTaxpayerDoc
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateTaxpayerDocument = `-- name: UpdateTaxpayerDocument :one
+UPDATE taxpayer_documents
+SET important_kind      = $1,
+    visible_to_taxpayer = $2,
+    title               = $3,
+    note                = $4,
+    valid_until         = $5
+WHERE taxpayer_id = $6 AND id = $7
+RETURNING id, uuid, taxpayer_id, category, isg_kind, title, note, document_date, valid_until, storage_key, sha256, size_bytes, content_type, file_name, visible_to_taxpayer, created_by, created_at, updated_at, important_kind
+`
+
+type UpdateTaxpayerDocumentParams struct {
+	ImportantKind     pgtype.Text `json:"important_kind"`
+	VisibleToTaxpayer bool        `json:"visible_to_taxpayer"`
+	Title             string      `json:"title"`
+	Note              string      `json:"note"`
+	ValidUntil        pgtype.Date `json:"valid_until"`
+	TaxpayerID        int64       `json:"taxpayer_id"`
+	ID                int64       `json:"id"`
+}
+
+// Ofis düzenlemesi (#780 B): önemli işareti ve türü, "Mükellef de görsün",
+// ad, not ve geçerlilik bitişi. Değişmeyen alan aynen yazılır.
+func (q *Queries) UpdateTaxpayerDocument(ctx context.Context, arg UpdateTaxpayerDocumentParams) (TaxpayerDocument, error) {
+	row := q.db.QueryRow(ctx, updateTaxpayerDocument,
+		arg.ImportantKind,
+		arg.VisibleToTaxpayer,
+		arg.Title,
+		arg.Note,
+		arg.ValidUntil,
+		arg.TaxpayerID,
+		arg.ID,
+	)
+	var i TaxpayerDocument
+	err := row.Scan(
+		&i.ID,
+		&i.Uuid,
+		&i.TaxpayerID,
+		&i.Category,
+		&i.IsgKind,
+		&i.Title,
+		&i.Note,
+		&i.DocumentDate,
+		&i.ValidUntil,
+		&i.StorageKey,
+		&i.Sha256,
+		&i.SizeBytes,
+		&i.ContentType,
+		&i.FileName,
+		&i.VisibleToTaxpayer,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ImportantKind,
+	)
+	return i, err
+}
+
+const upsertImportantDocumentSettings = `-- name: UpsertImportantDocumentSettings :one
+INSERT INTO important_document_settings (organization_id, enabled, updated_by, updated_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (organization_id) DO UPDATE
+SET enabled = EXCLUDED.enabled, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+RETURNING organization_id, enabled, updated_by, updated_at
+`
+
+type UpsertImportantDocumentSettingsParams struct {
+	OrganizationID int64       `json:"organization_id"`
+	Enabled        bool        `json:"enabled"`
+	UpdatedBy      pgtype.Int8 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertImportantDocumentSettings(ctx context.Context, arg UpsertImportantDocumentSettingsParams) (ImportantDocumentSetting, error) {
+	row := q.db.QueryRow(ctx, upsertImportantDocumentSettings, arg.OrganizationID, arg.Enabled, arg.UpdatedBy)
+	var i ImportantDocumentSetting
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.Enabled,
+		&i.UpdatedBy,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

@@ -220,6 +220,11 @@ masraflardan ve onaylı Z raporlarından hesaplanır; KDV tutarı tahminidir.
   günüyle) mükellefin paneline ve e-postasına ofis adınızla gönderir. İsterseniz
   kısa bir not ekleyin. Kartın altında mükellefe ne söylendiği ve ne zaman,
   o günkü rakamlarla görünür.
+- **KDV nöbetçisi**: her sabah bu ayın KDV'si yeniden hesaplanır. Mükellefe
+  söylenen durum yeni bir faturayla değiştiyse kartta **KDV durumu
+  değişti** uyarısı çıkar ve size bildirim gelir; **Mükellefe yeni bilgi
+  gönder** ile güncel durumu tek tıkla iletin. Sabahı beklemeden bakmak için
+  **Şimdi kontrol et**e basın.
 
 Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.
@@ -240,6 +245,17 @@ söyler; o güne kadar rakamlar gelen faturalara göre anlık tahmindir.
   tutarla yeniden hesaplanır.
 - **Eşik aşıldı**: ödenecek KDV, uyarı ayarındaki eşiği geçti.
 - Rapor ofis yöneticisinin **Ayarlar → KDV takibi** bölümünden kapatılabilir.
+
+## Önemli belgeler
+
+Mükellef ayrıntısının özet sayfasındaki **Önemli belgeler** bölümünde vergi
+levhası, imza sirküleri, ticaret sicil gazetesi, kira sözleşmesi, ruhsat ve
+vekâletname gibi sık istenen belgeler durur. **Önemli belge ekle** ile tür,
+ad, geçerlilik bitişi ve notla yükleyin ya da **Arşiv** sekmesinde bir
+belgenin yıldızına basıp "önemli" işaretleyin. Bitişi 30 gün içinde olan ya
+da geçmiş belge renkli satırda görünür; yenisini zamanında isteyin.
+**Mükellef görebilir** açık olan belgeyi mükellef kendi panelinde görür ve
+indirir; belge bazında kapatabilirsiniz.
 
 ## Sık sorulanlar
 

@@ -264,6 +264,7 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/payroll/documents/{documentUuid}":                      {last: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/archive-documents": {file: "file", fileName: "isg-egitim.pdf", fileBody: "%PDF-1.4\n% isg taramasi\n",
 		fields: map[string]string{"category": "isg", "isg_kind": "isg_training", "valid_until": "2027-01-31"}},
+	"PATCH /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                                {body: `{"important_kind":"tax_certificate","visible_to_taxpayer":true}`, late: true},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/archive-documents/{archiveDocumentUuid}":                               {last: true},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/cash-boxes/{cashBoxUuid}":                                               {body: `{"name":"Tarama kasası 2"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-statements/{importId}":                                            {},
@@ -294,9 +295,16 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/communication/groups/{groupUuid}":                                                                   {last: true},
 	"POST /v1/tenant/communication/bulk-sends/preview":                                                                     {body: `{"channel":"mail","subject":"Konu","body":"Sayın :mukellef","target":{"kind":"selection","engagement_uuids":["{engagementUuid}"]}}`},
 	"POST /v1/tenant/communication/bulk-sends":                                                                             {body: `{"channel":"mail","subject":"Konu","body":"Sayın :mukellef","target":{"kind":"selection","engagement_uuids":["{engagementUuid}"]}}`},
+	"POST /v1/tenant/automations":                                                                                          {body: `{"name":"Tarama kuralı","trigger_kind":"calendar","trigger":{"mode":"days","days":[15],"hour":9,"before_due_days":0,"tax":"","current_period":false,"event":"","delay_min_hours":0,"delay_max_hours":0,"resend_after_days":0,"payment_date":"","payment_amount":"","payment_days_before":0},"target_kind":"all","channels":["sms"],"body":"Sayın :mukellef, bilgi.","approval_mode":"auto","active":false}`},
+	"PUT /v1/tenant/automations/{automationUuid}":                                                                          {body: `{"name":"Tarama kuralı","trigger_kind":"calendar","trigger":{"mode":"days","days":[15],"hour":9,"before_due_days":0,"tax":"","current_period":false,"event":"","delay_min_hours":0,"delay_max_hours":0,"resend_after_days":0,"payment_date":"","payment_amount":"","payment_days_before":0},"target_kind":"all","channels":["sms"],"body":"Sayın :mukellef, bilgi.","approval_mode":"auto","active":false}`},
+	"DELETE /v1/tenant/automations/{automationUuid}":                                                                       {},
+	"PUT /v1/tenant/automations/{automationUuid}/active":                                                                   {body: `{"active":false}`},
+	"PUT /v1/tenant/automation-settings":                                                                                   {body: `{"enabled":true}`},
+	"POST /v1/tenant/automation-runs/decide":                                                                               {body: `{"uuids":["00000000-0000-0000-0000-000000000000"],"approve":false}`},
 	"PUT /v1/tenant/support-settings":                                                                                      {body: `{"clickfix_widget_id":"ofis-destek"}`},
 	"PUT /v1/tenant/account-rule-settings":                                                                                 {body: `{"rule_candidate_min_count":4,"rule_candidate_decisions":"corrections_only"}`},
 	"PUT /v1/tenant/tax-return-settings":                                                                                   {body: `{"final_check_required":true}`},
+	"PUT /v1/tenant/important-document-settings":                                                                           {body: `{"enabled":true}`},
 	"PUT /v1/tenant/account-rules/{ruleKey}":                                                                               {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.02","conditions":{}}`},
 	"DELETE /v1/tenant/account-rules/{ruleKey}":                                                                            {},
 	"POST /v1/tenant/engagements/{engagementUuid}/account-rules":                                                           {body: `{"role":"line","name":"Tarama kuralı","account_code":"770.01","conditions":{}}`},
@@ -332,6 +340,9 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/categories": {body: `{"source":"invoice","record_uuid":"00000000-0000-4000-8000-000000000780","category":"general_expense"}`, late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/inventory":  {body: `{"year":2026,"opening":"1000.00","closing":"1500.00"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":        {body: `{}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":          {body: `{}`},
+	"PUT /v1/tenant/vat-report-rules":                                          {body: `{"items":[{"trigger_kind":"day","day":29,"audience":"office","scope":"all","engagement_uuids":[],"enabled":true}]}`},
+	"POST /v1/tenant/vat-report-rules/{rule}/run":                              {body: `{}`},
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},
@@ -679,6 +690,17 @@ func (e *sweepEnv) do(t *testing.T, method, path string, c sweepCase, taxpayer b
 // paramValue queries: the most recent demo row for a path parameter. $1 is
 // the demo office, $2 the Atlas engagement, $3 Atlas (taxpayer).
 var paramQueries = map[string]string{
+	// A real rule of office A (one is added when the office has none), so the
+	// IDOR check sees office B ask for a record that is not its own: the
+	// default rule ("default") exists in every office.
+	"rule": `WITH ins AS (
+		INSERT INTO vat_report_rules (organization_id, trigger_kind, day, label)
+		SELECT $1, 'day', 29, 'Tarama kuralı' WHERE $2 > 0 AND $3 > 0
+			AND NOT EXISTS (SELECT 1 FROM vat_report_rules WHERE organization_id = $1)
+		RETURNING uuid)
+	SELECT uuid::text FROM ins
+	UNION ALL (SELECT uuid::text FROM vat_report_rules WHERE organization_id = $1 ORDER BY id LIMIT 1)
+	LIMIT 1`,
 	"userUuid":            `SELECT u.uuid::text FROM users u WHERE u.email = 'stajyer@demo.hakan.local' AND $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"roleKey":             `SELECT 'sweep_role' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
 	"code":                `SELECT 'BNK_UNDOCUMENTED_PAYMENT' WHERE $1 > 0 AND $2 > 0 AND $3 > 0`,
@@ -691,6 +713,7 @@ var paramQueries = map[string]string{
 	"retailSaleUuid":      `SELECT uuid::text FROM retail_sales WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"vehicleUuid":         `SELECT uuid::text FROM taxpayer_vehicles WHERE taxpayer_id = $3 AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 	"summaryUuid":         `SELECT uuid::text FROM period_summaries WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"automationUuid":      `SELECT uuid::text FROM automation_rules WHERE organization_id = $1 AND deleted_at IS NULL AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"agentUuid":           `SELECT uuid::text FROM desktop_agents WHERE organization_id = $1 AND $2 > 0 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"draftUuid":           `SELECT uuid::text FROM journal_drafts WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"batchUuid":           `SELECT uuid::text FROM export_batches WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
