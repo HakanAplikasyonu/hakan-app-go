@@ -316,8 +316,8 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}":    {body: `{"rate":"20"}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}": {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend":                                 {late: true},
-	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    {body: `{}`},
 	"PUT /v1/tenant/vat-tracking-settings":                                                                                 {body: `{"report_enabled":true,"report_day":29}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/notices":                                                    {body: `{}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch":                                                      {body: `{}`},
 
 	// Aktarılmış fişin tamamen iptali (#710).

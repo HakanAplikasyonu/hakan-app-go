@@ -26584,7 +26584,7 @@ components:
       required: [report_enabled, report_day, watch_enabled, report_ready_on, updated_at]
       properties:
         report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
-        report_day: { type: integer, description: Day of month the report is ready (1-31, default 29) }
+        report_day: { type: integer, description: 'Day of month the report is ready (1-31, default 29)' }
         watch_enabled: { type: boolean, description: "Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true)" }
         report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
         updated_at: { type: [string, "null"], format: date-time }

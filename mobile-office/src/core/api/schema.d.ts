@@ -21085,7 +21085,7 @@ export interface components {
         VATTrackingSettings: {
             /** @description Month-end VAT report is shown (default true) */
             report_enabled: boolean;
-            /** @description Day of month the report is ready (1-31 */
+            /** @description Day of month the report is ready (1-31, default 29) */
             report_day: number;
             /** @description Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true) */
             watch_enabled: boolean;
