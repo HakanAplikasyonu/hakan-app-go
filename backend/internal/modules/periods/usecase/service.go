@@ -234,7 +234,7 @@ func (s *Service) Matrix(ctx context.Context, f MatrixFilter, until string, n in
 		return Matrix{}, err
 	}
 	for _, e := range engs {
-		row := MatrixRow{EngagementUUID: e.UUID, TaxpayerUUID: e.TaxpayerUUID, TaxpayerTitle: e.TaxpayerTitle, TaxpayerTaxID: e.TaxpayerTaxID, Cells: make([]Cell, 0, len(periods))}
+		row := MatrixRow{EngagementUUID: e.UUID, TaxpayerUUID: e.TaxpayerUUID, TaxpayerTitle: e.TaxpayerTitle, TaxpayerTaxID: e.TaxpayerTaxID, LedgerType: e.LedgerType, Cells: make([]Cell, 0, len(periods))}
 		for _, p := range periods {
 			k := MatrixKey{EngagementID: e.ID, Period: p}
 			cell := Cell{Period: p, OpenBlockers: c.Blockers[k], OpenWarnings: c.Warnings[k], OpenChangeRequests: c.ChangeRequests[k],

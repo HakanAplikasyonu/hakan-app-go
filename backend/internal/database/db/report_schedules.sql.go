@@ -19,14 +19,15 @@ FROM report_schedules s
 JOIN engagements e ON e.organization_id = s.organization_id AND e.id = s.engagement_id
 JOIN organizations o ON o.id = s.organization_id
 WHERE s.enabled AND e.status = 'active' AND e.ended_at IS NULL
-  AND s.day_of_month <= $1::int
-  AND (s.last_period IS NULL OR s.last_period < $2::text)
+  AND LEAST(s.day_of_month, $1::int) <= $2::int
+  AND (s.last_period IS NULL OR s.last_period < $3::text)
 ORDER BY s.organization_id, s.engagement_id
-LIMIT $3
+LIMIT $4
 FOR UPDATE OF s SKIP LOCKED
 `
 
 type DueReportSchedulesParams struct {
+	LastDay    int32  `json:"last_day"`
 	Today      int32  `json:"today"`
 	Period     string `json:"period"`
 	BatchLimit int32  `json:"batch_limit"`
@@ -43,9 +44,14 @@ type DueReportSchedulesRow struct {
 
 // tenant-lint: cross-org worker taraması (rls.System); sırası gelen zamanlanmış raporlar
 // Etkin, engagement'ı açık, günü gelmiş ve bu dönemi henüz gönderilmemiş
-// zamanlamalar.
+// zamanlamalar. Ay seçilen günden kısaysa (29-31) ayın son günü sayılır (#780).
 func (q *Queries) DueReportSchedules(ctx context.Context, arg DueReportSchedulesParams) ([]DueReportSchedulesRow, error) {
-	rows, err := q.db.Query(ctx, dueReportSchedules, arg.Today, arg.Period, arg.BatchLimit)
+	rows, err := q.db.Query(ctx, dueReportSchedules,
+		arg.LastDay,
+		arg.Today,
+		arg.Period,
+		arg.BatchLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
