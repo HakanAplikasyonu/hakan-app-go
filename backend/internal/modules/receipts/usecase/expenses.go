@@ -21,6 +21,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/receipts/posting"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/dbtx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 )
 
 // Posting target types (receipt_postings.target_type).
@@ -388,6 +389,12 @@ func (s *Service) postExpense(ctx context.Context, q *db.Queries, sc engagementc
 		return err
 	}
 	r := expenseToRow(e)
+	// İşletme defteri / serbest meslek (#780): kategori gider türünü verir;
+	// hesap kodu ve yevmiye taslağı yok.
+	single, err := singleEntry(ctx, q, sc)
+	if err != nil {
+		return err
+	}
 	p, err := q.GetReceiptPosting(ctx, db.GetReceiptPostingParams{OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TargetType: TargetExpense, TargetID: e.ID})
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
@@ -395,9 +402,13 @@ func (s *Service) postExpense(ctx context.Context, q *db.Queries, sc engagementc
 		if !ok {
 			return fmt.Errorf("%w: no expense category is active", ErrInvalid)
 		}
+		account := text(sug.AccountCode)
+		if single {
+			account = pgtype.Text{}
+		}
 		p, err = q.UpsertReceiptPosting(ctx, db.UpsertReceiptPostingParams{
 			OrganizationID: sc.OrganizationID, EngagementID: sc.ID, TaxpayerID: sc.TaxpayerID, TargetType: TargetExpense, TargetID: e.ID,
-			CategoryCode: text(sug.CategoryCode), AccountCode: text(sug.AccountCode), AccountSource: text(sug.Source),
+			CategoryCode: text(sug.CategoryCode), AccountCode: account, AccountSource: text(sug.Source),
 			Confidence: optNum(sug.Confidence, true), DecidedBy: optID(userID),
 		})
 		if err != nil {
@@ -405,6 +416,9 @@ func (s *Service) postExpense(ctx context.Context, q *db.Queries, sc engagementc
 		}
 	case err != nil:
 		return err
+	}
+	if single {
+		return nil
 	}
 	if !p.AccountCode.Valid {
 		// A category was chosen without a resolvable account.
@@ -533,4 +547,14 @@ func decPtr(n pgtype.Numeric) *decimal.Decimal {
 	}
 	d := decimal.NewFromBigInt(n.Int, n.Exp)
 	return &d
+}
+
+// singleEntry reports whether the engagement keeps an işletme defteri or
+// serbest meslek kazanç defteri (#780): no account postings, no journal.
+func singleEntry(ctx context.Context, q *db.Queries, sc engagementctx.Scope) (bool, error) {
+	t, err := ledger.Of(ctx, q, sc.OrganizationID, sc.ID)
+	if err != nil {
+		return false, err
+	}
+	return ledger.SingleEntry(t), nil
 }

@@ -314,6 +314,11 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/accrual-document": {file: "file", fileName: "tahakkuk.pdf", fileBody: "%PDF-1.4\n% tahakkuk taramasi\n", late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/payment":          {body: `{"paid_on":"2026-11-20"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/amend":           {late: true},
+	// Defter türü ve işletme hesabı (#780): engagement işletme defterine
+	// geçer; kategori ve mal mevcudu ondan sonra yazılır.
+	"PUT /v1/tenant/engagements/{engagementUuid}/ledger-type":                  {body: `{"ledger_type":"isletme"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/categories": {body: `{"source":"invoice","record_uuid":"00000000-0000-4000-8000-000000000780","category":"general_expense"}`, late: true},
+	"PUT /v1/tenant/engagements/{engagementUuid}/operating-account/inventory":  {body: `{"year":2026,"opening":"1000.00","closing":"1500.00"}`, late: true},
 
 	// Aktarılmış fişin tamamen iptali (#710).
 	"POST /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/cancel-export": {body: `{"reason":"tarama"}`, late: true},

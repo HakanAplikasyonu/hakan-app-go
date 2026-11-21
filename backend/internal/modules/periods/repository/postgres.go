@@ -331,7 +331,7 @@ func (p *Postgres) MatrixEngagements(ctx context.Context, f usecase.MatrixFilter
 	}
 	out := make([]usecase.MatrixEngagement, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, usecase.MatrixEngagement{ID: r.ID, UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle, TaxpayerTaxID: r.TaxpayerTaxID})
+		out = append(out, usecase.MatrixEngagement{ID: r.ID, UUID: r.Uuid, TaxpayerUUID: r.TaxpayerUuid, TaxpayerTitle: r.TaxpayerTitle, TaxpayerTaxID: r.TaxpayerTaxID, LedgerType: r.LedgerType})
 	}
 	return out, total, nil
 }
