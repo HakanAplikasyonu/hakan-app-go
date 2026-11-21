@@ -59,10 +59,13 @@ export async function fetchUpstream(
     method: string;
     headers?: HeadersInit;
     body?: BodyInit | null;
+    /** "manual" hands a 3xx back instead of following it. */
+    redirect?: RequestRedirect;
   },
 ): Promise<UpstreamResult> {
   const response = await fetch(buildUpstreamUrl(pathWithQuery), {
     method: init.method,
+    redirect: init.redirect ?? "follow",
     headers: scrubUpstreamHeaders(init.headers),
     body:
       init.body && init.method !== "GET" && init.method !== "HEAD"

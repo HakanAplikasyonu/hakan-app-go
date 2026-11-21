@@ -3561,6 +3561,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/late-documents/summary": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide count of late documents per taxpayer
+         * @description Requires `tenant.periods.read` (#780 C). Documents that arrived after
+         *     their period was closed, per taxpayer: pending and total counts and
+         *     the oldest pending period. Refreshed on every read. Active
+         *     engagements only; without `tenant.engagements.read_all` only
+         *     engagements assigned to the caller.
+         */
+        get: operations["getLateDocumentSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/clients": {
         parameters: {
             query?: never;
@@ -12135,6 +12165,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Late documents of an engagement (geçmiş dönem takibi)
+         * @description Requires `tenant.periods.read` and engagement access (#780 C). A
+         *     document has two dates: its arrival (`arrived_at`, when it entered the
+         *     system) and its period (the month of the document date). A document
+         *     that arrived after its period was closed (the period was locked, or a
+         *     tax return of the period was filed; `closed_at`, `close_reason`) is
+         *     listed here with the office's decision. The list is refreshed on every
+         *     read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+         *     `document_uuid` (the warning on one document).
+         */
+        get: operations["listEngagementLateDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the office's decision on a late document
+         * @description Requires `tenant.change_requests.decide` and engagement access.
+         *     `correction`: taken into a correction return (düzeltme beyannamesi);
+         *     `current_period`: booked in a later month (`target_period`, default
+         *     the current month; must be after the document period); `ignored`;
+         *     `pending` undoes the decision. The KDV deduction month of a purchase
+         *     invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+         */
+        post: operations["decideEngagementLateDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks": {
         parameters: {
             query?: never;
@@ -12801,6 +12900,85 @@ export interface paths {
          *     is refused.
          */
         post: operations["sendTestSms"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/communications": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Communication history of the taxpayer (#780)
+         * @description Requires `tenant.engagements.read`. Every SMS and e-mail the office
+         *     sent to this taxpayer, newest first: number or address, text, NetGSM
+         *     job id, send time, delivery time (NetGSM report) for SMS, open and
+         *     download time (tracking pixel / link) for e-mail. `channel` narrows
+         *     to one channel.
+         */
+        get: operations["listEngagementCommunications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/mail/{token}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * E-mail open tracking pixel (#780)
+         * @description The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+         *     the unguessable `track_token` of the record is the key. The first hit
+         *     writes `opened_at`; later hits change nothing. A bad or unknown token
+         *     gets the same image and writes nothing. Limited per client address.
+         */
+        get: operations["getMailOpenPixel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/mail/{token}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * E-mail attachment / document link (#780)
+         * @description Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+         *     the first click, then redirects to `to`. Only the app's own frontend
+         *     and storage origins are redirect targets (a path is taken as a
+         *     frontend path); any other target answers 404, so the route is not an
+         *     open redirect. No session: `track_token` is the key.
+         */
+        get: operations["getMailTrackedLink"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -21011,6 +21189,106 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        LateDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            document_type: "invoice" | "expense" | "retail_sale";
+            /** Format: uuid */
+            document_uuid: string;
+            /** @description Invoice number, receipt number or description, Z report number */
+            label: string;
+            counterparty: string | null;
+            /** Format: date */
+            document_date: string | null;
+            /** @description Total with two decimals */
+            amount: string;
+            currency: string;
+            period: components["schemas"]["Period"];
+            /**
+             * Format: date-time
+             * @description Geliş tarihi: when the document entered the system
+             */
+            arrived_at: string;
+            /**
+             * Format: date-time
+             * @description When the period was closed
+             */
+            closed_at: string;
+            /**
+             * @description lock: the period was locked; filed: a tax return of the period was filed
+             * @enum {string}
+             */
+            close_reason: "lock" | "filed";
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description The month it was booked in (current_period) */
+            target_period: string | null;
+            note: string | null;
+            decided_by_name: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            /** @enum {string|null} */
+            invoice_direction: "incoming" | "outgoing" | null;
+            /** @description A purchase invoice's KDV deduction month when moved forward (#640) */
+            vat_deduction_period: string | null;
+        };
+        LateDocumentCounts: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            correction: number;
+            /** Format: int64 */
+            current_period: number;
+            /** Format: int64 */
+            ignored: number;
+        };
+        LateDocumentList: {
+            items: components["schemas"]["LateDocument"][];
+            counts: components["schemas"]["LateDocumentCounts"];
+        };
+        LateDocumentDecision: {
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description YYYY-MM, only for current_period; default the current month */
+            target_period?: string;
+            note?: string;
+        };
+        LateDocumentSummaryRow: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            oldest_pending_period: string | null;
+        };
+        LateDocumentSummary: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            items: components["schemas"]["LateDocumentSummaryRow"][];
+        };
+        EnvelopeLateDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentSummary: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentSummary"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
             /** @description No open blocker, change request or unprocessed record (#575) */
@@ -21397,6 +21675,43 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["SmsMessage"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CommunicationHistoryItem: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            channel: "sms" | "email";
+            /** @description Phone number (SMS) or e-mail address. */
+            to: string;
+            subject: string;
+            body: string;
+            /** @enum {string} */
+            status: "pending" | "sent" | "failed" | "uncertain" | "dry_run";
+            msgheader: string;
+            provider_job_id: string;
+            error_code: string;
+            error_message: string;
+            source_rule: string;
+            source_ref: string;
+            sent_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+            /** Format: date-time */
+            opened_at: string | null;
+            /** Format: date-time */
+            downloaded_at: string | null;
+        };
+        EnvelopeCommunicationHistory: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["CommunicationHistoryItem"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -23114,6 +23429,7 @@ export interface components {
         /** @description Dönem (YYYY-MM) */
         PeriodPath: string;
         ChangeRequestUuid: string;
+        LateDocumentUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -28671,6 +28987,35 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLateDocumentSummary: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late document counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
@@ -42210,6 +42555,81 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listEngagementLateDocuments: {
+        parameters: {
+            query?: {
+                status?: "pending" | "correction" | "current_period" | "ignored";
+                period?: components["schemas"]["Period"];
+                document_uuid?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late documents and counts by status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideEngagementLateDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LateDocumentDecision"];
+            };
+        };
+        responses: {
+            /** @description Updated late document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantDocumentTasks: {
         parameters: {
             query?: {
@@ -43190,6 +43610,89 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementCommunications: {
+        parameters: {
+            query?: {
+                channel?: "sms" | "email";
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCommunicationHistory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getMailOpenPixel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pixel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/gif": string;
+                };
+            };
+        };
+    };
+    getMailTrackedLink: {
+        parameters: {
+            query: {
+                /** @description Target URL or frontend path. */
+                to: string;
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the target. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getClickFixIdentity: {
