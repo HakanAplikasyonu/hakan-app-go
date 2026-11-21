@@ -29,11 +29,23 @@ func actionOf(s Step) string {
 }
 
 func TestChain(t *testing.T) {
-	// An empty period: only the report is to do.
+	// An empty period: the Luca mizan, the VAT notice and the report are to
+	// do (the report waits for the other two).
 	r := Row{}
 	fill(&r, Counts{})
-	if r.NextStep == nil || *r.NextStep != StepReport || r.ActiveSteps != 3 || r.DoneSteps != 2 {
+	if r.NextStep == nil || *r.NextStep != StepLucaImport || r.ActiveSteps != 5 || r.DoneSteps != 2 {
 		t.Fatalf("empty period: %+v", r)
+	}
+	if v := stepOf(t, r.Steps, StepVAT); v.Status != StatusTodo || actionOf(v) != ActionOpenVAT {
+		t.Fatalf("vat: %+v", v)
+	}
+	if len(r.Steps) != len(StepKeys) {
+		t.Fatalf("steps: %+v", r.Steps)
+	}
+	// closed: what the Luca and VAT steps need to be done.
+	closed := func(c Counts) Counts {
+		c.TrialBalanceImported, c.VATNotices = true, 1
+		return c
 	}
 	// Bank movements without suggestions come first after documents.
 	fill(&r, Counts{BankTotal: 8, BankUnassigned: 3, BankSuggested: 2, DocsOpen: 1})
@@ -53,28 +65,82 @@ func TestChain(t *testing.T) {
 	if j := stepOf(t, r.Steps, StepJournals); actionOf(j) != ActionJournalsApprove || j.Count != 2 {
 		t.Fatalf("drafts: %+v", j)
 	}
+	// Pending masraf / Z raporu approvals keep the journals step open (#780).
+	fill(&r, closed(Counts{JournalExported: 2, TransferImported: 1, ExpensesPending: 3, ZReportsPending: 1}))
+	if j := stepOf(t, r.Steps, StepJournals); j.Status != StatusTodo || j.Count != 3 || actionOf(j) != ActionOpenExpenses || *r.NextStep != StepJournals {
+		t.Fatalf("expenses pending: %+v", j)
+	}
+	fill(&r, closed(Counts{ZReportsPending: 2}))
+	if j := stepOf(t, r.Steps, StepJournals); j.Status != StatusTodo || j.Count != 2 || actionOf(j) != ActionOpenZReports {
+		t.Fatalf("z reports pending: %+v", j)
+	}
 	fill(&r, Counts{BankTotal: 8, JournalApproved: 2})
 	if tr := stepOf(t, r.Steps, StepTransfer); actionOf(tr) != ActionExportTransfer || *r.NextStep != StepTransfer {
 		t.Fatalf("transfer: %+v", tr)
 	}
 	// A queued transfer waits; a failed one blocks.
-	fill(&r, Counts{BankTotal: 8, JournalExported: 2, TransferOpen: 1, ReportSent: 1})
+	fill(&r, closed(Counts{BankTotal: 8, JournalExported: 2, TransferOpen: 1, ReportSent: 1}))
 	if tr := stepOf(t, r.Steps, StepTransfer); tr.Status != StatusWaiting || r.NextStep != nil {
 		t.Fatalf("waiting: %+v next=%v", tr, r.NextStep)
 	}
-	fill(&r, Counts{BankTotal: 8, JournalExported: 2, TransferFailed: 1, ReportSent: 1})
+	fill(&r, closed(Counts{BankTotal: 8, JournalExported: 2, TransferFailed: 1, ReportSent: 1}))
 	if tr := stepOf(t, r.Steps, StepTransfer); tr.Status != StatusBlocked || *r.NextStep != StepTransfer {
 		t.Fatalf("blocked: %+v", tr)
+	}
+	// Only downloaded: not transferred until marked uploaded (#780).
+	fill(&r, closed(Counts{BankTotal: 8, JournalExported: 2, TransferDownloaded: 1, ReportSent: 1}))
+	if tr := stepOf(t, r.Steps, StepTransfer); tr.Status != StatusTodo || tr.Count != 1 || actionOf(tr) != ActionOpenExport || *r.NextStep != StepTransfer {
+		t.Fatalf("downloaded: %+v", tr)
 	}
 	// The report waits while an earlier step is open, even once sent.
 	fill(&r, Counts{BankTotal: 8, JournalDraft: 2, ReportSent: 1})
 	if rp := stepOf(t, r.Steps, StepReport); rp.Status != StatusWaiting || rp.Action != nil || *r.NextStep != StepJournals {
 		t.Fatalf("report before journals: %+v", rp)
 	}
+	// Luca'dan alındı: payroll first (only when expected), then the mizan,
+	// then the comparison's differences.
+	fill(&r, Counts{PayrollExpected: true, VATNotices: 1})
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Status != StatusTodo || l.Count != 2 || actionOf(l) != ActionOpenPayroll || *r.NextStep != StepLucaImport {
+		t.Fatalf("payroll missing: %+v", l)
+	}
+	fill(&r, Counts{PayrollExpected: true, PayrollImported: true, VATNotices: 1})
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Count != 1 || actionOf(l) != ActionOpenTrialBalance {
+		t.Fatalf("mizan missing: %+v", l)
+	}
+	fill(&r, closed(Counts{Reconciled: true, ReconciliationIssues: 4, ReportSent: 1}))
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Status != StatusBlocked || l.Count != 4 || actionOf(l) != ActionOpenReconciliation {
+		t.Fatalf("differences: %+v", l)
+	}
+	fill(&r, closed(Counts{Reconciled: true, ReportSent: 1}))
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Status != StatusDone {
+		t.Fatalf("reconciled: %+v", l)
+	}
+	if v := stepOf(t, r.Steps, StepVAT); v.Status != StatusDone || v.Count != 1 {
+		t.Fatalf("vat done: %+v", v)
+	}
 	// Closed: everything done.
-	fill(&r, Counts{BankTotal: 8, JournalExported: 2, TransferImported: 1, ReportSent: 1})
-	if r.NextStep != nil || r.DoneSteps != r.ActiveSteps || r.ActiveSteps != 6 {
+	fill(&r, closed(Counts{BankTotal: 8, JournalExported: 2, TransferImported: 1, ReportSent: 1}))
+	if r.NextStep != nil || r.DoneSteps != r.ActiveSteps || r.ActiveSteps != 8 {
 		t.Fatalf("closed: %+v", r)
+	}
+}
+
+func TestSummarize(t *testing.T) {
+	rows := make([]Row, 4)
+	fill(&rows[0], Counts{DocsOpen: 1})
+	fill(&rows[1], Counts{})
+	fill(&rows[2], Counts{TrialBalanceImported: true, VATNotices: 1, ReportPending: 1})
+	fill(&rows[3], Counts{TrialBalanceImported: true, VATNotices: 1, ReportSent: 1})
+	s := Summarize(rows)
+	by := map[string]int64{}
+	for _, c := range s.Steps {
+		by[c.Key] = c.Count
+	}
+	if len(s.Steps) != len(StepKeys) || by[StepDocuments] != 1 || by[StepLucaImport] != 1 || s.Waiting != 1 || s.Closed != 1 || s.Scanned != 4 {
+		t.Fatalf("summary: %+v", s)
+	}
+	if !ValidStep(StepVAT) || ValidStep("bogus") {
+		t.Fatal("ValidStep")
 	}
 }
 

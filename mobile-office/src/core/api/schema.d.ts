@@ -6328,12 +6328,23 @@ export interface paths {
          *     chain: `documents` (open document requests) → `bank` (movements
          *     to propose / approve) → `review` (pending suggestions, bank ones
          *     excluded) → `journals` (approved movements to draft, drafts to
-         *     approve) → `transfer` (approved entries to Luca / Zirve) →
-         *     `report` (monthly report email). A step is `done`, `todo`,
-         *     `waiting` (queued, outcome not back), `blocked` (failed) or `na`
-         *     (nothing of that kind in the period); `action` is the catalog
-         *     action that runs it now. `next_step` is the first `todo` /
-         *     `blocked` step.
+         *     approve, then pending masraf / Z raporu approvals, #780) →
+         *     `transfer` (approved entries to Luca / Zirve; an export that was
+         *     only downloaded is `todo` until marked uploaded, #780) →
+         *     `luca_import` (the period's Luca payroll export, when the taxpayer
+         *     has employees or payroll history, and the Luca mizan were
+         *     uploaded; `blocked` while the latest trial balance comparison
+         *     shows differences, #780) → `vat` (the period's VAT notice was sent
+         *     to the taxpayer, #780) → `report` (monthly report email). A step
+         *     is `done`, `todo`, `waiting` (queued, outcome not back), `blocked`
+         *     (failed) or `na` (nothing of that kind in the period); `action` is
+         *     the catalog action that runs it now. `next_step` is the first
+         *     `todo` / `blocked` step.
+         *
+         *     `summary=true` adds the office counters (engagements by next step)
+         *     and `step` keeps only the engagements whose next step is that one;
+         *     both read the chains of at most 2000 engagements (`summary.truncated`
+         *     says when there are more).
          */
         get: operations["getCopilotWorkflow"];
         put?: never;
@@ -7928,7 +7939,10 @@ export interface paths {
          *     an export whose entries were all reversed cannot be sent
          *     (`422 TRANSFER_REVERSED`). An export has at most one open or
          *     imported transfer (`409 TRANSFER_EXISTS`). No Luca / Zirve
-         *     credential is needed or stored.
+         *     credential is needed or stored. `method: manual` (#780) records
+         *     that the downloaded files were uploaded to the program by hand
+         *     ("Luca'ya yükledim"): the transfer is created `imported` with who
+         *     and when, for offices without the desktop agent.
          */
         post: operations["createJournalTransfer"];
         delete?: never;
@@ -16846,13 +16860,16 @@ export interface components {
          * @description Catalog action (#392). Write actions (plan steps, need approval):
          *     `bank_suggest`, `bank_approve`, `bank_drafts`, `journals_approve`,
          *     `export_transfer`, `report_send`. Screens: `open_documents`,
-         *     `open_review`, `open_journals`.
+         *     `open_review`, `open_journals`, and for the month-end close (#780)
+         *     `open_expenses`, `open_z_reports`, `open_export`, `open_payroll`,
+         *     `open_trial_balance`, `open_reconciliation`, `open_vat`.
          * @enum {string}
          */
-        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals";
+        CopilotAction: "bank_suggest" | "bank_approve" | "bank_drafts" | "journals_approve" | "export_transfer" | "report_send" | "open_documents" | "open_review" | "open_journals" | "open_expenses" | "open_z_reports" | "open_export" | "open_payroll" | "open_trial_balance" | "open_reconciliation" | "open_vat";
+        /** @enum {string} */
+        CopilotStepKey: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report";
         CopilotStep: {
-            /** @enum {string} */
-            key: "documents" | "bank" | "review" | "journals" | "transfer" | "report";
+            key: components["schemas"]["CopilotStepKey"];
             /** @enum {string} */
             status: "done" | "todo" | "waiting" | "blocked" | "na";
             /** Format: int64 */
@@ -16869,7 +16886,7 @@ export interface components {
             period: string;
             steps: components["schemas"]["CopilotStep"][];
             /** @enum {string|null} */
-            next_step: "documents" | "bank" | "review" | "journals" | "transfer" | "report" | null;
+            next_step: "documents" | "bank" | "review" | "journals" | "transfer" | "luca_import" | "vat" | "report" | null;
             done_steps: number;
             active_steps: number;
         };
@@ -16880,6 +16897,22 @@ export interface components {
             total: number;
             limit: number;
             offset: number;
+            summary?: components["schemas"]["CopilotWorkflowSummary"];
+        };
+        /** @description Office counters (#780): engagements by next step; waiting: only outcomes pending; closed: every step done. */
+        CopilotWorkflowSummary: {
+            steps: {
+                key: components["schemas"]["CopilotStepKey"];
+                /** Format: int64 */
+                count: number;
+            }[];
+            /** Format: int64 */
+            waiting: number;
+            /** Format: int64 */
+            closed: number;
+            /** Format: int64 */
+            scanned: number;
+            truncated: boolean;
         };
         CopilotPlanStep: {
             index: number;
@@ -20579,10 +20612,11 @@ export interface components {
         JournalTransferStatus: "queued" | "claimed" | "delivered" | "imported" | "failed" | "cancelled";
         JournalTransferInput: {
             /**
+             * @description manual: the downloaded files were uploaded to the program by hand (Luca'ya yükledim, #780); the transfer is imported at once.
              * @default agent_folder
              * @enum {string}
              */
-            method: "agent_folder";
+            method: "agent_folder" | "manual";
         };
         JournalTransferClaimInput: {
             /** Format: uuid */
@@ -20621,8 +20655,10 @@ export interface components {
             /** @example luca */
             driver: string;
             /** @enum {string} */
-            method: "agent_folder";
+            method: "agent_folder" | "manual";
             status: components["schemas"]["JournalTransferStatus"];
+            /** @description Who closed the transfer or marked the manual upload */
+            completed_by_name?: string;
             agent?: {
                 /** Format: uuid */
                 uuid: string;
@@ -20690,6 +20726,9 @@ export interface components {
             period?: string;
             driver: string;
             status: components["schemas"]["JournalTransferStatus"];
+            /** @enum {string} */
+            method?: "agent_folder" | "manual";
+            completed_by_name?: string;
             error_message?: string;
             /** Format: date-time */
             completed_at?: string;
@@ -34063,6 +34102,10 @@ export interface operations {
                 period?: string;
                 /** @description Title contains or tax id equals */
                 q?: string;
+                /** @description Only the engagements whose next step is this one (#780) */
+                step?: components["schemas"]["CopilotStepKey"];
+                /** @description Add the office counters by next step (#780) */
+                summary?: boolean;
                 limit?: number;
                 offset?: number;
             };
