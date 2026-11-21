@@ -60,12 +60,12 @@ func seedCurrentSales(ctx context.Context, pool *pgxpool.Pool, tpID int64, now t
 					direction, type, issue_date, period, currency, line_extension_amount, tax_exclusive_amount,
 					tax_amount, tax_inclusive_amount, payable_amount, tax_summary_source, customer_name,
 					customer_tax_number)
-				VALUES ($1, $2, $3, 'api', $4, $5, $6, $7, $8, 'TRY', $9, $9, $10, $9 + $10, $9 + $10,
-					'source_summary', $11, $12)
+				VALUES ($1, $2, $3, 'api', $4, $5, $6, $7::date, $8, 'TRY', $9::numeric, $9::numeric, $10::numeric,
+					$11::numeric, $11::numeric, 'source_summary', $12, $13)
 				ON CONFLICT (taxpayer_id, source_system, source_id) DO NOTHING
 				RETURNING id`,
 				tpID, salesDemoSource, fmt.Sprintf("%s-%02d", period, i+1), number, inv.direction, "SATIS",
-				date, period, inv.base, vat, inv.name, inv.vkn).Scan(&id)
+				date, period, inv.base, vat, inv.base+vat, inv.name, inv.vkn).Scan(&id)
 			if errors.Is(err, pgx.ErrNoRows) {
 				continue // already seeded this month
 			}
@@ -74,7 +74,7 @@ func seedCurrentSales(ctx context.Context, pool *pgxpool.Pool, tpID int64, now t
 			}
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO invoice_tax_summaries (taxpayer_id, invoice_id, tax_rate, base, vat)
-				VALUES ($1, $2, $3, $4, $5)`, tpID, id, inv.rate, inv.base, vat); err != nil {
+				VALUES ($1, $2, $3::numeric, $4::numeric, $5::numeric)`, tpID, id, inv.rate, inv.base, vat); err != nil {
 				return fmt.Errorf("invoice %d summary: %w", i+1, err)
 			}
 		}
