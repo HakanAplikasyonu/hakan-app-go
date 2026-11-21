@@ -32,6 +32,7 @@ import { useLedgerType } from "./ledger-type";
 import { downloadFile } from "../services/download";
 import { useUrlOfficePeriod } from "../period";
 import { BankAliasPanel } from "./bank-alias-panel";
+import { BankLedgerDifferencePanel } from "./bank-ledger-difference";
 import { BankPostingPanel } from "./bank-posting-panel";
 import { BankStatementUpload } from "./bank-statement-upload";
 import { LucaBankExportPanel } from "./luca-bank-export-panel";
@@ -43,8 +44,15 @@ type BankRow = components["schemas"]["BankTransaction"];
 type MatchFilter = "all" | "unmatched" | "suggested" | "matched";
 // #383: hareketler, hareket → mizan hesabı eşleştirme, karşı taraf takma adları.
 // #465: Luca banka ekstresi CSV'si ve eşleme rehberi.
-type BankView = "movements" | "posting" | "aliases" | "luca";
-const VIEWS: BankView[] = ["movements", "posting", "aliases", "luca"];
+// #780 C: ekstre bakiyesi ile 102 bakiyesi farkı ve nedenleri.
+type BankView = "movements" | "posting" | "difference" | "aliases" | "luca";
+const VIEWS: BankView[] = [
+  "movements",
+  "posting",
+  "difference",
+  "aliases",
+  "luca",
+];
 const MATCH_FILTERS: MatchFilter[] = [
   "all",
   "unmatched",
@@ -366,6 +374,11 @@ function EngagementBankInner({ engagement }: { engagement: string }) {
           </p>
         ) : view === "posting" ? (
           <BankPostingPanel engagement={engagement} period={period} />
+        ) : view === "difference" ? (
+          <BankLedgerDifferencePanel
+            engagement={engagement}
+            period={period ?? ""}
+          />
         ) : view === "luca" ? (
           <LucaBankExportPanel engagement={engagement} period={period} />
         ) : (

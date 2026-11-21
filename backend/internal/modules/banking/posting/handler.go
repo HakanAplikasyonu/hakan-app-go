@@ -66,6 +66,11 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	l := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-ledger-accounts"
 	mux.Handle("GET "+l, middleware.Chain(http.HandlerFunc(h.ledgerAccounts), authn, org, read, eng))
 	mux.Handle("PUT "+l+"/{cashBoxUuid}", middleware.Chain(http.HandlerFunc(h.setLedgerAccount), authn, org, write, eng))
+	// Banka bakiyesi ile 102 bakiyesi farkı ve nedenleri (#780 C).
+	d := "/v1/tenant/engagements/{" + engagementctx.PathParam + "}/bank-ledger-difference"
+	mux.Handle("GET "+d, middleware.Chain(http.HandlerFunc(h.difference), authn, org, read, eng))
+	mux.Handle("POST "+d+"/resolutions", middleware.Chain(http.HandlerFunc(h.resolve), authn, org, write, journals, eng))
+	mux.Handle("DELETE "+d+"/resolutions/{resolutionUuid}", middleware.Chain(http.HandlerFunc(h.unexplain), authn, org, write, eng))
 }
 
 func subjectOf(r *http.Request) Subject {
@@ -96,6 +101,8 @@ func writeErr(w http.ResponseWriter, r *http.Request, err error, what string) {
 		response.NotFound(w, r, what+" not found")
 	case errors.Is(err, ErrNoPosting):
 		response.Error(w, r, http.StatusConflict, "BANK_POSTING_MISSING", "pick the movement's account first")
+	case errors.Is(err, ErrAlreadyExplained):
+		response.Error(w, r, http.StatusConflict, "ALREADY_EXPLAINED", "the reason is already marked explained")
 	case errors.Is(err, ledger.ErrNotBalanceSheet):
 		response.Conflict(w, r, "LEDGER_NOT_BALANCE_SHEET", "the taxpayer keeps an income/expense book; bank movements get no account postings")
 	case errors.Is(err, ErrDrafted):
@@ -354,6 +361,51 @@ func (h *Handler) setLedgerAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.flow.SetLedgerAccount(r.Context(), subjectOf(r), userOf(r), id, in.AccountCode); err != nil {
 		writeErr(w, r, err, "cash box")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// difference: GET .../bank-ledger-difference?period=YYYY-MM (#780 C).
+func (h *Handler) difference(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	if !periodRe.MatchString(period) {
+		response.BadRequest(w, r, "INVALID_PERIOD", "period must be YYYY-MM")
+		return
+	}
+	rep, err := h.flow.Difference(r.Context(), subjectOf(r), period)
+	if err != nil {
+		writeErr(w, r, err, "bank ledger difference")
+		return
+	}
+	response.JSON(w, r, http.StatusOK, rep)
+}
+
+// resolve: POST .../bank-ledger-difference/resolutions marks a reason
+// explained or books its correction draft.
+func (h *Handler) resolve(w http.ResponseWriter, r *http.Request) {
+	var in ResolutionInput
+	if !decode(w, r, &in) {
+		return
+	}
+	res, err := h.flow.Resolve(r.Context(), engagementctx.Must(r.Context()), userOf(r), in)
+	if err != nil {
+		writeErr(w, r, err, "cash box")
+		return
+	}
+	response.JSON(w, r, http.StatusCreated, res)
+}
+
+// unexplain: DELETE .../bank-ledger-difference/resolutions/{uuid} takes an
+// "explained" mark back.
+func (h *Handler) unexplain(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("resolutionUuid"))
+	if err != nil {
+		response.NotFound(w, r, "resolution not found")
+		return
+	}
+	if err := h.flow.Unexplain(r.Context(), subjectOf(r), id); err != nil {
+		writeErr(w, r, err, "resolution")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
