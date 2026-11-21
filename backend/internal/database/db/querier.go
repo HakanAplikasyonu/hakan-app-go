@@ -43,6 +43,8 @@ type Querier interface {
 	AddJournalDraftManualLink(ctx context.Context, arg AddJournalDraftManualLinkParams) (int64, error)
 	AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error)
 	AddRolePermissionsBySlug(ctx context.Context, arg AddRolePermissionsBySlugParams) error
+	// Elle bağlanan ödeme primi öder (#565).
+	AddSgkPremiumPaid(ctx context.Context, arg AddSgkPremiumPaidParams) error
 	AddTaxpayerMember(ctx context.Context, arg AddTaxpayerMemberParams) error
 	// The row stays (foreign keys, audit trail); every personal field is replaced
 	// and the account can never sign in again.
@@ -252,6 +254,8 @@ type Querier interface {
 	DeleteBankCounterpartyAlias(ctx context.Context, arg DeleteBankCounterpartyAliasParams) (int64, error)
 	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
+	// Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
+	// geri alınır (#565): prim yeniden açık borç olur.
 	DeleteBankTransactionMatches(ctx context.Context, arg DeleteBankTransactionMatchesParams) error
 	// Yükleme geri alma (21 §2): yalnızca o yüklemenin kaynak satırları silinir.
 	DeleteBankTransactionSourcesByImport(ctx context.Context, arg DeleteBankTransactionSourcesByImportParams) ([]int64, error)
@@ -795,6 +799,9 @@ type Querier interface {
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
+	ListBankTransactionFinancialMatches(ctx context.Context, arg ListBankTransactionFinancialMatchesParams) ([]ListBankTransactionFinancialMatchesRow, error)
+	// Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+	ListBankTransactionFxMatches(ctx context.Context, arg ListBankTransactionFxMatchesParams) ([]ListBankTransactionFxMatchesRow, error)
 	ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error)
 	// Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
 	// kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
@@ -803,6 +810,7 @@ type Querier interface {
 	ListBankTransactionMatches(ctx context.Context, arg ListBankTransactionMatchesParams) ([]BankTransactionMatch, error)
 	// Hareketin bağlandığı bordrolar (net maaş ödemesi, #710).
 	ListBankTransactionPayrollMatches(ctx context.Context, arg ListBankTransactionPayrollMatchesParams) ([]ListBankTransactionPayrollMatchesRow, error)
+	ListBankTransactionSgkMatches(ctx context.Context, arg ListBankTransactionSgkMatchesParams) ([]ListBankTransactionSgkMatchesRow, error)
 	ListBankTransactionSources(ctx context.Context, arg ListBankTransactionSourcesParams) ([]BankTransactionSource, error)
 	// Dönem kontrolleri (21 §6.3) için dönemin bütün geçerli hareketleri.
 	// booked_by_hand (#565): müşavir hareketi bu angajmanda kendi kararıyla bir
@@ -874,6 +882,9 @@ type Querier interface {
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	// Cari hafızası (#319): incelemede kararlaştırılmış cari hesaplar.
 	ListEngagementCounterpartyAccounts(ctx context.Context, arg ListEngagementCounterpartyAccountsParams) ([]ListEngagementCounterpartyAccountsRow, error)
+	// Fişe bağlanabilecek cari kartları (#710): mükellefin müşteri ve
+	// tedarikçileri, unvana göre; q unvanda aranır (VKN ile arama yok).
+	ListEngagementCustomers(ctx context.Context, arg ListEngagementCustomersParams) ([]ListEngagementCustomersRow, error)
 	// Ofis panelinde mükellefin masrafları; kategori ve hesap ofis tarafından.
 	ListEngagementExpenses(ctx context.Context, arg ListEngagementExpensesParams) ([]ListEngagementExpensesRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait
@@ -916,6 +927,10 @@ type Querier interface {
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
+	// Elle bağlanabilecek kaynak finansal işlemleri (#565): çek, senet, kredi
+	// kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
+	// 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
+	ListFinancialTransactionsForBankMatch(ctx context.Context, arg ListFinancialTransactionsForBankMatchParams) ([]ListFinancialTransactionsForBankMatchRow, error)
 	// Luca hesap planı ve cari alt hesap çıktısı (#464).
 	ListGeneratedSubaccounts(ctx context.Context, arg ListGeneratedSubaccountsParams) ([]GeneratedSubaccount, error)
 	ListHistorySharesForEngagement(ctx context.Context, arg ListHistorySharesForEngagementParams) ([]ListHistorySharesForEngagementRow, error)
@@ -1078,6 +1093,9 @@ type Querier interface {
 	ListScopedInbox(ctx context.Context, arg ListScopedInboxParams) ([]Notification, error)
 	ListSecretRecordsNotOnKEK(ctx context.Context, arg ListSecretRecordsNotOnKEKParams) ([]ListSecretRecordsNotOnKEKRow, error)
 	ListSgkPremiums(ctx context.Context, arg ListSgkPremiumsParams) ([]ListSgkPremiumsRow, error)
+	// Elle bağlanabilecek SGK primleri (#565): dönem aralığında; ödenen tutar
+	// bu hareketin payı hariç (yeniden bağlama).
+	ListSgkPremiumsForBankMatch(ctx context.Context, arg ListSgkPremiumsForBankMatchParams) ([]ListSgkPremiumsForBankMatchRow, error)
 	ListSharedKeys(ctx context.Context, keys []string) ([]string, error)
 	ListSkippedExcelImportRows(ctx context.Context, arg ListSkippedExcelImportRowsParams) ([]int32, error)
 	ListSourceConnections(ctx context.Context, taxpayerID int64) ([]SourceConnection, error)
@@ -1430,12 +1448,15 @@ type Querier interface {
 	SearchJournalLinesForBankMatch(ctx context.Context, arg SearchJournalLinesForBankMatchParams) ([]SearchJournalLinesForBankMatchRow, error)
 	SetAppSettingsLogo(ctx context.Context, logoObjectKey pgtype.Text) (AppSetting, error)
 	SetAttachmentOwner(ctx context.Context, arg SetAttachmentOwnerParams) (int64, error)
+	// POS komisyonu (#565): yalnız fişe girmemiş harekette; boş değer siler.
+	SetBankPostingCommission(ctx context.Context, arg SetBankPostingCommissionParams) (int64, error)
 	SetBankPostingSuggestion(ctx context.Context, arg SetBankPostingSuggestionParams) error
 	SetBankPostingsDraft(ctx context.Context, arg SetBankPostingsDraftParams) error
 	SetBankTransactionClassification(ctx context.Context, arg SetBankTransactionClassificationParams) error
 	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
 	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
 	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
+	SetBankTransactionMatchFx(ctx context.Context, arg SetBankTransactionMatchFxParams) error
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error

@@ -61,6 +61,9 @@ type TransactionSummary struct {
 	Unmatched int64  `json:"unmatched"`
 	Suggested int64  `json:"suggested"`
 	Matched   int64  `json:"matched"`
+	// UnmatchedBooked: unmatched movements whose counter account is
+	// approved (tax, SGK, salary, fees …): done, not waiting (#710).
+	UnmatchedBooked int64 `json:"unmatched_booked"`
 }
 
 func decimalString(n pgtype.Numeric) string {
@@ -154,7 +157,7 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sum, err := h.q.SummarizeBankTransactions(r.Context(), db.SummarizeBankTransactionsParams{
-		TaxpayerID: scope.TaxpayerID, Period: period, CashBoxUuid: box,
+		OrganizationID: scope.OrganizationID, EngagementID: scope.ID, TaxpayerID: scope.TaxpayerID, Period: period, CashBoxUuid: box,
 	})
 	if err != nil {
 		response.InternalErr(w, r, err, "could not summarize bank transactions")
@@ -210,7 +213,7 @@ func (h *Handler) listTransactions(w http.ResponseWriter, r *http.Request) {
 		"items": items, "limit": limit, "offset": offset,
 		"summary": TransactionSummary{
 			Total: sum.Total, InTotal: decimalString(sum.InTotal), OutTotal: decimalString(sum.OutTotal),
-			Unmatched: sum.Unmatched, Suggested: sum.Suggested, Matched: sum.Matched,
+			Unmatched: sum.Unmatched, Suggested: sum.Suggested, Matched: sum.Matched, UnmatchedBooked: sum.UnmatchedBooked,
 		},
 	})
 }

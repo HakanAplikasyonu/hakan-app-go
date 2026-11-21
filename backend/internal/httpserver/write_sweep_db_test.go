@@ -208,7 +208,8 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":              {body: `{"invoice_uuids":["00000000-0000-0000-0000-000000000001"]}`},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/matches":           {},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account":              {body: `{"account_code":"120.01.001"}`},
-	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": {body: `{"excluded":true}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion":            {body: `{"excluded":true}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate":              {body: `{"rate":"35.00"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections":                                   {body: `{"email":"muhasebe@atlas.example.test","password":"` + testfakes.EasytradePassword + `","company_id":"` + testfakes.EasytradeCompanyID + `"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}/sync":             {body: sweepRange},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/easytrade-connections/{connectionUuid}":                 {body: `{"sync_interval_minutes":60}`},
@@ -236,6 +237,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-postings/approve":                                   {body: `{"transaction_uuids":["00000000-0000-0000-0000-000000000001"]}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-postings/drafts":                                    {body: `{"period":"2026-10"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}":                          {body: `{"account_code":"120.01.001"}`},
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission":               {body: `{"amount":"12.50","account_code":"653"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts/{cashBoxUuid}":                       {body: `{"account_code":"102.01"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/cash-boxes":                                              {body: `{"type":"cash","name":"Tarama kasası"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/employees":                                       {body: `{"full_name":"Tarama Personel","job_title":"Muhasebe"}`},
@@ -318,6 +320,10 @@ var tenantWrites = map[string]sweepCase{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              {late: true},
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    {},
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": {late: true},
+
+	// Fişe elle bağlanan cari kartı (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    {},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": {late: true},
 }
 
 type sweepEnv struct {
@@ -691,6 +697,7 @@ var paramQueries = map[string]string{
 	"counterpartyUuid":    `SELECT uuid::text FROM counterparty_reconciliations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 AND result <> 'matched' ORDER BY id DESC LIMIT 1`,
 	"declarationUuid":     `SELECT uuid::text FROM babs_declarations WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
 	"letterUuid":          `SELECT uuid::text FROM reconciliation_letters WHERE organization_id = $1 AND engagement_id = $2 AND $3 > 0 ORDER BY id DESC LIMIT 1`,
+	"customerUuid":        `SELECT uuid::text FROM customers WHERE taxpayer_id = $3 AND type <> 'employee' AND $1 > 0 AND $2 > 0 ORDER BY id DESC LIMIT 1`,
 }
 
 // uuidQueries fill {uuid} by the operation's path.

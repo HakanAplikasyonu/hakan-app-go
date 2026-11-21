@@ -58,7 +58,7 @@ func seedEasytrade(ctx context.Context, pool *pgxpool.Pool, taxpayerID int64) er
 		// answered 500) retried five minutes later, then a quiet run.
 		first := easytrade.Counters{Report: rep, WindowsDone: 8}
 		partial := easytrade.Counters{Report: sources.Report{InvoicesExisting: 0, Excluded: sources.Excluded{}}, WindowsDone: 6, WindowsFailed: 2}
-		quiet := easytrade.Counters{Report: sources.Report{ExpensesUnchanged: 3, FinancialUnchanged: 8, ZReportsUnchanged: 5, Excluded: sources.Excluded{}}, WindowsDone: 8}
+		quiet := easytrade.Counters{Report: sources.Report{ExpensesUnchanged: 3, FinancialUnchanged: 10, ZReportsUnchanged: 5, Excluded: sources.Excluded{}}, WindowsDone: 8}
 		for _, r := range []struct {
 			kind, status string
 			c            easytrade.Counters

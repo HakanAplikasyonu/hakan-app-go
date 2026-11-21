@@ -308,7 +308,8 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-connections/{connectionUuid}/sync":                       azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-matching":                                                azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/account":                   azTenantWrite,
-	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion": azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/exclusion":                 azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate":                   azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/invoice-search":            azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/journal-line-search":       azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/history":                   azTenantRead,
@@ -334,6 +335,7 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-postings/approve":                                        azTenantWrite,
 	"POST /v1/tenant/engagements/{engagementUuid}/bank-postings/drafts":                                         azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}":                               azTenantWrite,
+	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission":                    azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts":                                          azTenantRead,
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts/{cashBoxUuid}":                            azTenantWrite,
 	"GET /v1/tenant/engagements/{engagementUuid}/cash-boxes":                                                    azTenantRead,
@@ -543,7 +545,7 @@ var authzTable = map[string]authzClass{
 	"PUT /v1/tenant/review/settings":                                                                            azTenantWrite,
 	"DELETE /v1/tenant/review/settings/{kind}":                                                                  azTenantWrite,
 	"GET /v1/tenant/review/suggestions":                                                                         azTenantRead,
-	"GET /v1/tenant/review/taxpayers": azTenantRead,
+	"GET /v1/tenant/review/taxpayers":                                                                           azTenantRead,
 	"GET /v1/tenant/role-permissions":                                                                           azTenantRead,
 	"GET /v1/tenant/roles":                                                                                      azTenantRead,
 	"POST /v1/tenant/roles":                                                                                     azTenantWrite,
@@ -620,4 +622,9 @@ var authzTable = map[string]authzClass{
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/invoices/{invoiceUuid}":              azTenantWrite,
 	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}":    azTenantWrite,
 	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/bank-transactions/{transactionUuid}": azTenantWrite,
+
+	// Fişe elle bağlanan cari kartı ve adayları (#710).
+	"PUT /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}":    azTenantWrite,
+	"DELETE /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": azTenantWrite,
+	"GET /v1/tenant/engagements/{engagementUuid}/link-candidates/customers":                                    azTenantRead,
 }

@@ -450,26 +450,31 @@ type BankTransactionMatch struct {
 	Evidence          []byte             `json:"evidence"`
 	MatchedBy         pgtype.Int8        `json:"matched_by"`
 	MatchedAt         pgtype.Timestamptz `json:"matched_at"`
+	FxRateInvoice     pgtype.Numeric     `json:"fx_rate_invoice"`
+	FxRatePayment     pgtype.Numeric     `json:"fx_rate_payment"`
+	FxDiffTry         pgtype.Numeric     `json:"fx_diff_try"`
 }
 
 type BankTransactionPosting struct {
-	ID                int64              `json:"id"`
-	OrganizationID    int64              `json:"organization_id"`
-	EngagementID      int64              `json:"engagement_id"`
-	TaxpayerID        int64              `json:"taxpayer_id"`
-	BankTransactionID int64              `json:"bank_transaction_id"`
-	AccountCode       string             `json:"account_code"`
-	AccountName       string             `json:"account_name"`
-	Status            string             `json:"status"`
-	Confidence        pgtype.Numeric     `json:"confidence"`
-	Source            string             `json:"source"`
-	Reason            string             `json:"reason"`
-	SuggestionID      pgtype.Int8        `json:"suggestion_id"`
-	JournalDraftUuid  pgtype.UUID        `json:"journal_draft_uuid"`
-	ApprovedBy        pgtype.Int8        `json:"approved_by"`
-	ApprovedAt        pgtype.Timestamptz `json:"approved_at"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ID                    int64              `json:"id"`
+	OrganizationID        int64              `json:"organization_id"`
+	EngagementID          int64              `json:"engagement_id"`
+	TaxpayerID            int64              `json:"taxpayer_id"`
+	BankTransactionID     int64              `json:"bank_transaction_id"`
+	AccountCode           string             `json:"account_code"`
+	AccountName           string             `json:"account_name"`
+	Status                string             `json:"status"`
+	Confidence            pgtype.Numeric     `json:"confidence"`
+	Source                string             `json:"source"`
+	Reason                string             `json:"reason"`
+	SuggestionID          pgtype.Int8        `json:"suggestion_id"`
+	JournalDraftUuid      pgtype.UUID        `json:"journal_draft_uuid"`
+	ApprovedBy            pgtype.Int8        `json:"approved_by"`
+	ApprovedAt            pgtype.Timestamptz `json:"approved_at"`
+	CreatedAt             pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `json:"updated_at"`
+	CommissionAmount      pgtype.Numeric     `json:"commission_amount"`
+	CommissionAccountCode pgtype.Text        `json:"commission_account_code"`
 }
 
 type BankTransactionSource struct {

@@ -24,7 +24,7 @@ import { usePeriodMatrix } from "../hooks/use-office-data";
 import { tabState } from "../lib/engagement-nav";
 import { FocusedRecord } from "./related-records";
 import { LockedPeriodNote } from "./locked-period-note";
-import { useOfficePeriod } from "../period";
+import { ALL_PERIODS, periodLabel, useOfficePeriod } from "../period";
 import type { PeriodMatrixRow } from "../services/periods.service";
 
 type Cell = PeriodMatrixRow["cells"][number];
@@ -235,14 +235,22 @@ export function EngagementTabs({ engagement }: { engagement: string }) {
  * Dönem şeridi: son altı dönem, her biri bir taç (veri · onay · aktarım).
  * Bir döneme basınca ofisin global dönemi o olur; seçili dönem vurgulu.
  */
+/**
+ * Dönem şeridi. "Tüm dönemler" seçiliyken hiçbir ay seçili görünmez (#710):
+ * eskiden beyan ayı seçili gibi duruyor, ama sekmeler bütün dönemleri
+ * listeliyordu (şeritte "3 açık uyarı", listede 17). Seçim satırı ne
+ * gösterildiğini söyler ve seçim tek tıkla kaldırılır.
+ */
 function PeriodStrip({
   cells,
-  focus,
+  selected,
   onPick,
+  onAll,
 }: {
   cells: Cell[];
-  focus: string;
+  selected: string | undefined;
   onPick: (period: string) => void;
+  onAll: () => void;
 }) {
   const { t, locale } = useLocale();
   const month = (p: string) =>
@@ -264,11 +272,33 @@ function PeriodStrip({
         <span className="text-text-3 text-xs">
           {t("office.engagement.strip_hint")}
         </span>
+        <span
+          className="text-text-2 ms-auto flex items-center gap-2 text-xs"
+          data-testid="period-strip-scope"
+        >
+          {selected ? (
+            <>
+              {t("office.engagement.strip_scope_one", {
+                period: periodLabel(selected, locale),
+              })}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 max-md:min-h-11"
+                onClick={onAll}
+              >
+                {t("office.engagement.strip_show_all")}
+              </Button>
+            </>
+          ) : (
+            t("office.engagement.strip_scope_all")
+          )}
+        </span>
       </div>
       <ol className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {cells.map((cell) => {
           const { durum, key } = periodCrown(cell);
-          const on = cell.period === focus;
+          const on = cell.period === selected;
           const label = t(`office.engagement.state_${key}`);
           return (
             <li key={cell.period}>
@@ -331,7 +361,7 @@ export function EngagementLayout({
   children: ReactNode;
 }) {
   const { t } = useLocale();
-  const { focus, setPeriod } = useOfficePeriod();
+  const { focus, period: selected, setPeriod } = useOfficePeriod();
   const matrix = usePeriodMatrix(ENGAGEMENT_MONTHS);
   const row = matrix.data?.items.find((r) => r.engagement_uuid === engagement);
   // Matris yeniden eskiye gelir; şerit soldan sağa eskiden yeniye.
@@ -390,14 +420,22 @@ export function EngagementLayout({
           </div>
         </div>
         <EngagementTabs engagement={engagement} />
-        <PeriodStrip cells={cells} focus={period ?? focus} onPick={setPeriod} />
+        <PeriodStrip
+          cells={cells}
+          selected={selected}
+          onPick={setPeriod}
+          onAll={() => setPeriod(ALL_PERIODS)}
+        />
         {period && cells.find((c) => c.period === period)?.locked ? (
           <LockedPeriodNote engagement={engagement} period={period} />
         ) : null}
-        <ChangeRequestsPanel
-          engagement={engagement}
-          open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}
-        />
+        {/* Panel ?talepler=ac'yi arama parametrelerinden okur (#710). */}
+        <Suspense fallback={null}>
+          <ChangeRequestsPanel
+            engagement={engagement}
+            open={cells.reduce((n, c) => n + (c.open_change_requests ?? 0), 0)}
+          />
+        </Suspense>
         {/* Seçili kayıt (?kayit=tür:uuid) ve ilişkili kayıtları (#469). */}
         <Suspense fallback={null}>
           <FocusedRecord engagement={engagement} />

@@ -63,7 +63,14 @@ export function periodsOf(rep: BankStatementReport): string[] {
  * kendiliğinden çalışır; yüksek güvenli öneriler bildirimden tek tıkla
  * onaylanır, ardından taslak fiş oluşturulur.
  */
-export function BankStatementUpload({ engagement }: { engagement: string }) {
+export function BankStatementUpload({
+  engagement,
+  variant = "outline",
+}: {
+  engagement: string;
+  /** Sayfanın birincil eylemiyse "default" (#710: tek birincil eylem). */
+  variant?: "default" | "outline";
+}) {
   const { t } = useLocale();
   const { slug } = useTenant();
   const { can } = usePermission();
@@ -263,7 +270,7 @@ export function BankStatementUpload({ engagement }: { engagement: string }) {
         }}
       />
       <Button
-        variant="outline"
+        variant={variant}
         disabled={busy}
         onClick={() => input.current?.click()}
       >

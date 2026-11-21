@@ -20,6 +20,11 @@ test('greeting by Istanbul hour', () => {
   assert.equal(greeting(new Date('2026-11-16T12:00:00Z')), 'İyi günler'); // 15:00
   assert.equal(greeting(new Date('2026-11-16T18:00:00Z')), 'İyi akşamlar'); // 21:00
   assert.equal(greeting(new Date('2026-11-16T00:00:00Z')), 'İyi geceler'); // 03:00
+  assert.equal(greeting(new Date('2026-11-16T01:30:00Z')), 'İyi geceler'); // 04:30
+  assert.equal(greeting(new Date('2026-11-16T02:00:00Z')), 'Günaydın'); // 05:00
+  assert.equal(greeting(new Date('2026-11-16T15:00:00Z')), 'İyi akşamlar'); // 18:00
+  assert.equal(greeting(new Date('2026-11-16T19:00:00Z')), 'İyi geceler'); // 22:00
+  assert.equal(greeting(new Date('2026-11-16T20:59:00Z')), 'İyi geceler'); // 23:59
 });
 
 test('declaration period and VAT due day', () => {

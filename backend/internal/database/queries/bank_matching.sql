@@ -44,8 +44,21 @@ INSERT INTO bank_transaction_matches (
 ON CONFLICT (taxpayer_id, bank_transaction_id, target_type, target_id) DO NOTHING
 RETURNING *;
 
+-- Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
+-- geri alınır (#565): prim yeniden açık borç olur.
 -- name: DeleteBankTransactionMatches :exec
-DELETE FROM bank_transaction_matches WHERE taxpayer_id = @taxpayer_id AND bank_transaction_id = @bank_transaction_id;
+WITH released AS (
+    UPDATE sgk_premiums s
+    SET paid_amount = GREATEST(s.paid_amount - m.total, 0),
+        paid_at = CASE WHEN s.paid_amount - m.total <= 0 THEN NULL ELSE s.paid_at END,
+        bank_transaction_id = CASE WHEN s.bank_transaction_id = @bank_transaction_id THEN NULL ELSE s.bank_transaction_id END
+    FROM (SELECT x.target_id, sum(x.amount) AS total FROM bank_transaction_matches x
+          WHERE x.taxpayer_id = @taxpayer_id AND x.bank_transaction_id = @bank_transaction_id AND x.target_type = 'sgk_premium'
+          GROUP BY x.target_id) m
+    WHERE s.taxpayer_id = @taxpayer_id AND s.id = m.target_id
+    RETURNING s.id
+)
+DELETE FROM bank_transaction_matches d WHERE d.taxpayer_id = @taxpayer_id AND d.bank_transaction_id = @bank_transaction_id;
 
 -- name: ListBankTransactionMatches :many
 SELECT * FROM bank_transaction_matches
@@ -79,7 +92,8 @@ SELECT * FROM bank_transactions WHERE taxpayer_id = @taxpayer_id AND uuid = @uui
 
 -- name: ListBankTransactionMatchInvoices :many
 SELECT m.amount, m.score, m.method, m.matched_at, m.evidence,
-       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount
+       m.fx_rate_invoice, m.fx_rate_payment, m.fx_diff_try,
+       i.uuid AS invoice_uuid, i.invoice_number, i.issue_date, i.customer_name, i.currency, i.payable_amount, i.exchange_rate
 FROM bank_transaction_matches m
 JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
 WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'invoice'
@@ -220,3 +234,68 @@ SELECT r.id, r.uuid, r.period, r.net_total,
 FROM payroll_runs r
 WHERE r.taxpayer_id = @taxpayer_id AND r.period >= @period_from::text AND r.period <= @period_to::text
 ORDER BY r.period DESC;
+
+-- name: ListBankTransactionFinancialMatches :many
+SELECT m.amount, m.method, f.uuid AS financial_uuid, f.transaction_date, f.due_date, f.payment_method_type,
+       f.amount_try, f.description, f.customer_name, f.reference_document_no, f.source_system
+FROM bank_transaction_matches m
+JOIN source_financial_transactions f ON f.taxpayer_id = m.taxpayer_id AND f.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'financial_transaction'
+ORDER BY f.transaction_date, f.id;
+
+-- Elle bağlanabilecek kaynak finansal işlemleri (#565): çek, senet, kredi
+-- kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
+-- 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
+-- name: ListFinancialTransactionsForBankMatch :many
+SELECT f.id, f.uuid, f.transaction_date, f.due_date, f.payment_method_type, f.amount_try, f.description,
+       f.customer_name, f.reference_document_no, f.source_system,
+       COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = f.taxpayer_id AND m.target_type = 'financial_transaction' AND m.target_id = f.id
+                   AND m.bank_transaction_id <> @bank_transaction_id), 0)::numeric(18,2) AS matched
+FROM source_financial_transactions f
+WHERE f.taxpayer_id = @taxpayer_id AND f.direction = @direction::text
+  AND f.payment_method_type = ANY(@methods::text[])
+  AND COALESCE(f.due_date, f.transaction_date) BETWEEN @date_from::date AND @date_to::date
+ORDER BY abs(f.amount_try - @amount::numeric), f.transaction_date DESC
+LIMIT 20;
+
+-- name: ListBankTransactionSgkMatches :many
+SELECT m.amount, m.method, s.uuid AS sgk_premium_uuid, s.period, s.payable_amount
+FROM bank_transaction_matches m
+JOIN sgk_premiums s ON s.taxpayer_id = m.taxpayer_id AND s.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id AND m.target_type = 'sgk_premium'
+ORDER BY s.period;
+
+-- Elle bağlanabilecek SGK primleri (#565): dönem aralığında; ödenen tutar
+-- bu hareketin payı hariç (yeniden bağlama).
+-- name: ListSgkPremiumsForBankMatch :many
+SELECT s.id, s.uuid, s.period, s.payable_amount, s.due_date,
+       (s.paid_amount - COALESCE((SELECT sum(m.amount) FROM bank_transaction_matches m
+                 WHERE m.taxpayer_id = s.taxpayer_id AND m.target_type = 'sgk_premium' AND m.target_id = s.id
+                   AND m.bank_transaction_id = @bank_transaction_id), 0))::numeric(18,2) AS paid
+FROM sgk_premiums s
+WHERE s.taxpayer_id = @taxpayer_id AND s.payable_amount > 0
+  AND s.period >= @period_from::text AND s.period <= @period_to::text
+ORDER BY s.period DESC;
+
+-- Elle bağlanan ödeme primi öder (#565).
+-- name: AddSgkPremiumPaid :exec
+UPDATE sgk_premiums
+SET paid_amount = paid_amount + @amount::numeric,
+    paid_at = @paid_at::date,
+    bank_transaction_id = @bank_transaction_id::bigint
+WHERE taxpayer_id = @taxpayer_id AND id = @id;
+
+-- Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+-- name: ListBankTransactionFxMatches :many
+SELECT m.id, m.amount, i.exchange_rate
+FROM bank_transaction_matches m
+JOIN invoices i ON i.taxpayer_id = m.taxpayer_id AND i.id = m.target_id
+WHERE m.taxpayer_id = @taxpayer_id AND m.bank_transaction_id = @bank_transaction_id
+  AND m.target_type = 'invoice' AND i.currency <> 'TRY'
+ORDER BY m.id;
+
+-- name: SetBankTransactionMatchFx :exec
+UPDATE bank_transaction_matches
+SET fx_rate_invoice = sqlc.narg(fx_rate_invoice), fx_rate_payment = sqlc.narg(fx_rate_payment), fx_diff_try = sqlc.narg(fx_diff_try)
+WHERE taxpayer_id = @taxpayer_id AND id = @id AND target_type = 'invoice';

@@ -6,9 +6,11 @@ import { addConsentedTaxpayer, Api, DEMO, officePath, uiLogin, uniqueVkn } from 
  * Banka hareketini bordroya elle bağlama (#710): toplu maaş ödemesi hareket
  * panelinde "Bordroya bağla" bölümünde, hareketin ayı ve önceki iki ayın
  * ödenmemiş bordrolarıyla (personel sayısı, açık net) listelenir. Seçilen
- * bordroya bağlanır; bordro bağlantısı bordro sayfasında o dönemi ve
- * personel dökümünü açar; bordro "ödendi" olur. Personel satırına basınca
- * detay açılır: brütten nete, işveren payları, bağlı banka ödemesi. Gelen para (tahsilat)
+ * bordroya bağlanır; panelde personel dökümü (kişi başı net, bordro
+ * toplamı, bağlanan tutar, fark) açılır; bordro bağlantısı bordro
+ * sayfasında o dönemi ve personel dökümünü açar; bordro "ödendi" olur.
+ * Personel satırına basınca detay açılır: brütten nete, işveren payları,
+ * bağlı banka ödemesi. Gelen para (tahsilat)
  * bordroya bağlanamaz.
  *
  * Veri: demo ofisine her koşuda yeni bir mükellef; Ekim 2026 bordrosu (iki
@@ -109,6 +111,16 @@ test("maaş ödemesi bordroya elle bağlanır; bordro bağlantısı dönemi aça
   const linked = panel.getByTestId("bank-transaction-payroll-matches");
   await expect(linked).toContainText("Ekim 2026 bordrosu");
   await expect(linked).toContainText("Elle");
+
+  // Personel dökümü: kişi başı net, bordro toplamı, bu ödeme ve fark.
+  const breakdown = linked.getByTestId("bank-payroll-breakdown");
+  await breakdown.getByRole("button", { name: "Personel dökümü" }).click();
+  for (const p of PEOPLE) {
+    await expect(breakdown.getByRole("row").filter({ hasText: p })).toContainText("25.469,68");
+  }
+  await expect(breakdown.getByRole("row").filter({ hasText: "Bordro net toplamı (2 kişi)" })).toContainText("50.939,36");
+  await expect(breakdown.getByRole("row").filter({ hasText: "Bu ödemeden bağlanan" })).toContainText("50.939,36");
+  await expect(breakdown.getByTestId("bank-payroll-diff")).toContainText("Fark yok");
 
   // Veritabanı: bağlantı ve bordronun ödeme durumu.
   const after = await api.json<Matching>(await api.get(`${tx}/matching`));

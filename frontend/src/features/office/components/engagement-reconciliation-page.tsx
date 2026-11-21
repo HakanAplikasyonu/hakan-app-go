@@ -17,6 +17,7 @@ import {
 import { Suspense, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { ErrorState } from "@/components/common/error-state";
 import { EntityTable, useUrlListState } from "@/components/entity";
 import {
   createActionsColumn,
@@ -51,6 +52,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { permissions } from "@/config/permissions";
+import { routes } from "@/config/routes";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { isApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -198,13 +200,20 @@ function ReconciliationInner({ engagement }: { engagement: string }) {
         <LettersView engagement={engagement} canWrite={canWrite} />
       ) : latest.isLoading ? (
         <Skeleton className="h-64 w-full" />
+      ) : latest.isError ? (
+        // Yükleme hatası "bu dönem karşılaştırma yok" ile karışmasın;
+        // ne olduğu ve tek tık yeniden deneme.
+        <ErrorState
+          title={t("office.api.load_error")}
+          description={latest.error?.message}
+          onRetry={() => void latest.refetch()}
+          retryLabel={t("common.retry")}
+        />
       ) : notRun || !detail ? (
         <div className="border-line bg-surface rounded-xl border p-8 text-center">
           <Scale className="text-text-3 mx-auto size-8" aria-hidden />
           <h2 className="mt-3 font-semibold">
-            {latest.isError && !notRun
-              ? t("office.api.load_error")
-              : t("office.reconciliation.empty_title")}
+            {t("office.reconciliation.empty_title")}
           </h2>
           <p className="text-text-2 mx-auto mt-1 max-w-lg text-sm">
             {t("office.reconciliation.empty", { period: periodText(period) })}
@@ -265,6 +274,65 @@ function ReconciliationExplainer() {
       </dl>
       <p className="text-text-2">{t("office.reconciliation.explain_causes")}</p>
     </section>
+  );
+}
+
+/**
+ * Önerinin tek tık eylemi (#669 UX geçişi): öneri "taslakları onaylayıp
+ * dışa aktarın" ya da "portalda da fişleyin" diyorsa, işin yapıldığı
+ * ekrana götürür. Eylemi olmayan önerilerde bağlantı yok.
+ */
+const SUGGESTION_ACTIONS: Partial<
+  Record<
+    NonNullable<ReconciliationItem["suggestion_code"]>,
+    {
+      labelKey: string;
+      href: (slug: string, engagement: string, period: string) => string;
+    }
+  >
+> = {
+  draft_not_exported: {
+    labelKey: "office.reconciliation.go_drafts",
+    href: (slug, e, period) =>
+      `${routes.tenant.engagementJournals(slug, e)}?period=${encodeURIComponent(period)}`,
+  },
+  unposted_sources: {
+    labelKey: "office.reconciliation.go_unposted",
+    href: (slug, e) => routes.tenant.engagementReview(slug, e),
+  },
+  single_unposted: {
+    labelKey: "office.reconciliation.go_unposted",
+    href: (slug, e) => routes.tenant.engagementReview(slug, e),
+  },
+  opening_balance: {
+    labelKey: "office.reconciliation.go_trial_balance",
+    href: (slug, e) => routes.tenant.engagementTrialBalance(slug, e),
+  },
+};
+
+function SuggestionLink({
+  item,
+  engagement,
+  period,
+}: {
+  item: ReconciliationItem;
+  engagement: string;
+  period: string;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const action = item.suggestion_code
+    ? SUGGESTION_ACTIONS[item.suggestion_code]
+    : undefined;
+  if (!action) return null;
+  return (
+    <Link
+      href={action.href(slug, engagement, period)}
+      className="text-brand-text ms-1 font-medium whitespace-nowrap hover:underline"
+      aria-label={`${t(action.labelKey)}: ${item.main_code} ${item.account_name}`}
+    >
+      {t(action.labelKey)}
+    </Link>
   );
 }
 
@@ -426,6 +494,11 @@ function AccountsView({
                 {t("office.reconciliation.suggested")}
               </StatusPill>
               {x.suggestion}
+              <SuggestionLink
+                item={x}
+                engagement={engagement}
+                period={period}
+              />
             </p>
           ) : (
             <span className="text-text-3">—</span>
@@ -500,7 +573,7 @@ function AccountsView({
         ),
       }),
     ],
-    [t, canWrite, decideItem],
+    [t, canWrite, decideItem, engagement, period],
   );
 
   const unpostedAmount = Object.values(sum.unposted).reduce(

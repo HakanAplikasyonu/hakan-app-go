@@ -7563,6 +7563,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link a cari card to the journal draft by hand (#710)
+         * @description Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+         *     supplier or both) is kept on the draft (origin.manual_links, kind
+         *     `customer`) and shows in the draft's related records with relation
+         *     `manual` (status = card type). Lines, amounts and the export are not
+         *     changed. Linking twice or unlinking a missing link is a no-op.
+         */
+        put: operations["linkJournalDraftCustomer"];
+        post?: never;
+        /**
+         * Unlink a cari card from the journal draft (#710)
+         * @description Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+         *     supplier or both) is kept on the draft (origin.manual_links, kind
+         *     `customer`) and shows in the draft's related records with relation
+         *     `manual` (status = card type). Lines, amounts and the export are not
+         *     changed. Linking twice or unlinking a missing link is a no-op.
+         */
+        delete: operations["unlinkJournalDraftCustomer"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/link-candidates/customers": {
+        parameters: {
+            query?: {
+                /** @description Searched in the name only */
+                q?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Cari cards that can be linked to a journal draft (#710)
+         * @description Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most `limit` (default 200).
+         */
+        get: operations["listJournalLinkCustomerCandidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove": {
         parameters: {
             query?: never;
@@ -9585,6 +9659,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/bank-transactions/{transactionUuid}/fx-rate": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Payment day rate of a foreign currency movement (exchange difference)
+         * @description Requires `tenant.bank.write` (#565). The office enters the payment
+         *     day rate of a foreign currency movement; for each foreign currency
+         *     invoice it closes, the closed amount × (payment rate − invoice rate)
+         *     is stored as the exchange difference (gain 646, loss 656; a payment
+         *     reverses the sign). `null` clears it. 409 `BANK_FX_NOT_APPLICABLE`
+         *     when the movement is in TRY or closes no foreign currency invoice;
+         *     422 `INVOICE_EXCHANGE_RATE_MISSING` when a matched invoice has no
+         *     rate.
+         */
+        put: operations["setTenantBankTransactionFxRate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/easytrade-connections": {
         parameters: {
             query?: never;
@@ -10926,6 +11036,39 @@ export interface paths {
          *     A movement already in a journal draft answers `BANK_POSTING_DRAFTED`.
          */
         put: operations["setTenantBankPostingAccount"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Net a POS collection with the commission the bank kept
+         * @description Requires `tenant.bank.write` (#565). The bank paid in the net; the
+         *     commission is booked to 653 / 780 and the counter account takes the
+         *     gross (net + commission) in the journal draft. Only an incoming TRY
+         *     movement whose account is chosen (`BANK_POSTING_MISSING`) and which
+         *     is in no draft yet (`BANK_POSTING_DRAFTED`). `amount: null` removes it.
+         */
+        put: operations["setTenantBankPostingCommission"];
         post?: never;
         delete?: never;
         options?: never;
@@ -17572,6 +17715,21 @@ export interface components {
             account_name: string | null;
         };
         BankTransactionMatching: {
+            /**
+             * @description Exchange difference of a foreign currency movement closing foreign
+             *     currency invoices (#565); null for a TRY movement or one with no
+             *     such match. `diff_try` is positive for a gain (646 Kambiyo
+             *     kârları), negative for a loss (656 Kambiyo zararları).
+             */
+            fx: {
+                /** @description Payment day rate entered by the office (TRY per unit) */
+                rate_payment: string | null;
+                diff_try: string | null;
+                /** @enum {string|null} */
+                account_code: "646" | "656" | null;
+                /** @description A matched invoice has no exchange rate; enter it on the invoice first */
+                missing_invoice_rate: boolean;
+            } | null;
             /** @description An outgoing payment can be tied to a payroll run (#710) */
             payroll_matchable: boolean;
             /** @description Payroll runs the movement pays (net salaries, */
@@ -17593,6 +17751,62 @@ export interface components {
                 open_amount: string;
                 employee_count: number;
             }[];
+            /** @description SGK premiums the movement pays (#565) */
+            sgk_matches: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description SGK premiums of the movement's month and the three before still unpaid (#565); only for an outgoing payment */
+            sgk_candidates: {
+                /** Format: uuid */
+                sgk_premium_uuid: string;
+                period: string;
+                payable_amount: string;
+                open_amount: string;
+                /** Format: date */
+                due_date: string;
+            }[];
+            /** @description Source financial transactions (cheque, promissory note) the movement settles (#565) */
+            financial_matches: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                amount: string;
+                /** @enum {string} */
+                method: "auto" | "manual";
+            }[];
+            /** @description Cheques / notes of the same direction around the movement's date not yet settled (#565) */
+            financial_candidates: {
+                /** Format: uuid */
+                financial_transaction_uuid: string;
+                /** Format: date */
+                transaction_date: string;
+                /** Format: date */
+                due_date: string | null;
+                /** @enum {string} */
+                payment_method_type: "check" | "promissory_note" | "credit_card";
+                amount_try: string;
+                description: string;
+                counterparty_name: string | null;
+                document_no: string | null;
+                source_system: string;
+                open_amount: string;
+            }[];
             /** @description The movement can be tied to an existing journal line (any movement that is not cancelled, #669 G) */
             line_matchable: boolean;
             /** @description Journal lines the movement is tied to (#669 G) */
@@ -17608,6 +17822,12 @@ export interface components {
                 source: string;
                 /** Format: uuid */
                 journal_draft_uuid: string | null;
+                /** @description POS commission the bank kept from the collection (#565) */
+                commission_amount: string | null;
+                /** @description 653 or 780 (or a sub account) */
+                commission_account_code: string | null;
+                /** @description Movement amount + commission: what the counter account takes */
+                gross_amount: string | null;
             };
             /** Format: uuid */
             uuid: string;
@@ -17980,6 +18200,11 @@ export interface components {
                 suggested: number;
                 /** Format: int64 */
                 matched: number;
+                /**
+                 * Format: int64
+                 * @description Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)
+                 */
+                unmatched_booked: number;
             };
         };
         /** @description An employee of the taxpayer (#382). The national id is never returned in clear. */
@@ -20808,7 +21033,7 @@ export interface components {
         RelatedSourceKind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction";
         RelatedRecord: {
             /** @enum {string} */
-            kind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "suggestion" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction" | "rule" | "account";
+            kind: "invoice" | "bank_transaction" | "journal_draft" | "warning" | "suggestion" | "expense" | "retail_sale" | "payroll_run" | "financial_transaction" | "rule" | "account" | "customer";
             /**
              * Format: uuid
              * @description null for rule and account
@@ -21174,10 +21399,25 @@ export interface components {
         };
         JournalDraftManualLink: {
             /** @enum {string} */
-            kind: "invoice" | "bank_transaction";
+            kind: "invoice" | "bank_transaction" | "customer";
             /** Format: uuid */
             uuid: string;
             linked: boolean;
+        };
+        JournalLinkCustomerCandidate: {
+            /** Format: uuid */
+            uuid: string;
+            name: string;
+            /** @enum {string} */
+            type: "customer" | "supplier" | "both";
+        };
+        EnvelopeJournalLinkCustomerCandidates: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["JournalLinkCustomerCandidate"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
         };
         EnvelopeJournalDraftManualLink: {
             /** @enum {boolean} */
@@ -33533,6 +33773,110 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    linkJournalDraftCustomer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    unlinkJournalDraftCustomer: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                draftUuid: string;
+                customerUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the link exists now */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalDraftManualLink"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listJournalLinkCustomerCandidates: {
+        parameters: {
+            query?: {
+                /** @description Searched in the name only */
+                q?: string;
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cari cards */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeJournalLinkCustomerCandidates"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     unapproveJournalDraft: {
         parameters: {
             query?: never;
@@ -36724,6 +37068,10 @@ export interface operations {
                     invoice_uuids?: string[];
                     /** @description Payroll runs an outgoing payment pays (net salaries, */
                     payroll_run_uuids?: string[];
+                    /** @description SGK premiums (monthly payable) an outgoing payment pays (#565); of the movement's month or the three before. The premium is marked paid; unmatching gives the amount back */
+                    sgk_premium_uuids?: unknown[];
+                    /** @description Source financial transactions (cheque, promissory note, credit card from an integration) the movement settles (#565); same direction, dated up to 120 days before or 10 days after */
+                    financial_transaction_uuids?: string[];
                     /** @description Existing journal lines (voucher + line number) to tie the movement to (#669 G) */
                     journal_lines?: {
                         /** Format: uuid */
@@ -36893,6 +37241,57 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankTransactionFxRate: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description TRY per unit of the movement's currency */
+                    rate: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The movement with its exchange difference */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBankTransactionMatching"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            /** @description `INVOICE_EXCHANGE_RATE_MISSING`: a matched invoice has no exchange rate */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             500: components["responses"]["InternalError"];
         };
     };
@@ -39100,6 +39499,68 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             /** @description `BANK_POSTING_DRAFTED` or `SUGGESTION_STATE` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `VALIDATION_ERROR` */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            500: components["responses"]["InternalError"];
+        };
+    };
+    setTenantBankPostingCommission: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                transactionUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @example 250.00 */
+                    amount: string | null;
+                    /**
+                     * @description 653 or 780, or a sub account; required with an amount
+                     * @example 653
+                     */
+                    account_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `BANK_POSTING_MISSING` or `BANK_POSTING_DRAFTED` */
             409: {
                 headers: {
                     [name: string]: unknown;
