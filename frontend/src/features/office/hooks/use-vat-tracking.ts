@@ -89,6 +89,9 @@ export function useSaveVATTrackingSettings(slug: string) {
       report_enabled: boolean;
       report_day: number;
       watch_enabled?: boolean;
+      watch_email?: boolean;
+      /** Eşik (TL, "10000.00"); null siler, verilmezse değişmez. */
+      payable_limit?: string | null;
     }) =>
       tenantRequest<VATTrackingSettings>(
         slug,
@@ -97,6 +100,23 @@ export function useSaveVATTrackingSettings(slug: string) {
         { body },
       ),
     onSuccess: (data) => qc.setQueryData(key(slug), data),
+  });
+}
+
+export type OfficeVATWatchEvent =
+  components["schemas"]["OfficeVATWatchEvent"];
+
+/** Son KDV uyarıları (#780 B): ofis genelindeki son nöbetçi olayları. */
+export function useOfficeVATWatchEvents(slug: string, limit = 10) {
+  return useQuery({
+    queryKey: ["tenant", slug.toLowerCase(), "vat-watch-events", limit],
+    queryFn: () =>
+      tenantRequest<{ items: OfficeVATWatchEvent[] }>(
+        slug,
+        "GET",
+        "/v1/tenant/vat-forecast/watch-events",
+        { query: { limit }, silent: true },
+      ),
   });
 }
 
