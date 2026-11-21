@@ -6317,6 +6317,7 @@ paths:
         - { name: isg_kind, in: query, schema: { type: string, enum: [isg_training, risk_assessment, health_report, other] } }
         - { name: q, in: query, schema: { type: string, maxLength: 100 } }
         - { name: expiring, in: query, schema: { type: boolean } }
+        - { name: important, in: query, description: "Only important documents (#780 B); the soonest validity end first", schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
       responses:
@@ -6332,6 +6333,41 @@ paths:
                   data: { $ref: "#/components/schemas/ArchiveDocumentPage" }
                   meta: { $ref: "#/components/schemas/ResponseMeta" }
         "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403":
+          description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/taxpayer/important-documents:
+    parameters:
+      - $ref: "#/components/parameters/XTaxpayer"
+    get:
+      tags: [TaxpayerPortal]
+      operationId: listTaxpayerImportantDocuments
+      summary: Önemli belgeler (vergi levhası, imza sirküleri...)
+      description: |
+        Mükellef paneli (#780 B). Ofisin "önemli" işaretlediği ve "Mükellef
+        de görsün" açık olan belgeler; bitişi yakın olan önce. Şirketin
+        ofisi bölümü kapattıysa `enabled` false ve liste boş. Dosya
+        `/v1/taxpayer/archive-documents/{uuid}/file` ile iner. Yalnızca
+        sahip rolü görür.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/TaxpayerImportantDocuments" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403":
           description: "`NO_TAXPAYER_MEMBERSHIP`, or the caller is not the taxpayer's owner"
@@ -10908,6 +10944,7 @@ paths:
         - { name: isg_kind, in: query, schema: { type: string, enum: [isg_training, risk_assessment, health_report, other] } }
         - { name: q, in: query, schema: { type: string, maxLength: 100 } }
         - { name: expiring, in: query, schema: { type: boolean } }
+        - { name: important, in: query, description: "Only important documents (#780 B); the soonest validity end first", schema: { type: boolean } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
       responses:
@@ -10951,6 +10988,7 @@ paths:
                 document_date: { type: string, format: date }
                 valid_until: { type: string, format: date }
                 visible_to_taxpayer: { type: boolean, default: false }
+                important_kind: { type: string, enum: [tax_certificate, signature_circular, trade_registry_gazette, lease_contract, license, power_of_attorney, other], description: "Marks the document important (#780 B)" }
       responses:
         "201":
           description: Created
@@ -10977,6 +11015,39 @@ paths:
       - $ref: "#/components/parameters/XOrganization"
       - $ref: "#/components/parameters/EngagementUuid"
       - { name: archiveDocumentUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [DocumentArchive]
+      operationId: updateArchiveDocument
+      summary: Edit an archived document (important mark, visibility, title, note, validity)
+      description: |
+        Requires `tenant.documents.write` (#780 B). Omitted fields stay as
+        they are. `important_kind` marks the document important (empty
+        string removes the mark); `visible_to_taxpayer` false hides it from
+        the mükellef panel; empty `valid_until` removes the validity end.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArchiveDocumentPatch" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/ArchiveDocument" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
     delete:
       tags: [DocumentArchive]
       operationId: deleteArchiveDocument
@@ -16693,6 +16764,52 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/important-document-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getImportantDocumentSettings
+      summary: The office's "Önemli belgeler" section setting (#780 B)
+      description: Requires `tenant.documents.read`. `enabled` defaults to true.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportantDocumentSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putImportantDocumentSettings
+      summary: Turn the "Önemli belgeler" section on or off (#780 B)
+      description: Requires `tenant.settings.write` (office owner / admin). Off, the section is hidden on the taxpayer page and in the mükellef panel.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeImportantDocumentSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/tax-return-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -23847,7 +23964,7 @@ components:
         offset: { type: integer }
     ArchiveDocument:
       type: object
-      required: [uuid, category, isg_kind, title, note, document_date, valid_until, expiry_status, days_left, file_name, size_bytes, content_type, visible_to_taxpayer, created_at]
+      required: [uuid, category, isg_kind, title, note, document_date, valid_until, expiry_status, days_left, file_name, size_bytes, content_type, visible_to_taxpayer, important_kind, created_at]
       properties:
         uuid: { type: string, format: uuid }
         category: { type: string, enum: [general, contract, tax, sgk, trade_registry, isg, other] }
@@ -23862,10 +23979,48 @@ components:
         size_bytes: { type: integer, format: int64 }
         content_type: { type: string }
         visible_to_taxpayer: { type: boolean }
+        important_kind:
+          type: [string, "null"]
+          enum: [tax_certificate, signature_circular, trade_registry_gazette, lease_contract, license, power_of_attorney, other, null]
+          description: Important document kind (#780 B); null when not important
         created_at: { type: string, format: date-time }
+    ArchiveDocumentPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        important_kind:
+          type: string
+          enum: [tax_certificate, signature_circular, trade_registry_gazette, lease_contract, license, power_of_attorney, other, ""]
+          description: Empty string removes the important mark
+        visible_to_taxpayer: { type: boolean }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        note: { type: string, maxLength: 1000 }
+        valid_until: { type: string, description: "YYYY-MM-DD; empty string removes the validity end" }
+    TaxpayerImportantDocuments:
+      type: object
+      required: [enabled, items, expiring_days]
+      properties:
+        enabled: { type: boolean, description: False when the office turned the section off }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ArchiveDocument" }
+        expiring_days: { type: integer, examples: [30] }
+    ImportantDocumentSettings:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean, description: The "Önemli belgeler" section is shown (default true) }
+        updated_at: { type: string, format: date-time }
+    EnvelopeImportantDocumentSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/ImportantDocumentSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     ArchiveDocumentCounts:
       type: object
-      required: [total, isg, expired, expiring, isg_expired, isg_expiring]
+      required: [total, isg, expired, expiring, isg_expired, isg_expiring, important, important_expiring]
       properties:
         total: { type: integer, format: int64 }
         isg: { type: integer, format: int64 }
@@ -23873,6 +24028,8 @@ components:
         expiring: { type: integer, format: int64 }
         isg_expired: { type: integer, format: int64 }
         isg_expiring: { type: integer, format: int64 }
+        important: { type: integer, format: int64 }
+        important_expiring: { type: integer, format: int64, description: Important documents expired or ending within 30 days }
     ArchiveDocumentPage:
       type: object
       required: [items, total, limit, offset, counts, expiring_days]
