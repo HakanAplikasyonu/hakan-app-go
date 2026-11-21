@@ -248,7 +248,9 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 
 	mailer := mail.NewSMTPSender(cfg.SMTP)
 	// İletişim merkezi (#780 A): ofisin NetGSM hesabı, SMS / e-posta kaydı.
-	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)
+	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log).
+		// E-posta açılma pikseli ve ek bağlantısı (#780 D).
+		WithTracking(communicationmodule.TrackingFromConfig(cfg))
 	provs := []providers.Provider{
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
@@ -733,7 +735,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
-		communication: communicationmodule.NewHandler(commSvc),
+		communication: communicationHandler(commSvc, limiter),
 		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
 		whatsapp: whatsappmodule.NewHandler(
 			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),
@@ -928,4 +930,12 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 func newCopilotHandler(q copilotmodule.Queries, ai copilotmodule.AI, log *slog.Logger) *copilotmodule.Handler {
 	svc := copilotmodule.NewService(q)
 	return copilotmodule.NewHandler(svc, copilotmodule.NewPlans(svc, copilotmodule.NewAIPlanner(ai), log))
+}
+
+// communicationHandler builds the İletişim merkezi handler; the public
+// e-mail tracking routes share the API's rate limiter (#780 D).
+func communicationHandler(svc *communicationmodule.Service, l communicationmodule.RateLimiter) *communicationmodule.Handler {
+	h := communicationmodule.NewHandler(svc)
+	h.SetRateLimiter(l)
+	return h
 }

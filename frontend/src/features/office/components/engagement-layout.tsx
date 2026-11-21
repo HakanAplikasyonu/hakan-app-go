@@ -168,6 +168,11 @@ export function useEngagementTabs(engagement: string): EngagementTab[] {
       href: routes.tenant.engagementReport(slug, engagement),
       label: t("office.engagement.tab_report"),
     },
+    // İletişim geçmişi (#780 D): "bana söylemediniz" diyene gösterilecek kanıt.
+    {
+      href: routes.tenant.engagementCommunications(slug, engagement),
+      label: t("office.engagement.tab_communications"),
+    },
     // Banka, entegratör ve diğer dış bağlantılar (#518).
     {
       href: routes.tenant.engagementConnections(slug, engagement),

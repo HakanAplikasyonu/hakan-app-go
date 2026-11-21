@@ -12775,6 +12775,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/communications": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Communication history of the taxpayer (#780)
+         * @description Requires `tenant.engagements.read`. Every SMS and e-mail the office
+         *     sent to this taxpayer, newest first: number or address, text, NetGSM
+         *     job id, send time, delivery time (NetGSM report) for SMS, open and
+         *     download time (tracking pixel / link) for e-mail. `channel` narrows
+         *     to one channel.
+         */
+        get: operations["listEngagementCommunications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/mail/{token}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * E-mail open tracking pixel (#780)
+         * @description The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+         *     the unguessable `track_token` of the record is the key. The first hit
+         *     writes `opened_at`; later hits change nothing. A bad or unknown token
+         *     gets the same image and writes nothing. Limited per client address.
+         */
+        get: operations["getMailOpenPixel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/mail/{token}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * E-mail attachment / document link (#780)
+         * @description Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+         *     the first click, then redirects to `to`. Only the app's own frontend
+         *     and storage origins are redirect targets (a path is taken as a
+         *     frontend path); any other target answers 404, so the route is not an
+         *     open redirect. No session: `track_token` is the key.
+         */
+        get: operations["getMailTrackedLink"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/support/clickfix-identity": {
         parameters: {
             query?: never;
@@ -21060,6 +21139,43 @@ export interface components {
             success: true;
             data: {
                 items: components["schemas"]["SmsMessage"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        CommunicationHistoryItem: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            channel: "sms" | "email";
+            /** @description Phone number (SMS) or e-mail address. */
+            to: string;
+            subject: string;
+            body: string;
+            /** @enum {string} */
+            status: "pending" | "sent" | "failed" | "uncertain" | "dry_run";
+            msgheader: string;
+            provider_job_id: string;
+            error_code: string;
+            error_message: string;
+            source_rule: string;
+            source_ref: string;
+            sent_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+            /** Format: date-time */
+            opened_at: string | null;
+            /** Format: date-time */
+            downloaded_at: string | null;
+        };
+        EnvelopeCommunicationHistory: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["CommunicationHistoryItem"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -42513,6 +42629,89 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
+        };
+    };
+    listEngagementCommunications: {
+        parameters: {
+            query?: {
+                channel?: "sms" | "email";
+                limit?: number;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCommunicationHistory"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getMailOpenPixel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pixel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/gif": string;
+                };
+            };
+        };
+    };
+    getMailTrackedLink: {
+        parameters: {
+            query: {
+                /** @description Target URL or frontend path. */
+                to: string;
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the target. */
+            302: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getClickFixIdentity: {

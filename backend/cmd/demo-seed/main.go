@@ -317,6 +317,11 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedCommunication(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("communication: %w", err)
 	}
+	// İletişim geçmişi (#780 D): iletildi / açıldı bilgili örnekler ve
+	// "e-posta açılmadı, SMS gitti" örneği.
+	if err := seedCommunicationHistory(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("communication history: %w", err)
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }

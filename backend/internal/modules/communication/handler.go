@@ -13,7 +13,10 @@ import (
 )
 
 // Handler serves Ayarlar > SMS (#780 A).
-type Handler struct{ svc *Service }
+type Handler struct {
+	svc     *Service
+	limiter RateLimiter
+}
 
 // NewHandler builds the handler; svc nil answers 404 on every route.
 func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }

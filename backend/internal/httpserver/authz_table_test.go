@@ -72,9 +72,14 @@ var authzTable = map[string]authzClass{
 	"POST /v1/tenant/sms-settings/test":                                  azTenantWrite,
 	"GET /v1/tenant/sms-messages":                                        azTenantRead,
 	"POST /v1/tenant/sms-messages/test":                                  azTenantWrite,
-	"GET /v1/tenant/support/clickfix-identity":                           azTenantRead,
-	"PUT /v1/tenant/account-rule-settings":                               azTenantWrite,
-	"GET /v1/tenant/account-rule-settings/preview":                       azTenantRead,
+	// İletişim geçmişi ve e-posta izleme (#780 D): piksel ve bağlantı
+	// oturumsuz, anahtar track_token.
+	"GET /v1/tenant/engagements/{engagementUuid}/communications": azTenantRead,
+	"GET /v1/public/mail/{token}/open":                           azPublic,
+	"GET /v1/public/mail/{token}/link":                           azPublic,
+	"GET /v1/tenant/support/clickfix-identity":                   azTenantRead,
+	"PUT /v1/tenant/account-rule-settings":                       azTenantWrite,
+	"GET /v1/tenant/account-rule-settings/preview":               azTenantRead,
 	// WhatsApp Web uzantısı (#388): eşleştirme kodu kendisi kimlik; kayıt fiş yetkisiyle.
 	"POST /v1/auth/whatsapp/pair":                                                      azPublic,
 	"POST /v1/tenant/whatsapp/pairings":                                                azTenantWrite,
