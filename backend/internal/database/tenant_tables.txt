@@ -98,3 +98,6 @@ vat_report_rules
 operating_account_inventories engagement
 operating_account_categories engagement
 late_documents engagement
+foreign_service_invoices engagement
+foreign_service_kind_settings
+foreign_invoice_settings
