@@ -1,6 +1,6 @@
 // Package taxreturns prepares the period tax returns of a taxpayer in the
 // shape of the GİB forms (issue #390): KDV1 (1 No.lu KDV beyannamesi),
-// KDV2 (2 No.lu, #575), MUHSGK (muhtasar ve prim hizmet beyannamesi) and
+// KDV2 (2 No.lu, #575), damga vergisi (#575), MUHSGK (muhtasar ve prim hizmet beyannamesi) and
 // Form Ba / Bs.
 //
 // The preview is computed on every request from the common data: invoices
@@ -32,6 +32,9 @@ const (
 	// KindKDV2: 2 No.lu KDV beyannamesi (#575), only when the taxpayer
 	// withheld VAT on purchases.
 	KindKDV2 = "kdv2"
+	// KindStamp: damga vergisi beyannamesi (#575), for taxpayers who do not
+	// declare damga vergisi on MUHSGK. Lines are entered by hand.
+	KindStamp = "damga"
 )
 
 // Statuses of tax_returns.status.
@@ -48,12 +51,12 @@ var Kinds = []string{KindKDV1, KindMUHSGK, KindBABS}
 
 // ValidKind reports whether k is a known kind.
 func ValidKind(k string) bool {
-	return k == KindKDV1 || k == KindMUHSGK || k == KindBABS || k == KindKDV2
+	return k == KindKDV1 || k == KindMUHSGK || k == KindBABS || k == KindKDV2 || k == KindStamp
 }
 
 // Due days of the following month (VUK 18 hafta sonu kuralı DueDate'te).
 // Ba/Bs is due on the last day of the following month (31 is clamped).
-var dueDays = map[string]int{KindKDV1: 28, KindMUHSGK: 26, KindBABS: 31, KindKDV2: 28}
+var dueDays = map[string]int{KindKDV1: 28, KindMUHSGK: 26, KindBABS: 31, KindKDV2: 28, KindStamp: 26}
 
 // BABSThreshold: Form Ba / Bs reports a counterparty when the period's
 // documents reach 5.000 TL excluding VAT (VUK 396 Sıra No.lu Tebliğ).

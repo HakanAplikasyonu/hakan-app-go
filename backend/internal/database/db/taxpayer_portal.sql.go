@@ -397,3 +397,115 @@ func (q *Queries) ListTaxpayerUploadJobs(ctx context.Context, arg ListTaxpayerUp
 	}
 	return items, nil
 }
+
+const taxpayerSalesMonthly = `-- name: TaxpayerSalesMonthly :many
+SELECT period::text AS period,
+       (count(*) FILTER (WHERE type <> 'IADE'))::bigint AS invoices,
+       coalesce(sum(CASE WHEN type = 'IADE' THEN -1 ELSE 1 END *
+                    CASE WHEN currency = 'TRY' THEN tax_exclusive_amount
+                         ELSE tax_exclusive_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS base,
+       coalesce(sum(CASE WHEN type = 'IADE' THEN -1 ELSE 1 END *
+                    CASE WHEN currency = 'TRY' THEN tax_amount
+                         ELSE tax_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS vat
+FROM invoices
+WHERE taxpayer_id = $1 AND direction = 'outgoing' AND status_normalized = 'active'
+  AND period >= $2::text AND period <= $3::text
+GROUP BY period
+ORDER BY period
+`
+
+type TaxpayerSalesMonthlyParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	FromPeriod string `json:"from_period"`
+	ToPeriod   string `json:"to_period"`
+}
+
+type TaxpayerSalesMonthlyRow struct {
+	Period   string         `json:"period"`
+	Invoices int64          `json:"invoices"`
+	Base     pgtype.Numeric `json:"base"`
+	Vat      pgtype.Numeric `json:"vat"`
+}
+
+// Mükellef panelinde satış raporu (#780): aktif giden faturalar, ay bazında.
+// İade (IADE) faturaları satıştan düşülür; döviz faturada kur ile TL.
+func (q *Queries) TaxpayerSalesMonthly(ctx context.Context, arg TaxpayerSalesMonthlyParams) ([]TaxpayerSalesMonthlyRow, error) {
+	rows, err := q.db.Query(ctx, taxpayerSalesMonthly, arg.TaxpayerID, arg.FromPeriod, arg.ToPeriod)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaxpayerSalesMonthlyRow{}
+	for rows.Next() {
+		var i TaxpayerSalesMonthlyRow
+		if err := rows.Scan(
+			&i.Period,
+			&i.Invoices,
+			&i.Base,
+			&i.Vat,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const taxpayerSalesTopBuyers = `-- name: TaxpayerSalesTopBuyers :many
+SELECT coalesce(max(customer_name), '')::text AS name,
+       coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, ''), '')::text AS tax_id,
+       count(*)::bigint AS invoices,
+       coalesce(sum(CASE WHEN currency = 'TRY' THEN tax_exclusive_amount
+                         ELSE tax_exclusive_amount * coalesce(exchange_rate, 1) END), 0)::numeric AS base
+FROM invoices
+WHERE taxpayer_id = $1 AND direction = 'outgoing' AND status_normalized = 'active'
+  AND type <> 'IADE' AND period = $2::text
+GROUP BY coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, ''), ''),
+         CASE WHEN coalesce(nullif(customer_tax_number, ''), nullif(customer_identity_number, '')) IS NULL
+              THEN coalesce(customer_name, '') ELSE '' END
+ORDER BY base DESC, name
+LIMIT $3
+`
+
+type TaxpayerSalesTopBuyersParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Period     string `json:"period"`
+	Lim        int32  `json:"lim"`
+}
+
+type TaxpayerSalesTopBuyersRow struct {
+	Name     string         `json:"name"`
+	TaxID    string         `json:"tax_id"`
+	Invoices int64          `json:"invoices"`
+	Base     pgtype.Numeric `json:"base"`
+}
+
+// Dönemin en çok satış yapılan alıcıları (#780): aktif giden, iade hariç
+// faturalar; alıcı VKN/TCKN'ye göre, kimliksiz alıcılar unvana göre.
+func (q *Queries) TaxpayerSalesTopBuyers(ctx context.Context, arg TaxpayerSalesTopBuyersParams) ([]TaxpayerSalesTopBuyersRow, error) {
+	rows, err := q.db.Query(ctx, taxpayerSalesTopBuyers, arg.TaxpayerID, arg.Period, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TaxpayerSalesTopBuyersRow{}
+	for rows.Next() {
+		var i TaxpayerSalesTopBuyersRow
+		if err := rows.Scan(
+			&i.Name,
+			&i.TaxID,
+			&i.Invoices,
+			&i.Base,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
