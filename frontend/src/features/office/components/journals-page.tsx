@@ -1157,6 +1157,7 @@ function JournalsInner() {
             onClick={() => setLinesOf(row.original)}
             aria-label={t("office.journals.lines.open_entry", {
               entry: row.original.entry_no,
+              count: row.original.lines,
             })}
           >
             <ListTree className="size-4" />

@@ -306,6 +306,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedPlanExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("plan export → %s: %w", tp.Key, err)
 			}
+			// Cari mizanı: Kasım fişleri, ters bakiyeli tedarikçi (#780 C).
+			if err := seedCariMizan(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("cari mizan → %s: %w", tp.Key, err)
+			}
 			// Dilekçeler sekmesi boş durmasın (#780).
 			if err := seedPetitions(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("petitions → %s: %w", tp.Key, err)

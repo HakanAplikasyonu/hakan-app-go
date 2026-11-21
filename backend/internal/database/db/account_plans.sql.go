@@ -56,6 +56,65 @@ func (q *Queries) AccountPlanNames(ctx context.Context, arg AccountPlanNamesPara
 	return items, nil
 }
 
+const cariAccountInfo = `-- name: CariAccountInfo :many
+SELECT code::text AS code, name::text AS name, tax_id::text AS tax_id, rank::int AS rank FROM (
+    SELECT a.code, a.name, '' AS tax_id, 0 AS rank, a.id FROM account_plan_accounts a
+    WHERE a.organization_id = $1 AND a.engagement_id = $2
+      AND a.code = ANY($3::text[])
+    UNION ALL
+    SELECT g.code, g.name, CASE WHEN g.counterparty_key ~ '^[0-9]{10,11}$' THEN g.counterparty_key ELSE '' END, 1, g.id
+    FROM generated_subaccounts g
+    WHERE g.organization_id = $1 AND g.engagement_id = $2
+      AND g.code = ANY($3::text[])
+    UNION ALL
+    SELECT c.account_code, c.account_name, c.counterparty_tax_id, 2, c.id FROM counterparty_accounts c
+    WHERE c.organization_id = $1 AND c.engagement_id = $2
+      AND c.account_code = ANY($3::text[])
+) n
+ORDER BY code, rank, id DESC
+`
+
+type CariAccountInfoParams struct {
+	OrganizationID int64    `json:"organization_id"`
+	EngagementID   int64    `json:"engagement_id"`
+	Codes          []string `json:"codes"`
+}
+
+type CariAccountInfoRow struct {
+	Code  string `json:"code"`
+	Name  string `json:"name"`
+	TaxID string `json:"tax_id"`
+	Rank  int32  `json:"rank"`
+}
+
+// Cari mizanı (#780): cari alt hesapların adı ve VKN'si; etkin plan, üretilen
+// cari alt hesaplar ve cari hafızası. Kod başına birden çok satır gelebilir,
+// öncelik rank'ta (0 plan).
+func (q *Queries) CariAccountInfo(ctx context.Context, arg CariAccountInfoParams) ([]CariAccountInfoRow, error) {
+	rows, err := q.db.Query(ctx, cariAccountInfo, arg.OrganizationID, arg.EngagementID, arg.Codes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CariAccountInfoRow{}
+	for rows.Next() {
+		var i CariAccountInfoRow
+		if err := rows.Scan(
+			&i.Code,
+			&i.Name,
+			&i.TaxID,
+			&i.Rank,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countAccountPlanAccounts = `-- name: CountAccountPlanAccounts :one
 SELECT COUNT(*) FROM account_plan_accounts
 WHERE organization_id = $1 AND engagement_id = $2 AND target = $3
