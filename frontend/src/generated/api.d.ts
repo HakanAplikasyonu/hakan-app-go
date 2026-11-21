@@ -5996,9 +5996,13 @@ export interface paths {
          * @description Requires `tenant.warnings.write` and engagement access. Checks every
          *     invoice and line of the period: FIXED_ASSET_CANDIDATE and
          *     UNUSUAL_RECORD_TYPE on lines, UNUSUAL_AMOUNT and NEW_PARTY_HIGH_AMOUNT on
-         *     invoices (06 T3). Thresholds and keyword lists come from the warning
-         *     rule configuration. A re-run refreshes instead of duplicating; a
-         *     condition that no longer holds is auto_resolved.
+         *     invoices (06 T3). Also refreshes the engagement's connection health
+         *     warnings (05 §3.5, #669 K): INT_CONNECTION_FAILED and INT_SYNC_STALE
+         *     on each source_connection, written to the current month whatever the
+         *     requested period; a worker sweep refreshes them every 15 minutes too.
+         *     Thresholds and keyword lists come from the warning rule configuration.
+         *     A re-run refreshes instead of duplicating; a condition that no longer
+         *     holds is auto_resolved.
          */
         post: operations["runEngagementControls"];
         delete?: never;
