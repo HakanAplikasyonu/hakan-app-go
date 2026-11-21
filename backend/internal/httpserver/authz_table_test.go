@@ -51,6 +51,7 @@ var authzTable = map[string]authzClass{
 	// Mükellef raporu (#386).
 	"GET /v1/tenant/engagements/{engagementUuid}/report":             azTenantRead,
 	"GET /v1/taxpayer/report":                                        azTaxpayerRead,
+	"GET /v1/taxpayer/vat-sales":                                     azTaxpayerRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/report/pdf":         azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/report/deliveries":  azTenantRead,
 	"POST /v1/tenant/engagements/{engagementUuid}/report/deliveries": azTenantWrite,

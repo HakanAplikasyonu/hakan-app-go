@@ -138,5 +138,11 @@
   "final_check_title": "Responsible accountant's final check",
   "final_check_label": "Only the responsible marks \"Checked\" and \"Filed\"",
   "final_check_on": "On: everyone prepares returns; only the office owner or an admin marks them checked and filed.",
-  "final_check_off": "Off: whoever prepares a return can also mark it checked and filed. Who and when are still recorded."
+  "final_check_off": "Off: whoever prepares a return can also mark it checked and filed. Who and when are still recorded.",
+  "settings_section_taxpayer_panel": "Taxpayer panel",
+  "settings_section_taxpayer_panel_description": "What taxpayers see in their own panel.",
+  "taxpayer_vat_panel_title": "VAT status and sales report",
+  "taxpayer_vat_panel_label": "Show VAT and sales report in the taxpayer panel",
+  "taxpayer_vat_panel_on": "On: the taxpayer sees this month's estimated VAT, the due date, total sales, top buyers and recent months' sales.",
+  "taxpayer_vat_panel_off": "Off: the section is hidden in the taxpayer panel; the figures stay in the office."
 }
