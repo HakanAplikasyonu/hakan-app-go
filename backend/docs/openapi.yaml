@@ -18237,8 +18237,8 @@ components:
       name: returnKind
       in: path
       required: true
-      description: kdv1 (1 No.lu KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
-      schema: { type: string, enum: [kdv1, muhsgk, babs] }
+      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -26092,7 +26092,7 @@ components:
       type: object
       required: [kind, status, payable_amount, filed_on, paid_on]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
@@ -26103,7 +26103,7 @@ components:
       required: [period, kind, due_date, rolled_forward]
       properties:
         period: { type: string, example: "2026-10" }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         due_date: { type: string, format: date }
         rolled_forward: { type: boolean, description: The deadline fell on a weekend or public holiday and moved to the next working day }
 
@@ -26923,6 +26923,32 @@ components:
         additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
         other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
 
+    TaxReturnKDV2:
+      type: object
+      description: 2 No.lu KDV beyannamesi (#575) — VAT the taxpayer withheld on purchases (KDV tevkifatı), declared as the responsible party
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [code, rate, ratio, invoice_count, base, vat, withheld]
+            properties:
+              code: { type: string, description: 'Withholding (işlem türü) code, empty when the invoice has none' }
+              rate: { type: string, description: VAT rate in percent }
+              ratio: { type: string, description: 'Withholding ratio, e.g. "9/10"' }
+              invoice_count: { type: integer, format: int64 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+              withheld: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [base, vat, payable]
+          properties:
+            base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
+
     TaxReturnKDV1:
       type: object
       required: [sales, withholdings, special_bases, purchases, exemptions, totals, carry, adjustments]
@@ -27142,7 +27168,7 @@ components:
       type: object
       required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         engagement_uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -27166,6 +27192,7 @@ components:
         computed_at: { type: string, format: date-time }
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
+        kdv2: { $ref: "#/components/schemas/TaxReturnKDV2" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
         payment:
@@ -27312,7 +27339,7 @@ components:
       required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [kdv1, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
         period: { type: string }
         status: { type: string, enum: [draft, prepared, filed] }
         payable: { type: [string, "null"] }
