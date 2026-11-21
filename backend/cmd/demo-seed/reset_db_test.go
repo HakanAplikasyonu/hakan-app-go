@@ -286,7 +286,9 @@ func TestSeedBankMonth(t *testing.T) {
 		t.Fatal(err)
 	}
 	atlas := demoScope(t, d, "atlas")
-	if n := count(t, d, `SELECT count(*) FROM bank_transactions WHERE taxpayer_id = $1`, atlas.TaxpayerID); n != 9 {
+	// The Ziraat month; the Garanti account of the ledger difference (#780 C) has its own.
+	if n := count(t, d, `SELECT count(*) FROM bank_transactions t JOIN cash_boxes cb ON cb.id = t.cash_box_id
+		WHERE t.taxpayer_id = $1 AND cb.iban = $2`, atlas.TaxpayerID, DemoBankIBAN); n != 9 {
 		t.Fatalf("movements = %d", n)
 	}
 	if n := count(t, d, `SELECT count(*) FROM bank_transaction_postings WHERE engagement_id = $1 AND status = 'approved'`, atlas.ID); n < 3 {

@@ -67,6 +67,14 @@ type Querier interface {
 	// bakiyesi + giriş − çıkış, son hareketin sonraki bakiyesiyle karşılaştırılır.
 	// Önceki bakiye yoksa sonraki bakiyeden geri hesaplanır.
 	BankBalanceCheck(ctx context.Context, arg BankBalanceCheckParams) ([]BankBalanceCheckRow, error)
+	// Mükellefin banka hesapları ve 102 hesapları (satırı yoksa "102").
+	BankDifferenceBoxes(ctx context.Context, arg BankDifferenceBoxesParams) ([]BankDifferenceBoxesRow, error)
+	// Yılbaşından döneme 102 hesaplarına yazılmış fiş satırları (taslaklar dahil).
+	BankDifferenceLedgerLines(ctx context.Context, arg BankDifferenceLedgerLinesParams) ([]BankDifferenceLedgerLinesRow, error)
+	// Banka bakiyesi ile muhasebe (102) bakiyesi farkı ve nedenleri (#780 C).
+	// Yılbaşından döneme TL hareketler (iptal edilenler de: fişe girmiş iptal
+	// hareket mükerrer sayılır), karşı virman hareketiyle.
+	BankDifferenceTransactions(ctx context.Context, arg BankDifferenceTransactionsParams) ([]BankDifferenceTransactionsRow, error)
 	// Banka listesindeki "hesaba işlendi" göstergesi (#565): onaylanmış karşı
 	// hesabı olan hareketler.
 	BankTransactionBookedAccounts(ctx context.Context, arg BankTransactionBookedAccountsParams) ([]BankTransactionBookedAccountsRow, error)
@@ -260,6 +268,8 @@ type Querier interface {
 	DeleteBabsDeclaration(ctx context.Context, arg DeleteBabsDeclarationParams) (int64, error)
 	DeleteBankBalanceSnapshotsByImport(ctx context.Context, arg DeleteBankBalanceSnapshotsByImportParams) error
 	DeleteBankCounterpartyAlias(ctx context.Context, arg DeleteBankCounterpartyAliasParams) (int64, error)
+	// Yalnız "açıklandı" işareti geri alınır; düzeltme fişi fişler ekranından silinir.
+	DeleteBankDifferenceExplanation(ctx context.Context, arg DeleteBankDifferenceExplanationParams) (int64, error)
 	DeleteBankStatementTemplate(ctx context.Context, arg DeleteBankStatementTemplateParams) (int64, error)
 	DeleteBankTransaction(ctx context.Context, arg DeleteBankTransactionParams) error
 	// Hareketin eşleşmeleri silinirken bağlı SGK primlerinden ödenen tutar
@@ -640,6 +650,7 @@ type Querier interface {
 	InsertAppRelease(ctx context.Context, arg InsertAppReleaseParams) (InsertAppReleaseRow, error)
 	InsertBankBalanceSnapshot(ctx context.Context, arg InsertBankBalanceSnapshotParams) error
 	InsertBankCounterpartyAlias(ctx context.Context, arg InsertBankCounterpartyAliasParams) (BankCounterpartyAlias, error)
+	InsertBankDifferenceResolution(ctx context.Context, arg InsertBankDifferenceResolutionParams) (InsertBankDifferenceResolutionRow, error)
 	InsertBankStatementExport(ctx context.Context, arg InsertBankStatementExportParams) (BankStatementExport, error)
 	// Dosyaya giren hareketler. items: [{"id": 1, "previous": 0}, ...]
 	InsertBankStatementExportItems(ctx context.Context, arg InsertBankStatementExportItemsParams) (int64, error)
@@ -807,6 +818,7 @@ type Querier interface {
 	ListBankCounterpartyAliasesBySuggestion(ctx context.Context, arg ListBankCounterpartyAliasesBySuggestionParams) ([]BankCounterpartyAlias, error)
 	// Liste ucu (issue #453): sayfalı, toplamla.
 	ListBankCounterpartyAliasesPage(ctx context.Context, arg ListBankCounterpartyAliasesPageParams) ([]ListBankCounterpartyAliasesPageRow, error)
+	ListBankDifferenceResolutions(ctx context.Context, arg ListBankDifferenceResolutionsParams) ([]ListBankDifferenceResolutionsRow, error)
 	ListBankLedgerAccounts(ctx context.Context, arg ListBankLedgerAccountsParams) ([]ListBankLedgerAccountsRow, error)
 	// Ekran listesi: hareket + öneri + inceleme önerisi; durum süzgeci
 	// unassigned (önerisi yok) / suggested / approved (fişe girmedi) / drafted.

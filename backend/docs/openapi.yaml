@@ -14843,6 +14843,109 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [Bank]
+      operationId: getTenantBankLedgerDifference
+      summary: Bank statement balance vs trial balance (102) and the reasons of the difference
+      description: >-
+        Requires `tenant.bank.read` (#780 C). For each TRY bank account the
+        statement balance at the end of the period is compared with its 102
+        balance from January to the period (drafts included). The difference
+        is broken down by reason (opening, unbooked, other_account,
+        manual_lines, gaps, duplicates, unexplained), each with its amount,
+        the records behind it, the corrections booked and the office's
+        explained mark.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, required: true, schema: { type: string, example: "2026-10" } }
+      responses:
+        "200":
+          description: Comparison per bank account
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankLedgerDifference" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [Bank]
+      operationId: resolveTenantBankLedgerDifference
+      summary: Mark a difference reason explained or book its correction draft
+      description: >-
+        Requires `tenant.bank.write` and `tenant.journals.write`. `explained`
+        records the explanation; `corrected` also books a mahsup draft on the
+        period's last day: the bank's 102 code against `counter_account`
+        (`amount` positive raises the 102 balance). Who and when are kept.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cash_box_uuid, period, reason, action, explanation]
+              additionalProperties: false
+              properties:
+                cash_box_uuid: { type: string, format: uuid }
+                period: { type: string, example: "2026-10" }
+                reason: { type: string, enum: [opening, unbooked, other_account, manual_lines, gaps, duplicates, unexplained] }
+                action: { type: string, enum: [explained, corrected] }
+                explanation: { type: string, maxLength: 1000 }
+                counter_account: { type: string, example: "689" }
+                amount: { type: string, example: "-150.00" }
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeBankDifferenceResolutionResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: "`ALREADY_EXPLAINED`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: "`VALIDATION_ERROR`"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions/{resolutionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: resolutionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    delete:
+      tags: [Bank]
+      operationId: deleteTenantBankLedgerDifferenceExplanation
+      summary: Take an explained mark back
+      description: Requires `tenant.bank.write`. Only `explained` marks; a correction draft is handled in the journals screen.
+      security:
+        - bearerAuth: []
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/bank-statement-exports:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -22904,6 +23007,107 @@ components:
         currency: { type: string }
         account_code: { type: string }
         default: { type: boolean }
+
+    BankDifferenceRecord:
+      type: object
+      required: [kind, date, period, amount, description]
+      properties:
+        kind: { type: string, enum: [bank_transaction, journal_line, gap] }
+        date: { type: string, format: date }
+        period: { type: string }
+        amount: { type: string }
+        description: { type: string }
+        transaction_uuid: { type: string, format: uuid }
+        draft_uuid: { type: string, format: uuid }
+        entry_no: { type: integer }
+        account_code: { type: string }
+        to_date: { type: string, format: date }
+
+    BankDifferenceResolution:
+      type: object
+      required: [uuid, action, amount, counter_account, explanation, journal_draft_uuid, created_by, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        action: { type: string, enum: [explained, corrected] }
+        amount: { type: [string, "null"] }
+        counter_account: { type: [string, "null"] }
+        explanation: { type: string }
+        journal_draft_uuid: { type: [string, "null"], format: uuid }
+        created_by: { type: string }
+        created_at: { type: string, format: date-time }
+
+    BankDifferenceReason:
+      type: object
+      required: [reason, amount, corrected, open, explained, corrections, records, more]
+      properties:
+        reason: { type: string, enum: [opening, unbooked, other_account, manual_lines, gaps, duplicates, unexplained] }
+        amount: { type: string }
+        corrected: { type: string }
+        open: { type: string }
+        explained:
+          oneOf:
+            - $ref: "#/components/schemas/BankDifferenceResolution"
+            - type: "null"
+        corrections:
+          type: array
+          items: { $ref: "#/components/schemas/BankDifferenceResolution" }
+        records:
+          type: array
+          items: { $ref: "#/components/schemas/BankDifferenceRecord" }
+        more: { type: integer }
+
+    BankDifferenceAccount:
+      type: object
+      required: [cash_box_uuid, name, iban, account_code, shared_code, statement_balance, statement_date, ledger_balance, difference, balanced, open_total, reasons]
+      properties:
+        cash_box_uuid: { type: string, format: uuid }
+        name: { type: string }
+        iban: { type: string }
+        account_code: { type: string }
+        shared_code: { type: boolean }
+        statement_balance: { type: [string, "null"] }
+        statement_date: { type: string }
+        ledger_balance: { type: string }
+        difference: { type: [string, "null"] }
+        balanced: { type: boolean }
+        open_total: { type: string }
+        reasons:
+          type: array
+          items: { $ref: "#/components/schemas/BankDifferenceReason" }
+
+    EnvelopeBankLedgerDifference:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [period, from_period, items]
+          properties:
+            period: { type: string }
+            from_period: { type: string }
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/BankDifferenceAccount" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+
+    EnvelopeBankDifferenceResolutionResult:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [uuid, action, created_at, draft]
+          properties:
+            uuid: { type: string, format: uuid }
+            action: { type: string, enum: [explained, corrected] }
+            created_at: { type: string, format: date-time }
+            draft:
+              oneOf:
+                - $ref: "#/components/schemas/JournalDraft"
+                - type: "null"
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeBankPostingPage:
       type: object

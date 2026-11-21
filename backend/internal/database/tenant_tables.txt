@@ -82,3 +82,4 @@ account_plan_exports engagement
 bank_statement_exports engagement
 bank_statement_export_items engagement
 tax_return_versions engagement
+bank_difference_resolutions engagement

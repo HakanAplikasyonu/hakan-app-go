@@ -240,6 +240,8 @@ var tenantWrites = map[string]sweepCase{
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}":                          {body: `{"account_code":"120.01.001"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-postings/{transactionUuid}/commission":               {body: `{"amount":"12.50","account_code":"653"}`},
 	"PUT /v1/tenant/engagements/{engagementUuid}/bank-ledger-accounts/{cashBoxUuid}":                       {body: `{"account_code":"102.01"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions":                      {body: `{"cash_box_uuid":"00000000-0000-0000-0000-000000000000","period":"2026-10","reason":"unexplained","action":"explained","explanation":"Tarama"}`},
+	"DELETE /v1/tenant/engagements/{engagementUuid}/bank-ledger-difference/resolutions/{resolutionUuid}":   {},
 	"POST /v1/tenant/engagements/{engagementUuid}/cash-boxes":                                              {body: `{"type":"cash","name":"Tarama kasası"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/payroll/employees":                                       {body: `{"full_name":"Tarama Personel","job_title":"Muhasebe"}`},
 	"PATCH /v1/tenant/engagements/{engagementUuid}/payroll/employees/{employeeUuid}":                       {body: `{"department":"Finans"}`, late: true},

@@ -310,6 +310,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedBankStatementExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("bank statement export → %s: %w", tp.Key, err)
 			}
+			// Garanti hesabı: ekstre ile 102.02 farkı iki nedenle (#780 C).
+			if err := seedBankDifference(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("bank difference → %s: %w", tp.Key, err)
+			}
 		}
 		fmt.Printf("taxpayer %-6s %s engagement %s\n", tp.Key, identity.TaxID, created.UUID)
 	}
