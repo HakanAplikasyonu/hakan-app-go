@@ -263,6 +263,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			if err := seedReport(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, tp.Key, demo.OrgName, time.Now()); err != nil {
 				return fmt.Errorf("report → %s: %w", tp.Key, err)
 			}
+			// KDV bildirimi ve "durum değişti" olayı (#780 B).
+			if err := seedVATWatch(ctx, pool, org.ID, eng.ID, eng.TaxpayerID, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("vat watch → %s: %w", tp.Key, err)
+			}
 			// Bu ayın birkaç satış ve alış faturası: mükellef panelinde KDV
 			// kartı ve satış raporu (#780).
 			if err := seedCurrentSales(ctx, pool, eng.TaxpayerID, time.Now()); err != nil {
@@ -315,6 +319,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 			// Luca hesap planı: yeni tedarikçinin alt hesabı ve indirme (#464).
 			if err := seedPlanExport(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
 				return fmt.Errorf("plan export → %s: %w", tp.Key, err)
+			}
+			// Cari mizanı: Kasım fişleri, ters bakiyeli tedarikçi (#780 C).
+			if err := seedCariMizan(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {
+				return fmt.Errorf("cari mizan → %s: %w", tp.Key, err)
 			}
 			// Dilekçeler sekmesi boş durmasın (#780).
 			if err := seedPetitions(ctx, pool, scope, byEmail[demo.Members[1].Email].ID); err != nil {

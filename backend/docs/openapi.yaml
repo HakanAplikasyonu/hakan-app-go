@@ -15539,6 +15539,40 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [AccountPlan]
+      operationId: getEngagementCariBalances
+      summary: Cari mizanı — every current account's debit, credit and balance (#780)
+      description: |
+        Requires `tenant.account_plan.read`. Built from the same journal lines as the live trial balance (onaylı ve aktarılmış; `include_drafts=true` adds drafts, January of the period's year to the period), kept to the current-account main accounts (120, 121, 126, 127, 131-136, 159, 195, 196, 320, 321, 326, 329, 331-336, 340). Each group's debit / credit / balance equals that main account's line in the live trial balance.
+
+        Each posted code under a main account is one row; names and VKN / TCKN come from the active plan, the generated cari sub accounts and the cari hafızası. Amounts on the main account itself (or on a code that has sub accounts) are one `unassigned` row. `share` is the row's part of the group balance among rows on the group's side; `reverse` marks a balance on the other side than the main account normally carries. `period` defaults to the current month.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: period, in: query, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', examples: ["2026-10"] } }
+        - { name: include_drafts, in: query, schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success, data, meta]
+                properties:
+                  success: { type: boolean, enum: [true] }
+                  data: { $ref: "#/components/schemas/CariBalanceReport" }
+                  meta: { $ref: "#/components/schemas/ResponseMeta" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/account-plan/live-trial-balance/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17217,6 +17251,87 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-report-rules:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [VAT]
+      operationId: listVATReportRules
+      summary: The office's VAT report rules (#780)
+      description: |
+        Requires `tenant.vat.read`. The days the VAT report is produced (a
+        day of the month, a shorter month uses its last day, or N days before
+        the month end), who gets it and which taxpayers. An office that never
+        saved a list gets one default rule (`default: true`): its report day,
+        office only, all taxpayers. When a rule fires, `vat.report_ready` is
+        raised once per covered taxpayer (same payload as the VAT watch
+        events, plus `rule_uuid`, `trigger`, `audience`, `scope`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Rules
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATReportRules" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [VAT]
+      operationId: putVATReportRules
+      summary: Replace the office's VAT report rules (#780)
+      description: Requires `tenant.settings.write`. Up to 10 rules; an empty list returns the office to the default rule (report day, office only, all taxpayers). To stop the report switch it off in the VAT tracking settings.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              additionalProperties: false
+              properties:
+                items: { type: array, maxItems: 10, items: { $ref: "#/components/schemas/VATReportRule" } }
+      responses:
+        "200":
+          description: Saved rules
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATReportRules" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/vat-report-rules/{rule}/run:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - name: rule
+        in: path
+        required: true
+        description: Rule uuid, or `default` for the default rule
+        schema: { type: string }
+    post:
+      tags: [VAT]
+      operationId: runVATReportRule
+      summary: Run one VAT report rule now (#780)
+      description: |
+        Requires `tenant.settings.write`. Fires the rule today regardless of
+        its day; a rule raises its events once a day per taxpayer.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: What the run did
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATReportRun" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/vat-tracking-settings:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -17259,6 +17374,7 @@ paths:
               properties:
                 report_enabled: { type: boolean }
                 report_day: { type: integer, minimum: 1, maximum: 31 }
+                watch_enabled: { type: boolean, description: "KDV nöbetçisi (omitted: unchanged)" }
       responses:
         "200":
           description: Saved
@@ -17855,6 +17971,56 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { description: "`NO_TAXPAYER_USER`: the taxpayer has no panel user" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch-events:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    get:
+      tags: [VAT]
+      operationId: listVATWatchEvents
+      summary: VAT watch events of the engagement (#780)
+      description: |
+        Requires `tenant.vat.read`. Newest first (at most 20). Events of the
+        daily VAT watch (`vat.status_changed`, `vat.threshold_exceeded`);
+        each is raised once per engagement and period (`dedupe_key`).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATWatch" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/tenant/engagements/{engagementUuid}/vat-forecast/watch:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+    post:
+      tags: [VAT]
+      operationId: runVATWatch
+      summary: Run the VAT watch for the engagement now (#780)
+      description: |
+        Requires `tenant.vat.write`. Same check the daily sweep runs: compares
+        this month's forecast with what the taxpayer was last told and with
+        the office's payable threshold; new events notify the office in-app
+        and go to the outbox. `raised` is how many were new.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Events after the run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeVATWatch" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: "`VAT_WATCH_DISABLED`: the office switched the VAT watch off" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/tenant/engagements/{engagementUuid}/vat-forecast/openings:
     parameters:
@@ -26643,6 +26809,59 @@ components:
             debit: { type: string, description: "Decimal string, sum over leaf accounts" }
             credit: { type: string }
 
+    CariBalanceAccount:
+      type: object
+      required: [code, name, tax_id, debit, credit, balance, side, share, reverse, unassigned]
+      properties:
+        code: { type: string, examples: ["120.01.001"] }
+        name: { type: string, description: "Empty when no source names the code" }
+        tax_id: { type: [string, "null"], description: VKN / TCKN when known }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string, description: "Signed (positive: borç bakiyesi)" }
+        side: { type: string, enum: [debit, credit, zero] }
+        share: { type: [string, "null"], description: "Percent of the group balance (one decimal) among rows on the group's side; null otherwise" }
+        reverse: { type: boolean, description: "Balance on the other side than the main account normally carries (ters bakiye)" }
+        unassigned: { type: boolean, description: "Amounts on the main account itself or on a code with sub accounts, on no single cari" }
+
+    CariBalanceGroup:
+      type: object
+      required: [main_code, name, debit, credit, balance, side, count, reverse_count, accounts]
+      properties:
+        main_code: { type: string, examples: ["120"] }
+        name: { type: string }
+        debit: { type: string }
+        credit: { type: string }
+        balance: { type: string }
+        side: { type: string, enum: [debit, credit, zero] }
+        count: { type: integer, description: Caris in the group (unassigned row not counted) }
+        reverse_count: { type: integer }
+        accounts:
+          type: array
+          items: { $ref: "#/components/schemas/CariBalanceAccount" }
+
+    CariBalanceReport:
+      type: object
+      required: [period, from_period, include_drafts, groups, totals]
+      properties:
+        period: { type: string, examples: ["2026-10"] }
+        from_period: { type: string, examples: ["2026-01"] }
+        include_drafts: { type: boolean }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/CariBalanceGroup" }
+        totals:
+          type: object
+          required: [debit, credit, debit_balance, credit_balance, count, reverse_count, unassigned_count]
+          properties:
+            debit: { type: string }
+            credit: { type: string }
+            debit_balance: { type: string, description: Sum of the debit balances }
+            credit_balance: { type: string, description: Sum of the credit balances (positive) }
+            count: { type: integer }
+            reverse_count: { type: integer }
+            unassigned_count: { type: integer }
+
     AccountPlanAccount:
       type: object
       required: [code, name, main_code, level, is_leaf]
@@ -27401,12 +27620,55 @@ components:
           type: boolean
           description: Only the responsible marks "kontrol edildi" / "verildi" (default true)
         updated_at: { type: string, format: date-time }
+    VATReportRule:
+      type: object
+      required: [trigger_kind, day, days_before, audience, scope, group_ref, engagement_uuids, label, enabled]
+      properties:
+        uuid: { type: string, format: uuid, description: Absent on the default rule and on new rules }
+        trigger_kind: { type: string, enum: [day, before_month_end] }
+        day: { type: [integer, "null"], minimum: 1, maximum: 31, description: "trigger_kind day: day of the month (a shorter month uses its last day)" }
+        days_before: { type: [integer, "null"], minimum: 0, maximum: 27, description: "trigger_kind before_month_end: days before the month's last day" }
+        audience: { type: string, enum: [office, taxpayer_approval, taxpayer_direct] }
+        scope: { type: string, enum: [all, group, selected, payable_only] }
+        group_ref: { type: [string, "null"], description: "scope group: communication centre group (#780 A)" }
+        engagement_uuids: { type: array, items: { type: string, format: uuid }, description: "scope selected: taxpayer files" }
+        label: { type: [string, "null"], maxLength: 80 }
+        enabled: { type: boolean }
+        next_run_on: { type: string, format: date, description: Next fire date (Istanbul); ignored on save }
+    EnvelopeVATReportRules:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items, default]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/VATReportRule" } }
+            default: { type: boolean, description: The office never saved a list; items holds the default rule }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeVATReportRun:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [taxpayers, raised, payable, notified, skipped]
+          properties:
+            taxpayers: { type: integer, description: Taxpayers the rule covered }
+            raised: { type: integer, description: New vat.report_ready events }
+            payable: { type: integer, description: Covered taxpayers with a payment due }
+            notified: { type: integer, description: "taxpayer_direct: notices sent" }
+            skipped: { type: integer, description: "taxpayer_direct: taxpayers without a panel user" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     VATTrackingSettings:
       type: object
-      required: [report_enabled, report_day, report_ready_on, updated_at]
+      required: [report_enabled, report_day, watch_enabled, report_ready_on, updated_at]
       properties:
         report_enabled: { type: boolean, description: Month-end VAT report is shown (default true) }
         report_day: { type: integer, description: 'Day of month the report is ready (1-31, default 29)' }
+        watch_enabled: { type: boolean, description: "Daily VAT watch (KDV nöbetçisi): status changed / threshold exceeded (default true)" }
         report_ready_on: { type: string, format: date, description: This month's ready date (a shorter month uses its last day) }
         updated_at: { type: [string, "null"], format: date-time }
     EnvelopeVATTrackingSettings:
@@ -27885,6 +28147,30 @@ components:
         message_ref:
           type: [string, "null"]
           description: İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null.
+    VATWatchEvent:
+      type: object
+      required: [uuid, period, event, payload, created_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        period: { type: string }
+        event: { type: string, enum: [vat.status_changed, vat.threshold_exceeded, vat.report_ready] }
+        payload:
+          type: object
+          additionalProperties: true
+          description: Common VAT event fields (taxpayer_title, period, outcome, payable, due_date, dedupe_key, ...); see #780.
+        created_at: { type: string, format: date-time }
+    EnvelopeVATWatch:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [raised, items]
+          properties:
+            raised: { type: integer }
+            items: { type: array, items: { $ref: "#/components/schemas/VATWatchEvent" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeVATNotice:
       type: object
       required: [success, data, meta]

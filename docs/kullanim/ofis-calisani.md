@@ -220,6 +220,11 @@ masraflardan ve onaylı Z raporlarından hesaplanır; KDV tutarı tahminidir.
   günüyle) mükellefin paneline ve e-postasına ofis adınızla gönderir. İsterseniz
   kısa bir not ekleyin. Kartın altında mükellefe ne söylendiği ve ne zaman,
   o günkü rakamlarla görünür.
+- **KDV nöbetçisi**: her sabah bu ayın KDV'si yeniden hesaplanır. Mükellefe
+  söylenen durum yeni bir faturayla değiştiyse kartta **KDV durumu
+  değişti** uyarısı çıkar ve size bildirim gelir; **Mükellefe yeni bilgi
+  gönder** ile güncel durumu tek tıkla iletin. Sabahı beklemeden bakmak için
+  **Şimdi kontrol et**e basın.
 
 Birden çok mükellefe aynı anda göndermek için kenar çubuğundaki
 **Raporlar** sayfasında mükellefleri seçip **Seçilenlere gönder**e basın.

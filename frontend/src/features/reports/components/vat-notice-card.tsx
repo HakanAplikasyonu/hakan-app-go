@@ -1,9 +1,10 @@
 "use client";
 
-import { Send } from "lucide-react";
+import { AlertTriangle, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,8 +20,10 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  useRunVATWatch,
   useSendVATNotice,
   useVATNotices,
+  useVATWatchEvents,
 } from "@/features/reports/hooks/use-vat-notices";
 import type { VATNotice } from "@/features/reports/services/vat-notice.service";
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
@@ -86,9 +89,11 @@ export function VATNoticeCard({
   engagement: string;
   canSend: boolean;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { slug } = useTenant();
   const list = useVATNotices(slug, engagement);
+  const watch = useVATWatchEvents(slug, engagement);
+  const run = useRunVATWatch(slug, engagement);
   const send = useSendVATNotice(slug, engagement);
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
@@ -115,6 +120,31 @@ export function VATNoticeCard({
   };
 
   const items = list.data?.items ?? [];
+  // KDV nöbetçisi (#780): son bildirimden sonra durum değiştiyse uyarı.
+  const latest = items[0];
+  const changed = latest
+    ? (watch.data?.items ?? []).find(
+        (e) =>
+          e.event === "vat.status_changed" &&
+          e.payload.notice_uuid === latest.uuid,
+      )
+    : undefined;
+
+  const onRun = () =>
+    run.mutate(undefined, {
+      onSuccess: (data) =>
+        toast.success(
+          data.raised > 0
+            ? t("reports.vat_watch.raised", { count: data.raised })
+            : t("reports.vat_watch.nothing"),
+        ),
+      onError: (e) =>
+        toast.error(
+          e instanceof Error && e.message
+            ? e.message
+            : t("reports.vat_watch.error"),
+        ),
+    });
 
   return (
     <Card data-testid="vat-notice-card">
@@ -126,13 +156,50 @@ export function VATNoticeCard({
           <p className="text-text-2 text-sm">{t("reports.vat_notice.hint")}</p>
         </div>
         {canSend ? (
-          <Button size="sm" onClick={() => setOpen(true)}>
-            <Send className="size-4" aria-hidden />
-            {t("reports.vat_notice.send")}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRun}
+              disabled={run.isPending}
+            >
+              <RefreshCw className="size-4" aria-hidden />
+              {t("reports.vat_watch.run")}
+            </Button>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              <Send className="size-4" aria-hidden />
+              {t("reports.vat_notice.send")}
+            </Button>
+          </div>
         ) : null}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
+        {changed && latest ? (
+          <Alert data-testid="vat-status-changed">
+            <AlertTriangle className="size-4" aria-hidden />
+            <AlertTitle>{t("reports.vat_watch.changed_title")}</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>
+                {t(
+                  latest.outcome === "payment"
+                    ? "reports.vat_watch.changed_was_payment"
+                    : "reports.vat_watch.changed_was_no_payment",
+                  { month: monthLabel(latest.period, locale) },
+                )}{" "}
+                {changed.payload.outcome === "payment"
+                  ? t("reports.vat_watch.changed_now_payment", {
+                      amount: money(String(changed.payload.payable), locale),
+                    })
+                  : t("reports.vat_watch.changed_now_no_payment")}
+              </p>
+              {canSend ? (
+                <Button size="sm" onClick={() => setOpen(true)}>
+                  {t("reports.vat_watch.resend")}
+                </Button>
+              ) : null}
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {list.isLoading ? (
           <Skeleton className="h-16 w-full" />
         ) : items.length === 0 ? (

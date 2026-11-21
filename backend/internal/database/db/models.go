@@ -2629,12 +2629,43 @@ type VatNotice struct {
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
+type VatReportRule struct {
+	ID              int64              `json:"id"`
+	Uuid            uuid.UUID          `json:"uuid"`
+	OrganizationID  int64              `json:"organization_id"`
+	TriggerKind     string             `json:"trigger_kind"`
+	Day             pgtype.Int4        `json:"day"`
+	DaysBefore      pgtype.Int4        `json:"days_before"`
+	Audience        string             `json:"audience"`
+	Scope           string             `json:"scope"`
+	GroupRef        pgtype.Text        `json:"group_ref"`
+	EngagementUuids []uuid.UUID        `json:"engagement_uuids"`
+	Label           pgtype.Text        `json:"label"`
+	Enabled         bool               `json:"enabled"`
+	UpdatedBy       pgtype.Int8        `json:"updated_by"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+}
+
 type VatTrackingSetting struct {
 	OrganizationID int64              `json:"organization_id"`
 	ReportEnabled  bool               `json:"report_enabled"`
 	ReportDay      int32              `json:"report_day"`
 	UpdatedBy      pgtype.Int8        `json:"updated_by"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	WatchEnabled   bool               `json:"watch_enabled"`
+}
+
+type VatWatchEvent struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   int64              `json:"engagement_id"`
+	Period         string             `json:"period"`
+	Event          string             `json:"event"`
+	DedupeKey      string             `json:"dedupe_key"`
+	Payload        []byte             `json:"payload"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
 type WarningCode struct {

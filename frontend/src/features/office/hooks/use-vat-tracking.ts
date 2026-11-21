@@ -6,6 +6,60 @@ import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
 export type VATTrackingSettings = components["schemas"]["VATTrackingSettings"];
+export type VATReportRule = components["schemas"]["VATReportRule"];
+export type VATReportRules =
+  components["schemas"]["EnvelopeVATReportRules"]["data"];
+export type VATReportRun =
+  components["schemas"]["EnvelopeVATReportRun"]["data"];
+
+const rulesKey = (slug: string) =>
+  ["tenant", slug.toLowerCase(), "vat-report-rules"] as const;
+
+/** KDV raporu kuralları (#780): günler, kime, hangi mükellefler. */
+export function useVATReportRules(slug: string) {
+  return useQuery({
+    queryKey: rulesKey(slug),
+    queryFn: () =>
+      tenantRequest<VATReportRules>(
+        slug,
+        "GET",
+        "/v1/tenant/vat-report-rules",
+        {
+          silent: true,
+        },
+      ),
+  });
+}
+
+export function useSaveVATReportRules(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: VATReportRule[]) =>
+      tenantRequest<VATReportRules>(
+        slug,
+        "PUT",
+        "/v1/tenant/vat-report-rules",
+        {
+          body: { items },
+          silent: true,
+        },
+      ),
+    onSuccess: (data) => qc.setQueryData(rulesKey(slug), data),
+  });
+}
+
+/** Bir kuralı şimdi çalıştırır ("default": varsayılan kural). */
+export function useRunVATReportRule(slug: string) {
+  return useMutation({
+    mutationFn: (rule: string) =>
+      tenantRequest<VATReportRun>(
+        slug,
+        "POST",
+        `/v1/tenant/vat-report-rules/${encodeURIComponent(rule)}/run`,
+        { body: {}, silent: true },
+      ),
+  });
+}
 
 const key = (slug: string) =>
   ["tenant", slug.toLowerCase(), "vat-tracking-settings"] as const;
@@ -31,7 +85,11 @@ export function useVATTrackingSettings(slug: string, enabled = true) {
 export function useSaveVATTrackingSettings(slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { report_enabled: boolean; report_day: number }) =>
+    mutationFn: (body: {
+      report_enabled: boolean;
+      report_day: number;
+      watch_enabled?: boolean;
+    }) =>
       tenantRequest<VATTrackingSettings>(
         slug,
         "PUT",
