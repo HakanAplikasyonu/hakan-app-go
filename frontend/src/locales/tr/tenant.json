@@ -192,5 +192,11 @@
   "final_check_title": "Sorumlu müşavirin son kontrolü",
   "final_check_label": "\"Kontrol edildi\" ve \"Verildi\" işaretini yalnız sorumlu koysun",
   "final_check_on": "Açık: beyanı herkes hazırlar; kontrol edildi ve verildi işaretini yalnız ofis sahibi ya da yönetici koyar.",
-  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir."
+  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir.",
+  "settings_section_taxpayer_panel": "Mükellef paneli",
+  "settings_section_taxpayer_panel_description": "Mükelleflerin kendi panelinde neleri göreceği.",
+  "taxpayer_vat_panel_title": "KDV durumu ve satış raporu",
+  "taxpayer_vat_panel_label": "Mükellef panelinde KDV ve satış raporu göster",
+  "taxpayer_vat_panel_on": "Açık: mükellef bu ayın tahmini KDV'sini, son ödeme gününü, satış toplamını, en çok satış yaptığı alıcıları ve son ayların satışını görür.",
+  "taxpayer_vat_panel_off": "Kapalı: bu bölüm mükellef panelinde görünmez; hesap yalnız ofiste kalır."
 }

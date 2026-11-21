@@ -121,7 +121,7 @@ func selfRegisteredModules(h moduleHandlers) []module.Module {
 		legalmodule.Module{H: h.legal},
 		doctasksmodule.Module{H: h.doctasks, Engagements: h.engagements, Taxpayers: h.taxpayers},
 		accountrulesmodule.Module{H: h.accountrules, Engagements: h.engagements},
-		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope},
+		vatforecastmodule.Module{H: h.vat, Engagements: h.engagements, Scope: h.rlsScope, Taxpayers: h.taxpayers},
 		officesetup.Module{H: h.setup},
 		supportmodule.Module{H: h.support, Taxpayers: h.taxpayers},
 		communicationmodule.Module{H: h.communication, Engagements: h.engagements},
