@@ -24,6 +24,7 @@ import { StatementAiSetting } from "@/features/tenant/components/statement-ai-se
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
 import { AutomationsCard } from "@/features/tenant/components/automations-card";
 import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
+import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
@@ -32,6 +33,7 @@ import { usePermission } from "@/providers/permission-provider";
 type SectionId =
   | "office"
   | "tax-returns"
+  | "taxpayer-panel"
   | "support"
   | "sms"
   | "automations"
@@ -135,6 +137,10 @@ export function TenantSettingsPage() {
       id: "tax-returns",
       label: t("tenant.settings_section_tax_returns"),
     },
+    {
+      id: "taxpayer-panel",
+      label: t("tenant.settings_section_taxpayer_panel"),
+    },
     { id: "support", label: t("tenant.settings_section_support") },
     { id: "sms", label: t("tenant.settings_section_sms") },
     { id: "automations", label: t("tenant.settings_section_automations") },
@@ -233,6 +239,16 @@ export function TenantSettingsPage() {
               slug={tenant.slug}
               canWrite={canWrite}
             />
+          </Section>
+          {/* Mükellef paneli (#780): anlık KDV ve satış raporu, varsayılan açık. */}
+          <Section
+            id="taxpayer-panel"
+            title={t("tenant.settings_section_taxpayer_panel")}
+            description={t(
+              "tenant.settings_section_taxpayer_panel_description",
+            )}
+          >
+            <TaxpayerVatPanelSetting slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {/* Destek (#387): ofisin ClickFix widget kimliği. */}
           <Section

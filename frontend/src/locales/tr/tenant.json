@@ -331,5 +331,11 @@
   "automation_drafts_reject_selected": "Seçilenleri reddet",
   "automation_drafts_approve": "Gönder",
   "automation_drafts_reject": "Reddet",
-  "automation_decided": "{{sent}} gönderildi, {{rejected}} reddedildi, {{failed}} başarısız."
+  "automation_decided": "{{sent}} gönderildi, {{rejected}} reddedildi, {{failed}} başarısız.",
+  "settings_section_taxpayer_panel": "Mükellef paneli",
+  "settings_section_taxpayer_panel_description": "Mükelleflerin kendi panelinde neleri göreceği.",
+  "taxpayer_vat_panel_title": "KDV durumu ve satış raporu",
+  "taxpayer_vat_panel_label": "Mükellef panelinde KDV ve satış raporu göster",
+  "taxpayer_vat_panel_on": "Açık: mükellef bu ayın tahmini KDV'sini, son ödeme gününü, satış toplamını, en çok satış yaptığı alıcıları ve son ayların satışını görür.",
+  "taxpayer_vat_panel_off": "Kapalı: bu bölüm mükellef panelinde görünmez; hesap yalnız ofiste kalır."
 }
