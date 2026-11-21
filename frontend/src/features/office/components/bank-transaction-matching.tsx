@@ -805,6 +805,17 @@ export function BankTransactionMatchingPanel({
         onBook={(code, name) => book.mutate({ code, name })}
       />
 
+      {v.fx ? (
+        <FxSection
+          engagement={engagement}
+          transaction={transaction}
+          currency={v.currency}
+          fx={v.fx}
+          canWrite={canWrite}
+          onSaved={(next) => qc.setQueryData(key, next)}
+        />
+      ) : null}
+
       {v.posting && v.debit_credit === "A" && v.currency === "TRY" ? (
         <CommissionSection
           engagement={engagement}
@@ -1029,6 +1040,136 @@ function AccountSection({
           )}
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Kur farkı (#565): döviz hareketi döviz faturasını kapatınca müşavir
+ * ödeme günü kurunu girer; kapanan tutar × (ödeme kuru − fatura kuru) TL
+ * farkı kâr ise 646 Kambiyo kârları, zarar ise 656 Kambiyo zararları olur.
+ */
+function FxSection({
+  engagement,
+  transaction,
+  currency,
+  fx,
+  canWrite,
+  onSaved,
+}: {
+  engagement: string;
+  transaction: string;
+  currency: string;
+  fx: NonNullable<BankTransactionMatching["fx"]>;
+  canWrite: boolean;
+  onSaved: (v: BankTransactionMatching) => void;
+}) {
+  const { t } = useLocale();
+  const { slug } = useTenant();
+  const [value, setValue] = useState("");
+  const save = useMutation({
+    mutationFn: (rate: string | null) =>
+      bankMatchingService.setFxRate(slug, engagement, transaction, rate),
+    onSuccess: (v, rate) => {
+      setValue("");
+      toast.success(
+        t(
+          rate === null
+            ? "office.bank.matching.fx_removed"
+            : "office.bank.matching.fx_saved",
+        ),
+      );
+      onSaved(v);
+    },
+    onError: (e) =>
+      toast.error(errText(e, t("office.bank.matching.fx_failed"))),
+  });
+  // Kur "34,5678" ya da "34.5678" yazılır: virgül varsa nokta binlik ayırıcıdır.
+  const raw = value.trim();
+  const typed = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+  const valid = /^\d+(\.\d{1,6})?$/.test(typed) && Number(typed) > 0;
+  const diff = fx.diff_try;
+  const gain = diff !== null && !diff.startsWith("-");
+  return (
+    <section className="space-y-2" data-testid="bank-transaction-fx">
+      <h3 className="text-sm font-medium">
+        {t("office.bank.matching.fx_title")}
+      </h3>
+      {fx.missing_invoice_rate ? (
+        <p className="text-warn text-sm">
+          {t("office.bank.matching.fx_missing_invoice_rate")}
+        </p>
+      ) : diff !== null ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span>
+            {t("office.bank.matching.fx_rate_label", { currency })}{" "}
+            <Figure>{fx.rate_payment}</Figure>
+          </span>
+          <span
+            className={cn("font-medium", gain ? "text-ok" : "text-warn")}
+            data-testid="bank-transaction-fx-diff"
+          >
+            {t(
+              gain
+                ? "office.bank.matching.fx_gain"
+                : "office.bank.matching.fx_loss",
+            )}{" "}
+            <Money value={diff.replace("-", "")} currency="TRY" /> (
+            <Figure>{fx.account_code}</Figure>)
+          </span>
+          {canWrite ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={save.isPending}
+              onClick={() => save.mutate(null)}
+            >
+              {t("office.bank.matching.fx_remove")}
+            </Button>
+          ) : null}
+        </div>
+      ) : canWrite ? (
+        <>
+          <p className="text-text-2 text-xs">
+            {t("office.bank.matching.fx_hint")}
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (valid) save.mutate(typed);
+            }}
+          >
+            <div className="space-y-1">
+              <Label htmlFor={`fx-${transaction}`}>
+                {t("office.bank.matching.fx_rate_label", { currency })}
+              </Label>
+              <Input
+                id={`fx-${transaction}`}
+                inputMode="decimal"
+                className="w-36"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="0,0000"
+              />
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!valid || save.isPending}
+              className="max-md:min-h-11"
+            >
+              {t("office.bank.matching.fx_save")}
+            </Button>
+          </form>
+        </>
+      ) : (
+        <p className="text-text-3 text-sm">
+          {t("office.bank.matching.fx_none")}
+        </p>
+      )}
     </section>
   );
 }

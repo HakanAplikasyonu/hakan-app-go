@@ -81,6 +81,8 @@
   "codes.PAYROLL_SHEET_NOT_FOUND": "No sheet in the file looks like a payroll. Upload the payroll report as Excel or CSV.",
   "codes.PAYROLL_UNAVAILABLE": "Payroll is not available right now. Try again shortly.",
   "codes.BANK_POSTING_DRAFTED": "This transaction is in a journal draft. Reverse the draft first to change it.",
+  "codes.BANK_FX_NOT_APPLICABLE": "Exchange difference applies only to a foreign currency movement closing a foreign currency invoice.",
+  "codes.INVOICE_EXCHANGE_RATE_MISSING": "A matched foreign currency invoice has no rate. Enter its issue date rate on the invoice first.",
   "codes.BANK_POSTING_MISSING": "This movement has no counter account yet. Book it to an account first, then enter the commission.",
   "codes.BANK_REFUSED": "The bank refused the request. Check the connection details.",
   "codes.BANK_NOT_SUPPORTED": "There is no direct connection for this bank yet. Upload a statement instead.",

@@ -195,6 +195,20 @@ export const bankMatchingService = {
    * POS komisyonu (#565): banka tahsilattan komisyonu düşüp neti yatırdı;
    * komisyon 653 / 780'e, karşı hesaba brüt yazılır. null siler.
    */
+  /** Döviz hareketinin ödeme günü kuru; kur farkı hesaplanır (#565). */
+  setFxRate(
+    slug: string,
+    engagement: string,
+    transaction: string,
+    rate: string | null,
+  ) {
+    return tenantRequest<BankTransactionMatching>(
+      slug,
+      "PUT",
+      `${tx(engagement, transaction)}/fx-rate`,
+      { body: { rate } },
+    );
+  },
   setCommission(
     slug: string,
     engagement: string,

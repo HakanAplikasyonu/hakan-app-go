@@ -56,6 +56,9 @@ type TransactionView struct {
 	Matchable           bool             `json:"matchable"`
 	Matches             []MatchedInvoice `json:"matches"`
 	Candidates          []CandidateView  `json:"candidates"`
+	// Fx: the exchange difference of a foreign currency movement closing
+	// foreign currency invoices (#565); nil otherwise.
+	Fx *FxView `json:"fx"`
 	// LineMatchable: the movement can be tied to an existing journal line
 	// (any movement that is not cancelled, #669 G).
 	LineMatchable  bool                 `json:"line_matchable"`
@@ -256,6 +259,7 @@ func (s *Service) view(ctx context.Context, q *db.Queries, sub Subject, t db.Ban
 	if err := s.financialView(ctx, q, sub, t, &v); err != nil {
 		return v, err
 	}
+	v.Fx = fxView(t, matches)
 	matched := map[uuid.UUID]bool{}
 	for _, r := range matches {
 		matched[r.InvoiceUuid] = true
