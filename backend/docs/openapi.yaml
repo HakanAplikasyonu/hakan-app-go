@@ -17735,6 +17735,76 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/rent-withholdings/{transactionUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - $ref: "#/components/parameters/TaxReturnKind"
+      - { name: period, in: path, required: true, schema: { type: string, pattern: "^[0-9]{4}-(0[1-9]|1[0-2])$" } }
+      - { name: transactionUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [TaxReturns]
+      operationId: setEngagementTaxReturnRentWithholding
+      summary: Mark a bank movement as rent paid without an invoice
+      description: |
+        Requires `tenant.tax_returns.write` (#575). MUHSGK only (`400` otherwise), while it is a draft
+        (`409 TAX_RETURN_NOT_DRAFT`). The movement must be an outgoing TRY payment of the period, not cancelled
+        (`422`). Net = the movement's amount; gross = net / (1 − rate / 100); tax = gross − net. `rate` defaults to 20
+        (GVK 94/5-a, rent paid to individuals). Marking again changes the rate.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rate: { type: [string, "null"], description: "Percent, 0 < rate < 100; default 20" }
+      responses:
+        "200":
+          description: The MUHSGK preview with the rent row
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: not an outgoing TRY payment of the period, or the rate is out of range"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [TaxReturns]
+      operationId: deleteEngagementTaxReturnRentWithholding
+      summary: Remove the rent mark of a bank movement
+      description: Requires `tenant.tax_returns.write` (#575). MUHSGK draft only.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: The MUHSGK preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTaxReturn"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422":
+          description: "`VALIDATION_ERROR`: the movement is not in the period"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/tax-returns/{returnKind}/{period}/export:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -27008,11 +27078,18 @@ components:
             type: object
             required: [kind, rate, count, base, tax]
             properties:
-              kind: { type: string, enum: [wage, self_employed, agricultural, other] }
+              kind: { type: string, enum: [wage, self_employed, agricultural, other, rent], description: rent is rent paid from the bank without an invoice (#575) }
               rate: { type: string }
               count: { type: integer, format: int64 }
               base: { $ref: "#/components/schemas/TaxReturnMoney" }
               tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+        rent_payments:
+          type: array
+          description: |
+            Faturasız kira (#575): bank movements of the period marked as rent paid without an invoice (gross = net / (1 − rate),
+            tax = gross − net; default rate 20, GVK 94/5-a) and rent-looking outgoing movements not matched to an invoice
+            (marked false). Missing in snapshots taken before #575.
+          items: { $ref: "#/components/schemas/TaxReturnRentPayment" }
         employees:
           type: array
           items:
@@ -27194,6 +27271,20 @@ components:
             - type: "null"
         differences: { type: array, items: { $ref: "#/components/schemas/TaxReturnAmendmentFigure" } }
         versions: { type: array, description: "Archived versions, newest first", items: { $ref: "#/components/schemas/TaxReturnAmendmentVersion" } }
+
+    TaxReturnRentPayment:
+      type: object
+      required: [uuid, transaction_date, description, counterparty_name, net, marked, rate, gross, tax]
+      properties:
+        uuid: { type: string, format: uuid }
+        transaction_date: { type: string, format: date }
+        description: { type: string }
+        counterparty_name: { type: string }
+        net: { $ref: "#/components/schemas/TaxReturnMoney" }
+        marked: { type: boolean }
+        rate: { type: string, description: Empty unless marked }
+        gross: { $ref: "#/components/schemas/TaxReturnMoney" }
+        tax: { $ref: "#/components/schemas/TaxReturnMoney" }
 
     TaxReturnSection:
       type: object

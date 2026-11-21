@@ -19,6 +19,8 @@ export type TaxReturnAdjustments =
   components["schemas"]["TaxReturnKDV1Adjustments"];
 export type TaxReturnDraftInput = components["schemas"]["TaxReturnDraftInput"];
 export type TaxReturnFileInput = components["schemas"]["TaxReturnFileInput"];
+export type TaxReturnRentPayment =
+  components["schemas"]["TaxReturnRentPayment"];
 export type TaxReturnAmendment = components["schemas"]["TaxReturnAmendment"];
 export type TaxReturnPayment = components["schemas"]["TaxReturnPayment"];
 export type TaxReturnPaymentMovement =
@@ -157,6 +159,37 @@ export const taxReturnsService = {
       slug,
       "POST",
       `${one(engagement, kind, period)}/amend`,
+      { silent: true },
+    );
+  },
+  /**
+   * Faturasız kira stopajı (#575): banka çıkışı kira ödemesi işaretlenir
+   * (brüt = net / (1 − oran)); null oran %20. Yalnız taslak MUHSGK.
+   */
+  setRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+    rate: string | null = null,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "PUT",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
+      { body: { rate }, silent: true },
+    );
+  },
+  deleteRent(
+    slug: string,
+    engagement: string,
+    period: string,
+    transaction: string,
+  ) {
+    return tenantRequest<TaxReturnPreview>(
+      slug,
+      "DELETE",
+      `${one(engagement, "muhsgk", period)}/rent-withholdings/${encodeURIComponent(transaction)}`,
       { silent: true },
     );
   },
