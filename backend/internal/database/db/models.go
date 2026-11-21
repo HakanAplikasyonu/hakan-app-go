@@ -450,6 +450,9 @@ type BankTransactionMatch struct {
 	Evidence          []byte             `json:"evidence"`
 	MatchedBy         pgtype.Int8        `json:"matched_by"`
 	MatchedAt         pgtype.Timestamptz `json:"matched_at"`
+	FxRateInvoice     pgtype.Numeric     `json:"fx_rate_invoice"`
+	FxRatePayment     pgtype.Numeric     `json:"fx_rate_payment"`
+	FxDiffTry         pgtype.Numeric     `json:"fx_diff_try"`
 }
 
 type BankTransactionPosting struct {

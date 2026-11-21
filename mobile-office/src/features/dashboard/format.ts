@@ -20,12 +20,13 @@ export function countLabel(n: number | undefined | null): string {
   return n > 999 ? '999+' : String(n);
 }
 
+/** Türkiye saatine göre: 05–12 Günaydın, 12–18 İyi günler, 18–22 İyi akşamlar, 22–05 İyi geceler. */
 export function greeting(now: Date = new Date()): string {
-  const h = Number(now.toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Europe/Istanbul' }));
-  if (h < 6) return 'İyi geceler';
-  if (h < 12) return 'Günaydın';
-  if (h < 18) return 'İyi günler';
-  return 'İyi akşamlar';
+  const h = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/Istanbul' }).format(now));
+  if (h >= 5 && h < 12) return 'Günaydın';
+  if (h >= 12 && h < 18) return 'İyi günler';
+  if (h >= 18 && h < 22) return 'İyi akşamlar';
+  return 'İyi geceler';
 }
 
 function istanbulYearMonthDay(now: Date): [number, number, number] {

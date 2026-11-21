@@ -799,6 +799,9 @@ type Querier interface {
 	// Banka ekstresi şablonları (issue #383): ofisin kaydettiği başlık
 	// düzenleri. Başlangıç şablonları kodda (banking/statement/templates.go).
 	ListBankStatementTemplates(ctx context.Context, organizationID int64) ([]BankStatementTemplate, error)
+	ListBankTransactionFinancialMatches(ctx context.Context, arg ListBankTransactionFinancialMatchesParams) ([]ListBankTransactionFinancialMatchesRow, error)
+	// Kur farkı (#565): hareketin döviz fatura eşleşmeleri ve faturaların kuru.
+	ListBankTransactionFxMatches(ctx context.Context, arg ListBankTransactionFxMatchesParams) ([]ListBankTransactionFxMatchesRow, error)
 	ListBankTransactionMatchInvoices(ctx context.Context, arg ListBankTransactionMatchInvoicesParams) ([]ListBankTransactionMatchInvoicesRow, error)
 	// Fiş satırı / cari hareketi eşleşmesi (#669 G). Satır angajman
 	// kapsamlıdır: her sorgu satırı ve fişi organization_id + engagement_id ile,
@@ -924,6 +927,10 @@ type Querier interface {
 	ListExportJobsForActor(ctx context.Context, arg ListExportJobsForActorParams) ([]ExportJob, error)
 	// Onaylı ve geri alınmamış bir batch'te olmayan fişler.
 	ListExportableJournalDrafts(ctx context.Context, arg ListExportableJournalDraftsParams) ([]JournalDraft, error)
+	// Elle bağlanabilecek kaynak finansal işlemleri (#565): çek, senet, kredi
+	// kartı; aynı yön, TL; işlem ya da vade tarihi hareketin 120 gün öncesi ile
+	// 10 gün sonrası arasında. Bağlanan tutar bu hareketin payı hariç.
+	ListFinancialTransactionsForBankMatch(ctx context.Context, arg ListFinancialTransactionsForBankMatchParams) ([]ListFinancialTransactionsForBankMatchRow, error)
 	// Luca hesap planı ve cari alt hesap çıktısı (#464).
 	ListGeneratedSubaccounts(ctx context.Context, arg ListGeneratedSubaccountsParams) ([]GeneratedSubaccount, error)
 	ListHistorySharesForEngagement(ctx context.Context, arg ListHistorySharesForEngagementParams) ([]ListHistorySharesForEngagementRow, error)
@@ -1449,6 +1456,7 @@ type Querier interface {
 	// Ofis hareketi hesaptan çıkarır ya da yeniden dahil eder (#710). Bankanın
 	// iptal ettiği hareket (excluded_at boş, is_cancelled) dahil edilemez.
 	SetBankTransactionExcluded(ctx context.Context, arg SetBankTransactionExcludedParams) (SetBankTransactionExcludedRow, error)
+	SetBankTransactionMatchFx(ctx context.Context, arg SetBankTransactionMatchFxParams) error
 	SetBankTransactionMatchStatus(ctx context.Context, arg SetBankTransactionMatchStatusParams) error
 	// Daha öncelikli bir kanal geldiğinde birincil kaynağı değiştirir.
 	SetBankTransactionPrimarySource(ctx context.Context, arg SetBankTransactionPrimarySourceParams) error

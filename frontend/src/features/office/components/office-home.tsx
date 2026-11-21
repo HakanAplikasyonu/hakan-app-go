@@ -25,6 +25,7 @@ import {
   useReviewPeriodTotals,
 } from "../hooks/use-office-data";
 import { cellAt, sortByProgress } from "../lib/command";
+import { greetingKey } from "../lib/greeting";
 import {
   daysUntil,
   monthName,
@@ -94,19 +95,6 @@ function cellCrown(c: PeriodMatrixCell | undefined): TacDurumu {
   if (c.locked) return "aktarildi";
   if (c.ready) return "onaylandi";
   return "yuklendi";
-}
-
-function greetingKey(now = new Date()) {
-  const h = Number(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Europe/Istanbul",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(now),
-  );
-  if (h >= 5 && h < 12) return "office.home.greeting_morning";
-  if (h >= 12 && h < 18) return "office.home.greeting_day";
-  return "office.home.greeting_evening";
 }
 
 const feedKey: Record<OfficeDashboardUpload["kind"], string> = {
@@ -362,11 +350,16 @@ export function OfficeHome() {
                       : Math.round(approval * 100),
                 })
               : undefined,
+            // Sade cümle (#710): "5 mükellefin 5 tanesinde" yerine "hepsinde".
             rows.length - ready > 0
-              ? t("office.home.crown_summary_left", {
-                  left: rows.length - ready,
-                  blocked,
-                })
+              ? t(
+                  blocked === 0
+                    ? "office.home.crown_summary_left_none"
+                    : blocked >= rows.length - ready
+                      ? "office.home.crown_summary_left_all"
+                      : "office.home.crown_summary_left",
+                  { left: rows.length - ready, blocked },
+                )
               : undefined,
           ]
             .filter(Boolean)
