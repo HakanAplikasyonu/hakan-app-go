@@ -312,3 +312,28 @@ func (p *Postgres) AccountNames(ctx context.Context, s usecase.Subject, target s
 	}
 	return out, nil
 }
+
+// CariInfo implements usecase.Store (#780): the first name and the first
+// VKN / TCKN found per code, in source order (plan, generated sub
+// accounts, cari hafızası).
+func (p *Postgres) CariInfo(ctx context.Context, s usecase.Subject, codes []string) (map[string]usecase.CariInfo, error) {
+	out := map[string]usecase.CariInfo{}
+	if len(codes) == 0 {
+		return out, nil
+	}
+	rows, err := p.q.CariAccountInfo(ctx, db.CariAccountInfoParams{OrganizationID: s.OrganizationID, EngagementID: s.EngagementID, Codes: codes})
+	if err != nil {
+		return nil, fmt.Errorf("cari account info: %w", err)
+	}
+	for _, r := range rows {
+		c := out[r.Code]
+		if c.Name == "" {
+			c.Name = r.Name
+		}
+		if c.TaxID == "" {
+			c.TaxID = r.TaxID
+		}
+		out[r.Code] = c
+	}
+	return out, nil
+}

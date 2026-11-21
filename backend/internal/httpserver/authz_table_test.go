@@ -39,6 +39,7 @@ const (
 // authzTable classifies every operation (generated from the observed
 // matrix with AUTHZ_DISCOVER=1, then reviewed: see docs/yetki-matrisi.md).
 var authzTable = map[string]authzClass{
+	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/cari-balances": azTenantRead,
 	// Co-pilot (#392).
 	"GET /v1/tenant/copilot/workflow":                              azTenantRead,
 	"GET /v1/tenant/engagements/{engagementUuid}/copilot/workflow": azTenantRead,
