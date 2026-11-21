@@ -22,13 +22,14 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
+import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 type SectionId =
-  "office" | "tax-returns" | "support" | "ai" | "agents" | "appearance";
+  "office" | "tax-returns" | "support" | "sms" | "ai" | "agents" | "appearance";
 
 /** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
 function SettingsNav({
@@ -127,6 +128,7 @@ export function TenantSettingsPage() {
       label: t("tenant.settings_section_tax_returns"),
     },
     { id: "support", label: t("tenant.settings_section_support") },
+    { id: "sms", label: t("tenant.settings_section_sms") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
       : []),
@@ -230,6 +232,14 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_support_description")}
           >
             <SupportSettingsCard slug={tenant.slug} canWrite={canWrite} />
+          </Section>
+          {/* SMS (#780 A, İletişim merkezi): ofisin NetGSM hesabı. */}
+          <Section
+            id="sms"
+            title={t("tenant.settings_section_sms")}
+            description={t("tenant.settings_section_sms_description")}
+          >
+            <SmsSettingsCard slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {showAi ? (
             <Section

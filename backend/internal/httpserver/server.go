@@ -53,6 +53,7 @@ import (
 	bulkmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk"
 	bulkhandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/handler"
 	bulkusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/bulk/usecase"
+	communicationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/communication"
 	copilotmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/copilot"
 	doctasksmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/doctasks"
 	engagementsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/engagements"
@@ -246,11 +247,13 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 	}
 
 	mailer := mail.NewSMTPSender(cfg.SMTP)
+	// İletişim merkezi (#780 A): ofisin NetGSM hesabı, SMS / e-posta kaydı.
+	commSvc := communicationmodule.NewFromConfig(deps.DB, cfg.Encryption.SecretsKeyring, cfg.Encryption.SecretsActiveKeyID, cfg.Encryption.Key, mailer, log)
 	provs := []providers.Provider{
 		providers.InappProvider{},
 		providers.NewEmailProvider(mailer, cfg.Auth.FrontendURL, cfg.Encryption.Key),
 		providers.RealtimeProvider{Pub: deps.Realtime},
-		providers.NoopProvider{Name: "sms", Log: log},
+		communicationmodule.SMSProvider{Svc: commSvc},
 		providers.NoopProvider{Name: "push", Log: log},
 	}
 	secretBox, err := crypto.NewSecretBox(cfg.Encryption.Key)
@@ -730,6 +733,7 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		officeReview:  &officedashmodule.ReviewHandler{Q: deps.Queries},
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
+		communication: communicationmodule.NewHandler(commSvc),
 		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
 		whatsapp: whatsappmodule.NewHandler(
 			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),

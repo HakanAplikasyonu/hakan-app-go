@@ -1347,6 +1347,27 @@ type LogPurgeRule struct {
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
+type MailMessage struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	ToEmail        string             `json:"to_email"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	Status         string             `json:"status"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	BulkID         pgtype.UUID        `json:"bulk_id"`
+	TrackToken     uuid.UUID          `json:"track_token"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	OpenedAt       pgtype.Timestamptz `json:"opened_at"`
+	DownloadedAt   pgtype.Timestamptz `json:"downloaded_at"`
+}
+
 type Notification struct {
 	ID                int64              `json:"id"`
 	Uuid              uuid.UUID          `json:"uuid"`
@@ -1450,6 +1471,23 @@ type OfficeExportSetting struct {
 	UpdatedBy           pgtype.Int8        `json:"updated_by"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OfficeSmsSetting struct {
+	OrganizationID  int64              `json:"organization_id"`
+	Enabled         bool               `json:"enabled"`
+	TestMode        bool               `json:"test_mode"`
+	Usercode        string             `json:"usercode"`
+	PasswordRef     pgtype.Text        `json:"password_ref"`
+	Msgheader       string             `json:"msgheader"`
+	Encoding        string             `json:"encoding"`
+	Appname         string             `json:"appname"`
+	LastTestAt      pgtype.Timestamptz `json:"last_test_at"`
+	LastTestOk      pgtype.Bool        `json:"last_test_ok"`
+	LastTestCode    string             `json:"last_test_code"`
+	LastTestHeaders []string           `json:"last_test_headers"`
+	UpdatedBy       pgtype.Int8        `json:"updated_by"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OfficeSupportSetting struct {
@@ -2006,6 +2044,27 @@ type SgkPremium struct {
 	Note              pgtype.Text        `json:"note"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SmsMessage struct {
+	ID             int64              `json:"id"`
+	Uuid           uuid.UUID          `json:"uuid"`
+	OrganizationID int64              `json:"organization_id"`
+	EngagementID   pgtype.Int8        `json:"engagement_id"`
+	Phone          string             `json:"phone"`
+	Body           string             `json:"body"`
+	Msgheader      string             `json:"msgheader"`
+	Status         string             `json:"status"`
+	ProviderJobID  string             `json:"provider_job_id"`
+	ErrorCode      string             `json:"error_code"`
+	ErrorMessage   string             `json:"error_message"`
+	SourceRule     string             `json:"source_rule"`
+	SourceRef      string             `json:"source_ref"`
+	SentBy         pgtype.Int8        `json:"sent_by"`
+	BulkID         pgtype.UUID        `json:"bulk_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
 }
 
 type SourceConnection struct {
