@@ -321,7 +321,7 @@ func (s *Service) StartBulk(ctx context.Context, org, actor int64, in BulkInput)
 	items := p.plan.Items
 	start := func(context.Context) {
 		s.bulkWG.Add(1)
-		go func() {
+		go func() { //nolint:gosec // G118: the send outlives the request on purpose; the request ctx carries a finished tx
 			defer s.bulkWG.Done()
 			// The request's transaction (if any) has ended; the send runs on
 			// the pool, outside the request.
