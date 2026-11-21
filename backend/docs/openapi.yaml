@@ -23299,7 +23299,7 @@ components:
         offset: { type: integer }
         summary:
           type: object
-          required: [total, in_total, out_total, unmatched, suggested, matched]
+          required: [total, in_total, out_total, unmatched, suggested, matched, unmatched_booked]
           properties:
             total: { type: integer, format: int64 }
             in_total: { type: string, description: Decimal string }
@@ -23307,6 +23307,7 @@ components:
             unmatched: { type: integer, format: int64 }
             suggested: { type: integer, format: int64 }
             matched: { type: integer, format: int64 }
+            unmatched_booked: { type: integer, format: int64, description: "Unmatched movements whose counter account is approved (tax, SGK, salary, fees): done, not waiting (#710)" }
     PayrollEmployee:
       type: object
       description: An employee of the taxpayer (#382). The national id is never returned in clear.
