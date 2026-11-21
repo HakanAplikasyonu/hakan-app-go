@@ -70,6 +70,8 @@ import {
   type TaxReturnEmployee,
   type TaxReturnKDV1,
   type TaxReturnKDV2,
+  type TaxReturnStamp,
+  type TaxReturnStampLine,
   type TaxReturnKind,
   type TaxReturnMUHSGK,
   type TaxReturnPreview,
@@ -207,7 +209,10 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
     }) =>
       taxReturnsService.saveDraft(slug, engagement, kind, period, {
         acknowledged: body.acknowledged ?? acks,
-        adjustments: kind === "kdv1" ? (body.adjustments ?? adjustments) : {},
+        adjustments:
+          kind === "kdv1" || kind === "damga"
+            ? (body.adjustments ?? adjustments)
+            : {},
         note: p?.record?.note ?? null,
       }),
     onSuccess: onSaved,
@@ -393,6 +398,17 @@ function TaxReturnsInner({ engagement }: { engagement: string }) {
             />
           ) : null}
           {p.kdv2 ? <KDV2View k={p.kdv2} /> : null}
+          {p.damga ? (
+            <StampView
+              x={p.damga}
+              lines={adjustments.stamp_lines ?? []}
+              editable={editable}
+              busy={save.isPending}
+              onSave={(lines) =>
+                save.mutate({ adjustments: { stamp_lines: lines } })
+              }
+            />
+          ) : null}
           {p.muhsgk ? <MUHSGKView m={p.muhsgk} /> : null}
           {p.babs ? <BABSView b={p.babs} /> : null}
         </>
@@ -440,6 +456,16 @@ function TaxReturnSummary({ p }: { p: TaxReturnPreview }) {
     figures.push(
       { label: t("office.tax_returns.base_total"), value: x.base },
       { label: t("office.tax_returns.calculated_vat"), value: x.vat },
+      {
+        label: t("office.tax_returns.payable"),
+        value: x.payable,
+        strong: true,
+      },
+    );
+  } else if (p.damga) {
+    const x = p.damga.totals;
+    figures.push(
+      { label: t("office.tax_returns.base_total"), value: x.base },
       {
         label: t("office.tax_returns.payable"),
         value: x.payable,
@@ -1146,6 +1172,217 @@ function KDV2View({ k }: { k: TaxReturnKDV2 }) {
         empty={t("office.tax_returns.kdv2_empty")}
       />
     </Section>
+  );
+}
+
+/** "1.250,50" → "1250.50"; boş → undefined; geçersiz → null. */
+function parseTL(v: string): string | undefined | null {
+  const raw = v.trim().replace(/\./g, "").replace(",", ".");
+  if (raw === "") return undefined;
+  return /^\d+(\.\d{1,2})?$/.test(raw) ? raw : null;
+}
+
+type StampDraftRow = {
+  id: number;
+  document: string;
+  count: string;
+  base: string;
+  rate: string;
+  tax: string;
+};
+
+const STAMP_FIELDS = ["document", "count", "base", "rate", "tax"] as const;
+
+/**
+ * Damga vergisi beyannamesi (#575): kağıtlar elle girilir. Nispi satırda
+ * matrah × binde oran / 1000, maktu satırda girilen vergi.
+ */
+function StampView({
+  x,
+  lines,
+  editable,
+  busy,
+  onSave,
+}: {
+  x: TaxReturnStamp;
+  lines: TaxReturnStampLine[];
+  editable: boolean;
+  busy: boolean;
+  onSave: (lines: TaxReturnStampLine[]) => void;
+}) {
+  const { t } = useLocale();
+  const m = (v: string) => <Money value={v} />;
+  return (
+    <Section title={t("office.tax_returns.stamp_rows")}>
+      <p className="text-text-2 mb-2 text-sm">
+        {t("office.tax_returns.stamp_hint")}
+      </p>
+      <Grid
+        head={[
+          t("office.tax_returns.col_document"),
+          t("office.tax_returns.col_count"),
+          t("office.tax_returns.col_base"),
+          t("office.tax_returns.col_rate_permille"),
+          t("office.tax_returns.stamp_col_tax"),
+        ]}
+        rows={[
+          ...x.rows.map((r) => [
+            r.document,
+            r.count,
+            r.base ? m(r.base) : t("office.tax_returns.stamp_fixed"),
+            r.rate_permille ? `‰${r.rate_permille.replace(".", ",")}` : "",
+            m(r.tax),
+          ]),
+          ...(x.rows.length > 0
+            ? [
+                [
+                  t("office.tax_returns.total"),
+                  x.totals.count,
+                  m(x.totals.base),
+                  "",
+                  m(x.totals.payable),
+                ],
+              ]
+            : []),
+        ]}
+        empty={t("office.tax_returns.stamp_empty")}
+      />
+      {editable ? (
+        <StampForm
+          key={JSON.stringify(lines)}
+          lines={lines}
+          busy={busy}
+          onSave={onSave}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+function StampForm({
+  lines,
+  busy,
+  onSave,
+}: {
+  lines: TaxReturnStampLine[];
+  busy: boolean;
+  onSave: (lines: TaxReturnStampLine[]) => void;
+}) {
+  const { t } = useLocale();
+  const tr = (v?: string | null) => (v ?? "").replace(".", ",");
+  const [rows, setRows] = useState<StampDraftRow[]>(() =>
+    lines.map((l, i) => ({
+      id: i,
+      document: l.document,
+      count: String(l.count),
+      base: tr(l.base),
+      rate: tr(l.rate_permille),
+      tax: tr(l.tax),
+    })),
+  );
+  const [nextId, setNextId] = useState(lines.length);
+  const [error, setError] = useState("");
+  const set = (id: number, f: keyof StampDraftRow, v: string) =>
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, [f]: v } : r)));
+  return (
+    <form
+      className="border-line mt-4 space-y-3 border-t pt-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const out: TaxReturnStampLine[] = [];
+        for (const r of rows) {
+          const document = r.document.trim();
+          const count = Number(r.count.trim());
+          const base = parseTL(r.base);
+          const tax = parseTL(r.tax);
+          const rateRaw = r.rate.trim().replace(",", ".");
+          const rateOk = rateRaw === "" || /^\d+(\.\d{1,3})?$/.test(rateRaw);
+          const nispi = base !== undefined || rateRaw !== "";
+          const ok =
+            document !== "" &&
+            Number.isInteger(count) &&
+            count >= 1 &&
+            base !== null &&
+            tax !== null &&
+            rateOk &&
+            (nispi
+              ? base !== undefined && rateRaw !== "" && tax === undefined
+              : tax !== undefined);
+          if (!ok) {
+            setError(t("office.tax_returns.stamp_invalid"));
+            return;
+          }
+          out.push(
+            nispi
+              ? { document, count, base, rate_permille: rateRaw }
+              : { document, count, tax },
+          );
+        }
+        setError("");
+        onSave(out);
+      }}
+    >
+      {rows.map((r, i) => (
+        <div
+          key={r.id}
+          role="group"
+          aria-label={t("office.tax_returns.stamp_line", { n: i + 1 })}
+          className="grid gap-2 sm:grid-cols-[2fr_5rem_1fr_6rem_1fr_auto]"
+        >
+          {STAMP_FIELDS.map((f) => (
+            <Input
+              key={f}
+              aria-label={t(`office.tax_returns.stamp_field_${f}`)}
+              placeholder={t(`office.tax_returns.stamp_placeholder_${f}`)}
+              inputMode={f === "document" ? undefined : "decimal"}
+              className={f === "document" ? "" : "text-right tabular-nums"}
+              value={r[f]}
+              onChange={(e) => set(r.id, f, e.target.value)}
+            />
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setRows((rs) => rs.filter((x) => x.id !== r.id))}
+          >
+            {t("office.tax_returns.stamp_remove")}
+          </Button>
+        </div>
+      ))}
+      {error ? (
+        <p role="alert" className="text-danger text-sm">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={rows.length >= 50}
+          onClick={() => {
+            setRows((rs) => [
+              ...rs,
+              {
+                id: nextId,
+                document: "",
+                count: "1",
+                base: "",
+                rate: "",
+                tax: "",
+              },
+            ]);
+            setNextId((n) => n + 1);
+          }}
+        >
+          {t("office.tax_returns.stamp_add")}
+        </Button>
+        <Button type="submit" size="sm" variant="outline" disabled={busy}>
+          {t("office.tax_returns.stamp_save")}
+        </Button>
+      </div>
+    </form>
   );
 }
 

@@ -243,11 +243,58 @@ func TestComputeKDV2(t *testing.T) {
 	}
 }
 
+func TestComputeStamp(t *testing.T) {
+	adj, err := ParseStampAdjustments([]byte(`{"stamp_lines":[
+		{"document":" Kira sözleşmesi ","count":1,"base":"120000.00","rate_permille":"1.89"},
+		{"document":"İhale kararı","count":2,"base":"33333.33","rate_permille":"5.69"},
+		{"document":"Bilanço","count":1,"tax":"1106.90"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, items := ComputeStamp(StampInput{Adjustments: adj, PayrollStampTax: d("455.10")})
+	if len(x.Rows) != 3 || x.Rows[0].Document != "Kira sözleşmesi" || x.Rows[0].Fixed || !x.Rows[2].Fixed || x.Rows[2].Base != nil {
+		t.Fatalf("rows = %+v", x.Rows)
+	}
+	eq(t, "kira", x.Rows[0].Tax, "226.80")  // 120000 × 1,89 / 1000
+	eq(t, "ihale", x.Rows[1].Tax, "189.67") // 33333,33 × 5,69 / 1000 = 189,666...
+	eq(t, "maktu", x.Rows[2].Tax, "1106.90")
+	eq(t, "base", x.Totals.Base, "153333.33")
+	eq(t, "payable", x.Totals.Payable, "1523.37")
+	if x.Totals.Count != 4 {
+		t.Errorf("count = %d", x.Totals.Count)
+	}
+	if c := codes(items)["PAYROLL_STAMP_IN_MUHSGK"]; c.Severity != SeverityWarning {
+		t.Errorf("payroll item = %+v", items)
+	}
+
+	none, items := ComputeStamp(StampInput{})
+	if len(none.Rows) != 0 || !none.Totals.Payable.Dec().IsZero() || codes(items)["NO_STAMP_DOCUMENTS"].Severity != SeverityInfo {
+		t.Errorf("empty = %+v %+v", none, items)
+	}
+
+	for _, bad := range []string{
+		`{"stamp_lines":[{"document":"","count":1,"tax":"1"}]}`,
+		`{"stamp_lines":[{"document":"x","count":0,"tax":"1"}]}`,
+		`{"stamp_lines":[{"document":"x","count":1}]}`,
+		`{"stamp_lines":[{"document":"x","count":1,"base":"10"}]}`,
+		`{"stamp_lines":[{"document":"x","count":1,"base":"10","rate_permille":"9.48","tax":"1"}]}`,
+		`{"stamp_lines":[{"document":"x","count":1,"base":"10","rate_permille":"25"}]}`,
+		`{"stamp_lines":[{"document":"x","count":1,"base":"-10","rate_permille":"1"}]}`,
+		`{"stamp_lines":[{"document":"x","count":1,"tax":"-1"}]}`,
+		`{"carried_in":"10"}`,
+	} {
+		if _, err := ParseStampAdjustments([]byte(bad)); err == nil {
+			t.Errorf("accepted %s", bad)
+		}
+	}
+}
+
 func TestDueDate(t *testing.T) {
 	cases := []struct{ kind, period, want string }{
 		{KindKDV1, "2026-10", "2026-11-30"},   // 28 Kasım 2026 cumartesi → pazartesi
 		{KindMUHSGK, "2026-10", "2026-11-26"}, // perşembe
 		{KindKDV2, "2026-10", "2026-11-30"},   // KDV1 ile aynı gün
+		{KindStamp, "2026-10", "2026-11-26"},  // MUHSGK ile aynı gün
 		{KindBABS, "2026-10", "2026-11-30"},   // ayın son günü, pazartesi
 		{KindBABS, "2027-01", "2027-03-01"},   // 28 Şubat 2027 pazar → 1 Mart
 		{KindKDV1, "2026-04", "2026-06-01"},   // 28 Mayıs 2026 Kurban Bayramı → ilk iş günü

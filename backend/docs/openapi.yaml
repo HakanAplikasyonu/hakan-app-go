@@ -17417,9 +17417,11 @@ paths:
       operationId: putEngagementTaxReturnDraft
       summary: Save a draft's adjustments, acknowledgements and note
       description: |
-        Requires `tenant.tax_returns.write`. `adjustments` is only for
-        `kdv1` (`carried_in`, `additional_vat`, `other_deductions`; decimal
-        strings ≥ 0); other kinds take `{}`. `acknowledged` replaces the
+        Requires `tenant.tax_returns.write`. `adjustments` is for `kdv1`
+        (`carried_in`, `additional_vat`, `other_deductions`; decimal
+        strings ≥ 0) and `damga` (`stamp_lines`, at most 50: `document`,
+        `count` ≥ 1 and either `base` + `rate_permille` (binde, 0–20) or a
+        fixed `tax`); other kinds take `{}`. `acknowledged` replaces the
         acknowledged checklist codes. `409 TAX_RETURN_NOT_DRAFT` once
         prepared or filed.
       security:
@@ -18087,8 +18089,8 @@ components:
       name: returnKind
       in: path
       required: true
-      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
-      schema: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+      description: kdv1 (1 No.lu KDV), kdv2 (2 No.lu KDV, alışlarda tevkif edilen KDV), damga (damga vergisi beyannamesi, satırlar elle), muhsgk (muhtasar ve prim hizmet), babs (Form Ba + Bs)
+      schema: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
     ReportPeriod:
       name: period
       in: query
@@ -25934,7 +25936,7 @@ components:
       type: object
       required: [kind, status, payable_amount, filed_on]
       properties:
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         status: { type: string, enum: [draft, prepared, filed] }
         payable_amount: { type: [string, "null"], description: Amount payable (TL) once prepared }
         filed_on: { type: [string, "null"], format: date }
@@ -25944,7 +25946,7 @@ components:
       required: [period, kind, due_date, rolled_forward]
       properties:
         period: { type: string, example: "2026-10" }
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         due_date: { type: string, format: date }
         rolled_forward: { type: boolean, description: The deadline fell on a weekend or public holiday and moved to the next working day }
 
@@ -26732,7 +26734,7 @@ components:
       properties:
         uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
-        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        adjustments: { $ref: "#/components/schemas/TaxReturnAdjustments" }
         acknowledged: { type: array, items: { type: string } }
         note: { type: [string, "null"] }
         prepared_at: { type: [string, "null"], format: date-time }
@@ -26763,6 +26765,53 @@ components:
         carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
         additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
         other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnAdjustments:
+      type: object
+      additionalProperties: false
+      description: Manual fields of a draft — the KDV1 amounts or the damga vergisi lines; absent means not entered.
+      properties:
+        carried_in: { $ref: "#/components/schemas/TaxReturnMoney" }
+        additional_vat: { $ref: "#/components/schemas/TaxReturnMoney" }
+        other_deductions: { $ref: "#/components/schemas/TaxReturnMoney" }
+        stamp_lines:
+          type: array
+          maxItems: 50
+          items:
+            type: object
+            additionalProperties: false
+            required: [document, count]
+            properties:
+              document: { type: string, maxLength: 120, description: Kağıdın türü }
+              count: { type: integer, format: int64, minimum: 1 }
+              base: { $ref: "#/components/schemas/TaxReturnMoney" }
+              rate_permille: { type: string, description: 'Rate in binde, e.g. "9.48"' }
+              tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+
+    TaxReturnStamp:
+      type: object
+      description: Damga vergisi beyannamesi (#575) — manual lines; nispi tax = base × rate_permille / 1000
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [document, count, base, rate_permille, fixed, tax]
+            properties:
+              document: { type: string }
+              count: { type: integer, format: int64 }
+              base: { type: [string, "null"], description: Matrah (TL); null for a fixed (maktu) line }
+              rate_permille: { type: [string, "null"] }
+              fixed: { type: boolean, description: Maktu — the tax was entered }
+              tax: { $ref: "#/components/schemas/TaxReturnMoney" }
+        totals:
+          type: object
+          required: [count, base, payable]
+          properties:
+            count: { type: integer, format: int64 }
+            base: { $ref: "#/components/schemas/TaxReturnMoney" }
+            payable: { $ref: "#/components/schemas/TaxReturnMoney" }
 
     TaxReturnKDV2:
       type: object
@@ -26998,7 +27047,7 @@ components:
       type: object
       required: [kind, period, engagement_uuid, status, frozen, calendar, record, open_warnings, sections, computed_at, checklist]
       properties:
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         period: { type: string }
         engagement_uuid: { type: string, format: uuid }
         status: { type: string, enum: [draft, prepared, filed] }
@@ -27023,6 +27072,7 @@ components:
         checklist: { type: array, items: { $ref: "#/components/schemas/TaxReturnCheckItem" } }
         kdv1: { $ref: "#/components/schemas/TaxReturnKDV1" }
         kdv2: { $ref: "#/components/schemas/TaxReturnKDV2" }
+        damga: { $ref: "#/components/schemas/TaxReturnStamp" }
         muhsgk: { $ref: "#/components/schemas/TaxReturnMUHSGK" }
         babs: { $ref: "#/components/schemas/TaxReturnBABS" }
 
@@ -27079,7 +27129,7 @@ components:
       required: [uuid, kind, period, status, payable, carry_out, due_date, prepared_at, filed_on, accrual_number, updated_at]
       properties:
         uuid: { type: string, format: uuid }
-        kind: { type: string, enum: [kdv1, kdv2, muhsgk, babs] }
+        kind: { type: string, enum: [kdv1, kdv2, damga, muhsgk, babs] }
         period: { type: string }
         status: { type: string, enum: [draft, prepared, filed] }
         payable: { type: [string, "null"] }
@@ -27094,7 +27144,7 @@ components:
       type: object
       additionalProperties: false
       properties:
-        adjustments: { $ref: "#/components/schemas/TaxReturnKDV1Adjustments" }
+        adjustments: { $ref: "#/components/schemas/TaxReturnAdjustments" }
         acknowledged: { type: array, items: { type: string }, maxItems: 50 }
         note: { type: [string, "null"], maxLength: 2000 }
 
