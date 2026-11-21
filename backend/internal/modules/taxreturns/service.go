@@ -23,6 +23,8 @@ type Service struct {
 	q     *db.Queries
 	now   func() time.Time
 	store ObjectStore
+	// accounts books a tax payment's bank movement to 360 (#575).
+	accounts AccountBooker
 }
 
 // New builds the service on pool (statements join the request's RLS scope).
@@ -87,6 +89,9 @@ type Preview struct {
 	// Sections: the period's source records, processed / total (#710).
 	// Always live, also for a prepared or filed return.
 	Sections []Section `json:"sections"`
+	// Payment: the accrual payment of a filed return with an amount to pay
+	// (#575); nil otherwise.
+	Payment *PaymentView `json:"payment"`
 	body
 }
 
@@ -281,6 +286,9 @@ func (s *Service) Preview(ctx context.Context, sc engagementctx.Scope, kind, per
 				return Preview{}, fmt.Errorf("tax return snapshot: %w", err)
 			}
 			p.Frozen = true
+			if p.Payment, err = s.payment(ctx, sc, kind, rec, p.Calendar); err != nil {
+				return Preview{}, err
+			}
 			return p, nil
 		}
 	}

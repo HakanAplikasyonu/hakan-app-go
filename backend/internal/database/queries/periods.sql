@@ -110,7 +110,7 @@ WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids
 
 -- name: PeriodMatrixReturns :many
 -- Ofis beyan görünümü (#575): dönemin beyan kayıtları (kayıt yoksa hazırlanmadı).
-SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on
+SELECT engagement_id, period::text AS period, kind, status, payable_amount, filed_on, paid_on
 FROM tax_returns
 WHERE organization_id = @organization_id AND engagement_id = ANY(@engagement_ids::bigint[])
   AND period = ANY(@periods::text[]);
