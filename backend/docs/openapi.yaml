@@ -16780,6 +16780,135 @@ paths:
         "403": { $ref: "#/components/responses/TenantForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/sms-settings:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: getSmsSettings
+      summary: The office's NetGSM account (#780)
+      description: |
+        Requires `tenant.settings.read`. The API password is never returned;
+        `password_set` says whether one is stored. `live_allowed` is false
+        when the server keeps every office in test mode (NETGSM_SEND_ENABLED).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSmsSettings" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    put:
+      tags: [Tenant]
+      operationId: putSmsSettings
+      summary: Save the office's NetGSM account (#780)
+      description: |
+        Requires `tenant.settings.write`. A non-empty password goes to the
+        credential vault; null or empty keeps the stored one. Enabling needs
+        the subscriber number, a password and a sender name.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmsSettingsInput" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSmsSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/sms-settings/test:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: testSmsSettings
+      summary: Test the NetGSM connection (#780)
+      description: |
+        Requires `tenant.settings.write`. Reads the account's approved sender
+        names with the stored account; no SMS is sent. The result is stored
+        as `last_test`.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSmsSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+        "503": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/sms-messages:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    get:
+      tags: [Tenant]
+      operationId: listSmsMessages
+      summary: The office's latest SMS records (#780)
+      description: Requires `tenant.settings.read`. Newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: Records
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSmsMessageList" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/sms-messages/test:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+    post:
+      tags: [Tenant]
+      operationId: sendTestSms
+      summary: Send a test SMS (#780)
+      description: |
+        Requires `tenant.settings.write`. One SMS to the given number with the
+        office's account. In test mode it is only recorded (status dry_run).
+        A landline or broken number is recorded as failed; campaign wording
+        is refused.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SmsTestMessageInput" }
+      responses:
+        "200":
+          description: The record
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnvelopeSmsMessage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/TenantForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/support/clickfix-identity:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26694,6 +26823,94 @@ components:
       additionalProperties: false
       properties:
         clickfix_widget_id: { type: string, maxLength: 128, pattern: "^[A-Za-z0-9_-]*$" }
+    SmsSettings:
+      type: object
+      required: [enabled, test_mode, live_allowed, usercode, password_set, msgheader, encoding, appname, last_test, updated_at]
+      properties:
+        enabled: { type: boolean }
+        test_mode: { type: boolean, description: "Test mode: records only, nothing is sent" }
+        live_allowed: { type: boolean, description: "The server allows real sends (NETGSM_SEND_ENABLED)" }
+        usercode: { type: string, description: "NetGSM subscriber number" }
+        password_set: { type: boolean, description: "A password is stored (it is never returned)" }
+        msgheader: { type: string, description: "Sender name (3 to 11 characters)" }
+        encoding: { type: string, enum: [TR, UTF-8, UNICODE] }
+        appname: { type: string }
+        last_test:
+          oneOf:
+            - { $ref: "#/components/schemas/SmsConnectionTest" }
+            - { type: "null" }
+        updated_at: { type: [string, "null"], format: date-time }
+    SmsConnectionTest:
+      type: object
+      required: [at, ok, code, message, headers]
+      properties:
+        at: { type: string, format: date-time }
+        ok: { type: boolean }
+        code: { type: string, description: "NetGSM answer code or network" }
+        message: { type: string }
+        headers: { type: array, items: { type: string } }
+    SmsSettingsInput:
+      type: object
+      required: [enabled, test_mode, usercode, msgheader, encoding, appname]
+      additionalProperties: false
+      properties:
+        enabled: { type: boolean }
+        test_mode: { type: boolean }
+        usercode: { type: string, pattern: "^[0-9]{0,20}$" }
+        password: { type: [string, "null"], description: "New password; null or empty keeps the stored one" }
+        msgheader: { type: string, maxLength: 11 }
+        encoding: { type: string, enum: [TR, UTF-8, UNICODE] }
+        appname: { type: string, maxLength: 64 }
+    SmsTestMessageInput:
+      type: object
+      required: [phone]
+      additionalProperties: false
+      properties:
+        phone: { type: string }
+        text: { type: string }
+    SmsMessage:
+      type: object
+      required: [uuid, phone, body, msgheader, status, provider_job_id, error_code, error_message, source_rule, taxpayer_title, engagement_uuid, created_at, sent_at, delivered_at]
+      properties:
+        uuid: { type: string, format: uuid }
+        phone: { type: string }
+        body: { type: string }
+        msgheader: { type: string }
+        status: { type: string, enum: [pending, sent, failed, uncertain, dry_run] }
+        provider_job_id: { type: string }
+        error_code: { type: string }
+        error_message: { type: string }
+        source_rule: { type: string }
+        taxpayer_title: { type: string }
+        engagement_uuid: { type: string }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        delivered_at: { type: [string, "null"], format: date-time }
+    EnvelopeSmsSettings:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SmsSettings" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeSmsMessage:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data: { $ref: "#/components/schemas/SmsMessage" }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
+    EnvelopeSmsMessageList:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/SmsMessage" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
     EnvelopeSupportSettings:
       type: object
       required: [success, data, meta]
