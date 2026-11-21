@@ -80,6 +80,8 @@ func ComputeKDV2(in KDV2Input) (KDV2, []CheckItem) {
 	for k := range groups {
 		keys = append(keys, k)
 	}
+	// İşlem türü koduna, sonra orana göre; kodsuz satırlar en sonda
+	// ("|" rakamlardan büyük).
 	sort.Strings(keys)
 	out := KDV2{Rows: []KDV2Row{}}
 	var base, vat, withheld decimal.Decimal

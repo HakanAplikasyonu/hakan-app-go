@@ -222,11 +222,11 @@ func TestComputeKDV2(t *testing.T) {
 	if len(k.Rows) != 3 {
 		t.Fatalf("rows = %+v", k.Rows)
 	}
-	r := k.Rows[1] // sıralama: "" < "601" < "624"
+	r := k.Rows[0] // sıralama: "601" < "624" < kodsuz (en sonda)
 	if r.Code != "601" || r.Ratio != "9/10" || r.InvoiceCount != 2 || r.Rate != "20" {
 		t.Errorf("601 row = %+v", r)
 	}
-	if k.Rows[2].Ratio != "5/10" || k.Rows[0].Code != "" || k.Rows[0].Ratio != "7/10" {
+	if k.Rows[1].Ratio != "5/10" || k.Rows[2].Code != "" || k.Rows[2].Ratio != "7/10" {
 		t.Errorf("rows = %+v", k.Rows)
 	}
 	eq(t, "base", k.Totals.Base, "16000")
