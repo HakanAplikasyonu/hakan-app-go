@@ -43,6 +43,7 @@ import (
 	authsettingsmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings"
 	authsettingshandler "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/handler"
 	authsettingsusecase "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/authsettings/usecase"
+	automationmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/automation"
 	bankingmodule "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking"
 	bankmatching "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/matching"
 	bankposting "github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/banking/posting"
@@ -734,6 +735,8 @@ func New(cfg config.Config, log *slog.Logger, deps Deps) (*Server, error) {
 		setup:         officesetup.NewHandler(officesetup.New(deps.DB)),
 		support:       supportmodule.NewHandler(deps.Queries, supportmodule.IdentitySecretFromEnv()),
 		communication: communicationmodule.NewHandler(commSvc),
+		// Otomasyon kuralları (#780 C): taslak onayı istekte gönderir.
+		automation: automationmodule.NewHandler(automationmodule.New(deps.DB, commSvc, notifSvc, cfg.Auth.FrontendURL, log)),
 		// WhatsApp Web uzantısı (#388): eşleştirme QR girişiyle aynı oturum modeli.
 		whatsapp: whatsappmodule.NewHandler(
 			whatsappmodule.New(deps.DB, receiptsSvc, docTasksSvc, deps.Storage, log),
