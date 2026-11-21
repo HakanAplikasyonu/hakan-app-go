@@ -33,6 +33,7 @@ var boundedLists = map[string]string{
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/imports":        "server-side cap (LIMIT)",
 	"GET /v1/tenant/engagements/{engagementUuid}/account-plan/trial-balances": "server-side cap (LIMIT)",
 	"GET /v1/tenant/engagements/{engagementUuid}/tax-returns":                 "three returns a month, filtered by year",
+	"GET /v1/taxpayer/important-documents":                                    "server-side cap (LIMIT 200): a company's important documents (#780 B)",
 	"GET /v1/tenant/engagement-assignments":                                   "server-side cap (LIMIT): assignees of the office's engagements, one request instead of one per row (#639)",
 }
 
