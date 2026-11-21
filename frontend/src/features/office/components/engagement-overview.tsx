@@ -20,6 +20,7 @@ import { useWarningGroups } from "../hooks/use-warnings";
 import { useOfficePeriod, usePeriodText } from "../period";
 import { DocTaskSubmission } from "./doc-task-submission";
 import { ENGAGEMENT_MONTHS, periodCrown } from "./engagement-layout";
+import { ImportantDocumentsSection } from "./important-documents-section";
 
 function Stat({
   label,
@@ -303,6 +304,9 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           )}
         </section>
       </div>
+
+      {/* Önemli belgeler (#780 B): ofis ayarından kapatılabilir. */}
+      <ImportantDocumentsSection engagement={engagement} />
     </div>
   );
 }

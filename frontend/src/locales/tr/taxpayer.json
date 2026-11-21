@@ -231,5 +231,14 @@
   "archive_category_sgk": "SGK",
   "archive_category_trade_registry": "Ticaret sicil",
   "archive_category_isg": "İSG",
-  "archive_category_other": "Diğer"
+  "archive_category_other": "Diğer",
+  "important_title": "Önemli belgeler",
+  "important_description": "Müşavirinizin sizin için sakladığı vergi levhası, imza sirküleri, ticaret sicil gazetesi gibi belgeler. Süresi yaklaşan belge renkli görünür; yenisini müşavirinize iletin.",
+  "important_kind_tax_certificate": "Vergi levhası",
+  "important_kind_signature_circular": "İmza sirküleri",
+  "important_kind_trade_registry_gazette": "Ticaret sicil gazetesi",
+  "important_kind_lease_contract": "Kira sözleşmesi",
+  "important_kind_license": "Ruhsat",
+  "important_kind_power_of_attorney": "Vekâletname",
+  "important_kind_other": "Diğer önemli belge"
 }

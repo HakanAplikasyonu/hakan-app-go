@@ -138,5 +138,11 @@
   "final_check_title": "Sorumlu müşavirin son kontrolü",
   "final_check_label": "\"Kontrol edildi\" ve \"Verildi\" işaretini yalnız sorumlu koysun",
   "final_check_on": "Açık: beyanı herkes hazırlar; kontrol edildi ve verildi işaretini yalnız ofis sahibi ya da yönetici koyar.",
-  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir."
+  "final_check_off": "Kapalı: beyanı hazırlayan kişi kontrol edildi ve verildi işaretini de koyabilir. Kim ve ne zaman işaretlediği yine kaydedilir.",
+  "settings_section_documents": "Belgeler",
+  "settings_section_documents_description": "Mükellefin önemli belgeleri bölümü.",
+  "important_docs_title": "Önemli belgeler bölümü",
+  "important_docs_label": "Mükellef sayfasında ve mükellef panelinde \"Önemli belgeler\" görünsün",
+  "important_docs_on": "Açık: vergi levhası, imza sirküleri gibi belgeler ayrı bölümde durur; bitişi yaklaşan belge renkli görünür, mükellef paylaşılanları indirir.",
+  "important_docs_off": "Kapalı: bölüm gizlenir. Belgeler arşivde kalır, silinmez."
 }

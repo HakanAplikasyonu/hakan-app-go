@@ -7,10 +7,14 @@ import {
 
 export type TaxpayerArchiveDocument = components["schemas"]["ArchiveDocument"];
 export type TaxpayerArchivePage = components["schemas"]["ArchiveDocumentPage"];
+export type TaxpayerImportantDocuments =
+  components["schemas"]["TaxpayerImportantDocuments"];
 
 export const taxpayerArchiveKeys = {
   documents: (taxpayer: string) =>
     ["taxpayer", taxpayer.toLowerCase(), "archive"] as const,
+  important: (taxpayer: string) =>
+    ["taxpayer", taxpayer.toLowerCase(), "important-documents"] as const,
 };
 
 /**
@@ -23,6 +27,13 @@ export const taxpayerArchiveService = {
     taxpayerRequest<TaxpayerArchivePage>(
       "GET",
       "/v1/taxpayer/archive-documents?limit=200",
+      { taxpayer },
+    ),
+  /** Önemli belgeler (#780 B); ofis bölümü kapattıysa enabled false. */
+  important: (taxpayer: string) =>
+    taxpayerRequest<TaxpayerImportantDocuments>(
+      "GET",
+      "/v1/taxpayer/important-documents",
       { taxpayer },
     ),
   async download(taxpayer: string, doc: TaxpayerArchiveDocument) {

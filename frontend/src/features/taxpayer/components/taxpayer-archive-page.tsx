@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Download, FileText } from "lucide-react";
+import { Download, FileText, Star } from "lucide-react";
 import { toast } from "sonner";
 
 import { ErrorState } from "@/components/common/error-state";
@@ -67,6 +67,107 @@ function Validity({ d, intl }: { d: TaxpayerArchiveDocument; intl: string }) {
  * gruplu; yalnızca okuma ve indirme.
  */
 export function TaxpayerArchivePage({ taxpayer }: { taxpayer: string }) {
+  return (
+    <div className="space-y-5">
+      <ImportantDocuments taxpayer={taxpayer} />
+      <SharedDocuments taxpayer={taxpayer} />
+    </div>
+  );
+}
+
+function DownloadButton({
+  taxpayer,
+  d,
+}: {
+  taxpayer: string;
+  d: TaxpayerArchiveDocument;
+}) {
+  const { t } = useLocale();
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="min-h-11 sm:min-h-9"
+      aria-label={t("taxpayer.archive_download_named", { title: d.title })}
+      onClick={() =>
+        void taxpayerArchiveService
+          .download(taxpayer, d)
+          .catch(() => toast.error(t("taxpayer.archive_download_failed")))
+      }
+    >
+      <Download aria-hidden className="size-4" />
+      {t("taxpayer.archive_download")}
+    </Button>
+  );
+}
+
+/**
+ * Önemli belgeler (#780 B): vergi levhası, imza sirküleri, ticaret sicil
+ * gazetesi, kira sözleşmesi... Müşavirin "önemli" işaretleyip paylaştığı
+ * belgeler; bitişi 30 gün içinde olan belge renkli. Ofis bölümü kapattıysa ya
+ * da paylaşılan önemli belge yoksa görünmez.
+ */
+function ImportantDocuments({ taxpayer }: { taxpayer: string }) {
+  const { t, locale } = useLocale();
+  const intl = locale === "tr" ? "tr-TR" : "en-GB";
+  const q = useQuery({
+    queryKey: taxpayerArchiveKeys.important(taxpayer),
+    queryFn: () => taxpayerArchiveService.important(taxpayer),
+  });
+  const items = q.data?.items ?? [];
+  if (!q.data?.enabled || items.length === 0) return null;
+  return (
+    <Card role="region" aria-labelledby="important-documents-title">
+      <CardHeader>
+        <CardTitle id="important-documents-title">
+          {t("taxpayer.important_title")}
+        </CardTitle>
+        <CardDescription>{t("taxpayer.important_description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="border-line divide-line divide-y rounded-lg border">
+          {items.map((d) => {
+            const urgent =
+              d.expiry_status === "expiring" || d.expiry_status === "expired";
+            return (
+              <li
+                key={d.uuid}
+                data-urgent={urgent || undefined}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5",
+                  d.expiry_status === "expiring" && "bg-warn-tint",
+                  d.expiry_status === "expired" && "bg-danger-tint",
+                )}
+              >
+                <Star
+                  aria-hidden
+                  className={cn(
+                    "size-5 shrink-0",
+                    urgent ? "text-warn" : "text-text-3",
+                  )}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {d.title}
+                  </span>
+                  <span className="text-text-3 block text-xs">
+                    {d.important_kind
+                      ? t(`taxpayer.important_kind_${d.important_kind}`)
+                      : null}
+                    <Validity d={d} intl={intl} />
+                  </span>
+                </span>
+                <DownloadButton taxpayer={taxpayer} d={d} />
+              </li>
+            );
+          })}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SharedDocuments({ taxpayer }: { taxpayer: string }) {
   const { t, locale } = useLocale();
   const intl = locale === "tr" ? "tr-TR" : "en-GB";
   const list = useQuery({
@@ -133,24 +234,7 @@ export function TaxpayerArchivePage({ taxpayer }: { taxpayer: string }) {
                         <Validity d={d} intl={intl} />
                       </span>
                     </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="min-h-11 sm:min-h-9"
-                      aria-label={t("taxpayer.archive_download_named", {
-                        title: d.title,
-                      })}
-                      onClick={() =>
-                        void taxpayerArchiveService
-                          .download(taxpayer, d)
-                          .catch(() =>
-                            toast.error(t("taxpayer.archive_download_failed")),
-                          )
-                      }
-                    >
-                      <Download aria-hidden className="size-4" />
-                      {t("taxpayer.archive_download")}
-                    </Button>
+                    <DownloadButton taxpayer={taxpayer} d={d} />
                   </li>
                 ))}
               </ul>

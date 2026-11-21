@@ -22,13 +22,20 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
+import { ImportantDocumentsSetting } from "@/features/tenant/components/important-documents-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
 import { useLocale } from "@/providers/locale-provider";
 import { usePermission } from "@/providers/permission-provider";
 
 type SectionId =
-  "office" | "tax-returns" | "support" | "ai" | "agents" | "appearance";
+  | "office"
+  | "tax-returns"
+  | "important-documents"
+  | "support"
+  | "ai"
+  | "agents"
+  | "appearance";
 
 /** Ayarlar alt menüsü (OfisAyarlar): geniş ekranda solda, dar ekranda üstte. */
 function SettingsNav({
@@ -126,6 +133,10 @@ export function TenantSettingsPage() {
       id: "tax-returns",
       label: t("tenant.settings_section_tax_returns"),
     },
+    {
+      id: "important-documents",
+      label: t("tenant.settings_section_documents"),
+    },
     { id: "support", label: t("tenant.settings_section_support") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
@@ -219,6 +230,17 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_tax_returns_description")}
           >
             <TaxReturnFinalCheckSetting
+              slug={tenant.slug}
+              canWrite={canWrite}
+            />
+          </Section>
+          {/* Önemli belgeler (#780 B): varsayılan açık, kapatılabilir. */}
+          <Section
+            id="important-documents"
+            title={t("tenant.settings_section_documents")}
+            description={t("tenant.settings_section_documents_description")}
+          >
+            <ImportantDocumentsSetting
               slug={tenant.slug}
               canWrite={canWrite}
             />
