@@ -125,6 +125,9 @@ export const routes = {
     /** Office setup wizard (issue #273). */
     setup: (slug: string) => `/t/${encodeURIComponent(slug)}/setup`,
     taxpayers: (slug: string) => `/t/${encodeURIComponent(slug)}/taxpayers`,
+    /** Ofis geneli geçmiş dönem takibi (#780 C). */
+    lateDocuments: (slug: string) =>
+      `/t/${encodeURIComponent(slug)}/late-documents`,
     /** Ofisin beyan dönemi: mükellef bazında KDV1 / MUHSGK durumu (#575). */
     taxReturns: (slug: string) => `/t/${encodeURIComponent(slug)}/tax-returns`,
     /** "Mükellef ekle": consent requests the office sent (issue #7). */
@@ -225,6 +228,9 @@ export const routes = {
     /** Mükellef mizanı: yüklenen Luca mizanı, Excel / PDF (#669 E). */
     engagementTrialBalance: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/trial-balance`,
+    /** Geçmiş dönem takibi: kapanıştan sonra gelen belgeler (#780 C). */
+    engagementLateDocuments: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/late-documents`,
     /** Z reports (ÖKC gün sonu) of one engagement (#384). */
     engagementZReports: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/z-reports`,
@@ -234,6 +240,9 @@ export const routes = {
     /** Mükellef raporu: dörtlü grafik, PDF, e-posta (#386). */
     engagementReport: (slug: string, engagementUuid: string) =>
       `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/report`,
+    /** İletişim geçmişi: mükellefe giden SMS ve e-postalar, kanıtıyla (#780 D). */
+    engagementCommunications: (slug: string, engagementUuid: string) =>
+      `/t/${encodeURIComponent(slug)}/engagements/${encodeURIComponent(engagementUuid)}/communications`,
   },
   /** Mükellef (taxpayer) shell — company users invited by an office. */
   taxpayer: {

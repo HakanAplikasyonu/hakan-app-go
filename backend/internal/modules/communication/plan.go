@@ -13,11 +13,8 @@ import (
 // hedefteki mükelleflerden kime ne gideceğini, elenen tekrarları, atlanan
 // mükellefleri ve gönderimi durduran uzunluk aşımlarını çıkarır.
 
-// Bulk channels.
-const (
-	ChannelSMS  = "sms"
-	ChannelMail = "mail"
-)
+// Bulk channels (ChannelSMS: history.go).
+const ChannelMail = "mail"
 
 const (
 	// MaxBulkRecipients caps one bulk send (hedefteki mükellef sayısı).

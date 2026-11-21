@@ -1,6 +1,9 @@
 import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
+export type CommunicationItem =
+  components["schemas"]["CommunicationHistoryItem"];
+export type CommunicationChannel = CommunicationItem["channel"];
 export type TaxpayerGroup = components["schemas"]["TaxpayerGroup"];
 export type TaxpayerGroupInput = components["schemas"]["TaxpayerGroupInput"];
 export type CommunicationFilters =
@@ -12,6 +15,15 @@ export type BulkSend = components["schemas"]["BulkSend"];
 export type BulkChannel = BulkSendInput["channel"];
 
 export const communicationKeys = {
+  history: (slug: string, engagement: string, channel: string) =>
+    [
+      "tenant",
+      slug.toLowerCase(),
+      "engagement",
+      engagement,
+      "communications",
+      channel,
+    ] as const,
   all: (slug: string) =>
     ["tenant", slug.toLowerCase(), "communication"] as const,
   groups: (slug: string) => [...communicationKeys.all(slug), "groups"] as const,
@@ -31,6 +43,19 @@ export const communicationKeys = {
  * `bulkSend` ile ilerlemeyi okur.
  */
 export const communicationService = {
+  /**
+   * İletişim geçmişi (#780 D): mükellefe giden SMS ve e-postalar, yeniden
+   * eskiye. SMS'te NetGSM iş no ve iletim zamanı, e-postada açılma ve indirme
+   * zamanı gelir.
+   */
+  history(slug: string, engagement: string, channel?: CommunicationChannel) {
+    return tenantRequest<{ items: CommunicationItem[] }>(
+      slug,
+      "GET",
+      `/v1/tenant/engagements/${encodeURIComponent(engagement)}/communications`,
+      { query: { channel, limit: 200 }, silent: true },
+    );
+  },
   groups(slug: string) {
     return tenantRequest<{ items: TaxpayerGroup[] }>(
       slug,

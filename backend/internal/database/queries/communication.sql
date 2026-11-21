@@ -64,3 +64,52 @@ SELECT e.id AS engagement_id, t.title, COALESCE(t.contact_phone, '')::text AS co
 FROM engagements e
 JOIN taxpayers t ON t.id = e.taxpayer_id
 WHERE e.organization_id = @organization_id AND e.uuid = @engagement_uuid;
+
+-- İletişim geçmişi (#780 D): mükellefe giden SMS ve e-postalar, yeniden eskiye.
+
+-- name: ListEngagementSmsMessages :many
+SELECT m.*, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM sms_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = @organization_id AND m.engagement_id = @engagement_id
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT @lim;
+
+-- name: ListEngagementMailMessages :many
+SELECT m.*, COALESCE(NULLIF(TRIM(u.name || ' ' || u.surname), ''), '')::text AS sent_by_name
+FROM mail_messages m
+LEFT JOIN users u ON u.id = m.sent_by
+WHERE m.organization_id = @organization_id AND m.engagement_id = @engagement_id
+ORDER BY m.created_at DESC, m.id DESC
+LIMIT @lim;
+
+-- İletim raporu taraması (#780 D): NetGSM'in kabul ettiği, henüz iletim
+-- bilgisi gelmemiş son günlerin SMS'leri. Bütün ofisler (rls.System içinde).
+-- tenant-lint: cross-org NetGSM iletim raporu taraması, bütün ofisler
+-- name: ListSmsAwaitingDelivery :many
+SELECT id, organization_id, provider_job_id, phone
+FROM sms_messages
+WHERE status = 'sent' AND delivered_at IS NULL AND provider_job_id <> '' AND sent_at >= @since
+ORDER BY organization_id, sent_at, id
+LIMIT @lim;
+
+-- name: MarkSmsDelivered :execrows
+UPDATE sms_messages SET delivered_at = @delivered_at
+WHERE organization_id = @organization_id AND id = @id AND delivered_at IS NULL;
+
+-- name: MarkSmsDeliveryFailed :execrows
+UPDATE sms_messages SET status = 'failed', error_code = @error_code, error_message = @error_message
+WHERE organization_id = @organization_id AND id = @id AND status = 'sent' AND delivered_at IS NULL;
+
+-- E-posta izleme (#780 D): piksel ve bağlantı oturum açmadan gelir; anahtar
+-- tahmin edilemez track_token'dır. Zaman yalnız ilk seferde yazılır.
+-- tenant-lint: cross-org izleme pikseli, oturumsuz, track_token benzersiz
+-- name: MarkMailOpenedByToken :execrows
+UPDATE mail_messages SET opened_at = NOW()
+WHERE track_token = @track_token AND opened_at IS NULL;
+
+-- tenant-lint: cross-org ek bağlantısı, oturumsuz, track_token benzersiz
+-- name: MarkMailDownloadedByToken :execrows
+UPDATE mail_messages
+SET downloaded_at = COALESCE(downloaded_at, NOW()), opened_at = COALESCE(opened_at, NOW())
+WHERE track_token = @track_token AND (downloaded_at IS NULL OR opened_at IS NULL);

@@ -1,19 +1,29 @@
 package communication
 
 import (
+	"net/http"
+
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/middleware"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/module"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/rbac"
 )
 
-// Module mounts the routes.
-type Module struct{ H *Handler }
+// Module mounts the routes. The engagement history needs Engagements (the
+// engagement resolver); without it that route is not mounted.
+type Module struct {
+	H           *Handler
+	Engagements engagementctx.Resolver
+}
 
 // Name implements module.Module.
 func (Module) Name() string { return "communication" }
 
 // Routes implements module.Module. Reading is every member's (settings
 // read); changing the account and sending a test SMS is the owner's /
-// manager's (settings write).
+// manager's (settings write). The taxpayer's communication history is read
+// with the engagement (engagements read). The e-mail tracking pixel and
+// link are public: the unguessable track_token is the key.
 func (m Module) Routes(r *module.Router) {
 	h := m.H
 	if h == nil {
@@ -37,4 +47,14 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST /v1/tenant/communication/bulk-sends", rbac.PermTenantEngagementsWrite, h.StartBulk)
 	r.Tenant("GET /v1/tenant/communication/bulk-sends", rbac.PermTenantEngagementsRead, h.ListBulk)
 	r.Tenant("GET /v1/tenant/communication/bulk-sends/{bulkUuid}", rbac.PermTenantEngagementsRead, h.GetBulk)
+	// E-posta izleme (#780 D).
+	r.Public("GET /v1/public/mail/{token}/open", h.MailOpen)
+	r.Public("GET /v1/public/mail/{token}/link", h.MailLink)
+
+	if m.Engagements == nil {
+		return
+	}
+	eng := []func(http.Handler) http.Handler{middleware.RequireEngagement(m.Engagements)}
+	// İletişim geçmişi (#780 D).
+	r.Tenant("GET /v1/tenant/engagements/{engagementUuid}/communications", rbac.PermTenantEngagementsRead, h.History, eng...)
 }

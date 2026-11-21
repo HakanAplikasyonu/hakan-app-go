@@ -3561,6 +3561,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/late-documents/summary": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Office-wide count of late documents per taxpayer
+         * @description Requires `tenant.periods.read` (#780 C). Documents that arrived after
+         *     their period was closed, per taxpayer: pending and total counts and
+         *     the oldest pending period. Refreshed on every read. Active
+         *     engagements only; without `tenant.engagements.read_all` only
+         *     engagements assigned to the caller.
+         */
+        get: operations["getLateDocumentSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/clients": {
         parameters: {
             query?: never;
@@ -12135,6 +12165,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Late documents of an engagement (geçmiş dönem takibi)
+         * @description Requires `tenant.periods.read` and engagement access (#780 C). A
+         *     document has two dates: its arrival (`arrived_at`, when it entered the
+         *     system) and its period (the month of the document date). A document
+         *     that arrived after its period was closed (the period was locked, or a
+         *     tax return of the period was filed; `closed_at`, `close_reason`) is
+         *     listed here with the office's decision. The list is refreshed on every
+         *     read. Pending rows first. Filters: `status`, `period` (YYYY-MM) and
+         *     `document_uuid` (the warning on one document).
+         */
+        get: operations["listEngagementLateDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/late-documents/{lateDocumentUuid}/decision": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the office's decision on a late document
+         * @description Requires `tenant.change_requests.decide` and engagement access.
+         *     `correction`: taken into a correction return (düzeltme beyannamesi);
+         *     `current_period`: booked in a later month (`target_period`, default
+         *     the current month; must be after the document period); `ignored`;
+         *     `pending` undoes the decision. The KDV deduction month of a purchase
+         *     invoice is set separately (`PUT .../invoices/{invoiceUuid}/vat-deduction-period`).
+         */
+        post: operations["decideEngagementLateDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/tenant/engagements/{engagementUuid}/document-tasks": {
         parameters: {
             query?: never;
@@ -12807,39 +12906,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/communication/groups": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The office's taxpayer groups (#780)
-         * @description Requires `tenant.engagements.read`. Saved taxpayer lists with their active member counts; `members` is empty here.
-         */
-        get: operations["listTaxpayerGroups"];
-        put?: never;
-        /**
-         * Save a taxpayer group (#780)
-         * @description Requires `tenant.engagements.write`. The name is unique in the office
-         *     (case-insensitive). Unknown or ended engagements are ignored; at most
-         *     500 members.
-         */
-        post: operations["createTaxpayerGroup"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/communication/groups/{groupUuid}": {
+    "/v1/tenant/engagements/{engagementUuid}/communications": {
         parameters: {
             query?: never;
             header: {
@@ -12850,51 +12917,19 @@ export interface paths {
                 "X-Organization": components["parameters"]["XOrganization"];
             };
             path: {
-                groupUuid: string;
+                engagementUuid: components["parameters"]["EngagementUuid"];
             };
             cookie?: never;
         };
         /**
-         * One taxpayer group with its members (#780)
-         * @description Requires `tenant.engagements.read`.
+         * Communication history of the taxpayer (#780)
+         * @description Requires `tenant.engagements.read`. Every SMS and e-mail the office
+         *     sent to this taxpayer, newest first: number or address, text, NetGSM
+         *     job id, send time, delivery time (NetGSM report) for SMS, open and
+         *     download time (tracking pixel / link) for e-mail. `channel` narrows
+         *     to one channel.
          */
-        get: operations["getTaxpayerGroup"];
-        /**
-         * Rename a taxpayer group and replace its members (#780)
-         * @description Requires `tenant.engagements.write`.
-         */
-        put: operations["updateTaxpayerGroup"];
-        post?: never;
-        /**
-         * Delete a taxpayer group (#780)
-         * @description Requires `tenant.engagements.write`. The taxpayers stay.
-         */
-        delete: operations["deleteTaxpayerGroup"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/communication/filters": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Dynamic target filters of a bulk send (#780)
-         * @description Requires `tenant.engagements.read`. Tax return kinds (taxpayers with a
-         *     tax return of that kind in the last 12 months) and the office members
-         *     taxpayers are assigned to, each with a taxpayer count.
-         */
-        get: operations["getCommunicationFilters"];
+        get: operations["listEngagementCommunications"];
         put?: never;
         post?: never;
         delete?: never;
@@ -12903,90 +12938,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/communication/bulk-sends/preview": {
+    "/v1/public/mail/{token}/open": {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Preview a bulk SMS or e-mail send (#780)
-         * @description Requires `tenant.engagements.write`. Resolves the target, personalizes
-         *     the text and applies the bulk rules: at most 500 taxpayers, one send
-         *     per phone or address (duplicates listed), taxpayers without a usable
-         *     contact skipped. `blocked` is non-empty when the send must not start
-         *     (an SMS beyond `part_limit` parts after personalization, campaign
-         *     wording, nobody to send to). Nothing is sent or recorded.
+         * E-mail open tracking pixel (#780)
+         * @description The 1x1 transparent GIF in the HTML part of office e-mail. No session:
+         *     the unguessable `track_token` of the record is the key. The first hit
+         *     writes `opened_at`; later hits change nothing. A bad or unknown token
+         *     gets the same image and writes nothing. Limited per client address.
          */
-        post: operations["previewBulkSend"];
+        get: operations["getMailOpenPixel"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/tenant/communication/bulk-sends": {
+    "/v1/public/mail/{token}/link": {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
+            header?: never;
             path?: never;
             cookie?: never;
         };
         /**
-         * The caller's last five bulk sends (#780)
-         * @description Requires `tenant.engagements.read`. The recent set ("Son gönderilenler"); each can be a target again (kind recent).
+         * E-mail attachment / document link (#780)
+         * @description Writes `downloaded_at` (and `opened_at` when the pixel was blocked) on
+         *     the first click, then redirects to `to`. Only the app's own frontend
+         *     and storage origins are redirect targets (a path is taken as a
+         *     frontend path); any other target answers 404, so the route is not an
+         *     open redirect. No session: `track_token` is the key.
          */
-        get: operations["listBulkSends"];
-        put?: never;
-        /**
-         * Start a bulk SMS or e-mail send (#780)
-         * @description Requires `tenant.engagements.write`. Same rules as the preview; a
-         *     blocked send answers 400 and records nothing. The messages go in the
-         *     background, each recorded with this send's `bulk_id` (test mode
-         *     applies); poll the send for progress.
-         */
-        post: operations["startBulkSend"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/tenant/communication/bulk-sends/{bulkUuid}": {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                bulkUuid: string;
-            };
-            cookie?: never;
-        };
-        /**
-         * One bulk send with its progress and failures (#780)
-         * @description Requires `tenant.engagements.read`.
-         */
-        get: operations["getBulkSend"];
+        get: operations["getMailTrackedLink"];
         put?: never;
         post?: never;
         delete?: never;
@@ -13528,6 +13518,44 @@ export interface paths {
          * @description Requires `tenant.vat.write`. Applies `VAT_PAYABLE_THRESHOLD` (payable ≥ `limit`; null limit = off) and `VAT_DEADLINE_NEAR` (0 ≤ days left ≤ `days_before`) on the period entity, producer `control:vat_forecast`. Conditions that no longer hold are auto-resolved. Without `period`: last month and this month.
          */
         post: operations["evaluateEngagementVATForecast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/engagements/{engagementUuid}/vat-forecast/notices": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        /**
+         * VAT notices sent to the taxpayer (#780)
+         * @description Requires `tenant.vat.read`. Newest first (at most 20). Each notice
+         *     freezes what the taxpayer was told and when. Per-channel proof of
+         *     sending belongs to the communication centre (#780 A); `message_ref`
+         *     will link its message record.
+         */
+        get: operations["listVATNotices"];
+        put?: never;
+        /**
+         * Send the taxpayer the in-period VAT status (#780)
+         * @description Requires `tenant.vat.write`. Computes the forecast of `period`
+         *     (default this month), freezes it and notifies every panel user of the
+         *     taxpayer in-app and by e-mail ("KDV ödemeniz çıkıyor / çıkmıyor").
+         *     `422 NO_TAXPAYER_USER` when the taxpayer has no panel user.
+         */
+        post: operations["sendVATNotice"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14450,6 +14478,194 @@ export interface paths {
          *     longer open; 404 for an unknown capture or task.
          */
         put: operations["linkWhatsAppCaptureTask"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/groups": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The office's taxpayer groups (#780)
+         * @description Requires `tenant.engagements.read`. Saved taxpayer lists with their active member counts; `members` is empty here.
+         */
+        get: operations["listTaxpayerGroups"];
+        put?: never;
+        /**
+         * Save a taxpayer group (#780)
+         * @description Requires `tenant.engagements.write`. The name is unique in the office
+         *     (case-insensitive). Unknown or ended engagements are ignored; at most
+         *     500 members.
+         */
+        post: operations["createTaxpayerGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/groups/{groupUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                groupUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One taxpayer group with its members (#780)
+         * @description Requires `tenant.engagements.read`.
+         */
+        get: operations["getTaxpayerGroup"];
+        /**
+         * Rename a taxpayer group and replace its members (#780)
+         * @description Requires `tenant.engagements.write`.
+         */
+        put: operations["updateTaxpayerGroup"];
+        post?: never;
+        /**
+         * Delete a taxpayer group (#780)
+         * @description Requires `tenant.engagements.write`. The taxpayers stay.
+         */
+        delete: operations["deleteTaxpayerGroup"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/filters": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Dynamic target filters of a bulk send (#780)
+         * @description Requires `tenant.engagements.read`. Tax return kinds (taxpayers with a
+         *     tax return of that kind in the last 12 months) and the office members
+         *     taxpayers are assigned to, each with a taxpayer count.
+         */
+        get: operations["getCommunicationFilters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/bulk-sends/preview": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a bulk SMS or e-mail send (#780)
+         * @description Requires `tenant.engagements.write`. Resolves the target, personalizes
+         *     the text and applies the bulk rules: at most 500 taxpayers, one send
+         *     per phone or address (duplicates listed), taxpayers without a usable
+         *     contact skipped. `blocked` is non-empty when the send must not start
+         *     (an SMS beyond `part_limit` parts after personalization, campaign
+         *     wording, nobody to send to). Nothing is sent or recorded.
+         */
+        post: operations["previewBulkSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/bulk-sends": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's last five bulk sends (#780)
+         * @description Requires `tenant.engagements.read`. The recent set ("Son gönderilenler"); each can be a target again (kind recent).
+         */
+        get: operations["listBulkSends"];
+        put?: never;
+        /**
+         * Start a bulk SMS or e-mail send (#780)
+         * @description Requires `tenant.engagements.write`. Same rules as the preview; a
+         *     blocked send answers 400 and records nothing. The messages go in the
+         *     background, each recorded with this send's `bulk_id` (test mode
+         *     applies); poll the send for progress.
+         */
+        post: operations["startBulkSend"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tenant/communication/bulk-sends/{bulkUuid}": {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                bulkUuid: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One bulk send with its progress and failures (#780)
+         * @description Requires `tenant.engagements.read`.
+         */
+        get: operations["getBulkSend"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -21066,6 +21282,106 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        LateDocument: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            document_type: "invoice" | "expense" | "retail_sale";
+            /** Format: uuid */
+            document_uuid: string;
+            /** @description Invoice number, receipt number or description, Z report number */
+            label: string;
+            counterparty: string | null;
+            /** Format: date */
+            document_date: string | null;
+            /** @description Total with two decimals */
+            amount: string;
+            currency: string;
+            period: components["schemas"]["Period"];
+            /**
+             * Format: date-time
+             * @description Geliş tarihi: when the document entered the system
+             */
+            arrived_at: string;
+            /**
+             * Format: date-time
+             * @description When the period was closed
+             */
+            closed_at: string;
+            /**
+             * @description lock: the period was locked; filed: a tax return of the period was filed
+             * @enum {string}
+             */
+            close_reason: "lock" | "filed";
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description The month it was booked in (current_period) */
+            target_period: string | null;
+            note: string | null;
+            decided_by_name: string | null;
+            /** Format: date-time */
+            decided_at: string | null;
+            /** @enum {string|null} */
+            invoice_direction: "incoming" | "outgoing" | null;
+            /** @description A purchase invoice's KDV deduction month when moved forward (#640) */
+            vat_deduction_period: string | null;
+        };
+        LateDocumentCounts: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            correction: number;
+            /** Format: int64 */
+            current_period: number;
+            /** Format: int64 */
+            ignored: number;
+        };
+        LateDocumentList: {
+            items: components["schemas"]["LateDocument"][];
+            counts: components["schemas"]["LateDocumentCounts"];
+        };
+        LateDocumentDecision: {
+            /** @enum {string} */
+            status: "pending" | "correction" | "current_period" | "ignored";
+            /** @description YYYY-MM, only for current_period; default the current month */
+            target_period?: string;
+            note?: string;
+        };
+        LateDocumentSummaryRow: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            taxpayer_title: string;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            oldest_pending_period: string | null;
+        };
+        LateDocumentSummary: {
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            total: number;
+            items: components["schemas"]["LateDocumentSummaryRow"][];
+        };
+        EnvelopeLateDocument: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocument"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentList: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentList"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeLateDocumentSummary: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["LateDocumentSummary"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
         PeriodMatrixCell: {
             period: components["schemas"]["Period"];
             /** @description No open blocker, change request or unprocessed record (#575) */
@@ -21455,180 +21771,40 @@ export interface components {
             };
             meta: components["schemas"]["ResponseMeta"];
         };
-        TaxpayerGroup: {
+        CommunicationHistoryItem: {
             /** Format: uuid */
             uuid: string;
-            name: string;
-            description: string;
-            member_count: number;
-            /** Format: date-time */
-            created_at: string;
-            /** Format: date-time */
-            updated_at: string;
-            members: components["schemas"]["TaxpayerGroupMember"][];
-        };
-        TaxpayerGroupMember: {
-            /** Format: uuid */
-            engagement_uuid: string;
-            title: string;
-            tax_id: string;
-        };
-        TaxpayerGroupInput: {
-            name: string;
-            description?: string;
-            engagement_uuids?: string[];
-        };
-        CommunicationFilterOption: {
-            code: string;
-            label: string;
-            count: number;
-        };
-        CommunicationAssigneeOption: {
-            /** Format: uuid */
-            uuid: string;
-            name: string;
-            count: number;
-        };
-        CommunicationFilters: {
-            tax_kinds: components["schemas"]["CommunicationFilterOption"][];
-            assignees: components["schemas"]["CommunicationAssigneeOption"][];
-        };
-        BulkSendTarget: {
             /** @enum {string} */
-            kind: "selection" | "group" | "filter" | "recent";
-            engagement_uuids?: string[];
-            /** Format: uuid */
-            group_uuid?: string;
-            /** @enum {string} */
-            tax_kind?: "" | "kdv1" | "muhsgk";
-            /** Format: uuid */
-            assignee_uuid?: string;
-            /** Format: uuid */
-            bulk_uuid?: string;
-            /** @description Screen name of a filter target */
-            label?: string;
-        };
-        BulkSendInput: {
-            /** @enum {string} */
-            channel: "sms" | "mail";
-            /** @description E-mail subject (required for mail) */
-            subject?: string;
-            /** @description Text with the variables :mukellef :ofis :donem :tutar :son_gun :link */
-            body: string;
-            target: components["schemas"]["BulkSendTarget"];
-        };
-        BulkSendSkip: {
-            engagement_uuid: string;
-            title: string;
-            /** @enum {string} */
-            reason: "no_contact" | "invalid_phone" | "invalid_email" | "campaign_words";
-        };
-        BulkSendDuplicate: {
-            title: string;
-            /** @description The taxpayer who gets the message for this contact */
-            same_as: string;
-            contact: string;
-        };
-        BulkSendTooLong: {
-            title: string;
-            chars: number;
-            parts: number;
-        };
-        BulkSendSample: {
-            title: string;
+            channel: "sms" | "email";
+            /** @description Phone number (SMS) or e-mail address. */
             to: string;
             subject: string;
-            text: string;
-            chars: number;
-            parts: number;
-        };
-        BulkSendPreview: {
-            /** @enum {string} */
-            channel: "sms" | "mail";
-            target_label: string;
-            /** @description Active taxpayers in the target */
-            targets: number;
-            /** @description Messages that will go */
-            recipients: number;
-            duplicates: components["schemas"]["BulkSendDuplicate"][];
-            skipped: components["schemas"]["BulkSendSkip"][];
-            too_long: components["schemas"]["BulkSendTooLong"][];
-            max_parts: number;
-            part_limit: number;
-            max_recipients: number;
-            test_mode: boolean;
-            /** @description Why the send must not start; empty when it may */
-            blocked: string;
-            sample: components["schemas"]["BulkSendSample"] | null;
-        };
-        BulkSendFailure: {
-            title: string;
-            recipient: string;
-            status: string;
-            error_message: string;
-        };
-        BulkSend: {
-            /** Format: uuid */
-            uuid: string;
-            /** @enum {string} */
-            channel: "sms" | "mail";
-            subject: string;
             body: string;
             /** @enum {string} */
-            target_kind: "selection" | "group" | "filter" | "recent";
-            target_label: string;
-            /** @enum {string} */
-            status: "running" | "done" | "failed" | "interrupted";
-            total: number;
-            processed: number;
-            sent: number;
-            failed: number;
-            duplicates: number;
-            skipped: components["schemas"]["BulkSendSkip"][];
-            failures: components["schemas"]["BulkSendFailure"][];
+            status: "pending" | "sent" | "failed" | "uncertain" | "dry_run";
+            msgheader: string;
+            provider_job_id: string;
+            error_code: string;
             error_message: string;
+            source_rule: string;
+            source_ref: string;
+            sent_by_name: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
-            finished_at: string | null;
+            sent_at: string | null;
+            /** Format: date-time */
+            delivered_at: string | null;
+            /** Format: date-time */
+            opened_at: string | null;
+            /** Format: date-time */
+            downloaded_at: string | null;
         };
-        EnvelopeTaxpayerGroup: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["TaxpayerGroup"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeTaxpayerGroupList: {
-            /** @enum {boolean} */
-            success: true;
-            data: {
-                items: components["schemas"]["TaxpayerGroup"][];
-            };
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeCommunicationFilters: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["CommunicationFilters"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeBulkSendPreview: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["BulkSendPreview"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeBulkSend: {
-            /** @enum {boolean} */
-            success: true;
-            data: components["schemas"]["BulkSend"];
-            meta: components["schemas"]["ResponseMeta"];
-        };
-        EnvelopeBulkSendList: {
+        EnvelopeCommunicationHistory: {
             /** @enum {boolean} */
             success: true;
             data: {
-                items: components["schemas"]["BulkSend"][];
+                items: components["schemas"]["CommunicationHistoryItem"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -22062,6 +22238,40 @@ export interface components {
                 total: number;
                 limit: number;
                 offset: number;
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        VATNotice: {
+            /** Format: uuid */
+            uuid: string;
+            period: string;
+            /** @enum {string} */
+            outcome: "payment" | "no_payment";
+            output_vat: string;
+            input_vat: string;
+            carried_in: string;
+            payable: string;
+            carry_out: string;
+            /** Format: date */
+            due_date: string | null;
+            message: string | null;
+            sent_by_name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description İletişim merkezinin mesaj kaydına bağlantı (#780 A); servis gelene kadar null. */
+            message_ref: string | null;
+        };
+        EnvelopeVATNotice: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["VATNotice"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeVATNoticeList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["VATNotice"][];
             };
             meta: components["schemas"]["ResponseMeta"];
         };
@@ -23113,6 +23323,183 @@ export interface components {
             /** Format: date-time */
             expires_at: string | null;
         };
+        TaxpayerGroup: {
+            /** Format: uuid */
+            uuid: string;
+            name: string;
+            description: string;
+            member_count: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            members: components["schemas"]["TaxpayerGroupMember"][];
+        };
+        TaxpayerGroupMember: {
+            /** Format: uuid */
+            engagement_uuid: string;
+            title: string;
+            tax_id: string;
+        };
+        TaxpayerGroupInput: {
+            name: string;
+            description?: string;
+            engagement_uuids?: string[];
+        };
+        CommunicationFilterOption: {
+            code: string;
+            label: string;
+            count: number;
+        };
+        CommunicationAssigneeOption: {
+            /** Format: uuid */
+            uuid: string;
+            name: string;
+            count: number;
+        };
+        CommunicationFilters: {
+            tax_kinds: components["schemas"]["CommunicationFilterOption"][];
+            assignees: components["schemas"]["CommunicationAssigneeOption"][];
+        };
+        BulkSendTarget: {
+            /** @enum {string} */
+            kind: "selection" | "group" | "filter" | "recent";
+            engagement_uuids?: string[];
+            /** Format: uuid */
+            group_uuid?: string;
+            /** @enum {string} */
+            tax_kind?: "" | "kdv1" | "muhsgk";
+            /** Format: uuid */
+            assignee_uuid?: string;
+            /** Format: uuid */
+            bulk_uuid?: string;
+            /** @description Screen name of a filter target */
+            label?: string;
+        };
+        BulkSendInput: {
+            /** @enum {string} */
+            channel: "sms" | "mail";
+            /** @description E-mail subject (required for mail) */
+            subject?: string;
+            /** @description Text with the variables :mukellef :ofis :donem :tutar :son_gun :link */
+            body: string;
+            target: components["schemas"]["BulkSendTarget"];
+        };
+        BulkSendSkip: {
+            engagement_uuid: string;
+            title: string;
+            /** @enum {string} */
+            reason: "no_contact" | "invalid_phone" | "invalid_email" | "campaign_words";
+        };
+        BulkSendDuplicate: {
+            title: string;
+            /** @description The taxpayer who gets the message for this contact */
+            same_as: string;
+            contact: string;
+        };
+        BulkSendTooLong: {
+            title: string;
+            chars: number;
+            parts: number;
+        };
+        BulkSendSample: {
+            title: string;
+            to: string;
+            subject: string;
+            text: string;
+            chars: number;
+            parts: number;
+        };
+        BulkSendPreview: {
+            /** @enum {string} */
+            channel: "sms" | "mail";
+            target_label: string;
+            /** @description Active taxpayers in the target */
+            targets: number;
+            /** @description Messages that will go */
+            recipients: number;
+            duplicates: components["schemas"]["BulkSendDuplicate"][];
+            skipped: components["schemas"]["BulkSendSkip"][];
+            too_long: components["schemas"]["BulkSendTooLong"][];
+            max_parts: number;
+            part_limit: number;
+            max_recipients: number;
+            test_mode: boolean;
+            /** @description Why the send must not start; empty when it may */
+            blocked: string;
+            sample: components["schemas"]["BulkSendSample"] | null;
+        };
+        BulkSendFailure: {
+            title: string;
+            recipient: string;
+            status: string;
+            error_message: string;
+        };
+        BulkSend: {
+            /** Format: uuid */
+            uuid: string;
+            /** @enum {string} */
+            channel: "sms" | "mail";
+            subject: string;
+            body: string;
+            /** @enum {string} */
+            target_kind: "selection" | "group" | "filter" | "recent";
+            target_label: string;
+            /** @enum {string} */
+            status: "running" | "done" | "failed" | "interrupted";
+            total: number;
+            processed: number;
+            sent: number;
+            failed: number;
+            duplicates: number;
+            skipped: components["schemas"]["BulkSendSkip"][];
+            failures: components["schemas"]["BulkSendFailure"][];
+            error_message: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            finished_at: string | null;
+        };
+        EnvelopeTaxpayerGroup: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["TaxpayerGroup"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeTaxpayerGroupList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["TaxpayerGroup"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeCommunicationFilters: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["CommunicationFilters"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBulkSendPreview: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BulkSendPreview"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBulkSend: {
+            /** @enum {boolean} */
+            success: true;
+            data: components["schemas"]["BulkSend"];
+            meta: components["schemas"]["ResponseMeta"];
+        };
+        EnvelopeBulkSendList: {
+            /** @enum {boolean} */
+            success: true;
+            data: {
+                items: components["schemas"]["BulkSend"][];
+            };
+            meta: components["schemas"]["ResponseMeta"];
+        };
     };
     responses: {
         /**
@@ -23268,6 +23655,7 @@ export interface components {
         /** @description Dönem (YYYY-MM) */
         PeriodPath: string;
         ChangeRequestUuid: string;
+        LateDocumentUuid: string;
         DocumentTaskUuid: string;
         DocumentTaskUploadUuid: string;
     };
@@ -28825,6 +29213,35 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getLateDocumentSummary: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late document counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentSummary"];
+                };
+            };
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["TenantForbidden"];
             500: components["responses"]["InternalError"];
@@ -42364,6 +42781,81 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
+    listEngagementLateDocuments: {
+        parameters: {
+            query?: {
+                status?: "pending" | "correction" | "current_period" | "ignored";
+                period?: components["schemas"]["Period"];
+                document_uuid?: string;
+            };
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Late documents and counts by status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocumentList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    decideEngagementLateDocument: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+                lateDocumentUuid: components["parameters"]["LateDocumentUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LateDocumentDecision"];
+            };
+        };
+        responses: {
+            /** @description Updated late document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeLateDocument"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["EngagementForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
     listTenantDocumentTasks: {
         parameters: {
             query?: {
@@ -43346,72 +43838,12 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    listTaxpayerGroups: {
+    listEngagementCommunications: {
         parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
+            query?: {
+                channel?: "sms" | "email";
+                limit?: number;
             };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Groups */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerGroupList"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    createTaxpayerGroup: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaxpayerGroupInput"];
-            };
-        };
-        responses: {
-            /** @description Created */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    getTaxpayerGroup: {
-        parameters: {
-            query?: never;
             header: {
                 /**
                  * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
@@ -43420,55 +43852,19 @@ export interface operations {
                 "X-Organization": components["parameters"]["XOrganization"];
             };
             path: {
-                groupUuid: string;
+                engagementUuid: components["parameters"]["EngagementUuid"];
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Group */
+            /** @description Records */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    updateTaxpayerGroup: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                groupUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaxpayerGroupInput"];
-            };
-        };
-        responses: {
-            /** @description Saved */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
+                    "application/json": components["schemas"]["EnvelopeCommunicationHistory"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -43478,194 +43874,51 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    deleteTaxpayerGroup: {
+    getMailOpenPixel: {
         parameters: {
             query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
+            header?: never;
             path: {
-                groupUuid: string;
+                token: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Deleted */
-            204: {
+            /** @description The pixel. */
+            200: {
                 headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/gif": string;
+                };
+            };
+        };
+    };
+    getMailTrackedLink: {
+        parameters: {
+            query: {
+                /** @description Target URL or frontend path. */
+                to: string;
+            };
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the target. */
+            302: {
+                headers: {
+                    Location?: string;
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
             404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    getCommunicationFilters: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Filters */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeCommunicationFilters"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    previewBulkSend: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkSendInput"];
-            };
-        };
-        responses: {
-            /** @description Preview */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeBulkSendPreview"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    listBulkSends: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Bulk sends */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeBulkSendList"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    startBulkSend: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkSendInput"];
-            };
-        };
-        responses: {
-            /** @description Started */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeBulkSend"];
-                };
-            };
-            400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    getBulkSend: {
-        parameters: {
-            query?: never;
-            header: {
-                /**
-                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
-                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
-                 */
-                "X-Organization": components["parameters"]["XOrganization"];
-            };
-            path: {
-                bulkUuid: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Bulk send */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EnvelopeBulkSend"];
-                };
-            };
-            401: components["responses"]["Unauthenticated"];
-            403: components["responses"]["TenantForbidden"];
-            404: components["responses"]["NotFound"];
-            500: components["responses"]["InternalError"];
         };
     };
     getClickFixIdentity: {
@@ -44477,6 +44730,86 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["EngagementForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listVATNotices: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNoticeList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    sendVATNotice: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                engagementUuid: components["parameters"]["EngagementUuid"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    period?: string;
+                    /** @description Optional note from the office */
+                    message?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Sent */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeVATNotice"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `NO_TAXPAYER_USER`: the taxpayer has no panel user */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             500: components["responses"]["InternalError"];
         };
     };
@@ -45738,6 +46071,328 @@ export interface operations {
             403: components["responses"]["EngagementForbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listTaxpayerGroups: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerGroupList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    createTaxpayerGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxpayerGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getTaxpayerGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                groupUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Group */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    updateTaxpayerGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                groupUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxpayerGroupInput"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeTaxpayerGroup"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    deleteTaxpayerGroup: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                groupUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getCommunicationFilters: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Filters */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeCommunicationFilters"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    previewBulkSend: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkSendInput"];
+            };
+        };
+        responses: {
+            /** @description Preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBulkSendPreview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    listBulkSends: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bulk sends */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBulkSendList"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    startBulkSend: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkSendInput"];
+            };
+        };
+        responses: {
+            /** @description Started */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBulkSend"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getBulkSend: {
+        parameters: {
+            query?: never;
+            header: {
+                /**
+                 * @description Organization of a `/v1/tenant/*` request: its slug (preferred, readable
+                 *     in logs) or uuid. The BFF forwards it on `/api/v1/tenant/*` only.
+                 */
+                "X-Organization": components["parameters"]["XOrganization"];
+            };
+            path: {
+                bulkUuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bulk send */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnvelopeBulkSend"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["TenantForbidden"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
