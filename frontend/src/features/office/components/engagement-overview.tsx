@@ -177,7 +177,11 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           <ul className="divide-line divide-y">
             <Stat
               label={t("office.engagement.stat_invoices")}
-              value={invoices.isLoading ? "–" : (invoices.data?.total ?? 0)}
+              value={
+                invoices.isLoading || invoices.isError
+                  ? "–"
+                  : (invoices.data?.total ?? 0)
+              }
               href={routes.tenant.engagementInvoices(slug, engagement)}
             />
             <Stat
@@ -188,7 +192,9 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
             />
             <Stat
               label={t("office.engagement.stat_warnings")}
-              value={warnings.isLoading ? "–" : openWarnings}
+              value={
+                warnings.isLoading || warnings.isError ? "–" : openWarnings
+              }
               href={routes.tenant.engagementWarnings(slug, engagement)}
             />
             <Stat
@@ -197,7 +203,11 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
             />
             <Stat
               label={t("office.engagement.stat_tasks")}
-              value={tasks.isLoading ? "–" : (tasks.data?.length ?? 0)}
+              value={
+                tasks.isLoading || tasks.isError
+                  ? "–"
+                  : (tasks.data?.length ?? 0)
+              }
               href={`#${DOC_TASKS_ANCHOR}`}
             />
           </ul>
@@ -217,10 +227,25 @@ export function EngagementOverviewPage({ engagement }: { engagement: string }) {
           </h2>
           {tasks.isLoading ? (
             <Skeleton className="h-24 w-full" />
+          ) : tasks.isError ? (
+            <ErrorState
+              title={t("office.engagement.tasks_error")}
+              onRetry={() => void tasks.refetch()}
+              retryLabel={t("common.retry")}
+            />
           ) : (tasks.data ?? []).length === 0 ? (
             <BosDurum
               className="border-0 py-4"
               baslik={t("office.engagement.tasks_empty")}
+              aciklama={t("office.engagement.tasks_empty_hint")}
+              eylem={
+                <Link
+                  href={routes.tenant.engagementWarnings(slug, engagement)}
+                  className="text-brand text-sm font-semibold underline-offset-2 hover:underline"
+                >
+                  {t("office.engagement.tasks_empty_action")}
+                </Link>
+              }
             />
           ) : (
             <ul className="divide-line divide-y">

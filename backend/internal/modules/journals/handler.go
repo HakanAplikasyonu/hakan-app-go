@@ -88,6 +88,10 @@ func RegisterRoutes(mux *http.ServeMux, tokens *jwt.Manager, loader middleware.I
 	mux.Handle("DELETE "+links+"/invoices/{invoiceUuid}", engaged(write, h.manualLink(LinkInvoice, "invoiceUuid", false)))
 	mux.Handle("PUT "+links+"/bank-transactions/{transactionUuid}", engaged(write, h.manualLink(LinkBankTransaction, "transactionUuid", true)))
 	mux.Handle("DELETE "+links+"/bank-transactions/{transactionUuid}", engaged(write, h.manualLink(LinkBankTransaction, "transactionUuid", false)))
+	mux.Handle("PUT "+links+"/customers/{customerUuid}", engaged(write, h.manualLink(LinkCustomer, "customerUuid", true)))
+	mux.Handle("DELETE "+links+"/customers/{customerUuid}", engaged(write, h.manualLink(LinkCustomer, "customerUuid", false)))
+	// Fişe bağlanabilecek cari kartları (#710).
+	mux.Handle("GET "+base+"/link-candidates/customers", engaged(read, h.customerCandidates))
 	mux.Handle("GET "+base+"/journal-exports", engaged(read, h.listBatches))
 	mux.Handle("POST "+base+"/journal-exports", scoped(export, h.export))
 	// Pre-export check and the document → file trail (#466).
@@ -252,6 +256,24 @@ func (h *Handler) manualLink(kind, param string, on bool) http.HandlerFunc {
 		}
 		response.JSON(w, r, http.StatusOK, map[string]any{"kind": kind, "uuid": target, "linked": linked})
 	}
+}
+
+func (h *Handler) customerCandidates(w http.ResponseWriter, r *http.Request) {
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len([]rune(q)) > 100 {
+		response.BadRequest(w, r, response.CodeValidationError, "q is at most 100 characters")
+		return
+	}
+	limit := int32(200)
+	if l := r.URL.Query().Get("limit"); l != "" {
+		limit, _ = paging(l, "")
+	}
+	items, err := h.svc.CustomerCandidates(r.Context(), engagementctx.Must(r.Context()), q, limit)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	response.JSON(w, r, http.StatusOK, map[string]any{"items": items})
 }
 
 func (h *Handler) setLineAccount(w http.ResponseWriter, r *http.Request) {
