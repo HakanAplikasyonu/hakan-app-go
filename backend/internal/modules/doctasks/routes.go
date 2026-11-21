@@ -48,6 +48,9 @@ func (m Module) Routes(r *module.Router) {
 	r.Tenant("POST "+base, write, h.CreateRequest, eng...)
 	r.Tenant("POST "+base+"/detect", write, h.Detect, eng...)
 	r.Tenant("POST "+base+"/generate", write, h.Generate, eng...)
+	// Ay başı belge toplama (#780): eksik belgeler ve topluca isteme.
+	r.Tenant("GET "+base+"/missing", read, h.Missing, eng...)
+	r.Tenant("POST "+base+"/missing", write, h.RequestMissing, eng...)
 	r.Tenant("GET "+base+"/{taskUuid}", read, h.Get, eng...)
 	r.Tenant("POST "+base+"/{taskUuid}/cancel", write, h.Cancel, eng...)
 	r.Tenant("POST "+base+"/{taskUuid}/complete", write, h.Complete, eng...)

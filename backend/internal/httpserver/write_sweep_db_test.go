@@ -284,6 +284,7 @@ var tenantWrites = map[string]sweepCase{
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks":                                                          {body: `{"title":"Kira sözleşmesi","note":"Ekim kira sözleşmesi","due_days":7}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/detect":                                                   {body: `{"period":"2026-10"}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/generate":                                                 {body: `{"period":"2026-10"}`},
+	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/missing":                                                  {body: `{"period":"2026-10","items":[{"kind":"z_reports"}],"sms":true}`},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/cancel":                                        {body: `{"reason":"tarama"}`, late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/complete":                                      {late: true},
 	"POST /v1/tenant/engagements/{engagementUuid}/document-tasks/{taskUuid}/rerequest":                                     {body: `{"note":"Faturanın ikinci sayfası eksik"}`},
