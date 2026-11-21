@@ -63,6 +63,7 @@ taxpayer_import_batches
 account_rule_settings
 office_support_settings
 tax_return_settings
+important_document_settings
 report_deliveries engagement
 whatsapp_chat_links engagement
 whatsapp_captures engagement
