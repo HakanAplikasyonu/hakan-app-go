@@ -357,6 +357,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
 		return err
 	}
+	// Ay sonu kapanış zinciri (#780): mükellefler farklı adımlarda dursun.
+	if err := seedCloseChain(ctx, pool, org.ID); err != nil {
+		return fmt.Errorf("close chain: %w", err)
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }

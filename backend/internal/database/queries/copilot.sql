@@ -115,8 +115,10 @@ WHERE e.organization_id = @organization_id AND e.id = ANY(@engagement_ids::bigin
 -- mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
 -- ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
 -- karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
--- olmayan).
+-- olmayan). Mizan yalnız bilanço esasındaki mükellefte beklenir (işletme
+-- ve serbest meslek defterinde hesap planı yok).
 SELECT e.id AS engagement_id,
+       (e.ledger_type = 'bilanco')::bool AS trial_balance_expected,
        EXISTS (SELECT 1 FROM payroll_runs pr
                WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period = @period)::bool AS payroll_imported,
        (EXISTS (SELECT 1 FROM payroll_runs pr

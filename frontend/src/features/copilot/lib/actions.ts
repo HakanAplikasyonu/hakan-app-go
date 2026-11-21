@@ -61,8 +61,12 @@ export function actionHref(
 ): string {
   switch (action) {
     // Eksik belge: dosya listesi değil, açık belge istekleri (#563).
+    // Ofis listesinden: belge toplama ekranı, mükellefe süzülü (#800);
+    // mükellef sayfasında açık belge istekleri kalır.
     case "open_documents":
-      return routes.tenant.engagementDocTasks(slug, engagement);
+      return inEngagement
+        ? routes.tenant.engagementDocTasks(slug, engagement)
+        : routes.tenant.documentCollection(slug, engagement);
     case "open_review":
       return inEngagement
         ? routes.tenant.engagementReview(slug, engagement)
@@ -134,7 +138,7 @@ export function stepHref(
     return actionHref(slug, action, engagement, inEngagement);
   switch (key) {
     case "documents":
-      return routes.tenant.engagementDocTasks(slug, engagement);
+      return actionHref(slug, "open_documents", engagement, inEngagement);
     case "bank":
       return routes.tenant.engagementBank(slug, engagement);
     case "review":

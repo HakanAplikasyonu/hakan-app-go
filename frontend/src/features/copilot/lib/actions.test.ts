@@ -25,8 +25,9 @@ describe("actionHref", () => {
   });
 
   it("eksik belge açık belge isteklerine gider (#563)", () => {
+    // Ofis listesinden belge toplama ekranına, mükellefe süzülü (#800).
     expect(actionHref("demo", "open_documents", "e1")).toBe(
-      "/t/demo/engagements/e1#belge-istekleri",
+      "/t/demo/document-collection?engagement=e1",
     );
     expect(actionHref("demo", "open_documents", "e1", true)).toBe(
       "/t/demo/engagements/e1#belge-istekleri",

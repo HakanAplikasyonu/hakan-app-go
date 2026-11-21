@@ -107,6 +107,15 @@ func TestChain(t *testing.T) {
 	if l := stepOf(t, r.Steps, StepLucaImport); l.Count != 1 || actionOf(l) != ActionOpenTrialBalance {
 		t.Fatalf("mizan missing: %+v", l)
 	}
+	// İşletme / serbest meslek defteri: mizan yok; bordro yoksa adım yok.
+	fill(&r, Counts{NoTrialBalance: true, VATNotices: 1})
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Status != StatusNA {
+		t.Fatalf("no trial balance: %+v", l)
+	}
+	fill(&r, Counts{NoTrialBalance: true, PayrollExpected: true, VATNotices: 1})
+	if l := stepOf(t, r.Steps, StepLucaImport); l.Count != 1 || actionOf(l) != ActionOpenPayroll {
+		t.Fatalf("no trial balance, payroll: %+v", l)
+	}
 	fill(&r, closed(Counts{Reconciled: true, ReconciliationIssues: 4, ReportSent: 1}))
 	if l := stepOf(t, r.Steps, StepLucaImport); l.Status != StatusBlocked || l.Count != 4 || actionOf(l) != ActionOpenReconciliation {
 		t.Fatalf("differences: %+v", l)

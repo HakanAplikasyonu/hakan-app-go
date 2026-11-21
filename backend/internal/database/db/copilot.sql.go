@@ -165,6 +165,7 @@ func (q *Queries) CopilotJournalCounts(ctx context.Context, arg CopilotJournalCo
 
 const copilotLucaImportCounts = `-- name: CopilotLucaImportCounts :many
 SELECT e.id AS engagement_id,
+       (e.ledger_type = 'bilanco')::bool AS trial_balance_expected,
        EXISTS (SELECT 1 FROM payroll_runs pr
                WHERE pr.taxpayer_id = e.taxpayer_id AND pr.period = $1)::bool AS payroll_imported,
        (EXISTS (SELECT 1 FROM payroll_runs pr
@@ -198,6 +199,7 @@ type CopilotLucaImportCountsParams struct {
 
 type CopilotLucaImportCountsRow struct {
 	EngagementID         int64 `json:"engagement_id"`
+	TrialBalanceExpected bool  `json:"trial_balance_expected"`
 	PayrollImported      bool  `json:"payroll_imported"`
 	PayrollExpected      bool  `json:"payroll_expected"`
 	TrialBalanceImported bool  `json:"trial_balance_imported"`
@@ -209,7 +211,8 @@ type CopilotLucaImportCountsRow struct {
 // mizanı (trial_balance içe aktarması) yüklendi mi; bordro yalnız çalışanı
 // ya da bordro geçmişi olan mükellefte beklenir. Dönemin son mizan
 // karşılaştırması ve fark sayısı (tutmayan + mizanda olmayan + kaynağı
-// olmayan).
+// olmayan). Mizan yalnız bilanço esasındaki mükellefte beklenir (işletme
+// ve serbest meslek defterinde hesap planı yok).
 func (q *Queries) CopilotLucaImportCounts(ctx context.Context, arg CopilotLucaImportCountsParams) ([]CopilotLucaImportCountsRow, error) {
 	rows, err := q.db.Query(ctx, copilotLucaImportCounts, arg.Period, arg.OrganizationID, arg.EngagementIds)
 	if err != nil {
@@ -221,6 +224,7 @@ func (q *Queries) CopilotLucaImportCounts(ctx context.Context, arg CopilotLucaIm
 		var i CopilotLucaImportCountsRow
 		if err := rows.Scan(
 			&i.EngagementID,
+			&i.TrialBalanceExpected,
 			&i.PayrollImported,
 			&i.PayrollExpected,
 			&i.TrialBalanceImported,

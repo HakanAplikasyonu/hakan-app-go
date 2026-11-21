@@ -150,6 +150,16 @@ export const routes = {
     command: (slug: string) => `/t/${encodeURIComponent(slug)}/command`,
     /** Co-pilot: sıradaki iş akışı ve komut çubuğu (#392). */
     copilot: (slug: string) => `/t/${encodeURIComponent(slug)}/copilot`,
+    /**
+     * Ofis geneli belge toplama (#800): eksik ekstre / Z / masraf / fatura
+     * ve tek tık istek; `engagement` verilirse o mükellefe süzülür.
+     */
+    documentCollection: (slug: string, engagementUuid?: string) =>
+      `/t/${encodeURIComponent(slug)}/document-collection${
+        engagementUuid
+          ? `?engagement=${encodeURIComponent(engagementUuid)}`
+          : ""
+      }`,
     review: (slug: string) => `/t/${encodeURIComponent(slug)}/review`,
     upload: (slug: string) => `/t/${encodeURIComponent(slug)}/upload`,
     /** Journal drafts and Luca / Zirve export (issue #143). */

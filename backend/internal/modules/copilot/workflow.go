@@ -129,6 +129,8 @@ type Counts struct {
 	// Luca'dan alınanlar (#780).
 	PayrollExpected, PayrollImported, TrialBalanceImported, Reconciled bool
 	ReconciliationIssues                                               int64
+	// NoTrialBalance: işletme / serbest meslek defteri, Luca mizanı yok.
+	NoTrialBalance bool
 	// VATNotices: KDV bildirimleri of the period (#780).
 	VATNotices int64
 }
@@ -197,19 +199,23 @@ func Chain(c Counts) []Step {
 	}
 	// Luca'dan alındı (#780): bordro Luca'da kalır; dönemin bordro dökümü
 	// (çalışanı olan mükellefte) ve Luca mizanı yüklenir. Mizan
-	// karşılaştırması fark gösteriyorsa adım bakılmayı bekler.
+	// karşılaştırması fark gösteriyorsa adım bakılmayı bekler. İşletme ve
+	// serbest meslek defterinde mizan yok.
 	missingPayroll := c.PayrollExpected && !c.PayrollImported
+	missingMizan := !c.NoTrialBalance && !c.TrialBalanceImported
 	var missing int64
 	if missingPayroll {
 		missing++
 	}
-	if !c.TrialBalanceImported {
+	if missingMizan {
 		missing++
 	}
 	switch {
+	case c.NoTrialBalance && !c.PayrollExpected:
+		steps = append(steps, Step{Key: StepLucaImport, Status: StatusNA})
 	case missingPayroll:
 		steps = append(steps, Step{Key: StepLucaImport, Status: StatusTodo, Count: missing, Action: act(ActionOpenPayroll)})
-	case !c.TrialBalanceImported:
+	case missingMizan:
 		steps = append(steps, Step{Key: StepLucaImport, Status: StatusTodo, Count: missing, Action: act(ActionOpenTrialBalance)})
 	case c.Reconciled && c.ReconciliationIssues > 0:
 		steps = append(steps, Step{Key: StepLucaImport, Status: StatusBlocked, Count: c.ReconciliationIssues, Action: act(ActionOpenReconciliation)})
@@ -606,6 +612,7 @@ func (s *Service) fillRows(ctx context.Context, organizationID int64, period str
 	for _, r := range li {
 		if c := counts[r.EngagementID]; c != nil {
 			c.PayrollExpected, c.PayrollImported, c.TrialBalanceImported = r.PayrollExpected, r.PayrollImported, r.TrialBalanceImported
+			c.NoTrialBalance = !r.TrialBalanceExpected
 			c.Reconciled, c.ReconciliationIssues = r.Reconciled, r.ReconciliationIssues
 		}
 	}
