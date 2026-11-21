@@ -22,6 +22,7 @@ import {
 import { useTenant } from "@/features/tenant/providers/tenant-provider";
 import { StatementAiSetting } from "@/features/tenant/components/statement-ai-setting";
 import { TaxReturnFinalCheckSetting } from "@/features/tenant/components/tax-return-final-check-setting";
+import { SmsSettingsCard } from "@/features/tenant/components/sms-settings-card";
 import { TaxpayerVatPanelSetting } from "@/features/tenant/components/taxpayer-vat-panel-setting";
 import { SupportSettingsCard } from "@/features/tenant/components/support-settings-card";
 import { TenantForbidden } from "@/features/tenant/components/tenant-forbidden";
@@ -33,6 +34,7 @@ type SectionId =
   | "tax-returns"
   | "taxpayer-panel"
   | "support"
+  | "sms"
   | "ai"
   | "agents"
   | "appearance";
@@ -138,6 +140,7 @@ export function TenantSettingsPage() {
       label: t("tenant.settings_section_taxpayer_panel"),
     },
     { id: "support", label: t("tenant.settings_section_support") },
+    { id: "sms", label: t("tenant.settings_section_sms") },
     ...(showAi
       ? [{ id: "ai" as const, label: t("tenant.settings_section_ai") }]
       : []),
@@ -251,6 +254,14 @@ export function TenantSettingsPage() {
             description={t("tenant.settings_section_support_description")}
           >
             <SupportSettingsCard slug={tenant.slug} canWrite={canWrite} />
+          </Section>
+          {/* SMS (#780 A, İletişim merkezi): ofisin NetGSM hesabı. */}
+          <Section
+            id="sms"
+            title={t("tenant.settings_section_sms")}
+            description={t("tenant.settings_section_sms_description")}
+          >
+            <SmsSettingsCard slug={tenant.slug} canWrite={canWrite} />
           </Section>
           {showAi ? (
             <Section
