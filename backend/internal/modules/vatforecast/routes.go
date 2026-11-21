@@ -46,6 +46,8 @@ func (m Module) Routes(r *module.Router) {
 		office = append(office, m.Scope)
 	}
 	r.Tenant("GET /v1/tenant/vat-forecast", read, h.Office, office...)
+	r.Tenant("GET /v1/tenant/vat-tracking-settings", read, h.Tracking, office...)
+	r.Tenant("PUT /v1/tenant/vat-tracking-settings", rbac.PermTenantSettingsWrite, h.PutTracking, office...)
 	// Mükellef paneli (#780): anlık KDV ve satış raporu, salt okunur.
 	tp := func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) { response.NotFound(w, req, "") })

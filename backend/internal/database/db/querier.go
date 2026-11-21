@@ -77,6 +77,10 @@ type Querier interface {
 	CancelAccountingTransfer(ctx context.Context, arg CancelAccountingTransferParams) (AccountingTransfer, error)
 	CancelDocumentTask(ctx context.Context, arg CancelDocumentTaskParams) (int64, error)
 	CancelOnboardingRequest(ctx context.Context, arg CancelOnboardingRequestParams) (int64, error)
+	// Cari mizanı (#780): cari alt hesapların adı ve VKN'si; etkin plan, üretilen
+	// cari alt hesaplar ve cari hafızası. Kod başına birden çok satır gelebilir,
+	// öncelik rank'ta (0 plan).
+	CariAccountInfo(ctx context.Context, arg CariAccountInfoParams) ([]CariAccountInfoRow, error)
 	// Son kontrol (#669): hazırlanmış beyanı sorumlu "kontrol edildi" işaretler.
 	CheckTaxReturn(ctx context.Context, arg CheckTaxReturnParams) (TaxReturn, error)
 	// Ajan görevi üstlenir. Bekleyen ya da 15 dakikadır sonuç bildirilmemiş
@@ -640,6 +644,8 @@ type Querier interface {
 	GetUserTOTPByUserID(ctx context.Context, userID int64) (UserTotp, error)
 	// period'a en yakın (aynı ya da önceki) elle girilmiş açılış devri.
 	GetVATOpeningAtOrBefore(ctx context.Context, arg GetVATOpeningAtOrBeforeParams) (GetVATOpeningAtOrBeforeRow, error)
+	// KDV takibi ofis ayarları (#780); satırı yoksa varsayılan (açık, 29).
+	GetVATTrackingSettings(ctx context.Context, organizationID int64) (VatTrackingSetting, error)
 	GetValidRefreshTokenByHash(ctx context.Context, tokenHash string) (RefreshToken, error)
 	GetWebAuthnCredentialByCredentialID(ctx context.Context, credentialID string) (WebauthnCredential, error)
 	GetWebAuthnCredentialByUUID(ctx context.Context, arg GetWebAuthnCredentialByUUIDParams) (WebauthnCredential, error)
@@ -1852,6 +1858,7 @@ type Querier interface {
 	UpsertTaxReturnSettings(ctx context.Context, arg UpsertTaxReturnSettingsParams) (TaxReturnSetting, error)
 	UpsertUserTOTPSetup(ctx context.Context, arg UpsertUserTOTPSetupParams) (UserTotp, error)
 	UpsertVATOpening(ctx context.Context, arg UpsertVATOpeningParams) (UpsertVATOpeningRow, error)
+	UpsertVATTrackingSettings(ctx context.Context, arg UpsertVATTrackingSettingsParams) (VatTrackingSetting, error)
 	UpsertWhatsAppChatLink(ctx context.Context, arg UpsertWhatsAppChatLinkParams) (uuid.UUID, error)
 	UserHasRoleSlug(ctx context.Context, arg UserHasRoleSlugParams) (bool, error)
 	// Tahmine giren fatura sayısı ve girmeyenler (ekranda "şunlar sayılmadı").
