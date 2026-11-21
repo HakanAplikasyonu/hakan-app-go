@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRightLeft, CircleCheck } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -76,38 +77,48 @@ function PendingCell({ row }: { row: PendingJournalTransfer }) {
   );
 }
 
-/** Programa alınan dönemin mizan durumu (#574); yalnız aktarılanlarda. */
+/**
+ * Programa alınan dönemin mizan durumu (#574); yalnız aktarılanlarda.
+ * Fark, eski ya da hiç karşılaştırma yoksa yazı mükellefin Mutabakat
+ * ekranını o dönemle açar (#669 UX geçişi): farkın nedeni ve
+ * "Yeniden karşılaştır" orada; satır tıklaması Fişler'e gider.
+ */
 function CheckCell({ tr }: { tr: OfficeJournalTransfer }) {
   const { t } = useLocale();
+  const { slug } = useTenant();
+  const { setPeriod } = useOfficePeriod();
   const c = tr.check;
   if (!c) return <span className="text-muted-foreground text-xs">—</span>;
-  switch (c.status) {
-    case "ok":
-      return (
-        <span className="text-status-approved inline-flex items-center gap-1 text-xs">
-          <CircleCheck className="size-3.5" aria-hidden />
-          {t("office.transfers.check_ok")}
-        </span>
-      );
-    case "differences":
-      return (
-        <span className="text-status-blocking text-xs">
-          {t("office.transfers.check_differences", { count: c.issues })}
-        </span>
-      );
-    case "stale":
-      return (
-        <span className="text-status-warning text-xs">
-          {t("office.transfers.check_stale")}
-        </span>
-      );
-    default:
-      return (
-        <span className="text-status-warning text-xs">
-          {t("office.transfers.check_none")}
-        </span>
-      );
-  }
+  if (c.status === "ok")
+    return (
+      <span className="text-status-approved inline-flex items-center gap-1 text-xs">
+        <CircleCheck className="size-3.5" aria-hidden />
+        {t("office.transfers.check_ok")}
+      </span>
+    );
+  const [label, tone] =
+    c.status === "differences"
+      ? [
+          t("office.transfers.check_differences", { count: c.issues }),
+          "text-status-blocking",
+        ]
+      : c.status === "stale"
+        ? [t("office.transfers.check_stale"), "text-status-warning"]
+        : [t("office.transfers.check_none"), "text-status-warning"];
+  return (
+    <Link
+      href={routes.tenant.engagementReconciliation(slug, tr.engagement_uuid)}
+      className={`${tone} text-xs font-medium underline-offset-2 hover:underline`}
+      aria-label={`${label}: ${t("office.transfers.open_reconciliation")}`}
+      onClick={(e) => {
+        // Satır tıklaması Fişler'i açar; bu bağlantı Mutabakat'ı.
+        e.stopPropagation();
+        if (tr.period) setPeriod(tr.period);
+      }}
+    >
+      {label}
+    </Link>
+  );
 }
 
 /**
