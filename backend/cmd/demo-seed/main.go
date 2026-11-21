@@ -325,6 +325,10 @@ func seed(ctx context.Context, pool *pgxpool.Pool, pass, clickfixWidgetID string
 	if err := seedCommunicationBulk(ctx, pool, org.ID); err != nil {
 		return fmt.Errorf("communication bulk: %w", err)
 	}
+	// İşletme defteri ve serbest meslek mükellefleri (#780): yeni satırlar.
+	if err := seedOperatingTaxpayers(ctx, pool, org.ID, tpSvc, engSvc, store, byEmail); err != nil {
+		return err
+	}
 	fmt.Printf("demo office %q created\n", demo.OrgSlug)
 	return nil
 }

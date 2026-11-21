@@ -24,6 +24,7 @@ import (
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/database/db"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/modules/invoices/repository"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/engagementctx"
+	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/ledger"
 	"github.com/HakanAplikasyonu/hakan-app-go/backend/internal/platform/storage"
 )
 
@@ -187,6 +188,10 @@ func (s *Service) CreateDraft(ctx context.Context, scope engagementctx.Scope, ac
 			(l.Debit.IsZero() == l.Credit.IsZero()) || (l.SourceKind == "") != (l.SourceID == "") {
 			return Draft{}, fmt.Errorf("%w: line %d needs an account and exactly one of debit / credit", ErrInvalid, i+1)
 		}
+	}
+	// İşletme defteri / serbest meslek mükellefinde yevmiye yok (#780).
+	if err := ledger.RequireBalance(ctx, s.q, scope.OrganizationID, scope.ID); err != nil {
+		return Draft{}, err
 	}
 	period := in.Date.Format("2006-01")
 	origin, err := json.Marshal(nonNil(in.Origin))

@@ -144,6 +144,7 @@ type MatrixEngagement struct {
 	TaxpayerUUID  uuid.UUID
 	TaxpayerTitle string
 	TaxpayerTaxID string
+	LedgerType    string
 }
 
 // MatrixCounts are the per (engagement, period) counts of the matrix.
@@ -221,7 +222,9 @@ type MatrixRow struct {
 	TaxpayerUUID   uuid.UUID `json:"taxpayer_uuid"`
 	TaxpayerTitle  string    `json:"taxpayer_title"`
 	TaxpayerTaxID  string    `json:"taxpayer_tax_id"`
-	Cells          []Cell    `json:"cells"`
+	// LedgerType: defter türü (#780), bilanco / isletme / serbest_meslek.
+	LedgerType string `json:"ledger_type"`
+	Cells      []Cell `json:"cells"`
 }
 
 // Matrix is the office "command center" view (docs/01 §3).
