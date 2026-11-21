@@ -558,6 +558,48 @@ func (q *Queries) JournalDraftTotals(ctx context.Context, arg JournalDraftTotals
 	return i, err
 }
 
+const listEngagementCustomers = `-- name: ListEngagementCustomers :many
+SELECT c.uuid, c.name, c.type FROM customers c
+WHERE c.taxpayer_id = $1 AND c.type <> 'employee' AND c.deleted_at_source IS NULL
+  AND ($2::text = '' OR c.name ILIKE '%' || $2::text || '%')
+ORDER BY c.name, c.id
+LIMIT $3
+`
+
+type ListEngagementCustomersParams struct {
+	TaxpayerID int64  `json:"taxpayer_id"`
+	Q          string `json:"q"`
+	Lim        int32  `json:"lim"`
+}
+
+type ListEngagementCustomersRow struct {
+	Uuid uuid.UUID `json:"uuid"`
+	Name string    `json:"name"`
+	Type string    `json:"type"`
+}
+
+// Fişe bağlanabilecek cari kartları (#710): mükellefin müşteri ve
+// tedarikçileri, unvana göre; q unvanda aranır (VKN ile arama yok).
+func (q *Queries) ListEngagementCustomers(ctx context.Context, arg ListEngagementCustomersParams) ([]ListEngagementCustomersRow, error) {
+	rows, err := q.db.Query(ctx, listEngagementCustomers, arg.TaxpayerID, arg.Q, arg.Lim)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEngagementCustomersRow{}
+	for rows.Next() {
+		var i ListEngagementCustomersRow
+		if err := rows.Scan(&i.Uuid, &i.Name, &i.Type); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listExportBatchItems = `-- name: ListExportBatchItems :many
 SELECT i.id, i.organization_id, i.engagement_id, i.export_batch_id, i.journal_draft_id, i.reversed_at, i.reversed_by, i.reversal_reason, i.created_at, d.uuid AS journal_draft_uuid, d.entry_no, d.period
 FROM export_batch_items i

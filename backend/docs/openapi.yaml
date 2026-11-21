@@ -10114,6 +10114,84 @@ paths:
         "403": { $ref: "#/components/responses/EngagementForbidden" }
         "500": { $ref: "#/components/responses/InternalError" }
 
+  /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/links/customers/{customerUuid}:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: draftUuid, in: path, required: true, schema: { type: string, format: uuid } }
+      - { name: customerUuid, in: path, required: true, schema: { type: string, format: uuid } }
+    put:
+      tags: [Journals]
+      operationId: linkJournalDraftCustomer
+      summary: Link a cari card to the journal draft by hand (#710)
+      description: |
+        Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+        supplier or both) is kept on the draft (origin.manual_links, kind
+        `customer`) and shows in the draft's related records with relation
+        `manual` (status = card type). Lines, amounts and the export are not
+        changed. Linking twice or unlinking a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+    delete:
+      tags: [Journals]
+      operationId: unlinkJournalDraftCustomer
+      summary: Unlink a cari card from the journal draft (#710)
+      description: |
+        Requires `tenant.journals.write`. The taxpayer's cari card (customer,
+        supplier or both) is kept on the draft (origin.manual_links, kind
+        `customer`) and shows in the draft's related records with relation
+        `manual` (status = card type). Lines, amounts and the export are not
+        changed. Linking twice or unlinking a missing link is a no-op.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Whether the link exists now
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalDraftManualLink"
+        "404": { $ref: "#/components/responses/NotFound" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /v1/tenant/engagements/{engagementUuid}/link-candidates/customers:
+    parameters:
+      - $ref: "#/components/parameters/XOrganization"
+      - $ref: "#/components/parameters/EngagementUuid"
+      - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 }, description: Searched in the name only }
+      - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 200 } }
+    get:
+      tags: [Journals]
+      operationId: listJournalLinkCustomerCandidates
+      summary: Cari cards that can be linked to a journal draft (#710)
+      description: Requires `tenant.journals.read`. The taxpayer's customers and suppliers by name, at most `limit` (default 200).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Cari cards
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeJournalLinkCustomerCandidates"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/EngagementForbidden" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
   /v1/tenant/engagements/{engagementUuid}/journal-drafts/{draftUuid}/unapprove:
     parameters:
       - $ref: "#/components/parameters/XOrganization"
@@ -26377,7 +26455,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [invoice, bank_transaction, journal_draft, warning, suggestion, expense, retail_sale, payroll_run, financial_transaction, rule, account]
+          enum: [invoice, bank_transaction, journal_draft, warning, suggestion, expense, retail_sale, payroll_run, financial_transaction, rule, account, customer]
         uuid: { type: [string, "null"], format: uuid, description: "null for rule and account" }
         relation:
           type: string
@@ -26794,9 +26872,29 @@ components:
       type: object
       required: [kind, uuid, linked]
       properties:
-        kind: { type: string, enum: [invoice, bank_transaction] }
+        kind: { type: string, enum: [invoice, bank_transaction, customer] }
         uuid: { type: string, format: uuid }
         linked: { type: boolean }
+
+    JournalLinkCustomerCandidate:
+      type: object
+      required: [uuid, name, type]
+      properties:
+        uuid: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string, enum: [customer, supplier, both] }
+
+    EnvelopeJournalLinkCustomerCandidates:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success: { type: boolean, enum: [true] }
+        data:
+          type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/JournalLinkCustomerCandidate" } }
+        meta: { $ref: "#/components/schemas/ResponseMeta" }
 
     EnvelopeJournalDraftManualLink:
       type: object

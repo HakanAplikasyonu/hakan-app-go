@@ -880,6 +880,9 @@ type Querier interface {
 	ListEngagementAssignments(ctx context.Context, arg ListEngagementAssignmentsParams) ([]ListEngagementAssignmentsRow, error)
 	// Cari hafızası (#319): incelemede kararlaştırılmış cari hesaplar.
 	ListEngagementCounterpartyAccounts(ctx context.Context, arg ListEngagementCounterpartyAccountsParams) ([]ListEngagementCounterpartyAccountsRow, error)
+	// Fişe bağlanabilecek cari kartları (#710): mükellefin müşteri ve
+	// tedarikçileri, unvana göre; q unvanda aranır (VKN ile arama yok).
+	ListEngagementCustomers(ctx context.Context, arg ListEngagementCustomersParams) ([]ListEngagementCustomersRow, error)
 	// Ofis panelinde mükellefin masrafları; kategori ve hesap ofis tarafından.
 	ListEngagementExpenses(ctx context.Context, arg ListEngagementExpensesParams) ([]ListEngagementExpensesRow, error)
 	// Ofis paneli fatura görünümü (issue #142). Bir engagement'ın mükellefine ait

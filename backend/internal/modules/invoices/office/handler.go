@@ -37,9 +37,11 @@ type Downloader func(r *http.Request, path string) (io.ReadCloser, int64, error)
 
 // Handler serves the routes.
 type Handler struct {
-	q        *db.Queries
-	download Downloader
-	activity *activity.Recorder
+	q           *db.Queries
+	download    Downloader
+	activity    *activity.Recorder
+	notifier    Notifier
+	frontendURL string
 }
 
 // WithActivity records KDV indirim dönemi changes in the activity log (#640);
@@ -242,6 +244,13 @@ func (h *Handler) applyVATDeduction(w http.ResponseWriter, r *http.Request, inv 
 		h.activity.Record(r.Context(), &uid, action, "invoice", &invUUID, map[string]any{
 			"engagement_uuid": s.UUID.String(), "document_period": inv.Period, "from": from, "to": to,
 		}, r)
+	}
+	if target != "" {
+		var actorID int64
+		if p, ok := authctx.PrincipalFrom(r.Context()); ok {
+			actorID = p.UserInternal
+		}
+		h.notifyLatePurchase(r.Context(), s, inv, actorID, target)
 	}
 	h.get(w, r)
 }

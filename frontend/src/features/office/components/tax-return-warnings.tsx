@@ -118,6 +118,11 @@ export function TaxReturnWarnings({
   const current = open
     ? (groups.find((g) => g.key === open.key) ?? { ...open, items: [] })
     : null;
+  // Başlık listelenen uyarıyı sayar; liste boşsa (kalan maddeler yalnız
+  // kontrol listesinde onay bekliyor) kutu hiç görünmez: "3 açık uyarı"
+  // deyip altında "uyarı kalmadı" yazmak çelişkiydi.
+  const listed = groups.reduce((n, g) => n + g.items.length, 0);
+  if (!q.isLoading && listed === 0 && current === null) return null;
 
   return (
     <section
@@ -127,7 +132,9 @@ export function TaxReturnWarnings({
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h3 id="tr-warnings" className="font-display text-base font-semibold">
-            {t("office.tax_returns.blocking_title", { count: codes.length })}
+            {t("office.tax_returns.blocking_title", {
+              count: q.isLoading ? codes.length : listed,
+            })}
           </h3>
           <p className="text-text-3 text-xs">
             {t("office.tax_returns.blocking_hint")}

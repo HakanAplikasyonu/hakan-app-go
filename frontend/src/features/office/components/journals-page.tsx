@@ -213,7 +213,7 @@ function DraftCheck({
       });
     },
     onError: (err) =>
-      toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+      toast.error(journalErrorText(t, err, t("office.journals.action_error"))),
   });
   const openPeriod = async () => {
     const reason = await prompt({
@@ -268,7 +268,9 @@ function DraftCheck({
             }),
           ),
         onError: (err) =>
-          toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+          toast.error(
+            journalErrorText(t, err, t("office.journals.action_error")),
+          ),
       },
     );
   };
@@ -405,7 +407,9 @@ function DraftAmountsDialog({
           onClose();
         },
         onError: (err) =>
-          toast.error(journalErrorText(t, err, t("office.api.load_error"))),
+          toast.error(
+            journalErrorText(t, err, t("office.journals.action_error")),
+          ),
       },
     );
   };
@@ -604,7 +608,7 @@ function ApproveClean({
         done += 1;
       } catch (err) {
         failed += 1;
-        reason = journalErrorText(t, err, t("office.api.load_error"));
+        reason = journalErrorText(t, err, t("office.journals.action_error"));
       }
     }
     setBusy(false);
@@ -856,11 +860,15 @@ function ExportPanel({
         ) : run.isError &&
           !(isApiError(run.error) && run.error.code === "EXPORT_BLOCKED") ? (
           <p className="text-status-blocking text-sm">
-            {journalErrorText(t, run.error, t("office.api.load_error"))}
+            {journalErrorText(t, run.error, t("office.journals.action_error"))}
           </p>
         ) : check.isError ? (
           <p className="text-status-blocking text-sm">
-            {journalErrorText(t, check.error, t("office.api.load_error"))}
+            {journalErrorText(
+              t,
+              check.error,
+              t("office.journals.action_error"),
+            )}
           </p>
         ) : null}
         {run.data ? (
@@ -949,7 +957,7 @@ function SendToAgent({
           {journalErrorText(
             t,
             requestTransfer.error,
-            t("office.api.load_error"),
+            t("office.journals.action_error"),
           )}
         </span>
       ) : null}
@@ -1383,7 +1391,11 @@ function JournalsInner() {
       >
         {actionError ? (
           <p className="text-status-blocking px-4 pt-3 text-sm">
-            {journalErrorText(t, actionError, t("office.api.load_error"))}
+            {journalErrorText(
+              t,
+              actionError,
+              t("office.journals.action_error"),
+            )}
           </p>
         ) : null}
         {drafts.isLoading ? (

@@ -1,10 +1,11 @@
 import type { components } from "@/generated/api";
 import { tenantRequest } from "@/lib/api/tenant-request";
 
-export type ManualLinkKind = "invoice" | "bank_transaction";
+export type ManualLinkKind = "invoice" | "bank_transaction" | "customer";
 type OfficeInvoicePage = components["schemas"]["OfficeInvoicePage"];
 type BankTransactionPage = components["schemas"]["BankTransactionPage"];
 type ManualLink = components["schemas"]["JournalDraftManualLink"];
+type CustomerCandidate = components["schemas"]["JournalLinkCustomerCandidate"];
 
 /** Bağlanabilecek kayıt: fişin dönemindeki fatura ya da banka hareketi. */
 export type LinkCandidate = {
@@ -14,6 +15,8 @@ export type LinkCandidate = {
   currency: string;
   label: string;
   detail: string;
+  /** Cari kartının türü (customer, supplier, both); yalnız cari için. */
+  cardType?: string;
 };
 
 const eng = (engagement: string) =>
@@ -21,6 +24,7 @@ const eng = (engagement: string) =>
 const segment: Record<ManualLinkKind, string> = {
   invoice: "invoices",
   bank_transaction: "bank-transactions",
+  customer: "customers",
 };
 
 /** Fişe elle kayıt bağlama (#710). */
@@ -45,6 +49,22 @@ export const journalLinksService = {
     kind: ManualLinkKind,
     period: string,
   ): Promise<LinkCandidate[]> {
+    if (kind === "customer") {
+      const page = await tenantRequest<{ items: CustomerCandidate[] }>(
+        slug,
+        "GET",
+        `${eng(engagement)}/link-candidates/customers`,
+      );
+      return page.items.map((c) => ({
+        uuid: c.uuid,
+        date: "",
+        amount: "",
+        currency: "TRY",
+        label: c.name,
+        detail: "",
+        cardType: c.type,
+      }));
+    }
     if (kind === "invoice") {
       const page = await tenantRequest<OfficeInvoicePage>(
         slug,
