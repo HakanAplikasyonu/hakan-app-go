@@ -179,17 +179,17 @@ func (h *Handler) PutTracking(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	org := orgctx.Must(r.Context()).ID
-	watch := true
+	var watchOn bool
 	if in.WatchEnabled != nil {
-		watch = *in.WatchEnabled
+		watchOn = *in.WatchEnabled
 	} else if cur, err := h.svc.Tracking(r.Context(), org); err == nil {
-		watch = cur.WatchEnabled
+		watchOn = cur.WatchEnabled
 	} else {
 		writeError(w, r, err)
 		return
 	}
 	st, err := h.svc.SaveTracking(r.Context(), org, userID(r),
-		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watch})
+		usecase.TrackingSettings{ReportEnabled: *in.ReportEnabled, ReportDay: *in.ReportDay, WatchEnabled: watchOn})
 	if err != nil {
 		writeError(w, r, err)
 		return
